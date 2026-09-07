@@ -65,6 +65,10 @@ class PipeLibraryAbstract(ABC):
         pass
 
     @abstractmethod
+    def get_own_pipes(self) -> list[PipeAbstract]:
+        """The library's own pipes, without the aliased entries its dependency packages contributed."""
+
+    @abstractmethod
     def get_pipes_dict(self) -> dict[str, PipeAbstract]:
         pass
 

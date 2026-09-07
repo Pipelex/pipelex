@@ -47,6 +47,7 @@ from pipelex.cli.dev_cli.commands.projection_reference import (
     project_inputs_template,
 )
 from pipelex.cli.error_handlers import ErrorContext
+from pipelex.core.pipes.pipe_io_artifacts import render_pipe_io_artifact_files
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -63,9 +64,9 @@ from pipelex.pipe_machinery.rendering.input_renderer import (
     serialize_inputs_template_to_toml,
 )
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor, build_input_form, build_output_form
-from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
+from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_console
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -73,9 +74,6 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
 
-INPUT_FORM_FILE_NAME = "input_form.json"
-OUTPUT_FORM_FILE_NAME = "output_form.json"
-PIPE_IO_CONTRACTS_FILE_NAME = "pipe_io_contracts.json"
 TEMPLATES_DIR_NAME = "inputs_template"
 ENGINE_DIR_NAME = "engine"
 MANIFEST_FILE_NAME = "manifest.json"
@@ -612,21 +610,12 @@ async def generate_projection_corpus(*, bundle_paths: list[Path], output_dir: Pa
         result = await validate_bundle(mthds_contents=mthds_contents, mthds_sources=mthds_sources)
         validation_library_id = get_current_library_id_or_none()
 
-        input_form = build_input_form(result.pipes)
-        _write_json(
-            path=output_dir / INPUT_FORM_FILE_NAME,
-            payload={pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in input_form.items()},
-        )
-        output_form = build_output_form(result.pipes)
-        _write_json(
-            path=output_dir / OUTPUT_FORM_FILE_NAME,
-            payload={pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in output_form.items()},
-        )
-        io_contracts = build_pipe_io_contracts(result.pipes)
-        _write_json(
-            path=output_dir / PIPE_IO_CONTRACTS_FILE_NAME,
-            payload={pipe_ref: contract.model_dump(mode="json") for pipe_ref, contract in io_contracts.items()},
-        )
+        # The three artifacts through the same builder and the same rendering a run's results
+        # directory uses, so the committed corpus and a results directory hold byte-identical files.
+        artifacts = build_pipe_io_artifacts(result.pipes)
+        for file_name, text in render_pipe_io_artifact_files(artifacts).items():
+            _write_text(path=output_dir / file_name, content=text)
+        input_form = artifacts.input_form
         for pipe in result.pipes:
             _capture_pipe(
                 pipe=pipe,

@@ -24,6 +24,7 @@ from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
+from pipelex.cli.version_report import version_report_lines
 from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -104,10 +105,10 @@ app = typer.Typer(
 
 
 def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes Option callbacks positionally
-    """Print version and exit when --version is passed."""
+    """Print the version handshake and exit when --version is passed."""
     if value:
-        package_version = get_package_version()
-        typer.echo(f"pipelex {package_version}")
+        for line in version_report_lines(program_name="pipelex"):
+            typer.echo(line)
         raise typer.Exit
 
 

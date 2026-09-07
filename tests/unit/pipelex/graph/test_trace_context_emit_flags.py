@@ -23,6 +23,7 @@ class TestTraceContextEmitFlags:
         context = TraceContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF)
         assert context.emit_graph_events is True
         assert context.emit_usage_events is True
+        assert context.describe_pipe_io is True
 
     def test_copy_for_child_preserves_costs_only_flags(self) -> None:
         """costs-only flags survive into a child context (graph off, costs on)."""
@@ -49,3 +50,9 @@ class TestTraceContextEmitFlags:
         child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=2)
         assert child.emit_graph_events is True
         assert child.emit_usage_events is False
+
+    def test_copy_for_child_preserves_describe_pipe_io_off(self) -> None:
+        """A run that will write no graphspec keeps its I/O description off in every child context."""
+        parent = TraceContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, describe_pipe_io=False)
+        child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=1)
+        assert child.describe_pipe_io is False

@@ -29,10 +29,10 @@ from pipelex.interpreter_hub import clear_current_library, get_current_library_i
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipeline.advisory_warnings import build_advisory_warnings
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs, select_primary_blueprint
+from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
-from pipelex.pipeline.input_form import InputForm, OutputForm, build_input_form, build_output_form, qualify_current_library_crate
+from pipelex.pipeline.input_form import qualify_current_library_crate
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
-from pipelex.pipeline.pipe_io_contracts import PipeIOContracts, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 
@@ -106,19 +106,17 @@ async def validate_bundles_in_process(
         # current — the graph arm and the finally must target the SAME library even if
         # something inside the window later moves the contextvar.
         validation_library_id = get_current_library_id_or_none()
-        pipe_io_contracts: PipeIOContracts = build_pipe_io_contracts(result.pipes)
         # One crate qualification per validate pass — the descriptors and the hint lint read the same one.
         qualified_crate = qualify_current_library_crate()
-        input_form: InputForm = build_input_form(result.pipes, qualified_crate=qualified_crate)
-        # The output half, off the same qualification and the same pipe order — all three
-        # artifacts share one key set because all three iterate `result.pipes`.
-        output_form: OutputForm = build_output_form(result.pipes, qualified_crate=qualified_crate)
+        # The three I/O artifacts come from the one builder a run uses too, so a validate report and
+        # a run's results directory cannot drift on how they are derived.
+        artifacts = build_pipe_io_artifacts(result.pipes, qualified_crate=qualified_crate)
         # One taint walk per validate pass — both report projections read the same analyses.
         taint_analyses = collect_controller_taint_analyses(result.pipes)
         liftable_pipes: list[LiftablePipeEntry] = build_liftable_pipes(taint_analyses)
         warnings: list[ValidationErrorItem] = build_advisory_warnings(
             taint_analyses=taint_analyses,
-            input_form=input_form,
+            input_form=artifacts.input_form,
             entry_pipe_refs=collect_entry_pipe_refs(result.blueprints),
             qualified_crate=qualified_crate,
         )
@@ -152,9 +150,9 @@ async def validate_bundles_in_process(
                 )
     return build_validation_report(
         blueprints=result.blueprints,
-        pipe_io_contracts=pipe_io_contracts,
-        input_form=input_form,
-        output_form=output_form,
+        pipe_io_contracts=artifacts.pipe_io_contracts,
+        input_form=artifacts.input_form,
+        output_form=artifacts.output_form,
         liftable_pipes=liftable_pipes,
         dry_run_result=result.dry_run_result,
         pending_signatures=result.pending_signatures,

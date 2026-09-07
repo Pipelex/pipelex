@@ -181,6 +181,11 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         return list(self.root.values())
 
     @override
+    def get_own_pipes(self) -> list[PipeAbstract]:
+        # A dependency's pipe is keyed `alias->domain.code` (see `add_dependency_pipe`); the host's are keyed by bare `pipe_ref`.
+        return [pipe for key, pipe in self.root.items() if not QualifiedRef.has_cross_package_prefix(key)]
+
+    @override
     def get_pipes_dict(self) -> dict[str, PipeAbstract]:
         return self.root
 

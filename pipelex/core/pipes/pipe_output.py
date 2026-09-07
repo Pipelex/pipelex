@@ -4,6 +4,7 @@ from mthds.protocol.pipe_output import PipeOutputAbstract
 from pydantic import Field, PrivateAttr
 
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -26,6 +27,12 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     graph_spec: GraphSpec | None = None
     graph_assembly_error: str | None = None
+    # The I/O artifacts describing the graph's data (`pipe_io_contracts`, `input_form`, `output_form`),
+    # built inside the run's library window over the whole run library and carried beside the graph:
+    # every writer that serializes graph_spec to graphspec.json writes them as three sibling files.
+    # None when graph tracing was off; None with pipe_io_artifacts_error set when the build failed.
+    pipe_io_artifacts: PipeIOArtifacts | None = None
+    pipe_io_artifacts_error: str | None = None
     # Token usage assembled from the trace-event stream at the end of the run (mirrors graph_spec):
     # the submitter renders the cost report from this field. None when cost reporting was off or the run
     # emitted no trace events at all; an empty list when on with events present but no inference happened.

@@ -64,6 +64,7 @@ def serialize_completed_output(
 
     graph_spec_dump = pipe_output.graph_spec.model_dump(mode="json") if pipe_output.graph_spec is not None else None
     tokens_usages_dump = [usage.model_dump(mode="json") for usage in pipe_output.tokens_usages] if pipe_output.tokens_usages is not None else None
+    pipe_io_artifacts_dump = pipe_output.pipe_io_artifacts.model_dump(mode="json") if pipe_output.pipe_io_artifacts is not None else None
 
     return PipelexPipeRunOutput(
         output_dict=output_dict,
@@ -74,6 +75,8 @@ def serialize_completed_output(
         graph_assembly_error=pipe_output.graph_assembly_error,
         tokens_usages_dump=tokens_usages_dump,
         usage_assembly_error=pipe_output.usage_assembly_error,
+        pipe_io_artifacts_dump=pipe_io_artifacts_dump,
+        pipe_io_artifacts_error=pipe_output.pipe_io_artifacts_error,
     )
 
 
