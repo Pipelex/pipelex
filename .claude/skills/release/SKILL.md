@@ -29,7 +29,7 @@ pip index versions pipelex                                          # the regist
 git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 ```
 
-`gh release view vX.Y.Z` confirms the Release and its notes. A publish that failed *after* the merge is recoverable only by hand: re-running the run replays the workflow file it started with, so use `workflow_dispatch`, which accepts `main`, `release/vX.Y.Z` and `pre-release/v*` and nothing else. The Release step is idempotent — it edits an existing release rather than failing on it.
+`gh release view vX.Y.Z` confirms the Release and its notes. A publish that failed *after* the merge is recovered by re-running that run's **failed jobs**, which keeps the successful ones. Once the dists have reached PyPI that is the only path: the publish job sets no `skip-existing`, so a fresh run fails on the files already there and never reaches the `github-release` job that depends on it. The Release step itself is idempotent — it edits an existing release rather than failing on one. Reserve `workflow_dispatch` for a failure that needs the workflow file changed, since a re-run replays the file the run started with; it accepts `main`, `release/vX.Y.Z` and `pre-release/v*` and nothing else, and its run lists under the ref it was dispatched from rather than under the release branch.
 
 ## Version files and the lock
 
@@ -42,7 +42,7 @@ git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 
 ## Gates
 
-1. **`make agent-check`** — format, lint, pyright, mypy, plus the migration-ledger legality check, the keyword-only convention, the hub-layering check and the drift contracts. It **rewrites files** (`fix-unused-imports`, `fix-keyword-only`, `format`), so whatever it touched joins the release commit. Red blocks the release: fix the errors, never skip the target.
+1. **`make agent-check`** — format, lint, pyright, mypy, plus the migration-ledger legality check, the keyword-only convention, the hub-layering check and the drift contracts. It **rewrites files** (`fix-unused-imports`, `fix-keyword-only`, `format`), so whatever it touched joins the release commit — and its `drift-check` reads the git index, so a rewrite made in the same run is invisible to it: stage what the fixers changed and run the target again, because CI reads the committed tree. Red blocks the release: fix the errors, never skip the target.
 2. **`make check-migration-schemas`** — the schema-coverage gate, which `make agent-check` does **not** run (it is a golden check and lives in `make check`), so without this step a moved configuration surface reaches a release with no migration to repair a user's file. Red blocks the release, and the cure is the **`add-migration`** skill: it derives the entry from the fingerprint diff the gate just printed, bumps the surface's schema version, regenerates the goldens and adds the changelog bullet. Then re-run the gate. Never run `make up-migration-schemas` to make it quiet — a green gate over an unaccounted removal is precisely the failure the gate exists to prevent.
 3. **The ledger-against-changelog cross-check**, once the gate is green. Diff the ledgers against the tag of the version the pre-flight read — the previous release. `origin/main` is not a safe baseline, and from `main` itself that diff is empty:
 
@@ -50,7 +50,7 @@ git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
    git diff v<current version> -- pipelex/migration/ledgers/
    ```
 
-   The migration ledger and the changelog are deliberately separate artifacts saying the same thing to different readers, and this is the only place they are checked against each other. For every entry new since that release carrying `breaking = true`, confirm the changelog has a matching `**Migration:**` bullet naming the entry id and what a user has to do — house style is a bold label, then two to four complete sentences. Write it now if it is missing.
+   The migration ledger and the changelog are deliberately separate artifacts saying the same thing to different readers, and this is the only place they are checked against each other. For every entry new since that release carrying `breaking = true`, confirm the changelog has a matching `**Migration:**` bullet naming the entry id and what a user has to do — house style is a bold label, then two to four complete sentences. Write it now if it is missing; the gates run before the entry is assembled, so at this point that content is what `[Unreleased]` holds.
 
    - **A renumbered entry reads as two ids, and both need a mention.** A pre-history entry inserted below existing ones takes a version already in use and pushes everything above it up, so the diff shows one id modified and one added — which looks like two independent breaking changes and is one insertion. The changelog must name the new entry *and* say that the existing one was renumbered, so a reader who quoted the old id somewhere can still find it.
    - **Confirm `introduced_in` on every such entry.** It is written when the entry is authored, before the release number is known, so it is routinely one bump off. Nothing branches on it, but it is what a reader correlates the changelog against: fix it here rather than leaving it wrong.
@@ -66,8 +66,8 @@ git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 
 The checks that exist for the release:
 
-- **`guard-branches.yml`** (`gate-main`) — refuses any head branch into `main` that is not `release/vX.Y.Z` exactly. This is what makes the two checks below unavoidable.
-- **`version-check.yml`** — `pyproject.toml`'s version equals the version in the branch name. It exits 0 and skips itself when the head is not a `release/vX.Y.Z` branch, so on its own it is no gate at all; the branch guard is.
+- **`guard-branches.yml`** (`gate-main`) — refuses any head branch into `main` that is not `release/vX.Y.Z` exactly, so the release branch name is the only way in.
+- **`version-check.yml`** — `pyproject.toml`'s version equals the version in the branch name. A head that does not match the release form does not slip past it: the `exit 0` in its first step ends that step alone, and the comparison that follows then fails on an empty branch version.
 - **`changelog-check.yml`** — `CHANGELOG.md` carries `## [vX.Y.Z] - ` for the version in `pyproject.toml`. It asserts nothing about `[Unreleased]`: a leftover heading passes CI and ships a wrong changelog, so removing it is this skill's job, not CI's.
 - **`check-test-count-badge.yml`** — `make check-test-badge` on every pull request to `main`.
 - **`package-check.yml`** (`uv-lock-check`, on every pull request) — `uv lock --locked` leaves `uv.lock` unchanged, and `requires-python` still starts at `>=3.11`.
@@ -77,13 +77,12 @@ The pre-main gates a release pull request meets that a pull request to `dev` nev
 - **`lint-fresh-check.yml`** — the read-only lint suite across every supported Python version with no mypy cache, so incremental-mypy drift and version-specific breakage cannot reach `main`.
 - **`tests-full-check.yml`** — the full Python matrix, sharded and balanced by `.test_durations`.
 - **`doc-check.yml`** — `mkdocs build --strict`, which runs unconditionally when the base is `main` rather than only when `docs/` changed.
-- **`dependency-review.yml`** — fails on a newly introduced dependency vulnerable at moderate severity or above.
 
-Everything that runs on every pull request gates it too, including `lint-check.yml`'s `Lint (agent-rules)` job (`make check-rules`, which `make agent-check` does not run), `tests-check.yml` and `mthds-standard-check.yml`. A red in `mthds-standard-check.yml` with no pinned-set change in the branch means the MTHDS standard moved, and the remedy is a dedicated change bringing the pinned natives to the standard's page — never a tweak to the release branch.
+Everything that runs on every pull request gates it too, including `lint-check.yml`'s `Lint (agent-rules)` and `Lint (config-sync)` jobs (`make check-rules` and `make check-config-sync`, neither of which `make agent-check` runs), `tests-check.yml`, `mthds-standard-check.yml`, and `dependency-review.yml`, which fails on a newly introduced dependency vulnerable at moderate severity or above and runs on pull requests to `dev` just the same. A red in `mthds-standard-check.yml` with no pinned-set change in the branch means the MTHDS standard moved, and the remedy is a dedicated change bringing the pinned natives to the standard's page — never a tweak to the release branch.
 
 ## Particulars
 
 - **The migration gate feeds back into the bump.** A breaking entry found by the cross-check above turns a patch into a minor, so the bump is not final until that gate has run.
-- **The pre-release track is a different flow, not this play.** `pre-release/vX.Y.Z(a|b|rc)N` is a *base* branch that work merges into: `prerelease-version-check.yml` validates the PEP 440 form against the branch name, `publish-pypi.yml` also fires on a merge into it and marks the GitHub Release a pre-release, and `deploy-docs.yml` publishes those docs under the `pre-release` alias. A `release/vX.Y.Z` branch therefore never carries a pre-release version: `version-check.yml` would skip a non-matching head, and `guard-branches.yml` would refuse it into `main` anyway.
+- **The pre-release track is a different flow, not this play.** `pre-release/vX.Y.Z(a|b|rc)N` is a *base* branch that work merges into: `prerelease-version-check.yml` validates the PEP 440 form against the branch name, `publish-pypi.yml` also fires on a merge into it and marks the GitHub Release a pre-release, and `deploy-docs.yml` fires on the push to it as well — though its pre-release branch calls `make docs-deploy-specific-version`, a name with no recipe behind it (the recipe is `docs-deploy-specific-version-pre-release`), so that step succeeds and publishes nothing. A `release/vX.Y.Z` branch therefore never carries a pre-release version: `version-check.yml` fails on the mismatch with the branch name, and `guard-branches.yml` refuses a `release/vX.Y.Z(a|b|rc)N` head into `main` outright.
 - **The changelog heading carries the `v`** — `## [vX.Y.Z] - YYYY-MM-DD`, which is exactly what `changelog-check.yml` greps for and what `publish-pypi.yml` slices the GitHub Release notes out of. No `[Unreleased]` heading is left behind; the next change re-creates one.
 - **`.worktreeinclude` names the gitignored files a fresh worktree needs** — `.env`, the `.pipelex/` overrides and `.pipelex-dev/test_profiles_override.toml` — and `wt add` provisions them. A gate that fails in `_pipelex--release` on a missing local config means that file is short: add it there rather than hand-copying the file every release.
