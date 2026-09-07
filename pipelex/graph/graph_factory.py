@@ -204,10 +204,12 @@ def save_graph_outputs_to_dir(
             file_path.write_text(text, encoding="utf-8")
             saved_files[output_key] = file_path
             log.verbose(f"{file_name} saved to: {file_path}")
-        elif graph_outputs.graphspec_json is not None:
+        elif graph_outputs.graphspec_json is not None and file_path.exists():
             # A written graphspec owns the companions beside it: one left by an earlier run in a reused
-            # directory would describe this graph's data with another method's declarations.
-            file_path.unlink(missing_ok=True)
+            # directory would describe this graph's data with another method's declarations. Said out
+            # loud, because the agent CLI's directory is the user's own bundle directory.
+            file_path.unlink()
+            log.warning(f"Removed {file_name} at {file_path}: the graphspec written beside it carries no I/O artifacts of its own")
 
     if graph_outputs.mermaidflow_mmd is not None:
         file_path = output_dir / "mermaidflow.mmd"

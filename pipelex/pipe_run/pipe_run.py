@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -130,15 +129,16 @@ class PipeRun(PipeRunProtocol):
         which writes the artifacts beside the graphspec. The scope is the library's own pipes, as
         validate's is: a dependency package's pipes are keyed by alias in the library but by bare
         `pipe_ref` in the artifacts, where they would collide with the host's, and the host's crate
-        holds no blueprint of theirs to describe them from. Best-effort like the graph assembly: a
-        failure of the builders' own — a contract that will not render, a crate that will not
-        normalize, a protocol model that will not validate — is reported on
-        `pipe_io_artifacts_error` and never fails a run that succeeded; anything else is a bug and
-        surfaces.
+        holds no blueprint of theirs to describe them from. Best-effort like the graph assembly, and
+        blind on purpose: this runs in the `finally` ahead of the delivery, so an exception that
+        escaped here would replace the run's own outcome and skip the delivery of a run that
+        completed. Whatever the builders raise — a contract that will not render, a crate that
+        will not normalize, a protocol model that will not validate, or a bug of their own — is
+        reported on `pipe_io_artifacts_error` and the run keeps its result.
         """
         try:
             pipe_output.pipe_io_artifacts = build_pipe_io_artifacts(get_own_pipes())
-        except (PipelexError, ValidationError) as build_error:
+        except Exception as build_error:  # ruff: ignore[blind-except]
             message = f"Failed to build the I/O artifacts for pipeline_run_id={pipeline_run_id}: {build_error}"
             log.warning(message)
             pipe_output.pipe_io_artifacts_error = message

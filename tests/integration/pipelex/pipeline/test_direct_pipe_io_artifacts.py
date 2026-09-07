@@ -127,13 +127,19 @@ class TestDirectPipeIOArtifacts:
         assert pipe_output.pipe_io_artifacts_error is None
         builder.assert_not_called()
 
-    async def test_an_unexpected_builder_error_fails_the_run(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
-        """Only the builders' own failures are reported on the output; a programming error surfaces."""
+    async def test_an_unexpected_builder_error_is_reported_and_the_run_succeeds(
+        self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture
+    ) -> None:
+        """A bug in the builders is reported like their own failures: the build runs in the `finally` ahead of the delivery and must never escape."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_artifacts_bug")))
         mocker.patch("pipelex.pipe_run.pipe_run.build_pipe_io_artifacts", side_effect=TypeError("a bug in the builder"))
 
-        with pytest.raises(TypeError, match="a bug in the builder"):
-            await self._run(_config(generate_graph=True))
+        pipe_output = await self._run(_config(generate_graph=True))
+
+        assert pipe_output.graph_spec is not None
+        assert pipe_output.pipe_io_artifacts is None
+        assert pipe_output.pipe_io_artifacts_error is not None
+        assert "a bug in the builder" in pipe_output.pipe_io_artifacts_error
 
     async def test_validate_does_not_build_the_artifacts_a_second_time(self, mocker: MockerFixture) -> None:
         """Validate builds the artifacts once, for its report; its graph dry run must not build a set it throws away."""

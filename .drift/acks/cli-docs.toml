@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:5beb005d90ecebe6f3d8b17156025af1c252c8430132630340c60fda3c01ad7e"
+digest = "sha256:7e55677c7b9478aa63196079905ef3df321fdba98eb27592d9fe7754e03f2a50"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-07T11:22:39Z"
-rationale = "Both run cores now pass pipe_output.pipe_io_artifacts to generate_graph_outputs, and the agent CLI adds the three companion paths (pipe_io_contracts, input_form, output_form) to the graph_files side-effect map. Reviewed docs/tools/cli/: run.md gained a results-directory section naming the three siblings beside graphspec.json and their graphspec_json gate; agent-cli.md's Graph Visualization section now describes the files a run writes beside its bundle, the live-run rename of the graphspec and the canonical names of its companions, and the graph_files keys. Reviewed pipelex/cli/agent_cli/CLAUDE.md: the run contract line now names the graph_files keys and the directory-not-name resolution a viewer relies on. Every other option list in docs/tools/cli/ is unchanged because no flag changed."
+reviewed_at = "2026-09-07T13:48:53Z"
+rationale = "The agent CLI now applies its graphs-inclusion override (graphspec on, viewer on, mermaid off) before the run instead of at render time, so the graphspec's companions are built in the run window whatever graphspec_json the user configured. Reviewed docs/tools/cli/agent-cli.md: the Graph Visualization section describes the files a run writes and named no inclusion flag, so it stays true. Updated pipelex/cli/agent_cli/CLAUDE.md: the run contract line now says the inclusion is settled before the run rather than that the companions follow the flag. No flag or option changed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -39,7 +39,7 @@ rationale = "Both run cores now pass pipe_output.pipe_io_artifacts to generate_g
 "pipelex/cli/agent_cli/commands/plxt_passthrough.py" = "blob:a1c530d110482485ce462f199b9e79fac29f8896"
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:40ed1700e0d5e86d7696eadd7f9887baeb8059f6"
-"pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:a21dd16134353863d852d378774530972f264c3b"
+"pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:aeb90b4b2149fc6c977adaf1d9f535549cb34068"
 "pipelex/cli/agent_cli/commands/run/_run_core_api.py" = "blob:78a27e0ba91e6bbf99c11caedb29ad4cf20ac78b"
 "pipelex/cli/agent_cli/commands/run/app.py" = "blob:64b2ecc02007cda11b526d8d3fc139593875dd9d"
 "pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:daf6207146c0ea41fe34bb272ed51350208af790"

@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.pipes.pipe_io_artifacts import (
     INPUT_FORM_FILE_NAME,
@@ -269,19 +270,44 @@ class TestGraphspecCompanions:
         assert set(saved) == {"graphspec_json"}
         assert {path.name for path in tmp_path.iterdir()} == {"graphspec.json"}
 
-    async def test_a_graphspec_without_artifacts_removes_the_previous_companions(self, tmp_path: Path) -> None:
-        """A reused directory must not pair a new graphspec with an older run's description."""
+    async def test_a_graphspec_without_artifacts_removes_the_previous_companions(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A reused directory must not pair a new graphspec with an older run's description, and each removal is said out loud."""
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        warning_spy = mocker.spy(pipelex_log, "warning")
         graph_spec = _make_sequence_graphspec()
         config = _with_inclusion(GraphsInclusionConfig(graphspec_json=True, mermaidflow_mmd=False, mermaidflow_html=False, reactflow_html=False))
         first = await generate_graph_outputs(graph_spec=graph_spec, graph_config=config, pipe_io_artifacts=make_pipe_io_artifacts())
         save_graph_outputs_to_dir(graph_outputs=first, output_dir=tmp_path)
         assert (tmp_path / INPUT_FORM_FILE_NAME).is_file()
+        assert not warning_spy.call_args_list
 
         second = await generate_graph_outputs(graph_spec=graph_spec, graph_config=config)
         saved = save_graph_outputs_to_dir(graph_outputs=second, output_dir=tmp_path)
 
         assert set(saved) == {"graphspec_json"}
         assert {path.name for path in tmp_path.iterdir()} == {"graphspec.json"}
+        removed = [str(call.args[0]) for call in warning_spy.call_args_list if "Removed" in str(call.args[0])]
+        assert {
+            name for name in (PIPE_IO_CONTRACTS_FILE_NAME, INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME) if any(name in msg for msg in removed)
+        } == {
+            PIPE_IO_CONTRACTS_FILE_NAME,
+            INPUT_FORM_FILE_NAME,
+            OUTPUT_FORM_FILE_NAME,
+        }
+
+    async def test_a_fresh_directory_removes_nothing_and_says_nothing(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The removal warning names a file that was there: a directory with no companions gets no warning."""
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        warning_spy = mocker.spy(pipelex_log, "warning")
+        graph_spec = _make_sequence_graphspec()
+        config = _with_inclusion(GraphsInclusionConfig(graphspec_json=True, mermaidflow_mmd=False, mermaidflow_html=False, reactflow_html=False))
+        outputs = await generate_graph_outputs(graph_spec=graph_spec, graph_config=config)
+
+        save_graph_outputs_to_dir(graph_outputs=outputs, output_dir=tmp_path)
+
+        assert not [call for call in warning_spy.call_args_list if "Removed" in str(call.args[0])]
 
     async def test_no_graphspec_leaves_the_directory_alone(self, tmp_path: Path) -> None:
         """Only a written graphspec owns the companions beside it: a mermaid-only run touches nothing else."""
