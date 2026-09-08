@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260907-817d80
 ---
 
@@ -58,8 +58,8 @@ Reached on 2026-09-07. `make agent-check` is green. Decisions beyond the design:
 
 ## Phase 5 — Landing and the downstream chain
 
-- [ ] `/rev` at the derived profile before the pull request; the PR body carries `Closes L-260907-817d80`.
-- [ ] After the merge, `/ledger-land`; the release that carries the change is what unblocks the downstream items filed in Phase 0, and the `pipelex-server` pin bump is the moment the Temporal twin lands — until then a hosted run writes `graphspec.json` without its siblings, and the platform relays nothing new.
+- [x] `/rev` at the derived profile before the pull request; the PR body carries `Closes L-260907-817d80`. Two rounds ran, at profile 4 then profile 5; what they did not fix is recorded under "Deferred from the review rounds" below.
+- [x] After the merge, `/ledger-land`; the release that carries the change is what unblocks the downstream items filed in Phase 0, and the `pipelex-server` pin bump is the moment the Temporal twin lands — until then a hosted run writes `graphspec.json` without its siblings, and the platform relays nothing new. Landed as `pipelex` PR #1195, squash-merged to `dev` as `0c3dd3a34f31572389ac6ef87322db99c4c3356d` with every check green; `L-260907-817d80` closed on that evidence, and the eight items it held are released.
 - [ ] `vscode-pipelex` L-260906-e9ab24 verifies end to end against a real `pipelex run` results directory once the release is installable.
 
 ## Deferred from the review rounds
@@ -84,4 +84,6 @@ Round 2 fixed three things and deferred the rest: the agent CLI now settles its 
 
 ## Live state
 
-Decisions taken so far are in the design's "Decision" and "Questions settled at ratification" sections. Phases 0 to 4 are implemented in the worktree on `feature/Run-artifacts-beside-graphspec`, from `pipelex` `dev` as of the commit that added the compact Commands rules; Checkpoint 1 below records the state at the end of Phase 4, and the review rounds that followed narrowed the build to the library's own pipes, gated it on `graphspec_json` through `describe_pipe_io` on the trace context (which the agent CLI now settles before the run), made a written graphspec remove stale companions with a warning, and restored the blind catch around the build. What remains is Phase 5.
+Decisions taken so far are in the design's "Decision" and "Questions settled at ratification" sections. Phases 0 to 4 landed in `pipelex` `dev` as `0c3dd3a34f31572389ac6ef87322db99c4c3356d` (PR #1195); Checkpoint 1 below records the state at the end of Phase 4, and the review rounds that followed narrowed the build to the library's own pipes, gated it on `graphspec_json` through `describe_pipe_io` on the trace context (which the agent CLI now settles before the run), made a written graphspec remove stale companions with a warning, and restored the blind catch around the build.
+
+What is left is not this repo's to do. The change is on `dev` and not yet on `main`, so nothing is published — PyPI's latest `pipelex` is 0.56.0, cut before this merge, and no release item is open to carry the next one. Every downstream item filed in Phase 0 — the `pipelex-api` rehydration, the two `pipelex-server` halves, the two SDKs, the app, the MCP views, the workspace spec, and `vscode-pipelex`'s end-to-end verification — needs the published artifact rather than this merge, so the release is the real prerequisite. Filing that release item, and whether those items should be wired `blocked_by` it, is a call for a person rather than for the landing.
