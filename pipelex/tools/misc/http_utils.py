@@ -2,7 +2,6 @@ from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.urls import URLs
 
 URL_MAX_LENGTH = 2048
 
@@ -28,9 +27,14 @@ def validate_http_url_syntax(*, url: str) -> None:
 
 
 def get_user_agent() -> str:
+    """The User-Agent pipelex sends when it fetches a resource on a user's behalf: ``Pipelex/<version>``.
+
+    Product and version only, the shape a browser or an SDK sends. The crawler convention of a
+    URL in parentheses is what bot walls key on: the same host that serves ``Pipelex/0.57.0``
+    in under a second stalls ``Pipelex/0.57.0 (https://pipelex.com)`` until the timeout.
+    """
     version = get_package_version()
-    homepage_url = URLs.homepage
-    return f"Pipelex/{version} ({homepage_url})"
+    return f"Pipelex/{version}"
 
 
 def validate_url_resource_exists(url: str) -> None:

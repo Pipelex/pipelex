@@ -1,7 +1,7 @@
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.tools.misc.http_utils import validate_http_url_syntax, validate_url_resource_exists
+from pipelex.tools.misc.http_utils import get_user_agent, validate_http_url_syntax, validate_url_resource_exists
 
 
 class TestValidateUrlResourceExists:
@@ -67,3 +67,10 @@ class TestValidateUrlResourceExists:
     def test_malformed_http_url_syntax_raises(self, url: str) -> None:
         with pytest.raises(ValueError, match="not a valid http\\(s\\) URL"):
             validate_http_url_syntax(url=url)
+
+    def test_user_agent_is_product_and_version_only(self) -> None:
+        """No URL in parentheses: that crawler signature is what bot walls stall on."""
+        user_agent = get_user_agent()
+        assert user_agent.startswith("Pipelex/")
+        assert "(" not in user_agent
+        assert "http" not in user_agent
