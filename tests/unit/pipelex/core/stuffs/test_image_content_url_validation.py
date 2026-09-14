@@ -17,8 +17,8 @@ class TestImageContentUrlValidation:
     def test_validate_resources_remote_url_is_not_probed(self, mocker: MockerFixture) -> None:
         """validate_resources() makes no HTTP request for a remote URL: the downstream extractor is the source of truth."""
         mock_head = mocker.patch("httpx.head")
-        doc = ImageContent(url="https://this-domain-cannot-exist.invalid/file.png")
-        doc.validate_resources()
+        img = ImageContent(url="https://this-domain-cannot-exist.invalid/image.png")
+        img.validate_resources()
         mock_head.assert_not_called()
 
     def test_validate_resources_nonexistent_local_file(self) -> None:
