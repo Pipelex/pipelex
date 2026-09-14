@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **The input pre-check no longer probes remote URLs**: before a pipe ran, a `Document` or `Image` input carrying an http(s) URL was probed with a blocking HEAD request whose outcome only ever produced a log line. On the hosted runner that pre-check is workflow code, so a host that stalls the request tripped Temporal's deadlock detector, the workflow task was retried until the execution timeout, and the run ended `TIMED_OUT` with no error. Remote URLs now pass straight through to the operator, which fetches the resource inside its activity and reports a real failure; a local file path is still required to exist.
+
 ## [v0.57.0] - 2026-09-07
 
 ### Added

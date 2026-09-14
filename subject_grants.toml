@@ -6448,10 +6448,6 @@ rationale = "Transforms the string; single operand."
 param = "data"
 rationale = "Transforms the data; single operand."
 
-["pipelex/tools/misc/http_utils.py::_validate_http_url"]
-param = "url"
-rationale = "Validates/checks the url; single operand."
-
 ["pipelex/tools/misc/http_utils.py::_validate_local_path"]
 param = "url"
 rationale = "Validates/checks the url; single operand."
