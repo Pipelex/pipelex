@@ -546,7 +546,7 @@ uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,link
 
 ## License
 
-This project is licensed under the Elastic License 2.0 (ELv2); see [LICENSE](LICENSE). Runtime dependencies are distributed under their own licenses via PyPI.
+This project is licensed under the Elastic License 2.0 (ELv2); see [LICENSE](LICENSE) for the terms, and the [license page](https://docs.pipelex.com/latest/license/) for how Pipelex reads them. Runtime dependencies are distributed under their own licenses via PyPI.
 
 ---
 

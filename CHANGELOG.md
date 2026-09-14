@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **License (Breaking)**: `pipelex` is now licensed under the Elastic License 2.0 (ELv2) instead of MIT, and the package metadata declares the SPDX expression `Elastic-2.0` in place of the MIT license classifier, which makes hatchling 1.27 or later a requirement for building from source. ELv2 is source-available: its main limitation is that the software may not be provided to third parties as a hosted or managed service giving users access to a substantial set of its features, and `LICENSE` carries the full terms, including its conditions on notices and redistribution. Every earlier version, up to and including v0.57.0, stays under MIT.
+- **License (Breaking)**: `pipelex` is now licensed under the Elastic License 2.0 (ELv2) instead of MIT, and the package metadata declares the SPDX expression `Elastic-2.0` in place of the MIT license classifier, which makes hatchling 1.27 or later a requirement for building from source. ELv2 is source-available: its main limitation is that the software may not be provided to third parties as a hosted or managed service giving users access to a substantial set of its features, and `LICENSE` carries the full terms, including its conditions on notices and redistribution, while the [License](license.md) page on docs.pipelex.com explains how Pipelex reads them. Every earlier version, up to and including v0.57.0, stays under MIT.
 
 ## [v0.57.0] - 2026-09-07
 
