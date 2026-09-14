@@ -131,7 +131,7 @@ The class-registry accessor and its library scoping (`pipelex/runtime_hub.py`, `
 
 ## Where open core ends
 
-The boundary types and the host-agnostic helpers are **open** (MIT, in the `pipelex` distribution):
+The boundary types and the host-agnostic helpers are **open** (source-available under the Elastic License 2.0, in the `pipelex` distribution):
 
 | Concern | Open core (`pipelex`) |
 |---|---|
