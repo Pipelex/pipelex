@@ -1,6 +1,6 @@
 # Pipelex Documentation
 
-> Official documentation for Pipelex, an open-source library/CLI for building and running executable AI methods.
+> Official documentation for Pipelex, a source-available library/CLI for building and running executable AI methods.
 
 # Get Started
 
@@ -1834,7 +1834,7 @@ MIT-licensed. Designed for portability. The method outlives any vendor or model 
 
 ## Pipelex: The Reference Runtime
 
-Pipelex is the open-source reference runtime for the MTHDS standard. It reads, validates, and executes `.mthds` files, and ships as a runtime, CLI, Claude Code plugin, cookbook, and documentation.
+Pipelex is the source-available reference runtime for the MTHDS standard. It reads, validates, and executes `.mthds` files, and ships as a runtime, CLI, Claude Code plugin, cookbook, and documentation.
 
 [github.com/Pipelex/pipelex](https://github.com/Pipelex/pipelex) | [docs.pipelex.com](https://docs.pipelex.com)
 
@@ -19608,7 +19608,7 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 
 A pipe a host runtime invokes through the runtime bridge runs along **two orthogonal axes**:
 
-- **`orchestration_mode`** — *which* orchestrator runs the pipe. An **open string token**, not a closed enum: core owns only `"direct"` (in-process); every other token is contributed by the plugin that owns its orchestrator — [`"temporal"`](https://pipelex.com/products#temporal) (durable, on a Temporal worker fleet) by our Temporal plugin, [`"mistral-workflows"`](https://pipelex.com/products#mistral-workflows) (decomposed into Mistral Workflows primitives) by our Mistral Workflows plugin. Neither is built into the open-source `pipelex` core: both ship as external, closed-source host-runtime backends, distributed privately rather than on PyPI as part of Pipelex's [workflow-orchestration offer](https://pipelex.com/products#durable-execution).
+- **`orchestration_mode`** — *which* orchestrator runs the pipe. An **open string token**, not a closed enum: core owns only `"direct"` (in-process); every other token is contributed by the plugin that owns its orchestrator — [`"temporal"`](https://pipelex.com/products#temporal) (durable, on a Temporal worker fleet) by our Temporal plugin, [`"mistral-workflows"`](https://pipelex.com/products#mistral-workflows) (decomposed into Mistral Workflows primitives) by our Mistral Workflows plugin. Neither is built into the source-available `pipelex` core: both ship as external, closed-source host-runtime backends, distributed privately rather than on PyPI as part of Pipelex's [workflow-orchestration offer](https://pipelex.com/products#durable-execution).
 - **`delivery`** — *whether the caller waits*. A **closed** core `DeliveryMode` enum (`BLOCKING` / `FIRE_AND_FORGET`) on the wire input, set by the endpoint, never received from a caller. On the SPI it is expressed as *which method* the endpoint calls — `execute` (blocking) or `start` (fire-and-forget) — so each return type is truthful on its own; `supports_fire_and_forget` advertises whether an orchestrator can do genuine async.
 
 An **orchestrator** is what knows how to run a pipe under one token. Core names no orchestrator by import or by string. The bridge resolves the orchestrator for the requested token from a registry (keyed by the token `str`) and calls its `execute` — `"direct"` is contributed by a core plugin, `"temporal"` by our Temporal plugin, `"mistral-workflows"` by our external Mistral Workflows plugin. A lookup miss raises a generic `MissingOrchestratorError` that names no orchestrator. This page documents that seam, the **Orchestrator SPI** a host-runtime plugin compiles against, and how the Temporal plugin is wired.
@@ -19627,7 +19627,7 @@ An **orchestrator** is what knows how to run a pipe under one token. Core names 
 
 The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match orchestration_mode:` anywhere in the bridge — the token set is open, so validation is the registry lookup itself; adding a mode's behavior means registering an orchestrator for its token, nothing in core changes.
 
-The *port* — `OrchestratorProtocol` and its registry — is kernel-layer, and the registry is set on the `RuntimeHub`. An orchestrator *adapter* is not: constructing one names the method interpreter, so the built-in `direct` one lives in `pipelex/interpreter_plugins/` rather than beside the inference plugins. An out-of-tree plugin makes the same split explicit instead of by directory: it declares its layer through the entry-point group it publishes under, and an orchestrator plugin therefore belongs in `pipelex.plugins.interpreter` ([below](#shipping-it-as-an-out-of-tree-plugin)). See [Hub layering](../contribute/hub-layering.md#where-the-built-in-plugins-split).
+The *port* — `OrchestratorProtocol` and its registry — is kernel-layer, and the registry is set on the `RuntimeHub`. An orchestrator *adapter* is not: constructing one names the method interpreter, so the built-in `direct` one lives in `pipelex/interpreter_plugins/` rather than beside the inference plugins. An out-of-tree plugin makes the same split explicit instead of by directory: it declares its layer through the entry-point group it publishes under, and an orchestrator plugin therefore belongs in `pipelex.plugins.interpreter` ([below](#authoring-an-out-of-tree-orchestrator-plugin)). See [Hub layering](../contribute/hub-layering.md#where-the-built-in-plugins-split).
 
 !!! note "Open seam, closed host-side entry"
     Pipelex's own host-side entry — the bridge entry point and `PipeJob` builder, plus the dispatch primitives that decode the boundary payload, scope the per-call library, and deliver results — is **not part of open core**: it backs a Pipelex [commercial capability](https://pipelex.com/products#durable-execution). What stays **open** is the seam you extend to run pipes on an orchestrator of your own: the orchestrator registry, `OrchestratorProtocol`, and the `pipelex.runtime_bridge` modules listed in [The Orchestrator SPI](#the-orchestrator-spi) below.
@@ -20890,7 +20890,7 @@ The class-registry accessor and its library scoping (`pipelex/runtime_hub.py`, `
 
 ## Where open core ends
 
-The boundary types and the host-agnostic helpers are **open** (MIT, in the `pipelex` distribution):
+The boundary types and the host-agnostic helpers are **open** (source-available under the Elastic License 2.0, in the `pipelex` distribution):
 
 | Concern | Open core (`pipelex`) |
 |---|---|
