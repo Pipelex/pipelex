@@ -1,3 +1,5 @@
+from pydantic import HttpUrl, TypeAdapter, ValidationError
+
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.urls import URLs
@@ -6,6 +8,23 @@ URL_MAX_LENGTH = 2048
 
 # URI schemes that are handled internally and should not be validated
 _SKIP_VALIDATION_PREFIXES = ("data:", "pipelex-storage://")
+
+# The syntax of an http(s) URL, as pydantic reads it: scheme, host, no whitespace, a length bound.
+_HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
+
+
+def validate_http_url_syntax(*, url: str) -> None:
+    """Check that ``url`` is a well-formed http(s) URL, without touching the network.
+
+    Raises:
+        ValueError: If the URL does not parse as an http(s) URL.
+    """
+    try:
+        _HTTP_URL_ADAPTER.validate_python(url)
+    except ValidationError as exc:
+        first_error = exc.errors()[0]["msg"] if exc.errors() else "not a valid http(s) URL"
+        msg = f"URL '{url}' is not a valid http(s) URL: {first_error}"
+        raise ValueError(msg) from exc
 
 
 def get_user_agent() -> str:

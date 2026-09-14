@@ -1,7 +1,7 @@
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.tools.misc.http_utils import validate_url_resource_exists
+from pipelex.tools.misc.http_utils import validate_http_url_syntax, validate_url_resource_exists
 
 
 class TestValidateUrlResourceExists:
@@ -43,3 +43,27 @@ class TestValidateUrlResourceExists:
     def test_missing_local_path_raises(self) -> None:
         with pytest.raises(ValueError, match="does not exist"):
             validate_url_resource_exists("/nonexistent/path/to/file.png")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            pytest.param("https://example.com/file.pdf", id="https"),
+            pytest.param("http://localhost:8000/file.pdf", id="localhost-with-port"),
+            pytest.param("https://example.com/a%20b.pdf?x=1#frag", id="encoded-query-fragment"),
+        ],
+    )
+    def test_well_formed_http_url_syntax_passes(self, url: str) -> None:
+        validate_http_url_syntax(url=url)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            pytest.param("https://", id="no-host"),
+            pytest.param("https://exa mple.com/file.pdf", id="space-in-host"),
+            pytest.param("ftp://example.com/file.pdf", id="wrong-scheme"),
+            pytest.param("not a url", id="plain-text"),
+        ],
+    )
+    def test_malformed_http_url_syntax_raises(self, url: str) -> None:
+        with pytest.raises(ValueError, match="not a valid http\\(s\\) URL"):
+            validate_http_url_syntax(url=url)

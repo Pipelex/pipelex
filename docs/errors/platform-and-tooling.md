@@ -37,6 +37,7 @@ own page. Classes are grouped by subsystem.
 - [`JsonTypeError`](json-type-error.md) — Json type
 - [`ModuleFileError`](module-file-error.md) — Module file
 - [`PyPdfium2RendererError`](py-pdfium2-renderer-error.md) — Py pdfium 2 renderer
+- [`RemoteFileFetchError`](remote-file-fetch-error.md) — Remote file could not be fetched
 - [`SecretNotFoundError`](secret-not-found-error.md) — Secret not found
 - [`SsrfBlockedError`](ssrf-blocked-error.md) — Outbound request blocked (SSRF guard)
 - [`StorageConfigError`](storage-config-error.md) — Storage config

@@ -2,9 +2,9 @@
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
-- **The input pre-check no longer probes remote URLs**: before a pipe ran, a `Document` or `Image` input carrying an http(s) URL was probed with a blocking HEAD request whose outcome only ever produced a log line. On the hosted runner that pre-check is workflow code, so a host that stalls the request tripped Temporal's deadlock detector, the workflow task was retried until the execution timeout, and the run ended `TIMED_OUT` with no error. Remote URLs now pass straight through to the operator, which fetches the resource inside its activity and reports a real failure; a local file path is still required to exist.
+- **Remote inputs are checked the way the web checks them (Breaking)**: an http(s) URL on a `Document` or `Image` input is validated for syntax when the inputs are shaped, and refused with `PipelineInputUrlInvalidError` when it does not parse; whether the resource exists is decided by the operator that fetches it, which now raises a caller-facing `RemoteFileFetchError` naming the URL and what the server or the network answered, instead of a raw `httpx` error. The former pre-flight HEAD probe is gone: on the hosted runner it ran as workflow code, so a host that stalled the request tripped Temporal's deadlock detector and the run ended `TIMED_OUT` with no error, and its outcome only ever produced a log line. A local file path is still required to exist before the run starts.
 
 ## [v0.57.0] - 2026-09-07
 
