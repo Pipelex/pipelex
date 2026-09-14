@@ -6,6 +6,10 @@
 
 - **License (Breaking)**: `pipelex` is now licensed under the Elastic License 2.0 (ELv2) instead of MIT, and the package metadata declares the SPDX expression `Elastic-2.0` in place of the MIT license classifier, which makes hatchling 1.27 or later a requirement for building from source; every earlier version, up to and including v0.57.0, stays under MIT. ELv2 is source-available: you may embed `pipelex` in your own products, including services you offer to others whose features run your methods, and in your internal tools, while its main limitation rules out hosting a service that runs methods for others, whether they send the methods or pick them from a catalog. `LICENSE` carries the full terms, including its conditions on notices and redistribution, and the [License](license.md) page on docs.pipelex.com explains how Pipelex reads them.
 
+### Security
+
+- **Docs site built on mkdocs-material 9.7.7**: the `docs` extra now requires `mkdocs-material>=9.7.7`, which closes a DOM XSS in the theme's search suggestions (GHSA-xvg9-69gf-fjrf) that the published site shipped. The pull-request documentation check now builds from `uv.lock` like the deploy does, instead of from its own hand-pinned theme versions.
+
 ## [v0.57.0] - 2026-09-07
 
 ### Added
