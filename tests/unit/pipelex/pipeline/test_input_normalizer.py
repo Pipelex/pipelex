@@ -24,7 +24,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputUrlMissingError
+from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputUrlInvalidError, PipelineInputUrlMissingError
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -57,6 +57,29 @@ class TestInputNormalizerUrlGuards:
 
         with pytest.raises(PipelineInputUrlMissingError, match="blank url"):
             await normalize_data_urls_to_storage(_memory_with_document(blank_url), storage_scope="test/scope")
+
+    @pytest.mark.parametrize("bad_url", ["https://", "https://exa mple.com/file.pdf"])
+    async def test_malformed_http_url_raises_caller_facing_input_error(self, mocker: MockerFixture, bad_url: str) -> None:
+        """A malformed http(s) url is refused at shaping time, with a message STRICT disclosure keeps."""
+        _patch_storage_and_config(mocker)
+
+        with pytest.raises(PipelineInputUrlInvalidError) as exc_info:
+            await normalize_data_urls_to_storage(_memory_with_document(bad_url), storage_scope="test/scope")
+
+        strict = exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert "not a valid http(s) URL" in strict["message"]
+
+    async def test_well_formed_http_url_passes_through_unchanged(self, mocker: MockerFixture) -> None:
+        """A well-formed http(s) url is not fetched or probed at shaping time."""
+        _patch_storage_and_config(mocker)
+        mock_get = mocker.patch("httpx.AsyncClient.get")
+
+        memory = await normalize_data_urls_to_storage(_memory_with_document("https://example.com/file.pdf"), storage_scope="test/scope")
+
+        content = memory.get_stuff("document").content
+        assert isinstance(content, DocumentContent)
+        assert content.url == "https://example.com/file.pdf"
+        mock_get.assert_not_called()
 
     async def test_blank_url_message_survives_strict_disclosure(self, mocker: MockerFixture) -> None:
         """The blank-url message names only the accepted schemes, so STRICT keeps it.

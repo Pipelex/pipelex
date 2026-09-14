@@ -256,6 +256,22 @@ class PipelineInputContentError(PipelexError):
     )
 
 
+class PipelineInputUrlInvalidError(PipelineInputContentError):
+    """An Image/Document input carries an http(s) url that does not parse as one.
+
+    Caller-facing on purpose: the message repeats the url the caller supplied and
+    what is wrong with its shape, both of which are the caller's own facts. Whether
+    the resource behind a well-formed url exists is not decided here — the operator
+    that consumes the input fetches it and reports a real failure.
+    """
+
+    _authors_caller_facing_message = True
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Provide a well-formed http(s) URL: a scheme, a host, and no whitespace.",
+    )
+
+
 class PipelineInputUrlMissingError(PipelineInputContentError):
     """An Image/Document input carries a blank url.
 
