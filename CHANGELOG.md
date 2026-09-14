@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- **Docs site built on mkdocs-material 9.7.7**: the `docs` extra now requires `mkdocs-material>=9.7.7`, which closes a DOM XSS in the theme's search suggestions (GHSA-xvg9-69gf-fjrf) that the published site shipped. The pull-request documentation check now builds from `uv.lock` like the deploy does, instead of from its own hand-pinned theme versions.
+
 ## [v0.57.0] - 2026-09-07
 
 ### Added
