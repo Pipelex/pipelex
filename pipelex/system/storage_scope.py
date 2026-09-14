@@ -10,7 +10,7 @@ The hosted Pipelex platform fills it with `<org_id>/<method_id>/<run_id>`, but
 nothing here knows or checks that — a single-user deployment can pass
 `<user_id>/<run_id>` and a local one passes just `<run_id>`. Threading the
 host's own concepts through the transport instead was considered and rejected:
-`method_id` is a hosted catalog concept with no meaning in an MIT-licensed
+`method_id` is a hosted catalog concept with no meaning in a source-available
 runtime, and `uri_format`'s placeholder set is closed by design.
 
 **Why the validation is here rather than at the call sites.** The value reaches
