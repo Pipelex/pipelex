@@ -98,7 +98,7 @@ MIT-licensed. Designed for portability. The method outlives any vendor or model 
 
 ## Pipelex: The Reference Runtime
 
-Pipelex is the open-source reference runtime for the MTHDS standard. It reads, validates, and executes `.mthds` files, and ships as a runtime, CLI, Claude Code plugin, cookbook, and documentation.
+Pipelex is the source-available reference runtime for the MTHDS standard. It reads, validates, and executes `.mthds` files, and ships as a runtime, CLI, Claude Code plugin, cookbook, and documentation.
 
 [github.com/Pipelex/pipelex](https://github.com/Pipelex/pipelex) | [docs.pipelex.com](https://docs.pipelex.com)
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **License (Breaking)**: `pipelex` is now licensed under the Elastic License 2.0 (ELv2) instead of MIT, and the package metadata declares the SPDX expression `Elastic-2.0` in place of the MIT license classifier. ELv2 is source-available: it forbids providing the software to third parties as a hosted or managed service and permits everything else. Every earlier version, up to and including v0.57.0, stays under MIT.
+
 ## [v0.57.0] - 2026-09-07
 
 ### Added
