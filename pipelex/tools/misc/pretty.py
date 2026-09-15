@@ -95,14 +95,6 @@ class PrettyPrintMode(StrEnum):
     POOR = "poor"
     SILENT = "silent"
 
-    @property
-    def is_silent(self) -> bool:
-        match self:
-            case PrettyPrintMode.RICH | PrettyPrintMode.POOR:
-                return False
-            case PrettyPrintMode.SILENT:
-                return True
-
 
 def pretty_print(
     content: str | Any,
@@ -198,7 +190,9 @@ class PrettyPrinter:
                     console_width=console_width,
                 )
             case PrettyPrintMode.POOR:
-                cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle, inner_title=inner_title, console_width=console_width)
+                cls.pretty_print_without_rich(
+                    content=content, title=title, subtitle=subtitle, inner_title=inner_title, width=width, console_width=console_width
+                )
             case PrettyPrintMode.SILENT:
                 return
 
@@ -399,28 +393,35 @@ class PrettyPrinter:
         if isinstance(content, str) and content.startswith(("http://", "https://")):
             cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle)
             return
-        title_str = str(title) if title else ""
+        # Titles are Rich markup in every mode (a caller writes them once, for the Rich panel), so they are
+        # measured and printed as the text they render to, not as the tags they are spelled with.
+        title_str = cls._plain_title(title=title) if title else ""
         if subtitle:
-            title_str += f"\n{subtitle!s}"
+            title_str += f"\n{cls._plain_title(title=subtitle)}"
         if inner_title:
             title_str += f"\n{inner_title}"
         terminal_width = console_width or shutil.get_terminal_size().columns
-        content_str = f"{content}"
 
         # Split title into lines if it contains newlines
         title_lines = title_str.splitlines() if title_str else []
 
-        # Calculate max content width based on longest title line
-        max_title_len = max(len(line) for line in title_lines) if title_lines else 0
-        max_content_width = terminal_width - max_title_len - 8  # Accounting for frame and padding
+        # Titles sit on rows of their own, so they take nothing from the content's width. The width is
+        # floored at one character, the smallest step the wrapping below can take through a line.
+        max_content_width = terminal_width - 8  # Accounting for frame and padding
         if width:
             max_content_width = min(max_content_width, width)
+        max_content_width = max(max_content_width, 1)
+        if isinstance(content, PrettyPrintable):
+            # A caller handing over a Rich renderable gets its text, not the object's repr.
+            content_str = cls.pretty_text(content, width=max_content_width)
+        else:
+            content_str = f"{content}"
         wrapped_lines: list[str] = []
         for line in content_str.splitlines():
-            while len(line) > max_content_width:
-                wrapped_lines.append(line[:max_content_width])
-                line = line[max_content_width:]
-            wrapped_lines.append(line)
+            if not line:
+                wrapped_lines.append(line)
+            for index_start in range(0, len(line), max_content_width):
+                wrapped_lines.append(line[index_start : index_start + max_content_width])
 
         if not wrapped_lines:
             wrapped_lines.append("")
@@ -441,6 +442,13 @@ class PrettyPrinter:
             padding = " " * (frame_width - len(line) - 3)
             print_to_stderr(f"{BORDER_COLOR}│ {TEXT_COLOR}{line}{RESET_FONT}{padding}{BORDER_COLOR}│{RESET_FONT}")
         print_to_stderr(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")
+
+    @classmethod
+    def _plain_title(cls, *, title: TextType) -> str:
+        """The text a panel title renders to: markup tags dropped, as Rich's `Panel` would drop them."""
+        if isinstance(title, Text):
+            return title.plain
+        return Text.from_markup(title).plain
 
     @classmethod
     def pretty_print_url_without_rich(

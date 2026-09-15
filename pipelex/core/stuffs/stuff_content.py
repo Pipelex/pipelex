@@ -5,7 +5,7 @@ from mthds.protocol.stuff import StuffContentAbstract
 from rich.json import JSON
 from typing_extensions import override
 
-from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, PrettyRenderable, pretty_print
+from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, PrettyPrintMode, PrettyRenderable, pretty_print
 from pipelex.tools.templating.text_format import TextFormat
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -133,11 +133,17 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         return JSON.from_data(json_data, indent=4)
 
     def pretty_print_content(self, *, title: str | None = None) -> None:
-        if PrettyPrinter.mode.is_silent:
-            return
-        pretty = self.rendered_pretty()
-        width = PrettyPrinter.pretty_width()
-        pretty_print(pretty, title=title, width=width)
+        # The mode is read before anything is rendered: a silent printer builds nothing, and a poor one
+        # prints the plain rendering rather than building a Rich tree it would only flatten again.
+        match PrettyPrinter.mode:
+            case PrettyPrintMode.SILENT:
+                return
+            case PrettyPrintMode.POOR:
+                pretty_print(self.rendered_plain(), title=title)
+            case PrettyPrintMode.RICH:
+                pretty = self.rendered_pretty()
+                width = PrettyPrinter.pretty_width()
+                pretty_print(pretty, title=title, width=width)
 
     @override
     def rendered_pretty_html(self, *, title: str | None = None, width: int | None = None) -> str:

@@ -48,6 +48,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry as _get_active_class_registry
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -191,11 +192,16 @@ class RuntimeHub:
         paths open: between teardown and the next boot ``get_runtime_hub()`` still hands out the dead
         hub, and ``is_in_isolated_execution()`` is a module-level accessor (``ReportingManager`` reads
         it) that would answer with the torn-down boot's runtime split.
+
+        The pretty-print mode goes back to the class default for the same reason as the flags: boot
+        writes it from ``[runtime.log]``, and a torn-down ``silent`` boot would otherwise keep silencing
+        ``pretty_print(...)`` for everything else in the process.
         """
         self._config = None
         self._is_dry_run_forced = False
         self._boot_orchestrator = None
         self._isolated_execution_probe = _never_in_isolated_execution
+        PrettyPrinter.mode = PrettyPrintMode.RICH
         log.reset()
 
     def set_console_print_target(self, target: ConsoleTarget):

@@ -1,17 +1,23 @@
-"""The pretty-print mode is configuration: shipped as `rich`, applied at boot, and read through the enum."""
+"""The pretty-print mode is configuration: shipped as `rich`, applied at boot, and released at teardown."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import tomli
 
 from pipelex.config import get_config
+from pipelex.pipelex import Pipelex
+from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 
 PIPELEX_REPO_ROOT = Path(__file__).resolve().parents[5]
 PACKAGE_DEFAULT_TOML = PIPELEX_REPO_ROOT / "pipelex" / "pipelex.toml"
+
+
+def _test_integration_mode() -> IntegrationMode:
+    """The boot mode the session conftest uses, so a re-boot here matches the one it replaces."""
+    return IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST
 
 
 class TestPrettyPrintModeConfig:
@@ -21,17 +27,24 @@ class TestPrettyPrintModeConfig:
             shipped = tomli.load(toml_file)
         assert shipped["runtime"]["log"]["pretty_print_mode"] == PrettyPrintMode.RICH
 
-    def test_boot_applies_the_configured_mode(self) -> None:
-        """`Pipelex.make()` (run by the module fixture) sets the printer's mode from `[runtime.log]`."""
-        assert PrettyPrinter.mode is get_config().runtime.log.pretty_print_mode
+    def test_boot_applies_the_configured_mode_and_teardown_releases_it(self) -> None:
+        """Boot with a mode that is neither the class default nor the shipped one, so a boot that forgot to
+        apply `[runtime.log]` fails here; then tear down, which must hand the process back its default.
 
-    @pytest.mark.parametrize(
-        ("mode", "expected_is_silent"),
-        [
-            (PrettyPrintMode.RICH, False),
-            (PrettyPrintMode.POOR, False),
-            (PrettyPrintMode.SILENT, True),
-        ],
-    )
-    def test_is_silent(self, mode: PrettyPrintMode, expected_is_silent: bool) -> None:
-        assert mode.is_silent is expected_is_silent
+        Re-boots the process singleton, so it restores the module fixture's boot on the way out.
+        """
+        Pipelex.teardown_if_needed()
+        try:
+            Pipelex.make(
+                integration_mode=_test_integration_mode(),
+                needs_inference=False,
+                config_overrides={"runtime": {"log": {"pretty_print_mode": PrettyPrintMode.SILENT}}},
+            )
+            assert get_config().runtime.log.pretty_print_mode is PrettyPrintMode.SILENT
+            assert PrettyPrinter.mode is PrettyPrintMode.SILENT
+
+            Pipelex.teardown_if_needed()
+            assert PrettyPrinter.mode is PrettyPrintMode.RICH
+        finally:
+            Pipelex.teardown_if_needed()
+            Pipelex.make(integration_mode=_test_integration_mode())

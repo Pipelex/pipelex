@@ -52,9 +52,10 @@ pretty_print_mode = "rich"
 
 - Controls the panels that `pretty_print(...)` renders, such as the "Output of pipe" panel shown after every operator pipe
 - `"rich"`: Rich tables and panels on the console print target
-- `"poor"`: plain text, no Rich rendering
+- `"poor"`: plain text in a drawn frame on stderr, with no Rich panel; a pipe's output prints as its plain rendering
 - `"silent"`: nothing is printed and no renderable is built, for a host with no console or one that must not spend time rendering on the thread that runs pipes
 - Default: `"rich"`. The agent CLI forces `"silent"`
+- Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to `"rich"`
 
 ### JSON Formatting
 

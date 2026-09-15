@@ -4,11 +4,15 @@
 
 ### Added
 
-- **`pretty_print_mode` in `[runtime.log]`**: `rich` (the default), `poor` or `silent`, applied at boot beside `log_mode`, so a host with no console turns the "Output of pipe" panels off in configuration rather than in code; a silent printer no longer builds the Rich renderable at all. The agent CLI forces `silent`.
+- **`pretty_print_mode` in `[runtime.log]` (Breaking)**: `rich` (the default), `poor` or `silent`, applied at boot beside `log_mode` and returned to `rich` at teardown, so a host with no console turns the "Output of pipe" panels off in configuration rather than in code; a silent printer no longer builds the Rich renderable at all. Boot now replaces a `PrettyPrinter.mode` assigned in code before it, so set the key instead. The agent CLI forces `silent`.
 
 ### Changed
 
-- **Graph text and HTML renderings are opt-in (Breaking)**: `stuff_text_content` and `stuff_html_content` under `[interpreter.pipeline_execution.graph.data_inclusion]` now default to `false`, so a run no longer renders every traced input and output through Rich on the execution path, a cost that grows with text volume times nesting depth. A graph's `data_text` and `data_html` fields, which only the Mermaid viewer's text and HTML tabs read, come back with `--graph-full-data` or the two keys set to `true`.
+- **Graph text and HTML renderings are opt-in (Breaking)**: `stuff_text_content` and `stuff_html_content` under `[interpreter.pipeline_execution.graph.data_inclusion]` now default to `false`, so a run no longer renders every traced input and output through Rich on the execution path, a cost that grows with text volume times nesting depth. A project initialised by an earlier `pipelex init` sets both keys to `true` in its own `.pipelex/pipelex.toml` and keeps paying that cost until you set them to `false` there. A graph's `data_text` and `data_html` fields, which only the Mermaid viewer's text and HTML tabs read, come back with `--graph-full-data` or the two keys set to `true`.
+
+### Fixed
+
+- **Poor pretty-print mode**: a panel whose title is wider than the terminal no longer hangs the run in an endless wrapping loop, which every operator pipe's "Output of pipe" panel did on an 80-column headless console. Titles print without their Rich markup, and an output prints as its plain rendering instead of a Rich object's repr.
 
 ## [v0.58.0] - 2026-09-14
 

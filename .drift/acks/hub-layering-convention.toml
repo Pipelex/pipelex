@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:db6f431f6d19eada9e44890a88a38218c5ec408e4bd603ebd0ea3a2119d6c7dd"
+digest = "sha256:73d5e8b62d67fb4231655c06e3d6129b046af97d755bd928c4bb9223cf7f6114"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-07T12:04:46Z"
-rationale = "interpreter_hub gains get_own_pipes, a library-lookup accessor beside get_pipes returning the current library's own pipes without the aliased dependency entries. Added it to the library-lookups row of the accessor partition table in docs/contribute/hub-layering.md; the boundary, the one-arrow rule and the closure claim are untouched."
+reviewed_at = "2026-09-15T22:39:13Z"
+rationale = "runtime_hub.reset_boot_state now returns PrettyPrinter.mode to RICH at teardown, which adds a module-level import of pipelex.tools.misc.pretty to runtime_hub. That module is in tools, the bottom layer, and names nothing from the packages the doc forbids; the guard passes. The doc does not enumerate what reset_boot_state releases or runtime_hub's permitted imports, so no doc change is needed."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:498312f15921753263a4ad3475c9da5eefb8e4ba"
+"pipelex/runtime_hub.py" = "blob:d8d3455459c14fe229f659f7866fed780dedc560"
