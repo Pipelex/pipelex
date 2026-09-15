@@ -110,15 +110,7 @@ class BuilderConfig(ConfigModel):
     default_directory_base_name: str
 
 
-class InputReachabilityConfig(ConfigModel):
-    """The submission-time reachability probe over a run's remote inputs (``pipelex.pipeline.input_reachability``)."""
-
-    is_enabled: bool
-    timeout_seconds: Annotated[float, Field(gt=0)]
-
-
 class PipelineExecutionConfig(ConfigModel):
-    input_reachability: InputReachabilityConfig
     is_normalize_data_urls_to_storage: bool
     is_mock_inputs: bool
     is_generate_graph: bool
