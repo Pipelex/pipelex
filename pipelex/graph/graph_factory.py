@@ -126,13 +126,10 @@ async def generate_graph_outputs(
         if inclusion.mermaidflow_mmd:
             mermaidflow_mmd = mermaidflow.mermaid_code
         if inclusion.mermaidflow_html:
-            has_any_stuff_data = mermaidflow.stuff_data or mermaidflow.stuff_data_text or mermaidflow.stuff_data_html
-            if has_any_stuff_data:
+            if mermaidflow.stuff_data:
                 mermaidflow_html = await render_mermaid_html_with_data_async(
                     mermaidflow.mermaid_code,
                     stuff_data=mermaidflow.stuff_data,
-                    stuff_data_text=mermaidflow.stuff_data_text,
-                    stuff_data_html=mermaidflow.stuff_data_html,
                     stuff_metadata=mermaidflow.stuff_metadata,
                     stuff_content_type=mermaidflow.stuff_content_type,
                     title=page_title,

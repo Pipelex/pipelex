@@ -15,7 +15,7 @@ from pipelex.migration.coverage import check_defaults_layer, check_registry
 from pipelex.migration.diagnosis import diagnose_unexplained_paths
 from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, load_ledger, packaged_migration_dir
 from pipelex.migration.ledger_check import check_ledgers
-from pipelex.migration.surfaces import build_config_surface_registry
+from pipelex.migration.surfaces import DocumentShape, build_config_surface_registry
 from pipelex.migration.transform_check import check_transforms
 
 
@@ -82,6 +82,18 @@ class TestTheRealRegistry:
                     blocked=[],
                 )
                 assert unexplained == [], f"{surface.surface_id} ({label}): {[found.path for found in unexplained]}"
+
+    def test_every_whole_document_surface_reports_a_refusal_instead_of_raising(self) -> None:
+        """A refusal is the transform check's finding, not its crash — including for a `ConfigRoot` model,
+        whose `__init__` raises `ConfigValidationError` rather than pydantic's `ValidationError`.
+        """
+        registry = build_config_surface_registry()
+        for surface in registry.surfaces:
+            if surface.document_shape is not DocumentShape.WHOLE_DOCUMENT:
+                continue
+            rejection = surface.validate_document(document={"a_key_no_surface_has": True})
+            assert rejection is not None, surface.surface_id
+            assert surface.config_model.__name__ in rejection
 
     def test_every_surface_has_a_ledger(self) -> None:
         migration_dir = packaged_migration_dir()

@@ -45,12 +45,6 @@ class TestPrettySilent:
         result = PrettyPrinter.pretty_text(renderable)
         assert "Hello from silent" in result
 
-    def test_pretty_html_still_works_in_silent_mode(self) -> None:
-        """Rendering to HTML string should be unaffected by SILENT mode."""
-        renderable = Text("Hello HTML")
-        result = PrettyPrinter.pretty_html(renderable)
-        assert "Hello HTML" in result
-
     def test_silent_mode_builds_no_renderable_for_stuff_content(self, mocker: MockerFixture, capsys: CaptureFixture[str]) -> None:
         """A silent printer must not build the Rich renderable: on a Temporal worker that build is the
         cost that trips the deadlock detector, so the mode is checked before rendering, not after.

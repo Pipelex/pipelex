@@ -96,18 +96,18 @@ class TestDirectTracingAssembly:
         assert pipe_output.tokens_usages is None
 
     async def test_graph_mode_serializes_stuff_payloads(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
-        """Baseline for E1: with graph events + full data inclusion, the per-pipe HTML payload IS built."""
+        """Baseline for E1: with graph events + full data inclusion, the per-pipe JSON payload IS built."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_graph_full")))
-        render_spy = mocker.spy(StuffContent, "rendered_pretty_html")
+        render_spy = mocker.spy(StuffContent, "smart_dump")
 
         await self._run(_config(generate_graph=True, generate_usage=True, full_data=True))
 
         assert render_spy.call_count >= 1
 
     async def test_costs_only_skips_stuff_serialization(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
-        """E1: in costs-only mode the per-pipe HTML payload (graph-only) is never built, even with full data inclusion."""
+        """E1: in costs-only mode the per-pipe JSON payload (graph-only) is never built, even with full data inclusion."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_costs_full")))
-        render_spy = mocker.spy(StuffContent, "rendered_pretty_html")
+        render_spy = mocker.spy(StuffContent, "smart_dump")
 
         pipe_output = await self._run(_config(generate_graph=False, generate_usage=True, full_data=True))
 

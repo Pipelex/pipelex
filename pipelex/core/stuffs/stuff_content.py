@@ -144,7 +144,3 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
                 pretty = self.rendered_pretty()
                 width = PrettyPrinter.pretty_width()
                 pretty_print(pretty, title=title, width=width)
-
-    @override
-    def rendered_pretty_html(self, *, title: str | None = None, width: int | None = None) -> str:
-        return self.rendered_html()

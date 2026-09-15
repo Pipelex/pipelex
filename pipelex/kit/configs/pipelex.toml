@@ -221,8 +221,6 @@ max_concurrency = 8
 [interpreter.pipeline_execution.graph.data_inclusion]
 # Control what data is included in graph outputs
 stuff_json_content = true
-stuff_text_content = false
-stuff_html_content = false
 error_stack_traces = true
 pipe_and_concept_registry = true
 

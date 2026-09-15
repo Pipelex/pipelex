@@ -15,7 +15,6 @@ from rich.pretty import Pretty
 from rich.style import StyleType
 from rich.syntax import Syntax
 from rich.table import Table
-from rich.terminal_theme import TerminalTheme
 from rich.text import Text, TextType
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
@@ -30,30 +29,6 @@ BORDER_COLOR = TerminalColor.YELLOW
 PRETTY_WIDTH_MIN: int = 125
 PRETTY_WIDTH_FOR_EXPORT: int = 100
 MAX_RENDER_DEPTH = 6
-EXPORT_THEME = TerminalTheme(
-    (0, 0, 0),
-    (197, 200, 198),
-    [
-        (75, 78, 85),
-        (204, 85, 90),
-        (152, 168, 75),
-        (208, 179, 68),
-        (96, 138, 177),
-        (152, 114, 159),
-        (104, 160, 179),
-        (197, 200, 198),
-        (154, 155, 153),
-    ],
-    [
-        (255, 38, 39),
-        (0, 130, 61),
-        (208, 132, 66),
-        (25, 132, 233),
-        (255, 44, 122),
-        (57, 130, 128),
-        (253, 253, 197),
-    ],
-)
 
 PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
 
@@ -75,19 +50,6 @@ class PrettyRenderable(ABC):
         """
         pretty = self.rendered_pretty(title=title, depth=0)
         return PrettyPrinter.pretty_text(pretty, width=width)
-
-    def rendered_pretty_html(self, *, title: str | None = None, width: int | None = None) -> str:
-        """Render as HTML string.
-
-        Args:
-            title: Optional title for the rendering
-            width: Optional console width for layout
-
-        Returns:
-            HTML string representation
-        """
-        pretty = self.rendered_pretty(title=title, depth=0)
-        return PrettyPrinter.pretty_html(pretty, width=width or PRETTY_WIDTH_FOR_EXPORT)
 
 
 class PrettyPrintMode(StrEnum):
@@ -300,18 +262,6 @@ class PrettyPrinter:
         console = Console(record=True, file=buf, width=width, force_terminal=False)
         console.print(pretty)
         return console.export_text()
-
-    @classmethod
-    def pretty_html(
-        cls,
-        pretty: PrettyPrintable,
-        *,
-        width: int = PRETTY_WIDTH_FOR_EXPORT,
-    ) -> str:
-        buf = StringIO()
-        console = Console(record=True, file=buf, width=width, force_terminal=False)
-        console.print(pretty)
-        return console.export_html(inline_styles=False, clear=False, theme=EXPORT_THEME)
 
     @classmethod
     def pretty_svg(cls, pretty: PrettyPrintable, *, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:

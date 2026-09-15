@@ -87,8 +87,6 @@ async def render_mermaid_html_with_data_async(
     mermaid_code: str,
     *,
     stuff_data: dict[str, str | dict[str, object] | list[str] | list[dict[str, object]] | None] | None = None,
-    stuff_data_text: dict[str, str] | None = None,
-    stuff_data_html: dict[str, str] | None = None,
     stuff_metadata: dict[str, dict[str, str]] | None = None,
     stuff_content_type: dict[str, str] | None = None,
     title: str = "Pipelex Graph",
@@ -97,14 +95,12 @@ async def render_mermaid_html_with_data_async(
     """Render Mermaid code with clickable stuff nodes into a standalone HTML page.
 
     This renders an interactive version where clicking on stuff nodes (data items)
-    displays their full serialized content in a modal dialog. Supports multiple
-    display formats (JSON, Text, HTML) with runtime toggle.
+    displays their full serialized content in a modal dialog: the JSON data, and a preview
+    for image and PDF content rendered from the URL that data carries.
 
     Args:
         mermaid_code: The Mermaid flowchart code to embed.
         stuff_data: Mapping from stuff mermaid IDs to their full data content (JSON format).
-        stuff_data_text: Mapping from stuff mermaid IDs to their ASCII text representation.
-        stuff_data_html: Mapping from stuff mermaid IDs to their HTML representation.
         stuff_metadata: Mapping from stuff mermaid IDs to their display metadata (name, concept).
         stuff_content_type: Mapping from stuff mermaid IDs to their content_type (e.g., 'application/pdf').
         title: The page title (appears in browser tab and as h1).
@@ -114,7 +110,7 @@ async def render_mermaid_html_with_data_async(
         Complete HTML page as a string with interactive data display.
     """
     template_source = TemplateRegistry.get(_INTERACTIVE_TEMPLATE_KEY)
-    has_data = bool(stuff_data or stuff_data_text or stuff_data_html)
+    has_data = bool(stuff_data)
 
     # Pre-serialize the data to JSON for embedding in the template
     context: dict[str, Any] = {
@@ -122,8 +118,6 @@ async def render_mermaid_html_with_data_async(
         "title": title,
         "mermaid_code": mermaid_code,
         "stuff_data_json": dumps(stuff_data or {}),
-        "stuff_data_text_json": dumps(stuff_data_text or {}),
-        "stuff_data_html_json": dumps(stuff_data_html or {}),
         "stuff_metadata_json": dumps(stuff_metadata or {}),
         "stuff_content_type_json": dumps(stuff_content_type or {}),
         "has_data": has_data,

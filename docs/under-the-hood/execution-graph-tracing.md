@@ -32,11 +32,11 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 |----------|-----|-----|--------|
 | Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexMTHDSProtocol(execution_config=...).execute(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
-| Force exclude data | `--graph --graph-no-data` | The four stuff/error `data_inclusion` flags → `False` (`pipe_and_concept_registry` unaffected) | Previews only |
+| Force exclude data | `--graph --graph-no-data` | The stuff and error `data_inclusion` flags → `False` (`pipe_and_concept_registry` unaffected) | Previews only |
 | Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
-!!! info "JSON Data Included by Default, Renderings Opt-In"
-    The default configuration includes the serialized data in graphs (`stuff_json_content`, `error_stack_traces` and `pipe_and_concept_registry` are `true`) and leaves the text and HTML renderings out (`stuff_text_content` and `stuff_html_content` are `false`): they render every traced input and output through Rich on the execution path, at a cost that grows with text volume times nesting depth, and only the Mermaid viewer's text and HTML tabs read them. `--graph-full-data` turns all four data flags on and `--graph-no-data` turns them off, overriding project-specific settings; `pipe_and_concept_registry` is set only via config.
+!!! info "JSON Data Included by Default"
+    The default configuration includes the serialized data in graphs: `stuff_json_content`, `error_stack_traces` and `pipe_and_concept_registry` are `true`. A traced input or output carries that JSON content and nothing else — the text and HTML renderings a run used to build for every one of them are gone, because they cost a render on the execution path, growing with text volume times nesting depth, and only the Mermaid viewer read them. `--graph-full-data` turns the data flags on and `--graph-no-data` turns them off, overriding project-specific settings; `pipe_and_concept_registry` is set only via config.
 
 ---
 
@@ -409,6 +409,8 @@ print(mermaidflow.mermaid_code)
 - Stuff nodes (data items) rendered as stadium shapes
 - DATA edges connect producers → stuff → consumers
 
+In the standalone viewer (`mermaidflow.html`), clicking a stuff node opens its JSON content, and an image or PDF output also offers a preview rendered from the URL that JSON carries.
+
 ### ReactFlow HTML
 
 ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec layer. The HTML generator embeds GraphSpec as JSON and the client-side JavaScript handles dataflow analysis, layout, and rendering.
@@ -425,8 +427,6 @@ ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec
 
 [interpreter.pipeline_execution.graph.data_inclusion]
 stuff_json_content = true       # Include full serialized data
-stuff_text_content = false      # Include the Rich text rendering (opt-in: one render per traced stuff)
-stuff_html_content = false      # Include the HTML rendering (opt-in: one render per traced stuff)
 error_stack_traces = true       # Include full stack traces
 pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 
@@ -479,8 +479,6 @@ class IOSpec(BaseModel):
     size: int | None  # Content size
     digest: str | None  # Unique identifier for data flow
     data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None  # Full serialized content
-    data_text: str | None  # ASCII text representation
-    data_html: str | None  # HTML representation
     extra: dict[str, Any]  # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
 ```
 

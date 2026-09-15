@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:9a99c5564b97735d0ea295f2dc38253f065469c286b0f3bfce22d89294041688"
+digest = "sha256:48f0e53a827002ec434880b902b9d04c99be68045da6afbe84d58a20c18ed53d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-15T21:59:36Z"
-rationale = "The agent CLI's log-field overrides now also pin pretty_print_mode to silent, so the silence it already enforced in code is set through configuration too. No flag, option or output contract changed; docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md name none of the override knobs and stay true."
+reviewed_at = "2026-09-15T23:02:04Z"
+rationale = "The agent CLI's render-time graph config no longer sets the two removed keys; no flag, option or output contract changed. Reviewed docs/tools/cli: it documents --graph-full-data and --graph-no-data without naming the individual data_inclusion keys, which stays true, and pipelex/cli/agent_cli/CLAUDE.md names none of them."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -39,7 +39,7 @@ rationale = "The agent CLI's log-field overrides now also pin pretty_print_mode 
 "pipelex/cli/agent_cli/commands/plxt_passthrough.py" = "blob:a1c530d110482485ce462f199b9e79fac29f8896"
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:40ed1700e0d5e86d7696eadd7f9887baeb8059f6"
-"pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:aeb90b4b2149fc6c977adaf1d9f535549cb34068"
+"pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:3721f0e9288fc7611917839ab303418a983a6883"
 "pipelex/cli/agent_cli/commands/run/_run_core_api.py" = "blob:78a27e0ba91e6bbf99c11caedb29ad4cf20ac78b"
 "pipelex/cli/agent_cli/commands/run/app.py" = "blob:64b2ecc02007cda11b526d8d3fc139593875dd9d"
 "pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:daf6207146c0ea41fe34bb272ed51350208af790"
