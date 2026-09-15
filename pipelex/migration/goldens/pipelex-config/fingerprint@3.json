@@ -692,7 +692,7 @@
     "interpreter.pipeline_execution.graph.data_inclusion.stuff_html_content": {
       "value_type": "bool",
       "required": true,
-      "default": true,
+      "default": false,
       "open_node": false
     },
     "interpreter.pipeline_execution.graph.data_inclusion.stuff_json_content": {
@@ -704,7 +704,7 @@
     "interpreter.pipeline_execution.graph.data_inclusion.stuff_text_content": {
       "value_type": "bool",
       "required": true,
-      "default": true,
+      "default": false,
       "open_node": false
     },
     "interpreter.pipeline_execution.graph.graphs_inclusion": {
@@ -1134,6 +1134,17 @@
       "value_type": "int",
       "required": true,
       "default": 120,
+      "open_node": false
+    },
+    "runtime.log.pretty_print_mode": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "poor",
+        "rich",
+        "silent"
+      ],
+      "default": "rich",
       "open_node": false
     },
     "runtime.log.rich_log": {

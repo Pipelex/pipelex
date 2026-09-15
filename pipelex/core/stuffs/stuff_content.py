@@ -133,6 +133,8 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         return JSON.from_data(json_data, indent=4)
 
     def pretty_print_content(self, *, title: str | None = None) -> None:
+        if PrettyPrinter.mode.is_silent:
+            return
         pretty = self.rendered_pretty()
         width = PrettyPrinter.pretty_width()
         pretty_print(pretty, title=title, width=width)

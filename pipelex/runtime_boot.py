@@ -123,6 +123,7 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
+from pipelex.tools.misc.pretty import PrettyPrinter
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.urls import URLs
@@ -262,6 +263,7 @@ class RuntimeBoot(metaclass=MetaSingleton):
         log_config = get_config().runtime.log
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
+        PrettyPrinter.mode = log_config.pretty_print_mode
         log.verbose("Logs are configured")
         if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
             log.warning(stale_warning)

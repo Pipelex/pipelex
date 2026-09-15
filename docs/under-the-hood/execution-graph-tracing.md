@@ -35,8 +35,8 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 | Force exclude data | `--graph --graph-no-data` | The four stuff/error `data_inclusion` flags → `False` (`pipe_and_concept_registry` unaffected) | Previews only |
 | Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
-!!! info "Full Data Included by Default"
-    The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, `error_stack_traces`, and `pipe_and_concept_registry` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings — the flags toggle the first four; `pipe_and_concept_registry` is set only via config.
+!!! info "JSON Data Included by Default, Renderings Opt-In"
+    The default configuration includes the serialized data in graphs (`stuff_json_content`, `error_stack_traces` and `pipe_and_concept_registry` are `true`) and leaves the text and HTML renderings out (`stuff_text_content` and `stuff_html_content` are `false`): they render every traced input and output through Rich on the execution path, at a cost that grows with text volume times nesting depth, and only the Mermaid viewer's text and HTML tabs read them. `--graph-full-data` turns all four data flags on and `--graph-no-data` turns them off, overriding project-specific settings; `pipe_and_concept_registry` is set only via config.
 
 ---
 
@@ -425,8 +425,8 @@ ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec
 
 [interpreter.pipeline_execution.graph.data_inclusion]
 stuff_json_content = true       # Include full serialized data
-stuff_text_content = true       # Include ASCII text representation
-stuff_html_content = true       # Include HTML representation
+stuff_text_content = false      # Include the Rich text rendering (opt-in: one render per traced stuff)
+stuff_html_content = false      # Include the HTML rendering (opt-in: one render per traced stuff)
 error_stack_traces = true       # Include full stack traces
 pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 

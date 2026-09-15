@@ -95,6 +95,14 @@ class PrettyPrintMode(StrEnum):
     POOR = "poor"
     SILENT = "silent"
 
+    @property
+    def is_silent(self) -> bool:
+        match self:
+            case PrettyPrintMode.RICH | PrettyPrintMode.POOR:
+                return False
+            case PrettyPrintMode.SILENT:
+                return True
+
 
 def pretty_print(
     content: str | Any,

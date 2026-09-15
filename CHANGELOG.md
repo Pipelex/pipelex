@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pretty_print_mode` in `[runtime.log]`**: `rich` (the default), `poor` or `silent`, applied at boot beside `log_mode`, so a host with no console turns the "Output of pipe" panels off in configuration rather than in code; a silent printer no longer builds the Rich renderable at all. The agent CLI forces `silent`.
+
+### Changed
+
+- **Graph text and HTML renderings are opt-in (Breaking)**: `stuff_text_content` and `stuff_html_content` under `[interpreter.pipeline_execution.graph.data_inclusion]` now default to `false`, so a run no longer renders every traced input and output through Rich on the execution path, a cost that grows with text volume times nesting depth. A graph's `data_text` and `data_html` fields, which only the Mermaid viewer's text and HTML tabs read, come back with `--graph-full-data` or the two keys set to `true`.
+
 ## [v0.58.0] - 2026-09-14
 
 ### Changed

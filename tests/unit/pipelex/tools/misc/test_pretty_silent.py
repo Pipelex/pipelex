@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from pytest import CaptureFixture
 from rich.text import Text
 
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode, pretty_print
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestPrettySilent:
@@ -44,3 +50,14 @@ class TestPrettySilent:
         renderable = Text("Hello HTML")
         result = PrettyPrinter.pretty_html(renderable)
         assert "Hello HTML" in result
+
+    def test_silent_mode_builds_no_renderable_for_stuff_content(self, mocker: MockerFixture, capsys: CaptureFixture[str]) -> None:
+        """A silent printer must not build the Rich renderable: on a Temporal worker that build is the
+        cost that trips the deadlock detector, so the mode is checked before rendering, not after.
+        """
+        rendered_pretty_mock = mocker.patch.object(TextContent, "rendered_pretty")
+
+        TextContent(text="Hello").pretty_print_content(title="Text")
+
+        rendered_pretty_mock.assert_not_called()
+        assert capsys.readouterr().out == ""

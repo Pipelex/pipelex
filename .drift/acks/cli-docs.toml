@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:7e55677c7b9478aa63196079905ef3df321fdba98eb27592d9fe7754e03f2a50"
+digest = "sha256:9a99c5564b97735d0ea295f2dc38253f065469c286b0f3bfce22d89294041688"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-07T13:48:53Z"
-rationale = "The agent CLI now applies its graphs-inclusion override (graphspec on, viewer on, mermaid off) before the run instead of at render time, so the graphspec's companions are built in the run window whatever graphspec_json the user configured. Reviewed docs/tools/cli/agent-cli.md: the Graph Visualization section describes the files a run writes and named no inclusion flag, so it stays true. Updated pipelex/cli/agent_cli/CLAUDE.md: the run contract line now says the inclusion is settled before the run rather than that the companions follow the flag. No flag or option changed."
+reviewed_at = "2026-09-15T21:59:36Z"
+rationale = "The agent CLI's log-field overrides now also pin pretty_print_mode to silent, so the silence it already enforced in code is set through configuration too. No flag, option or output contract changed; docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md name none of the override knobs and stay true."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -11,7 +11,7 @@ rationale = "The agent CLI now applies its graphs-inclusion override (graphspec 
 "pipelex/cli/agent_cli/_agent_cli.py" = "blob:e49ea3d36aa0e964e6d2cc66e901f8362c9ae76b"
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/accept_gateway_terms_cmd.py" = "blob:cb8338c09a7b5dee6088551c156d69dab613213a"
-"pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:c9a251db61d8655bdb41002c62eab88b486fc32f"
+"pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:ba63ff317613e9be35677fca949f0991a6f6c47e"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:a1ffa37559c51d6272d0ec26bfbd073303233096"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
 "pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:ff33446143044332983a0cb7b204b8eca349795a"
