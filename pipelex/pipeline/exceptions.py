@@ -272,6 +272,21 @@ class PipelineInputUrlInvalidError(PipelineInputContentError):
     )
 
 
+class PipelineInputUnreachableError(PipelineInputContentError):
+    """An Image/Document input carries an http(s) url the submission-time probe found dead.
+
+    Raised only on an unambiguous signal — the host does not resolve, refuses the connection,
+    or answers 404/410. Caller-facing on purpose: the message names the input, the url the
+    caller supplied and what the probe saw, all the caller's own facts, never a resolved address.
+    """
+
+    _authors_caller_facing_message = True
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Provide a URL that resolves and serves the resource; the run was refused before it started.",
+    )
+
+
 class PipelineInputUrlMissingError(PipelineInputContentError):
     """An Image/Document input carries a blank url.
 

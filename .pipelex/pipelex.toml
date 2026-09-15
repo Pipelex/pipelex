@@ -218,6 +218,12 @@ is_generate_usage = true
 # Set max_concurrency = "unbounded" to disable the bound.
 max_concurrency = 8
 
+# The submission-time probe over remote inputs: a link that is unambiguously dead refuses the run
+# before it starts; anything the probe cannot decide passes with a warning.
+[interpreter.pipeline_execution.input_reachability]
+is_enabled = true
+timeout_seconds = 5.0
+
 [interpreter.pipeline_execution.graph.data_inclusion]
 # Control what data is included in graph outputs
 stuff_json_content = true

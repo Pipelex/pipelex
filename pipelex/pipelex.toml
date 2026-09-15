@@ -366,6 +366,14 @@ is_generate_usage = true
 # asyncio, memory, and provider rate limits. Set to "unbounded" to disable the bound.
 max_concurrency = 8
 
+# The submission-time probe over a run's remote inputs: every http(s) URL a Document or Image
+# input carries gets one HEAD (not a download) before the run starts, and a link that is
+# unambiguously dead (host unresolvable or refusing, HTTP 404/410) refuses the run. Any other
+# answer, a bot wall's 403 or a slow host included, passes with a warning and the real fetch decides.
+[interpreter.pipeline_execution.input_reachability]
+is_enabled = true
+timeout_seconds = 5.0
+
 [interpreter.pipeline_execution.graph]
 
 [interpreter.pipeline_execution.graph.data_inclusion]

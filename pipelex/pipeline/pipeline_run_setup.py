@@ -22,8 +22,9 @@ from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
     VariableMultiplicity,
 )
-from pipelex.pipeline.exceptions import PipeExecutionError
+from pipelex.pipeline.exceptions import PipeExecutionError, PipelineInputUnreachableError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
+from pipelex.pipeline.input_reachability import collect_remote_input_refs, log_unknown_inputs, probe_remote_inputs
 from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
@@ -333,6 +334,20 @@ async def pipeline_run_setup(
             request_id=request_id,
             inputs_base_dir=inputs_base_dir,
         )
+
+        # The submission-time probe over the caller's remote inputs: once, here, in the process
+        # that accepted the request — never in workflow code, and never over values a pipe
+        # produces mid-run. A dry run fetches nothing, so it is not probed.
+        reachability_config = execution_config.input_reachability
+        if pipe_run_mode.is_live and reachability_config.is_enabled:
+            remote_refs = collect_remote_input_refs(working_memory=pipe_job.get_working_memory())
+            if remote_refs:
+                report = await probe_remote_inputs(refs=remote_refs, timeout_seconds=reachability_config.timeout_seconds)
+                log_unknown_inputs(report=report)
+                if report.unreachable:
+                    details = "; ".join(f"'{verdict.variable_name}' at '{verdict.url}': {verdict.reason}" for verdict in report.unreachable)
+                    msg = f"Run of pipe '{pipe.code}' refused before it started, unreachable input(s): {details}"
+                    raise PipelineInputUnreachableError(msg)
 
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,

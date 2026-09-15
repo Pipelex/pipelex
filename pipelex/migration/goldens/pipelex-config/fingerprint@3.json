@@ -888,6 +888,26 @@
       "default": "dark",
       "open_node": false
     },
+    "interpreter.pipeline_execution.input_reachability": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.input_reachability.is_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.input_reachability.timeout_seconds": {
+      "value_type": "float",
+      "required": true,
+      "default": 5.0,
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
+    },
     "interpreter.pipeline_execution.is_generate_graph": {
       "value_type": "bool",
       "required": true,
