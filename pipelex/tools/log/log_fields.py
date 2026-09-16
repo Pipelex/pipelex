@@ -1,16 +1,18 @@
 """What a record carries beyond its message: the bound context, the call's fields and the structured content.
 
-All three become attributes of the stdlib ``LogRecord`` through ``extra``, which is where a sink reads
-them. The stdlib refuses an ``extra`` key that would overwrite one of the record's own attributes, and
-a library's log call never raises, so a colliding field is carried under a prefixed name instead.
+All three become attributes of the stdlib ``LogRecord``, which is where a sink reads them. The stdlib
+refuses an ``extra`` key that would overwrite one of the record's own attributes, and a library's log
+call never raises, so a colliding entry is carried under a prefixed name instead. The collision is read
+off the record actually built, through whatever record factory is installed, so an attribute a factory
+added is a collision too rather than the stdlib's ``KeyError``.
 """
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import logging
     from collections.abc import Mapping
 
     from pipelex.tools.log.log_context import LogContext
@@ -18,25 +20,11 @@ if TYPE_CHECKING:
 # The attribute a ``dict`` or ``list`` content is carried under, JSON-ready, beside its console rendering.
 DATA_FIELD = "data"
 
-# The prefix a field takes when its name is one the stdlib record already owns.
+# The prefix an entry takes when its name is one the record already owns.
 COLLIDING_FIELD_PREFIX = "field_"
 
-
-def _stdlib_log_record_attributes() -> frozenset[str]:
-    """Every attribute a fresh record carries, read off one so a new Python version cannot silently add one we miss."""
-    probe = logging.LogRecord(name="", level=logging.NOTSET, pathname="", lineno=0, msg="", args=(), exc_info=None)
-    # ``message`` and ``asctime`` are set by the formatter, not the constructor; ``makeRecord`` refuses them too.
-    return frozenset({*vars(probe), "message", "asctime"})
-
-
-STDLIB_LOG_RECORD_ATTRIBUTES: frozenset[str] = _stdlib_log_record_attributes()
-
-
-def record_attribute_name(*, field_name: str) -> str:
-    """The attribute a field lands on: its own name, or the prefixed one when the stdlib owns that name."""
-    if field_name in STDLIB_LOG_RECORD_ATTRIBUTES:
-        return f"{COLLIDING_FIELD_PREFIX}{field_name}"
-    return field_name
+# Set by the formatter rather than the constructor, so a fresh record does not carry them yet and the stdlib refuses them all the same.
+FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime"})
 
 
 def build_log_record_extra(
@@ -54,8 +42,21 @@ def build_log_record_extra(
     if context is not None:
         extra.update(context.fields)
     if fields:
-        for field_name, value in fields.items():
-            extra[record_attribute_name(field_name=field_name)] = value
+        extra.update(fields)
     if data is not None:
         extra[DATA_FIELD] = data
     return extra
+
+
+def attach_log_record_extra(*, record: logging.LogRecord, extra: Mapping[str, Any]) -> None:
+    """Set each entry as an attribute of the record, under a prefixed name when the record already owns that name.
+
+    The record was built by the logger, through the installed record factory, so what it owns is exactly
+    what the stdlib's own ``makeRecord`` would refuse: its declared attributes and anything a factory
+    stamped on it. Entries are attached in order, so an entry that lands on a prefixed name makes that
+    name owned for the entries after it, and no value is lost.
+    """
+    owned = vars(record)
+    for name, value in extra.items():
+        attribute = f"{COLLIDING_FIELD_PREFIX}{name}" if name in owned or name in FORMATTER_OWNED_ATTRIBUTES else name
+        setattr(record, attribute, value)

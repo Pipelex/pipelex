@@ -8,14 +8,19 @@ so a structured sink renders them as fields while the console keeps its narrativ
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 import pytest
+from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.tools.log.log_context import LogContext, get_log_context
-from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD, STDLIB_LOG_RECORD_ATTRIBUTES
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
 if TYPE_CHECKING:
@@ -108,11 +113,43 @@ class TestLogFields:
         assert getattr(record, f"{COLLIDING_FIELD_PREFIX}lineno") == -1
         assert _field(record, name="safe") == 1
 
-    def test_the_reserved_attribute_set_covers_what_the_stdlib_refuses(self) -> None:
-        """Every attribute a fresh ``LogRecord`` carries, plus the two the formatter adds, is reserved."""
-        probe = logging.LogRecord(name="probe", level=logging.INFO, pathname=__file__, lineno=1, msg="m", args=(), exc_info=None)
-        assert set(vars(probe)) <= STDLIB_LOG_RECORD_ATTRIBUTES
-        assert {"message", "asctime"} <= STDLIB_LOG_RECORD_ATTRIBUTES
+    def test_an_attribute_a_record_factory_added_is_a_collision_too(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A record factory (an OpenTelemetry or tracing instrumentation) stamps attributes the stdlib never declared.
+
+        The collision is read off the record actually built, so a field, a context identifier or the
+        ``data`` attribute named like one is prefixed rather than raising ``KeyError`` out of the log call.
+        """
+        previous_factory = logging.getLogRecordFactory()
+
+        def stamping_factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+            record = previous_factory(*args, **kwargs)
+            record.otelTraceID = "trace-from-factory"
+            record.request_id = "request-from-factory"
+            record.data = "data-from-factory"
+            return record
+
+        logging.setLogRecordFactory(stamping_factory)
+        try:
+            with caplog.at_level(logging.INFO), log.context(request_id="r1"):
+                log.info({"key": "value"}, fields={"otelTraceID": "trace-from-call"})
+        finally:
+            logging.setLogRecordFactory(previous_factory)
+
+        (record,) = _own_records(caplog)
+        assert _field(record, name="otelTraceID") == "trace-from-factory"
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}otelTraceID") == "trace-from-call"
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}request_id") == "r1"
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}") == {"key": "value"}
+
+    def test_a_prefixed_name_that_is_itself_given_loses_no_value(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``name`` lands on ``field_name``, which makes that name owned for the ``field_name`` entry after it."""
+        with caplog.at_level(logging.INFO):
+            log.info("both given", fields={"name": "alpha", "field_name": "beta"})
+
+        (record,) = _own_records(caplog)
+        assert record.name == __name__
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}name") == "alpha"
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{COLLIDING_FIELD_PREFIX}name") == "beta"
 
     def test_a_field_overrides_the_context_for_that_record(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.INFO), log.context(request_id="from-context"):
@@ -141,6 +178,26 @@ class TestStructuredContent:
 
         (record,) = _own_records(caplog)
         assert getattr(record, DATA_FIELD) == [1, "two", {"three": 3}]
+
+    def test_a_list_of_models_is_carried_as_json_ready_data(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A python-mode model dump keeps datetimes and the like as objects; ``data`` is what the console rendered, re-read as JSON."""
+
+        class Event(BaseModel):
+            when: datetime
+            price: Decimal
+            ref: UUID
+
+        event = Event(when=datetime(2020, 1, 2, 3, 4, 5, tzinfo=UTC), price=Decimal("1.50"), ref=UUID(int=7))
+        with caplog.at_level(logging.INFO):
+            log.info([event])
+
+        (record,) = _own_records(caplog)
+        data = getattr(record, DATA_FIELD)
+        assert json.loads(json.dumps(data)) == data
+        assert data == json.loads(record.getMessage())
+        assert data[0]["when"] == "2020-01-02 03:04:05+00:00"
+        assert data[0]["price"] == "1.50"
+        assert data[0]["ref"] == str(UUID(int=7))
 
     def test_string_content_carries_no_data(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.INFO):

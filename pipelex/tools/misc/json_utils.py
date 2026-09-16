@@ -368,14 +368,15 @@ def purify_json(
             return [], "[]"
         if isinstance(the_list[0], CustomBaseModel) and is_truncate_bytes_enabled:
             the_list_of_custom_base_models = cast("list[CustomBaseModel]", the_list)
-            pure_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
-            dict_string = json.dumps(pure_list, indent=indent, default=str)
-            return pure_list, dict_string
+            dumped_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
+            dict_string = json.dumps(dumped_list, indent=indent, default=str)
+            # A python-mode dump keeps datetimes and the like as objects; the structure handed back is the rendered JSON.
+            return json.loads(dict_string), dict_string
         if isinstance(the_list[0], BaseModel):
             the_list_of_base_models = cast("list[BaseModel]", the_list)
-            pure_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
-            dict_string = json.dumps(pure_list, indent=indent, default=str)
-            return pure_list, dict_string
+            dumped_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
+            dict_string = json.dumps(dumped_list, indent=indent, default=str)
+            return json.loads(dict_string), dict_string
 
     try:
         dict_string = json.dumps(data, indent=indent)
@@ -429,14 +430,15 @@ def purify_json_list(
         return [], "[]"
     if isinstance(data[0], CustomBaseModel) and is_truncate_bytes_enabled:
         the_list_of_custom_base_models = cast("list[CustomBaseModel]", data)
-        pure_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
-        list_string = json.dumps(pure_list, indent=indent, default=str)
-        return pure_list, list_string
+        dumped_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
+        list_string = json.dumps(dumped_list, indent=indent, default=str)
+        # A python-mode dump keeps datetimes and the like as objects; the structure handed back is the rendered JSON.
+        return json.loads(list_string), list_string
     if isinstance(data[0], BaseModel):
         the_list_of_base_models: list[BaseModel] = data
-        pure_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
-        list_string = json.dumps(pure_list, indent=indent, default=str)
-        return pure_list, list_string
+        dumped_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
+        list_string = json.dumps(dumped_list, indent=indent, default=str)
+        return json.loads(list_string), list_string
 
     try:
         list_string = json.dumps(data, indent=indent)

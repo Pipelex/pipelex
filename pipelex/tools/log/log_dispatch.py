@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig, LogMode
 from pipelex.tools.log.log_context import get_log_context
-from pipelex.tools.log.log_fields import build_log_record_extra
+from pipelex.tools.log.log_fields import attach_log_record_extra, build_log_record_extra
 from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
 
 if TYPE_CHECKING:
@@ -196,7 +196,11 @@ class LogDispatch:
         caller_frame: FrameType | None,
         extra: dict[str, Any],
     ):
-        """Build the record at the caller's location and hand it to the logger's handlers."""
+        """Build the record at the caller's location, attach what it carries, and hand it to the logger's handlers.
+
+        The record is built first and the extra attached afterwards: ``makeRecord`` raises on a key the
+        record already owns, and what it owns is only known once the installed record factory has run.
+        """
         if caller_frame is None:
             pathname, lineno, func_name = UNKNOWN_FILE_NAME, 0, UNKNOWN_FUNCTION_NAME
         else:
@@ -210,6 +214,6 @@ class LogDispatch:
             args=(),
             exc_info=None,
             func=func_name,
-            extra=extra,
         )
+        attach_log_record_extra(record=record, extra=extra)
         logger.handle(record)
