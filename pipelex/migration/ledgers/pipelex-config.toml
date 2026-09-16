@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 4
+current_schema_version = 5
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -375,3 +375,50 @@ key = "stuff_text_content"
 kind = "delete_key"
 table_path = ["interpreter", "pipeline_execution", "graph", "data_inclusion"]
 key = "stuff_html_content"
+
+[[migration]]
+id = "pipelex-config@5"
+to_schema_version = 5
+introduced_in = "0.60.0"
+breaking = true
+safety = "safe"
+title = "Log sinks replace the rich-or-poor log mode"
+description = """
+Where log records go is now a sink selected by `[runtime.log] sink`, a registered token such as \
+`console`, `json` or `otlp`, in place of the `rich` / `poor` log mode. `log_mode`, the poor-logger \
+settings `poor_loggers` and `generic_poor_logger`, and `is_console_logging_enabled` are gone, and are \
+deleted from files that still set them. The new `sink` key is absorbed by the defaults layer, \
+`console`, so a migrated file keeps rendering as it did.
+"""
+guidance = """
+A file that set `log_mode = "poor"` chose a plain handler for a process with no terminal; that process \
+now sets `sink = "json"` in `[runtime.log]`, which is what a log agent ingests without a parser. A \
+`console` selection cannot be remapped from the old value automatically because `sink` is an open \
+token, not an enumeration, so the key is deleted and the default applies.
+
+`is_console_logging_enabled = false` silenced every handler on the root logger. To silence Pipelex's \
+own records set `default_log_level = "OFF"`; to send them somewhere else, select the sink that goes there.
+
+`poor_loggers` and `generic_poor_logger` routed some records to a plain stream handler beside the \
+console; every record now goes to the one selected sink, so there is nothing to carry over.
+"""
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["runtime", "log"]
+key = "log_mode"
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["runtime", "log"]
+key = "poor_loggers"
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["runtime", "log"]
+key = "generic_poor_logger"
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["runtime", "log"]
+key = "is_console_logging_enabled"

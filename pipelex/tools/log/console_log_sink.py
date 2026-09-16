@@ -1,0 +1,85 @@
+"""The ``console`` sink: the Rich handler with the emoji formatter and every ``[runtime.log.rich_log]`` setting.
+
+Rich is imported when the handler is built and nowhere else in this module, so a process that selects
+another sink never loads it, and one that selects this sink without Rich installed fails at boot with
+the extra to install and the ``json`` alternative named, per the plugin system's fail-at-use rule.
+"""
+
+from __future__ import annotations
+
+import sys
+from typing import TYPE_CHECKING
+
+from typing_extensions import override
+
+from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.log.log_config import HighlighterName
+from pipelex.tools.log.log_formatter import EmojiLogFormatter
+from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, stream_for_target
+
+if TYPE_CHECKING:
+    import logging
+
+    from rich.logging import RichHandler
+
+    from pipelex.system.console_target import ConsoleTarget
+    from pipelex.tools.log.log_config import RichLogConfig
+
+# The extra that installs Rich. Rich is a hard dependency today; this is the name the extra takes when it moves.
+RICH_EXTRA_NAME = "cli"
+
+
+class ConsoleLogSink(LogSink):
+    """Today's console rendering, byte for byte: a ``RichHandler`` on the configured stream."""
+
+    def __init__(self, *, rich_log_config: RichLogConfig, target: ConsoleTarget) -> None:
+        super().__init__()
+        self._rich_log_config = rich_log_config
+        self._target = target
+        self._rich_handler: RichHandler | None = None
+
+    @override
+    def make_handler(self) -> logging.Handler:
+        try:
+            from rich.console import Console  # ruff: ignore[import-outside-top-level]
+            from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter  # ruff: ignore[import-outside-top-level]
+            from rich.logging import RichHandler  # ruff: ignore[import-outside-top-level]
+        except ImportError as exc:
+            msg = (
+                f"The '{LogSinkMethod.CONSOLE}' log sink renders through Rich. Install the extra, "
+                f"or select the '{LogSinkMethod.JSON}' sink in [runtime.log] for a process with no terminal."
+            )
+            raise MissingDependencyError(dependency_name="rich", extra_name=RICH_EXTRA_NAME, message=msg) from exc
+
+        config = self._rich_log_config
+        highlighter: Highlighter
+        match config.highlighter_name:
+            case HighlighterName.JSON:
+                highlighter = JSONHighlighter()
+            case HighlighterName.REPR:
+                highlighter = ReprHighlighter()
+        handler = RichHandler(
+            console=Console(file=stream_for_target(target=self._target)),
+            show_time=config.is_show_time,
+            show_level=config.is_show_level,
+            enable_link_path=config.is_link_path_enabled,
+            highlighter=highlighter,
+            markup=config.is_markup_enabled,
+            rich_tracebacks=config.is_rich_tracebacks,
+            tracebacks_word_wrap=config.is_tracebacks_word_wrap,
+            tracebacks_show_locals=config.is_tracebacks_show_locals,
+            tracebacks_suppress=config.tracebacks_suppress,
+            keywords=config.keywords_to_hilight,
+        )
+        handler.setFormatter(EmojiLogFormatter())
+        self._rich_handler = handler
+        return handler
+
+    @override
+    def redirect_to_stderr(self) -> None:
+        from rich.console import Console  # ruff: ignore[import-outside-top-level]
+
+        if self._rich_handler is None:
+            _ = self.handler
+        if self._rich_handler is not None:
+            self._rich_handler.console = Console(file=sys.stderr)

@@ -42,9 +42,12 @@ from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, co
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.validation import MIGRATE_COMMAND, raise_config_setup_error, report_validation_error
+from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES, ENTRY_POINT_GROUPS
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.exceptions import MigrationError
 from pipelex.migration.run import config_directories_to_migrate, migrate_config_directories, scan_config_surface
+from pipelex.plugins.discovery import build_registrar
+from pipelex.plugins.log_sink_registry import LogSinkRegistry
 from pipelex.runtime_hub import RuntimeHub, get_console, set_runtime_hub
 from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager, pydantic_error_behind
 from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID, TELEMETRY_CONFIG_SURFACE_ID, strip_reserved_meta
@@ -1033,7 +1036,10 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
 
     ``log.configure`` is invoked through ``configure_if_unset`` so that if a library
     embedding or interleaved test has already configured logging, this call no-ops
-    instead of raising the once-per-process ``RuntimeError``.
+    instead of raising the once-per-process ``RuntimeError``. When it does apply, the
+    sink is selected the way boot selects it: the pure ``build_registrar`` discovery,
+    then the ``runtime.log.sink`` lookup — the doctor bypasses ``Pipelex.make`` but not
+    the configuration's choice of where its own lines go.
 
     Args:
         log_config_overrides: Optional mapping of ``LogConfig`` field names → values to
@@ -1062,7 +1068,15 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
         deep_update(merged, updates=log_config_overrides)
         log_config = LogConfig.model_validate(merged)
     runtime_hub.set_console_print_target(target=log_config.console_print_target)
-    log.configure_if_unset(log_config=log_config)
+    if log.configure_if_unset(log_config=log_config):
+        registrar = build_registrar(
+            config=get_config(),
+            boot_orchestrator=None,
+            builtin_plugins=BUILTIN_PLUGINS,
+            core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+            entry_point_groups=ENTRY_POINT_GROUPS,
+        )
+        log.install_sink(LogSinkRegistry(registrar.log_sinks).get_required(method=log_config.sink)(log_config))
     runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
     if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
         log.warning(stale_warning)

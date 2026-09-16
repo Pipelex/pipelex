@@ -9,10 +9,10 @@ added is a collision too rather than the stdlib's ``KeyError``.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    import logging
     from collections.abc import Mapping
 
     from pipelex.tools.log.log_context import LogContext
@@ -25,6 +25,16 @@ COLLIDING_FIELD_PREFIX = "field_"
 
 # Set by the formatter rather than the constructor, so a fresh record does not carry them yet and the stdlib refuses them all the same.
 FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime"})
+
+# The attributes the stdlib gives every record, read off one built by the stdlib's own constructor on
+# this interpreter rather than listed by hand, so a version that adds one (``taskName`` arrived with
+# 3.12) is covered. Everything else on a record is what a call, a context or a record factory put there.
+STDLIB_RECORD_ATTRIBUTES: frozenset[str] = (
+    frozenset(
+        vars(logging.LogRecord(name="", level=logging.NOTSET, pathname="", lineno=0, msg="", args=(), exc_info=None)),
+    )
+    | FORMATTER_OWNED_ATTRIBUTES
+)
 
 
 def build_log_record_extra(
@@ -52,14 +62,23 @@ def attach_log_record_extra(*, record: logging.LogRecord, extra: Mapping[str, An
     """Set each entry as an attribute of the record, under a prefixed name when the record already owns that name.
 
     The record was built by the logger, through the installed record factory, so what it owns is exactly
-    what the stdlib's own ``makeRecord`` would refuse: its declared attributes and anything a factory
-    stamped on it. The prefix is applied until the name lands on an attribute nobody owns, and entries
-    are attached in order, so an entry attached earlier under a prefixed name is owned for the entries
-    after it: whatever the order of the mapping, no value is lost.
+    what the stdlib's own ``makeRecord`` would refuse: its declared attributes, anything a factory stamped
+    on it, and what the ``LogRecord`` class itself owns, ``getMessage`` and the dunders among them, which
+    a lookup in the instance dict alone would miss. The prefix is applied until the name lands on an
+    attribute nobody owns, and entries are attached in order, so an entry attached earlier under a
+    prefixed name is owned for the entries after it: whatever the order of the mapping, no value is lost.
     """
-    owned = vars(record)
     for name, value in extra.items():
         attribute = name
-        while attribute in owned or attribute in FORMATTER_OWNED_ATTRIBUTES:
+        while hasattr(record, attribute) or attribute in FORMATTER_OWNED_ATTRIBUTES:
             attribute = f"{COLLIDING_FIELD_PREFIX}{attribute}"
         setattr(record, attribute, value)
+
+
+def carried_attributes(*, record: logging.LogRecord) -> dict[str, Any]:
+    """Everything on the record that is not the stdlib's: the fields, the context identifiers, ``data``, a factory's stamps.
+
+    Read the way a structured sink reads a record, in the order the attributes were attached. A value is
+    handed back as the call gave it: a sink serializes it when it emits, on the calling thread.
+    """
+    return {name: value for name, value in vars(record).items() if name not in STDLIB_RECORD_ATTRIBUTES}

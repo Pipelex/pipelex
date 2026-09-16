@@ -199,3 +199,19 @@ class TestLogFields:
         override, plain = _own_records(caplog)
         assert _field(override, name="request_id") == "from-call-site"
         assert _field(plain, name="request_id") == "from-context"
+
+    @pytest.mark.parametrize("name", ["__class__", "__dict__", "getMessage"])
+    def test_a_name_the_record_class_owns_is_prefixed_and_the_record_survives(self, caplog: pytest.LogCaptureFixture, name: str) -> None:
+        """A name owned by the ``LogRecord`` class rather than the instance is a collision too.
+
+        Set on the instance, ``__class__`` and ``__dict__`` raise ``TypeError`` out of the log call and
+        ``getMessage`` shadows the method so every formatter fails and the stdlib drops the record. Each is
+        carried under the prefix instead, and the record still formats.
+        """
+        with caplog.at_level(logging.INFO):
+            log.info("class-owned", fields={name: "given"})
+
+        (record,) = _own_records(caplog)
+        assert record.getMessage() == "class-owned"
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{name}") == "given"
+        assert logging.Formatter("%(message)s").format(record) == "class-owned"

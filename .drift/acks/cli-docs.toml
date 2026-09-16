@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:0f04ef9927c69cc0d91d68490a0dfe4f65840553414fd92773028b3192630db4"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-09-16T08:54:19Z"
-rationale = "Round-2 review fix in graph_cmd: the refused-spec handler now escapes its message before handing it to log.error and console.print, so a user path holding square brackets prints as written instead of being swallowed or raising MarkupError; no flag, option, exit code or output contract moved. Listed docs/tools/cli: it has no page for graph render. Grepped pipelex/cli/agent_cli/CLAUDE.md: its graph mentions are the agent run and validate graph options, none of which this touches. Nothing stale."
+digest = "sha256:f0c448506224c353bc46bb26f43419dd07bc9465fdc67c2a7b0446e7935916f9"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-09-16T18:14:06Z"
+rationale = "doctor_cmd.py now installs the configured log sink through the plugin registrar right after configuring the log in setup_doctor_runtime; no command, flag, option, exit code or output contract moved. Reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md: neither describes how doctor wires its logging, nothing stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "Round-2 review fix in graph_cmd: the refused-spec handler now escap
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:d800566d0f69b766131baa0f64ee9f9fbb41cf57"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:f7e17982b9e05d098d361cdd61790d98e2c5b110"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"

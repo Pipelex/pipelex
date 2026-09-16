@@ -43,9 +43,12 @@ class TestLogBeforeConfigure:
             fresh.info({"structured": "content"}, title="Data")
 
         assert logging.getLogger().handlers == root_handlers_before
-        messages = [record.getMessage() for record in _own_records(caplog)]
+        records = _own_records(caplog)
+        messages = [record.getMessage() for record in records]
         assert messages[:5] == ["verbose", "debug", "dev", "info", "warning"]
-        assert messages[5].startswith("error\nTraceback")
+        assert messages[5] == "error"
+        assert records[5].exc_info is not None
+        assert records[5].exc_info[0] is ValueError
         assert messages[6] == "critical"
         assert messages[7].startswith("Data:")
         assert all(record.name == __name__ for record in _own_records(caplog))

@@ -33,6 +33,10 @@ _GUARD_SCRIPT = textwrap.dedent(
         # discovery/registration in core must never pull one in.
         "fastapi",
         "starlette",
+        # Nor the OpenTelemetry SDK and its exporters: the built-in ``otlp`` log sink defers them into
+        # its factory, so registering the sinks must not load them.
+        "opentelemetry.sdk",
+        "opentelemetry.exporter",
     )
 
     class _Blocker(importlib.abc.MetaPathFinder):
@@ -73,6 +77,9 @@ _GUARD_SCRIPT = textwrap.dedent(
     # google-cloud-storage: the s3/gcp SDK guards live inside the providers' I/O methods, so
     # registration stays import-light even though those SDKs are BLOCKED above.
     assert registrar.storage_providers, "expected the built-in storage providers to be registered import-light"
+    # The built-in LogSinkPlugin registers the three sinks without importing the OpenTelemetry SDK:
+    # the ``otlp`` factory imports it when the sink is selected, never at register.
+    assert registrar.log_sinks, "expected the built-in log sinks to be registered import-light"
     print("import-light OK")
     """
 )

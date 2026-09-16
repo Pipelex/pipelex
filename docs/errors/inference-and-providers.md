@@ -120,6 +120,7 @@ own page. Classes are grouped by subsystem.
 - [`DuplicateBundleValidatorError`](duplicate-bundle-validator-error.md) — Duplicate bundle validator
 - [`DuplicateHttpErrorMapperError`](duplicate-http-error-mapper-error.md) — Duplicate http error mapper
 - [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
+- [`DuplicateLogSinkError`](duplicate-log-sink-error.md) — Duplicate log sink
 - [`DuplicateModelListerError`](duplicate-model-lister-error.md) — Duplicate model lister
 - [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator
 - [`DuplicatePipeFuncExecutorError`](duplicate-pipe-func-executor-error.md) — Duplicate pipe func executor
@@ -133,6 +134,7 @@ own page. Classes are grouped by subsystem.
 - [`PluginLayerViolationError`](plugin-layer-violation-error.md) — Plugin layer violation
 - [`RetiredPluginEntryPointGroupError`](retired-plugin-entry-point-group-error.md) — Retired plugin entry point group
 - [`UnknownBootOrchestratorError`](unknown-boot-orchestrator-error.md) — Unknown boot orchestrator
+- [`UnknownLogSinkError`](unknown-log-sink-error.md) — Unknown log sink
 - [`UnknownPipeFuncExecutionModeError`](unknown-pipe-func-execution-mode-error.md) — Unknown pipe func execution mode
 - [`UnknownSecretsMethodError`](unknown-secrets-method-error.md) — Unknown secrets method
 - [`UnknownStorageMethodError`](unknown-storage-method-error.md) — Unknown storage method

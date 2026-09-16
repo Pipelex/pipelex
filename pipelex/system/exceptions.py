@@ -54,9 +54,7 @@ class TracebackMessageError(PipelexError):
         logger_name = __name__
         match self.__class__.error_mode:
             case TracebackMessageErrorMode.ERROR:
-                generic_poor_logger = "#poor-log"
-                logger = logging.getLogger(generic_poor_logger)
-                logger.error(message)
+                logging.getLogger(logger_name).error(message)
             case TracebackMessageErrorMode.EXCEPTION:
                 self.logger = logging.getLogger(logger_name)
                 self.logger.exception(message)

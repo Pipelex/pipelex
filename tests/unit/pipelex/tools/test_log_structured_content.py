@@ -105,3 +105,33 @@ class TestStructuredContent:
         (record,) = _own_records(caplog)
         assert record.getMessage() == "Empty:\nNone"
         assert not hasattr(record, DATA_FIELD)
+
+    def test_a_circular_reference_is_rendered_as_its_repr_and_never_raises(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``json.dumps`` raises ``ValueError`` on a cycle, which the JSON helpers do not catch; a log call never raises."""
+        cyclic: dict[str, Any] = {"name": "loop"}
+        cyclic["self"] = cyclic
+        with caplog.at_level(logging.INFO):
+            log.info(cyclic, title="Cycle")
+
+        (record,) = _own_records(caplog)
+        assert record.getMessage().startswith("Cycle:\n")
+        assert "loop" in record.getMessage()
+        assert not hasattr(record, DATA_FIELD)
+
+    def test_a_non_string_key_is_rendered_as_its_repr_and_never_raises(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``json.dumps`` applies ``default`` to values and not to keys, so a tuple key raises ``TypeError`` from every fallback."""
+        keyed: dict[Any, Any] = {(1, 2): "a"}
+        with caplog.at_level(logging.INFO):
+            log.info(keyed)
+
+        (record,) = _own_records(caplog)
+        assert "(1, 2)" in record.getMessage()
+        assert not hasattr(record, DATA_FIELD)
+
+    def test_a_scalar_content_is_carried_as_itself(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``data`` is whatever the JSON rendering parses back to, a scalar for a scalar content."""
+        with caplog.at_level(logging.INFO):
+            log.info(42)
+
+        (record,) = _own_records(caplog)
+        assert getattr(record, DATA_FIELD) == 42
