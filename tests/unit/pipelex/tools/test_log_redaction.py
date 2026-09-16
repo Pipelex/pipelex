@@ -267,6 +267,20 @@ class TestLogRedaction:
         assert record.getMessage() == f"token {REDACTED_TEXT}"
         assert getattr(record, FIELD_NAME) == "line\\nforged"
 
+    def test_a_sink_installed_again_after_a_reset_carries_one_redaction_processor(self, fresh_log: Log) -> None:
+        """``reset`` takes back the processor ``install_sink`` put on the sink, so a reused sink object does not scrub twice or under a stale configuration."""
+        sink = _ListSink()
+        fresh_log.configure(log_config=_package_log_config())
+        fresh_log.install_sink(sink)
+        processors_after_one_install = list(sink.processors)
+
+        fresh_log.reset()
+        assert sink.processors == []
+        fresh_log.configure(log_config=_package_log_config())
+        fresh_log.install_sink(sink)
+
+        assert len(sink.processors) == len(processors_after_one_install)
+
     def test_no_processor_is_installed_when_the_configuration_turns_redaction_off(self, fresh_log: Log) -> None:
         fresh_log.configure(log_config=_package_log_config(is_redaction_enabled=False))
         sink = _ListSink()

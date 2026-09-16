@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from pipelex.tools.log.log_config import LogConfig
     from pipelex.tools.log.log_context import LogContext
-    from pipelex.tools.log.log_sink import LogSink
+    from pipelex.tools.log.log_sink import LogRecordProcessor, LogSink
 
 
 def _finish_teardown_step(*, sink: LogSink, verb: str, step: Callable[[], None]) -> None:
@@ -58,6 +58,8 @@ class Log:
         self._log_config_instance: LogConfig | None = None
         self._holding_handler: HoldingLogHandler | None = None
         self._sink: LogSink | None = None
+        # The redaction processor ``install_sink`` put on the sink, so ``reset`` can take it back.
+        self._redaction_processor: LogRecordProcessor | None = None
         self.log_dispatch: LogDispatch = LogDispatch()
 
     @property
@@ -77,9 +79,10 @@ class Log:
         holds, and nothing that flush or close raises escapes: this runs first in the runtime's release
         of its process globals, and an error out of it would skip the rest and leave the process
         unbootable. The close runs whatever the flush did, since the close is what stops an exporter's
-        thread, ships its last batch and unregisters what it put at exit. A holding handler still in
-        place, because the boot died before its sink arrived, is closed too, and what it holds gets the
-        stdlib's last-resort handling.
+        thread, ships its last batch and unregisters what it put at exit. The redaction processor
+        ``install_sink`` put on the sink is taken back, so a sink object installed again carries the
+        next configuration's and not two. A holding handler still in place, because the boot died
+        before its sink arrived, is closed too, and what it holds gets the stdlib's last-resort handling.
         """
         root_logger = logging.getLogger()
         try:
@@ -91,6 +94,7 @@ class Log:
                     _finish_teardown_step(sink=sink, verb="flush", step=handler.flush)
                 finally:
                     _finish_teardown_step(sink=sink, verb="close", step=handler.close)
+                    self._take_back_redaction_processor(sink=sink)
             if self._holding_handler is not None:
                 holding, self._holding_handler = self._holding_handler, None
                 root_logger.removeHandler(holding)
@@ -149,6 +153,17 @@ class Log:
 
         self.verbose("Logs configured and config set")
 
+    def _take_back_redaction_processor(self, *, sink: LogSink) -> None:
+        """Remove from the sink the processor ``install_sink`` put there, so a sink installed again under another configuration carries only that one's.
+
+        Guarded, since a sink is free to have replaced its list; a processor that is no longer there is nothing to take back.
+        """
+        processor, self._redaction_processor = self._redaction_processor, None
+        if processor is None:
+            return
+        with contextlib.suppress(ValueError):
+            sink.processors.remove(processor)
+
     def install_sink(self, sink: LogSink):
         """Put the sink's handler on the root logger and replay through it every record held since ``configure``.
 
@@ -175,7 +190,9 @@ class Log:
         if redaction.is_enabled:
             # Ahead of whatever the sink appended, so a processor that renders or enriches a record
             # works on one the secrets have already left, and cannot put back what the scrub removed.
-            sink.processors.insert(0, make_redaction_processor(config=redaction))
+            # Remembered, so ``reset`` takes it back off a sink object a caller installs again.
+            self._redaction_processor = make_redaction_processor(config=redaction)
+            sink.processors.insert(0, self._redaction_processor)
 
         handler = sink.handler
         # Ahead of every other filter, so the sink's processors never run on a record it rejects.
