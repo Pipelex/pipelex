@@ -3,7 +3,9 @@
 Each record becomes one OTel log record on the logger named after the emitting module: the message
 is the body, the level maps onto the OTel severity scale, the record's fields, context identifiers and
 ``data`` ride as attributes, with a value the wire cannot carry as is written as JSON text, and an
-exception lands under the ``exception.*`` semantic-convention keys. The records the sink's own export
+exception lands under the ``exception.type`` and ``exception.stacktrace`` semantic-convention keys,
+the stacktrace being the record's rendered exception text so that what the redaction processor
+scrubbed is what leaves. The records the sink's own export
 path emits, the SDK's and the transport's, are rejected by a filter on the handler and never
 exported. This module imports the OpenTelemetry SDK at load, which is why the built-in plugin imports
 it inside the ``otlp`` factory and nowhere else.
@@ -155,9 +157,12 @@ class OtlpLogHandler(logging.Handler):
             exc_type, exc_value, exc_traceback = record.exc_info
             if exc_type is not None:
                 attributes[exception_attributes.EXCEPTION_TYPE] = exc_type.__name__
-            if exc_value is not None:
-                attributes[exception_attributes.EXCEPTION_MESSAGE] = str(exc_value)
-            if exc_traceback is not None:
+            # The type and the stacktrace, whose last line is the exception's own text, and no message
+            # attribute: ``str(exc_value)`` is the one rendering nothing before this sink can scrub,
+            # whereas ``exc_text`` is what the redaction processor rendered and scrubbed, when it ran.
+            if record.exc_text:
+                attributes[exception_attributes.EXCEPTION_STACKTRACE] = record.exc_text
+            elif exc_traceback is not None:
                 attributes[exception_attributes.EXCEPTION_STACKTRACE] = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
         return attributes
 

@@ -22,6 +22,7 @@ from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_K
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
+from pipelex.tools.log.log_redaction import REDACTED_TEXT
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
@@ -112,6 +113,19 @@ class TestJsonLogSink:
         assert line[MESSAGE_KEY] == "failed"
         assert "Traceback (most recent call last)" in line[EXCEPTION_KEY]
         assert "ValueError: boom" in line[EXCEPTION_KEY]
+
+    def test_a_secret_in_an_exceptions_message_is_scrubbed_from_the_exception_value(self, json_log: tuple[Log, io.StringIO]) -> None:
+        fresh, buffer = json_log
+        try:
+            msg = "refused: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.body.sig for sk_live_0123456789abcdef"
+            raise RuntimeError(msg)
+        except RuntimeError:
+            fresh.error("call failed", include_exception=True)
+
+        (line,) = _own_lines(buffer)
+        assert "eyJhbGciOiJIUzI1NiJ9" not in line[EXCEPTION_KEY]
+        assert "sk_live_0123456789abcdef" not in line[EXCEPTION_KEY]
+        assert line[EXCEPTION_KEY].endswith(f"RuntimeError: refused: Authorization: Bearer {REDACTED_TEXT} for {REDACTED_TEXT}")
 
     def test_no_ansi_ever_even_for_a_warning_or_an_error(self, json_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = json_log

@@ -9,6 +9,7 @@ newlines, which are the runtime's own rendering and not a caller's string.
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -196,6 +197,32 @@ class TestLogRedaction:
         assert sink.processors == []
         assert record.getMessage() == "token sk_live_0123456789abcdef"
         assert getattr(record, FIELD_NAME) == "line\nkept"
+
+    def test_an_exceptions_text_is_rendered_and_scrubbed_before_any_sink_reads_it(self) -> None:
+        """The stdlib renders the traceback lazily into ``exc_text``; the processor renders it first, scrubbed, and every formatter reads that."""
+        try:
+            msg = "auth failed for sk_live_0123456789abcdef with Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.body.sig"
+            raise RuntimeError(msg)
+        except RuntimeError:
+            record = logging.LogRecord(name=__name__, level=logging.ERROR, pathname="", lineno=0, msg="failed", args=(), exc_info=sys.exc_info())
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        assert record.exc_info is not None
+        assert record.exc_text is not None
+        assert "Traceback (most recent call last)" in record.exc_text
+        assert record.exc_text.endswith(f"RuntimeError: auth failed for {REDACTED_TEXT} with Authorization: Bearer {REDACTED_TEXT}")
+        assert logging.Formatter().format(record).endswith(record.exc_text)
+
+    def test_an_already_rendered_exception_text_is_scrubbed_in_place(self) -> None:
+        record = _record(text="failed")
+        record.exc_text = "RuntimeError: key sk_live_0123456789abcdef refused"
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        assert record.exc_text == f"RuntimeError: key {REDACTED_TEXT} refused"
 
     def test_a_record_whose_message_cannot_be_rendered_keeps_its_scrubbed_fields_and_raises_nothing(self) -> None:
         record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="%d items", args=("not a number",), exc_info=None)

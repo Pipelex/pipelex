@@ -26,13 +26,13 @@ line sitting at any depth of it is caught by the families that need no context.
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any, cast
 
 from pipelex.tools.log.log_fields import carried_attributes
 
 if TYPE_CHECKING:
-    import logging
     from collections.abc import Sequence
 
     from pipelex.tools.log.log_config import LogRedactionConfig
@@ -79,6 +79,10 @@ CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 # The escapes a reader recognises, for the three control characters that have a spelling of their own.
 _NAMED_ESCAPES = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
 
+# The stdlib's own rendering of an exception, chain included, which is what ``Formatter.format`` would
+# have put in ``exc_text`` had the processor not got there first.
+_EXCEPTION_FORMATTER = logging.Formatter()
+
 
 def _escaped_control_character(match: re.Match[str]) -> str:  # kw-only: ignore — ``re.sub`` calls its replacement positionally
     """The printable spelling of one control character: its named escape, or its hexadecimal one."""
@@ -117,7 +121,7 @@ def make_redaction_processor(*, config: LogRedactionConfig) -> LogRecordProcesso
 
 
 def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:
-    """Scrub the record's message, and scrub and neutralise every string the record carries."""
+    """Scrub the record's message and its exception text, and scrub and neutralise every string the record carries."""
     message = _rendered_message(record=record)
     if message is not None:
         scrubbed = scrub_secrets(text=message, patterns=patterns)
@@ -127,8 +131,27 @@ def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPatter
             # reading ``msg`` gets it too rather than the template the arguments would fill back in.
             record.msg = scrubbed
             record.args = ()
+    _redact_exception_text(record=record, patterns=patterns)
     for name, value in carried_attributes(record=record).items():
         setattr(record, name, _clean_value(value=value, patterns=patterns, open_containers=set()))
+
+
+def _redact_exception_text(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:
+    """Render the exception the stdlib way, scrubbed, into ``exc_text``, where every formatter reads it first.
+
+    ``Formatter.format`` renders ``exc_info`` into ``exc_text`` lazily and only when it is not already
+    there, and the ``json`` sink reads it the same way, so a rendering put there before any sink runs
+    is the one they all write. The exception object itself stays on the record, since a rendering can
+    be scrubbed and an exception cannot; a sink that renders from the object rather than the text, the
+    console's Rich traceback, is outside what this covers. A stack summary the call asked for rides
+    ``stack_info`` as text already and is scrubbed in place.
+    """
+    if record.exc_text:
+        record.exc_text = scrub_secrets(text=record.exc_text, patterns=patterns)
+    elif record.exc_info:
+        record.exc_text = scrub_secrets(text=_EXCEPTION_FORMATTER.formatException(record.exc_info), patterns=patterns)
+    if record.stack_info:
+        record.stack_info = scrub_secrets(text=record.stack_info, patterns=patterns)
 
 
 def _rendered_message(*, record: logging.LogRecord) -> str | None:
