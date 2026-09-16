@@ -10,6 +10,7 @@ goes to the stdlib's default handling.
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 import traceback
 from pathlib import Path
@@ -163,13 +164,16 @@ class LogDispatch:
             return "None", None
 
         indent = log_config.json_logs_indent if log_config is not None else None
-        data: Any
         if isinstance(content, dict):
-            data, rendered = purify_json_dict(data=content, indent=indent, is_warning_enabled=True)
+            _, rendered = purify_json_dict(data=content, indent=indent, is_warning_enabled=True)
         elif isinstance(content, list):
-            data, rendered = purify_json_list(data=cast("list[Any]", content), indent=indent, is_truncate_bytes_enabled=True)
+            _, rendered = purify_json_list(data=cast("list[Any]", content), indent=indent, is_truncate_bytes_enabled=True)
         else:
-            data, rendered = purify_json(data=content, indent=indent, is_truncate_bytes_enabled=True, is_warning_enabled=False)
+            _, rendered = purify_json(data=content, indent=indent, is_truncate_bytes_enabled=True, is_warning_enabled=False)
+        # The structure the helpers hand back is the caller's own object whenever it was JSON-clean as
+        # given, and a sink that serializes later would read whatever the caller did to it since. The
+        # data is therefore the rendering re-read: a snapshot of the call, JSON-ready whatever it held.
+        data: Any = json.loads(rendered)
         message = f"\n{rendered}"
         if title is not None:
             message = f"{title}:{message}"

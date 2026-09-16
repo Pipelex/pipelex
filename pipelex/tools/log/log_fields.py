@@ -53,10 +53,13 @@ def attach_log_record_extra(*, record: logging.LogRecord, extra: Mapping[str, An
 
     The record was built by the logger, through the installed record factory, so what it owns is exactly
     what the stdlib's own ``makeRecord`` would refuse: its declared attributes and anything a factory
-    stamped on it. Entries are attached in order, so an entry that lands on a prefixed name makes that
-    name owned for the entries after it, and no value is lost.
+    stamped on it. The prefix is applied until the name lands on an attribute nobody owns, and entries
+    are attached in order, so an entry attached earlier under a prefixed name is owned for the entries
+    after it: whatever the order of the mapping, no value is lost.
     """
     owned = vars(record)
     for name, value in extra.items():
-        attribute = f"{COLLIDING_FIELD_PREFIX}{name}" if name in owned or name in FORMATTER_OWNED_ATTRIBUTES else name
+        attribute = name
+        while attribute in owned or attribute in FORMATTER_OWNED_ATTRIBUTES:
+            attribute = f"{COLLIDING_FIELD_PREFIX}{attribute}"
         setattr(record, attribute, value)

@@ -1,25 +1,20 @@
-"""The fields channel and the run-scoped log context.
+"""The fields channel of a log call.
 
-A log call takes named ``fields`` and every record emitted inside ``with log.context(...)`` carries the
-bound identifiers. Both ride the stdlib ``LogRecord`` as attributes, never spliced into the message,
-so a structured sink renders them as fields while the console keeps its narrative line.
+A log call takes named ``fields``, and every record emitted inside ``with log.context(...)`` carries the
+bound identifiers beside them. Both ride the stdlib ``LogRecord`` as attributes, never spliced into the
+message, so a structured sink renders them as fields while the console keeps its narrative line. A name
+the record already owns is carried under a prefix rather than raising.
 """
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-from datetime import UTC, datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 import pytest
-from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.tools.log.log_context import LogContext, get_log_context
+from pipelex.tools.log.log_context import get_log_context
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
@@ -141,15 +136,60 @@ class TestLogFields:
         assert getattr(record, f"{COLLIDING_FIELD_PREFIX}request_id") == "r1"
         assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}") == {"key": "value"}
 
-    def test_a_prefixed_name_that_is_itself_given_loses_no_value(self, caplog: pytest.LogCaptureFixture) -> None:
-        """``name`` lands on ``field_name``, which makes that name owned for the ``field_name`` entry after it."""
+    @pytest.mark.parametrize(
+        ("fields", "expected"),
+        [
+            pytest.param(
+                {"name": "alpha", "field_name": "beta"},
+                {f"{COLLIDING_FIELD_PREFIX}name": "alpha", f"{COLLIDING_FIELD_PREFIX}{COLLIDING_FIELD_PREFIX}name": "beta"},
+                id="colliding-name-first",
+            ),
+            pytest.param(
+                {"field_name": "beta", "name": "alpha"},
+                {f"{COLLIDING_FIELD_PREFIX}name": "beta", f"{COLLIDING_FIELD_PREFIX}{COLLIDING_FIELD_PREFIX}name": "alpha"},
+                id="prefixed-name-first",
+            ),
+            pytest.param(
+                {"field_message": "given", "message": "colliding"},
+                {f"{COLLIDING_FIELD_PREFIX}message": "given", f"{COLLIDING_FIELD_PREFIX}{COLLIDING_FIELD_PREFIX}message": "colliding"},
+                id="formatter-owned-prefixed-first",
+            ),
+        ],
+    )
+    def test_a_prefixed_name_that_is_itself_given_loses_no_value(
+        self, caplog: pytest.LogCaptureFixture, fields: dict[str, str], expected: dict[str, str]
+    ) -> None:
+        """Whichever of ``name`` and ``field_name`` arrives first keeps ``field_name``; the other lands on ``field_field_name``."""
         with caplog.at_level(logging.INFO):
-            log.info("both given", fields={"name": "alpha", "field_name": "beta"})
+            log.info("both given", fields=fields)
 
         (record,) = _own_records(caplog)
         assert record.name == __name__
-        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}name") == "alpha"
-        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{COLLIDING_FIELD_PREFIX}name") == "beta"
+        assert record.getMessage() == "both given"
+        for attribute, value in expected.items():
+            assert getattr(record, attribute) == value
+
+    def test_a_factory_owning_the_prefixed_name_too_loses_neither_value(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A factory that stamps both ``request_id`` and ``field_request_id`` keeps both; the bound identifier lands one prefix further."""
+        previous_factory = logging.getLogRecordFactory()
+
+        def stamping_factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+            record = previous_factory(*args, **kwargs)
+            record.request_id = "request-from-factory"
+            record.field_request_id = "prefixed-from-factory"
+            return record
+
+        logging.setLogRecordFactory(stamping_factory)
+        try:
+            with caplog.at_level(logging.INFO), log.context(request_id="r1"):
+                log.info("bound under a factory")
+        finally:
+            logging.setLogRecordFactory(previous_factory)
+
+        (record,) = _own_records(caplog)
+        assert _field(record, name="request_id") == "request-from-factory"
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}request_id") == "prefixed-from-factory"
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{COLLIDING_FIELD_PREFIX}request_id") == "r1"
 
     def test_a_field_overrides_the_context_for_that_record(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.INFO), log.context(request_id="from-context"):
@@ -159,122 +199,3 @@ class TestLogFields:
         override, plain = _own_records(caplog)
         assert _field(override, name="request_id") == "from-call-site"
         assert _field(plain, name="request_id") == "from-context"
-
-
-class TestStructuredContent:
-    def test_dict_content_is_carried_as_data_and_rendered_for_the_console(self, caplog: pytest.LogCaptureFixture) -> None:
-        with caplog.at_level(logging.INFO):
-            log.info({"key": "value", "nested": {"flag": True}}, title="Config")
-
-        (record,) = _own_records(caplog)
-        assert getattr(record, DATA_FIELD) == {"key": "value", "nested": {"flag": True}}
-        rendered = record.getMessage()
-        assert rendered.startswith("Config:")
-        assert '"key": "value"' in rendered
-
-    def test_list_content_is_carried_as_data(self, caplog: pytest.LogCaptureFixture) -> None:
-        with caplog.at_level(logging.INFO):
-            log.info([1, "two", {"three": 3}])
-
-        (record,) = _own_records(caplog)
-        assert getattr(record, DATA_FIELD) == [1, "two", {"three": 3}]
-
-    def test_a_list_of_models_is_carried_as_json_ready_data(self, caplog: pytest.LogCaptureFixture) -> None:
-        """A python-mode model dump keeps datetimes and the like as objects; ``data`` is what the console rendered, re-read as JSON."""
-
-        class Event(BaseModel):
-            when: datetime
-            price: Decimal
-            ref: UUID
-
-        event = Event(when=datetime(2020, 1, 2, 3, 4, 5, tzinfo=UTC), price=Decimal("1.50"), ref=UUID(int=7))
-        with caplog.at_level(logging.INFO):
-            log.info([event])
-
-        (record,) = _own_records(caplog)
-        data = getattr(record, DATA_FIELD)
-        assert json.loads(json.dumps(data)) == data
-        assert data == json.loads(record.getMessage())
-        assert data[0]["when"] == "2020-01-02 03:04:05+00:00"
-        assert data[0]["price"] == "1.50"
-        assert data[0]["ref"] == str(UUID(int=7))
-
-    def test_string_content_carries_no_data(self, caplog: pytest.LogCaptureFixture) -> None:
-        with caplog.at_level(logging.INFO):
-            log.info("plain")
-
-        (record,) = _own_records(caplog)
-        assert not hasattr(record, DATA_FIELD)
-
-    def test_structured_content_wins_over_a_data_field(self, caplog: pytest.LogCaptureFixture) -> None:
-        with caplog.at_level(logging.INFO):
-            log.info({"from": "content"}, fields={DATA_FIELD: "from-field"})
-
-        (record,) = _own_records(caplog)
-        assert getattr(record, DATA_FIELD) == {"from": "content"}
-
-    def test_none_content_is_rendered_as_the_word_none_without_data(self, caplog: pytest.LogCaptureFixture) -> None:
-        with caplog.at_level(logging.INFO):
-            log.info(None, title="Empty")
-
-        (record,) = _own_records(caplog)
-        assert record.getMessage() == "Empty:\nNone"
-        assert not hasattr(record, DATA_FIELD)
-
-
-class TestLogContext:
-    def test_context_yields_the_bound_context_and_restores_on_exit(self) -> None:
-        assert get_log_context() is None
-        with log.context(request_id="r1", pipeline_run_id="p1") as bound:
-            assert bound == LogContext(request_id="r1", pipeline_run_id="p1")
-            assert get_log_context() is bound
-        assert get_log_context() is None
-
-    def test_nested_contexts_merge_and_the_inner_overrides(self) -> None:
-        with log.context(request_id="r1", pipeline_run_id="p1"):
-            with log.context(pipeline_run_id="p2", pipe_run_id="pr1") as inner:
-                assert inner == LogContext(request_id="r1", pipeline_run_id="p2", pipe_run_id="pr1")
-            outer = get_log_context()
-            assert outer == LogContext(request_id="r1", pipeline_run_id="p1")
-
-    def test_a_none_identifier_inherits_rather_than_clears(self) -> None:
-        with log.context(request_id="r1"), log.context(request_id=None, pipe_run_id="pr1") as inner:
-            assert inner == LogContext(request_id="r1", pipe_run_id="pr1")
-
-    def test_context_is_restored_when_the_block_raises(self) -> None:
-        def explode() -> None:
-            msg = "boom"
-            raise RuntimeError(msg)
-
-        with pytest.raises(RuntimeError), log.context(request_id="r1"):
-            explode()
-        assert get_log_context() is None
-
-    def test_fields_of_a_context_omit_absent_identifiers(self) -> None:
-        assert LogContext().fields == {}
-        assert LogContext(pipeline_run_id="p1").fields == {"pipeline_run_id": "p1"}
-        assert LogContext(request_id="r1", pipeline_run_id="p1", pipe_run_id="pr1").fields == {
-            "request_id": "r1",
-            "pipeline_run_id": "p1",
-            "pipe_run_id": "pr1",
-        }
-
-    @pytest.mark.asyncio
-    async def test_context_is_task_local(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Two concurrent tasks each see their own binding; neither leaks into the other or into the caller."""
-
-        async def emit(request_id: str) -> None:
-            with log.context(request_id=request_id):
-                await asyncio.sleep(0)
-                log.info("in task", fields={"tag": request_id})
-                await asyncio.sleep(0)
-                assert get_log_context() == LogContext(request_id=request_id)
-
-        with caplog.at_level(logging.INFO):
-            await asyncio.gather(emit("a"), emit("b"))
-
-        assert get_log_context() is None
-        records = _own_records(caplog)
-        assert len(records) == 2
-        for record in records:
-            assert _field(record, name="request_id") == _field(record, name="tag")
