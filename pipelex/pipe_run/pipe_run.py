@@ -35,6 +35,23 @@ class PipeRun(PipeRunProtocol):
         *,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
+        job_metadata = pipe_job.job_metadata
+        pipeline_run_id: str = job_metadata.run_metadata.pipeline_run_id
+        # The run's identifiers ride the payload; here is where a direct-mode run binds them onto every
+        # record it emits, the delivery's included. The binding is released when the run returns.
+        with log.context(
+            request_id=job_metadata.run_metadata.request_id,
+            pipeline_run_id=pipeline_run_id,
+            pipe_run_id=job_metadata.pipe_run_id,
+        ):
+            return await self._run_bound(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+
+    async def _run_bound(
+        self,
+        *,
+        pipe_job: PipeJob,
+        delivery_assignment: DeliveryAssignment | None,
+    ) -> PipeOutput:
         pipeline_run_id: str = pipe_job.job_metadata.run_metadata.pipeline_run_id
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
