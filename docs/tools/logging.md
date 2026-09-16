@@ -1,13 +1,13 @@
 ---
 title: "Logging"
-description: "Explore Pipelex logging: named fields, the run-scoped context, module-named loggers, custom log levels, Rich console formatting and structured data logging."
+description: "Explore Pipelex logging: named fields, the run-scoped context, module-named loggers, custom log levels, the console, json and otlp sinks and structured data logging."
 ---
 
 # Pipelex Logging System
 
 ## Overview
 
-Pipelex logs through one facade, `from pipelex import log`, built on Python's standard `logging`. A call takes a message, optional named fields and the usual presentation options; the run-scoped identifiers are bound once at a process entry and stamped onto every record emitted in scope. Fields and identifiers ride the stdlib `LogRecord` as attributes, never spliced into the message text, so a structured sink renders them as fields while the console keeps a narrative line.
+Pipelex logs through one facade, `from pipelex import log`, built on Python's standard `logging`. A call takes a message, optional named fields and the usual presentation options; the run-scoped identifiers are bound once at a process entry and stamped onto every record emitted in scope. Fields and identifiers ride the stdlib `LogRecord` as attributes, never spliced into the message text, so a structured sink renders them as fields while the console keeps a narrative line. Where the records go is one config key, `sink` under `[runtime.log]`: `console` renders them through Rich, `json` writes one JSON object per line, `otlp` ships them to an OpenTelemetry collector, and a plugin can register another. The keys are in [Logging Configuration](../configuration/config-practical/logging-config.md) and the seam itself in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md).
 
 ## Log Levels
 
@@ -48,7 +48,7 @@ log.verbose(data, title="Configuration")
 # Warning with problem ID
 log.warning("API rate limit approaching", problem_id="rate_limit_warning")
 
-# Error with exception traceback
+# Error carrying the exception being handled, for the sink to render
 log.error("Failed to process", include_exception=True)
 
 # Development logging
@@ -58,13 +58,13 @@ log.dev("Testing new feature")
 log.verbose("Detailed debug information")
 ```
 
-Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields`. `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside it.
+Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields`. `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside it. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
 
 ## Fields
 
 `fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.files` for the example above, or `%(files)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
 
-A value can be anything; the console ignores it and a structured sink serializes it, so prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to leave the process.
+A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink ignores it, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later.
 
 ### Naming convention
 
@@ -112,12 +112,16 @@ The last two are the runner's and the orchestration plugin's to bind, beside the
 
 ## Structured content
 
-When the content is not a string, it is rendered as JSON for the console, indented by `json_logs_indent`, and the JSON-ready form is carried as the record's `data` attribute for a structured sink:
+When the content is not a string, it is rendered as JSON for the message, indented by `json_logs_indent`, and the rendering is read back as the record's `data` attribute for a structured sink. `data` is therefore a snapshot of the call, JSON-ready whatever the content held, and the caller may mutate the object afterwards without changing what was emitted:
 
-- a `dict` is carried as a dictionary,
-- a `list` is carried as a list,
-- any other object, a pydantic model for instance, is carried as the dictionary or list its serialization produces,
-- `None` is rendered as the word `None` and carries no `data`.
+- a `dict` is carried as a dictionary and a `list` as a list, their values as JSON reads them back: a datetime as its text, a `Decimal` as a string,
+- a pydantic model, or a list of models, is carried as the dictionary or list its serialization produces,
+- a number or a boolean is carried as itself, `log.info(42)` giving `data == 42`,
+- a value JSON cannot serialize goes through the JSON helpers' fallbacks, kajson first and `str` last, and a dictionary that reaches the last fallback is wrapped as `{"!": ...}` to flag it,
+- `None` is rendered as the word `None` and carries no `data`,
+- content `json` refuses outright, a circular reference or a mapping with a non-string key, is rendered as its `repr` and carries no `data`; a log call never raises.
+
+A `NaN` or an infinity survives the round trip as a float, and the `json` sink writes it the way Python's `json` does, as the bare token `NaN` or `Infinity`.
 
 Structured content owns `data` outright: a `data` entry in `fields` beside a non-string content is overridden.
 
@@ -134,13 +138,17 @@ pipelex-pipe_operators-pipe_llm = "DEBUG"
 httpx = "WARNING"
 ```
 
-The record's `pathname`, `lineno` and `funcName` point at the calling line, which is what the Rich handler links to and what the caller-info templates render when `is_caller_info_enabled` is on; all of it comes from that same frame, with no source file read.
+The record's `pathname`, `lineno` and `funcName` point at the calling line, which is what the `console` sink links to and what the caller-info templates render when `is_caller_info_enabled` is on; all of it comes from that same frame, with no source file read.
+
+A filter attached to `logging.getLogger("pipelex")` never sees these records: the stdlib runs a logger's filters only for records emitted on that very logger, and a record is emitted on the module-named one. Attach the filter to the handler instead, which the stdlib runs for every record it handles, or, to reach whichever sink is installed, append a processor to the sink's `processors` list, as described in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md#logsink).
 
 ## Before configuration
 
-`log.configure` runs at boot, and a call before it never raises: the record goes to the stdlib's default handling at the stdlib's default level, so an `INFO` is dropped and a warning reaches stderr through `logging.lastResort`. No handler is installed as a side effect, and nothing is swallowed. A library that logs before Pipelex boots, and the boot itself while it configures, are both safe.
+Logging is configured in two steps at boot. `log.configure` sets the levels and installs a holding handler on the root logger; then, once the plugin registrar is built, the configured sink is looked up, its handler is installed and the held records are replayed to it in order, so the boot's own lines reach the sink selected for them. A call before `configure` never raises: the record goes to the stdlib's default handling at the stdlib's default level, so an `INFO` is dropped and a warning reaches stderr through `logging.lastResort`. A boot that fails between the two steps closes the holding handler, which hands what it held at `WARNING` and above to `logging.lastResort` and drops the rest. No handler is installed before `configure`, and nothing is swallowed. A library that logs before Pipelex boots, and the boot itself while it configures, are both safe.
 
 ## Console rendering
+
+The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is imported when the sink is built and nowhere else, so a process that selects `json` or `otlp` never loads it, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative.
 
 ### Rich Formatting
 
@@ -157,7 +165,6 @@ Built-in emoji indicators for different components, keyed on the logger name's p
 - 🌀 Google-related logs
 - ⚡️ Network connections
 - *️⃣ JSON processing
-- 🧿 Poor-log channel (`#poor-log`, the simplified fallback logger)
 
 ### Caller Information
 
@@ -194,11 +201,12 @@ Optional inclusion of caller information in logs, prefixed to the console line:
 
 4. **Exception Handling**:
 
-    - Use `include_exception=True` for error context
+    - Use `include_exception=True` inside the `except` block, and let the sink render the traceback its own way
     - Include relevant data in error logs
     - Use appropriate log levels for exceptions
 
 ## Related Documentation
 
-- [Logging Configuration](../configuration/config-practical/logging-config.md) - Configure log behavior in `pipelex.toml`
+- [Logging Configuration](../configuration/config-practical/logging-config.md) - Configure log behavior and select the sink in `pipelex.toml`
+- [Log Sink Plugins](../under-the-hood/log-sink-plugins.md) - The sink seam, the built-in sinks and how to write one
 - [CLI](./cli/index.md) - Commands that surface runtime logs during development

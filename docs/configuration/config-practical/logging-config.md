@@ -1,5 +1,5 @@
 ---
-description: "Fine-tune Pipelex logging levels, Rich console output, and message formatting through TOML configuration settings in pipelex.toml."
+description: "Select where Pipelex log records go with the sink key, and fine-tune logging levels, the console rendering, the JSON and OTLP sinks and message formatting through TOML configuration settings in pipelex.toml."
 ---
 
 # Logging Configuration
@@ -8,7 +8,7 @@ Configuration section: `[runtime.log]`
 
 ## Overview
 
-The logging configuration controls how Pipelex handles log messages, their formatting, and their display. The configuration is split into general logging settings and Rich console output settings.
+The logging configuration controls the levels, where the records go, and how they are rendered. Where they go is one key, `sink`, naming a registered log sink; each shipped sink then reads its own settings from the section, and the rest of the section applies to every sink.
 
 ## General Settings
 
@@ -20,6 +20,7 @@ default_log_level = "INFO"
 
 - Sets the default logging level for all loggers
 - Valid values: `"VERBOSE"`, `"DEBUG"`, `"DEV"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`
+- `"OFF"` silences Pipelex's own records whichever sink is selected
 
 ### Package-Specific Log Levels
 
@@ -36,14 +37,28 @@ pipelex = "INFO"
 - Use `-` instead of `.` in package names (e.g., `urllib3-connectionpool`)
 - A key works at any depth of the logger hierarchy, because Pipelex names every logger after the emitting module: `pipelex` governs the whole runtime, and `pipelex-pipe_operators-pipe_llm = "DEBUG"` opens one module while the rest of `pipelex` stays at its level
 
-### Console Output
+### The Sink
 
 ```toml
-is_console_logging_enabled = true
+sink = "console"
 ```
 
-- Enable/disable console logging
-- Default: `true`
+- Names the registered log sink boot installs on the root logger, the way `runtime.storage.method` names a storage backend
+- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering
+- `"json"`: one JSON object per line, for a server behind a log agent
+- `"otlp"`: the OpenTelemetry logs signal, for a collector
+- Any other token an installed plugin registers; a token nobody provides stops the boot naming the registered ones
+- The sink is a plugin capability: how it is discovered, selected and written is in [Log Sink Plugins](../../under-the-hood/log-sink-plugins.md)
+
+### Console Log Target
+
+```toml
+console_log_target = "stderr"
+```
+
+- The process stream the `console` and `json` sinks write to: `"stdout"` or `"stderr"`
+- Default: `"stderr"`, because logs are diagnostics and must stay off the data channel
+- `console_print_target`, beside it, is a different knob: the Rich `Console` used for banners and the main CLI's data tables, which default to `"stdout"` so they can be piped to a file
 
 ### Pretty-Print Mode
 
@@ -65,7 +80,7 @@ json_logs_indent = 4
 presentation_line_width = 120
 ```
 
-- `json_logs_indent`: Indentation for JSON log output
+- `json_logs_indent`: Indentation of the JSON rendering a structured content (a `dict`, a `list`, a model) gets in the message
 - `presentation_line_width`: Maximum line width for formatted output
 
 ### Caller Information
@@ -94,23 +109,9 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 - List of problem IDs to silence
 - Prevents specific warnings from being logged
 
-### Poor Loggers
+## The `console` Sink
 
-```toml
-generic_poor_logger = "#poor-log"
-poor_loggers = [
-    "kajson.decoder.sandbox",
-    "kajson.encoder.sandbox",
-    "class_registry.sandbox"
-]
-```
-
-- Loggers that use simplified formatting without fancy features
-- Useful for sandbox environments or when simple logging is needed
-
-## Rich Console Configuration
-
-Configuration section: `[runtime.log.rich_log]`
+Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`.
 
 ### Display Options
 
@@ -143,7 +144,7 @@ is_tracebacks_show_locals = false
 tracebacks_suppress = []
 ```
 
-- Control how Python tracebacks are displayed
+- Control how Python tracebacks are displayed; an exception a call carries with `include_exception=True` is rendered once, as a Rich traceback
 - Enable/disable word wrapping and local variable display
 - Suppress specific traceback patterns
 
@@ -156,22 +157,42 @@ keywords_to_hilight = []
 - List of keywords to highlight in log messages
 - Useful for emphasizing important terms
 
+## The `json` Sink
+
+No section of its own: the sink writes to `console_log_target`, one JSON object per line and no ANSI ever. Each line carries `time` (ISO 8601, UTC, milliseconds, `Z`), `severity` (the level name), `logger` (the module-named logger), `message`, `exception` when the record carries one, and then every field, the run-scoped identifiers and the `data` attribute flat beside them, under their own names. A field named like one of those fixed keys is carried under a `field_` prefix. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser.
+
+```json
+{"time": "2026-09-16T10:12:03.417Z", "severity": "INFO", "logger": "pipelex.pipe_operators.pipe_llm", "message": "Running the pipe", "request_id": "req-7f3a", "pipeline_run_id": "plr-01", "pipe_run_id": "pr-9c", "model": "gpt-5"}
+```
+
+## The `otlp` Sink
+
+Configuration section: `[runtime.log.otlp]`, read only when `sink = "otlp"`.
+
+```toml
+[runtime.log.otlp]
+endpoint = "http://collector:4318/v1/logs"
+headers = { Authorization = "Bearer ..." }
+```
+
+- `endpoint`: The collector's logs URL. Left unset, the exporter follows the OpenTelemetry environment conventions: `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`, then `OTEL_EXPORTER_OTLP_ENDPOINT` with the `/v1/logs` path, then the collector default on localhost
+- `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge
+- The records are exported in batches on the OTLP HTTP protocol, with the same service identity as the spans the runtime already exports, so a collector files the two together
+
 ## Example Configuration
 
 ```toml
 [runtime.log]
 default_log_level = "INFO"
-log_mode = "rich"
+sink = "console"
+console_log_target = "stderr"
+console_print_target = "stdout"
 pretty_print_mode = "rich"
-is_console_logging_enabled = true
 json_logs_indent = 4
 presentation_line_width = 120
 is_caller_info_enabled = true
 caller_info_template = "file_line_func"
-
 silenced_problem_ids = []
-generic_poor_logger = "#poor-log"
-poor_loggers = []
 
 [runtime.log.package_log_levels]
 pipelex = "INFO"
@@ -189,21 +210,28 @@ is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false
 tracebacks_suppress = []
 keywords_to_hilight = ["error", "warning", "failed"]
+
+[runtime.log.otlp]
+headers = {}
 ```
+
+## Migrating From the Log Mode
+
+`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone; `pipelex migrate` deletes them from an existing file (ledger entry `pipelex-config@5`). A file that set `log_mode = "poor"` chose a plain handler for a process with no terminal, and that process now sets `sink = "json"`. `is_console_logging_enabled = false` silenced every handler on the root logger; to silence Pipelex's own records set `default_log_level = "OFF"`, and to send them somewhere else select the sink that goes there.
 
 ## Best Practices
 
 1. **Development Environment**:
 
-    - Enable caller info for better debugging
+    - Keep the `console` sink, and enable caller info for better debugging
     - Use verbose logging levels
     - Enable local variables in tracebacks
 
 2. **Production Environment**:
 
+    - Select the `json` sink behind a log agent, or the `otlp` sink in front of a collector
     - Disable caller info for performance
     - Use INFO or higher log levels
-    - Disable local variables in tracebacks
 
 3. **Package Log Levels**:
 
@@ -214,3 +242,4 @@ keywords_to_hilight = ["error", "warning", "failed"]
 ## Related Documentation
 
 - [Logging Tool](../../tools/logging.md) - Using Pipelex logging in your code
+- [Log Sink Plugins](../../under-the-hood/log-sink-plugins.md) - The seam behind the `sink` key, and how to write a sink
