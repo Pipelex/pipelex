@@ -104,6 +104,17 @@ class TestConsoleLogSink:
         assert "ValueError" in rendered
         assert rendered == reference
 
+    def test_the_prefix_stays_on_a_line_that_carries_a_traceback(self) -> None:
+        """The Rich handler renders such a line from ``formatMessage`` alone, and the emoji must survive that path too."""
+        config = _package_rich_log_config()
+        assert config.is_rich_tracebacks, "the shipped default is what the regression rode on"
+        sink = ConsoleLogSink(rich_log_config=config, target=ConsoleTarget.STDERR)
+
+        rendered = _render(sink.handler)
+
+        assert "🧠: Failed" in rendered
+        assert "ValueError: boom" in rendered
+
     def test_the_handler_is_a_rich_handler_with_the_emoji_formatter_and_the_same_object_on_every_read(self) -> None:
         sink = ConsoleLogSink(rich_log_config=_package_rich_log_config(), target=ConsoleTarget.STDERR)
 

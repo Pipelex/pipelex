@@ -31,18 +31,19 @@ def emoji_for_channel(channel_name: str) -> str | None:
 
 
 class EmojiLogFormatter(logging.Formatter):
-    """The console sink's formatter: an emoji for the logger's prefix, then the message, and the record left as it was."""
+    """The console sink's formatter: an emoji for the logger's prefix, then the message, and the record left as it was.
+
+    The prefix goes on in ``formatMessage`` rather than ``format``: the Rich handler renders a record
+    that carries ``exc_info`` from ``formatMessage`` alone and discards what ``format`` returned, so a
+    prefix built anywhere else vanished from exactly the lines that carry a traceback. The base class's
+    ``format`` sets ``record.message``, calls this, and appends the exception text.
+    """
 
     @override
-    def format(self, record: logging.LogRecord):
-        log_fmt: str
+    def formatMessage(self, record: logging.LogRecord) -> str:
         emoji = emoji_for_channel(record.name)
         if emoji == "":
-            log_fmt = "%(message)s"
-        elif emoji:
-            log_fmt = f"{emoji}: %(message)s"
-        else:
-            log_fmt = "[%(name)s]: %(message)s"
-        formatter = logging.Formatter(log_fmt)
-
-        return formatter.format(record)
+            return record.message
+        if emoji:
+            return f"{emoji}: {record.message}"
+        return f"[{record.name}]: {record.message}"
