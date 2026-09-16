@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:253467d8e548ab963307b4efa6209306a83860076cc8b6116b20e7f74cd5db4e"
+digest = "sha256:33e844c30c705c038cf7809736a33622c8928c05cbcbd53e588c5a7235782929"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-15T23:02:03Z"
-rationale = "The two rendering keys are deleted from DataInclusionConfig and from every shipped pipelex.toml, and the deletion is accounted for by ledger entry pipelex-config@4 with its regenerated goldens. Reviewed docs/configuration: no page there names the data_inclusion keys, and the logging page's pretty-print section is unaffected. The tracing page under docs/under-the-hood, which did name them, is updated in this same change."
+reviewed_at = "2026-09-16T14:07:05Z"
+rationale = "Docstring-only change in ConfigLoader.take_stale_configuration_warning, rewritten because a log call before configure no longer raises and the old text said it did. No config model, key, default or validator moved, so the migration ledgers owe nothing. Reviewed docs/configuration: the logging-config page's package_log_levels section is updated in this same change to say a key works at module depth now that loggers are named by module."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -10,7 +10,7 @@ rationale = "The two rendering keys are deleted from DataInclusionConfig and fro
 "pipelex/pipelex.toml" = "blob:a4197193c4e9df0f09ef795149a505c0a149fdda"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:88e15a92b186088a5ea1c7c4ebcedac830707d3a"
-"pipelex/system/configuration/config_loader.py" = "blob:cbd3c9a54d5f9410c65b08702d19560a06f83086"
+"pipelex/system/configuration/config_loader.py" = "blob:d6d5e47bee142e5ba0bf157a72ac2af1b903a834"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/config_surface.py" = "blob:96f685656a3f4355e8a073e8bf6184e020fea8f5"

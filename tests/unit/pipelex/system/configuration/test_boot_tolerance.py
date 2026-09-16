@@ -531,9 +531,9 @@ class TestTheMainConfigurationLoader:
     ) -> None:
         """And the *migrated* value is the one that lands, not merely a configuration that parses.
 
-        The main configuration is what *configures logging*, so at this point in a boot no logger
-        exists yet: the warning is parked on the loader for the boot to emit once it does. The
-        unconfigured dispatch here is a cold boot's, and it raises on any attempt to log through it.
+        The main configuration is what *configures logging*, so at this point in a boot no handler
+        is installed yet: the warning is parked on the loader for the boot to emit once one is. The
+        unconfigured dispatch here is a cold boot's, whose lines go to the stdlib's default handling.
         """
         global_dir, _ = fake_dirs
         write_synthetic_ledger(

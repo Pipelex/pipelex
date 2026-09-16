@@ -1,14 +1,23 @@
+from __future__ import annotations
+
 import logging
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.logging import RichHandler
 
-from pipelex.tools.log.log_config import LogConfig, LogMode
+from pipelex.tools.log.log_context import bind_log_context
 from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_formatter import EmojiLogFormatter, LevelAndEmojiLogFormatter
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from contextlib import AbstractContextManager
+
+    from pipelex.tools.log.log_config import LogConfig, LogMode
+    from pipelex.tools.log.log_context import LogContext
 
 
 class Log:
@@ -27,22 +36,6 @@ class Log:
 
     def set_log_mode(self, mode: LogMode):
         self.log_dispatch.set_log_mode(mode=mode)
-
-    @property
-    def _log_config(self) -> LogConfig:
-        """Get the log configuration, raising an error if it's not set.
-
-        Returns:
-            LogConfig: The current log configuration.
-
-        Raises:
-            RuntimeError: If the log configuration is not set.
-
-        """
-        if self._log_config_instance is None:
-            msg = "LogConfig is not set. You must initialize Pipelex first."
-            raise RuntimeError(msg)
-        return self._log_config_instance
 
     def reset(self):
         """Reset the logging system."""
@@ -150,7 +143,9 @@ class Log:
             bool: True if the message should be ignored, False otherwise.
 
         """
-        return bool(problem_id) and problem_id in self._log_config.silenced_problem_ids
+        if self._log_config_instance is None:
+            return False
+        return bool(problem_id) and problem_id in self._log_config_instance.silenced_problem_ids
 
     ########################################################
     # Public methods
@@ -221,12 +216,28 @@ class Log:
         for package_name, level in package_log_levels.items():
             self.set_level_for_package(package_name=package_name, level=level)
 
+    def context(
+        self,
+        *,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        pipe_run_id: str | None = None,
+    ) -> AbstractContextManager[LogContext]:
+        """Bind the run-scoped identifiers onto every record emitted inside the block.
+
+        Bound at a process entry from the payload it received — ``PipeRun.run`` binds from the job's
+        metadata — and released when the block exits. Nested blocks merge, the inner overriding the
+        outer for the identifiers it gives; a ``None`` inherits rather than clears.
+        """
+        return bind_log_context(request_id=request_id, pipeline_run_id=pipeline_run_id, pipe_run_id=pipe_run_id)
+
     def verbose(
         self,
         content: str | Any,
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a verbose message.
 
@@ -235,10 +246,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = LOGGING_LEVEL_VERBOSE
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def debug(
         self,
@@ -246,6 +258,7 @@ class Log:
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a debug message.
 
@@ -254,10 +267,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = logging.DEBUG
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def dev(
         self,
@@ -265,6 +279,7 @@ class Log:
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a development message.
 
@@ -273,10 +288,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = LOGGING_LEVEL_DEV
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def info(
         self,
@@ -284,6 +300,7 @@ class Log:
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log an info message.
 
@@ -292,10 +309,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = logging.INFO
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def warning(
         self,
@@ -304,6 +322,7 @@ class Log:
         title: str | None = None,
         inline: str | None = None,
         problem_id: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a warning message.
 
@@ -312,13 +331,14 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
             problem_id (str | None, optional): A problem ID to associate with the warning. Defaults to None.
 
         """
         if self._should_ignore(problem_id=problem_id):
             return
         severity = logging.WARNING
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def error(
         self,
@@ -328,6 +348,7 @@ class Log:
         inline: str | None = None,
         include_exception: bool = False,
         problem_id: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log an error message.
 
@@ -336,6 +357,7 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the error. Defaults to None.
 
@@ -349,6 +371,7 @@ class Log:
             title=title,
             inline=inline,
             include_exception=include_exception,
+            fields=fields,
         )
 
     def critical(
@@ -359,6 +382,7 @@ class Log:
         inline: str | None = None,
         include_exception: bool = False,
         problem_id: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a critical message.
 
@@ -367,6 +391,7 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the critical message. Defaults to None.
 
@@ -380,6 +405,7 @@ class Log:
             title=title,
             inline=inline,
             include_exception=include_exception,
+            fields=fields,
         )
 
 
