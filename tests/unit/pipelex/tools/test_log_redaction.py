@@ -13,12 +13,14 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig, LogRedactionConfig
-from pipelex.tools.log.log_redaction import REDACTED_TEXT, make_redaction_processor
+from pipelex.tools.log.log_fields import DATA_FIELD
+from pipelex.tools.log.log_redaction import CYCLE_TEXT, REDACTED_TEXT, make_redaction_processor
 from pipelex.tools.log.log_sink import LogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -159,18 +161,63 @@ class TestLogRedaction:
             "attempt": 3,
         }
 
-    def test_a_value_that_contains_itself_is_left_alone_rather_than_walked_forever(self) -> None:
+    def test_a_value_that_contains_itself_is_cut_at_the_cycle_rather_than_walked_forever_or_kept_raw(self) -> None:
+        """The raw container kept in the cleaned result would hand its unscrubbed strings to the sink's ``repr`` fallback."""
         cyclic: dict[str, Any] = {"token": "sk_live_0123456789abcdef"}
         cyclic["me"] = cyclic
-        record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="cyclic", args=(), exc_info=None)
-        record.payload = cyclic
+        record = _record(text="cyclic", value=cyclic)
         processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
 
         processor(record)
 
-        cleaned = getattr(record, FIELD_NAME)
-        assert cleaned["token"] == REDACTED_TEXT
-        assert cleaned["me"] is cyclic
+        assert getattr(record, FIELD_NAME) == {"token": REDACTED_TEXT, "me": CYCLE_TEXT}
+
+    def test_a_mapping_entry_named_like_a_secret_loses_its_value_whatever_it_holds(self) -> None:
+        """The families read a name and a value out of one string; a mapping splits them, so the key is what names the secret."""
+        record = _record(
+            text="sending",
+            value={"Authorization": "Bearer short", "x-api-key": "k", "password": {"nested": "p"}, "code": "PIPE_NOT_FOUND", "user": "ada"},
+        )
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        assert getattr(record, FIELD_NAME) == {
+            "Authorization": REDACTED_TEXT,
+            "x-api-key": REDACTED_TEXT,
+            "password": REDACTED_TEXT,
+            "code": "PIPE_NOT_FOUND",
+            "user": "ada",
+        }
+
+    def test_a_model_is_dumped_and_an_object_is_rendered_before_the_walk_so_the_sink_meets_scrubbed_text(self) -> None:
+        """The sink would dump the model and render the object after the processor ran; the processor does it first so neither escapes the scrub."""
+
+        class Credentials(BaseModel):
+            api_key: str
+            note: str
+
+        class Carrier:
+            @override
+            def __str__(self) -> str:
+                return "carrying sk_live_0123456789abcdef"
+
+        record = _record(text="sending", value={"model": Credentials(api_key="plx_sk_ABCDEFGHIJKLMNOPQRSTU", note="line\nforged"), "object": Carrier()})
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        assert getattr(record, FIELD_NAME) == {"model": {"api_key": REDACTED_TEXT, "note": "line\\nforged"}, "object": f"carrying {REDACTED_TEXT}"}
+
+    def test_the_data_attribute_is_scrubbed_of_secrets_but_keeps_its_control_characters(self) -> None:
+        """``data`` is the runtime's own rendering of a structured content, which the wire sinks escape themselves, so a logged prompt keeps its newlines."""
+        record = _record(text="prompt", value="ignored")
+        setattr(record, DATA_FIELD, {"prompt": "line one\nline two", "token": "sk_live_0123456789abcdef"})
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        assert getattr(record, DATA_FIELD) == {"prompt": "line one\nline two", "token": REDACTED_TEXT}
 
     def test_the_scrub_edits_the_record_every_handler_shares_rather_than_a_copy(self, fresh_log: Log) -> None:
         """In place, not on a copy: a handler ordered after the sink is behind the scrub instead of being handed what the sink was spared."""

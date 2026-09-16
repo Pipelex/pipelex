@@ -18,11 +18,11 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex.system.configuration.config_loader import ConfigLoader
-from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, TIME_KEY, JsonLogSink
+from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, TIME_KEY, JsonLogFormatter, JsonLogSink
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
-from pipelex.tools.log.log_redaction import REDACTED_TEXT
+from pipelex.tools.log.log_redaction import CYCLE_TEXT, REDACTED_TEXT
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
@@ -147,7 +147,7 @@ class TestJsonLogSink:
         assert line[f"{COLLIDING_FIELD_PREFIX}logger"] == "other"
 
     def test_a_value_json_does_not_know_is_serialized_and_never_lost(self, json_log: tuple[Log, io.StringIO]) -> None:
-        """A model dumps in JSON mode, a datetime becomes text, a cycle keeps the line an object."""
+        """A model dumps in JSON mode, a datetime becomes text, a cycle is cut by the redaction walk and keeps the line an object."""
 
         class Item(BaseModel):
             name: str
@@ -163,8 +163,20 @@ class TestJsonLogSink:
         assert odd["item"] == {"name": "x", "when": "2020-01-02T00:00:00Z"}
         assert odd["when"] == "2021-03-04 00:00:00+00:00"
         assert cyclic_line[MESSAGE_KEY] == "cyclic value"
-        assert isinstance(cyclic_line["loop"], str)
-        assert "{...}" in cyclic_line["loop"]
+        assert cyclic_line["loop"] == {"me": CYCLE_TEXT}
+
+    def test_a_raw_cycle_reaching_the_formatter_keeps_the_line_an_object(self) -> None:
+        """The sink's own guard, for a process whose redaction is off: a value ``json`` refuses is written as its ``repr`` and the line stays one object."""
+        cyclic: dict[str, Any] = {}
+        cyclic["me"] = cyclic
+        record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="cyclic value", args=(), exc_info=None)
+        record.loop = cyclic
+
+        line = json.loads(JsonLogFormatter().format(record))
+
+        assert line[MESSAGE_KEY] == "cyclic value"
+        assert isinstance(line["loop"], str)
+        assert "{...}" in line["loop"]
 
     def test_a_non_finite_float_is_written_as_text_a_strict_parser_accepts(self, json_log: tuple[Log, io.StringIO]) -> None:
         """JSON has no NaN: the bare tokens Python writes by default would cost the whole line, so they are strings."""
@@ -207,7 +219,7 @@ class TestJsonLogSink:
         assert "ValueError: boom" in with_exception[EXCEPTION_KEY]
         assert with_exception[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"] == "supplied"
         assert cycle[MESSAGE_KEY] == "cycle under a reserved name"
-        assert "{...}" in cycle[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"]
+        assert cycle[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"] == {"me": CYCLE_TEXT}
 
     def test_redirect_to_stderr_moves_the_stream(self, json_log: tuple[Log, io.StringIO], capsys: pytest.CaptureFixture[str]) -> None:
         fresh, buffer = json_log

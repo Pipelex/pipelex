@@ -2,35 +2,37 @@
 
 Two distinct removals, on two distinct parts of a record.
 
-**Secrets are scrubbed** from the message and from every string a field carries. The pattern families
-are the ones the workspace already wrote twice: the hosted plane's Lambdas ran them over their own
-records, which is where the bearer tokens, the api-key and signature headers, the OAuth ``code``
-parameter, the cookies, the JSON secret fields and the key prefixes come from. Running them here
-instead means every Pipelex process gets them, whichever sink it selected, and a record a third-party
-library emitted with a raw request in it is scrubbed too, because the processor sits on the sink's
-handler rather than at the call sites.
+**Secrets are scrubbed** from the message, from the exception's rendered text and from every string
+a field carries. The pattern families are the ones the workspace already wrote twice: the hosted
+plane's Lambdas ran them over their own records, which is where the bearer tokens, the api-key and
+signature headers, the OAuth ``code`` parameter, the cookies, the JSON secret fields and the key
+prefixes come from. Running them here instead means every Pipelex process gets them, whichever sink
+it selected, and a record a third-party library emitted with a raw request in it is scrubbed too,
+because the processor sits on the sink's handler rather than at the call sites. A structured value is
+walked to any depth: a mapping entry named like a secret loses its value whatever it holds, since the
+mapping split the name from the value the string families read together; a model is dumped and any
+other object rendered as text before the walk, exactly as a wire sink would have done after it.
 
 **Control characters are neutralised** in a field's string values, and only there. A field value is
 caller-supplied text, and a sink that writes a ``key=value`` run or a console line renders it as it is,
 so a newline in it forges a line and a tab forges a separator; an escape byte forges colour on a
 terminal. Each becomes its printable escape, the way ``pipelex-api`` escaped the values it flattened
-into a log line. The **message** is left with its control characters, because they are the runtime's
-own rendering and not a caller's string: a titled call and a structured content both put a newline
-there deliberately, and escaping it would destroy every multi-line line the console draws.
-
-A secret whose name and value are split across a mapping's key and its value is not caught: the
-families read a name and a value out of one string, which is what a header line or a serialised JSON
-blob gives them. A structured value is walked all the same, because a key prefix or a whole header
-line sitting at any depth of it is caught by the families that need no context.
+into a log line. The **message** and the **data** attribute keep their control characters, because
+they are the runtime's own rendering and not a caller's string: a titled call and a structured content
+both put a newline there deliberately, the wire sinks escape ``data`` themselves, and escaping it here
+would turn a logged prompt's newlines into text no consumer can tell from a typed backslash.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.tools.log.log_fields import carried_attributes
+from pydantic import BaseModel
+
+from pipelex.tools.log.log_fields import DATA_FIELD, carried_attributes
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -40,6 +42,34 @@ if TYPE_CHECKING:
 
 # What a scrubbed secret is replaced by, everywhere: the line stays readable and says what was removed.
 REDACTED_TEXT = "[REDACTED]"
+
+# What a container that contains itself is cut at: the walk ends there, and the sink meets a marker
+# rather than the raw container whose strings the scrub never reached.
+CYCLE_TEXT = "[cycle]"
+
+# The names under which a mapping entry is a secret whatever it holds, read lowercased and with a dash
+# as an underscore, so a header name and a JSON key are both caught. ``code`` is not among them: it is
+# the runtime's own identifier for a pipe, a domain and an error, and the OAuth code has its own family.
+SECRET_KEY_NAMES = frozenset(
+    {
+        "password",
+        "pipelex_api_key",
+        "gateway_api_key",
+        "jwt_secret_key",
+        "portkey_api_key",
+        "client_secret",
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "authorization",
+        "api_key",
+        "x_api_key",
+        "x_signature",
+        "x_completion_signature",
+        "cookie",
+        "set_cookie",
+    }
+)
 
 # One compiled pattern and the text that replaces what it matched, a back-reference keeping whatever
 # named the secret so a reader still sees which header or which field was carrying it.
@@ -133,7 +163,13 @@ def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPatter
             record.args = ()
     _redact_exception_text(record=record, patterns=patterns)
     for name, value in carried_attributes(record=record).items():
-        setattr(record, name, _clean_value(value=value, patterns=patterns, open_containers=set()))
+        # ``data`` keeps its control characters for the reason the message does: it is the runtime's
+        # own rendering of the caller's object, and the wire sinks escape it themselves.
+        setattr(
+            record,
+            name,
+            _clean_value(value=value, patterns=patterns, open_containers=set(), is_escaping_control_characters=name != DATA_FIELD),
+        )
 
 
 def _redact_exception_text(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:
@@ -169,31 +205,53 @@ def _rendered_message(*, record: logging.LogRecord) -> str | None:
         return None
 
 
-def _clean_value(*, value: Any, patterns: tuple[RedactionPattern, ...], open_containers: set[int]) -> Any:
-    """The value with every string it holds, at any depth, scrubbed of secrets and stripped of control characters.
+def _is_secret_key(*, key: Any) -> bool:
+    """Whether a mapping key names a secret, read lowercased and with a dash as an underscore."""
+    return isinstance(key, str) and key.lower().replace("-", "_") in SECRET_KEY_NAMES
+
+
+def _clean_value(*, value: Any, patterns: tuple[RedactionPattern, ...], open_containers: set[int], is_escaping_control_characters: bool) -> Any:
+    """The value with every string it holds, at any depth, scrubbed of secrets, and its control characters escaped when asked.
 
     A mapping and a sequence are walked and rebuilt, a tuple coming back as a list the way a JSON
-    rendering would have made it; everything else is returned as it was, a number, a boolean and a
-    model included. A container that contains itself is returned as it is, as ``spell_non_finite``
-    returns it, so the walk terminates and the sink meets the same value it always would have.
+    rendering would have made it, and a mapping entry named like a secret loses its value whatever
+    the value is, since the mapping split the name from the value the string families read together.
+    A model is dumped and an object is rendered as text before the walk, exactly as the wire sinks
+    would have dumped and rendered them after it, so neither carries a secret past the scrub. A
+    number, a boolean and ``None`` come back as they are. A container that contains itself is cut at
+    the cycle with a marker: kept raw, it would hand its unscrubbed strings to a sink's fallback rendering.
     """
     if isinstance(value, str):
-        return escape_control_characters(text=scrub_secrets(text=value, patterns=patterns))
+        scrubbed = scrub_secrets(text=value, patterns=patterns)
+        return escape_control_characters(text=scrubbed) if is_escaping_control_characters else scrubbed
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, BaseModel):
+        value = value.model_dump(mode="json")
     container_id = id(value)
     if container_id in open_containers:
-        return value
-    if isinstance(value, dict):
-        mapping = cast("dict[Any, Any]", value)
+        return CYCLE_TEXT
+    if isinstance(value, Mapping):
+        mapping = cast("Mapping[Any, Any]", value)
         open_containers.add(container_id)
         try:
-            return {key: _clean_value(value=item, patterns=patterns, open_containers=open_containers) for key, item in mapping.items()}
+            return {
+                key: REDACTED_TEXT
+                if _is_secret_key(key=key)
+                else _clean_value(value=item, patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters)
+                for key, item in mapping.items()
+            }
         finally:
             open_containers.discard(container_id)
     if isinstance(value, (list, tuple)):
         sequence = cast("Sequence[Any]", value)
         open_containers.add(container_id)
         try:
-            return [_clean_value(value=item, patterns=patterns, open_containers=open_containers) for item in sequence]
+            return [
+                _clean_value(value=item, patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters)
+                for item in sequence
+            ]
         finally:
             open_containers.discard(container_id)
-    return value
+    # What ``json_fallback`` would have written for it, scrubbed before it is written.
+    return _clean_value(value=str(value), patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters)

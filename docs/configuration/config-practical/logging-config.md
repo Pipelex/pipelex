@@ -110,22 +110,24 @@ extra_patterns = []
 
 One processor, applied to every record before any sink renders it, whichever sink is selected. It does two things, and the difference between them matters.
 
-**It scrubs secrets** from the message and from every string a field carries, replacing what a pattern matched with `[REDACTED]` and keeping whatever named the secret, so a reader still sees which header or which entry was carrying it. The shipped families are the ones the hosted plane already ran over its own records:
+**It scrubs secrets** from the message, from the exception's rendered text and from every string a field carries, replacing what a pattern matched with `[REDACTED]` and keeping whatever named the secret, so a reader still sees which header or which entry was carrying it. The shipped families are the ones the hosted plane already ran over its own records:
 
 - an `Authorization` header carrying a bearer token,
 - an api-key header or entry, however it is spelled (`x-api-key`, `api-key`, `api_key`),
 - a webhook signature header (`x-signature`, `x-completion-signature`),
 - an OAuth authorization code in a query string (`?code=…`, `&code=…`),
-- a `Cookie` or `Set-Cookie` header's whole value,
-- the JSON entries that are a secret whatever they hold: `password`, `pipelex_api_key`, `gateway_api_key`, `jwt_secret_key`, `portkey_api_key`, `client_secret`, `code`, `access_token`, `refresh_token`, `id_token`,
+- a `Cookie` or `Set-Cookie` header's whole value, up to the end of the line or the closing quote,
+- the JSON entries that are a secret whatever they hold: `password`, `pipelex_api_key`, `gateway_api_key`, `jwt_secret_key`, `portkey_api_key`, `client_secret`, `access_token`, `refresh_token`, `id_token`,
 - a key recognisable by its prefix alone: `sk_`, `plx_sk_`, `pk_`, `bl_`.
 
-**It neutralises control characters** in a field's string values, and only there: each becomes its printable escape, so a newline in a caller-supplied value cannot forge a line and a tab cannot forge a field separator, and an escape byte cannot colour a terminal. The message keeps its control characters, because they are the runtime's own rendering — a titled call and a structured content both put a newline there deliberately.
+A structured value, a field's `dict` or `list` or the `data` a structured content produces, is walked to any depth. Its strings go through the families above, and a mapping entry whose key names a secret loses its value whatever it holds, since the mapping split the name from the value the families read together: the JSON entry names above, plus `authorization`, `api_key`, `x_api_key`, `x_signature`, `x_completion_signature`, `cookie` and `set_cookie`, read lowercased and with a dash as an underscore. A pydantic model is dumped and any other object rendered as text before the walk, exactly as the `json` and `otlp` sinks would have done after it, so neither carries a secret past the scrub. A container that contains itself is cut at the cycle with a `[cycle]` marker. `code` is deliberately not a secret name: it is the runtime's own identifier for a pipe, a domain and an error, and the OAuth code has its query-string family.
+
+**It neutralises control characters** in a field's string values, and only there: each becomes its printable escape, so a newline in a caller-supplied value cannot forge a line and a tab cannot forge a field separator, and an escape byte cannot colour a terminal. The message and the `data` attribute keep their control characters, because they are the runtime's own rendering — a titled call and a structured content both put a newline there deliberately, and the wire sinks escape `data` themselves, so a logged prompt keeps its line breaks.
 
 - `is_enabled`: `true` by default. `false` turns the processor off for a process that redacts downstream, or one whose records must be reproduced exactly as the calls made them
 - `extra_patterns`: regular expressions added to the shipped families, for the secret shapes only this deployment knows. Every match is replaced by `[REDACTED]`, and a pattern the `re` module refuses is a configuration error named when the configuration loads
 
-A secret whose name and its value are split across a mapping's key and its value is not caught: the families read a name and a value out of one string, which is what a header line or a serialised JSON blob gives them. A structured value is still walked to any depth, so a key prefix or a whole header line sitting inside a `dict` or a `list` is scrubbed. Where the processor runs, and why it edits the record rather than a copy of it, is in [Logging](../../tools/logging.md#redaction).
+What the processor does not reach is the `console` sink's Rich traceback, rendered from the exception object rather than from the scrubbed text, so on a person's terminal an exception reads as it was raised. Where the processor runs, and why it edits the record rather than a copy of it, is in [Logging](../../tools/logging.md#redaction).
 
 ### Problem Silencing
 
