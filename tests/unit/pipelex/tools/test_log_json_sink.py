@@ -166,7 +166,7 @@ class TestJsonLogSink:
         assert cyclic_line["loop"] == {"me": CYCLE_TEXT}
 
     def test_a_raw_cycle_reaching_the_formatter_keeps_the_line_an_object(self) -> None:
-        """The sink's own guard, for a process whose redaction is off: a value ``json`` refuses is written as its ``repr`` and the line stays one object."""
+        """The sink's own guard, for a process with redaction off: a value ``json`` refuses is written as its ``repr``, the line stays one object."""
         cyclic: dict[str, Any] = {}
         cyclic["me"] = cyclic
         record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="cyclic value", args=(), exc_info=None)

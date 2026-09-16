@@ -236,7 +236,9 @@ class TestLogRedaction:
             def __str__(self) -> str:
                 return "carrying sk_live_0123456789abcdef"
 
-        record = _record(text="sending", value={"model": Credentials(api_key="plx_sk_ABCDEFGHIJKLMNOPQRSTU", note="line\nforged"), "object": Carrier()})
+        record = _record(
+            text="sending", value={"model": Credentials(api_key="plx_sk_ABCDEFGHIJKLMNOPQRSTU", note="line\nforged"), "object": Carrier()}
+        )
         processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
 
         processor(record)
@@ -244,7 +246,7 @@ class TestLogRedaction:
         assert getattr(record, FIELD_NAME) == {"model": {"api_key": REDACTED_TEXT, "note": "line\\nforged"}, "object": f"carrying {REDACTED_TEXT}"}
 
     def test_the_data_attribute_is_scrubbed_of_secrets_but_keeps_its_control_characters(self) -> None:
-        """``data`` is the runtime's own rendering of a structured content, which the wire sinks escape themselves, so a logged prompt keeps its newlines."""
+        """``data`` is the runtime's own rendering of a structured content, escaped by the wire sinks, so a logged prompt keeps its newlines."""
         record = _record(text="prompt", value="ignored")
         setattr(record, DATA_FIELD, {"prompt": "line one\nline two", "token": "sk_live_0123456789abcdef"})
         processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
@@ -268,7 +270,7 @@ class TestLogRedaction:
         assert getattr(record, FIELD_NAME) == "line\\nforged"
 
     def test_a_sink_installed_again_after_a_reset_carries_one_redaction_processor(self, fresh_log: Log) -> None:
-        """``reset`` takes back the processor ``install_sink`` put on the sink, so a reused sink object does not scrub twice or under a stale configuration."""
+        """``reset`` takes back the processor ``install_sink`` put on the sink: a reused sink neither scrubs twice nor under a stale configuration."""
         sink = _ListSink()
         fresh_log.configure(log_config=_package_log_config())
         fresh_log.install_sink(sink)

@@ -154,7 +154,7 @@ class Log:
         self.verbose("Logs configured and config set")
 
     def _take_back_redaction_processor(self, *, sink: LogSink) -> None:
-        """Remove from the sink the processor ``install_sink`` put there, so a sink installed again under another configuration carries only that one's.
+        """Remove from the sink the processor ``install_sink`` put there, so a sink installed again carries the next configuration's alone.
 
         Guarded, since a sink is free to have replaced its list; a processor that is no longer there is nothing to take back.
         """

@@ -262,7 +262,9 @@ def _clean_value(*, value: Any, patterns: tuple[RedactionPattern, ...], open_con
             return {
                 key: REDACTED_TEXT
                 if _is_secret_key(key=key)
-                else _clean_value(value=item, patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters)
+                else _clean_value(
+                    value=item, patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters
+                )
                 for key, item in mapping.items()
             }
         finally:
@@ -272,10 +274,14 @@ def _clean_value(*, value: Any, patterns: tuple[RedactionPattern, ...], open_con
         open_containers.add(container_id)
         try:
             return [
-                _clean_value(value=item, patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters)
+                _clean_value(
+                    value=item, patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters
+                )
                 for item in sequence
             ]
         finally:
             open_containers.discard(container_id)
     # What ``json_fallback`` would have written for it, scrubbed before it is written.
-    return _clean_value(value=str(value), patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters)
+    return _clean_value(
+        value=str(value), patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters
+    )
