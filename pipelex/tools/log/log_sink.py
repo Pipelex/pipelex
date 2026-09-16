@@ -36,8 +36,11 @@ POSITIVE_INFINITY_TEXT = "Infinity"
 NEGATIVE_INFINITY_TEXT = "-Infinity"
 
 # A processor edits a record in place before the sink renders it; redaction is the intended one. It
-# runs on the sink's own handler, once per record, so a handler another integration attached to the
-# root logger sees the record as the processors left it only if it runs after this one.
+# runs on the sink's own handler, once per record, and on the original record rather than a copy, so a
+# handler another integration attached to the root logger sees the record as the processors left it
+# when it runs after this one, and as the call made it when it runs before. In place is deliberate:
+# what the processors do is remove what must not leave the process, and a copy would hand every other
+# handler the secret the sink was spared.
 LogRecordProcessor = Callable[[logging.LogRecord], None]
 
 
@@ -50,16 +53,28 @@ class LogSinkMethod(StrEnum):
 
 
 class _ProcessorFilter(logging.Filter):
-    """Runs the sink's processors over each record before the handler formats it, and never drops one."""
+    """Runs the sink's processors over each record before the handler formats it, and never drops one.
 
-    def __init__(self, processors: list[LogRecordProcessor]):
+    The stdlib runs a handler's filters outside any ``try``, so a processor that raised would raise out
+    of the ``log.<level>(...)`` call that emitted the record, against the promise that a log call never
+    raises. Each processor is therefore guarded on its own: what it raises goes to the handler's
+    ``handleError``, the stdlib's own channel for a handler that failed, the processors after it still
+    run, and the record is handed to the handler all the same. A processor that fails costs that
+    record its processing, never the call and never the line.
+    """
+
+    def __init__(self, *, processors: list[LogRecordProcessor], handler: logging.Handler):
         super().__init__()
         self._processors = processors
+        self._handler = handler
 
     @override
     def filter(self, record: logging.LogRecord) -> bool:
         for processor in self._processors:
-            processor(record)
+            try:
+                processor(record)
+            except Exception:  # ruff: ignore[blind-except]
+                self._handler.handleError(record)
         return True
 
 
@@ -84,7 +99,7 @@ class LogSink(ABC):
         """The sink's handler, built on first read with the processors wired in front of it."""
         if self._handler is None:
             handler = self.make_handler()
-            handler.addFilter(_ProcessorFilter(self.processors))
+            handler.addFilter(_ProcessorFilter(processors=self.processors, handler=handler))
             self._handler = handler
         return self._handler
 

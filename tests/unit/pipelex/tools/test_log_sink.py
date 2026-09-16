@@ -5,12 +5,16 @@ from __future__ import annotations
 import io
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 import pytest
 from typing_extensions import override
 
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_sink import LogSink, render_json, spell_non_finite, stream_for_target
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class _RecordingHandler(logging.Handler):
@@ -54,6 +58,27 @@ class TestLogSink:
         assert sink.handler is handler
         assert isinstance(handler, _RecordingHandler)
         assert handler.seen == ["one|yes", "two|yes"]
+
+    def test_a_processor_that_raises_costs_that_records_processing_and_not_the_log_call(self, mocker: MockerFixture) -> None:
+        """The stdlib runs a handler's filters outside any ``try``, so an unguarded processor would raise out of ``log.info``."""
+        sink = _RecordingSink()
+
+        def fail(_record: logging.LogRecord) -> None:
+            msg = "this processor is broken"
+            raise RuntimeError(msg)
+
+        def redact(record: logging.LogRecord) -> None:
+            record.redacted = "yes"
+
+        sink.processors.extend([fail, redact])
+        handler = sink.handler
+        handle_error = mocker.patch.object(handler, "handleError")
+
+        handler.handle(_record(message="one"))
+
+        assert isinstance(handler, _RecordingHandler)
+        assert handler.seen == ["one|yes"]
+        assert handle_error.call_count == 1
 
     def test_redirect_to_stderr_is_a_no_op_on_a_sink_that_writes_to_no_stream(self) -> None:
         sink = _RecordingSink()

@@ -125,6 +125,18 @@ A `NaN` or an infinity survives the round trip as a float; a wire sink writes it
 
 Structured content owns `data` outright: a `data` entry in `fields` beside a non-string content is overridden.
 
+## Redaction
+
+Every record is scrubbed once, before any sink renders it. The processor replaces what a secret pattern matched with `[REDACTED]`, in the message and in every string a field carries, and it replaces each control character in a field's string values with its printable escape, so a caller-supplied string cannot forge a line, a field separator or a colour on a terminal. The message keeps its control characters, which are the runtime's own rendering: a titled call and a structured content both put a newline there on purpose. The families, the two configuration keys and the limits are in [Logging Configuration](../configuration/config-practical/logging-config.md#redaction).
+
+**It runs on the sink's handler, not at the call sites, and it edits the record rather than a copy of it.** Both halves of that are deliberate.
+
+On the handler, because that is where every record passes: a line a third-party library emitted with a raw request in it is exactly the line most likely to carry a bearer token, and no call site of ours is behind it. Scrubbing at the call sites would cover only what the facade emitted, which is the smaller and safer half.
+
+In place, because what the processor does is *remove* something. A record that has lost a secret is strictly safer for any handler that sees it afterwards, so the edit is shared rather than kept to the sink: a handler an integration attached to the root logger after Pipelex booted is behind the scrub too. Handing the sink a redacted copy would have guaranteed the opposite — every other handler on the root logger would receive the secret the sink was spared. One limit follows, and it is the one the runtime cannot close: a handler already on the root logger *before* Pipelex booted runs ahead of the sink's and sees the record as the call made it. Redaction reaches the handlers Pipelex is in front of, and a host that installs its own handler first is in front of Pipelex.
+
+`log.install_sink` is what puts the processor in front of the sink's own, so every sink gets it — the built-in ones, an out-of-tree one, and the console sink `pipelex doctor` falls back to — and no sink knows about it. `[runtime.log.redaction] is_enabled = false` installs nothing at all.
+
 ## Logger names and levels
 
 Every record is emitted on the stdlib logger named after the module that made the call: a line from `pipelex/pipe_operators/pipe_llm.py` goes to `pipelex.pipe_operators.pipe_llm`, a line from your own `myapp.jobs.nightly` module goes to `myapp.jobs.nightly`. The module is read from one frame lookup at a fixed depth, so a log line costs a dictionary and a frame lookup; nothing walks the stack.

@@ -9,6 +9,7 @@ from pipelex.tools.log.log_context import bind_log_context
 from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_holding import ForwardedRecordFilter, HoldingLogHandler
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
+from pipelex.tools.log.log_redaction import make_redaction_processor
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -154,6 +155,10 @@ class Log:
         The handler is built here, so a sink whose dependency is missing fails at this call, at boot,
         with the extra named. Once per configuration: a second sink is refused, as a second ``configure`` is.
 
+        The redaction processor is put in front of the sink's own processors here rather than by each
+        sink, so every sink gets it, the built-in ones, an out-of-tree one and the console sink the
+        doctor falls back to alike, and none of them knows about it.
+
         Raises:
             RuntimeError: If logging is not configured, or a sink is already installed.
             MissingDependencyError: If the sink's handler needs a package that is not installed.
@@ -165,6 +170,12 @@ class Log:
         if self._sink is not None:
             msg = "A log sink is already installed. You can only call log.install_sink() once per configuration."
             raise RuntimeError(msg)
+
+        redaction = self._log_config_instance.redaction
+        if redaction.is_enabled:
+            # Ahead of whatever the sink appended, so a processor that renders or enriches a record
+            # works on one the secrets have already left, and cannot put back what the scrub removed.
+            sink.processors.insert(0, make_redaction_processor(config=redaction))
 
         handler = sink.handler
         # Ahead of every other filter, so the sink's processors never run on a record it rejects.

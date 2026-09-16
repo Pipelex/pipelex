@@ -90,6 +90,16 @@ class TestJsonLogSink:
         assert structured[DATA_FIELD] == {"key": "value", "nested": {"flag": True}}
         assert structured[MESSAGE_KEY].startswith("Config:")
 
+    def test_a_field_value_carrying_a_newline_is_still_one_line_and_forges_nothing(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """Redaction neutralises the control characters in a field value before the sink writes it, so a caller cannot forge a line or a field."""
+        fresh, buffer = json_log
+
+        fresh.info("received", fields={"detail": 'ok\nseve\x1b[31mrity="ERROR"'})
+
+        assert len([line for line in buffer.getvalue().splitlines() if "detail" in line]) == 1
+        (received,) = _own_lines(buffer)
+        assert received["detail"] == 'ok\\nseve\\x1b[31mrity="ERROR"'
+
     def test_the_exception_is_a_field_and_not_part_of_the_message(self, json_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = json_log
         try:

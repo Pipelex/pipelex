@@ -100,6 +100,33 @@ Available templates:
 - `"func_module"`: "function_name module"
 - `"func_module_line"`: "function_name module 123"
 
+### Redaction
+
+```toml
+[runtime.log.redaction]
+is_enabled = true
+extra_patterns = []
+```
+
+One processor, applied to every record before any sink renders it, whichever sink is selected. It does two things, and the difference between them matters.
+
+**It scrubs secrets** from the message and from every string a field carries, replacing what a pattern matched with `[REDACTED]` and keeping whatever named the secret, so a reader still sees which header or which entry was carrying it. The shipped families are the ones the hosted plane already ran over its own records:
+
+- an `Authorization` header carrying a bearer token,
+- an api-key header or entry, however it is spelled (`x-api-key`, `api-key`, `api_key`),
+- a webhook signature header (`x-signature`, `x-completion-signature`),
+- an OAuth authorization code in a query string (`?code=…`, `&code=…`),
+- a `Cookie` or `Set-Cookie` header's whole value,
+- the JSON entries that are a secret whatever they hold: `password`, `pipelex_api_key`, `gateway_api_key`, `jwt_secret_key`, `portkey_api_key`, `client_secret`, `code`, `access_token`, `refresh_token`, `id_token`,
+- a key recognisable by its prefix alone: `sk_`, `plx_sk_`, `pk_`, `bl_`.
+
+**It neutralises control characters** in a field's string values, and only there: each becomes its printable escape, so a newline in a caller-supplied value cannot forge a line and a tab cannot forge a field separator, and an escape byte cannot colour a terminal. The message keeps its control characters, because they are the runtime's own rendering — a titled call and a structured content both put a newline there deliberately.
+
+- `is_enabled`: `true` by default. `false` turns the processor off for a process that redacts downstream, or one whose records must be reproduced exactly as the calls made them
+- `extra_patterns`: regular expressions added to the shipped families, for the secret shapes only this deployment knows. Every match is replaced by `[REDACTED]`, and a pattern the `re` module refuses is a configuration error named when the configuration loads
+
+A secret whose name and its value are split across a mapping's key and its value is not caught: the families read a name and a value out of one string, which is what a header line or a serialised JSON blob gives them. A structured value is still walked to any depth, so a key prefix or a whole header line sitting inside a `dict` or a `list` is scrubbed. Where the processor runs, and why it edits the record rather than a copy of it, is in [Logging](../../tools/logging.md#redaction).
+
 ### Problem Silencing
 
 ```toml
@@ -194,6 +221,10 @@ presentation_line_width = 120
 is_caller_info_enabled = true
 caller_info_template = "file_line_func"
 silenced_problem_ids = []
+
+[runtime.log.redaction]
+is_enabled = true
+extra_patterns = ["tnt-[0-9]+"]
 
 [runtime.log.package_log_levels]
 pipelex = "INFO"
