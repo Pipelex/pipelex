@@ -21,11 +21,12 @@ HOLDING_CAPACITY = 1000
 
 
 class HoldingLogHandler(logging.Handler):
-    """Holds every record it is handed until a sink's handler takes them over."""
+    """Holds every record it is handed until a sink's handler takes them over, then forwards to that handler."""
 
     def __init__(self) -> None:
         super().__init__(level=logging.NOTSET)
         self._held: list[logging.LogRecord] = []
+        self._released_to: logging.Handler | None = None
 
     @property
     def held_count(self) -> int:
@@ -33,20 +34,43 @@ class HoldingLogHandler(logging.Handler):
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
+        # ``handle`` holds this handler's lock here, the lock ``release_to`` drains under, so a record
+        # arrives either before the drain and is held, or after it and goes straight to the handler
+        # that took the held ones: never into a list nobody reads again. A thread that picked this
+        # handler off the root logger just before it was removed is the one this is for.
+        if self._released_to is not None:
+            self._released_to.handle(record)
+            return
         if len(self._held) >= HOLDING_CAPACITY:
             del self._held[0]
         self._held.append(record)
 
     def release_to(self, *, handler: logging.Handler) -> None:
-        """Hand every held record to the handler, in the order they were emitted, and hold nothing after."""
-        held, self._held = self._held, []
-        for record in held:
-            handler.handle(record)
+        """Hand every held record to the handler, in the order they were emitted, and forward to it whatever arrives after.
+
+        One record the handler cannot render, a line Rich reads as unbalanced markup for one, gets the
+        stdlib's own recovery, ``handleError``, and costs none of the records after it.
+        """
+        self.acquire()
+        try:
+            held, self._held = self._held, []
+            self._released_to = handler
+            for record in held:
+                try:
+                    handler.handle(record)
+                except Exception:  # ruff: ignore[blind-except]
+                    handler.handleError(record)
+        finally:
+            self.release()
 
     @override
     def close(self) -> None:
         """Give what is still held the stdlib's last-resort handling: a warning or worse reaches stderr."""
-        held, self._held = self._held, []
+        self.acquire()
+        try:
+            held, self._held = self._held, []
+        finally:
+            self.release()
         last_resort = logging.lastResort
         if last_resort is not None:
             for record in held:

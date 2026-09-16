@@ -51,6 +51,23 @@ class _ListSink(LogSink):
         return [record.getMessage() for record in self.list_handler.records if record.name == __name__]
 
 
+class _RaisingOnPoisonHandler(_ListHandler):
+    """Raises out of ``emit`` on one message, the way Rich raises on a line it reads as unbalanced markup."""
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.getMessage() == "poison":
+            msg = "closing tag '[/pipe]' doesn't match any open tag"
+            raise RuntimeError(msg)
+        super().emit(record)
+
+
+class _RaisingOnPoisonSink(_ListSink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.list_handler = _RaisingOnPoisonHandler()
+
+
 class TestHoldingLogHandler:
     @pytest.fixture
     def fresh_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[Log]:
@@ -116,6 +133,40 @@ class TestHoldingLogHandler:
                 fresh.install_sink(_ListSink())
         finally:
             fresh.reset()
+
+    def test_a_held_record_the_sink_cannot_render_costs_neither_the_others_nor_the_installation(
+        self, fresh_log: Log, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The sink stays installed so ``reset`` removes it, and the records after the poisoned one are replayed."""
+        fresh_log.info("held first")
+        fresh_log.info("poison")
+        fresh_log.info("held third")
+        sink = _RaisingOnPoisonSink()
+
+        fresh_log.install_sink(sink)
+        fresh_log.info("live fourth")
+
+        assert sink.own_messages() == ["held first", "held third", "live fourth"]
+        assert fresh_log.sink is sink
+        assert sink.handler in logging.getLogger().handlers
+        assert "Logging error" in capsys.readouterr().err
+        fresh_log.reset()
+        assert fresh_log.sink is None
+        assert sink.handler not in logging.getLogger().handlers
+
+    def test_a_record_that_reaches_the_holding_handler_after_the_drain_is_forwarded_to_the_sink(self) -> None:
+        """A thread that picked the holding handler off the root logger just before its removal must lose nothing."""
+        holding = HoldingLogHandler()
+        target = _ListHandler()
+        holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="before", args=(), exc_info=None))
+        holding.release_to(handler=target)
+
+        holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="late", args=(), exc_info=None))
+        holding.close()
+        holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="later still", args=(), exc_info=None))
+
+        assert [record.getMessage() for record in target.records] == ["before", "late", "later still"]
+        assert holding.held_count == 0
 
     def test_the_holding_handler_keeps_the_newest_records_up_to_its_capacity(self) -> None:
         holding = HoldingLogHandler()

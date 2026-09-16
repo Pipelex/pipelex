@@ -145,12 +145,18 @@ class Log:
         handler = sink.handler
         root_logger = logging.getLogger()
         root_logger.addHandler(handler)
-        if self._holding_handler is not None:
-            root_logger.removeHandler(self._holding_handler)
-            self._holding_handler.release_to(handler=handler)
-            self._holding_handler.close()
-            self._holding_handler = None
+        # Recorded before the replay: a handler that raises on one held record leaves the sink
+        # installed all the same, so ``reset`` finds it and removes it rather than leaking it into
+        # the next boot. The sink's handler is on the root logger before the holding handler leaves
+        # it, so a record emitted meanwhile reaches one of the two rather than neither.
         self._sink = sink
+        if self._holding_handler is not None:
+            holding, self._holding_handler = self._holding_handler, None
+            root_logger.removeHandler(holding)
+            try:
+                holding.release_to(handler=handler)
+            finally:
+                holding.close()
 
     def _should_ignore(self, problem_id: str | None = None) -> bool:
         """Check if a log message should be ignored based on the problem ID.

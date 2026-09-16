@@ -17,8 +17,11 @@ from time import time_ns
 from typing import TYPE_CHECKING, Any, cast
 
 from opentelemetry._logs import SeverityNumber  # ruff: ignore[import-private-name]
-from opentelemetry.context import _SUPPRESS_INSTRUMENTATION_KEY  # ruff: ignore[import-private-name] # pyright: ignore[reportPrivateUsage]
-from opentelemetry.context import get_current, get_value
+from opentelemetry.context import (
+    _SUPPRESS_INSTRUMENTATION_KEY,  # ruff: ignore[import-private-name] # pyright: ignore[reportPrivateUsage]
+    get_current,
+    get_value,
+)
 from opentelemetry.sdk._logs import LoggerProvider  # ruff: ignore[import-private-name]
 from opentelemetry.semconv._incubating.attributes import code_attributes  # ruff: ignore[import-private-name]
 from opentelemetry.semconv.attributes import exception_attributes
