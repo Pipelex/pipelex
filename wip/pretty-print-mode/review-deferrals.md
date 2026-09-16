@@ -5,11 +5,15 @@ item: L-260915-c66b8a
 
 # Deferred review findings — `feature/Pretty-print-mode`
 
+What the `/rev` passes on this branch found and deliberately did not fix. Round 1 is recorded first; round 2 has its own section at the end.
+
+## Round 1
+
 What the round-1 `/rev` pass at profile 5 found, confirmed, and deliberately did not fix. The bar was `open`: confirmed defects that are real and matter, plus improvements that genuinely matter. Everything below is real and did not clear that bar, so it is recorded here rather than dropped. Nothing here was invented by the pass — each line is a reviewer's finding that a verifier then read the code for.
 
 Two findings left this document for a ledger item instead, because they are not this branch's to fix: the `pipelex-server` sweep miss and the stuff viewer's attribute-injection XSS.
 
-## Verified, deferred
+### Verified, deferred
 
 These were sent to the verifier and confirmed. They are deferred on importance, not on doubt.
 
@@ -20,7 +24,7 @@ These were sent to the verifier and confirmed. They are deferred on importance, 
 - **The two mermaid data test modules are byte-identical**, same class name included, so this branch applied the same deletions twice. Pre-existing. The risk is the ordinary one: an edit lands in one copy and the other keeps passing while asserting the old behaviour.
 - **The graph viewer's tab fallback can select a disabled tab.** `updateTabAvailability` returns `json` without consulting whether the JSON tab is itself disabled, so a stuff node with no JSON data and no previewable url gets a disabled button marked active over a "No JSON data available" body. Reachable from a content class that declares no fields.
 
-## Raised, not verified
+### Raised, not verified
 
 Sorted as deferrals on the reviewers' word alone — the bar would not have fixed them even read as true, so no verifier time was spent. Treat each as a candidate, not a fact.
 
@@ -40,6 +44,22 @@ Sorted as deferrals on the reviewers' word alone — the bar would not have fixe
 - **A Mermaid label escaping gap** — the escaper turns `<` and `>` into entities but not `&`, so a label already spelling an entity survives to be decoded. The reviewer did not execute this path, and Mermaid's own security level is the remaining barrier.
 - **The CSP nonce on the interactive page buys nothing**, since the page depends on inline handlers and a nonce makes `'unsafe-inline'` ignored for scripts. The two viewers are inconsistent about it.
 
-## Cleared
+### Cleared
 
-Worth recording so the next round does not re-litigate them. The `@3` migration golden rewrite is legitimate — it was the head link when it was rewritten, and the rule is that the head link tracks while every link below it is frozen; both gates pass and the reserved-key derivation is a path-set operation blind to default values. Two reviewers disagreed on this and the verified analysis won. Removing DOMPurify is safe on its own terms: a full sink audit of the interactive page found no attacker-controlled string reaching any `innerHTML` in the page's own JS. The exposure it appeared to cover was one layer up, in the JSON-embedding filter, which DOMPurify never covered either and which this branch fixed.
+Worth recording so the next round does not re-litigate them. The `@3` migration golden rewrite passes every gate, and the reserved-key derivation is a path-set operation blind to default values. The reason first given for it — that `@3` was the head link when it was rewritten — stopped holding once a later commit on this branch bumped the head to `@4`; round 2 revisits it below. Removing DOMPurify is safe on its own terms: a full sink audit of the interactive page found no attacker-controlled string reaching any `innerHTML` in the page's own JS. The exposure it appeared to cover was one layer up, in the JSON-embedding filter, which DOMPurify never covered either and which this branch fixed.
+
+## Round 2
+
+The round-2 pass ran at profile 4 under the `necessity` bar, which admits only defects the round-1 fixes introduced and criticals. It fixed five confirmed findings and deferred the rest. One Codex finding was rejected by the author: a graph spec or trace event saved by an earlier version is refused when read back, and that break is deliberate, with no backward compatibility owed.
+
+### Verified, deferred
+
+- **The `@3` goldens record an abandoned intermediate state.** `defaults@3.toml` and `fingerprint@3.json` were regenerated while `@3` was still the head link, so they carry the first design's `stuff_text_content = false` and `stuff_html_content = false`, with a comment saying `--graph-full-data` turns them on. The bump to `@4` then froze that state; the released 0.55.0–0.58.0 files carry `true` and `true`. The `pretty_print_mode` key in `@3` is what the head-regeneration rule produces, since `@3` also gained `interpreter.methods.*` between releases. No reader behaves differently: only the dev gates read the goldens, the runtime migrator projects the live models, default values never gate, and all three gates pass both with the branch's `@3` and with `@3` restored from `origin/dev`. Restoring the two false values to `true` before release would keep the frozen history truthful, at no risk.
+
+### Raised, not verified
+
+Sorted as deferrals on the reviewers' word alone. Treat each as a candidate, not a fact.
+
+- **The graph viewer tests data by truthiness** (`_interactive_scripts.js.jinja2:234`), so a stuff whose JSON is `""`, `[]` or `{}` disables the JSON tab and shows "No JSON data available"; with the Pretty and HTML tabs gone, such a value has no representation left. Availability should test for `null` or `undefined` instead.
+- **Event decoding is implemented twice**, in `NdjsonEventLog.read_events` and `DynamoDBEventLog.read_events`: the corrupt-versus-refused classification, the refusal count and the error construction. The two had already drifted apart on sanitizing the refusal, which round 2 fixed; a shared decoder taking backend-specific location context would keep them from drifting again.
+- **The kit template's `[runtime.log]` does not list `pretty_print_mode`** (`pipelex/kit/configs/pipelex.toml`). The section is a hand-picked subset that also omits `log_mode`, so this breaks no rule, but the docs recommend the key for hosts with no console.
