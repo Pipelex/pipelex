@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Named fields and a run-scoped context on the log calls**: the seven `log.*` methods take a keyword-only `fields={...}`, carried as attributes of the stdlib `LogRecord` and never rendered into the message, and `with log.context(request_id=..., pipeline_run_id=..., pipe_run_id=...)` stamps the run's identifiers onto every record emitted in scope, nested bindings merging and an absent identifier staying absent rather than reading `None`. `PipeRun.run` binds the request and pipeline identifiers from the job's metadata for a direct-mode run, and every pipe binds its own `pipe_run_id` around the whole of its run, its announcement and its failure included. A `dict` or `list` content is carried as the record's `data` attribute beside its console rendering, a JSON-ready snapshot of the call rather than the caller's live object, and an entry named like an attribute the record already owns, a record factory's included, is carried under a `field_` prefix instead of raising, whatever the order the names arrive in. See [Logging](tools/logging.md).
+
+### Changed
+
+- **Loggers are named by module (Breaking)**: a record from `pipelex/pipe_operators/pipe_llm.py` is emitted on the `pipelex.pipe_operators.pipe_llm` logger instead of `pipelex`, so a handler or filter keyed on the bare package name must key on the prefix, and a `package_log_levels` key now works at module depth too, `pipelex-pipe_operators-pipe_llm = "DEBUG"` for instance. The stack walk that named the logger on every line is gone, replaced by one frame lookup, and the caller-info templates that name the module now render instead of raising.
+
+### Fixed
+
+- **A log call before `log.configure` no longer raises**: it goes to the stdlib's default handling at the stdlib's default level, so a library that logs before Pipelex boots, or a boot that logs while it configures, cannot crash on the log line itself.
+
 ## [v0.59.0] - 2026-09-16
 
 ### Added

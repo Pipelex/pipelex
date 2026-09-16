@@ -6152,14 +6152,6 @@ rationale = "Factory from source: builds the result from the key; single operand
 param = "target"
 rationale = "Factory from source: builds the result from the target; single operand."
 
-["pipelex/tools/log/log_dispatch.py::LogDispatch._log_data"]
-param = "data"
-rationale = "Logs the content; single operand (formatting keyword-only)."
-
-["pipelex/tools/log/log_dispatch.py::LogDispatch._log_message"]
-param = "message"
-rationale = "Logs the content; single operand (formatting keyword-only)."
-
 ["pipelex/tools/log/log_dispatch.py::LogDispatch._log_to_console"]
 param = "message"
 rationale = "Transforms the message; single operand."
