@@ -74,7 +74,7 @@ A value can be anything; the console ignores it and a structured sink serializes
 
 ### Names the stdlib owns
 
-The stdlib refuses an `extra` key that would overwrite one of the record's own attributes (`name`, `message`, `lineno`, `module`, `args`, `asctime` and the rest), and a library's log call never raises. An entry of such a name is therefore carried under the prefix `field_`: `fields={"name": "alpha"}` lands as `record.field_name`. What counts as owned is read off the record actually built, through whatever record factory is installed, so an attribute an OpenTelemetry or tracing instrumentation stamps on every record is a collision too, for a field, a context identifier and `data` alike. Entries attach in order, and an entry that lands on a prefixed name makes that name owned for the entries after it, so a call that gives both `name` and `field_name` keeps both values.
+The stdlib refuses an `extra` key that would overwrite one of the record's own attributes (`name`, `message`, `lineno`, `module`, `args`, `asctime` and the rest), and a library's log call never raises. An entry of such a name is therefore carried under the prefix `field_`: `fields={"name": "alpha"}` lands as `record.field_name`. What counts as owned is read off the record actually built, through whatever record factory is installed, so an attribute an OpenTelemetry or tracing instrumentation stamps on every record is a collision too, for a field, a context identifier and `data` alike. The prefix is applied until the name lands on an attribute nobody owns, and entries attach in order, so a call that gives both `name` and `field_name` keeps both values whatever their order: the one that arrives second lands on `field_field_name`.
 
 ## The run-scoped context
 
@@ -104,7 +104,7 @@ The context is a `LogContext` with three optional identifiers, `request_id`, `pi
 The identifiers travel in the payload, and the contextvar is in-process plumbing bound after deserialization and nothing else; it never crosses a process boundary. Each process entry binds from the payload it received:
 
 - **A direct-mode run**: `PipeRun.run` binds `request_id` and `pipeline_run_id` from the job's `JobMetadata` for the whole run, delivery included, and releases the binding when the run returns. The metadata a submission builds carries no `pipe_run_id` yet.
-- **Every pipe**: `live_run_pipe` mints the pipe run's id and binds `pipe_run_id` around the pipe's execution, so a record emitted inside a pipe names the pipe run it belongs to, a nested pipe rebinding its own and the outer id coming back when it returns. This is the binding every orchestration shares, direct or distributed.
+- **Every pipe**: `live_run_pipe` mints the pipe run's id and binds `pipe_run_id` around the whole of the pipe's run, the line announcing it, its span lines and its failure included, so every record a pipe emits names the pipe run it belongs to, a nested pipe rebinding its own and the outer id coming back when it returns, however it returns. This is the binding every orchestration shares, direct or distributed.
 - **An API request**: the runner's request middleware is where `request_id` is bound from the inbound request, for the request's duration.
 - **A durable-execution activity or workflow**: the entry is where the identifiers are bound from the payload the orchestrator handed it.
 
