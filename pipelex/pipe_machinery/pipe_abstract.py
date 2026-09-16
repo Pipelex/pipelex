@@ -918,9 +918,10 @@ class PipeAbstract(ABC, BaseModel):
         this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
         # The pipe run's id exists from here on, so this is where the log context takes it: every
-        # record the pipe emits, its announcement, its span lines and its failure included, names the
-        # pipe run it belongs to, a nested pipe's until it binds its own. The outer binding comes
-        # back when the pipe returns, however it returns.
+        # record emitted during the run, its announcement, its span lines and its failure included,
+        # names the pipe run it belongs to, a nested pipe's until it binds its own. The outer binding
+        # comes back when the pipe returns, however it returns. A pipe lifted for absent optional
+        # inputs never gets here: it has no run and no id, and its skip line carries the enclosing binding.
         with log.context(pipe_run_id=this_pipe_run_id):
             log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
 

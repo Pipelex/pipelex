@@ -1,10 +1,11 @@
 """``live_run_pipe`` binds the pipe run's own id onto the log context for the whole of the pipe's run.
 
 The job metadata a submission builds carries no ``pipe_run_id``; the pipe mints one as it starts and
-hands it down on a metadata copy. The binding here is what makes every record a pipe emits name the
-pipe run it belongs to: the line announcing it, the records of its body, its span hooks and its
-failure alike. A nested pipe rebinds its own and the outer one comes back when it returns, however it
-returns. It is the binding every orchestration shares, so it lives on the pipe and not on the runner.
+hands it down on a metadata copy. The binding here is what makes every record emitted during a pipe's
+run name the run it belongs to: the line announcing it, the records of its body, its span hooks and
+its failure alike. A nested pipe rebinds its own and the outer one comes back when it returns, however
+it returns. A pipe lifted for absent optional inputs has no run and no id, so its skip line is not in
+scope here. It is the binding every orchestration shares, so it lives on the pipe and not on the runner.
 """
 
 from __future__ import annotations
