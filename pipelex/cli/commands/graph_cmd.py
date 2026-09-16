@@ -14,11 +14,13 @@ from typing import Annotated
 
 import typer
 from posthog import tag
+from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
+from pipelex.graph.exceptions import GraphSpecValidationError
 from pipelex.graph.graph_rendering import render_graph_from_spec
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipelex import Pipelex
@@ -50,7 +52,20 @@ def _do_graph_render(
     # Load the graph
     typer.echo(f"Loading graph from: {input_file}", err=True)
     json_str = load_text_from_path(input_file)
-    graph_spec = GraphSpec.model_validate_json(json_str)
+    try:
+        graph_spec = GraphSpec.model_validate_json(json_str)
+    except ValidationError as validation_error:
+        # A spec saved by an earlier version carries fields an `IOSpec` no longer declares, and an
+        # `IOSpec` takes no key it does not declare — so it is refused here rather than half-read. The
+        # refusal is named, because the command root's fallback prints the pydantic error itself, and
+        # that error quotes the offending input: on a graph file the input is the run's traced content,
+        # which would put a pipeline's data on the terminal once per rejected field.
+        msg = (
+            f"This graph spec is in a shape this version does not accept — it was most likely saved by an earlier "
+            f"one, whose specs carried fields that have since been retired. Run the pipeline again to get a spec in "
+            f"the current shape. ({validation_error.error_count()} field(s) refused in {input_file})"
+        )
+        raise GraphSpecValidationError(msg) from validation_error
     typer.secho(f"✅ Loaded graph with {len(graph_spec.nodes)} nodes", fg=typer.colors.GREEN, err=True)
 
     # Determine output directory
@@ -173,6 +188,15 @@ def graph_render_cmd(
                 subgraphs=subgraphs,
                 open_browser=open_browser,
             )
+
+    except GraphSpecValidationError as spec_error:
+        # A refused spec is a diagnosis, not a crash, so it gets its message and no traceback. The
+        # traceback below would print the pydantic error it was raised from, and that error quotes the
+        # input it refused — which on a graph file is the run's own traced content.
+        log.error(f"{spec_error}")
+        console = get_console()
+        console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{spec_error}\n")
+        raise typer.Exit(1) from spec_error
 
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.

@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:73d5e8b62d67fb4231655c06e3d6129b046af97d755bd928c4bb9223cf7f6114"
+digest = "sha256:7ca4729540c5b33002f03e1daa72c1b5d915f00e6e7488d6855f9a81d827d99a"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-15T22:39:13Z"
-rationale = "runtime_hub.reset_boot_state now returns PrettyPrinter.mode to RICH at teardown, which adds a module-level import of pipelex.tools.misc.pretty to runtime_hub. That module is in tools, the bottom layer, and names nothing from the packages the doc forbids; the guard passes. The doc does not enumerate what reset_boot_state releases or runtime_hub's permitted imports, so no doc change is needed."
+reviewed_at = "2026-09-16T07:11:17Z"
+rationale = "runtime_hub gains set_pretty_print_mode and a private field holding the mode the process had before boot, so reset_boot_state restores that instead of a hardcoded RICH. No new import: pipelex.tools.misc.pretty was already imported at module level by the change the previous ack covered, and tools is the bottom layer. The doc specifies the runtime_hub / interpreter_hub boundary and the guard that enforces it; it enumerates neither what reset_boot_state releases nor which modules runtime_hub may import, so there is nothing stale to update. The guard passes."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:d8d3455459c14fe229f659f7866fed780dedc560"
+"pipelex/runtime_hub.py" = "blob:159698a55f6535e818636cd7e31ec91e3d82ed37"

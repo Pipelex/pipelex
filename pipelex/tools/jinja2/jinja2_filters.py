@@ -1,4 +1,3 @@
-import re
 from enum import StrEnum
 from typing import Any
 
@@ -157,19 +156,25 @@ def apply_tag_style(*, context: Context, value: str, tag_name: str | None = None
 
 
 def escape_script_tag(value: Any) -> Any:
-    r"""Escape </script> to prevent script tag injection in JSON embeddings.
+    r"""Escape `<` to prevent script tag injection in JSON embeddings.
 
-    When embedding JSON in <script type="application/json"> tags, a malicious
-    string containing </script> could break out of the script block and inject
-    arbitrary HTML/JavaScript. HTML tag names are case-insensitive, so this
-    function uses case-insensitive matching to catch all variants.
+    When embedding JSON in a `<script>` block, a string containing `</script>` could break out of the
+    block and inject arbitrary HTML/JavaScript. Matching that literal spelling is not enough: the HTML
+    script-data end-tag also terminates on `</script` followed by a space, a tab, a slash or `>`, so
+    `</script >` and `</script/>` closed the block just as effectively while passing a `</script>` filter
+    untouched. Every `<` is therefore escaped instead of any particular tag spelling, which no end-tag
+    form can get around.
+
+    `<` is a valid escape both in JSON and in a JavaScript string literal, and it parses back to
+    `<`, so every consumer reads exactly the value it was given. In JSON a `<` can only ever appear
+    inside a string, so escaping it unconditionally never touches the document's structure.
 
     Args:
         value: The string to escape. Non-string values are returned unchanged.
 
     Returns:
-        The escaped string with </script> (any case) replaced by <\/script>.
+        The escaped string, with every `<` replaced by `<`.
     """
     if not isinstance(value, str):
         return value
-    return re.sub(r"</script>", r"<\/script>", value, flags=re.IGNORECASE)
+    return value.replace("<", "\\u003c")

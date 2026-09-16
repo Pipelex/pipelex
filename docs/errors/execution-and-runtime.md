@@ -53,6 +53,7 @@ own page. Classes are grouped by subsystem.
 
 - [`EventLogError`](event-log-error.md) — Event log
 - [`EventLogReadError`](event-log-read-error.md) — Event log read
+- [`EventLogSchemaMismatchError`](event-log-schema-mismatch-error.md) — Event log schema mismatch
 - [`EventLogSetupError`](event-log-setup-error.md) — Event log setup
 
 [Back to Error Reference](index.md)

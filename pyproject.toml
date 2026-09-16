@@ -479,7 +479,7 @@ runtime-evaluated-base-classes = [
   "pydantic.BaseModel",
   "pipelex.core.stuffs.structured_content.StructuredContent",
   "pipelex.system.configuration.config_model.ConfigModel",
-  "pipelex.system.configuration.config_model.ConfigRoot",
+  "pipelex.system.configuration.config_root.ConfigRoot",
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -38,6 +38,9 @@ class TestPrettySilent:
 
         captured = capsys.readouterr()
         assert captured.out == ""
+        # Both channels, because the poor printer writes to stderr: a silent mode that fell through to it
+        # would leave stdout empty and still print the whole panel.
+        assert captured.err == ""
 
     def test_pretty_text_still_works_in_silent_mode(self) -> None:
         """Rendering to string via pretty_text should be unaffected by SILENT mode."""
@@ -54,4 +57,8 @@ class TestPrettySilent:
         TextContent(text="Hello").pretty_print_content(title="Text")
 
         rendered_pretty_mock.assert_not_called()
-        assert capsys.readouterr().out == ""
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        # The poor arm calls `rendered_plain()` rather than `rendered_pretty()`, so the mock above stays
+        # un-called if the mode ever falls through to it. Only stderr catches that.
+        assert captured.err == ""

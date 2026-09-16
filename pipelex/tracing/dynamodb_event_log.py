@@ -21,7 +21,7 @@ from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
-from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
+from pipelex.tracing.exceptions import EventLogReadError, EventLogSchemaMismatchError, EventLogSetupError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
 
 try:
@@ -151,6 +151,8 @@ class DynamoDBEventLog(EventLogProtocol):
             raise EventLogReadError(msg) from exc
 
         events: list[TraceEvent] = []
+        refused_count = 0
+        first_refusal: str | None = None
         for item in items:
             payload = item.get("payload")
             if payload is None:
@@ -159,9 +161,30 @@ class DynamoDBEventLog(EventLogProtocol):
             try:
                 event = _any_trace_event_adapter.validate_json(payload)
             except ValidationError as exc:
-                log.warning(f"Skipping unparseable DynamoDB item PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}")
+                # `validate_json` reports unparseable input as a `json_invalid` entry rather than raising
+                # `JSONDecodeError`, so the two cases are told apart by the error type. A payload the event
+                # models refuse was stored whole, by a version whose event shape this one no longer accepts
+                # — so it is counted and raised rather than skipped, which would have handed the caller a
+                # silently truncated record of the run. This is the shape that persists across a rolling
+                # deploy, where one image writes what another reads back.
+                if any(error["type"] == "json_invalid" for error in exc.errors()):
+                    log.warning(
+                        f"Skipping unparseable DynamoDB item PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}"
+                    )
+                    continue
+                refused_count += 1
+                if first_refusal is None:
+                    first_refusal = f"PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}"
                 continue
             events.append(event)
+
+        if refused_count:
+            msg = (
+                f"{refused_count} trace event(s) for pipeline_run_id={pipeline_run_id} are in a shape this version "
+                f"does not accept, most likely written by an earlier one; run the pipeline again to get a log in the "
+                f"current shape. First refusal: {first_refusal}"
+            )
+            raise EventLogSchemaMismatchError(msg)
 
         return events
 

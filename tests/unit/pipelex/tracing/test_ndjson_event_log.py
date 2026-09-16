@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.tracing.exceptions import EventLogSchemaMismatchError
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import EdgeEvent, PipeStartEvent
 from tests.unit.pipelex.tracing.conftest import make_edge_event, make_trace_event
@@ -117,7 +118,9 @@ class TestNdjsonEventLog:
         assert result == []
 
     def test_corrupt_line_skipped(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-        """Corrupt NDJSON lines are skipped with a warning."""
+        """A line that is not JSON at all is a half-written record from a crash mid-write, so it is skipped
+        with a warning and the rest of the log — which is still the run's own record — is returned.
+        """
         event_log = NdjsonEventLog(traces_dir=str(tmp_path))
         event_log.emit(make_trace_event(sequence=0))
         event_log.emit(make_trace_event(sequence=1))
@@ -126,13 +129,31 @@ class TestNdjsonEventLog:
         ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
         with open(ndjson_file, "a", encoding="utf-8") as fhandle:
             fhandle.write("not valid json\n")
-            fhandle.write('{"event_kind": "pipe_start", "bad": true}\n')
 
         with caplog.at_level(logging.WARNING):
             result = event_log.read_events("run_001")
 
         assert len(result) == 2
         assert any("corrupt" in record.message.lower() or "skipping" in record.message.lower() for record in caplog.records)
+
+    def test_a_line_the_event_models_refuse_raises_instead_of_vanishing(self, tmp_path: Path) -> None:
+        """A line that parses as JSON and is then refused was written whole, by a version whose event shape
+        this one no longer accepts. Skipping those returned an old run's log as an empty list, which every
+        caller read as a run that recorded nothing — so the read refuses instead, and says how many and why.
+        """
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(sequence=0))
+        event_log.close()
+
+        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        with open(ndjson_file, "a", encoding="utf-8") as fhandle:
+            fhandle.write('{"event_kind": "pipe_start", "bad": true}\n')
+
+        with pytest.raises(EventLogSchemaMismatchError) as refusal:
+            event_log.read_events("run_001")
+
+        assert "1 trace event(s)" in str(refusal.value)
+        assert "run the pipeline again" in str(refusal.value)
 
     def test_multiprocess_concurrent_writes(self, tmp_path: Path) -> None:
         """Multiple processes writing to different workflow files produces no corruption."""

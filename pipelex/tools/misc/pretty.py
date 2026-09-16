@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 from kajson import kajson
 from pydantic import BaseModel
 from rich.console import Console, Group
+from rich.errors import MarkupError
 from rich.json import JSON
 from rich.markdown import Markdown
 from rich.measure import Measurement
@@ -89,6 +90,9 @@ def pretty_print_md(
     width: int | None = None,
     console_width: int | None = None,
 ):
+    if PrettyPrinter.mode is PrettyPrintMode.SILENT:
+        # A silent printer builds no renderable, and does not measure the terminal to size one.
+        return
     width = width or PrettyPrinter.pretty_width()
     md_content = Markdown(content)
     PrettyPrinter.pretty_print(
@@ -112,6 +116,9 @@ def pretty_print_url(
     width: int | None = None,
     console_width: int | None = None,
 ):
+    if PrettyPrinter.mode is PrettyPrintMode.SILENT:
+        # A silent printer builds no renderable.
+        return
     if url.startswith("/"):
         url = "file://" + url
     pretty_print(
@@ -341,7 +348,7 @@ class PrettyPrinter:
         console_width: int | None = None,
     ):
         if isinstance(content, str) and content.startswith(("http://", "https://")):
-            cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle)
+            cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle, width=width, console_width=console_width)
             return
         # Titles are Rich markup in every mode (a caller writes them once, for the Rich panel), so they are
         # measured and printed as the text they render to, not as the tags they are spelled with.
@@ -361,6 +368,9 @@ class PrettyPrinter:
         if width:
             max_content_width = min(max_content_width, width)
         max_content_width = max(max_content_width, 1)
+        # A title never widens the frame past the terminal: it is elided to the width the content wraps to, the way
+        # Rich's `Panel` truncates an over-wide title, rather than spilling the box it is supposed to sit inside.
+        title_lines = [cls._elide(line=line, max_width=max_content_width) for line in title_lines]
         if isinstance(content, PrettyPrintable):
             # A caller handing over a Rich renderable gets its text, not the object's repr.
             content_str = cls.pretty_text(content, width=max_content_width)
@@ -398,7 +408,21 @@ class PrettyPrinter:
         """The text a panel title renders to: markup tags dropped, as Rich's `Panel` would drop them."""
         if isinstance(title, Text):
             return title.plain
-        return Text.from_markup(title).plain
+        try:
+            return Text.from_markup(title).plain
+        except MarkupError:
+            # A title spelling something Rich reads as an unmatched closing tag — a path in brackets, say — is
+            # printed as it stands. The poor mode is the one that prints whatever happens, so it never raises here.
+            return title
+
+    @classmethod
+    def _elide(cls, *, line: str, max_width: int) -> str:
+        """The line cut to `max_width`, ending in an ellipsis when anything was cut."""
+        if len(line) <= max_width:
+            return line
+        if max_width <= 1:
+            return line[:max_width]
+        return line[: max_width - 1] + "…"
 
     @classmethod
     def pretty_print_url_without_rich(
@@ -407,18 +431,27 @@ class PrettyPrinter:
         *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        width: int | None = None,
+        console_width: int | None = None,
     ):
-        title = title or ""
+        # The url itself prints on a row of its own, outside the frame, so a terminal can linkify it whole.
+        # Everything around it obeys the same rules as the framed printer: markup titles render to their text,
+        # and nothing is drawn wider than the terminal.
+        title_str = cls._plain_title(title=title) if title else ""
         if subtitle:
-            title += f" ({subtitle})"
-        terminal_width = shutil.get_terminal_size().columns
+            title_str += f" ({cls._plain_title(title=subtitle)})"
+        terminal_width = console_width or shutil.get_terminal_size().columns
         frame_width = terminal_width - 2
+        if width:
+            frame_width = min(frame_width, width + 6)
+        frame_width = max(frame_width, 5)
+        title_str = cls._elide(line=title_str, max_width=frame_width - 4)
         top_border = "╭" + "─" * (frame_width - 2) + "╮"
         bottom_border = "╰" + "─" * (frame_width - 2) + "╯"
 
         print_to_stderr(f"{BORDER_COLOR}{top_border}{RESET_FONT}")
-        if title:
-            title_padding = " " * (frame_width - len(title) - 4)
-            print_to_stderr(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title}{RESET_FONT}:{title_padding}{BORDER_COLOR}│{RESET_FONT}")
+        if title_str:
+            title_padding = " " * (frame_width - len(title_str) - 4)
+            print_to_stderr(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title_str}{RESET_FONT}:{title_padding}{BORDER_COLOR}│{RESET_FONT}")
         print_to_stderr(f"{TEXT_COLOR}{content}{RESET_FONT}")
         print_to_stderr(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")

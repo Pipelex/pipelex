@@ -4,11 +4,16 @@
 
 ### Added
 
-- **`pretty_print_mode` in `[runtime.log]` (Breaking)**: `rich` (the default), `poor` or `silent`, applied at boot beside `log_mode` and returned to `rich` at teardown, so a host with no console turns the "Output of pipe" panels off in configuration rather than in code; a silent printer no longer builds the Rich renderable at all. Boot now replaces a `PrettyPrinter.mode` assigned in code before it, so set the key instead. The agent CLI forces `silent`.
+- **`pretty_print_mode` in `[runtime.log]` (Breaking)**: `rich` (the default), `poor` or `silent`, applied at boot beside `log_mode`, so a host with no console turns the "Output of pipe" panels off in configuration rather than in code; a silent printer builds no Rich renderable and does not measure the terminal to size one. Teardown returns the mode to whatever the process held before that boot rather than to `rich`, which matters on the failure path: a caller that pinned the mode itself and then booted — the agent CLI pins `silent` so nothing can corrupt its JSON envelope — gets its own mode back instead of one it never asked for. `pipelex doctor` applies the key too. Boot replaces a `PrettyPrinter.mode` assigned in code before it, so set the key instead.
 
 ### Fixed
 
-- **Poor pretty-print mode**: a panel whose title is wider than the terminal no longer hangs the run in an endless wrapping loop, which every operator pipe's "Output of pipe" panel did on an 80-column headless console. Titles print without their Rich markup, and an output prints as its plain rendering instead of a Rich object's repr.
+- **Poor pretty-print mode**: a panel whose title is wider than the terminal no longer hangs the run in an endless wrapping loop, which every operator pipe's "Output of pipe" panel did on an 80-column headless console, and no longer draws a frame wider than the terminal either — an over-wide title is elided the way Rich's own panel truncates one. Titles print without their Rich markup, including on the branch a bare url takes, which is where every image output lands; a title Rich reads as an unmatched closing tag, such as a path in square brackets, prints as it stands instead of raising on the execution path. An output prints as its plain rendering instead of a Rich object's repr.
+- **A trace event log the current models refuse is no longer read as an empty one**: a stored event that parses as JSON and is then refused was written whole, by a version whose event shape this one no longer accepts — so the read now refuses with a count and a reason, where it used to skip such lines one by one and hand back a run with no events at all, reported as a success. A line that is not JSON, the half-written record of a crash mid-write, is still skipped with a warning. `pipelex graph render` names the same diagnosis for a graph spec saved by an earlier version, instead of printing a raw traceback whose pydantic error quoted the run's traced content back to the terminal.
+
+### Security
+
+- **`escape_script_tag` escapes `<` rather than the literal `</script>`**: the HTML script-data end-tag also terminates on `</script` followed by a space, a tab, a slash or `>`, so `</script >` and `</script/>` closed an embedded JSON block while passing the filter untouched, and the remainder of the value parsed as live HTML. Every `<` is now escaped as `<`, which no end-tag spelling gets around and which both JSON and JavaScript parse back to `<`. This guards the graph and stuff viewer pages, which embed model-generated traced content and open from `file://` with no CSP.
 
 ### Removed
 
