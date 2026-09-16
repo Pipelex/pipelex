@@ -121,7 +121,7 @@ When the content is not a string, it is rendered as JSON for the message, indent
 - `None` is rendered as the word `None` and carries no `data`,
 - content `json` refuses outright, a circular reference or a mapping with a non-string key, is rendered as its `repr` and carries no `data`; a log call never raises.
 
-A `NaN` or an infinity survives the round trip as a float, and the `json` sink writes it the way Python's `json` does, as the bare token `NaN` or `Infinity`.
+A `NaN` or an infinity survives the round trip as a float; a wire sink writes it as the string `"NaN"`, `"Infinity"` or `"-Infinity"`, since JSON has no token for it that a strict parser accepts.
 
 Structured content owns `data` outright: a `data` entry in `fields` beside a non-string content is overridden.
 

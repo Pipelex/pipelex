@@ -3,8 +3,11 @@
 The keys are the ones a log agent ingests without a parser, the CloudWatch agent, the Google Cloud
 Logging agent and any OTLP collector among them: ``time``, ``severity``, ``logger``, ``message``, then
 ``exception`` when the record carries one, then the fields, the context identifiers and the ``data``
-attribute under their own names. A field named like one of the sink's own keys is carried under the
-same ``field_`` prefix the record uses for a name the stdlib owns, so no value is lost.
+attribute under their own names. The sink's own keys are reserved whether or not the line carries
+them: a field named like one is carried under the same ``field_`` prefix the record uses for a name
+the stdlib owns, on every line and not only the ones with an exception, so no value is lost and a
+field keeps one wire name. A non-finite float is written as the string ``"NaN"``, ``"Infinity"`` or
+``"-Infinity"``, since JSON has no token for it that a strict parser accepts.
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
-from pipelex.tools.log.log_sink import LogSink, json_fallback
+from pipelex.tools.log.log_sink import LogSink, json_fallback, spell_non_finite
 
 if TYPE_CHECKING:
     from typing import TextIO
@@ -28,7 +31,7 @@ SEVERITY_KEY = "severity"
 LOGGER_KEY = "logger"
 MESSAGE_KEY = "message"
 EXCEPTION_KEY = "exception"
-# The keys the sink writes itself; a carried attribute of the same name is prefixed.
+# The keys the sink writes itself, reserved on every line; a carried attribute of the same name is prefixed.
 FIXED_KEYS = frozenset({TIME_KEY, SEVERITY_KEY, LOGGER_KEY, MESSAGE_KEY, EXCEPTION_KEY})
 
 
@@ -42,7 +45,7 @@ def _json_line(*, payload: dict[str, Any]) -> str:
     lose the line or to break the one-object-per-line contract.
     """
     try:
-        return json.dumps(payload, ensure_ascii=False, default=json_fallback)
+        return json.dumps(payload, ensure_ascii=False, allow_nan=False, default=json_fallback)
     except (TypeError, ValueError):
         safe_payload = {key: value if key in FIXED_KEYS else repr(value) for key, value in payload.items()}
         return json.dumps(safe_payload, ensure_ascii=False, default=str)
@@ -70,9 +73,9 @@ class JsonLogFormatter(logging.Formatter):
             payload[EXCEPTION_KEY] = record.exc_text
         for name, value in carried_attributes(record=record).items():
             key = name
-            while key in payload:
+            while key in payload or key in FIXED_KEYS:
                 key = f"{COLLIDING_FIELD_PREFIX}{key}"
-            payload[key] = value
+            payload[key] = spell_non_finite(value=value)
         return _json_line(payload=payload)
 
 

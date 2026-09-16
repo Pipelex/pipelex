@@ -142,6 +142,49 @@ class TestJsonLogSink:
         assert isinstance(cyclic_line["loop"], str)
         assert "{...}" in cyclic_line["loop"]
 
+    def test_a_non_finite_float_is_written_as_text_a_strict_parser_accepts(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """JSON has no NaN: the bare tokens Python writes by default would cost the whole line, so they are strings."""
+
+        def refuse(token: str) -> None:
+            msg = f"bare token {token} on the wire"
+            raise ValueError(msg)
+
+        fresh, buffer = json_log
+        fresh.info(
+            "readings", fields={"reading": float("nan"), "up": float("inf"), "nested": {"deep": [float("-inf"), 1]}, "ok": "kept", "flag": True}
+        )
+        fresh.info({"structured": float("inf")}, title="Data")
+
+        strict = [json.loads(line, parse_constant=refuse) for line in buffer.getvalue().splitlines() if line]
+        readings, structured = [line for line in strict if line[LOGGER_KEY] == __name__]
+        assert readings["reading"] == "NaN"
+        assert readings["up"] == "Infinity"
+        assert readings["nested"] == {"deep": ["-Infinity", 1]}
+        assert readings["ok"] == "kept"
+        assert readings["flag"] is True
+        assert structured[DATA_FIELD] == {"structured": "Infinity"}
+
+    def test_the_sinks_own_keys_are_reserved_with_or_without_an_exception(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """A field's wire name must not depend on an exception being active, and a cycle under a reserved name must not cost the line."""
+        cyclic: dict[str, Any] = {}
+        cyclic["me"] = cyclic
+        fresh, buffer = json_log
+        fresh.info("no exception", fields={EXCEPTION_KEY: "supplied"})
+        try:
+            msg = "boom"
+            raise ValueError(msg)
+        except ValueError:
+            fresh.error("with exception", include_exception=True, fields={EXCEPTION_KEY: "supplied"})
+        fresh.info("cycle under a reserved name", fields={EXCEPTION_KEY: cyclic})
+
+        without, with_exception, cycle = _own_lines(buffer)
+        assert EXCEPTION_KEY not in without
+        assert without[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"] == "supplied"
+        assert "ValueError: boom" in with_exception[EXCEPTION_KEY]
+        assert with_exception[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"] == "supplied"
+        assert cycle[MESSAGE_KEY] == "cycle under a reserved name"
+        assert "{...}" in cycle[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"]
+
     def test_redirect_to_stderr_moves_the_stream(self, json_log: tuple[Log, io.StringIO], capsys: pytest.CaptureFixture[str]) -> None:
         fresh, buffer = json_log
         fresh.redirect_to_stderr()

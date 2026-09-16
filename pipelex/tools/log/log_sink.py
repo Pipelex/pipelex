@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
 from typing_extensions import override
@@ -24,7 +25,15 @@ from typing_extensions import override
 from pipelex.system.console_target import ConsoleTarget
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from typing import TextIO
+
+# JSON has no spelling for a float that is not a number: ``json.dumps`` writes the bare tokens ``NaN``
+# and ``Infinity`` by default, which a strict parser refuses line and all. A wire sink writes these
+# strings in their place.
+NAN_TEXT = "NaN"
+POSITIVE_INFINITY_TEXT = "Infinity"
+NEGATIVE_INFINITY_TEXT = "-Infinity"
 
 # A processor edits a record in place before the sink renders it; redaction is the intended one. It
 # runs on the sink's own handler, once per record, so a handler another integration attached to the
@@ -103,15 +112,54 @@ def json_fallback(value: Any) -> Any:  # kw-only: ignore — json.dumps calls it
     return str(value)
 
 
-def render_json(*, value: Any) -> str:
-    """Serialize one value for a wire sink without ever raising.
+def spell_non_finite(*, value: Any) -> Any:
+    """The value with every non-finite float, at any depth, replaced by the string JSON can carry.
 
-    A model dumps in JSON mode and an unknown object becomes its text. A value ``json`` refuses
-    outright, a circular reference or a mapping with a non-string key, is written as its ``repr``
-    instead: a sink must render every record it is handed, and a serialization failure is a fact about
-    the value, never a reason to lose the line.
+    A ``NaN`` becomes ``"NaN"``, an infinity ``"Infinity"`` or ``"-Infinity"``, inside a mapping or a
+    sequence as at the top, and everything else is returned as it was, a bool included since a bool
+    is never a float here. A tuple comes back as a list, which is what JSON would have made of it. A
+    container that contains itself is returned as it is, for ``json`` to refuse the way it always did.
+    """
+    return _spell_non_finite(value=value, open_containers=set())
+
+
+def _spell_non_finite(*, value: Any, open_containers: set[int]) -> Any:
+    if isinstance(value, float):
+        if math.isnan(value):
+            return NAN_TEXT
+        if math.isinf(value):
+            return POSITIVE_INFINITY_TEXT if value > 0 else NEGATIVE_INFINITY_TEXT
+        return value
+    container_id = id(value)
+    if container_id in open_containers:
+        return value
+    if isinstance(value, dict):
+        mapping = cast("dict[Any, Any]", value)
+        open_containers.add(container_id)
+        try:
+            return {key: _spell_non_finite(value=item, open_containers=open_containers) for key, item in mapping.items()}
+        finally:
+            open_containers.discard(container_id)
+    if isinstance(value, (list, tuple)):
+        sequence = cast("Sequence[Any]", value)
+        open_containers.add(container_id)
+        try:
+            return [_spell_non_finite(value=item, open_containers=open_containers) for item in sequence]
+        finally:
+            open_containers.discard(container_id)
+    return value
+
+
+def render_json(*, value: Any) -> str:
+    """Serialize one value for a wire sink without ever raising, and never as anything but JSON.
+
+    A model dumps in JSON mode and an unknown object becomes its text; a non-finite float is spelled
+    as the string ``"NaN"``, ``"Infinity"`` or ``"-Infinity"`` rather than the bare token ``json``
+    would write. A value ``json`` refuses outright, a circular reference or a mapping with a non-string
+    key, is written as its ``repr`` instead: a sink must render every record it is handed, and a
+    serialization failure is a fact about the value, never a reason to lose the line.
     """
     try:
-        return json.dumps(value, ensure_ascii=False, default=json_fallback)
+        return json.dumps(spell_non_finite(value=value), ensure_ascii=False, allow_nan=False, default=json_fallback)
     except (TypeError, ValueError):
         return json.dumps(repr(value), ensure_ascii=False)

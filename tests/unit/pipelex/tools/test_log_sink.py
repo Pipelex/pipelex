@@ -10,7 +10,7 @@ import pytest
 from typing_extensions import override
 
 from pipelex.system.console_target import ConsoleTarget
-from pipelex.tools.log.log_sink import LogSink, render_json, stream_for_target
+from pipelex.tools.log.log_sink import LogSink, render_json, spell_non_finite, stream_for_target
 
 
 class _RecordingHandler(logging.Handler):
@@ -77,3 +77,13 @@ class TestLogSink:
         assert render_json(value=object()).startswith('"<object object at')
         assert "{...}" in render_json(value=cyclic)
         assert render_json(value={(1, 2): "a"}) == "\"{(1, 2): 'a'}\""
+
+    def test_a_non_finite_float_is_spelled_as_text_at_any_depth_and_nothing_else_moves(self) -> None:
+        value = {"nan": float("nan"), "inf": float("inf"), "deep": [float("-inf"), 1, True, "x"], "pair": (2.5, float("nan"))}
+
+        spelled = spell_non_finite(value=value)
+
+        assert spelled == {"nan": "NaN", "inf": "Infinity", "deep": ["-Infinity", 1, True, "x"], "pair": [2.5, "NaN"]}
+        assert spelled["deep"][2] is True
+        assert render_json(value=[float("nan")]) == '["NaN"]'
+        assert "NaN" not in render_json(value=[1.5])
