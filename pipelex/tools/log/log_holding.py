@@ -41,6 +41,22 @@ class ForwardedRecordFilter(logging.Filter):
         return not getattr(record, FORWARDED_MARK, False)
 
 
+def _deliver(*, handler: logging.Handler, record: logging.LogRecord) -> None:
+    """Hand one record to the sink's handler the way the root logger would have.
+
+    ``Logger.callHandlers`` is what checks a handler's level; ``Handler.handle`` does not, so a replay
+    or a forward that called it alone would deliver what the live path withholds. And a record the
+    handler cannot render gets the stdlib's own recovery, ``handleError``, rather than raising out of
+    the log call that emitted it.
+    """
+    if record.levelno < handler.level:
+        return
+    try:
+        handler.handle(record)
+    except Exception:  # ruff: ignore[blind-except]
+        handler.handleError(record)
+
+
 class HoldingLogHandler(logging.Handler):
     """Holds every record it is handed until a sink's handler takes them over, then forwards to that handler."""
 
@@ -61,7 +77,7 @@ class HoldingLogHandler(logging.Handler):
         # forward, so the forward passes the handler's own guard and the root logger's delivery of
         # the same record, when the sink's handler is on the root too, does not.
         if self._released_to is not None:
-            self._released_to.handle(record)
+            _deliver(handler=self._released_to, record=record)
             setattr(record, FORWARDED_MARK, True)
             return
         if len(self._held) >= HOLDING_CAPACITY:
@@ -79,10 +95,7 @@ class HoldingLogHandler(logging.Handler):
             held, self._held = self._held, []
             self._released_to = handler
             for record in held:
-                try:
-                    handler.handle(record)
-                except Exception:  # ruff: ignore[blind-except]
-                    handler.handleError(record)
+                _deliver(handler=handler, record=record)
         finally:
             self.release()
 

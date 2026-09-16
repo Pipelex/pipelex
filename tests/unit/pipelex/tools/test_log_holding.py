@@ -222,6 +222,30 @@ class TestHoldingLogHandler:
         assert [record.getMessage() for record in target.records] == ["before", "late", "later still"]
         assert holding.held_count == 0
 
+    def test_a_record_below_the_handlers_level_is_neither_replayed_nor_forwarded(self) -> None:
+        """``Handler.handle`` checks no level where the root logger's dispatch does, so the replay and the forward check it."""
+        holding = HoldingLogHandler()
+        target = _ListHandler()
+        target.setLevel(logging.WARNING)
+        holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="held info", args=(), exc_info=None))
+        holding.handle(logging.LogRecord(name=__name__, level=logging.WARNING, pathname="", lineno=0, msg="held warning", args=(), exc_info=None))
+        holding.release_to(handler=target)
+
+        holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="late info", args=(), exc_info=None))
+        holding.handle(logging.LogRecord(name=__name__, level=logging.ERROR, pathname="", lineno=0, msg="late error", args=(), exc_info=None))
+
+        assert [record.getMessage() for record in target.records] == ["held warning", "late error"]
+
+    def test_a_forwarded_record_the_sink_cannot_render_costs_neither_the_log_call_nor_the_next_record(self) -> None:
+        holding = HoldingLogHandler()
+        target = _RaisingOnPoisonHandler()
+        holding.release_to(handler=target)
+
+        holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="poison", args=(), exc_info=None))
+        holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="after", args=(), exc_info=None))
+
+        assert [record.getMessage() for record in target.records] == ["after"]
+
     def test_the_holding_handler_keeps_the_newest_records_up_to_its_capacity(self) -> None:
         holding = HoldingLogHandler()
         for index in range(HOLDING_CAPACITY + 5):
