@@ -18,6 +18,7 @@
 
 - **A log call before `log.configure` no longer raises**: it goes to the stdlib's default handling at the stdlib's default level, so a library that logs before Pipelex boots, or a boot that logs while it configures, cannot crash on the log line itself. Between `log.configure` and the sink's arrival at boot, every record is held and replayed through the selected sink in order, so a boot's own lines are rendered by the sink the configuration chose.
 - **A log call never raises on a value the record or JSON refuses**: a field named like an attribute the `LogRecord` class owns (`__class__`, `__dict__`, `getMessage`) is prefixed like any other collision instead of raising `TypeError` or shadowing the method every formatter calls, and a content `json` refuses, a circular reference or a mapping with a non-string key, is rendered as its `repr` with no `data` instead of raising `ValueError` or `TypeError` out of `log.info`.
+- **A field named `_pipelex_forwarded` no longer deletes its own record**: the name the holding handler stamps on a record it has already forwarded was treated as unspellable because it starts with an underscore, but a fresh record does not carry it, so a caller's `fields={"_pipelex_forwarded": ...}` landed unprefixed and had the record rejected from every sink by the guard that exists to stop a double delivery. Such an entry is now carried under the `field_` prefix like any other collision, and the line is delivered.
 
 ## [v0.59.0] - 2026-09-16
 

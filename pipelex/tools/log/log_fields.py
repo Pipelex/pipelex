@@ -12,6 +12,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from pipelex.tools.log.log_holding import FORWARDED_MARK
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -23,8 +25,12 @@ DATA_FIELD = "data"
 # The prefix an entry takes when its name is one the record already owns.
 COLLIDING_FIELD_PREFIX = "field_"
 
-# Set by the formatter rather than the constructor, so a fresh record does not carry them yet and the stdlib refuses them all the same.
-FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime"})
+# Names a fresh record does not carry, so a ``hasattr`` check alone would let a caller's entry land on
+# one of them. ``message`` and ``asctime`` are set by the formatter rather than by the constructor, and
+# the stdlib refuses them all the same. ``FORWARDED_MARK`` is stamped by the holding handler on a
+# record it has already forwarded, and an entry landing on it unprefixed would have the record rejected
+# from every sink by ``ForwardedRecordFilter``: a caller's own field silently deleting its own line.
+FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime", FORWARDED_MARK})
 
 # The attributes the stdlib gives every record, read off one built by the stdlib's own constructor on
 # this interpreter rather than listed by hand, so a version that adds one (``taskName`` arrived with
