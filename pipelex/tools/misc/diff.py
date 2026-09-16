@@ -11,7 +11,7 @@ from rich.table import Table
 from rich.text import Text
 
 from pipelex.tools.misc.file_utils import is_excluded_by_name
-from pipelex.tools.misc.pretty import PrettyPrinter
+from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 
 if TYPE_CHECKING:
     from collections.abc import Set as AbstractSet
@@ -370,6 +370,9 @@ def diff_dirs(dir1: str | Path, dir2: str | Path) -> None:
     This function generates a formatted display of all differences including
     files only in left, only in right, and different files with full diff content.
     """
+    if PrettyPrinter.mode is PrettyPrintMode.SILENT:
+        # A silent printer builds no renderable, and does not walk both trees to build one.
+        return
     dir1 = Path(dir1)
     dir2 = Path(dir2)
 

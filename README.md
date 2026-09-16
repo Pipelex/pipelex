@@ -19,7 +19,7 @@ Each step is explicit, each output is structured, and every run is repeatable.</
   <br/>
 
   <p align="center">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Elastic--2.0-blue.svg" alt="Elastic License 2.0"></a>
     <a href="https://github.com/Pipelex/pipelex/tree/main/tests"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Pipelex/pipelex/main/.badges/tests.json" alt="Tests"></a>
     <a href="https://pypi.org/project/pipelex/"><img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
      alt="PyPI – latest release"></a>
@@ -471,7 +471,7 @@ The same `.mthds` file runs from multiple execution targets:
 
 ## Use Pipelex from TypeScript
 
-For Node, Next.js, or any TypeScript app, call a Pipelex API server via the [`mthds`](https://www.npmjs.com/package/mthds) npm SDK (source: [`mthds-js`](https://github.com/mthds-ai/mthds-js)). Self-host the open-source [`pipelex-api`](https://github.com/Pipelex/pipelex-api) and point the SDK at your instance. A Pipelex-hosted runner at `api.pipelex.com` is also available in private beta — [join the waitlist](https://go.pipelex.com/waitlist).
+For Node, Next.js, or any TypeScript app, call a Pipelex API server via the [`mthds`](https://www.npmjs.com/package/mthds) npm SDK (source: [`mthds-js`](https://github.com/mthds-ai/mthds-js)). Self-host the source-available [`pipelex-api`](https://github.com/Pipelex/pipelex-api) and point the SDK at your instance. A Pipelex-hosted runner at `api.pipelex.com` is also available in private beta — [join the waitlist](https://go.pipelex.com/waitlist).
 
 ```bash
 npm install mthds
@@ -546,7 +546,7 @@ uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,link
 
 ## License
 
-This project is licensed under the [MIT license](LICENSE). Runtime dependencies are distributed under their own licenses via PyPI.
+This project is licensed under the Elastic License 2.0 (ELv2); see [LICENSE](LICENSE) for the terms, and the [license page](https://docs.pipelex.com/latest/license/) for how Pipelex reads them. Runtime dependencies are distributed under their own licenses via PyPI.
 
 ---
 

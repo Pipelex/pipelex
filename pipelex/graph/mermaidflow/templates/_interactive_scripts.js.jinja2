@@ -1,14 +1,12 @@
-// Embedded stuff data from graph (all formats)
+// Embedded stuff data from graph
 const stuffDataJson = {{ stuff_data_json | escape_script_tag | safe }};
-const stuffDataText = {{ stuff_data_text_json | escape_script_tag | safe }};
-const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag | safe }};
 const stuffMetadata = {{ stuff_metadata_json | escape_script_tag | safe }};
 const stuffContentType = {{ stuff_content_type_json | escape_script_tag | safe }};
 const mermaidCode = {{ mermaid_code | tojson }};
 
 // Track current state
 let currentStuffId = null;
-let currentFormat = 'html';
+let currentFormat = 'preview';
 let currentTheme = {{ theme | tojson }};
 
 // Include shared utility functions
@@ -133,14 +131,8 @@ function attachClickHandlers() {
         const svgContainer = document.querySelector('.mermaid svg');
         if (!svgContainer) return;
 
-        // Find nodes by their flowchart IDs - use any available data source
-        const allStuffIds = new Set([
-            ...Object.keys(stuffDataJson || {}),
-            ...Object.keys(stuffDataText || {}),
-            ...Object.keys(stuffDataHtml || {})
-        ]);
-
-        for (const stuffId of allStuffIds) {
+        // Find nodes by their flowchart IDs
+        for (const stuffId of Object.keys(stuffDataJson || {})) {
             // Mermaid generates IDs like 'flowchart-s_xxx-123'
             const nodes = svgContainer.querySelectorAll(`[id^="flowchart-${stuffId}"]`);
             nodes.forEach(node => {
@@ -199,13 +191,13 @@ function setFormat(format) {
 
 function renderContent(stuffId, format) {
     const content = document.getElementById('modal-content');
-    content.classList.remove('html-content', 'text-content', 'pdf-content', 'image-content');
+    content.classList.remove('pdf-content', 'image-content');
 
     // Handle PDF content type with embedded viewer
     const contentType = stuffContentType?.[stuffId];
     const jsonData = stuffDataJson?.[stuffId];
 
-    if (format === 'html' && contentType === 'application/pdf') {
+    if (format === 'preview' && contentType === 'application/pdf') {
         const pdfUrl = extractUrl(jsonData);
         if (pdfUrl) {
             content.classList.add('pdf-content');
@@ -221,7 +213,7 @@ function renderContent(stuffId, format) {
     }
 
     // Handle image content type
-    if (format === 'html' && contentType?.startsWith('image/')) {
+    if (format === 'preview' && contentType?.startsWith('image/')) {
         const imageUrl = extractUrl(jsonData);
         if (imageUrl) {
             content.classList.add('image-content');
@@ -236,25 +228,12 @@ function renderContent(stuffId, format) {
         }
     }
 
+    content.innerHTML = '';
     if (format === 'json') {
         const data = stuffDataJson?.[stuffId];
-        content.innerHTML = '';
         content.textContent = data ? JSON.stringify(data, null, 2) : 'No JSON data available';
-    } else if (format === 'text') {
-        const data = stuffDataText?.[stuffId];
-        content.classList.add('text-content');
-        content.innerHTML = '';
-        content.textContent = data || 'No text data available';
-    } else if (format === 'html') {
-        const data = stuffDataHtml?.[stuffId];
-        if (data) {
-            content.classList.add('html-content');
-            content.innerHTML = DOMPurify.sanitize(data);
-            makeLinksOpenInNewWindow(content);
-        } else {
-            content.innerHTML = '';
-            content.textContent = 'No HTML data available';
-        }
+    } else {
+        content.textContent = 'No preview available';
     }
 
     updateOpenExternalButton(stuffId, contentType, jsonData);
@@ -273,32 +252,28 @@ function updateOpenExternalButton(stuffId, contentType, jsonData) {
 
 function updateTabAvailability(stuffId) {
     const jsonTab = document.getElementById('tab-json');
-    const textTab = document.getElementById('tab-text');
-    const htmlTab = document.getElementById('tab-html');
+    const previewTab = document.getElementById('tab-preview');
 
     jsonTab.disabled = !stuffDataJson?.[stuffId];
-    textTab.disabled = !stuffDataText?.[stuffId];
 
-    // For PDF and image content types, the tab can render from JSON data via extractUrl()
+    // PDF and image content preview from the URL their JSON data carries
     const contentType = stuffContentType?.[stuffId];
     const jsonData = stuffDataJson?.[stuffId];
-    const canRenderFromJson = (contentType === 'application/pdf' || contentType?.startsWith('image/')) && extractUrl(jsonData);
-    htmlTab.disabled = !stuffDataHtml?.[stuffId] && !canRenderFromJson;
+    const canPreview = (contentType === 'application/pdf' || contentType?.startsWith('image/')) && !!extractUrl(jsonData);
+    previewTab.disabled = !canPreview;
 
-    // Update HTML tab label based on content type
+    // Label the preview tab after the content type it shows
     if (contentType === 'application/pdf') {
-        htmlTab.textContent = 'PDF';
+        previewTab.textContent = 'PDF';
     } else if (contentType?.startsWith('image/')) {
-        htmlTab.textContent = 'Image';
+        previewTab.textContent = 'Image';
     } else {
-        htmlTab.textContent = 'HTML';
+        previewTab.textContent = 'Preview';
     }
 
-    // Find first available format (HTML -> JSON -> Pretty)
-    if (!htmlTab.disabled) return 'html';
-    if (!jsonTab.disabled) return 'json';
-    if (!textTab.disabled) return 'text';
-    return 'html';
+    // Find first available format (preview -> JSON)
+    if (!previewTab.disabled) return 'preview';
+    return 'json';
 }
 
 function showModal(stuffId) {
@@ -345,20 +320,15 @@ function hideModal() {
 function getCurrentContent() {
     if (!currentStuffId) return null;
 
+    const data = stuffDataJson?.[currentStuffId];
     if (currentFormat === 'json') {
-        const data = stuffDataJson?.[currentStuffId];
         if (!data) return null;
         return { content: JSON.stringify(data, null, 2), ext: 'json', mime: 'application/json' };
-    } else if (currentFormat === 'text') {
-        const data = stuffDataText?.[currentStuffId];
-        if (!data) return null;
-        return { content: data, ext: 'txt', mime: 'text/plain' };
-    } else if (currentFormat === 'html') {
-        const data = stuffDataHtml?.[currentStuffId];
-        if (!data) return null;
-        return { content: data, ext: 'html', mime: 'text/html' };
     }
-    return null;
+    // A preview's copyable content is the URL it shows
+    const url = extractUrl(data);
+    if (!url) return null;
+    return { content: url, ext: 'txt', mime: 'text/plain' };
 }
 
 // Copy content to clipboard

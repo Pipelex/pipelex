@@ -262,6 +262,7 @@ class RuntimeBoot(metaclass=MetaSingleton):
         log_config = get_config().runtime.log
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
+        self.runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
         log.verbose("Logs are configured")
         if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
             log.warning(stale_warning)

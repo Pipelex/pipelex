@@ -11,8 +11,6 @@ from pipelex.system.data_inclusion_config import DataInclusionConfig
 def _make_data_inclusion() -> DataInclusionConfig:
     return DataInclusionConfig(
         stuff_json_content=False,
-        stuff_text_content=False,
-        stuff_html_content=False,
         error_stack_traces=False,
         pipe_and_concept_registry=False,
     )

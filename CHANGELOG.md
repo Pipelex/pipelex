@@ -2,10 +2,37 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`pretty_print_mode` in `[runtime.log]` (Breaking)**: `rich` (the default), `poor` or `silent`, applied at boot beside `log_mode`, so a host with no console turns the "Output of pipe" panels off in configuration rather than in code; a silent printer builds no Rich renderable and does not measure the terminal to size one. Teardown returns the mode to whatever the process held before that boot rather than to `rich`, a boot that fails part-way included, so a process that set the mode itself before booting gets its own mode back; a mode assigned after boot is released too. `pipelex doctor` applies the key too. Boot replaces a `PrettyPrinter.mode` assigned in code before it, so set the key instead.
+
 ### Changed
 
 - **Remote inputs are checked the way the web checks them (Breaking)**: an http(s) URL on a `Document` or `Image` input is validated for syntax when the inputs are shaped, and refused with `PipelineInputUrlInvalidError` when it does not parse; whether the resource exists is decided by the operator that fetches it, which now raises a caller-facing `RemoteFileFetchError` naming the URL and what the server or the network answered, instead of a raw `httpx` error. The former pre-flight HEAD probe is gone: on the hosted runner it ran as workflow code, so a host that stalled the request tripped Temporal's deadlock detector and the run ended `TIMED_OUT` with no error, and its outcome only ever produced a log line. A local file path is still required to exist before the run starts.
 - **The User-Agent is `Pipelex/<version>`**: the `(https://pipelex.com)` suffix is gone. Product and version is the shape a browser or an SDK sends; the crawler convention of a URL in parentheses is what bot walls key on, and the brand sites that stalled the old string until the timeout serve the new one in under a second.
+
+### Fixed
+
+- **Poor pretty-print mode**: a panel whose title is wider than the terminal no longer hangs the run in an endless wrapping loop, which every operator pipe's "Output of pipe" panel did on an 80-column headless console, and no longer draws a frame wider than the terminal either — an over-wide title is elided the way Rich's own panel truncates one. Titles print without their Rich markup, including on the branch a bare url takes, which is where every image output lands; a title Rich reads as an unmatched closing tag, such as a path in square brackets, prints as it stands instead of raising on the execution path. An output prints as its plain rendering instead of a Rich object's repr.
+- **A trace event log the current models refuse is no longer read as an empty one**: a stored event that parses as JSON and is then refused was written whole, by a version whose event shape this one no longer accepts — so the read now refuses with a count and a reason, where it used to skip such lines one by one and hand back whatever was left, reported as a success. Because the read refuses as a whole, such a run now reports neither its graph nor its usage and cost total, each with its assembly error set. A line that is not JSON, the half-written record of a crash mid-write, is still skipped with a warning. `pipelex graph render` names the same diagnosis for a graph spec saved by an earlier version, instead of printing a raw traceback whose pydantic error quoted the run's traced content back to the terminal.
+
+### Security
+
+- **`escape_script_tag` escapes `<` rather than the literal `</script>`**: the HTML script-data end-tag also terminates on `</script` followed by a space, a tab, a slash or `>`, so `</script >` and `</script/>` closed an embedded JSON block while passing the filter untouched, and the remainder of the value parsed as live HTML. Every `<` is now escaped as `\u003c`, which no end-tag spelling gets around and which both JSON and JavaScript parse back to `<`. This guards the graph and stuff viewer pages, which embed model-generated traced content and open from `file://` with no CSP.
+
+### Removed
+
+- **The text and HTML renderings of traced data (Breaking)**: `stuff_text_content` and `stuff_html_content` under `[interpreter.pipeline_execution.graph.data_inclusion]` are gone, and so are a graph `IOSpec`'s `data_text` and `data_html`. A run rendered every traced input and output to Rich text and to HTML on the execution path, at a cost that grew with text volume times nesting depth, and only the Mermaid graph page's Pretty and HTML tabs ever read the result; that page now shows a data node's JSON, with a preview for image and PDF content. `PrettyPrinter.pretty_html` and `PrettyRenderable.rendered_pretty_html`, which nothing else called, go with them. A graph spec saved by an earlier version carries the two fields and is refused when it is read back — by `pipelex graph render`, for instance — because an `IOSpec` takes no key it does not declare; run the pipeline again to get a spec in the current shape. **Migration:** run `pipelex migrate` — ledger entry `pipelex-config@4` deletes both keys from `~/.pipelex/` and from every project `.pipelex/` file, keeping one timestamped backup per file.
+
+## [v0.58.0] - 2026-09-14
+
+### Changed
+
+- **License (Breaking)**: `pipelex` is now licensed under the Elastic License 2.0 (ELv2) instead of MIT, and the package metadata declares the SPDX expression `Elastic-2.0` in place of the MIT license classifier, which makes hatchling 1.27 or later a requirement for building from source; every earlier version, up to and including v0.57.0, stays under MIT. ELv2 is source-available: you may embed `pipelex` in your own products, including services you offer to others whose features run your methods, and in your internal tools, while its main limitation rules out hosting a service that runs methods for others, whether they send the methods or pick them from a catalog. `LICENSE` carries the full terms, including its conditions on notices and redistribution, and the [License](license.md) page on docs.pipelex.com explains how Pipelex reads them.
+
+### Security
+
+- **Docs site built on mkdocs-material 9.7.7**: the `docs` extra now requires `mkdocs-material>=9.7.7`, which closes a DOM XSS in the theme's search suggestions (GHSA-xvg9-69gf-fjrf) that the published site shipped. The pull-request documentation check now builds from `uv.lock` like the deploy does, instead of from its own hand-pinned theme versions.
 
 ## [v0.57.0] - 2026-09-07
 

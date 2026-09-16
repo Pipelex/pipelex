@@ -177,8 +177,6 @@ async def run_pipeline_core(
                 "data_inclusion": graph_config.data_inclusion.model_copy(
                     update={
                         "stuff_json_content": True,
-                        "stuff_text_content": True,
-                        "stuff_html_content": True,
                     }
                 ),
             }

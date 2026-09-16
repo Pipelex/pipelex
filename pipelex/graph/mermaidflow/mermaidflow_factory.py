@@ -24,8 +24,6 @@ from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
 from pipelex.graph.mermaidflow.stuff_collector import (
     collect_stuff_content_type,
     collect_stuff_data,
-    collect_stuff_data_html,
-    collect_stuff_data_text,
     collect_stuff_metadata,
 )
 from pipelex.tools.mermaid.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
@@ -301,30 +299,21 @@ class MermaidflowFactory:
 
         mermaid_code = "\n".join(lines)
 
-        # Collect stuff data in configured formats
+        # Collect stuff data when configured
         stuff_data: dict[str, Any] | None = None
-        stuff_data_text: dict[str, str] | None = None
-        stuff_data_html: dict[str, str] | None = None
-
         if graph_config.data_inclusion.stuff_json_content:
             stuff_data = collect_stuff_data(graph=graph)
-        if graph_config.data_inclusion.stuff_text_content:
-            stuff_data_text = collect_stuff_data_text(graph=graph)
-        if graph_config.data_inclusion.stuff_html_content:
-            stuff_data_html = collect_stuff_data_html(graph=graph)
 
         # Collect metadata and content_type if any stuff data is present
         stuff_metadata: dict[str, dict[str, str]] | None = None
         stuff_content_type: dict[str, str] | None = None
-        if stuff_data or stuff_data_text or stuff_data_html:
+        if stuff_data:
             stuff_metadata = collect_stuff_metadata(graph=graph)
             stuff_content_type = collect_stuff_content_type(graph=graph)
 
         return Mermaidflow(
             mermaid_code=mermaid_code,
             stuff_data=stuff_data,
-            stuff_data_text=stuff_data_text,
-            stuff_data_html=stuff_data_html,
             stuff_metadata=stuff_metadata,
             stuff_content_type=stuff_content_type,
         )

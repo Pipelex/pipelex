@@ -12,6 +12,9 @@
 .equal-width { width: 100%; max-width: 300px; display: inline-block; }
 pre code { white-space: pre-wrap !important; word-wrap: break-word; overflow-wrap: break-word; }
 
+/* License page: the verbatim license text, set apart from our reading of it */
+.md-typeset .license-text { border-left: 0.2rem solid var(--md-default-fg-color--lightest); padding-left: 1rem; }
+
 /* --- Sidebar width — widen to fit longer nav labels without wrapping --- */
 .md-sidebar { width: 13rem; }
 .md-sidebar .md-sidebar__inner { padding-right: 4px; }

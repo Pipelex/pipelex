@@ -73,32 +73,6 @@ def collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
     return _collect_stuff_field(graph, extractor=lambda io_spec: io_spec.data)
 
 
-def collect_stuff_data_text(graph: GraphSpec) -> dict[str, str]:
-    """Collect IOSpec.data_text (pre-rendered ASCII text) from all stuff nodes in the graph.
-
-    Args:
-        graph: The GraphSpec to extract data from.
-
-    Returns:
-        Dict mapping stuff IDs (s_xxx format) to their text representation.
-        Only includes entries where data_text is not None.
-    """
-    return _collect_stuff_field(graph, extractor=lambda io_spec: io_spec.data_text)
-
-
-def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
-    """Collect IOSpec.data_html (pre-rendered HTML) from all stuff nodes in the graph.
-
-    Args:
-        graph: The GraphSpec to extract data from.
-
-    Returns:
-        Dict mapping stuff IDs (s_xxx format) to their HTML representation.
-        Only includes entries where data_html is not None.
-    """
-    return _collect_stuff_field(graph, extractor=lambda io_spec: io_spec.data_html)
-
-
 def collect_stuff_content_type(graph: GraphSpec) -> dict[str, str]:
     """Collect IOSpec content_type from all stuff nodes in the graph.
 

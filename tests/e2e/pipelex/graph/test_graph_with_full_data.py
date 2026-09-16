@@ -38,13 +38,11 @@ def _get_next_output_folder() -> Path:
 
 async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[str, int]:
     """Save all graph outputs and return stats about stuff_data collection."""
-    # Get graph config with ALL stuff data formats enabled for interactive rendering
+    # Get graph config with the JSON stuff data enabled for interactive rendering
     base_graph_config = get_config().interpreter.pipeline_execution.graph
     new_data_inclusion = base_graph_config.data_inclusion.model_copy(
         update={
             "stuff_json_content": True,
-            "stuff_text_content": True,
-            "stuff_html_content": True,
         }
     )
     graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
@@ -65,13 +63,10 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
 
     log.info(f"Mermaidflow stuff_data keys: {list(mermaidflow.stuff_data.keys()) if mermaidflow.stuff_data else []}")
 
-    has_mermaidflow_data = mermaidflow.stuff_data or mermaidflow.stuff_data_text or mermaidflow.stuff_data_html
-    if has_mermaidflow_data:
+    if mermaidflow.stuff_data:
         mermaidflow_html = await render_mermaid_html_with_data_async(
             mermaidflow.mermaid_code,
             stuff_data=mermaidflow.stuff_data,
-            stuff_data_text=mermaidflow.stuff_data_text,
-            stuff_data_html=mermaidflow.stuff_data_html,
             stuff_metadata=mermaidflow.stuff_metadata,
             title="Mermaidflow (Interactive)",
             theme=mermaid_theme,
@@ -140,15 +135,11 @@ class TestGraphWithFullData:
 
         log.info(f"Graph generated with {len(graph_spec.nodes)} nodes and {len(graph_spec.edges)} edges")
 
-        # Count nodes and their data presence (all three formats: json, text, html)
+        # Count nodes and their data presence
         total_inputs = 0
         total_outputs = 0
         inputs_with_data = 0
         outputs_with_data = 0
-        inputs_with_data_text = 0
-        outputs_with_data_text = 0
-        inputs_with_data_html = 0
-        outputs_with_data_html = 0
         nodes_missing_input_data: list[str] = []
         nodes_missing_output_data: list[str] = []
 
@@ -164,16 +155,6 @@ class TestGraphWithFullData:
                     log.verbose(f"Node {node.pipe_code}: input '{input_spec.name}' has data")
                 else:
                     log.warning(f"Node {node.pipe_code}: input '{input_spec.name}' is MISSING data")
-                if input_spec.data_text is not None:
-                    inputs_with_data_text += 1
-                    log.verbose(f"Node {node.pipe_code}: input '{input_spec.name}' has data_text ({len(input_spec.data_text)} chars)")
-                else:
-                    log.warning(f"Node {node.pipe_code}: input '{input_spec.name}' is MISSING data_text")
-                if input_spec.data_html is not None:
-                    inputs_with_data_html += 1
-                    log.verbose(f"Node {node.pipe_code}: input '{input_spec.name}' has data_html ({len(input_spec.data_html)} chars)")
-                else:
-                    log.warning(f"Node {node.pipe_code}: input '{input_spec.name}' is MISSING data_html")
 
             for output_spec in node.node_io.outputs:
                 total_outputs += 1
@@ -183,16 +164,6 @@ class TestGraphWithFullData:
                     log.verbose(f"Node {node.pipe_code}: output '{output_spec.name}' has data")
                 else:
                     log.warning(f"Node {node.pipe_code}: output '{output_spec.name}' is MISSING data")
-                if output_spec.data_text is not None:
-                    outputs_with_data_text += 1
-                    log.verbose(f"Node {node.pipe_code}: output '{output_spec.name}' has data_text ({len(output_spec.data_text)} chars)")
-                else:
-                    log.warning(f"Node {node.pipe_code}: output '{output_spec.name}' is MISSING data_text")
-                if output_spec.data_html is not None:
-                    outputs_with_data_html += 1
-                    log.verbose(f"Node {node.pipe_code}: output '{output_spec.name}' has data_html ({len(output_spec.data_html)} chars)")
-                else:
-                    log.warning(f"Node {node.pipe_code}: output '{output_spec.name}' is MISSING data_html")
 
             # Track nodes missing data (only if they have inputs/outputs)
             node_display_name = node.pipe_code or node.node_id
@@ -202,12 +173,6 @@ class TestGraphWithFullData:
                 nodes_missing_output_data.append(node_display_name)
 
         log.info(f"Found {inputs_with_data}/{total_inputs} inputs with data, {outputs_with_data}/{total_outputs} outputs with data")
-        log.info(
-            f"Found {inputs_with_data_text}/{total_inputs} inputs with data_text, {outputs_with_data_text}/{total_outputs} outputs with data_text"
-        )
-        log.info(
-            f"Found {inputs_with_data_html}/{total_inputs} inputs with data_html, {outputs_with_data_html}/{total_outputs} outputs with data_html"
-        )
 
         # CRITICAL: All nodes with inputs should have data on ALL their inputs
         assert inputs_with_data == total_inputs, (
@@ -221,28 +186,6 @@ class TestGraphWithFullData:
             f"All outputs should have data when force_include_full_data=True. "
             f"Got {outputs_with_data}/{total_outputs} outputs with data. "
             f"Nodes missing output data: {nodes_missing_output_data}"
-        )
-
-        # CRITICAL: All nodes with inputs should have data_text on ALL their inputs
-        assert inputs_with_data_text == total_inputs, (
-            f"All inputs should have data_text when force_include_full_data=True. Got {inputs_with_data_text}/{total_inputs} inputs with data_text."
-        )
-
-        # CRITICAL: All nodes with outputs should have data_text on ALL their outputs
-        assert outputs_with_data_text == total_outputs, (
-            f"All outputs should have data_text when force_include_full_data=True. "
-            f"Got {outputs_with_data_text}/{total_outputs} outputs with data_text."
-        )
-
-        # CRITICAL: All nodes with inputs should have data_html on ALL their inputs
-        assert inputs_with_data_html == total_inputs, (
-            f"All inputs should have data_html when force_include_full_data=True. Got {inputs_with_data_html}/{total_inputs} inputs with data_html."
-        )
-
-        # CRITICAL: All nodes with outputs should have data_html on ALL their outputs
-        assert outputs_with_data_html == total_outputs, (
-            f"All outputs should have data_html when force_include_full_data=True. "
-            f"Got {outputs_with_data_html}/{total_outputs} outputs with data_html."
         )
 
         # Save all outputs to numbered folder

@@ -78,6 +78,7 @@ EntryPipeNotFoundError | Entry pipe not found | https://docs.pipelex.com/latest/
 EnvVarNotFoundError | Environment variable not set | https://docs.pipelex.com/latest/errors/env-var-not-found-error/
 EventLogError | Event log | https://docs.pipelex.com/latest/errors/event-log-error/
 EventLogReadError | Event log read | https://docs.pipelex.com/latest/errors/event-log-read-error/
+EventLogSchemaMismatchError | Event log schema mismatch | https://docs.pipelex.com/latest/errors/event-log-schema-mismatch-error/
 EventLogSetupError | Event log setup | https://docs.pipelex.com/latest/errors/event-log-setup-error/
 ExplicitConceptIncompatibleError | Explicit concept incompatible | https://docs.pipelex.com/latest/errors/explicit-concept-incompatible-error/
 ExtractCapabilityError | Extract capability | https://docs.pipelex.com/latest/errors/extract-capability-error/

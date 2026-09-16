@@ -33,9 +33,6 @@ jobs:
       - name: Install dependencies
         run: make install
 
-      - name: Install docs dependencies
-        run: uv pip install -e ".[docs]"
-
       - name: Configure git for mike
         run: |
           git config --global user.name "github-actions[bot]"
