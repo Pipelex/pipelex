@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import sys
 from typing import TYPE_CHECKING, Any
@@ -31,7 +32,10 @@ def _finish_teardown_step(*, sink: LogSink, verb: str, step: Callable[[], None])
     except (OSError, ValueError):
         pass
     except Exception as exc:  # ruff: ignore[blind-except]
-        sys.stderr.write(f"The log sink {type(sink).__name__} failed to {verb} at reset: {exc!r}\n")
+        # A closed or disconnected stderr is the one place the diagnostic can go, and a teardown that
+        # stopped to say it could not be said would be the failure it was written to avoid.
+        with contextlib.suppress(Exception):
+            sys.stderr.write(f"The log sink {type(sink).__name__} failed to {verb} at reset: {exc!r}\n")
 
 
 class Log:
@@ -77,20 +81,24 @@ class Log:
         stdlib's last-resort handling.
         """
         root_logger = logging.getLogger()
-        if self._sink is not None:
-            sink, self._sink = self._sink, None
-            handler = sink.handler
-            root_logger.removeHandler(handler)
-            try:
-                _finish_teardown_step(sink=sink, verb="flush", step=handler.flush)
-            finally:
-                _finish_teardown_step(sink=sink, verb="close", step=handler.close)
-        if self._holding_handler is not None:
-            root_logger.removeHandler(self._holding_handler)
-            self._holding_handler.close()
-            self._holding_handler = None
-        self._log_config_instance = None
-        self.log_dispatch.reset()
+        try:
+            if self._sink is not None:
+                sink, self._sink = self._sink, None
+                handler = sink.handler
+                root_logger.removeHandler(handler)
+                try:
+                    _finish_teardown_step(sink=sink, verb="flush", step=handler.flush)
+                finally:
+                    _finish_teardown_step(sink=sink, verb="close", step=handler.close)
+            if self._holding_handler is not None:
+                holding, self._holding_handler = self._holding_handler, None
+                root_logger.removeHandler(holding)
+                holding.close()
+        finally:
+            # Whatever the handlers did, the configuration is forgotten: a reset that left it in place
+            # would make the next ``configure`` refuse, which is the unbootable process this guards.
+            self._log_config_instance = None
+            self.log_dispatch.reset()
 
     def configure_if_unset(self, log_config: LogConfig) -> bool:
         """Configure logging unless already configured.

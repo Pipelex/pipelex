@@ -7,6 +7,7 @@ the stdlib's own shutdown; anything else the sink raises is said on stderr and s
 
 from __future__ import annotations
 
+import io
 import logging
 from typing import TYPE_CHECKING
 
@@ -21,6 +22,8 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from pytest_mock import MockerFixture
 
 
 def _package_log_config() -> LogConfig:
@@ -144,3 +147,17 @@ class TestLogReset:
         assert handler.is_closed
         assert configured_log.sink is None
         assert capsys.readouterr().err == ""
+
+    def test_a_closed_stderr_does_not_stop_the_reset_and_the_configuration_is_forgotten(self, configured_log: Log, mocker: MockerFixture) -> None:
+        """The diagnostic has one place to go; when that place is gone the teardown still finishes and the next configure is not refused."""
+        sink = _RaisingAtCloseSink(error=RuntimeError("the collector is gone"))
+        configured_log.install_sink(sink)
+        closed_stderr = io.StringIO()
+        closed_stderr.close()
+        mocker.patch("sys.stderr", closed_stderr)
+
+        configured_log.reset()
+
+        assert configured_log.sink is None
+        assert not configured_log.is_configured
+        assert sink.handler not in logging.getLogger().handlers
