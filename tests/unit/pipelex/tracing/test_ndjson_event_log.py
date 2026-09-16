@@ -147,13 +147,30 @@ class TestNdjsonEventLog:
 
         ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
         with open(ndjson_file, "a", encoding="utf-8") as fhandle:
-            fhandle.write('{"event_kind": "pipe_start", "bad": true}\n')
+            fhandle.write('{"event_kind": "pipe_start", "bad": "traced-value"}\n')
 
         with pytest.raises(EventLogSchemaMismatchError) as refusal:
             event_log.read_events("run_001")
 
         assert "1 trace event(s)" in str(refusal.value)
         assert "run the pipeline again" in str(refusal.value)
+
+    def test_a_refusal_does_not_quote_the_refused_event(self, tmp_path: Path) -> None:
+        """The refusal travels into the run's assembly errors, and from there into API responses and the
+        persisted usage file, so it names the fields it refused without quoting the traced values they held.
+        """
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(sequence=0))
+        event_log.close()
+
+        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        with open(ndjson_file, "a", encoding="utf-8") as fhandle:
+            fhandle.write('{"event_kind": "pipe_start", "bad": "traced-value"}\n')
+
+        with pytest.raises(EventLogSchemaMismatchError) as refusal:
+            event_log.read_events("run_001")
+
+        assert "traced-value" not in str(refusal.value)
 
     def test_multiprocess_concurrent_writes(self, tmp_path: Path) -> None:
         """Multiple processes writing to different workflow files produces no corruption."""

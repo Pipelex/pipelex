@@ -197,11 +197,10 @@ class RuntimeHub:
         The pretty-print mode is released for the same reason as the flags — boot writes it from
         ``[runtime.log]``, and a torn-down ``silent`` boot would otherwise keep silencing
         ``pretty_print(...)`` for everything else in the process — but it goes back to whatever the mode
-        was *before* that boot wrote it, not to the class default. The two differ whenever a caller pins
-        the mode itself and then boots, which is exactly what the agent CLI does: it pins ``silent`` so
-        nothing can corrupt its JSON envelope, and a boot that fails part-way releases through here. A
-        hardcoded ``RICH`` would hand that caller back a mode it never asked for, on the one path where
-        it has no opportunity to pin it again.
+        was *before* that boot wrote it, not to the class default. The two differ when a process sets the
+        mode itself before booting: it gets that mode back, a boot that fails part-way included, rather
+        than a ``RICH`` it never asked for. A mode assigned after boot is released too, since teardown
+        restores the pre-boot mode whatever happened in between.
         """
         self._config = None
         self._is_dry_run_forced = False

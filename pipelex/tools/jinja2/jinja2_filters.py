@@ -156,7 +156,7 @@ def apply_tag_style(*, context: Context, value: str, tag_name: str | None = None
 
 
 def escape_script_tag(value: Any) -> Any:
-    r"""Escape `<` to prevent script tag injection in JSON embeddings.
+    r"""Escape every `<` as `\u003c` to prevent script tag injection in JSON embeddings.
 
     When embedding JSON in a `<script>` block, a string containing `</script>` could break out of the
     block and inject arbitrary HTML/JavaScript. Matching that literal spelling is not enough: the HTML
@@ -165,7 +165,7 @@ def escape_script_tag(value: Any) -> Any:
     untouched. Every `<` is therefore escaped instead of any particular tag spelling, which no end-tag
     form can get around.
 
-    `<` is a valid escape both in JSON and in a JavaScript string literal, and it parses back to
+    `\u003c` is a valid escape both in JSON and in a JavaScript string literal, and it parses back to
     `<`, so every consumer reads exactly the value it was given. In JSON a `<` can only ever appear
     inside a string, so escaping it unconditionally never touches the document's structure.
 
@@ -173,7 +173,7 @@ def escape_script_tag(value: Any) -> Any:
         value: The string to escape. Non-string values are returned unchanged.
 
     Returns:
-        The escaped string, with every `<` replaced by `<`.
+        The escaped string, with every `<` replaced by `\u003c`.
     """
     if not isinstance(value, str):
         return value

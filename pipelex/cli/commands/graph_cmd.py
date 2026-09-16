@@ -15,6 +15,7 @@ from typing import Annotated
 import typer
 from posthog import tag
 from pydantic import ValidationError
+from rich.markup import escape
 
 from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
@@ -192,10 +193,12 @@ def graph_render_cmd(
     except GraphSpecValidationError as spec_error:
         # A refused spec is a diagnosis, not a crash, so it gets its message and no traceback. The
         # traceback below would print the pydantic error it was raised from, and that error quotes the
-        # input it refused — which on a graph file is the run's own traced content.
-        log.error(f"{spec_error}")
+        # input it refused — which on a graph file is the run's own traced content. The message names the
+        # user's path, which is escaped because both sinks read Rich markup and a path may hold brackets.
+        escaped_message = escape(str(spec_error))
+        log.error(escaped_message)
         console = get_console()
-        console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{spec_error}\n")
+        console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escaped_message}\n")
         raise typer.Exit(1) from spec_error
 
     except Exception as exc:

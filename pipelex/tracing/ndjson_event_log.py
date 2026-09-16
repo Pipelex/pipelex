@@ -13,6 +13,7 @@ from pydantic import TypeAdapter, ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.exceptions import EventLogSchemaMismatchError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
@@ -156,13 +157,15 @@ class NdjsonEventLog(EventLogProtocol):
                         # raising `JSONDecodeError`, so the two cases are told apart by the error type and
                         # not by the exception class: a line that is not JSON is the half-written record of
                         # a crash mid-write and is skipped, while one that parses and is then refused was
-                        # written whole by a version whose event shape this one no longer accepts.
+                        # written whole by a version whose event shape this one no longer accepts. The refusal
+                        # names fields rather than quoting them: it travels into the run's assembly errors, and
+                        # the pydantic error's own text quotes the traced values it refused.
                         if any(error["type"] == "json_invalid" for error in validation_error.errors()):
                             log.warning(f"Skipping corrupt line in {ndjson_path}:{line_number} — {validation_error}")
                             continue
                         refused_count += 1
                         if first_refusal is None:
-                            first_refusal = f"{ndjson_path}:{line_number} — {validation_error}"
+                            first_refusal = f"{ndjson_path}:{line_number} — {format_pydantic_validation_error(validation_error)}"
                         continue
 
                     dedup_key = (event.workflow_id, event.writer_id, type(event).__name__, event.sequence)

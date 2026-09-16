@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:7ca4729540c5b33002f03e1daa72c1b5d915f00e6e7488d6855f9a81d827d99a"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-16T07:11:17Z"
-rationale = "runtime_hub gains set_pretty_print_mode and a private field holding the mode the process had before boot, so reset_boot_state restores that instead of a hardcoded RICH. No new import: pipelex.tools.misc.pretty was already imported at module level by the change the previous ack covered, and tools is the bottom layer. The doc specifies the runtime_hub / interpreter_hub boundary and the guard that enforces it; it enumerates neither what reset_boot_state releases nor which modules runtime_hub may import, so there is nothing stale to update. The guard passes."
+digest = "sha256:ba531715aa9e9f29262c7ea2fd18c4a63e31b9878c5b5f1507b135f511aa7b38"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-09-16T08:54:20Z"
+rationale = "Round-2 review fix in runtime_hub is docstring-only: reset_boot_state no longer claims the agent CLI pins silent before booting (it pins after), and now says a mode assigned after boot is released too. No import, accessor or layer placement changed. Read docs/contribute/hub-layering.md: it specifies the boundary, the forbidden import list and the accessor table, and describes neither reset_boot_state nor the pretty-print mode. Nothing stale."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:159698a55f6535e818636cd7e31ec91e3d82ed37"
+"pipelex/runtime_hub.py" = "blob:4682e96a187338d7c0c6728319f0b81e270b0c21"

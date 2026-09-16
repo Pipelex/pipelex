@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:5211f741c965d61f8db46aa5ba8d6df66f5f4f90791e7c44b760c09db876b6a0"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-16T07:11:10Z"
-rationale = "Review-pass fixes to two CLI commands, neither of which changes a flag, an option or an output contract. doctor_cmd now applies pretty_print_mode in setup_doctor_runtime, which the boot path already did: the human doctor honours the configured mode instead of ignoring it, and the agent doctor is unaffected because it pins silent separately through apply_agent_cli_output_discipline. graph_cmd now catches a refused graph spec and exits 1 with a named diagnosis instead of a raw traceback that quoted the run's traced content back to the terminal; the exit code is unchanged. Reviewed docs/tools/cli: it has no page for graph render at all, and its doctor coverage is the agent CLI's format and error-format contract plus the pending-migrations row, none of which this touches. Reviewed pipelex/cli/agent_cli/CLAUDE.md: it names neither command's internals."
+digest = "sha256:0f04ef9927c69cc0d91d68490a0dfe4f65840553414fd92773028b3192630db4"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-09-16T08:54:19Z"
+rationale = "Round-2 review fix in graph_cmd: the refused-spec handler now escapes its message before handing it to log.error and console.print, so a user path holding square brackets prints as written instead of being swallowed or raising MarkupError; no flag, option, exit code or output contract moved. Listed docs/tools/cli: it has no page for graph render. Grepped pipelex/cli/agent_cli/CLAUDE.md: its graph mentions are the agent run and validate graph options, none of which this touches. Nothing stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -88,7 +88,7 @@ rationale = "Review-pass fixes to two CLI commands, neither of which changes a f
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"
 "pipelex/cli/commands/fix/app.py" = "blob:6f019930e8e3e0043ee46d87493ba4602eb33a76"
 "pipelex/cli/commands/fix/bundle_cmd.py" = "blob:427364cc453957dfe0cec879f019050329c13b3c"
-"pipelex/cli/commands/graph_cmd.py" = "blob:1af93f74a56ebe453c7d2b3e84ca28984ff247f4"
+"pipelex/cli/commands/graph_cmd.py" = "blob:d54737af7efc9ab9bbf3f978050d017af0e27a41"
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:7823d8f323e826e36ca389bf3491576723786163"
 "pipelex/cli/commands/init/command.py" = "blob:cc3449142cd39d6276a7b420f30e4ad0b0611409"

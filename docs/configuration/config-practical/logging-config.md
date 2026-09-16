@@ -55,7 +55,7 @@ pretty_print_mode = "rich"
 - `"poor"`: plain text in a drawn frame on stderr, with no Rich panel; a pipe's output prints as its plain rendering
 - `"silent"`: nothing is printed and no renderable is built, for a host with no console or one that must not spend time rendering on the thread that runs pipes
 - Default: `"rich"`. The agent CLI forces `"silent"`
-- Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to `"rich"`
+- Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to the mode the process held before that boot
 
 ### JSON Formatting
 
