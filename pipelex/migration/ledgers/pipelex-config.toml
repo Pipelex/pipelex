@@ -376,25 +376,35 @@ kind = "delete_key"
 table_path = ["interpreter", "pipeline_execution", "graph", "data_inclusion"]
 key = "stuff_html_content"
 
+# Safe, with one thing it cannot do, said in the title because the title is what a person sees. Two of
+# the retired keys chose a behaviour their deletion undoes: `log_mode = "poor"` chose plain output for a
+# process with no terminal, whose replacement is `sink = "json"`, and `is_console_logging_enabled = false`
+# chose silence, whose replacement is `default_log_level = "OFF"`. No operation in this vocabulary writes
+# a value, and a `remap_value` onto `sink` is refused as `safe` because `sink` is an open token rather
+# than an enumeration. An `unsafe` entry would block every file that still carries the keys at their
+# old defaults, which is every full copy of an older base file, for the sake of the two that chose
+# otherwise; so the keys are deleted, and the file that chose otherwise sets its replacement by hand.
 [[migration]]
 id = "pipelex-config@5"
 to_schema_version = 5
 introduced_in = "0.60.0"
 breaking = true
 safety = "safe"
-title = "Log sinks replace the rich-or-poor log mode"
+title = "Log sinks replace the rich-or-poor log mode: a poor-mode file then selects sink = \"json\" by hand"
 description = """
 Where log records go is now a sink selected by `[runtime.log] sink`, a registered token such as \
 `console`, `json` or `otlp`, in place of the `rich` / `poor` log mode. `log_mode`, the poor-logger \
-settings `poor_loggers` and `generic_poor_logger`, and `is_console_logging_enabled` are gone, and are \
-deleted from files that still set them. The new `sink` key is absorbed by the defaults layer, \
-`console`, so a migrated file keeps rendering as it did.
+settings `poor_loggers` and `generic_poor_logger`, and `is_console_logging_enabled` are deleted from \
+files that still set them, and the defaults layer supplies `sink = "console"`, the Rich rendering. A \
+file that had set `log_mode = "poor"` or `is_console_logging_enabled = false` chose a behaviour that \
+this deletion undoes, and no migration may write the replacement: such a file sets `sink = "json"` or \
+`default_log_level = "OFF"` by hand.
 """
 guidance = """
 A file that set `log_mode = "poor"` chose a plain handler for a process with no terminal; that process \
-now sets `sink = "json"` in `[runtime.log]`, which is what a log agent ingests without a parser. A \
-`console` selection cannot be remapped from the old value automatically because `sink` is an open \
-token, not an enumeration, so the key is deleted and the default applies.
+now sets `sink = "json"` in `[runtime.log]`, one JSON object per line, which is what a log agent ingests \
+without a parser. A file that set `log_mode = "rich"` chose what the default, `console`, renders, and \
+needs nothing.
 
 `is_console_logging_enabled = false` silenced every handler on the root logger. To silence Pipelex's \
 own records set `default_log_level = "OFF"`; to send them somewhere else, select the sink that goes there.

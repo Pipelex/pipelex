@@ -218,7 +218,7 @@ headers = {}
 
 ## Migrating From the Log Mode
 
-`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone; `pipelex migrate` deletes them from an existing file (ledger entry `pipelex-config@5`). A file that set `log_mode = "poor"` chose a plain handler for a process with no terminal, and that process now sets `sink = "json"`. `is_console_logging_enabled = false` silenced every handler on the root logger; to silence Pipelex's own records set `default_log_level = "OFF"`, and to send them somewhere else select the sink that goes there.
+`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone; `pipelex migrate` deletes them from an existing file (ledger entry `pipelex-config@5`), and the defaults layer then supplies `sink = "console"`. Two of those keys chose a behaviour the deletion undoes, and no migration may write the replacement, so it is yours to set: a file that had `log_mode = "poor"` chose a plain handler for a process with no terminal, and that process now sets `sink = "json"`; a file that had `is_console_logging_enabled = false` silenced every handler on the root logger, and to silence Pipelex's own records it now sets `default_log_level = "OFF"`, or selects the sink its records should go to instead. A file that had `log_mode = "rich"` needs nothing, and `poor_loggers` and `generic_poor_logger` have nothing to carry over.
 
 ## Best Practices
 
