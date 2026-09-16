@@ -75,6 +75,10 @@ SECRET_KEY_NAMES = frozenset(
 # named the secret so a reader still sees which header or which field was carrying it.
 RedactionPattern = tuple[re.Pattern[str], str]
 
+# The JSON entry names whose value is a secret whatever it holds, as one alternation for the two
+# quote characters a serialised object may use.
+_JSON_SECRET_NAMES = r"(?:password|pipelex_api_key|gateway_api_key|jwt_secret_key|portkey_api_key|client_secret|access_token|refresh_token|id_token)"
+
 # The shipped families, in the order they run. Ported from the hosted plane's own scrubber; a family
 # is written to name the secret's carrier in the same string as the secret, which is what a header
 # line, a query string or a serialised JSON object gives it.
@@ -87,17 +91,16 @@ SECRET_PATTERNS: tuple[RedactionPattern, ...] = (
     (re.compile(r"(?i)([\"']?x-(?:completion-)?signature[\"']?\s*[:=]\s*[\"']?)([A-Za-z0-9._\-~+/=]{8,})"), rf"\1{REDACTED_TEXT}"),
     # An OAuth authorization code in a query string.
     (re.compile(r"(?i)([?&]code=)([A-Za-z0-9._\-~+/=]{8,})"), rf"\1{REDACTED_TEXT}"),
-    # A cookie header's whole value, whichever crumb it carries.
-    (re.compile(r"(?i)((?:set-)?cookie[\"'\s:=]+)([^\"'\s,;][^\"',;]{4,})"), rf"\1{REDACTED_TEXT}"),
-    # The JSON entries that are a secret whatever they hold, the OAuth code among them, since a
-    # serialised event carries it as `"code": "..."`.
-    (
-        re.compile(
-            r"([\"'](?:password|pipelex_api_key|gateway_api_key|jwt_secret_key|portkey_api_key|client_secret|code"
-            r"|access_token|refresh_token|id_token)[\"']\s*:\s*[\"'])([^\"']+)([\"'])"
-        ),
-        rf"\1{REDACTED_TEXT}\3",
-    ),
+    # A cookie header's whole value, every crumb of it, up to the end of the line or the quote that
+    # closes a serialised entry. The word must introduce a value with a colon or an equals sign, so
+    # prose that merely mentions a cookie is left alone.
+    (re.compile(r"(?i)\b((?:set-)?cookie[\"']?\s*[:=]\s*[\"']?)([^\"'\r\n]{4,})"), rf"\1{REDACTED_TEXT}"),
+    # The JSON entries that are a secret whatever they hold, the value read up to the same quote that
+    # opened it with a backslash escape honoured, so a value holding the other quote character or an
+    # escaped one is removed whole. ``code`` is not among them: it is the runtime's own identifier for
+    # a pipe, a domain and an error, and the OAuth code has the query-string family above.
+    (re.compile(rf'("{_JSON_SECRET_NAMES}"\s*:\s*")((?:\\.|[^"\\])+)(")'), rf"\1{REDACTED_TEXT}\3"),
+    (re.compile(rf"('{_JSON_SECRET_NAMES}'\s*:\s*')((?:\\.|[^'\\])+)(')"), rf"\1{REDACTED_TEXT}\3"),
     # A key recognisable by its prefix alone, wherever it appears and whatever introduced it.
     (re.compile(r"\b((?:plx_sk_|sk_|pk_|bl_)[A-Za-z0-9_\-]{16,})\b"), REDACTED_TEXT),
 )

@@ -117,6 +117,38 @@ class TestLogRedaction:
         assert message == f"Set-Cookie: {REDACTED_TEXT}"
         assert value == f"Set-Cookie: {REDACTED_TEXT}"
 
+    def test_every_crumb_of_a_multi_cookie_header_is_scrubbed_and_the_next_line_survives(self) -> None:
+        message, value = _redact(text="Cookie: theme=light; session=private_session_12345\nUser ada logged in")
+
+        assert message == f"Cookie: {REDACTED_TEXT}\nUser ada logged in"
+        assert value == f"Cookie: {REDACTED_TEXT}\\nUser ada logged in"
+
+    def test_a_serialised_cookie_entry_is_scrubbed_up_to_its_closing_quote(self) -> None:
+        message, _ = _redact(text='{"cookie": "a=b; session=private_session_12345", "path": "/x"}')
+
+        assert message == f'{{"cookie": "{REDACTED_TEXT}", "path": "/x"}}'
+
+    def test_prose_that_merely_mentions_a_cookie_is_left_alone(self) -> None:
+        message, _ = _redact(text="the cookie was set and the rest of this sentence survives")
+
+        assert message == "the cookie was set and the rest of this sentence survives"
+
+    def test_a_json_secret_value_holding_the_other_quote_character_is_scrubbed_whole(self) -> None:
+        message, _ = _redact(text='{"password": "prefix\'private_suffix_12345", "next": "kept"}')
+
+        assert message == f'{{"password": "{REDACTED_TEXT}", "next": "kept"}}'
+
+    def test_a_json_secret_value_holding_an_escaped_quote_is_scrubbed_whole(self) -> None:
+        message, _ = _redact(text='{"access_token": "ab\\"cd_private_12345", "next": "kept"}')
+
+        assert message == f'{{"access_token": "{REDACTED_TEXT}", "next": "kept"}}'
+
+    def test_a_json_code_entry_is_not_a_secret(self) -> None:
+        message, value = _redact(text='{"error_type": "PipeDefinitionError", "code": "PIPE_NOT_FOUND"}')
+
+        assert message == '{"error_type": "PipeDefinitionError", "code": "PIPE_NOT_FOUND"}'
+        assert value == '{"error_type": "PipeDefinitionError", "code": "PIPE_NOT_FOUND"}'
+
     def test_a_json_secret_field_is_scrubbed_and_keeps_its_shape(self) -> None:
         message, value = _redact(text='{"user": "ada", "password": "hunter2hunter2", "access_token": "at-9f3c"}')
 
