@@ -104,10 +104,10 @@ The context is a `LogContext` with three optional identifiers, `request_id`, `pi
 The identifiers travel in the payload, and the contextvar is in-process plumbing bound after deserialization and nothing else; it never crosses a process boundary. Each process entry binds from the payload it received:
 
 - **A direct-mode run**: `PipeRun.run` binds `request_id`, `pipeline_run_id` and `pipe_run_id` from the job's `JobMetadata` for the whole run, delivery included, and releases the binding when the run returns.
-- **An API request**: the runner's request middleware binds `request_id` from the inbound request for the request's duration.
-- **A durable-execution activity or workflow**: the entry binds from the payload the orchestrator handed it.
+- **An API request**: the runner's request middleware is where `request_id` is bound from the inbound request, for the request's duration.
+- **A durable-execution activity or workflow**: the entry is where the identifiers are bound from the payload the orchestrator handed it.
 
-The last two live in the runner and in the orchestration plugin, beside the payload they read.
+The last two are the runner's and the orchestration plugin's to bind, beside the payload they read; the runtime only provides `log.context`.
 
 ## Structured content
 
