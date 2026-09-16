@@ -37,13 +37,11 @@ class TestGraphRenderersFromJson:
     """E2E tests for generating all graph renderings from JSON for comparison."""
 
     def _get_graph_config_with_data(self):
-        """Get a graph config with all stuff data inclusion flags enabled."""
+        """Get a graph config with the JSON stuff data inclusion enabled."""
         base_graph_config = get_config().interpreter.pipeline_execution.graph
         new_data_inclusion = base_graph_config.data_inclusion.model_copy(
             update={
                 "stuff_json_content": True,
-                "stuff_text_content": True,
-                "stuff_html_content": True,
             }
         )
         return base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
@@ -85,13 +83,10 @@ class TestGraphRenderersFromJson:
         # Mermaidflow with data
         mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config=graph_config, direction=FlowchartDirection.TOP_DOWN)
         (output_dir / "mermaidflow.mmd").write_text(mermaidflow.mermaid_code, encoding="utf-8")
-        has_mermaidflow_data = mermaidflow.stuff_data or mermaidflow.stuff_data_text or mermaidflow.stuff_data_html
-        if has_mermaidflow_data:
+        if mermaidflow.stuff_data:
             mermaidflow_html = await render_mermaid_html_with_data_async(
                 mermaidflow.mermaid_code,
                 stuff_data=mermaidflow.stuff_data,
-                stuff_data_text=mermaidflow.stuff_data_text,
-                stuff_data_html=mermaidflow.stuff_data_html,
                 stuff_metadata=mermaidflow.stuff_metadata,
                 title=f"Mermaidflow (Interactive): {topic}",
             )
@@ -124,15 +119,9 @@ class TestGraphRenderersFromJson:
             assert file_path.stat().st_size > 0, f"File is empty: {file_path}"
 
         # Verify stuff data collection was attempted when loading from JSON
-        # Note: Results may be empty if the test data doesn't have data/data_text/data_html fields populated
+        # Note: Results may be empty if the test data doesn't have its data fields populated
         if graph_config.data_inclusion.stuff_json_content:
             assert mermaidflow.stuff_data is not None, "stuff_data should be collected when stuff_json_content=True"
-
-        if graph_config.data_inclusion.stuff_text_content:
-            assert mermaidflow.stuff_data_text is not None, "stuff_data_text should be collected when stuff_text_content=True"
-
-        if graph_config.data_inclusion.stuff_html_content:
-            assert mermaidflow.stuff_data_html is not None, "stuff_data_html should be collected when stuff_html_content=True"
 
         # Summary
         log.info(

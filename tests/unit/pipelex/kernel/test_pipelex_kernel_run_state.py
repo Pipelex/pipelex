@@ -35,8 +35,6 @@ def _trace_context() -> TraceContext:
         graph_id=_GRAPH_ID,
         data_inclusion=DataInclusionConfig(
             stuff_json_content=False,
-            stuff_text_content=False,
-            stuff_html_content=False,
             error_stack_traces=False,
             pipe_and_concept_registry=False,
         ),

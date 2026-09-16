@@ -3296,14 +3296,6 @@ rationale = "Verb-object: collects from the graph; single operand."
 param = "graph"
 rationale = "Verb-object: collects from the graph; single operand."
 
-["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_data_html"]
-param = "graph"
-rationale = "Verb-object: collects from the graph; single operand."
-
-["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_data_text"]
-param = "graph"
-rationale = "Verb-object: collects from the graph; single operand."
-
 ["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_metadata"]
 param = "graph"
 rationale = "Verb-object: collects from the graph; single operand."
@@ -6448,10 +6440,6 @@ rationale = "Transforms the string; single operand."
 param = "data"
 rationale = "Transforms the data; single operand."
 
-["pipelex/tools/misc/http_utils.py::_validate_http_url"]
-param = "url"
-rationale = "Validates/checks the url; single operand."
-
 ["pipelex/tools/misc/http_utils.py::_validate_local_path"]
 param = "url"
 rationale = "Validates/checks the url; single operand."
@@ -6551,10 +6539,6 @@ rationale = "Factory from source: builds the result from the value; single opera
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.make_pretty_panel"]
 param = "content"
 rationale = "Factory from source: builds the result from the content; single operand."
-
-["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_html"]
-param = "pretty"
-rationale = "Renders the pretty; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_print"]
 param = "content"

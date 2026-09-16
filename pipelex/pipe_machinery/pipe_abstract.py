@@ -668,12 +668,6 @@ class PipeAbstract(ABC, BaseModel):
                             data=stuff.content.smart_dump()
                             if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content)
                             else None,
-                            data_text=stuff.content.rendered_pretty_text()
-                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_text_content)
-                            else None,
-                            data_html=stuff.content.rendered_pretty_html()
-                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_html_content)
-                            else None,
                         )
                         input_specs.append(input_spec)
 
@@ -780,12 +774,6 @@ class PipeAbstract(ABC, BaseModel):
                     content_type=main_stuff.content.content_type,
                     digest=main_stuff.stuff_code,
                     data=main_stuff.content.smart_dump() if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content) else None,
-                    data_text=main_stuff.content.rendered_pretty_text()
-                    if (include_graph_data and parent_trace_context.data_inclusion.stuff_text_content)
-                    else None,
-                    data_html=main_stuff.content.rendered_pretty_html()
-                    if (include_graph_data and parent_trace_context.data_inclusion.stuff_html_content)
-                    else None,
                     # The optional-edge marker (D8): a data edge fed by this output reports that the
                     # value may be absent in other runs.
                     extra={"optional": True} if self.output.presence.is_optional else {},

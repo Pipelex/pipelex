@@ -10,8 +10,6 @@ from pipelex.system.trace_context import TraceContext
 
 def make_defaulted_data_inclusion_config(
     stuff_json_content: bool = False,
-    stuff_text_content: bool = False,
-    stuff_html_content: bool = False,
     error_stack_traces: bool = False,
     pipe_and_concept_registry: bool = False,
 ) -> DataInclusionConfig:
@@ -19,8 +17,6 @@ def make_defaulted_data_inclusion_config(
 
     Args:
         stuff_json_content: Whether to include JSON stuff data.
-        stuff_text_content: Whether to include plain text stuff data.
-        stuff_html_content: Whether to include HTML stuff data.
         error_stack_traces: Whether to include error stack traces.
         pipe_and_concept_registry: Whether to include pipe and concept registries.
 
@@ -29,8 +25,6 @@ def make_defaulted_data_inclusion_config(
     """
     return DataInclusionConfig(
         stuff_json_content=stuff_json_content,
-        stuff_text_content=stuff_text_content,
-        stuff_html_content=stuff_html_content,
         error_stack_traces=error_stack_traces,
         pipe_and_concept_registry=pipe_and_concept_registry,
     )
@@ -41,8 +35,6 @@ def make_trace_context(
     parent_node_id: str | None = None,
     node_sequence: int = 0,
     stuff_json_content: bool = False,
-    stuff_text_content: bool = False,
-    stuff_html_content: bool = False,
     error_stack_traces: bool = False,
 ) -> TraceContext:
     """Create a TraceContext for testing.
@@ -52,8 +44,6 @@ def make_trace_context(
         parent_node_id: Optional parent node ID.
         node_sequence: The node sequence counter.
         stuff_json_content: Whether to include JSON stuff data.
-        stuff_text_content: Whether to include plain text stuff data.
-        stuff_html_content: Whether to include HTML stuff data.
         error_stack_traces: Whether to include error stack traces.
 
     Returns:
@@ -65,8 +55,6 @@ def make_trace_context(
         node_sequence=node_sequence,
         data_inclusion=make_defaulted_data_inclusion_config(
             stuff_json_content=stuff_json_content,
-            stuff_text_content=stuff_text_content,
-            stuff_html_content=stuff_html_content,
             error_stack_traces=error_stack_traces,
         ),
     )
@@ -80,15 +68,11 @@ def data_inclusion_config() -> DataInclusionConfig:
 
 def make_graph_config(
     include_stuff_json: bool = False,
-    include_stuff_text: bool = False,
-    include_stuff_html: bool = False,
 ) -> GraphConfig:
     """Create a GraphConfig for testing.
 
     Args:
         include_stuff_json: Whether to include JSON stuff data.
-        include_stuff_text: Whether to include plain text stuff data.
-        include_stuff_html: Whether to include HTML stuff data.
 
     Returns:
         A GraphConfig configured for testing.
@@ -97,7 +81,7 @@ def make_graph_config(
     return default_graph_config.model_copy(
         update={
             "data_inclusion": default_graph_config.data_inclusion.model_copy(
-                update={"stuff_json_content": include_stuff_json, "stuff_text_content": include_stuff_text, "stuff_html_content": include_stuff_html},
+                update={"stuff_json_content": include_stuff_json},
             ),
         }
     )
@@ -113,9 +97,3 @@ def graph_config() -> GraphConfig:
 def graph_config_with_json_data() -> GraphConfig:
     """Fixture that provides a GraphConfig with JSON stuff data enabled."""
     return make_graph_config(include_stuff_json=True)
-
-
-@pytest.fixture
-def graph_config_with_all_data() -> GraphConfig:
-    """Fixture that provides a GraphConfig with all stuff data formats enabled."""
-    return make_graph_config(include_stuff_json=True, include_stuff_text=True, include_stuff_html=True)

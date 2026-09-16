@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:db6f431f6d19eada9e44890a88a38218c5ec408e4bd603ebd0ea3a2119d6c7dd"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-07T12:04:46Z"
-rationale = "interpreter_hub gains get_own_pipes, a library-lookup accessor beside get_pipes returning the current library's own pipes without the aliased dependency entries. Added it to the library-lookups row of the accessor partition table in docs/contribute/hub-layering.md; the boundary, the one-arrow rule and the closure claim are untouched."
+digest = "sha256:ba531715aa9e9f29262c7ea2fd18c4a63e31b9878c5b5f1507b135f511aa7b38"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-09-16T08:54:20Z"
+rationale = "Round-2 review fix in runtime_hub is docstring-only: reset_boot_state no longer claims the agent CLI pins silent before booting (it pins after), and now says a mode assigned after boot is released too. No import, accessor or layer placement changed. Read docs/contribute/hub-layering.md: it specifies the boundary, the forbidden import list and the accessor table, and describes neither reset_boot_state nor the pretty-print mode. Nothing stale."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:498312f15921753263a4ad3475c9da5eefb8e4ba"
+"pipelex/runtime_hub.py" = "blob:4682e96a187338d7c0c6728319f0b81e270b0c21"

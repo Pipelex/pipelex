@@ -636,8 +636,6 @@ class PipeParallel(PipeController):
                 content_type=output_stuff.content.content_type,
                 digest=output_stuff.stuff_code,
                 data=output_stuff.content.smart_dump() if trace_context.data_inclusion.stuff_json_content else None,
-                data_text=output_stuff.content.rendered_pretty_text() if trace_context.data_inclusion.stuff_text_content else None,
-                data_html=output_stuff.content.rendered_pretty_html() if trace_context.data_inclusion.stuff_html_content else None,
             )
             tracer_manager.register_controller_output(
                 lookup_key=trace_context.lookup_key,

@@ -1063,6 +1063,7 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
         log_config = LogConfig.model_validate(merged)
     runtime_hub.set_console_print_target(target=log_config.console_print_target)
     log.configure_if_unset(log_config=log_config)
+    runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
     if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
         log.warning(stale_warning)
 

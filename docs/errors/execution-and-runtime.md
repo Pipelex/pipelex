@@ -32,6 +32,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow
 - [`PipelineExecutionError`](pipeline-execution-error.md) — Pipeline execution
 - [`PipelineInputContentError`](pipeline-input-content-error.md) — Pipeline input content
+- [`PipelineInputUrlInvalidError`](pipeline-input-url-invalid-error.md) — Pipeline input url invalid
 - [`PipelineInputUrlMissingError`](pipeline-input-url-missing-error.md) — Pipeline input url missing
 - [`PipelineManagerAlreadyExistsError`](pipeline-manager-already-exists-error.md) — Pipeline manager already exists
 - [`PipelineManagerNotFoundError`](pipeline-manager-not-found-error.md) — Pipeline manager not found
@@ -53,6 +54,7 @@ own page. Classes are grouped by subsystem.
 
 - [`EventLogError`](event-log-error.md) — Event log
 - [`EventLogReadError`](event-log-read-error.md) — Event log read
+- [`EventLogSchemaMismatchError`](event-log-schema-mismatch-error.md) — Event log schema mismatch
 - [`EventLogSetupError`](event-log-setup-error.md) — Event log setup
 
 [Back to Error Reference](index.md)

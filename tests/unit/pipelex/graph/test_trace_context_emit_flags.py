@@ -11,8 +11,6 @@ from pipelex.system.trace_context import TraceContext
 DATA_INCLUSION_OFF = DataInclusionConfig(
     pipe_and_concept_registry=False,
     stuff_json_content=False,
-    stuff_text_content=False,
-    stuff_html_content=False,
     error_stack_traces=False,
 )
 

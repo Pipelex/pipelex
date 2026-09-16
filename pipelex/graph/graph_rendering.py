@@ -58,8 +58,6 @@ async def render_graph_from_spec(
             "data_inclusion": graph_config.data_inclusion.model_copy(
                 update={
                     "stuff_json_content": True,
-                    "stuff_text_content": True,
-                    "stuff_html_content": True,
                 }
             ),
             "graphs_inclusion": graph_config.graphs_inclusion.model_copy(

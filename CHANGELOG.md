@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.59.0] - 2026-09-16
+
+### Added
+
+- **`pretty_print_mode` in `[runtime.log]` (Breaking)**: `rich` (the default), `poor` or `silent`, applied at boot beside `log_mode`, so a host with no console turns the "Output of pipe" panels off in configuration rather than in code; a silent printer builds no Rich renderable at all. Boot now replaces a `PrettyPrinter.mode` assigned in code before it, so set the key instead, and teardown restores whatever mode the process held before that boot. `pipelex doctor` applies the key too.
+
+### Changed
+
+- **Remote inputs are checked the way the web checks them (Breaking)**: an http(s) URL on a `Document` or `Image` input is only checked for syntax when the inputs are shaped, and refused with `PipelineInputUrlInvalidError` when it does not parse. Whether the resource exists is decided by the operator that fetches it, which raises a caller-facing `RemoteFileFetchError` naming the URL and the answer it got, instead of a raw `httpx` error. The pre-flight HEAD probe is gone: on the hosted runner a host that stalled it could end a run `TIMED_OUT` with no error. A local file path must still exist before the run starts.
+- **The User-Agent is `Pipelex/<version>`**: the `(https://pipelex.com)` suffix is gone, because the crawler-style URL in parentheses is what bot walls key on, and sites that stalled the old string serve the new one promptly.
+
+### Fixed
+
+- **Poor pretty-print mode**: a panel whose title is wider than the terminal no longer hangs the run in an endless wrapping loop, which every "Output of pipe" panel did on an 80-column headless console; an over-wide title is elided instead. Titles print without their Rich markup, a title in square brackets no longer raises, and an output prints as its plain rendering rather than a Rich object's repr.
+- **A trace event log the current models refuse is no longer read as an empty one**: an event written by a version whose event shape this one no longer accepts now makes the read refuse with a count and a reason, instead of being skipped and the remainder reported as a success; such a run reports neither its graph nor its usage and cost total, each with its assembly error set. A line that is not JSON, left by a crash mid-write, is still skipped with a warning. `pipelex graph render` gives the same diagnosis for a graph spec saved by an earlier version instead of a raw traceback.
+
+### Removed
+
+- **The text and HTML renderings of traced data (Breaking)**: `stuff_text_content` and `stuff_html_content` under `[interpreter.pipeline_execution.graph.data_inclusion]` are gone, along with a graph `IOSpec`'s `data_text` and `data_html` and the unused `PrettyPrinter.pretty_html` and `PrettyRenderable.rendered_pretty_html`. Runs no longer pay for rendering every traced input and output on the execution path, and the Mermaid graph page now shows a data node's JSON, with a preview for image and PDF content. A graph spec saved by an earlier version is refused when read back; run the pipeline again to get one in the current shape. **Migration:** run `pipelex migrate` — ledger entry `pipelex-config@4` deletes both keys from `~/.pipelex/` and from every project `.pipelex/` file, keeping one timestamped backup per file.
+
+### Security
+
+- **`escape_script_tag` escapes every `<`**: the filter only matched the literal `</script>`, so `</script >` and `</script/>` closed an embedded JSON block and let the rest of the value parse as live HTML. Every `<` is now escaped as `\u003c`, which guards the graph and stuff viewer pages that embed model-generated traced content.
+
 ## [v0.58.0] - 2026-09-14
 
 ### Changed

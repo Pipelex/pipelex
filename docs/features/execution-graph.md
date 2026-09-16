@@ -24,7 +24,6 @@ Render pipeline diagrams anywhere that supports Mermaid: VS Code, GitHub, web ap
 View the actual data at each execution stage:
 
 - **JSON** — Raw structured data
-- **HTML preview** — Rendered content
 - **Images** — Generated or extracted images
 - **Embedded PDFs** — Document content
 

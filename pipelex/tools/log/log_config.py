@@ -12,6 +12,7 @@ from rich.logging import RichHandler
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_levels import LogLevel
+from pipelex.tools.misc.pretty import PrettyPrintMode
 
 
 class LogMode(StrEnum):
@@ -105,6 +106,7 @@ class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
     package_log_levels: dict[str, LogLevel]
     log_mode: LogMode = Field(strict=False)
+    pretty_print_mode: PrettyPrintMode = Field(strict=False)
     console_log_target: ConsoleTarget = Field(strict=False)
     console_print_target: ConsoleTarget = Field(strict=False)
 

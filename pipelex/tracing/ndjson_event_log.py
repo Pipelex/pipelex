@@ -4,7 +4,6 @@ One JSON event per line, one file per workflow, organized by pipeline run:
     {traces_dir}/{pipeline_run_id}/wf_{workflow_id}.ndjson
 """
 
-import json
 import shutil
 import threading
 from pathlib import Path
@@ -14,7 +13,9 @@ from pydantic import TypeAdapter, ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.exceptions import EventLogSchemaMismatchError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
 
 _any_trace_event_adapter: TypeAdapter[TraceEvent] = TypeAdapter(AnyTraceEvent)
@@ -126,6 +127,11 @@ class NdjsonEventLog(EventLogProtocol):
         re-emission. Sorts by (workflow_id, sequence) for deterministic ordering.
         Corrupt lines (truncated JSON from crash-mid-write) are skipped with
         a warning log.
+
+        A line that parses as JSON but is refused by the event models is not corrupt — it was written
+        whole, by a version whose event shape this one no longer accepts — so it raises
+        :class:`EventLogSchemaMismatchError` rather than being skipped. Skipping those returned an old
+        run's log as an empty list, which every caller read as a run that simply recorded nothing.
         """
         run_dir = self._traces_dir / pipeline_run_id
         if not run_dir.is_dir():
@@ -135,6 +141,8 @@ class NdjsonEventLog(EventLogProtocol):
 
         seen: set[tuple[str, str, str, int]] = set()
         events: list[TraceEvent] = []
+        refused_count = 0
+        first_refusal: str | None = None
 
         for ndjson_path in ndjson_files:
             with open(ndjson_path, encoding="utf-8") as fhandle:
@@ -144,14 +152,34 @@ class NdjsonEventLog(EventLogProtocol):
                         continue
                     try:
                         event = _any_trace_event_adapter.validate_json(stripped)
-                    except (ValidationError, json.JSONDecodeError) as exc:
-                        log.warning(f"Skipping corrupt line in {ndjson_path}:{line_number} — {exc}")
+                    except ValidationError as validation_error:
+                        # `validate_json` reports unparseable input as a `json_invalid` entry rather than
+                        # raising `JSONDecodeError`, so the two cases are told apart by the error type and
+                        # not by the exception class: a line that is not JSON is the half-written record of
+                        # a crash mid-write and is skipped, while one that parses and is then refused was
+                        # written whole by a version whose event shape this one no longer accepts. The refusal
+                        # names fields rather than quoting them: it travels into the run's assembly errors, and
+                        # the pydantic error's own text quotes the traced values it refused.
+                        if any(error["type"] == "json_invalid" for error in validation_error.errors()):
+                            log.warning(f"Skipping corrupt line in {ndjson_path}:{line_number} — {validation_error}")
+                            continue
+                        refused_count += 1
+                        if first_refusal is None:
+                            first_refusal = f"{ndjson_path}:{line_number} — {format_pydantic_validation_error(validation_error)}"
                         continue
 
                     dedup_key = (event.workflow_id, event.writer_id, type(event).__name__, event.sequence)
                     if dedup_key not in seen:
                         seen.add(dedup_key)
                         events.append(event)
+
+        if refused_count:
+            msg = (
+                f"{refused_count} trace event(s) for pipeline_run_id={pipeline_run_id} are in a shape this version "
+                f"does not accept, most likely written by an earlier one; run the pipeline again to get a log in the "
+                f"current shape. First refusal: {first_refusal}"
+            )
+            raise EventLogSchemaMismatchError(msg)
 
         # TODO: causal ordering — sorting by (workflow_id, sequence) groups by lexicographic
         # workflow ID, not execution order. In parent/child workflow topologies this can cause

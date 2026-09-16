@@ -92,9 +92,11 @@ def assemble_tracing(
     DynamoDB backend converts its botocore throttle / auth / transport / timeout
     failures into ``EventLogReadError`` on read and ``EventLogSetupError`` on client
     construction — both subclasses of ``EventLogError``; NDJSON read failures surface
-    as ``OSError`` / ``JSONDecodeError``), malformed event data, and broken tracing
-    infrastructure (config errors, missing optional dependencies) are caught and
-    recorded in the ``*_error`` fields, not propagated. Programming bugs (KeyError,
+    as ``OSError``), malformed event data, and broken tracing infrastructure (config
+    errors, missing optional dependencies) are caught and recorded in the ``*_error``
+    fields, not propagated. Either backend refuses a log holding an event the current
+    models do not accept with ``EventLogSchemaMismatchError``, also an ``EventLogError``:
+    the read fails as a whole, so such a run gets neither its graph nor its usage total. Programming bugs (KeyError,
     AttributeError, etc.) propagate so they surface during development.
 
     Args:
@@ -126,7 +128,8 @@ def assemble_tracing(
     # The DynamoDB backend converts its botocore failures (ClientError / BotoCoreError) into our
     # EventLogError family — EventLogSetupError on client construction (make_event_log), EventLogReadError
     # inside ``DynamoDBEventLog.read_events`` — so the assembly layer catches the EventLogError base and
-    # never imports boto3 itself; NDJSON read failures surface as OSError / JSONDecodeError.
+    # never imports boto3 itself; NDJSON read failures surface as OSError. Both backends refuse a log holding an
+    # event the current models do not accept with EventLogSchemaMismatchError, which drops the graph and the usage.
     try:
         if event_log_override is not None:
             # The scope owner keeps the instance's lifecycle: read without close().
