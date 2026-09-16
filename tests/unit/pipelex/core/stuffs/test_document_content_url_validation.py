@@ -1,8 +1,7 @@
 """Unit tests for URL validation in DocumentContent."""
 
-import logging
-
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.stuffs.document_content import DocumentContent
 
@@ -15,12 +14,12 @@ class TestDocumentContentUrlValidation:
         doc = DocumentContent(url="https://this-domain-cannot-exist.invalid/file.pdf")
         assert doc.url == "https://this-domain-cannot-exist.invalid/file.pdf"
 
-    def test_validate_resources_unreachable_remote_url(self, caplog: pytest.LogCaptureFixture) -> None:
-        """validate_resources() does NOT raise for an unreachable HTTP URL: it logs a warning and lets the downstream extractor decide."""
+    def test_validate_resources_remote_url_is_not_probed(self, mocker: MockerFixture) -> None:
+        """validate_resources() makes no HTTP request for a remote URL: the downstream extractor is the source of truth."""
+        mock_head = mocker.patch("httpx.head")
         doc = DocumentContent(url="https://this-domain-cannot-exist.invalid/file.pdf")
-        with caplog.at_level(logging.WARNING, logger="pipelex"):
-            doc.validate_resources()
-        assert any("could not be reached" in record.message for record in caplog.records)
+        doc.validate_resources()
+        mock_head.assert_not_called()
 
     def test_validate_resources_nonexistent_local_file(self) -> None:
         """validate_resources() raises ValueError for a non-existent local file."""

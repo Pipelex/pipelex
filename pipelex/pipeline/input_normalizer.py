@@ -17,12 +17,13 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputUrlMissingError
+from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputUrlInvalidError, PipelineInputUrlMissingError
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
+from pipelex.tools.misc.http_utils import validate_http_url_syntax
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedLocalPath
+from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 # Type alias for content types that can have their URLs normalized
@@ -223,6 +224,16 @@ async def _normalize_url_content(
         raise PipelineInputUrlMissingError(msg)
 
     resolved_uri = resolve_uri(content.url)
+
+    if isinstance(resolved_uri, ResolvedHttpUrl):
+        # Syntax only, no network: the operator that consumes the input fetches it and
+        # reports a real failure, which is the one honest test of a remote resource.
+        try:
+            validate_http_url_syntax(url=resolved_uri.url)
+        except ValueError as exc:
+            msg = f"{type(content).__name__} input: {exc}"
+            raise PipelineInputUrlInvalidError(msg) from exc
+        return content
 
     if isinstance(resolved_uri, ResolvedBase64DataUrl):
         # Decode base64 data and store
