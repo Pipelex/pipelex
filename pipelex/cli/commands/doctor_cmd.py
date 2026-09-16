@@ -65,6 +65,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
@@ -675,6 +676,7 @@ def display_health_report(
     config_location: ConfigLocationInfo,
     fix_mode: bool = False,
     models_skipped: bool = False,
+    log_sink_check: LogSinkCheck | None = None,
 ) -> None:
     """Display a comprehensive health report.
 
@@ -698,9 +700,18 @@ def display_health_report(
         models_skipped: True when check_models was bypassed because config is broken — render
             the Models row as a yellow advisory and suppress its standalone Solutions entry,
             since the Config Files row already steers the user.
+        log_sink_check: What the runtime setup found about ``[runtime.log] sink``; None when the
+            setup never ran, in which case the row is not rendered.
     """
+    log_sink_healthy = log_sink_check is None or log_sink_check.is_healthy
     all_healthy = (
-        config_healthy and pending_migrations_check.is_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
+        config_healthy
+        and pending_migrations_check.is_healthy
+        and telemetry_check.is_healthy
+        and backends_healthy
+        and models_healthy
+        and deck_healthy
+        and log_sink_healthy
     )
 
     # Overall status panel
@@ -752,6 +763,16 @@ def display_health_report(
     else:
         console.print(f"  [red]✗[/red] {escape(telemetry_check.message)}")
     console.print()
+
+    # Log Sink section: where this very report's lines go, so a token nobody registered is a row
+    # rather than the end of the report.
+    if log_sink_check is not None:
+        console.print("[bold]Log Sink[/bold]")
+        if log_sink_check.is_healthy:
+            console.print(f"  [green]✓[/green] {escape(log_sink_check.message)}")
+        else:
+            console.print(f"  [red]✗[/red] {escape(log_sink_check.message)}")
+        console.print()
 
     # Backend Credentials section
     console.print("[bold]Backend Credentials[/bold]")
@@ -859,6 +880,7 @@ def display_health_report(
         has_deck_drift = not deck_healthy
         has_recommendations = (
             can_auto_fix_config
+            or not log_sink_healthy
             or can_auto_fix_telemetry
             or can_migrate
             or migrations_need_a_look
@@ -904,6 +926,9 @@ def display_health_report(
 
             if has_deck_drift:
                 console.print("  • Run [cyan]pipelex update[/cyan] to refresh the model deck from the current kit")
+
+            if not log_sink_healthy:
+                console.print(f"  • Set [cyan]sink[/cyan] in {escape('[runtime.log]')} to one of the registered log sinks named in the Log Sink row")
 
             # Backend file issues
             if can_auto_fix_backends:
@@ -1015,7 +1040,36 @@ def check_deck_sync(*, config_dir: Path | None = None) -> tuple[bool, DeckSyncRe
     return False, report, f"{len(actionable)} deck file(s) need action"
 
 
-def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = None, config_dir: Path | None = None) -> None:
+class LogSinkCheck(BaseModel):
+    """What the doctor found about ``[runtime.log] sink``: the configured sink installed, or the fallback and why."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_healthy: bool
+    message: str
+
+
+def install_doctor_log_sink(*, registry: LogSinkRegistry, log_config: LogConfig) -> LogSinkCheck:
+    """Install the configured sink, or the console sink with a finding when the token names no registered sink.
+
+    Boot stops on an unregistered token, naming the registered ones. The doctor must not, since where
+    its own lines go is one of the things it diagnoses: it installs the built-in console sink instead
+    and reports the token in a row of its own, so the rest of the report is still produced.
+    """
+    if registry.has(method=log_config.sink):
+        log.install_sink(registry.get_required(method=log_config.sink)(log_config))
+        return LogSinkCheck(is_healthy=True, message=f"Log sink '{log_config.sink}' installed")
+    log.install_sink(registry.get_required(method=LogSinkMethod.CONSOLE)(log_config))
+    return LogSinkCheck(
+        is_healthy=False,
+        message=(
+            f"No log sink is registered for '{log_config.sink}' in [runtime.log]; this report goes through the "
+            f"'{LogSinkMethod.CONSOLE}' sink instead. Registered sinks: {', '.join(registry.methods)}"
+        ),
+    )
+
+
+def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = None, config_dir: Path | None = None) -> LogSinkCheck:
     """Spin up a fresh RuntimeHub and configure logging for doctor checks.
 
     Doctor intentionally bypasses ``Pipelex.make`` so it can diagnose a broken config
@@ -1039,13 +1093,20 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
     instead of raising the once-per-process ``RuntimeError``. When it does apply, the
     sink is selected the way boot selects it: the pure ``build_registrar`` discovery,
     then the ``runtime.log.sink`` lookup — the doctor bypasses ``Pipelex.make`` but not
-    the configuration's choice of where its own lines go.
+    the configuration's choice of where its own lines go. Where boot would stop on a
+    token nobody registered, the doctor installs the console sink and says so in the
+    row it returns.
 
     Args:
         log_config_overrides: Optional mapping of ``LogConfig`` field names → values to
             merge into the loaded log_config before ``log.configure`` is called.
         config_dir: Optional explicit config dir (e.g. for ``--global``). When provided,
             project/global layering is bypassed and only this directory is read.
+
+    Returns:
+        The log sink row: healthy when the configured sink was installed, or when logging
+        was already configured and its sink stays; not healthy when the token named no
+        registered sink and the console sink stands in.
 
     Raises:
         PipelexConfigError: If config validation fails. Translation of
@@ -1068,6 +1129,7 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
         deep_update(merged, updates=log_config_overrides)
         log_config = LogConfig.model_validate(merged)
     runtime_hub.set_console_print_target(target=log_config.console_print_target)
+    log_sink_check = LogSinkCheck(is_healthy=True, message="Logging was already configured in this process, and its sink stays")
     if log.configure_if_unset(log_config=log_config):
         registrar = build_registrar(
             config=get_config(),
@@ -1076,10 +1138,11 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
             core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
             entry_point_groups=ENTRY_POINT_GROUPS,
         )
-        log.install_sink(LogSinkRegistry(registrar.log_sinks).get_required(method=log_config.sink)(log_config))
+        log_sink_check = install_doctor_log_sink(registry=LogSinkRegistry(registrar.log_sinks), log_config=log_config)
     runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
     if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
         log.warning(stale_warning)
+    return log_sink_check
 
 
 def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
@@ -1241,9 +1304,10 @@ def do_doctor_cmd(
     models_healthy: bool
     models_message: str
     backend_file_reports: dict[str, BackendFileReport]
+    log_sink_check: LogSinkCheck | None = None
     if config_healthy:
         try:
-            setup_doctor_runtime()
+            log_sink_check = setup_doctor_runtime()
             models_healthy, models_message, backend_file_reports = check_models()
             models_skipped = False
         except PipelexConfigError as exc:
@@ -1278,10 +1342,17 @@ def do_doctor_cmd(
         deck_report=deck_report,
         config_location=config_location,
         fix_mode=fix,
+        log_sink_check=log_sink_check,
     )
 
     all_healthy = (
-        config_healthy and pending_migrations_check.is_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
+        config_healthy
+        and pending_migrations_check.is_healthy
+        and telemetry_check.is_healthy
+        and backends_healthy
+        and models_healthy
+        and deck_healthy
+        and (log_sink_check is None or log_sink_check.is_healthy)
     )
 
     # Exit code: 0 if healthy, 1 if issues found

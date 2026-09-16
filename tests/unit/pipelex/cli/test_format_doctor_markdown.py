@@ -86,6 +86,16 @@ class TestFormatDoctorMarkdown:
         output = _format_doctor_markdown(self._HEALTHY_RESULT)
         assert "/home/user/.pipelex (global)" in output
 
+    def test_log_sink_section_renders_only_when_the_check_ran(self) -> None:
+        with_sink: dict[str, Any] = {
+            **self._HEALTHY_RESULT,
+            "checks": {**self._HEALTHY_RESULT["checks"], "log_sink": {"healthy": False, "message": "No log sink is registered for 'jsn'"}},
+        }
+
+        assert "## Log Sink" in _format_doctor_markdown(with_sink)
+        assert "No log sink is registered for 'jsn'" in _format_doctor_markdown(with_sink)
+        assert "## Log Sink" not in _format_doctor_markdown(self._HEALTHY_RESULT)
+
     def test_healthy_output_has_no_recommended_actions(self) -> None:
         """Healthy result should not include a Recommended Actions section."""
         output = _format_doctor_markdown(self._HEALTHY_RESULT)

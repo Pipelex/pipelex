@@ -10,6 +10,7 @@ from rich.console import Console
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
     TelemetryConfigCheck,
@@ -94,6 +95,24 @@ class TestDoctorDisplayReport:
         assert "Models are valid" in output
         assert "Deck is up to date with pipelex 1.2.0" in output
         assert "Possible Solutions" not in output
+
+    def test_an_unregistered_log_sink_is_a_row_of_its_own_and_flags_the_report(self, console: Console) -> None:
+        """The report still renders, on the console sink, and says which token was set and which sinks exist."""
+        kwargs = _healthy_report_kwargs()
+        kwargs["log_sink_check"] = LogSinkCheck(is_healthy=False, message="No log sink is registered for 'jsn'; registered: console, json")
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Overall Status: ⚠️  Issues Found" in output
+        assert "Log Sink" in output
+        assert "No log sink is registered for 'jsn'" in output
+        assert "Set sink in [runtime.log]" in output
+
+    def test_without_a_runtime_setup_there_is_no_log_sink_row(self, console: Console) -> None:
+        display_health_report(**_healthy_report_kwargs())
+
+        assert "Log Sink" not in console.export_text()
 
     def test_global_location_rendered(self, console: Console) -> None:
         """Without a project .pipelex/, the global location line is rendered."""

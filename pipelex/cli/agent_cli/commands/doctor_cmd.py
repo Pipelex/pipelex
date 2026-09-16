@@ -14,6 +14,7 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
     TelemetryConfigCheck,
@@ -124,6 +125,12 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     telemetry_check = checks["telemetry"]
     lines.append(f"\n## Telemetry \u2014 {_status_icon(healthy=telemetry_check['healthy'])}\n")
     lines.append(telemetry_check["message"])
+
+    # Log Sink, present only when the runtime setup ran
+    log_sink_check = checks.get("log_sink")
+    if log_sink_check is not None:
+        lines.append(f"\n## Log Sink \u2014 {_status_icon(healthy=log_sink_check['healthy'])}\n")
+        lines.append(log_sink_check["message"])
 
     # Backend Credentials
     creds_check = checks["backend_credentials"]
@@ -239,9 +246,10 @@ def agent_doctor_cmd(
         models_healthy: bool
         models_message: str
         backend_file_reports: dict[str, BackendFileReport]
+        log_sink_check: LogSinkCheck | None = None
         if config_healthy:
             try:
-                setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
+                log_sink_check = setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
                 # Pin discipline BEFORE check_models. setup_doctor_runtime uses
                 # log.configure_if_unset(), which no-ops when a prior process already configured
                 # logging (embedded reuse, interleaved tests) — in that case AGENT_CLI_STDERR_LOG_FIELDS
@@ -273,7 +281,14 @@ def agent_doctor_cmd(
     # installed a hub or configured log — the helper guards both internally).
     apply_agent_cli_output_discipline()
 
-    all_healthy = config_healthy and pending_migrations_check.is_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy
+    all_healthy = (
+        config_healthy
+        and pending_migrations_check.is_healthy
+        and telemetry_check.is_healthy
+        and backends_healthy
+        and models_healthy
+        and (log_sink_check is None or log_sink_check.is_healthy)
+    )
 
     # Build backend credential details
     backends_list: list[dict[str, Any]] = []
@@ -332,6 +347,8 @@ def agent_doctor_cmd(
                 recommended_actions.append(
                     f"Manually fix backend configuration in {config_location.config_dir}/inference/backends/{file_report.backend_name}.toml"
                 )
+    if log_sink_check is not None and not log_sink_check.is_healthy:
+        recommended_actions.append("Set 'sink' in [runtime.log] to one of the registered log sinks the log_sink check names")
 
     result: dict[str, Any] = {
         "success": True,
@@ -368,6 +385,8 @@ def agent_doctor_cmd(
             },
         },
     }
+    if log_sink_check is not None:
+        result["checks"]["log_sink"] = {"healthy": log_sink_check.is_healthy, "message": log_sink_check.message}
 
     if recommended_actions:
         result["recommended_actions"] = recommended_actions
