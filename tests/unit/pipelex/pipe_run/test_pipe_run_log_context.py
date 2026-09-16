@@ -2,7 +2,9 @@
 
 The run-scoped identifiers travel in the payload; the contextvar is in-process plumbing bound at the
 entry and released when the run returns, so a record emitted by anything the run calls carries them
-and a record emitted after the run does not.
+and a record emitted after the run does not. The job metadata a submission builds carries no
+``pipe_run_id``: the pipe's own is minted by ``live_run_pipe``, which binds it there, tested in
+``tests/unit/pipelex/pipe_machinery/test_live_run_pipe_log_context.py``.
 """
 
 from __future__ import annotations

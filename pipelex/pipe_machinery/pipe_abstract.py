@@ -957,14 +957,18 @@ class PipeAbstract(ABC, BaseModel):
 
         # Run pipe ------------------------------------------------------------
 
+        # The pipe run's id exists from here on and nowhere earlier, so this is where the log context
+        # takes it: every record emitted inside the pipe, a nested pipe's included until it binds its
+        # own, names the pipe run it belongs to. The outer binding comes back when the pipe returns.
         try:
-            pipe_output = await self._live_run_pipe(
-                job_metadata=child_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-                output_name=output_name,
-                library_crate=library_crate,
-            )
+            with log.context(pipe_run_id=this_pipe_run_id):
+                pipe_output = await self._live_run_pipe(
+                    job_metadata=child_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                    library_crate=library_crate,
+                )
         except Exception as exc:
             # Broad catch is intentional: the OTel span must be closed with ERROR status
             # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
