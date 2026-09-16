@@ -5,7 +5,7 @@ item: L-260915-c66b8a
 
 # Deferred review findings — `feature/Pretty-print-mode`
 
-What the `/rev` passes on this branch found and deliberately did not fix. Round 1 is recorded first; round 2 has its own section at the end.
+What the `/rev` passes on this branch found and deliberately did not fix. Each round has its own section, in order.
 
 ## Round 1
 
@@ -63,3 +63,17 @@ Sorted as deferrals on the reviewers' word alone. Treat each as a candidate, not
 - **The graph viewer tests data by truthiness** (`_interactive_scripts.js.jinja2:234`), so a stuff whose JSON is `""`, `[]` or `{}` disables the JSON tab and shows "No JSON data available"; with the Pretty and HTML tabs gone, such a value has no representation left. Availability should test for `null` or `undefined` instead.
 - **Event decoding is implemented twice**, in `NdjsonEventLog.read_events` and `DynamoDBEventLog.read_events`: the corrupt-versus-refused classification, the refusal count and the error construction. The two had already drifted apart on sanitizing the refusal, which round 2 fixed; a shared decoder taking backend-specific location context would keep them from drifting again.
 - **The kit template's `[runtime.log]` does not list `pretty_print_mode`** (`pipelex/kit/configs/pipelex.toml`). The section is a hand-picked subset that also omits `log_mode`, so this breaks no rule, but the docs recommend the key for hosts with no console.
+
+## Round 3
+
+The round-3 pass ran at profile 3 under the `necessity` bar, with cubic, Codex and the official code-review at `low`. It changed no code: none of the findings was introduced by the round-2 fixes, and none is critical. Three of the four repeat deferrals already recorded above, and the fourth is new.
+
+### Already deferred above
+
+- **The `@3` goldens** — code-review raised this again. Its report adds one correction to its own skill's framing: `check_entry_accounting` (`pipelex/migration/coverage.py`) only checks removed paths, so the `@4` ledger entry is checked correctly whichever `@3` is on disk. The damage is to the record, not to a gate.
+- **The graph viewer's JSON tab tests data by truthiness** — Codex raised this again at `_interactive_scripts.js.jinja2:275-276`. It joins the round-1 fallback finding: an empty-string payload gets a disabled JSON tab that the fallback still selects, so copy and download return nothing.
+- **Event decoding is implemented twice** — cubic raised this again at `pipelex/tracing/ndjson_event_log.py:142`.
+
+### Raised, not verified
+
+- **A graph file that is not JSON at all is told it was saved by an earlier version.** `graph render` catches every `ValidationError` from `GraphSpec.model_validate_json` (`pipelex/cli/commands/graph_cmd.py`), and malformed JSON arrives as a `json_invalid` entry of that same error, so a truncated or hand-mangled file gets the "saved by an earlier version, run the pipeline again" message. Separating the `json_invalid` case would give it a message of its own. This came in with the round-1 fixes, not round 2.
