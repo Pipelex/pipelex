@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:33e844c30c705c038cf7809736a33622c8928c05cbcbd53e588c5a7235782929"
+digest = "sha256:7855e5a0a09388da54a6365f26e2f0febef02310b309b613a562a969748d7f2e"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-16T14:07:05Z"
-rationale = "Docstring-only change in ConfigLoader.take_stale_configuration_warning, rewritten because a log call before configure no longer raises and the old text said it did. No config model, key, default or validator moved, so the migration ledgers owe nothing. Reviewed docs/configuration: the logging-config page's package_log_levels section is updated in this same change to say a key works at module depth now that loggers are named by module."
+reviewed_at = "2026-09-16T14:58:00Z"
+rationale = "Docstring-only wording fix in ConfigLoader.take_stale_configuration_warning: the review pass found the earlier text claimed a pre-configure warning misses the console, while it lands on stderr unformatted through logging.lastResort, and the docstring now says so. No config model, key, default or validator moved, so the migration ledgers owe nothing and docs/configuration stays as the previous ack left it."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -10,7 +10,7 @@ rationale = "Docstring-only change in ConfigLoader.take_stale_configuration_warn
 "pipelex/pipelex.toml" = "blob:a4197193c4e9df0f09ef795149a505c0a149fdda"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:88e15a92b186088a5ea1c7c4ebcedac830707d3a"
-"pipelex/system/configuration/config_loader.py" = "blob:d6d5e47bee142e5ba0bf157a72ac2af1b903a834"
+"pipelex/system/configuration/config_loader.py" = "blob:ac384ce993933656682999c26afffb4c9f9b1975"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/config_surface.py" = "blob:96f685656a3f4355e8a073e8bf6184e020fea8f5"

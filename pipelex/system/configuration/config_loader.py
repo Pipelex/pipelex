@@ -67,8 +67,8 @@ class ConfigLoader:
         The loader parks it rather than logging it because the main configuration is what
         *configures logging*: at the moment the retry succeeds no handler is installed yet, and a
         line emitted then goes to the stdlib's default handling, where an ``INFO`` is dropped and a
-        warning misses the console the user is watching. The boot emits it right after
-        ``log.configure``.
+        warning lands on stderr unformatted, ahead of the console about to be configured. The boot
+        emits it right after ``log.configure``, where it reads like every other line.
         """
         warning, self._stale_warning = self._stale_warning, None
         return warning
