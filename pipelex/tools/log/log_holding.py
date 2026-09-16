@@ -19,6 +19,27 @@ from typing_extensions import override
 # logging and never installs a sink cannot grow without bound. A boot holds a few dozen lines.
 HOLDING_CAPACITY = 1000
 
+# The attribute a forwarded record carries once the sink's handler has handled it, so the same record
+# reaching that handler again through the root logger is rejected. Underscored so no caller's ``extra``
+# can spell it: the stdlib refuses only the names a ``LogRecord`` already has.
+FORWARDED_MARK = "_pipelex_forwarded"
+
+
+class ForwardedRecordFilter(logging.Filter):
+    """Rejects a record the holding handler already forwarded to this handler.
+
+    While the sink's handler and the holding handler are both on the root logger, a record reaches the
+    holding handler first, which forwards it and marks it; this filter is what stops the root logger's
+    own delivery of the same record right after. It sits ahead of every other filter on the handler,
+    so the sink's processors never run on a record it rejects, and it stays installed: after the
+    handoff no record is marked again, and a thread that read the root's handler list mid-handoff
+    can still be on its way.
+    """
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not getattr(record, FORWARDED_MARK, False)
+
 
 class HoldingLogHandler(logging.Handler):
     """Holds every record it is handed until a sink's handler takes them over, then forwards to that handler."""
@@ -35,11 +56,13 @@ class HoldingLogHandler(logging.Handler):
     @override
     def emit(self, record: logging.LogRecord) -> None:
         # ``handle`` holds this handler's lock here, the lock ``release_to`` drains under, so a record
-        # arrives either before the drain and is held, or after it and goes straight to the handler
-        # that took the held ones: never into a list nobody reads again. A thread that picked this
-        # handler off the root logger just before it was removed is the one this is for.
+        # arrives either before the drain and is held, or after it and is forwarded to the handler
+        # that took the held ones: never into a list nobody reads again. The mark goes on after the
+        # forward, so the forward passes the handler's own guard and the root logger's delivery of
+        # the same record, when the sink's handler is on the root too, does not.
         if self._released_to is not None:
             self._released_to.handle(record)
+            setattr(record, FORWARDED_MARK, True)
             return
         if len(self._held) >= HOLDING_CAPACITY:
             del self._held[0]

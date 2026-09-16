@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipelex.tools.log.log_context import bind_log_context
 from pipelex.tools.log.log_dispatch import LogDispatch
-from pipelex.tools.log.log_holding import HoldingLogHandler
+from pipelex.tools.log.log_holding import ForwardedRecordFilter, HoldingLogHandler
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
 
 if TYPE_CHECKING:
@@ -143,20 +143,28 @@ class Log:
             raise RuntimeError(msg)
 
         handler = sink.handler
+        # Ahead of every other filter, so the sink's processors never run on a record it rejects.
+        handler.filters.insert(0, ForwardedRecordFilter())
         root_logger = logging.getLogger()
-        root_logger.addHandler(handler)
         # Recorded before the replay: a handler that raises on one held record leaves the sink
         # installed all the same, so ``reset`` finds it and removes it rather than leaking it into
-        # the next boot. The sink's handler is on the root logger before the holding handler leaves
-        # it, so a record emitted meanwhile reaches one of the two rather than neither.
+        # the next boot.
         self._sink = sink
-        if self._holding_handler is not None:
-            holding, self._holding_handler = self._holding_handler, None
+        if self._holding_handler is None:
+            root_logger.addHandler(handler)
+            return
+        # The held records drain first, so every one of them precedes whatever is emitted from now
+        # on. A record emitted meanwhile reaches the holding handler, which forwards it once and
+        # marks it; once the sink's handler is on the root logger too, the guard on it rejects the
+        # root's own delivery of that same record, so nothing is delivered twice, and nothing reaches
+        # neither, since one of the two handlers is on the root at every instant.
+        holding, self._holding_handler = self._holding_handler, None
+        try:
+            holding.release_to(handler=handler)
+        finally:
+            root_logger.addHandler(handler)
             root_logger.removeHandler(holding)
-            try:
-                holding.release_to(handler=handler)
-            finally:
-                holding.close()
+            holding.close()
 
     def _should_ignore(self, problem_id: str | None = None) -> bool:
         """Check if a log message should be ignored based on the problem ID.

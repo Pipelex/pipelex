@@ -22,6 +22,8 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pytest_mock import MockerFixture
+
 
 def _package_log_config() -> LogConfig:
     config_dict = load_toml_from_path(ConfigLoader().pipelex_root_dir / "pipelex.toml")
@@ -153,6 +155,58 @@ class TestHoldingLogHandler:
         fresh_log.reset()
         assert fresh_log.sink is None
         assert sink.handler not in logging.getLogger().handlers
+
+    @staticmethod
+    def _emit_while_both_handlers_are_on_the_root(*, mocker: MockerFixture, fresh_log: Log, message: str) -> None:
+        """Widen the handoff's window deterministically: a record is emitted right before the holding handler leaves the root.
+
+        ``install_sink`` puts the sink's handler on the root logger and then removes the holding handler; wrapping
+        the removal emits a record while both are on the root, which is the interleaving a concurrent thread produces.
+        """
+        original_remove = logging.Logger.removeHandler
+
+        def remove_after_emitting(logger: logging.Logger, handler: logging.Handler) -> None:
+            if isinstance(handler, HoldingLogHandler):
+                fresh_log.info(message)
+            original_remove(logger, handler)
+
+        mocker.patch.object(logging.Logger, "removeHandler", autospec=True, side_effect=remove_after_emitting)
+
+    def test_a_record_emitted_while_both_handlers_are_on_the_root_is_delivered_exactly_once(self, fresh_log: Log, mocker: MockerFixture) -> None:
+        fresh_log.info("held")
+        sink = _ListSink()
+        self._emit_while_both_handlers_are_on_the_root(mocker=mocker, fresh_log=fresh_log, message="meanwhile")
+
+        fresh_log.install_sink(sink)
+        fresh_log.info("live")
+
+        assert sink.own_messages().count("meanwhile") == 1
+        assert not any(isinstance(handler, HoldingLogHandler) for handler in logging.getLogger().handlers)
+
+    def test_the_held_records_precede_a_record_emitted_during_the_handoff(self, fresh_log: Log, mocker: MockerFixture) -> None:
+        fresh_log.info("held first")
+        fresh_log.warning("held second")
+        sink = _ListSink()
+        self._emit_while_both_handlers_are_on_the_root(mocker=mocker, fresh_log=fresh_log, message="meanwhile")
+
+        fresh_log.install_sink(sink)
+        fresh_log.info("live")
+
+        assert sink.own_messages() == ["held first", "held second", "meanwhile", "live"]
+
+    def test_a_processor_runs_once_on_a_record_forwarded_during_the_handoff(self, fresh_log: Log, mocker: MockerFixture) -> None:
+        sink = _ListSink()
+
+        def count(record: logging.LogRecord) -> None:
+            record.processed = getattr(record, "processed", 0) + 1
+
+        sink.processors.append(count)
+        self._emit_while_both_handlers_are_on_the_root(mocker=mocker, fresh_log=fresh_log, message="meanwhile")
+
+        fresh_log.install_sink(sink)
+
+        own = [record for record in sink.list_handler.records if record.name == __name__]
+        assert [(record.getMessage(), getattr(record, "processed", None)) for record in own] == [("meanwhile", 1)]
 
     def test_a_record_that_reaches_the_holding_handler_after_the_drain_is_forwarded_to_the_sink(self) -> None:
         """A thread that picked the holding handler off the root logger just before its removal must lose nothing."""
