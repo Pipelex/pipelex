@@ -7,10 +7,12 @@ production builds it on the batching processor and the OTLP HTTP exporter instea
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from opentelemetry._logs import SeverityNumber
+from opentelemetry.context import _SUPPRESS_INSTRUMENTATION_KEY, attach, detach, set_value  # pyright: ignore[reportPrivateUsage]
 from opentelemetry.sdk._logs.export import InMemoryLogExporter, SimpleLogRecordProcessor
 from opentelemetry.semconv._incubating.attributes import code_attributes
 from opentelemetry.semconv.attributes import exception_attributes
@@ -18,13 +20,14 @@ from opentelemetry.semconv.attributes import exception_attributes
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.tools.log.otlp_log_sink import OtlpLogSink
+from pipelex.tools.log.otlp_log_sink import FLUSH_TIMEOUT_MILLIS, ExportPathFilter, OtlpLogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from opentelemetry.sdk._logs import LogData
+    from pytest_mock import MockerFixture
 
 
 def _package_log_config() -> LogConfig:
@@ -140,3 +143,75 @@ class TestOtlpLogSink:
 
         scopes = {log_data.instrumentation_scope.name for log_data in exporter.get_finished_logs()}
         assert not any(scope == "opentelemetry" or scope.startswith("opentelemetry.") for scope in scopes)
+
+    def test_the_sdks_own_record_is_rejected_before_the_handler_lock_is_taken(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+        """At exit the stdlib's shutdown holds this lock while it flushes, and an exporting thread reporting its failure must not wait on it."""
+        fresh, _ = otlp_log
+        assert fresh.sink is not None
+        handler = fresh.sink.handler
+        assert any(isinstance(handler_filter, ExportPathFilter) for handler_filter in handler.filters)
+        sdk_record = logging.LogRecord(
+            name="opentelemetry.sdk", level=logging.ERROR, pathname="", lineno=0, msg="export failed", args=(), exc_info=None
+        )
+        lock_taken = threading.Event()
+        let_go = threading.Event()
+
+        def hold_the_lock() -> None:
+            handler.acquire()
+            lock_taken.set()
+            let_go.wait()
+            handler.release()
+
+        holder = threading.Thread(target=hold_the_lock)
+        holder.start()
+        lock_taken.wait()
+        handled = threading.Event()
+
+        def handle_the_sdks_record() -> None:
+            handler.handle(sdk_record)
+            handled.set()
+
+        try:
+            threading.Thread(target=handle_the_sdks_record, daemon=True).start()
+            assert handled.wait(timeout=2), "the guard ran after the lock was taken"
+        finally:
+            let_go.set()
+            holder.join()
+
+    def test_a_record_emitted_during_an_export_is_rejected_whatever_its_logger_is_called(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+        """The SDK sets a context value around ``exporter.export``; the transport logs under it, and the sink reads it. A private key, pinned here."""
+        fresh, exporter = otlp_log
+        token = attach(set_value(_SUPPRESS_INSTRUMENTATION_KEY, True))
+        try:
+            logging.getLogger("urllib3.connectionpool").warning("Retrying after connection broken")
+            fresh.info("mine, during an export")
+        finally:
+            detach(token)
+        fresh.info("mine, after the export")
+
+        assert [
+            log_data.log_record.body for log_data in exporter.get_finished_logs() if log_data.instrumentation_scope.name.startswith("urllib3")
+        ] == []
+        assert [log_data.log_record.body for log_data in _own_logs(exporter)] == ["mine, after the export"]
+
+    def test_a_mixed_type_sequence_rides_as_json_text_rather_than_being_dropped(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+        """The SDK keeps a sequence of one scalar type, compared by type equality, and drops the rest to ``None``."""
+        fresh, exporter = otlp_log
+        fresh.info("sequences", fields={"mixed": [1, "foo"], "int_bool": [1, True], "homogeneous": ["a", "b"], "empty": []})
+
+        (log_data,) = _own_logs(exporter)
+        attributes = _attributes(log_data)
+        assert attributes["mixed"] == '[1, "foo"]'
+        assert attributes["int_bool"] == "[1, true]"
+        assert list(attributes["homogeneous"]) == ["a", "b"]
+        assert list(attributes["empty"]) == []
+
+    def test_flush_hands_the_provider_a_deadline(self, otlp_log: tuple[Log, InMemoryLogExporter], mocker: MockerFixture) -> None:
+        fresh, _ = otlp_log
+        sink = fresh.sink
+        assert isinstance(sink, OtlpLogSink)
+        force_flush = mocker.patch.object(sink.logger_provider, "force_flush")
+
+        sink.handler.flush()
+
+        force_flush.assert_called_once_with(timeout_millis=FLUSH_TIMEOUT_MILLIS)

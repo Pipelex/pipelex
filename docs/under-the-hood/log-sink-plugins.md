@@ -39,7 +39,7 @@ RuntimeBoot.setup
   └─ log.install_sink(sink)                # the sink's handler replaces the holding handler,
                                            # which replays what it held through it, in order
 teardown
-  └─ log.reset()                           # flushes and closes the sink's handler, removes it
+  └─ log.reset()                           # flushes and closes the sink's handler, removes it; nothing it raises escapes
 ```
 
 ### Configured before it is selected
@@ -121,7 +121,7 @@ class LogSinkPlugin:
 |------|--------------|-----------------------------|
 | `json` | One JSON object per line on the configured stream: `time`, `severity`, `logger`, `message`, `exception` when there is one, then the fields, the context identifiers and `data` flat beside them, a field named like one of those keys under a `field_` prefix on every line, a non-finite float as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser, and no ANSI ever. What the hosted plane's runner and worker select. | `console_log_target` |
 | `console` | The Rich handler with the emoji formatter and every `[runtime.log.rich_log]` setting, byte for byte what the console showed before sinks existed. Rich is imported when the handler is built, and a process that selects another sink never loads it through this path. | `console_log_target`, `[runtime.log.rich_log]` |
-| `otlp` | The OpenTelemetry logs signal: a `LoggerProvider` carrying the same service identity as the tracer, a `BatchLogRecordProcessor` and the OTLP HTTP log exporter. The message is the body, the level maps onto the OTel severity scale, the fields, identifiers and `data` ride as attributes (a mapping as JSON text), an exception lands under the `exception.*` semantic-convention keys, and a collector receives the logs beside the spans the runtime already exports. | `[runtime.log.otlp]` |
+| `otlp` | The OpenTelemetry logs signal: a `LoggerProvider` carrying the same service identity as the tracer, a `BatchLogRecordProcessor` and the OTLP HTTP log exporter. The message is the body, the level maps onto the OTel severity scale, the fields, identifiers and `data` ride as attributes (a mapping as JSON text), an exception lands under the `exception.*` semantic-convention keys, and a collector receives the logs beside the spans the runtime already exports. A filter on the handler rejects the records of the sink's own export path, the SDK's by logger name and the transport's by the context value the SDK sets around an export, before the handler's lock is taken, so an export failure never re-enters the pipeline and a shutdown never waits on itself. | `[runtime.log.otlp]` |
 
 The `otlp` factory imports the OpenTelemetry logs SDK when it runs, never at register, so registering the built-ins imports none of it, which the import-light guard pins.
 

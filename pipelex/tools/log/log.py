@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING, Any
 
 from pipelex.tools.log.log_context import bind_log_context
@@ -47,12 +48,15 @@ class Log:
         """Remove what ``configure`` and ``install_sink`` put on the root logger, and forget the configuration.
 
         The sink's handler is flushed and closed, which is where a batching sink ships what it still
-        holds. A holding handler still in place, because the boot died before its sink arrived, is closed
-        too, and what it holds gets the stdlib's last-resort handling.
+        holds, and nothing that flush or close raises escapes: this runs first in the runtime's release
+        of its process globals, and an error out of it would skip the rest and leave the process
+        unbootable. A holding handler still in place, because the boot died before its sink arrived, is
+        closed too, and what it holds gets the stdlib's last-resort handling.
         """
         root_logger = logging.getLogger()
         if self._sink is not None:
-            handler = self._sink.handler
+            sink, self._sink = self._sink, None
+            handler = sink.handler
             root_logger.removeHandler(handler)
             try:
                 handler.flush()
@@ -61,7 +65,10 @@ class Log:
                 # The stream is already closed, a test capture or a redirected process stream torn
                 # down first; ``logging.shutdown`` tolerates the same two, and a teardown must finish.
                 pass
-            self._sink = None
+            except Exception as exc:  # ruff: ignore[blind-except]
+                # An exporter that cannot reach its collector, a processor whose shutdown raises: a fact
+                # about the sink, said on stderr, and never a reason to leave the teardown half done.
+                sys.stderr.write(f"The log sink {type(sink).__name__} failed to flush or close at reset: {exc!r}\n")
         if self._holding_handler is not None:
             root_logger.removeHandler(self._holding_handler)
             self._holding_handler.close()
