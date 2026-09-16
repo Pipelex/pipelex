@@ -29,6 +29,7 @@ from pipelex.cli.commands.doctor_cmd import (
 )
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.tools.log.log import log
 
 
 def _status_icon(*, healthy: bool) -> str:
@@ -205,6 +206,19 @@ def agent_doctor_cmd(
     Target directory: auto-detects project .pipelex/ if present, else ~/.pipelex/.
     Use --global/-g to force checking the global ~/.pipelex/ directory.
     """
+    # The doctor configures logging and installs a sink for its own report; once the report is out,
+    # it releases them, so an ``otlp`` sink's exporter and the hook it registered at exit go with the
+    # command rather than outliving it. Logging an embedder configured before calling in is left alone.
+    logging_was_configured = log.is_configured
+    try:
+        _do_agent_doctor_cmd(global_=global_, output_format=output_format, error_format=error_format)
+    finally:
+        if not logging_was_configured:
+            log.reset()
+
+
+def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error_format: CliOutputFormat | None) -> None:
+    """The report itself; ``agent_doctor_cmd`` is the entry point that releases what this configured."""
     set_agent_cli_error_format(error_format or output_format)
     # Process-global logging cutoff, BEFORE setup_doctor_runtime / check_* can trigger
     # any third-party log line.

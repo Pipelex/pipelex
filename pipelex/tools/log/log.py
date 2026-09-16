@@ -10,12 +10,28 @@ from pipelex.tools.log.log_holding import ForwardedRecordFilter, HoldingLogHandl
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from contextlib import AbstractContextManager
 
     from pipelex.tools.log.log_config import LogConfig
     from pipelex.tools.log.log_context import LogContext
     from pipelex.tools.log.log_sink import LogSink
+
+
+def _finish_teardown_step(*, sink: LogSink, verb: str, step: Callable[[], None]) -> None:
+    """Run one step of a sink's teardown and let nothing it raises escape.
+
+    A closed stream, a test capture or a redirected process stream torn down first, stays silent: the
+    stdlib's own shutdown tolerates the same two. Anything else, an exporter that cannot reach its
+    collector or a processor whose shutdown raises, is a fact about the sink, said on stderr with the
+    step that failed, and never a reason to leave the teardown half done.
+    """
+    try:
+        step()
+    except (OSError, ValueError):
+        pass
+    except Exception as exc:  # ruff: ignore[blind-except]
+        sys.stderr.write(f"The log sink {type(sink).__name__} failed to {verb} at reset: {exc!r}\n")
 
 
 class Log:
@@ -44,14 +60,21 @@ class Log:
         """The installed sink, or ``None`` before ``install_sink`` and after ``reset``."""
         return self._sink
 
+    @property
+    def is_configured(self) -> bool:
+        """Whether ``configure`` has run and ``reset`` has not, which is what makes a later ``configure`` refuse."""
+        return self._log_config_instance is not None
+
     def reset(self):
         """Remove what ``configure`` and ``install_sink`` put on the root logger, and forget the configuration.
 
         The sink's handler is flushed and closed, which is where a batching sink ships what it still
         holds, and nothing that flush or close raises escapes: this runs first in the runtime's release
         of its process globals, and an error out of it would skip the rest and leave the process
-        unbootable. A holding handler still in place, because the boot died before its sink arrived, is
-        closed too, and what it holds gets the stdlib's last-resort handling.
+        unbootable. The close runs whatever the flush did, since the close is what stops an exporter's
+        thread, ships its last batch and unregisters what it put at exit. A holding handler still in
+        place, because the boot died before its sink arrived, is closed too, and what it holds gets the
+        stdlib's last-resort handling.
         """
         root_logger = logging.getLogger()
         if self._sink is not None:
@@ -59,16 +82,9 @@ class Log:
             handler = sink.handler
             root_logger.removeHandler(handler)
             try:
-                handler.flush()
-                handler.close()
-            except (OSError, ValueError):
-                # The stream is already closed, a test capture or a redirected process stream torn
-                # down first; ``logging.shutdown`` tolerates the same two, and a teardown must finish.
-                pass
-            except Exception as exc:  # ruff: ignore[blind-except]
-                # An exporter that cannot reach its collector, a processor whose shutdown raises: a fact
-                # about the sink, said on stderr, and never a reason to leave the teardown half done.
-                sys.stderr.write(f"The log sink {type(sink).__name__} failed to flush or close at reset: {exc!r}\n")
+                _finish_teardown_step(sink=sink, verb="flush", step=handler.flush)
+            finally:
+                _finish_teardown_step(sink=sink, verb="close", step=handler.close)
         if self._holding_handler is not None:
             root_logger.removeHandler(self._holding_handler)
             self._holding_handler.close()

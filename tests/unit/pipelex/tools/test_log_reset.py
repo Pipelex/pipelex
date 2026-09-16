@@ -52,6 +52,36 @@ class _RaisingAtCloseSink(LogSink):
         return _RaisingAtCloseHandler(error=self._error)
 
 
+class _RaisingAtFlushHandler(logging.Handler):
+    def __init__(self, *, error: Exception) -> None:
+        super().__init__()
+        self._error = error
+        self.is_closed = False
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        return
+
+    @override
+    def flush(self) -> None:
+        raise self._error
+
+    @override
+    def close(self) -> None:
+        self.is_closed = True
+        super().close()
+
+
+class _RaisingAtFlushSink(LogSink):
+    def __init__(self, *, error: Exception) -> None:
+        super().__init__()
+        self._error = error
+
+    @override
+    def make_handler(self) -> logging.Handler:
+        return _RaisingAtFlushHandler(error=self._error)
+
+
 class TestLogReset:
     @pytest.fixture
     def configured_log(self) -> Iterator[Log]:
@@ -84,5 +114,33 @@ class TestLogReset:
 
         configured_log.reset()
 
+        assert configured_log.sink is None
+        assert capsys.readouterr().err == ""
+
+    def test_a_flush_that_raises_is_said_on_stderr_and_the_close_still_runs(self, configured_log: Log, capsys: pytest.CaptureFixture[str]) -> None:
+        """The close is what stops an exporter's thread and unregisters its exit hook; a failed flush must not skip it."""
+        sink = _RaisingAtFlushSink(error=RuntimeError("the collector is unreachable"))
+        configured_log.install_sink(sink)
+        handler = sink.handler
+        assert isinstance(handler, _RaisingAtFlushHandler)
+
+        configured_log.reset()
+
+        assert handler.is_closed
+        assert configured_log.sink is None
+        assert handler not in logging.getLogger().handlers
+        captured = capsys.readouterr()
+        assert "failed to flush" in captured.err
+        assert "the collector is unreachable" in captured.err
+
+    def test_a_flush_on_a_closed_stream_stays_silent_and_the_close_still_runs(self, configured_log: Log, capsys: pytest.CaptureFixture[str]) -> None:
+        sink = _RaisingAtFlushSink(error=ValueError("I/O operation on closed file"))
+        configured_log.install_sink(sink)
+        handler = sink.handler
+        assert isinstance(handler, _RaisingAtFlushHandler)
+
+        configured_log.reset()
+
+        assert handler.is_closed
         assert configured_log.sink is None
         assert capsys.readouterr().err == ""

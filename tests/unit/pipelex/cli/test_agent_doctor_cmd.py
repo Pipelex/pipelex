@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
+from typing_extensions import override
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+from pipelex.cli.agent_cli.commands import doctor_cmd as agent_doctor_module
 from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
@@ -23,7 +26,12 @@ from pipelex.cli.commands.doctor_cmd import (
 )
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.tools.log.log import log
+from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_sink import LogSink
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
     finding=PendingMigrationsFinding.UP_TO_DATE,
@@ -34,8 +42,37 @@ NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
 HEALTHY_LOG_SINK = LogSinkCheck(is_healthy=True, message="Log sink 'console' installed")
 
 
+class _NullSink(LogSink):
+    @override
+    def make_handler(self) -> logging.Handler:
+        return logging.NullHandler()
+
+
+def _package_log_config() -> LogConfig:
+    config_dict = load_toml_from_path(ConfigLoader().pipelex_root_dir / "pipelex.toml")
+    return LogConfig.model_validate(config_dict["runtime"]["log"])
+
+
 class TestAgentDoctorCmd:
     """Tests for agent_doctor_cmd JSON output."""
+
+    def test_the_doctor_releases_the_logging_it_configured_once_the_report_is_out(self, mocker: MockerFixture) -> None:
+        log.reset()
+        sink = _NullSink()
+
+        def report_through_a_sink(**_options: Any) -> None:
+            log.configure(log_config=_package_log_config())
+            log.install_sink(sink)
+
+        mocker.patch.object(agent_doctor_module, "_do_agent_doctor_cmd", side_effect=report_through_a_sink)
+        try:
+            agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+            assert log.sink is None
+            assert not log.is_configured
+            assert sink.handler not in logging.getLogger().handlers
+        finally:
+            log.reset()
 
     @pytest.fixture(autouse=True)
     def _mock_doctor_bootstrap(self, mocker: MockerFixture) -> None:

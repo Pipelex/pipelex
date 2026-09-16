@@ -1256,6 +1256,10 @@ def doctor_cmd(
         fix: If True, offer to fix detected issues interactively
     """
     console = get_console()
+    # The doctor configures logging and installs a sink for its own report; once the report is out,
+    # it releases them, so an ``otlp`` sink's exporter and the hook it registered at exit go with the
+    # command rather than outliving it. Logging an embedder configured before calling in is left alone.
+    logging_was_configured = log.is_configured
     try:
         do_doctor_cmd(fix=fix)
 
@@ -1269,6 +1273,9 @@ def doctor_cmd(
         console.print("  [cyan]https://go.pipelex.com/discord[/cyan] - Discord Community")
         console.print()
         sys.exit(1)
+    finally:
+        if not logging_was_configured:
+            log.reset()
 
 
 def do_doctor_cmd(
