@@ -20,7 +20,7 @@ default_log_level = "INFO"
 
 - Sets the default logging level for all loggers
 - Valid values: `"VERBOSE"`, `"DEBUG"`, `"DEV"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`
-- `"OFF"` silences Pipelex's own records whichever sink is selected
+- `"OFF"` silences the loggers `[runtime.log.package_log_levels]` does not pin; Pipelex's own loggers are pinned there at `INFO`, so silencing them, whichever sink is selected, is `pipelex = "OFF"` in that section
 
 ### Package-Specific Log Levels
 
@@ -218,7 +218,7 @@ headers = {}
 
 ## Migrating From the Log Mode
 
-`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone; `pipelex migrate` deletes them from an existing file (ledger entry `pipelex-config@5`), and the defaults layer then supplies `sink = "console"`. Two of those keys chose a behaviour the deletion undoes, and no migration may write the replacement, so it is yours to set: a file that had `log_mode = "poor"` chose a plain handler for a process with no terminal, and that process now sets `sink = "json"`; a file that had `is_console_logging_enabled = false` silenced every handler on the root logger, and to silence Pipelex's own records it now sets `default_log_level = "OFF"`, or selects the sink its records should go to instead. A file that had `log_mode = "rich"` needs nothing, and `poor_loggers` and `generic_poor_logger` have nothing to carry over.
+`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone; `pipelex migrate` deletes them from an existing file (ledger entry `pipelex-config@5`), and the defaults layer then supplies `sink = "console"`. Two of those keys chose a behaviour the deletion undoes, and no migration may write the replacement, so it is yours to set: a file that had `log_mode = "poor"` chose a plain handler for a process with no terminal, and that process now sets `sink = "json"`; a file that had `is_console_logging_enabled = false` silenced every handler on the root logger, and to silence Pipelex's own records it now sets `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone, since `default_log_level` governs only the loggers that section does not pin; silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, or the file selects the sink its records should go to instead. A file that had `log_mode = "rich"` needs nothing, and `poor_loggers` and `generic_poor_logger` have nothing to carry over.
 
 ## Best Practices
 
