@@ -13,6 +13,7 @@ from pipelex.cli.commands.doctor_cmd import (
     LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
+    PluginsCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     display_health_report,
@@ -113,6 +114,23 @@ class TestDoctorDisplayReport:
         display_health_report(**_healthy_report_kwargs())
 
         assert "Log Sink" not in console.export_text()
+
+    def test_a_plugin_registry_that_did_not_build_is_a_row_of_its_own_and_flags_the_report(self, console: Console) -> None:
+        kwargs = _healthy_report_kwargs()
+        kwargs["plugins_check"] = PluginsCheck(is_healthy=False, message="The plugin registry did not build: Plugin 'storage' is required by core")
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Overall Status: ⚠️  Issues Found" in output
+        assert "Plugins" in output
+        assert "Plugin 'storage' is required by core" in output
+        assert "plugin named in the Plugins row" in output
+
+    def test_without_a_plugin_discovery_there_is_no_plugins_row(self, console: Console) -> None:
+        display_health_report(**_healthy_report_kwargs())
+
+        assert "Plugins" not in console.export_text()
 
     def test_global_location_rendered(self, console: Console) -> None:
         """Without a project .pipelex/, the global location line is rendered."""

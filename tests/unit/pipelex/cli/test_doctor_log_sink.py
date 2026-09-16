@@ -1,22 +1,28 @@
-"""The doctor installs the configured log sink, or the console sink with a finding when the token names no registered sink.
+"""The doctor installs the configured log sink, or the console sink on stderr with a finding when it cannot.
 
-Boot stops on an unregistered token. The doctor exists to diagnose exactly that kind of misconfiguration,
-so it must not die on where its own lines go: the row says which token was set and which sinks exist.
-Once the report is out, the doctor releases the logging it configured, and only that.
+Boot stops on an unregistered token, on a sink that fails to install and on a plugin registry that does
+not build. The doctor exists to diagnose exactly that kind of misconfiguration, so it must not die on
+where its own lines go: the rows say what was set and what stopped it. Once the report is out, the
+doctor releases the logging it configured, and only that.
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from rich.logging import RichHandler
 from typing_extensions import override
 
 from pipelex.cli.commands import doctor_cmd
-from pipelex.cli.commands.doctor_cmd import install_doctor_log_sink
+from pipelex.cli.commands.doctor_cmd import discover_plugins_and_install_doctor_log_sink, install_doctor_log_sink
+from pipelex.plugins.exceptions import CoreUnconditionalPluginDisabledError
 from pipelex.plugins.log_sink_registry import LogSinkRegistry
 from pipelex.system.configuration.config_loader import ConfigLoader
+from pipelex.system.console_target import ConsoleTarget
+from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log import log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod
@@ -28,9 +34,17 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _log_config(*, sink: str) -> LogConfig:
+def _log_config(*, sink: str, console_log_target: ConsoleTarget = ConsoleTarget.STDERR) -> LogConfig:
     config_dict = load_toml_from_path(ConfigLoader().pipelex_root_dir / "pipelex.toml")
-    return LogConfig.model_validate({**config_dict["runtime"]["log"], "sink": sink})
+    return LogConfig.model_validate({**config_dict["runtime"]["log"], "sink": sink, "console_log_target": console_log_target})
+
+
+def _assert_the_fallback_console_sink_is_installed_on_stderr() -> None:
+    sink = log.sink
+    assert isinstance(sink, ConsoleLogSink)
+    handler = sink.handler
+    assert isinstance(handler, RichHandler)
+    assert handler.console.file is sys.stderr
 
 
 class _NamedSink(LogSink):
@@ -117,5 +131,36 @@ class TestDoctorLogSink:
         assert "'jsn'" in check.message
         assert f"{LogSinkMethod.CONSOLE}, {LogSinkMethod.JSON}" in check.message
         (installed,) = install_sink.call_args.args
-        assert isinstance(installed, _NamedSink)
-        assert installed.name == LogSinkMethod.CONSOLE
+        assert isinstance(installed, ConsoleLogSink)
+
+    @pytest.mark.usefixtures("released_log")
+    def test_a_sink_that_fails_to_install_on_this_config_is_a_row_and_the_report_goes_on_through_stderr(self) -> None:
+        """The shipped default, the console sink, on a console target no sink writes to: the fallback cannot read the same field."""
+        log_config = _log_config(sink=LogSinkMethod.CONSOLE, console_log_target=ConsoleTarget.FILE)
+        log.configure(log_config=log_config)
+        registry = LogSinkRegistry(
+            {LogSinkMethod.CONSOLE: lambda config: ConsoleLogSink(rich_log_config=config.rich_log, target=config.console_log_target)}
+        )
+
+        check = install_doctor_log_sink(registry=registry, log_config=log_config)
+
+        assert not check.is_healthy
+        assert "could not be installed" in check.message
+        assert "choose stdout or stderr" in check.message
+        _assert_the_fallback_console_sink_is_installed_on_stderr()
+
+    @pytest.mark.usefixtures("released_log")
+    def test_a_plugin_registry_that_does_not_build_is_a_row_and_the_report_goes_on_through_stderr(self, mocker: MockerFixture) -> None:
+        log_config = _log_config(sink=LogSinkMethod.JSON)
+        log.configure(log_config=log_config)
+        mocker.patch.object(doctor_cmd, "get_config")
+        mocker.patch.object(doctor_cmd, "build_registrar", side_effect=CoreUnconditionalPluginDisabledError(plugin_name="storage"))
+
+        runtime_setup = discover_plugins_and_install_doctor_log_sink(log_config=log_config)
+
+        assert runtime_setup.plugins is not None
+        assert not runtime_setup.plugins.is_healthy
+        assert "'storage'" in runtime_setup.plugins.message
+        assert not runtime_setup.log_sink.is_healthy
+        assert "registry did not build" in runtime_setup.log_sink.message
+        _assert_the_fallback_console_sink_is_installed_on_stderr()

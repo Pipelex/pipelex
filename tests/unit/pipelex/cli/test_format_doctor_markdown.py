@@ -96,6 +96,16 @@ class TestFormatDoctorMarkdown:
         assert "No log sink is registered for 'jsn'" in _format_doctor_markdown(with_sink)
         assert "## Log Sink" not in _format_doctor_markdown(self._HEALTHY_RESULT)
 
+    def test_plugins_section_renders_only_when_the_discovery_ran(self) -> None:
+        with_plugins: dict[str, Any] = {
+            **self._HEALTHY_RESULT,
+            "checks": {**self._HEALTHY_RESULT["checks"], "plugins": {"healthy": False, "message": "The plugin registry did not build"}},
+        }
+
+        assert "## Plugins" in _format_doctor_markdown(with_plugins)
+        assert "The plugin registry did not build" in _format_doctor_markdown(with_plugins)
+        assert "## Plugins" not in _format_doctor_markdown(self._HEALTHY_RESULT)
+
     def test_healthy_output_has_no_recommended_actions(self) -> None:
         """Healthy result should not include a Recommended Actions section."""
         output = _format_doctor_markdown(self._HEALTHY_RESULT)

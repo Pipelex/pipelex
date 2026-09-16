@@ -12,9 +12,11 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cli.commands.doctor_cmd import (
+    DoctorRuntimeSetup,
     LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
+    PluginsCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     check_backend_credentials,
@@ -38,6 +40,8 @@ NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
 
 
 HEALTHY_LOG_SINK = LogSinkCheck(is_healthy=True, message="Log sink 'console' installed")
+HEALTHY_PLUGINS = PluginsCheck(is_healthy=True, message="Plugins discovered and registered")
+HEALTHY_RUNTIME_SETUP = DoctorRuntimeSetup(log_sink=HEALTHY_LOG_SINK, plugins=HEALTHY_PLUGINS)
 
 
 class TestDoctorLayeredResolution:
@@ -56,7 +60,7 @@ class TestDoctorLayeredResolution:
         """
         # Stub the runtime bootstrap so the test doesn't load real config or call log.configure
         # (once-per-process). The bootstrap call itself is exercised separately.
-        mock_setup = mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_LOG_SINK)
+        mock_setup = mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_RUNTIME_SETUP)
         mock_check_config = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "OK"),

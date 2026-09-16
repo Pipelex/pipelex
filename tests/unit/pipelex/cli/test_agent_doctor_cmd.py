@@ -18,9 +18,11 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LO
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.commands.doctor_cmd import (
+    DoctorRuntimeSetup,
     LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
+    PluginsCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
 )
@@ -40,6 +42,8 @@ NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
 
 
 HEALTHY_LOG_SINK = LogSinkCheck(is_healthy=True, message="Log sink 'console' installed")
+HEALTHY_PLUGINS = PluginsCheck(is_healthy=True, message="Plugins discovered and registered")
+HEALTHY_RUNTIME_SETUP = DoctorRuntimeSetup(log_sink=HEALTHY_LOG_SINK, plugins=HEALTHY_PLUGINS)
 
 
 class _NullSink(LogSink):
@@ -87,7 +91,7 @@ class TestAgentDoctorCmd:
         out of scope for these tests — they cover the command's output shape, not the
         runtime bootstrap mechanics.
         """
-        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_LOG_SINK)
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_RUNTIME_SETUP)
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline")
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.silence_logging_for_agent_cli")
         # And the migration row, for a fourth reason: unlike every other check it takes no
@@ -129,7 +133,10 @@ class TestAgentDoctorCmd:
         """The doctor ran on the console sink; the envelope says why the report is not healthy and what to set."""
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime",
-            return_value=LogSinkCheck(is_healthy=False, message="No log sink is registered for 'jsn' in [runtime.log]; registered: console, json"),
+            return_value=DoctorRuntimeSetup(
+                log_sink=LogSinkCheck(is_healthy=False, message="No log sink is registered for 'jsn' in [runtime.log]; registered: console, json"),
+                plugins=HEALTHY_PLUGINS,
+            ),
         )
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files", return_value=(True, 0, "All config files present"))
         mocker.patch(
@@ -146,6 +153,34 @@ class TestAgentDoctorCmd:
         assert parsed["checks"]["log_sink"]["healthy"] is False
         assert "'jsn'" in parsed["checks"]["log_sink"]["message"]
         assert any("[runtime.log]" in action for action in parsed["recommended_actions"])
+
+    def test_a_plugin_registry_that_did_not_build_rides_the_envelope_with_its_action(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime",
+            return_value=DoctorRuntimeSetup(
+                log_sink=LogSinkCheck(
+                    is_healthy=False, message="The log sink 'json' could not be resolved because the plugin registry did not build"
+                ),
+                plugins=PluginsCheck(is_healthy=False, message="The plugin registry did not build: Plugin 'storage' is required by core"),
+            ),
+        )
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files", return_value=(True, 0, "All config files present"))
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured"),
+        )
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials", return_value=(True, {}, "All backends healthy"))
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_models", return_value=(True, "Models valid", {}))
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["all_healthy"] is False
+        assert parsed["checks"]["plugins"]["healthy"] is False
+        assert "'storage'" in parsed["checks"]["plugins"]["message"]
+        assert any("plugins check" in action for action in parsed["recommended_actions"])
 
     @pytest.mark.parametrize(
         ("finding", "expected_action"),
@@ -415,7 +450,7 @@ class TestAgentDoctorCmd:
         translation. The fix short-circuits to a "skipped — fix configuration errors
         first" model section so the full triage report still reaches stdout.
         """
-        mock_setup = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_LOG_SINK)
+        mock_setup = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_RUNTIME_SETUP)
         mock_check_models = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_models")
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
@@ -511,7 +546,7 @@ class TestAgentDoctorCmd:
         # Re-mock setup_doctor_runtime and apply_agent_cli_output_discipline so we can
         # capture their call args (the autouse fixture also mocks them, but we need the
         # fresh handles here).
-        mock_setup = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_LOG_SINK)
+        mock_setup = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_RUNTIME_SETUP)
         mock_discipline = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline")
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
@@ -559,7 +594,7 @@ class TestAgentDoctorCmd:
             call_order.append("check_models")
             return True, "OK", {}
 
-        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_LOG_SINK)
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_RUNTIME_SETUP)
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline",
             side_effect=record_discipline,
