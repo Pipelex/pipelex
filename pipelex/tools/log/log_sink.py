@@ -10,6 +10,7 @@ slot and the stream resolution, and names no sink.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
@@ -59,8 +60,10 @@ class _ProcessorFilter(logging.Filter):
     of the ``log.<level>(...)`` call that emitted the record, against the promise that a log call never
     raises. Each processor is therefore guarded on its own: what it raises goes to the handler's
     ``handleError``, the stdlib's own channel for a handler that failed, the processors after it still
-    run, and the record is handed to the handler all the same. A processor that fails costs that
-    record its processing, never the call and never the line.
+    run, and the record is handed to the handler all the same. The reporter is guarded too, since it
+    writes to stderr and a closed stderr makes it raise. A processor that fails costs that record its
+    processing, never the call and never the line; a processor that must not hand on what it failed
+    to process, the redaction, strips the record itself before it raises.
     """
 
     def __init__(self, *, processors: list[LogRecordProcessor], handler: logging.Handler):
@@ -74,7 +77,8 @@ class _ProcessorFilter(logging.Filter):
             try:
                 processor(record)
             except Exception:  # ruff: ignore[blind-except]
-                self._handler.handleError(record)
+                with contextlib.suppress(Exception):
+                    self._handler.handleError(record)
         return True
 
 

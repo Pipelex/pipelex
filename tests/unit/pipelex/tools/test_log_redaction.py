@@ -27,6 +27,8 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pytest_mock import MockerFixture
+
 FIELD_NAME = "payload"
 
 
@@ -302,6 +304,31 @@ class TestLogRedaction:
         processor(record)
 
         assert record.exc_text == f"RuntimeError: key {REDACTED_TEXT} refused"
+
+    def test_a_record_whose_cleaning_fails_is_quarantined_rather_than_handed_on_raw(self, mocker: MockerFixture) -> None:
+        """Redaction fails closed: whatever the walk raised, the sink meets a record with nothing of the call left on it."""
+        mocker.patch("pipelex.tools.log.log_redaction._redact_record", side_effect=RecursionError("too deep"))
+        try:
+            msg = "key sk_live_0123456789abcdef refused"
+            raise RuntimeError(msg)
+        except RuntimeError:
+            record = logging.LogRecord(
+                name=__name__, level=logging.ERROR, pathname="", lineno=0, msg="token %s", args=("sk_live_0123456789abcdef",), exc_info=sys.exc_info()
+            )
+        record.payload = {"nested": "sk_live_0123456789abcdef"}
+        setattr(record, DATA_FIELD, ["sk_live_0123456789abcdef"])
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        with pytest.raises(RecursionError):
+            processor(record)
+
+        assert record.getMessage() == "[REDACTION FAILED: RecursionError]"
+        assert record.args == ()
+        assert getattr(record, FIELD_NAME) == REDACTED_TEXT
+        assert getattr(record, DATA_FIELD) == REDACTED_TEXT
+        assert record.exc_info is None
+        assert record.exc_text is None
+        assert "sk_live" not in logging.Formatter().format(record)
 
     def test_a_record_whose_message_cannot_be_rendered_keeps_its_scrubbed_fields_and_raises_nothing(self) -> None:
         record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="%d items", args=("not a number",), exc_info=None)

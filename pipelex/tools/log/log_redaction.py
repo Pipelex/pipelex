@@ -47,6 +47,10 @@ REDACTED_TEXT = "[REDACTED]"
 # rather than the raw container whose strings the scrub never reached.
 CYCLE_TEXT = "[cycle]"
 
+# What the message of a record whose scrub failed becomes, followed by the name of what was raised and
+# a closing bracket: the sink writes a line that says the scrub failed, and nothing of the call.
+QUARANTINE_PREFIX = "[REDACTION FAILED: "
+
 # The names under which a mapping entry is a secret whatever it holds, read lowercased and with a dash
 # as an underscore, so a header name and a JSON key are both caught. ``code`` is not among them: it is
 # the runtime's own identifier for a pipe, a domain and an error, and the OAuth code has its own family.
@@ -148,9 +152,26 @@ def make_redaction_processor(*, config: LogRedactionConfig) -> LogRecordProcesso
     patterns = SECRET_PATTERNS + tuple((re.compile(extra), REDACTED_TEXT) for extra in config.extra_patterns)
 
     def redact(record: logging.LogRecord) -> None:  # kw-only: ignore — the sink seam calls a processor positionally
-        _redact_record(record=record, patterns=patterns)
+        try:
+            _redact_record(record=record, patterns=patterns)
+        except Exception as exc:
+            # Fails closed: the guard on the sink's handler reports what was raised and hands the record
+            # on all the same, so what it hands on must carry nothing of the call.
+            _quarantine(record=record, exc=exc)
+            raise
 
     return redact
+
+
+def _quarantine(*, record: logging.LogRecord, exc: Exception) -> None:
+    """Strip a record whose scrub failed down to a notice naming the failure, so nothing unscrubbed leaves with it."""
+    record.msg = f"{QUARANTINE_PREFIX}{type(exc).__name__}]"
+    record.args = ()
+    record.exc_info = None
+    record.exc_text = None
+    record.stack_info = None
+    for name in carried_attributes(record=record):
+        setattr(record, name, REDACTED_TEXT)
 
 
 def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:

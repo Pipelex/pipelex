@@ -80,6 +80,23 @@ class TestLogSink:
         assert handler.seen == ["one|yes"]
         assert handle_error.call_count == 1
 
+    def test_a_reporter_that_raises_on_a_failed_processor_does_not_raise_out_of_the_log_call(self, mocker: MockerFixture) -> None:
+        """``handleError`` writes to stderr, and a closed stderr makes it raise; the guard swallows that too, and the record is still delivered."""
+        sink = _RecordingSink()
+
+        def fail(_record: logging.LogRecord) -> None:
+            msg = "this processor is broken"
+            raise RuntimeError(msg)
+
+        sink.processors.append(fail)
+        handler = sink.handler
+        mocker.patch.object(handler, "handleError", side_effect=ValueError("I/O operation on closed file"))
+
+        handler.handle(_record(message="one"))
+
+        assert isinstance(handler, _RecordingHandler)
+        assert handler.seen == ["one|-"]
+
     def test_redirect_to_stderr_is_a_no_op_on_a_sink_that_writes_to_no_stream(self) -> None:
         sink = _RecordingSink()
         sink.redirect_to_stderr()
