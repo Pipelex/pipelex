@@ -1,6 +1,6 @@
 {
   "surface_id": "pipelex-config",
-  "schema_version": 3,
+  "schema_version": 4,
   "document_root_is_open": false,
   "paths": {
     "inference": {
@@ -689,22 +689,10 @@
       "default": true,
       "open_node": false
     },
-    "interpreter.pipeline_execution.graph.data_inclusion.stuff_html_content": {
-      "value_type": "bool",
-      "required": true,
-      "default": false,
-      "open_node": false
-    },
     "interpreter.pipeline_execution.graph.data_inclusion.stuff_json_content": {
       "value_type": "bool",
       "required": true,
       "default": true,
-      "open_node": false
-    },
-    "interpreter.pipeline_execution.graph.data_inclusion.stuff_text_content": {
-      "value_type": "bool",
-      "required": true,
-      "default": false,
       "open_node": false
     },
     "interpreter.pipeline_execution.graph.graphs_inclusion": {

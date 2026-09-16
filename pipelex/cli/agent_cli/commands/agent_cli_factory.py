@@ -39,7 +39,7 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 #     ``setup_doctor_runtime(log_config_overrides=...)`` for the doctor-only path that
 #     does not go through ``Pipelex.make``.
 #
-# The four knobs in this dict shape Pipelex's own log infrastructure but they CANNOT
+# The knobs in this dict shape Pipelex's own log infrastructure but they CANNOT
 # enumerate every third-party logger a transitive dependency might create. The
 # bulletproof cutoff lives in ``silence_logging_for_agent_cli`` below, which calls
 # ``logging.disable(sys.maxsize)`` — a process-global threshold checked inside
@@ -61,6 +61,9 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 #                                is INDEPENDENT of Python logging — ``logging.disable``
 #                                does not touch it — so this pin is the only thing
 #                                keeping Rich tables off stdout.
+#   - ``pretty_print_mode``    -> the ``PrettyPrinter`` behind ``pretty_print(...)``, the
+#                                "Output of pipe" panels among them. Pinned to silent so
+#                                no Rich panel is built or printed at all.
 #   - ``default_log_level``   -> root-logger level. Pinned at OFF as a backup in case
 #                                ``logging.disable`` is cleared.
 #   - ``package_log_levels``  -> historic ``pipelex = OFF`` pin. Redundant under
@@ -87,6 +90,7 @@ AGENT_CLI_STDERR_LOG_FIELDS: Mapping[str, Any] = MappingProxyType(
     {
         "console_log_target": ConsoleTarget.STDERR,
         "console_print_target": ConsoleTarget.STDERR,
+        "pretty_print_mode": PrettyPrintMode.SILENT,
         "default_log_level": LogLevel.OFF,
         "package_log_levels": MappingProxyType({"pipelex": LogLevel.OFF}),
     }

@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 3
+current_schema_version = 4
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -347,3 +347,31 @@ table_path = ["migration"]
 kind = "delete_key"
 table_path = []
 key = "session_id"
+
+[[migration]]
+id = "pipelex-config@4"
+to_schema_version = 4
+introduced_in = "0.59.0"
+breaking = true
+safety = "safe"
+title = "Retire the text and HTML renderings of traced data"
+description = """
+`stuff_text_content` and `stuff_html_content` under `[interpreter.pipeline_execution.graph.data_inclusion]` \
+are gone: the tracer no longer renders each traced input and output to Rich text and to HTML on the \
+execution path, and a graph's data carries its JSON content only. The two keys are deleted from files \
+that still set them.
+"""
+guidance = """
+Nothing to decide. The renderings fed only the Mermaid graph page's Pretty and HTML tabs; that page now \
+shows a data node's JSON, with a preview for image and PDF content.
+"""
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["interpreter", "pipeline_execution", "graph", "data_inclusion"]
+key = "stuff_text_content"
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["interpreter", "pipeline_execution", "graph", "data_inclusion"]
+key = "stuff_html_content"

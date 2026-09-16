@@ -58,6 +58,11 @@ caller_info_template = "file_line"
 is_caller_info_enabled = false
 
 log_mode = "rich"
+# pretty_print_mode controls the panels `pretty_print(...)` renders, the "Output of pipe" panel after
+# every operator pipe among them: "rich" renders Rich tables, "poor" prints plain text, "silent" prints
+# nothing and builds no renderable at all. A host with no console, or one that runs pipes on a thread
+# that must not stall, sets "silent"; the agent CLI forces it.
+pretty_print_mode = "rich"
 
 poor_loggers = []
 generic_poor_logger = "#poor-log"
@@ -370,8 +375,11 @@ max_concurrency = 8
 
 [interpreter.pipeline_execution.graph.data_inclusion]
 stuff_json_content = true
-stuff_text_content = true
-stuff_html_content = true
+# stuff_text_content and stuff_html_content render every traced input and output through Rich, on the
+# execution path, at a cost that grows with text volume times nesting depth. Only the Mermaid viewer's
+# text and HTML tabs read the result, so both are off unless asked for (`--graph-full-data` turns them on).
+stuff_text_content = false
+stuff_html_content = false
 error_stack_traces = true
 pipe_and_concept_registry = true
 

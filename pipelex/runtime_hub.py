@@ -48,6 +48,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry as _get_active_class_registry
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -119,6 +120,7 @@ class RuntimeHub:
         # must bypass the parent run's registered buffer. Core default never isolated (see
         # _never_in_isolated_execution); consumed by ReportingManager to route usage emissions.
         self._isolated_execution_probe: Callable[[], bool] = _never_in_isolated_execution
+        self._pretty_print_mode_before_boot: PrettyPrintMode | None = None
 
     ############################################################
     # Class methods for singleton management
@@ -191,12 +193,33 @@ class RuntimeHub:
         paths open: between teardown and the next boot ``get_runtime_hub()`` still hands out the dead
         hub, and ``is_in_isolated_execution()`` is a module-level accessor (``ReportingManager`` reads
         it) that would answer with the torn-down boot's runtime split.
+
+        The pretty-print mode is released for the same reason as the flags — boot writes it from
+        ``[runtime.log]``, and a torn-down ``silent`` boot would otherwise keep silencing
+        ``pretty_print(...)`` for everything else in the process — but it goes back to whatever the mode
+        was *before* that boot wrote it, not to the class default. The two differ when a process sets the
+        mode itself before booting: it gets that mode back, a boot that fails part-way included, rather
+        than a ``RICH`` it never asked for. A mode assigned after boot is released too, since teardown
+        restores the pre-boot mode whatever happened in between.
         """
         self._config = None
         self._is_dry_run_forced = False
         self._boot_orchestrator = None
         self._isolated_execution_probe = _never_in_isolated_execution
+        if self._pretty_print_mode_before_boot is not None:
+            PrettyPrinter.mode = self._pretty_print_mode_before_boot
+            self._pretty_print_mode_before_boot = None
         log.reset()
+
+    def set_pretty_print_mode(self, *, mode: PrettyPrintMode) -> None:
+        """Write the boot's pretty-print mode, remembering what it displaced so ``reset_boot_state`` can put it back.
+
+        Only the first write of a boot is remembered, so a boot that writes the mode more than once still
+        releases to the mode the process held before any of it happened.
+        """
+        if self._pretty_print_mode_before_boot is None:
+            self._pretty_print_mode_before_boot = PrettyPrinter.mode
+        PrettyPrinter.mode = mode
 
     def set_console_print_target(self, target: ConsoleTarget):
         match target:

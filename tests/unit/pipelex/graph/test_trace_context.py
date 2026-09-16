@@ -30,11 +30,7 @@ class TestTraceContext:
         parent = make_trace_context(
             graph_id="ctx-test",
             stuff_json_content=True,
-            stuff_text_content=True,
-            stuff_html_content=True,
         )
         child = parent.copy_for_child(child_node_id="ctx-test:node_0", next_sequence=1)
 
         assert child.data_inclusion.stuff_json_content is True
-        assert child.data_inclusion.stuff_text_content is True
-        assert child.data_inclusion.stuff_html_content is True

@@ -15,7 +15,5 @@ class DataInclusionConfig(ConfigModel):
     """Controls which data is included in graph outputs."""
 
     stuff_json_content: bool
-    stuff_text_content: bool
-    stuff_html_content: bool
     error_stack_traces: bool
     pipe_and_concept_registry: bool

@@ -44,6 +44,19 @@ is_console_logging_enabled = true
 - Enable/disable console logging
 - Default: `true`
 
+### Pretty-Print Mode
+
+```toml
+pretty_print_mode = "rich"
+```
+
+- Controls the panels that `pretty_print(...)` renders, such as the "Output of pipe" panel shown after every operator pipe
+- `"rich"`: Rich tables and panels on the console print target
+- `"poor"`: plain text in a drawn frame on stderr, with no Rich panel; a pipe's output prints as its plain rendering
+- `"silent"`: nothing is printed and no renderable is built, for a host with no console or one that must not spend time rendering on the thread that runs pipes
+- Default: `"rich"`. The agent CLI forces `"silent"`
+- Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to the mode the process held before that boot
+
 ### JSON Formatting
 
 ```toml
@@ -148,6 +161,7 @@ keywords_to_hilight = []
 [runtime.log]
 default_log_level = "INFO"
 log_mode = "rich"
+pretty_print_mode = "rich"
 is_console_logging_enabled = true
 json_logs_indent = 4
 presentation_line_width = 120

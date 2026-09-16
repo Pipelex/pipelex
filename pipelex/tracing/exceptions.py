@@ -17,6 +17,19 @@ class EventLogReadError(EventLogError):
     """
 
 
+class EventLogSchemaMismatchError(EventLogReadError):
+    """Raised when a trace event is well-formed JSON the current models refuse.
+
+    The distinction that matters is against a *corrupt* line — a half-written record from a crash
+    mid-write — which every backend legitimately skips with a warning, because the rest of the log is
+    still the run's own record. A line that parses as JSON and is then refused by the event models is a
+    different thing entirely: it was written whole, by a version whose event shape this one no longer
+    accepts. Skipping those quietly is what made an old log read back as a run with no events at all,
+    reported as a success, so they are counted and raised instead — a read that would return a
+    truncated version of the record returns none of it, and says why.
+    """
+
+
 class EventLogSetupError(EventLogError):
     """Raised when constructing the configured event-log backend fails.
 

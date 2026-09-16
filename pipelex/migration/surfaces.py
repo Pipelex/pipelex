@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import tomlkit
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
 from pipelex.cogt.model_backends.model_spec_document import (
@@ -29,7 +29,7 @@ from pipelex.cogt.model_backends.model_spec_keys import is_header_shaped, is_leg
 from pipelex.migration.exceptions import MigrationRegistryError
 from pipelex.migration.fingerprint import SurfaceFingerprint, compute_fingerprint
 from pipelex.suggested_fix import WILDCARD_SEGMENT
-from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, INFERENCE_DIR_NAME
+from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, CONFIG_REFUSED, INFERENCE_DIR_NAME
 from pipelex.system.configuration.config_surface import (
     INFERENCE_BACKEND_CONFIG_SURFACE_ID,
     PIPELEX_CONFIG_SURFACE_ID,
@@ -247,7 +247,10 @@ class Surface(BaseModel):
             case DocumentShape.WHOLE_DOCUMENT:
                 try:
                     self.config_model.model_validate(document)
-                except ValidationError as exc:
+                except CONFIG_REFUSED as exc:
+                    # A `ConfigRoot` translates pydantic's error into `ConfigValidationError` in its own
+                    # `__init__`, so catching pydantic's alone let the main configuration's refusal escape
+                    # as a crash of the gate instead of a reported issue.
                     return f"{self.config_model.__name__} rejects it — {exc}"
                 return None
             case DocumentShape.MODEL_SPEC_TABLES:
@@ -385,7 +388,7 @@ class Surface(BaseModel):
             case DefaultsLayerKind.MODEL_DEFAULTS:
                 try:
                     instance = self.config_model()
-                except ValidationError as exc:
+                except CONFIG_REFUSED as exc:
                     # A model-defaults surface whose model cannot be built from nothing has no
                     # defaults layer at all, which is the one condition the whole vocabulary rests
                     # on: without it an added key breaks every existing file and no structural

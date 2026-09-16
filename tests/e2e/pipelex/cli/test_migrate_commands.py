@@ -619,10 +619,11 @@ class TestAPreReshapeMachine:
         assert plan["summary"]["files_changed"] == 2
         assert plan["summary"]["files_written"] == 0
         stepped = {plan_dict["file_path"]: [step["title"] for step in plan_dict["steps"]] for plan_dict in plan["plans"] if plan_dict["steps"]}
-        assert stepped == {
-            str(global_file): ["The configuration reshape: one scheme for the root"],
-            str(project_file): ["The configuration reshape: one scheme for the root"],
-        }
+        # The first step per file, not the whole list: a later entry that also has something to say
+        # about these files is not what this test pins.
+        assert set(stepped) == {str(global_file), str(project_file)}
+        for stepped_path, titles in stepped.items():
+            assert titles[0] == "The configuration reshape: one scheme for the root", stepped_path
         assert existing_backups_of(path=global_file) == [], "a plan is not a write"
 
         applied = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
@@ -734,7 +735,8 @@ class TestAPreReshapeMachine:
         block: dict[str, Any] = envelope["migration"]
         assert block["remedy"] == "pipelex migrate"
         assert block["needs_attention"] is True
-        assert [step["title"] for plan in block["plans"] for step in plan["steps"]] == ["The configuration reshape: one scheme for the root"]
+        first_step_title = next(step["title"] for plan in block["plans"] for step in plan["steps"])
+        assert first_step_title == "The configuration reshape: one scheme for the root"
         assert [found["path"] for plan in block["plans"] for found in plan["unexplained"]] == ["posthog_project_key"]
 
         assert planted not in boot.stdout
@@ -811,12 +813,13 @@ class TestAPrePromptingStyleMachine:
         assert plan["is_clean"] is False
         assert plan["needs_attention"] is False, "every path of a pre-prompting-style file is one the two entries explain"
         stepped = {plan_dict["file_path"]: [step["title"] for step in plan_dict["steps"]] for plan_dict in plan["plans"] if plan_dict["steps"]}
-        assert stepped == {
-            str(global_file): [
-                "Prompting styles become a templating default",
-                "The configuration reshape: one scheme for the root",
-            ]
-        }
+        assert list(stepped) == [str(global_file)]
+        # The first two steps, in order: what this test pins is that the prompting section was dealt
+        # with while it was still under `[pipelex]`, not which later entries also touch the file.
+        assert stepped[str(global_file)][:2] == [
+            "Prompting styles become a templating default",
+            "The configuration reshape: one scheme for the root",
+        ]
 
 
 class TestTheBootstrapPath:
