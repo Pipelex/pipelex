@@ -51,6 +51,22 @@ class ConsoleLogSink(LogSink):
             )
             raise MissingDependencyError(dependency_name="rich", extra_name=RICH_EXTRA_NAME, message=msg) from exc
 
+        # Declared here because ``RichHandler`` is imported here, which is what keeps Rich off the import
+        # path of a process that selected another sink. ``RichHandler`` overrides ``emit`` and does not
+        # restore the ``try``/``handleError`` the stdlib's own handlers put around theirs, so anything
+        # raised while rendering leaves the log call: a message carrying a tag-shaped span — `list[int]` in
+        # a type complaint, or a bracketed path, both of which an error message is made of — raises
+        # ``MarkupError`` out of `log.error` and replaces whatever was being reported with itself. A log
+        # call never raises, so the guard goes back on and a line Rich cannot render gets the stdlib's own
+        # recovery instead.
+        class GuardedRichHandler(RichHandler):
+            @override
+            def emit(self, record: logging.LogRecord) -> None:
+                try:
+                    super().emit(record)
+                except Exception:  # ruff: ignore[blind-except]
+                    self.handleError(record)
+
         config = self._rich_log_config
         highlighter: Highlighter
         match config.highlighter_name:
@@ -58,7 +74,7 @@ class ConsoleLogSink(LogSink):
                 highlighter = JSONHighlighter()
             case HighlighterName.REPR:
                 highlighter = ReprHighlighter()
-        handler = RichHandler(
+        handler = GuardedRichHandler(
             console=Console(file=stream_for_target(target=self._target)),
             show_time=config.is_show_time,
             show_level=config.is_show_level,

@@ -38,9 +38,17 @@ FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime"})
 # the marker and cost the whole record its delivery.
 FORWARDED_MARK = "_pipelex_forwarded"
 
+# Rich's own per-record override of its handler's markup setting, which it reads as
+# ``getattr(record, "markup", self.markup)``, and so the one way to put one record on the console verbatim
+# while the handler goes on interpreting markup for every other. A message assembled from an exception is
+# what needs it: text like ``[Errno 2]`` is a markup tag to Rich, which swallows the span, or raises on an
+# unbalanced one. The name is Rich's rather than ours, but stamping it is a console concern that rides no
+# wire, and reserving it is what stops a caller steering the console through a field of that name.
+VERBATIM_MARK = "markup"
+
 # The names this package stamps on a record itself. Never a field: a caller's entry of the same name is
 # prefixed on the way on, and a record carrying one does not hand it to a sink as something it carries.
-PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK})
+PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, VERBATIM_MARK})
 
 # Reserved whether or not the record carries the name yet, which is exactly what the stdlib's own refusal
 # cannot cover: both sets are stamped after the entries are attached.
