@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`PINNED_NATIVES_MTHDS_VERSION` names the set it labels**: the constant read `1.0.0` while the standard pins the native set at `2.0.0`, so anything taking it as the answer to "which pinned set is this engine's" — a downstream port gating its own native goldens, for one — read a version the standard now describes as predating the pinning regime. It now reads `2.0.0`, and it is no longer a value nothing reads: the standard-conformance suite holds it to the page's own "Pinned at MTHDS" statement, and a check that needs no sibling checkout refuses a label later than the standard version this engine implements.
+
 ## [v0.59.0] - 2026-09-16
 
 ### Added
