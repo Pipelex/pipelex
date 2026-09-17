@@ -125,7 +125,7 @@ class TestJsonLogSink:
         (line,) = _own_lines(buffer)
         assert "eyJhbGciOiJIUzI1NiJ9" not in line[EXCEPTION_KEY]
         assert "sk_live_0123456789abcdef" not in line[EXCEPTION_KEY]
-        assert line[EXCEPTION_KEY].endswith(f"RuntimeError: refused: Authorization: Bearer {REDACTED_TEXT} for {REDACTED_TEXT}")
+        assert line[EXCEPTION_KEY].endswith(f"RuntimeError: refused: Authorization: Bearer {REDACTED_TEXT} for sk_{REDACTED_TEXT}")
 
     def test_no_ansi_ever_even_for_a_warning_or_an_error(self, json_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = json_log
@@ -232,3 +232,26 @@ class TestJsonLogSink:
         assert fresh.sink is not None
         assert isinstance(fresh.sink, JsonLogSink)
         assert fresh.sink.handler.stream is sys.stderr  # type: ignore[attr-defined]
+
+    def test_content_the_serialization_refuses_is_redacted_by_name_before_it_falls_back_to_a_repr(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """The ``repr`` of an entry holding an object is beyond what the string families read back out of text."""
+        fresh, buffer = json_log
+        cyclic: dict[str, Any] = {"password": {"value": "private_credential_12345"}}
+        cyclic["self"] = cyclic
+
+        fresh.info(cyclic)
+
+        (line,) = _own_lines(buffer)
+        assert "private_credential_12345" not in line[MESSAGE_KEY]
+        assert REDACTED_TEXT in line[MESSAGE_KEY]
+
+    def test_a_caller_field_named_like_the_content_attribute_is_carried_under_the_collision_prefix(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """``data`` is the runtime's own rendering and keeps its control characters; a caller's string must not land there."""
+        fresh, buffer = json_log
+
+        fresh.info("string content", fields={DATA_FIELD: "ok\nFAKE LINE", "other": "ok\nFAKE LINE"})
+
+        (line,) = _own_lines(buffer)
+        assert DATA_FIELD not in line
+        assert line[f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}"] == "ok\\nFAKE LINE"
+        assert line["other"] == "ok\\nFAKE LINE"

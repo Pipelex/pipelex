@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.tools.log.log_fields import UNSCRUBBED_MARK
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -54,7 +55,7 @@ class LogSinkMethod(StrEnum):
 
 
 class _ProcessorFilter(logging.Filter):
-    """Runs the sink's processors over each record before the handler formats it, and never drops one.
+    """Runs the sink's processors over each record before the handler formats it, and drops only what one asks it to.
 
     The stdlib runs a handler's filters outside any ``try``, so a processor that raised would raise out
     of the ``log.<level>(...)`` call that emitted the record, against the promise that a log call never
@@ -65,7 +66,8 @@ class _ProcessorFilter(logging.Filter):
     own values, so its exception is where they end up, the secret the redaction was removing among them.
     The reporter is guarded too, since a closed stderr makes it raise. A processor that fails costs that
     record its processing, never the call and never the line; a processor that must not hand on what it
-    failed to process, the redaction, strips the record itself before it raises.
+    failed to process, the redaction, strips the record itself before it raises, and where even the
+    stripping failed it leaves the mark that has this filter drop the record instead.
     """
 
     def __init__(self, *, processors: list[LogRecordProcessor]):
@@ -80,7 +82,11 @@ class _ProcessorFilter(logging.Filter):
             except Exception as exc:  # ruff: ignore[blind-except]
                 with contextlib.suppress(Exception):
                     _report_processor_failure(processor=processor, exc=exc)
-        return True
+        # A processor that must not hand on what it failed to process says so by leaving the mark on the
+        # record, and the record is dropped rather than emitted. It is read out of the record's own
+        # dictionary, so finding out costs no call and no frame: this runs where a stack that has run
+        # out is the likeliest reason a processor failed in the first place.
+        return UNSCRUBBED_MARK not in record.__dict__
 
 
 def _report_processor_failure(*, processor: LogRecordProcessor, exc: Exception) -> None:
@@ -118,6 +124,18 @@ class LogSink(ABC):
             handler.addFilter(_ProcessorFilter(processors=self.processors))
             self._handler = handler
         return self._handler
+
+    def discard_handler(self) -> None:
+        """Forget the handler built for an install, so a sink object installed again builds a fresh one.
+
+        A teardown closes the handler, and a close is terminal for a sink that really releases what it
+        writes to: the ``otlp`` sink shuts its logger provider down there, and a file sink closes its
+        file. Handing the same handler back at the next install would install a sink that accepts every
+        record, runs every filter and drops the lot on the floor, with nothing raised to say so. The
+        fresh handler also gets a fresh processor filter, reading whatever ``processors`` holds at that
+        install rather than the list the first one closed over.
+        """
+        self._handler = None
 
     def redirect_to_stderr(self) -> None:
         """Point a sink that writes to a process stream at stderr; a sink that does not ignores the call."""

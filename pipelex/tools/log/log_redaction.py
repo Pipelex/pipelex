@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
 
-from pipelex.tools.log.log_fields import DATA_FIELD, carried_attributes
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD, UNSCRUBBED_MARK, carried_attributes
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -96,34 +96,70 @@ RedactionPattern = tuple[re.Pattern[str], str]
 _SECRET_ENTRY_NAMES = "|".join(sorted(re.escape(name).replace("_", "[-_]") for name in SECRET_KEY_NAMES))
 _SECRET_ENTRY_KEY = rf"[\"'](?:{_SECRET_ENTRY_NAMES})[\"']\s*:\s*"
 
+# What a secret's value looks like once something has named it: the characters a token, a key, a hash or
+# a percent-encoded parameter is written in, and at least eight of them. The bound is what keeps these
+# families off ordinary prose, where a name followed by a colon is a sentence rather than a header; a
+# secret shorter than it is below what the shipped families read at all, in this repo as in the hosted
+# plane's scrubber they were ported from.
+_SECRET_VALUE = r"[A-Za-z0-9._\-~+/=%]{8,}"
+
+# A cookie header's value, in the grammar RFC 6265 gives it rather than as a run to the end of the line.
+# The first crumb must be ``name=value``, which is what tells a header from prose that merely says
+# "cookie:" before a sentence; the value is either double-quoted, or a run holding no quote, no comma
+# and no semicolon, which is exactly what the RFC admits, so a value holding an apostrophe is read whole
+# and one holding a double quote is read to its closing quote. The crumbs and flag attributes after the
+# first are taken with it, so the whole header goes and not only its first cookie.
+_COOKIE_VALUE = r"(?:\"[^\"\r\n]*\"|[^\s;,\"\r\n]*)"
+_COOKIE_RUN = rf"[^\s;=,\"\r\n]+={_COOKIE_VALUE}(?:\s*;\s*[^\s;=,\"\r\n]+(?:={_COOKIE_VALUE})?)*"
+
 # The shipped families, in the order they run. Ported from the hosted plane's own scrubber; a family
 # is written to name the secret's carrier in the same string as the secret, which is what a header
 # line, a query string or a serialised JSON object gives it.
 SECRET_PATTERNS: tuple[RedactionPattern, ...] = (
-    # An Authorization header carrying a bearer token.
-    (re.compile(r"(?i)(authorization[\"'\s:=]+bearer\s+)([A-Za-z0-9._\-~+/=]{8,})"), rf"\1{REDACTED_TEXT}"),
+    # An Authorization header, whichever scheme it carries. The schemes are named rather than read as
+    # "whatever word follows", because the header name introduces its value with whitespace as readily
+    # as with a colon, and a pattern taking any word there redacts the next word of a sentence that
+    # merely says "authorization". The scheme is kept, being what tells a reader which credential went.
+    (re.compile(rf"(?i)(authorization[\"'\s:=]+(?:bearer|basic|token|digest|negotiate|hmac)\s+)({_SECRET_VALUE})"), rf"\1{REDACTED_TEXT}"),
     # An api-key header or entry, however it is spelled: x-api-key, api-key, api_key.
-    (re.compile(r"(?i)([\"']?x?-?api[_-]key[\"']?\s*[:=]\s*[\"']?)([A-Za-z0-9._\-~+/=]{8,})"), rf"\1{REDACTED_TEXT}"),
+    (re.compile(rf"(?i)([\"']?x?-?api[_-]key[\"']?\s*[:=]\s*[\"']?)({_SECRET_VALUE})"), rf"\1{REDACTED_TEXT}"),
     # A webhook signature header: x-signature, x-completion-signature.
-    (re.compile(r"(?i)([\"']?x-(?:completion-)?signature[\"']?\s*[:=]\s*[\"']?)([A-Za-z0-9._\-~+/=]{8,})"), rf"\1{REDACTED_TEXT}"),
-    # An OAuth authorization code in a query string.
-    (re.compile(r"(?i)([?&]code=)([A-Za-z0-9._\-~+/=]{8,})"), rf"\1{REDACTED_TEXT}"),
-    # A cookie header's whole value, every crumb of it, up to the end of the line or the quote that
-    # closes a serialised entry. The word must introduce a value with a colon or an equals sign, so
-    # prose that merely mentions a cookie is left alone.
-    (re.compile(r"(?i)\b((?:set-)?cookie[\"']?\s*[:=]\s*[\"']?)([^\"'\r\n]{4,})"), rf"\1{REDACTED_TEXT}"),
+    (re.compile(rf"(?i)([\"']?x-(?:completion-)?signature[\"']?\s*[:=]\s*[\"']?)({_SECRET_VALUE})"), rf"\1{REDACTED_TEXT}"),
+    # An OAuth authorization code in a query string, read to the delimiter that ends the parameter
+    # rather than through an alphabet of its own: a code is routinely percent-encoded, and a class that
+    # stops at the escape leaves the tail behind — or the whole code, when the escape falls early enough
+    # that what precedes it is shorter than the minimum length.
+    (re.compile(r"(?i)([?&]code=)([^&#\s\"'\r\n]{8,})"), rf"\1{REDACTED_TEXT}"),
     # The serialised entries that are a secret whatever they hold, a JSON object and a Python ``repr``
     # alike. A quoted value is read up to the same quote that opened it, whichever quoted the name, with
     # a backslash escape honoured, so a value holding the other quote character or an escaped one is
     # removed whole; a number or a boolean is removed as the bare token it is. A nested object or list
     # is beyond a pattern, which is why a structured content is redacted by name before it is rendered.
     # ``code`` is not among the names: it is the runtime's own identifier for a pipe, a domain and an
-    # error, and the OAuth code has the query-string family above.
+    # error, and the OAuth code has the query-string family above. These run before the raw-header
+    # families below, so a header serialised as an entry is removed as an entry, quotes and all, and a
+    # raw-header family never reads into the JSON punctuation around it.
     (re.compile(rf'(?i)({_SECRET_ENTRY_KEY}")((?:\\.|[^"\\])+)(")'), rf"\1{REDACTED_TEXT}\3"),
     (re.compile(rf"(?i)({_SECRET_ENTRY_KEY}')((?:\\.|[^'\\])+)(')"), rf"\1{REDACTED_TEXT}\3"),
     (re.compile(rf"(?i)({_SECRET_ENTRY_KEY})(-?\d[\w.+-]*|true|false)(?![\w.+-])"), rf"\1{REDACTED_TEXT}"),
-    # A key recognisable by its prefix alone, wherever it appears and whatever introduced it.
-    (re.compile(r"\b((?:plx_sk_|sk_|pk_|bl_)[A-Za-z0-9_\-]{16,})\b"), REDACTED_TEXT),
+    # A raw cookie header's whole value, every crumb and every flag attribute of it. The value has to be
+    # a cookie header's own ``name=value`` grammar, which is what separates a header from prose: a
+    # sentence that merely says "cookie:" or "cookie=" before ordinary words is left alone, where a run
+    # to the end of the line destroyed the rest of it — the secret a later word carried among it.
+    (re.compile(rf"(?i)\b((?:set-)?cookie[\"']?\s*[:=]\s*[\"']?)({_COOKIE_RUN})"), rf"\1{REDACTED_TEXT}"),
+    # The same secret names again, named in the plain ``name=value`` or ``name: value`` form a query
+    # string, a form-encoded body or a header line writes them in. The entry families above read them
+    # only when something quoted the name, which is the serialised shape and not the shape a raw request
+    # reaches this processor in. The colon or the equals sign is required and the value must be at least
+    # eight characters of what a secret is written in, which is what keeps this off ordinary prose.
+    (re.compile(rf"(?i)((?:{_SECRET_ENTRY_NAMES})\s*[:=]\s*)({_SECRET_VALUE})"), rf"\1{REDACTED_TEXT}"),
+    # A key recognisable by its prefix alone, wherever it appears and whatever introduced it. The
+    # prefix is spelled with a dash as with an underscore, since that is how the keys in use are
+    # actually issued, and what follows it has to end in a long unbroken run of letters and digits: an
+    # ordinary snake_case identifier — a table, a column, a partition — is words all the way down, and
+    # a family reading the prefix alone redacted those. The prefix is kept, as every other family keeps
+    # what named the secret, so a reader still sees which kind of key was carried.
+    (re.compile(r"\b((?:plx[_-]sk|sk|pk|bl)[_-])((?:[A-Za-z0-9]{1,8}[_-]){0,2}[A-Za-z0-9]{16,})(?![A-Za-z0-9])"), rf"\1{REDACTED_TEXT}"),
 )
 
 # Every C0 and C1 control character, the DEL byte included. A newline or a tab forges a line or a field
@@ -172,8 +208,14 @@ def make_redaction_processor(*, config: LogRedactionConfig) -> LogRecordProcesso
         try:
             _redact_record(record=record, patterns=patterns)
         except Exception as exc:
-            # Fails closed: the guard on the sink's handler reports what was raised and hands the record
-            # on all the same, so what it hands on must carry nothing of the call.
+            # Fails closed, in two steps that do not depend on each other. The mark goes on first, by
+            # assignment into the record's own dictionary, which needs no call and no frame: whatever
+            # happens next, the guard on the sink's handler has been told not to hand this record on.
+            # Then the strip, which turns the record into a notice and lifts the mark when it gets all
+            # the way through. It is the strip that can fail a second time — the failure that brings us
+            # here is routinely a stack that has run out, and a stack that cannot take ``_redact_record``
+            # cannot always take the stripping of what it left behind either.
+            record.__dict__[UNSCRUBBED_MARK] = True
             _quarantine(record=record, exc=exc)
             raise
 
@@ -181,7 +223,12 @@ def make_redaction_processor(*, config: LogRedactionConfig) -> LogRecordProcesso
 
 
 def _quarantine(*, record: logging.LogRecord, exc: Exception) -> None:
-    """Strip a record whose scrub failed down to a notice naming the failure, so nothing unscrubbed leaves with it."""
+    """Strip a record whose scrub failed down to a notice naming the failure, so nothing unscrubbed leaves with it.
+
+    The mark ``redact`` set is lifted at the end and only there, so a strip that gets partway leaves the
+    record marked and the record is dropped rather than emitted as a notice that says it was stripped
+    while still carrying what the scrub never read.
+    """
     record.msg = f"{QUARANTINE_PREFIX}{type(exc).__name__}]"
     record.args = ()
     record.exc_info = None
@@ -189,6 +236,7 @@ def _quarantine(*, record: logging.LogRecord, exc: Exception) -> None:
     record.stack_info = None
     for name in carried_attributes(record=record):
         setattr(record, name, REDACTED_TEXT)
+    record.__dict__.pop(UNSCRUBBED_MARK, None)
 
 
 def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:
@@ -213,9 +261,23 @@ def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPatter
             record,
             name,
             REDACTED_TEXT
-            if _is_secret_key(key=name)
+            if _is_secret_field_name(name=name)
             else _clean_value(value=value, patterns=patterns, open_containers=set(), is_escaping_control_characters=name != DATA_FIELD),
         )
+
+
+def _is_secret_field_name(*, name: str) -> bool:
+    """Whether the name a field is carried under is a secret's, read with every collision prefix taken off first.
+
+    A field lands under a prefixed name whenever the record already owns the name the caller used, and a
+    record factory that stamps ``password`` is enough to do it — so the name reaching a sink is
+    ``field_password`` while the value under it is exactly the one the caller asked to have redacted.
+    Judging the name as it was spelled rather than as it was carried covers that, and covers a caller who
+    spelled the prefix themselves, which is the safe direction to be wrong in.
+    """
+    while name.startswith(COLLIDING_FIELD_PREFIX):
+        name = name[len(COLLIDING_FIELD_PREFIX) :]
+    return _is_secret_key(key=name)
 
 
 def _redact_exception_text(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:
@@ -267,19 +329,42 @@ def _withhold_arguments(*, record: logging.LogRecord, patterns: tuple[RedactionP
     record.args = ()
 
 
-def redact_secret_entries(*, value: Any) -> Any:
+def redact_secret_entries(*, value: Any, open_containers: set[int] | None = None) -> Any:
     """A JSON-ready value with every mapping entry named like a secret replaced by the redaction text, at any depth.
 
     For a structured content, before the dispatch renders it: the message it writes is that rendering,
     and a secret nested in an object or held as a number is beyond what the string families can read
     back out of text. What comes back is a new value wherever an entry was replaced, and the value
     itself otherwise.
+
+    A container that contains itself is cut at the cycle, exactly as the field walk cuts one. The walk
+    has to survive a cycle because the caller that needs it most is the one rendering content ``json``
+    has just refused, and a circular reference is the commonest reason it refuses.
     """
+    if open_containers is None:
+        open_containers = set()
+    container_id = id(value)
     if isinstance(value, Mapping):
+        if container_id in open_containers:
+            return CYCLE_TEXT
         mapping = cast("Mapping[Any, Any]", value)
-        return {key: REDACTED_TEXT if _is_secret_key(key=key) else redact_secret_entries(value=item) for key, item in mapping.items()}
+        open_containers.add(container_id)
+        try:
+            return {
+                key: REDACTED_TEXT if _is_secret_key(key=key) else redact_secret_entries(value=item, open_containers=open_containers)
+                for key, item in mapping.items()
+            }
+        finally:
+            open_containers.discard(container_id)
     if isinstance(value, list):
-        return [redact_secret_entries(value=item) for item in cast("list[Any]", value)]
+        if container_id in open_containers:
+            return CYCLE_TEXT
+        items = cast("list[Any]", value)
+        open_containers.add(container_id)
+        try:
+            return [redact_secret_entries(value=item, open_containers=open_containers) for item in items]
+        finally:
+            open_containers.discard(container_id)
     return value
 
 

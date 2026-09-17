@@ -186,8 +186,14 @@ class LogDispatch:
                     rendered = json.dumps(redacted, indent=indent)
         except (TypeError, ValueError):
             # What ``json`` refuses outright, a circular reference or a mapping with a non-string key,
-            # is rendered as its ``repr`` and carries no ``data``: a log call never raises.
-            rendered = repr(cast("object", content))
+            # is rendered as its ``repr`` and carries no ``data``: a log call never raises. The names
+            # are redacted on this path too, and not only where the serialization worked: the ``repr``
+            # of an entry holding an object is beyond what the string families can read back out of
+            # text, so a fallback that skipped it would be the one rendering in which a secret the
+            # redaction is configured to remove reaches the sink whole.
+            is_redacting = log_config is not None and log_config.redaction.is_enabled
+            fallback = cast("object", redact_secret_entries(value=content) if is_redacting else content)
+            rendered = repr(fallback)
             data = None
         message = f"\n{rendered}"
         if title is not None:

@@ -123,7 +123,7 @@ class TestOtlpLogSink:
         attributes = _attributes(log_data)
         assert exception_attributes.EXCEPTION_MESSAGE not in attributes
         assert "sk_live_0123456789abcdef" not in attributes[exception_attributes.EXCEPTION_STACKTRACE]
-        assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith(f"RuntimeError: refused for {REDACTED_TEXT}")
+        assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith(f"RuntimeError: refused for sk_{REDACTED_TEXT}")
 
     def test_an_exception_that_carries_no_traceback_still_exports_its_own_text(self, caplog: pytest.LogCaptureFixture) -> None:
         """``exc_text`` is the processor's rendering; with redaction off there is none and the stacktrace is the only place the text goes."""

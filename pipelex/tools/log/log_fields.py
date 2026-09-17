@@ -25,12 +25,21 @@ DATA_FIELD = "data"
 # The prefix an entry takes when its name is one the record already owns.
 COLLIDING_FIELD_PREFIX = "field_"
 
+# The attribute the redaction stamps on a record it could not strip, and takes back off the moment it
+# has. It is the fail-closed half of the scrub: a record still carrying it reaches no sink, because what
+# it carries is whatever the call put there and the scrub never read. It is set before the stripping
+# rather than after the failure, so a stripping that dies partway leaves it behind rather than needing a
+# second thing to go right at the moment the first one went wrong.
+UNSCRUBBED_MARK = "_pipelex_unscrubbed"
+
 # Names a fresh record does not carry, so a ``hasattr`` check alone would let a caller's entry land on
 # one of them. ``message`` and ``asctime`` are set by the formatter rather than by the constructor, and
 # the stdlib refuses them all the same. ``FORWARDED_MARK`` is stamped by the holding handler on a
 # record it has already forwarded, and an entry landing on it unprefixed would have the record rejected
 # from every sink by ``ForwardedRecordFilter``: a caller's own field silently deleting its own line.
-FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime", FORWARDED_MARK})
+# ``UNSCRUBBED_MARK`` is the same shape of hazard on the redaction's side: an entry landing on it would
+# have a perfectly ordinary record read as one the scrub could not strip, and dropped.
+FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime", FORWARDED_MARK, UNSCRUBBED_MARK})
 
 # The attributes the stdlib gives every record, read off one built by the stdlib's own constructor on
 # this interpreter rather than listed by hand, so a version that adds one (``taskName`` arrived with
@@ -53,12 +62,23 @@ def build_log_record_extra(
 
     A field overrides the context for its record, so a call site that names a request it is not
     running under can say so; structured content owns ``data`` outright.
+
+    ``data`` is the dispatch's own name, so a caller's entry spelled that way is carried under the
+    collision prefix whether or not this call has structured content to put there. Owning it only when
+    the content happens to be structured would leave a caller's ``data`` on the record's own ``data``
+    beside a string content — where the runtime treats it as its own rendering and hands it to a sink
+    with its control characters intact, which is exactly the forged line the escaping exists to stop.
     """
     extra: dict[str, Any] = {}
     if context is not None:
         extra.update(context.fields)
     if fields:
         extra.update(fields)
+    if DATA_FIELD in extra:
+        name = f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}"
+        while name in extra:
+            name = f"{COLLIDING_FIELD_PREFIX}{name}"
+        extra[name] = extra.pop(DATA_FIELD)
     if data is not None:
         extra[DATA_FIELD] = data
     return extra

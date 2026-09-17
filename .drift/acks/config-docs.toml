@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:c9192adee5886e85c7d4d5699e6023a2a5d0b5eafed39a3673cfb4437a6039f4"
+digest = "sha256:c92f24eeb4684a4bcfb92ea177fd96943be6bd045c04881bee14fafb6388166b"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-16T22:31:08Z"
-rationale = "LogConfig gains a redaction sub-model and pipelex.toml a [runtime.log.redaction] table with is_enabled and extra_patterns, both shipping their defaults, and the same table is added to the kit template and the project override file. docs/configuration/config-practical/logging-config.md gains a Redaction section naming the pattern families, the two keys and the limits, and the example configuration carries the table. The change is additive and the defaults layer supplies it, so the migration ledger takes no entry; the goldens were re-snapshotted with make umig and check-migration-schemas reports the surfaces accounted for. The narrowing validator on extra_patterns only refuses a regular expression the re module refuses, so it narrows no domain a fingerprint would have to see, and no existing validator moved."
+reviewed_at = "2026-09-17T13:32:03Z"
+rationale = "The only trigger change is the extra_patterns validator, which now also refuses a regular expression matching the empty string: x* where x+ was meant matches at every position and replaces the whole of every log line the process writes, for the life of the process, so it is named where the pattern is still in front of whoever typed it. It narrows the accepted domain and no fingerprint can see it, which is what this contract asks about, and it takes no migration ledger entry: the shipped default is an empty list, a file already holding such a pattern was already having every line destroyed by it, and no migration can guess what pattern was meant. No field was added, renamed or removed and no other validator moved; check-migration-schemas reports the surfaces accounted for. The review targets were read: docs/configuration/config-practical/logging-config.md now says the refusal beside the one for a pattern re refuses, and names what each shipped family actually reads, since the families were rewritten in the same change; configs.py and config_cogt.py are untouched by it."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -18,4 +18,4 @@ rationale = "LogConfig gains a redaction sub-model and pipelex.toml a [runtime.l
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:7070951a6d3e4c10cb7d59822ce168c6590c53be"
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
-"pipelex/tools/log/log_config.py" = "blob:ff6b7fc2b90634877345d845696519c1f5321e80"
+"pipelex/tools/log/log_config.py" = "blob:d42123b1bbd64383447e35414a8c4bcbf073b890"

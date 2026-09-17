@@ -20,7 +20,7 @@ from typing_extensions import override
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig, LogRedactionConfig
-from pipelex.tools.log.log_fields import DATA_FIELD
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
 from pipelex.tools.log.log_redaction import (
     ARGUMENTS_WITHHELD_TEXT,
     CYCLE_TEXT,
@@ -81,6 +81,19 @@ class _ListSink(LogSink):
 
     def own_records(self) -> list[logging.LogRecord]:
         return [record for record in self.list_handler.records if record.name == __name__]
+
+
+class _RebuildingSink(LogSink):
+    """A sink whose ``make_handler`` builds a new handler every time, the way a real one opens its target."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.builds = 0
+
+    @override
+    def make_handler(self) -> logging.Handler:
+        self.builds += 1
+        return _ListHandler()
 
 
 class _FailingOnceSink(_ListSink):
@@ -180,7 +193,7 @@ class TestLogRedaction:
 
     def test_an_api_key_prefix_is_scrubbed_wherever_it_appears(self) -> None:
         text = "keys sk_live_0123456789abcdef plx_sk_0123456789abcdef pk_live_0123456789abcdef bl_0123456789abcdef seen"
-        expected = f"keys {REDACTED_TEXT} {REDACTED_TEXT} {REDACTED_TEXT} {REDACTED_TEXT} seen"
+        expected = f"keys sk_{REDACTED_TEXT} plx_sk_{REDACTED_TEXT} pk_{REDACTED_TEXT} bl_{REDACTED_TEXT} seen"
 
         message, value = _redact(text=text)
 
@@ -196,8 +209,8 @@ class TestLogRedaction:
     def test_a_configured_extra_pattern_is_scrubbed_beside_the_shipped_families(self) -> None:
         message, value = _redact(text="tenant tnt-40718 on sk_live_0123456789abcdef", extra_patterns=[r"tnt-[0-9]+"])
 
-        assert message == f"tenant {REDACTED_TEXT} on {REDACTED_TEXT}"
-        assert value == f"tenant {REDACTED_TEXT} on {REDACTED_TEXT}"
+        assert message == f"tenant {REDACTED_TEXT} on sk_{REDACTED_TEXT}"
+        assert value == f"tenant {REDACTED_TEXT} on sk_{REDACTED_TEXT}"
 
     def test_an_extra_pattern_the_re_module_refuses_is_a_configuration_error_naming_it(self) -> None:
         with pytest.raises(ValueError, match=r"\(unclosed"):
@@ -212,7 +225,7 @@ class TestLogRedaction:
 
         assert getattr(record, FIELD_NAME) == {
             "sent": f"Authorization: Bearer {REDACTED_TEXT}",
-            "notes": ["a\\nb", REDACTED_TEXT],
+            "notes": ["a\\nb", f"sk_{REDACTED_TEXT}"],
             "attempt": 3,
         }
 
@@ -225,7 +238,7 @@ class TestLogRedaction:
 
         processor(record)
 
-        assert getattr(record, FIELD_NAME) == {"token": REDACTED_TEXT, "me": CYCLE_TEXT}
+        assert getattr(record, FIELD_NAME) == {"token": f"sk_{REDACTED_TEXT}", "me": CYCLE_TEXT}
 
     def test_a_mapping_entry_named_like_a_secret_loses_its_value_whatever_it_holds(self) -> None:
         """The families read a name and a value out of one string; a mapping splits them, so the key is what names the secret."""
@@ -264,7 +277,7 @@ class TestLogRedaction:
 
         processor(record)
 
-        assert getattr(record, FIELD_NAME) == {"model": {"api_key": REDACTED_TEXT, "note": "line\\nforged"}, "object": f"carrying {REDACTED_TEXT}"}
+        assert getattr(record, FIELD_NAME) == {"model": {"api_key": REDACTED_TEXT, "note": "line\\nforged"}, "object": f"carrying sk_{REDACTED_TEXT}"}
 
     def test_the_data_attribute_is_scrubbed_of_secrets_but_keeps_its_control_characters(self) -> None:
         """``data`` is the runtime's own rendering of a structured content, escaped by the wire sinks, so a logged prompt keeps its newlines."""
@@ -274,7 +287,7 @@ class TestLogRedaction:
 
         processor(record)
 
-        assert getattr(record, DATA_FIELD) == {"prompt": "line one\nline two", "token": REDACTED_TEXT}
+        assert getattr(record, DATA_FIELD) == {"prompt": "line one\nline two", "token": f"sk_{REDACTED_TEXT}"}
 
     def test_the_scrub_edits_the_record_every_handler_shares_rather_than_a_copy(self, fresh_log: Log) -> None:
         """In place, not on a copy: a handler ordered after the sink is behind the scrub instead of being handed what the sink was spared."""
@@ -287,7 +300,7 @@ class TestLogRedaction:
 
         (delivered,) = sink.own_records()
         assert delivered is record
-        assert record.getMessage() == f"token {REDACTED_TEXT}"
+        assert record.getMessage() == f"token sk_{REDACTED_TEXT}"
         assert getattr(record, FIELD_NAME) == "line\\nforged"
 
     def test_a_sink_installed_again_after_a_reset_carries_one_redaction_processor(self, fresh_log: Log) -> None:
@@ -330,7 +343,7 @@ class TestLogRedaction:
         assert record.exc_info is not None
         assert record.exc_text is not None
         assert "Traceback (most recent call last)" in record.exc_text
-        assert record.exc_text.endswith(f"RuntimeError: auth failed for {REDACTED_TEXT} with Authorization: Bearer {REDACTED_TEXT}")
+        assert record.exc_text.endswith(f"RuntimeError: auth failed for sk_{REDACTED_TEXT} with Authorization: Bearer {REDACTED_TEXT}")
         assert logging.Formatter().format(record).endswith(record.exc_text)
 
     def test_an_already_rendered_exception_text_is_scrubbed_in_place(self) -> None:
@@ -340,7 +353,7 @@ class TestLogRedaction:
 
         processor(record)
 
-        assert record.exc_text == f"RuntimeError: key {REDACTED_TEXT} refused"
+        assert record.exc_text == f"RuntimeError: key sk_{REDACTED_TEXT} refused"
 
     def test_a_record_whose_cleaning_fails_is_quarantined_rather_than_handed_on_raw(self, mocker: MockerFixture) -> None:
         """Redaction fails closed: whatever the walk raised, the sink meets a record with nothing of the call left on it."""
@@ -384,9 +397,9 @@ class TestLogRedaction:
         processor(record)
 
         assert record.args == ()
-        assert record.getMessage() == f"%d items for {REDACTED_TEXT} {ARGUMENTS_WITHHELD_TEXT}"
-        assert getattr(record, FIELD_NAME) == REDACTED_TEXT
-        assert "sk_" not in logging.Formatter().format(record)
+        assert record.getMessage() == f"%d items for sk_{REDACTED_TEXT} {ARGUMENTS_WITHHELD_TEXT}"
+        assert getattr(record, FIELD_NAME) == f"sk_{REDACTED_TEXT}"
+        assert "0123456789abcdef" not in logging.Formatter().format(record)
 
     def test_a_field_whose_own_name_is_a_secrets_loses_its_value_whatever_it_holds(self) -> None:
         """A mapping entry named like a secret is redacted by its key; a field is the same entry one level up, on the record itself."""
@@ -491,3 +504,104 @@ class TestLogRedaction:
         fresh_log.install_sink(sink)
 
         assert len(sink.processors) == 1
+
+    def test_a_cookie_value_holding_a_quote_is_removed_whole_rather_than_up_to_the_quote(self) -> None:
+        """Stopping at the quote left the session cookie after it in clear, and a value may legally hold one."""
+        quoted, _ = _redact(text='Cookie: session="private_session_12345"; HttpOnly')
+        apostrophe, _ = _redact(text="Cookie: theme=O'Reilly; session=private_session_12345")
+
+        assert quoted == f"Cookie: {REDACTED_TEXT}"
+        assert apostrophe == f"Cookie: {REDACTED_TEXT}"
+
+    def test_prose_that_says_cookie_before_a_colon_or_an_equals_sign_keeps_the_rest_of_its_line(self) -> None:
+        """Running the value to the end of the line destroyed the sentence, and any secret a later word carried."""
+        sentence, _ = _redact(text="The cookie: consent banner was shown to the user alice")
+        assignment, _ = _redact(text="Reading cookie=1 and then user=alice access_token=abcdefgh12345678")
+
+        assert sentence == "The cookie: consent banner was shown to the user alice"
+        assert assignment == f"Reading cookie=1 and then user=alice access_token={REDACTED_TEXT}"
+
+    def test_a_cookie_header_inside_a_serialised_string_stops_at_the_string_it_is_in(self) -> None:
+        """A raw-header family reading through the closing quote would take the JSON punctuation with it."""
+        message, _ = _redact(text='{"headers": "Cookie: session=abc"}')
+
+        assert message == f'{{"headers": "Cookie: {REDACTED_TEXT}"}}'
+
+    def test_a_percent_encoded_oauth_code_is_scrubbed_rather_than_passed_through(self) -> None:
+        """A class stopping at the escape leaves the tail, and the whole code when the escape falls early."""
+        message, value = _redact(text="/callback?code=4%2F0AfJohXm1n2o3p4q5&state=xyz")
+
+        assert message == f"/callback?code={REDACTED_TEXT}&state=xyz"
+        assert value == f"/callback?code={REDACTED_TEXT}&state=xyz"
+
+    def test_an_authorization_header_is_scrubbed_whichever_scheme_it_carries(self) -> None:
+        """Basic credentials decode to a password in one step; requiring the word bearer left them in clear."""
+        basic, _ = _redact(text="Authorization: Basic YWxhZGRpbjpvcGVuc2VzYW1l")
+        token, _ = _redact(text="Authorization: Token abcdefgh12345678")
+
+        assert basic == f"Authorization: Basic {REDACTED_TEXT}"
+        assert token == f"Authorization: Token {REDACTED_TEXT}"
+
+    def test_a_secret_named_in_the_plain_key_value_form_is_scrubbed_as_a_quoted_entry_is(self) -> None:
+        """A query string and a form-encoded body name their secrets unquoted, which is the shape a raw request arrives in."""
+        form, _ = _redact(text="form body: client_secret=s3cr3tvaluehere&grant_type=x")
+        query, _ = _redact(text="https://example.test/x?access_token=abcdefgh12345678")
+
+        assert form == f"form body: client_secret={REDACTED_TEXT}&grant_type=x"
+        assert query == f"https://example.test/x?access_token={REDACTED_TEXT}"
+
+    def test_a_key_is_scrubbed_by_its_prefix_spelled_with_a_dash_as_with_an_underscore(self) -> None:
+        """The dash-separated spellings are the ones the providers actually issue."""
+        message, _ = _redact(text="keys sk-proj-ABCDEFGHIJKLMNOPQRST and sk-ant-api03-ABCDEFGHIJKLMNOPQRST seen")
+
+        assert message == f"keys sk-{REDACTED_TEXT} and sk-{REDACTED_TEXT} seen"
+
+    def test_an_ordinary_identifier_that_starts_like_a_key_prefix_is_left_alone(self) -> None:
+        """A table, a column and a partition are named this way, and the family redacted them whole."""
+        message, _ = _redact(text="loaded pk_customer_reference_index rows from bl_run_history_partition")
+
+        assert message == "loaded pk_customer_reference_index rows from bl_run_history_partition"
+
+    def test_a_field_carried_under_the_collision_prefix_is_redacted_by_the_name_the_caller_used(self) -> None:
+        """A record factory that stamps ``password`` renames the caller's field, and the rename escaped the name check."""
+        record = _record(text="logging in")
+        setattr(record, f"{COLLIDING_FIELD_PREFIX}password", "private_credential_12345")
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}password") == REDACTED_TEXT
+
+    def test_a_pattern_that_matches_the_empty_string_is_refused_at_load(self) -> None:
+        """``x*`` for ``x+`` matches at every position, which replaces every log line the process writes."""
+        with pytest.raises(ValueError, match="matches the empty string"):
+            LogRedactionConfig(is_enabled=True, extra_patterns=["x*"])
+
+    def test_a_record_whose_quarantine_also_fails_is_dropped_rather_than_handed_to_the_sink(self, mocker: MockerFixture, fresh_log: Log) -> None:
+        """The stack that could not take the scrub cannot always take the stripping of what it left behind."""
+        mocker.patch("pipelex.tools.log.log_redaction._redact_record", side_effect=RecursionError("too deep"))
+        mocker.patch("pipelex.tools.log.log_redaction.carried_attributes", side_effect=RecursionError("too deep"))
+        fresh_log.configure(log_config=_package_log_config())
+        sink = _ListSink()
+        fresh_log.install_sink(sink)
+        record = _record(text="Authorization: Bearer private_token_1234567890")
+
+        sink.handler.handle(record)
+
+        assert sink.own_records() == []
+
+    def test_a_sink_installed_again_after_a_reset_builds_a_fresh_handler(self, fresh_log: Log) -> None:
+        """A close is terminal for a sink that releases what it writes to, so the handler it closed must not be handed back."""
+        sink = _RebuildingSink()
+        fresh_log.configure(log_config=_package_log_config())
+        fresh_log.install_sink(sink)
+        first = sink.handler
+        fresh_log.reset()
+        fresh_log.configure(log_config=_package_log_config())
+        fresh_log.install_sink(sink)
+
+        assert sink.builds == 2
+        assert sink.handler is not first
+        # The forwarded-record filter is inserted at every install and taken off by none, so the filters
+        # stacked up on the cached handler for as long as the same one came back.
+        assert len(sink.handler.filters) == len(first.filters)

@@ -80,9 +80,11 @@ class Log:
         of its process globals, and an error out of it would skip the rest and leave the process
         unbootable. The close runs whatever the flush did, since the close is what stops an exporter's
         thread, ships its last batch and unregisters what it put at exit. The redaction processor
-        ``install_sink`` put on the sink is taken back, so a sink object installed again carries the
-        next configuration's and not two. A holding handler still in place, because the boot died
-        before its sink arrived, is closed too, and what it holds gets the stdlib's last-resort handling.
+        ``install_sink`` put on the sink is taken back and the closed handler is discarded, so a sink
+        object installed again carries the next configuration's processor and not two, and builds itself
+        a live handler rather than being handed back the one this close just finished with. A holding
+        handler still in place, because the boot died before its sink arrived, is closed too, and what
+        it holds gets the stdlib's last-resort handling.
         """
         root_logger = logging.getLogger()
         try:
@@ -95,6 +97,7 @@ class Log:
                 finally:
                     _finish_teardown_step(sink=sink, verb="close", step=handler.close)
                     self._take_back_redaction_processor(sink=sink)
+                    sink.discard_handler()
             if self._holding_handler is not None:
                 holding, self._holding_handler = self._holding_handler, None
                 root_logger.removeHandler(holding)
