@@ -28,7 +28,8 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 # It is NOT the standard version this engine implements (`MTHDS_STANDARD_VERSION`, which is what a
 # crate's `mthds_version` stamp records), and the two only coincide while the set's last re-pinning
 # is the latest release of the standard. `tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py`
-# holds this value to the page, and to the standard version this engine implements.
+# holds this value to the page; `test_pinned_natives_version.py` beside it holds it to the standard
+# version this engine implements, which is the reading that needs no sibling checkout.
 PINNED_NATIVES_MTHDS_VERSION = "2.0.0"
 
 

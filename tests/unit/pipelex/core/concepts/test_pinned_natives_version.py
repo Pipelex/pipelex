@@ -4,8 +4,13 @@
 changed. The authority on that number is the standard's own page, and `test_pinned_natives_vs_standard.py`
 holds the constant to it — but that comparison reads the sibling `mthds/` checkout and skips without
 it, which is most contributors most of the time. This module is the reading that needs nothing but
-the installed `mthds`, so the constant is never left with no reader at all: that is how it sat at
-`1.0.0` across the standard's `2.0.0` cut without a single test going red.
+the installed `mthds`.
+
+It is a bound in one direction, deliberately: without the page, nothing here can know whether the
+standard re-pinned the set at its latest version, so a label that *lags* a re-pinning — which is how
+this constant sat at `1.0.0` across the standard's `2.0.0` cut — is the page comparison's to catch
+and not this one's. What this module catches is the other direction, a label naming a standard
+version this engine does not implement.
 """
 
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
