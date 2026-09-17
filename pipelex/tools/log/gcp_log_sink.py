@@ -5,7 +5,9 @@ message and the call's fields become the JSON payload, the run-scoped identifier
 the run's OpenTelemetry trace id becomes the entry's ``trace`` field, so Cloud Logging files the line
 under the same trace as the spans the runtime exports. The entries leave through the client library's
 transport, a batching background thread in production, so no record costs an API round trip on the
-thread that logged it.
+thread that logged it. What that thread itself logs never leaves through the sink: the library reports
+a refused batch through a logger of its own, and a report exported through the pipeline it reports on
+fails with it and is reported again, so the handler rejects the export path before its lock is taken.
 
 **Most processes should not select this sink.** A process on Cloud Run, on GKE, or on any platform
 whose logging agent reads the container's stdout needs no client at all: the agent ingests one JSON
@@ -24,13 +26,14 @@ from __future__ import annotations
 import json
 import logging
 import math
-import traceback
+import threading
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from typing_extensions import override
 
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, FIXED_KEYS, LOGGER_KEY, MESSAGE_KEY
 from pipelex.tools.log.log_context import PIPE_RUN_ID_FIELD, PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, render_json
@@ -43,17 +46,33 @@ if TYPE_CHECKING:
 GCP_LOGGING_DEPENDENCY_NAME = "google-cloud-logging"
 GCP_LOGGING_EXTRA_NAME = "gcp-logging"
 
-# The payload keys the sink writes itself, spelled as the ``json`` sink spells them so one field keeps
-# one wire name whichever of the two a process selects. A carried attribute named like one of them is
-# prefixed rather than dropped.
-MESSAGE_KEY = "message"
-LOGGER_KEY = "logger"
-EXCEPTION_KEY = "exception"
-FIXED_PAYLOAD_KEYS = frozenset({MESSAGE_KEY, LOGGER_KEY, EXCEPTION_KEY})
+# The sink writes three of the ``json`` sink's keys into the payload — its ``message``, ``logger`` and
+# ``exception``, imported rather than respelled — and reserves that sink's whole set against a carried
+# attribute, so one field keeps one wire name whichever of the two a process selects. ``time`` and
+# ``severity`` are not payload keys here, the client library carrying both out of band, but a field
+# named like one is ``field_time`` and ``field_severity`` under either sink rather than under one only.
+FIXED_PAYLOAD_KEYS = FIXED_KEYS
+
+# The stdlib formatter the ``json`` sink renders a traceback through, so both sinks spell one exception
+# the same way: the trailing newline stripped, and the stdlib's own placeholder for the
+# ``(None, None, None)`` triple a caller logging outside an ``except`` block produces.
+_EXCEPTION_FORMATTER = logging.Formatter()
 
 # The record attributes that become entry labels rather than payload keys: the run-scoped identifiers
 # the log context binds. Cloud Logging indexes labels, so these are what a query filters a run by.
 LABEL_ATTRIBUTES = (REQUEST_ID_FIELD, PIPELINE_RUN_ID_FIELD, PIPE_RUN_ID_FIELD)
+
+# The client library's own logging loggers, and the name its transport gives the thread that exports.
+# A record from either must not travel out through the sink that emitted it.
+GCP_LOGGING_LOGGER_PREFIXES = ("google.cloud.logging", "google.cloud.logging_v2")
+GCP_WORKER_THREAD_NAME = "google.cloud.logging.Worker"
+
+# The deadline a flush waits for the transport's queue to drain. The client library's ``flush`` ends in
+# ``queue.join()``, which waits unbounded and takes no timeout, so the bound is imposed here rather
+# than passed: the drain runs on a thread of its own and the join is what carries the deadline. What is
+# still queued when it expires leaves through ``close``, whose grace period the library bounds itself.
+FLUSH_TIMEOUT_SECONDS = 5.0
+_FLUSH_THREAD_NAME = "pipelex-gcp-log-flush"
 
 
 class GcpLogSeverity(StrEnum):
@@ -85,6 +104,34 @@ class GcpLogTransport(Protocol):
     def flush(self) -> None: ...
 
     def close(self) -> None: ...
+
+
+class GcpExportPathFilter(logging.Filter):
+    """Rejects the records the sink's own export path emits, before the handler's lock is taken.
+
+    Two guards. The client library's logging loggers are named ``google.cloud.logging*`` and are
+    rejected by name: its transport reports a failed batch through one of them, at ``ERROR``, and
+    nothing sets ``propagate = False`` on it — the library does that in its own ``setup_logging``,
+    which this sink deliberately does not call. Left to reach the handler, that report becomes an entry,
+    fails with the batch it reports on, and is reported again, forever. The second guard rejects every
+    record emitted on the transport's background thread, whatever its logger is called, which is what
+    catches the layers beneath: the auth stack and the HTTP or gRPC client log under their own names
+    and only ever reach this handler from that thread, the transport's ``send`` being the one call the
+    sink makes and the export being the one thing that thread does. Both names are the library's own,
+    and the tests against the installed library are what pin them.
+
+    A filter rather than a check inside ``emit``, because ``Handler.handle`` runs the filters before it
+    takes the handler's lock and ``emit`` after. The ``otlp`` sink carries the same design for the same
+    reason: an exporting thread blocking on that lock to report its own failure while the teardown holds
+    it and waits for the queue to drain is a deadlock at exit, and it was reproduced here with the
+    installed library.
+    """
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        if threading.current_thread().name == GCP_WORKER_THREAD_NAME:
+            return False
+        return not any(record.name == prefix or record.name.startswith(f"{prefix}.") for prefix in GCP_LOGGING_LOGGER_PREFIXES)
 
 
 def severity_for_level(*, levelno: int) -> GcpLogSeverity:
@@ -131,15 +178,18 @@ def _payload_value(*, value: Any) -> Any:
 
 
 def _exception_text(*, record: logging.LogRecord) -> str | None:
-    """The record's exception as text, or ``None`` when it carries none."""
+    """The record's exception as text, spelled as the ``json`` sink spells it, or ``None`` when it carries none.
+
+    The rendering goes through the stdlib formatter rather than through ``traceback`` directly, so the
+    two sinks cannot disagree about a traceback's trailing newline or about what an ``exc_info`` of
+    ``(None, None, None)`` means — a triple ``logging.error(msg, exc_info=True)`` builds when a caller
+    outside an ``except`` block asks for one, which a foreign library does.
+    """
+    if record.exc_info:
+        return record.exc_text or _EXCEPTION_FORMATTER.formatException(record.exc_info)
     if record.exc_text:
         return record.exc_text
-    if record.exc_info is None:
-        return None
-    exc_type, exc_value, exc_traceback = record.exc_info
-    if exc_type is None:
-        return None
-    return "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    return None
 
 
 def _entry_payload(*, record: logging.LogRecord) -> dict[str, Any]:
@@ -203,7 +253,26 @@ class GcpLogHandler(logging.Handler):
 
     @override
     def flush(self) -> None:
-        self._transport.flush()
+        """Waits for the transport's queue to drain, and never longer than ``FLUSH_TIMEOUT_SECONDS``.
+
+        The library's own flush waits on the queue with no deadline, and the teardown that calls it runs
+        in a ``finally``: a batch the API is refusing, or an export the network is holding, would keep
+        the process alive with no way out. The drain is given a thread so the join can carry the bound,
+        and a failure it raises is re-raised here so the teardown still reports it.
+        """
+        failure: list[Exception] = []
+
+        def drain() -> None:
+            try:
+                self._transport.flush()
+            except Exception as exc:  # ruff: ignore[blind-except]
+                failure.append(exc)
+
+        flushing = threading.Thread(target=drain, name=_FLUSH_THREAD_NAME, daemon=True)
+        flushing.start()
+        flushing.join(timeout=FLUSH_TIMEOUT_SECONDS)
+        if failure:
+            raise failure[0]
 
     @override
     def close(self) -> None:
@@ -225,7 +294,9 @@ class GcpLogSink(LogSink):
 
     @override
     def make_handler(self) -> logging.Handler:
-        return GcpLogHandler(transport=self._transport, project=self._project)
+        handler = GcpLogHandler(transport=self._transport, project=self._project)
+        handler.addFilter(GcpExportPathFilter())
+        return handler
 
 
 def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:

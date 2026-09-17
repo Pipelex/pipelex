@@ -207,10 +207,11 @@ credentials_file_path = "gcp_credentials.json"
 Each record becomes one Cloud Logging entry with a JSON payload:
 
 - The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's two custom levels, `VERBOSE` and `DEV`, both land there
-- The payload carries `message`, `logger` and `exception` when the record carries one, then every field and the `data` attribute flat beside them. Those three keys are reserved, so a field named like one of them is carried under a `field_` prefix; a value JSON cannot carry — a non-finite float, a model, a circular structure — is written as text rather than costing the line
+- The payload carries `message`, `logger` and `exception` when the record carries one, then every field and the `data` attribute flat beside them. The keys the `json` sink reserves are reserved here too, `time` and `severity` included although the payload carries neither — the client library takes both out of band — so a field named like one of them is carried under a `field_` prefix under either sink rather than under one and not the other; a value JSON cannot carry — a non-finite float, a model, a circular structure — is written as text rather than costing the line
 - The run-scoped identifiers become the entry's **labels** rather than payload keys: `request_id`, `pipeline_run_id` and `pipe_run_id`, whichever of them the record carries. Cloud Logging indexes labels, so these are what a query filters a run by
 - The entry's `trace` field carries the run's own OpenTelemetry trace id, project-qualified as `projects/<project>/traces/<trace-id>`. The id is derived from `pipeline_run_id` by the same hash the tracer uses, so a line and the spans of the run it belongs to agree on it and Cloud Logging files them together
-- The entries leave through the client library's background-thread transport, which batches them off the thread that logged, so no record costs an API round trip on the calling thread. The teardown flushes and closes it
+- The entries leave through the client library's background-thread transport, which batches them off the thread that logged, so no record costs an API round trip on the calling thread. The teardown flushes and closes it, and the flush carries a deadline of its own because the library's does not
+- What the export path logs never leaves through the sink: the library reports a refused batch through a logger of its own, and a report exported through the pipeline it reports on would fail with it and be reported again. The handler rejects those records, and every record emitted on the library's export thread, before its lock is taken — the same guard the `otlp` sink carries, against the same deadlock at exit
 
 ## Example Configuration
 

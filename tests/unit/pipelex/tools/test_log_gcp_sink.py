@@ -2,31 +2,33 @@
 
 The sink is built around a fake transport, a subclass of the client library's own ``Transport``, so
 each entry is captured where the library would have batched it; production builds it on the
-``BackgroundThreadTransport`` around a real client instead. A second class pins what the sink assumes
-of the library itself: the transport methods it calls, and that the severity it computes is the one
-that lands on the entry rather than the one the library derives from the level.
+``BackgroundThreadTransport`` around a real client instead. The guards on the export path are here
+too, since what they guard is the handler. ``test_log_gcp_sink_mapping.py`` reads the severity scale
+and the trace name on their own, ``test_log_gcp_json_payload_parity.py`` holds this payload and the
+``json`` sink's line together, and ``test_log_gcp_client_library_contract.py`` pins what the sink
+assumes of ``google-cloud-logging`` itself.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+import threading
+import time
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from google.cloud.logging_v2.entries import StructEntry
-from google.cloud.logging_v2.handlers.transports.background_thread import _Worker  # pyright: ignore[reportPrivateUsage]
 from google.cloud.logging_v2.handlers.transports.base import Transport
 from typing_extensions import override
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.gcp_log_sink import (
     EXCEPTION_KEY,
+    GCP_WORKER_THREAD_NAME,
     LOGGER_KEY,
     MESSAGE_KEY,
+    GcpExportPathFilter,
     GcpLogSeverity,
     GcpLogSink,
-    severity_for_level,
-    trace_name_for_run,
 )
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
@@ -35,6 +37,8 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from pytest_mock import MockerFixture
 
 PROJECT = "a-test-project"
 
@@ -79,6 +83,47 @@ def _package_log_config() -> LogConfig:
 def _own_entries(transport: FakeTransport) -> list[CapturedEntry]:
     """The entries this module's own records produced, whatever else the process logged meanwhile."""
     return [entry for entry in transport.entries if entry.record.name == __name__]
+
+
+class NeverDrainingTransport(Transport):  # pyright: ignore[reportUntypedBaseClass]
+    """A transport whose flush waits on a queue that never drains, which is what the library's does."""
+
+    def __init__(self) -> None:
+        self.entered = threading.Event()
+        self.released = threading.Event()
+
+    @override
+    def send(self, record: logging.LogRecord, message: dict[str, Any], **kwargs: Any) -> None:  # kw-only: ignore — the library's own signature
+        return None
+
+    @override
+    def flush(self) -> None:
+        self.entered.set()
+        # Bounded only so a regression fails the test instead of hanging the suite.
+        self.released.wait(timeout=10)
+
+    @override
+    def close(self) -> None:
+        return None
+
+
+class FailingFlushTransport(Transport):  # pyright: ignore[reportUntypedBaseClass]
+    """A transport whose flush raises, as one refusing the API does."""
+
+    def __init__(self) -> None:
+        self.message = "the API refused the batch"
+
+    @override
+    def send(self, record: logging.LogRecord, message: dict[str, Any], **kwargs: Any) -> None:  # kw-only: ignore — the library's own signature
+        return None
+
+    @override
+    def flush(self) -> None:
+        raise RuntimeError(self.message)
+
+    @override
+    def close(self) -> None:
+        return None
 
 
 class TestGcpLogSink:
@@ -212,57 +257,89 @@ class TestGcpLogSink:
         fresh.reset()
 
         assert transport.flush_count > 0
-        assert transport.close_count == 1
 
+    def test_the_client_librarys_own_export_failure_is_rejected_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """The library reports a refused batch at ``ERROR``; exported, that report fails with the batch and is reported again."""
+        _, transport = gcp_log
+        logging.getLogger("google.cloud.logging_v2.handlers.transports.background_thread").error("Failed to submit 1 logs.")
+        logging.getLogger("google.cloud.logging").warning("dropped")
 
-class TestGcpLogSinkMapping:
-    """The two mappings the sink owns, read without a handler in the way."""
+        assert [entry for entry in transport.entries if entry.record.name.startswith("google.cloud.logging")] == []
 
-    def test_the_two_custom_levels_land_on_debug(self) -> None:
-        assert severity_for_level(levelno=5) is GcpLogSeverity.DEBUG
-        assert severity_for_level(levelno=15) is GcpLogSeverity.DEBUG
+    def test_a_record_emitted_on_the_export_thread_is_rejected_whatever_its_logger_is_called(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """The auth stack and the HTTP client log under their own names, and only ever reach this handler from that thread."""
+        _, transport = gcp_log
 
-    def test_a_level_above_critical_still_maps_to_critical(self) -> None:
-        assert severity_for_level(levelno=logging.CRITICAL + 10) is GcpLogSeverity.CRITICAL
+        def log_as_the_exporting_thread() -> None:
+            logging.getLogger("urllib3.connectionpool").error("Retrying after connection broken")
 
-    def test_the_trace_name_is_the_tracers_own_id_in_32_hex_digits(self) -> None:
-        trace_name = trace_name_for_run(project="p", pipeline_run_id="plr-42")
-        prefix, _, trace_id = trace_name.rpartition("/")
-        assert prefix == "projects/p/traces"
-        assert len(trace_id) == 32
-        assert int(trace_id, 16) == hash_md5_to_int("plr-42")
+        exporting = threading.Thread(target=log_as_the_exporting_thread, name=GCP_WORKER_THREAD_NAME)
+        exporting.start()
+        exporting.join()
+        logging.getLogger("urllib3.connectionpool").error("Retrying, on any other thread")
 
+        urllib3_entries = [entry for entry in transport.entries if entry.record.name.startswith("urllib3")]
+        assert [entry.payload[MESSAGE_KEY] for entry in urllib3_entries] == ["Retrying, on any other thread"]
 
-class TestTheClientLibraryContract:
-    """What the sink assumes of ``google-cloud-logging``, asserted against the installed library.
+    def test_the_export_paths_record_is_rejected_before_the_handler_lock_is_taken(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """At exit the stdlib's shutdown holds this lock while it flushes, and an exporting thread reporting its failure must not wait on it."""
+        fresh, _ = gcp_log
+        assert fresh.sink is not None
+        handler = fresh.sink.handler
+        assert any(isinstance(handler_filter, GcpExportPathFilter) for handler_filter in handler.filters)
+        library_record = logging.LogRecord(
+            name="google.cloud.logging_v2.handlers.transports.background_thread",
+            level=logging.ERROR,
+            pathname="",
+            lineno=0,
+            msg="Failed to submit 1 logs.",
+            args=(),
+            exc_info=None,
+        )
+        lock_taken = threading.Event()
+        let_go = threading.Event()
 
-    The sink declares the transport's shape rather than importing it, and it computes the severity
-    itself rather than letting the library derive one from the level, because the library's own
-    normalization has no spelling for our ``VERBOSE`` and ``DEV``. Both are assumptions about a third
-    party whose change would break a production sink silently and no other test would see.
-    """
+        def hold_the_lock() -> None:
+            handler.acquire()
+            lock_taken.set()
+            let_go.wait()
+            handler.release()
 
-    def test_the_transport_still_carries_the_three_methods_the_sink_calls(self) -> None:
-        for method_name in ("send", "flush", "close"):
-            assert callable(getattr(Transport, method_name))
+        holder = threading.Thread(target=hold_the_lock)
+        holder.start()
+        lock_taken.wait()
+        handled = threading.Event()
 
-    def test_the_severity_the_sink_passes_overrides_the_one_the_library_derives_from_the_level(self) -> None:
-        # The worker only holds the logger for its own thread, which is never started here, so the
-        # queued entry can be read without a client.
-        worker: Any = _Worker(object())
-        record = logging.LogRecord(name="pipelex", level=5, pathname="", lineno=0, msg="verbose line", args=(), exc_info=None)
-        worker.enqueue(record, {MESSAGE_KEY: "verbose line"}, severity=GcpLogSeverity.DEBUG.value, labels={}, trace=None)
+        def handle_the_librarys_record() -> None:
+            handler.handle(library_record)
+            handled.set()
 
-        queued = cast("dict[str, Any]", worker._queue.get_nowait())  # ruff: ignore[private-member-access]
-        assert queued["severity"] == GcpLogSeverity.DEBUG.value
-        assert queued["message"] == {MESSAGE_KEY: "verbose line"}
-        assert queued["labels"]["python_logger"] == "pipelex"
+        try:
+            threading.Thread(target=handle_the_librarys_record, daemon=True).start()
+            assert handled.wait(timeout=2), "the guard ran after the lock was taken"
+        finally:
+            let_go.set()
+            holder.join()
 
-    def test_a_struct_entry_renders_the_severity_name_and_the_trace_the_sink_passes(self) -> None:
-        trace_name = trace_name_for_run(project="p", pipeline_run_id="plr-1")
-        # The library builds its entries from a namedtuple whose fields mypy does not see.
-        entry: Any = StructEntry(payload={MESSAGE_KEY: "m"}, severity=GcpLogSeverity.WARNING.value, trace=trace_name)  # type: ignore[call-arg]
+    def test_the_flush_gives_up_on_a_queue_that_never_drains(self, mocker: MockerFixture) -> None:
+        """The library's flush ends in ``queue.join()``, which takes no deadline, so the teardown would never return."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        transport = NeverDrainingTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
 
-        api_repr = cast("dict[str, Any]", entry.to_api_repr())
-        assert api_repr["severity"] == GcpLogSeverity.WARNING.value
-        assert api_repr["trace"] == trace_name
+        started = time.monotonic()
+        try:
+            handler.flush()
+            waited = time.monotonic() - started
+        finally:
+            transport.released.set()
+
+        assert transport.entered.is_set(), "the flush never reached the transport"
+        assert waited < 5, f"the flush waited {waited:.1f}s on a queue that never drains"
+
+    def test_a_transport_that_refuses_the_flush_still_reports_it(self) -> None:
+        """The bound must not swallow what the teardown is there to report."""
+        handler = GcpLogSink(transport=FailingFlushTransport(), project=PROJECT).make_handler()
+
+        with pytest.raises(RuntimeError, match="the API refused the batch"):
+            handler.flush()
