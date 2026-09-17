@@ -3,6 +3,7 @@ from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
+from pipelex.tools.log.gcp_log_sink import make_gcp_log_sink
 from pipelex.tools.log.json_log_sink import JsonLogSink
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, stream_for_target
@@ -45,14 +46,22 @@ def _make_otlp_log_sink(config: LogConfig) -> LogSink:
     return OtlpLogSink(processor=BatchLogRecordProcessor(exporter), resource=resource)
 
 
+def _make_gcp_log_sink(config: LogConfig) -> LogSink:
+    # Deferred import: the Google Cloud Logging client library loads inside ``make_gcp_log_sink``,
+    # when this factory runs, so registering the built-ins imports none of it and a process on
+    # another sink never pays for it. A missing extra fails there, loud, with the install hint.
+    return make_gcp_log_sink(config=config.gcp)
+
+
 class LogSinkPlugin:
-    """Always-on built-in provider of the ``json`` / ``console`` / ``otlp`` log sinks.
+    """Always-on built-in provider of the ``json`` / ``console`` / ``otlp`` / ``gcp`` log sinks.
 
     Core-unconditional: a process needs somewhere for its records to go, so this plugin cannot be
     disabled into a boot with no sink (see ``KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers
     one factory per built-in method; ``runtime.log.sink`` selects which one boot invokes. Importing
-    this module is import-light: Rich loads when the console sink builds its handler, and the
-    OpenTelemetry SDK when the ``otlp`` factory runs, never at register.
+    this module is import-light: Rich loads when the console sink builds its handler, the
+    OpenTelemetry SDK when the ``otlp`` factory runs, and the Google Cloud Logging client library
+    when the ``gcp`` factory runs, never at register.
     """
 
     name = "log_sinks"
@@ -62,3 +71,4 @@ class LogSinkPlugin:
         registrar.add_log_sink(method=LogSinkMethod.JSON, factory=_make_json_log_sink)
         registrar.add_log_sink(method=LogSinkMethod.CONSOLE, factory=_make_console_log_sink)
         registrar.add_log_sink(method=LogSinkMethod.OTLP, factory=_make_otlp_log_sink)
+        registrar.add_log_sink(method=LogSinkMethod.GCP, factory=_make_gcp_log_sink)
