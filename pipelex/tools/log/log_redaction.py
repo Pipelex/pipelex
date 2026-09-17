@@ -10,8 +10,11 @@ prefixes come from. Running them here instead means every Pipelex process gets t
 it selected, and a record a third-party library emitted with a raw request in it is scrubbed too,
 because the processor sits on the sink's handler rather than at the call sites. A structured value is
 walked to any depth: a mapping entry named like a secret loses its value whatever it holds, since the
-mapping split the name from the value the string families read together; a model is dumped and any
-other object rendered as text before the walk, exactly as a wire sink would have done after it.
+mapping split the name from the value the string families read together, and so does a field whose own
+name is a secret's; a model is dumped and any other object rendered as text before the walk, exactly as
+a wire sink would have done after it, and one that refuses to render loses that value alone. A
+structured content is redacted by name before the dispatch renders it, so the message a sink writes
+beside ``data`` is the rendering of what ``data`` holds rather than a second copy of the secret.
 
 **Control characters are neutralised** in a field's string values, and only there. A field value is
 caller-supplied text, and a sink that writes a ``key=value`` run or a console line renders it as it is,
@@ -51,6 +54,14 @@ CYCLE_TEXT = "[cycle]"
 # a closing bracket: the sink writes a line that says the scrub failed, and nothing of the call.
 QUARANTINE_PREFIX = "[REDACTION FAILED: "
 
+# What a value that refuses to render becomes, followed by the name of what was raised and a closing
+# bracket: that one value is lost, and the record and every other value it carries are handed on.
+UNRENDERABLE_PREFIX = "[UNRENDERABLE: "
+
+# What follows the format string of a record whose arguments do not fit it, in place of the arguments:
+# the stdlib's own report of that failure prints them raw, which is exactly what the scrub removes.
+ARGUMENTS_WITHHELD_TEXT = "[ARGUMENTS WITHHELD: the message could not be rendered]"
+
 # The names under which a mapping entry is a secret whatever it holds, read lowercased and with a dash
 # as an underscore, so a header name and a JSON key are both caught. ``code`` is not among them: it is
 # the runtime's own identifier for a pipe, a domain and an error, and the OAuth code has its own family.
@@ -79,9 +90,11 @@ SECRET_KEY_NAMES = frozenset(
 # named the secret so a reader still sees which header or which field was carrying it.
 RedactionPattern = tuple[re.Pattern[str], str]
 
-# The JSON entry names whose value is a secret whatever it holds, as one alternation for the two
-# quote characters a serialised object may use.
-_JSON_SECRET_NAMES = r"(?:password|pipelex_api_key|gateway_api_key|jwt_secret_key|portkey_api_key|client_secret|access_token|refresh_token|id_token)"
+# A quoted entry name whose value is a secret whatever it holds, and what introduces the value: the
+# names a mapping key is read against, with a dash or an underscore wherever the name has an underscore
+# and in any case, so a serialised object and a mapping key are judged by the same list.
+_SECRET_ENTRY_NAMES = "|".join(sorted(re.escape(name).replace("_", "[-_]") for name in SECRET_KEY_NAMES))
+_SECRET_ENTRY_KEY = rf"[\"'](?:{_SECRET_ENTRY_NAMES})[\"']\s*:\s*"
 
 # The shipped families, in the order they run. Ported from the hosted plane's own scrubber; a family
 # is written to name the secret's carrier in the same string as the secret, which is what a header
@@ -99,12 +112,16 @@ SECRET_PATTERNS: tuple[RedactionPattern, ...] = (
     # closes a serialised entry. The word must introduce a value with a colon or an equals sign, so
     # prose that merely mentions a cookie is left alone.
     (re.compile(r"(?i)\b((?:set-)?cookie[\"']?\s*[:=]\s*[\"']?)([^\"'\r\n]{4,})"), rf"\1{REDACTED_TEXT}"),
-    # The JSON entries that are a secret whatever they hold, the value read up to the same quote that
-    # opened it with a backslash escape honoured, so a value holding the other quote character or an
-    # escaped one is removed whole. ``code`` is not among them: it is the runtime's own identifier for
-    # a pipe, a domain and an error, and the OAuth code has the query-string family above.
-    (re.compile(rf'("{_JSON_SECRET_NAMES}"\s*:\s*")((?:\\.|[^"\\])+)(")'), rf"\1{REDACTED_TEXT}\3"),
-    (re.compile(rf"('{_JSON_SECRET_NAMES}'\s*:\s*')((?:\\.|[^'\\])+)(')"), rf"\1{REDACTED_TEXT}\3"),
+    # The serialised entries that are a secret whatever they hold, a JSON object and a Python ``repr``
+    # alike. A quoted value is read up to the same quote that opened it, whichever quoted the name, with
+    # a backslash escape honoured, so a value holding the other quote character or an escaped one is
+    # removed whole; a number or a boolean is removed as the bare token it is. A nested object or list
+    # is beyond a pattern, which is why a structured content is redacted by name before it is rendered.
+    # ``code`` is not among the names: it is the runtime's own identifier for a pipe, a domain and an
+    # error, and the OAuth code has the query-string family above.
+    (re.compile(rf'(?i)({_SECRET_ENTRY_KEY}")((?:\\.|[^"\\])+)(")'), rf"\1{REDACTED_TEXT}\3"),
+    (re.compile(rf"(?i)({_SECRET_ENTRY_KEY}')((?:\\.|[^'\\])+)(')"), rf"\1{REDACTED_TEXT}\3"),
+    (re.compile(rf"(?i)({_SECRET_ENTRY_KEY})(-?\d[\w.+-]*|true|false)(?![\w.+-])"), rf"\1{REDACTED_TEXT}"),
     # A key recognisable by its prefix alone, wherever it appears and whatever introduced it.
     (re.compile(r"\b((?:plx_sk_|sk_|pk_|bl_)[A-Za-z0-9_\-]{16,})\b"), REDACTED_TEXT),
 )
@@ -177,7 +194,9 @@ def _quarantine(*, record: logging.LogRecord, exc: Exception) -> None:
 def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:
     """Scrub the record's message and its exception text, and scrub and neutralise every string the record carries."""
     message = _rendered_message(record=record)
-    if message is not None:
+    if message is None:
+        _withhold_arguments(record=record, patterns=patterns)
+    else:
         scrubbed = scrub_secrets(text=message, patterns=patterns)
         if scrubbed != message:
             # The rendering replaces the format string and its arguments, because that is where the
@@ -187,12 +206,15 @@ def _redact_record(*, record: logging.LogRecord, patterns: tuple[RedactionPatter
             record.args = ()
     _redact_exception_text(record=record, patterns=patterns)
     for name, value in carried_attributes(record=record).items():
-        # ``data`` keeps its control characters for the reason the message does: it is the runtime's
-        # own rendering of the caller's object, and the wire sinks escape it themselves.
+        # A field whose own name is a secret's loses its value whatever it holds, exactly as a mapping
+        # entry does. ``data`` keeps its control characters for the reason the message does: it is the
+        # runtime's own rendering of the caller's object, and the wire sinks escape it themselves.
         setattr(
             record,
             name,
-            _clean_value(value=value, patterns=patterns, open_containers=set(), is_escaping_control_characters=name != DATA_FIELD),
+            REDACTED_TEXT
+            if _is_secret_key(key=name)
+            else _clean_value(value=value, patterns=patterns, open_containers=set(), is_escaping_control_characters=name != DATA_FIELD),
         )
 
 
@@ -219,14 +241,46 @@ def _rendered_message(*, record: logging.LogRecord) -> str | None:
 
     ``getMessage`` interpolates the call's arguments, which is where a third-party library puts the
     value its format string names, so the secret is usually in the rendering rather than in ``msg``.
-    A record whose arguments do not match its format string raises there; such a record is left exactly
-    as it was, for the handler to fail on the way it always did, since redaction is not the place to
-    turn one failure into another.
+    A record whose arguments do not match its format string raises there, and ``_withhold_arguments``
+    decides what it becomes.
     """
     try:
         return record.getMessage()
     except Exception:  # ruff: ignore[blind-except]
         return None
+
+
+def _withhold_arguments(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:
+    """Replace the arguments of a record whose message cannot be rendered by a notice, after its scrubbed format string.
+
+    Left as it was, the record would fail again in the handler, and the stdlib's report of that failure
+    prints the format string and every argument to stderr as they are, the value a secret pattern would
+    have removed among them. With no arguments the stdlib renders the format string as it stands, so the
+    line still says which call it was; a format string that cannot even be read as text is dropped too.
+    """
+    try:
+        template = scrub_secrets(text=str(record.msg), patterns=patterns)
+    except Exception:  # ruff: ignore[blind-except]
+        record.msg = ARGUMENTS_WITHHELD_TEXT
+    else:
+        record.msg = f"{template} {ARGUMENTS_WITHHELD_TEXT}"
+    record.args = ()
+
+
+def redact_secret_entries(*, value: Any) -> Any:
+    """A JSON-ready value with every mapping entry named like a secret replaced by the redaction text, at any depth.
+
+    For a structured content, before the dispatch renders it: the message it writes is that rendering,
+    and a secret nested in an object or held as a number is beyond what the string families can read
+    back out of text. What comes back is a new value wherever an entry was replaced, and the value
+    itself otherwise.
+    """
+    if isinstance(value, Mapping):
+        mapping = cast("Mapping[Any, Any]", value)
+        return {key: REDACTED_TEXT if _is_secret_key(key=key) else redact_secret_entries(value=item) for key, item in mapping.items()}
+    if isinstance(value, list):
+        return [redact_secret_entries(value=item) for item in cast("list[Any]", value)]
+    return value
 
 
 def _is_secret_key(*, key: Any) -> bool:
@@ -244,6 +298,9 @@ def _clean_value(*, value: Any, patterns: tuple[RedactionPattern, ...], open_con
     would have dumped and rendered them after it, so neither carries a secret past the scrub. A
     number, a boolean and ``None`` come back as they are. A container that contains itself is cut at
     the cycle with a marker: kept raw, it would hand its unscrubbed strings to a sink's fallback rendering.
+    A model whose dump raises and an object whose text raises become a marker naming what was raised,
+    and nothing of what it said, which may be the very value it failed on: one value that refuses to
+    render costs that value, not the record and every other value beside it.
     """
     if isinstance(value, str):
         scrubbed = scrub_secrets(text=value, patterns=patterns)
@@ -251,7 +308,10 @@ def _clean_value(*, value: Any, patterns: tuple[RedactionPattern, ...], open_con
     if value is None or isinstance(value, (bool, int, float)):
         return value
     if isinstance(value, BaseModel):
-        value = value.model_dump(mode="json")
+        try:
+            value = value.model_dump(mode="json")
+        except Exception as exc:  # ruff: ignore[blind-except]
+            return _unrenderable_text(exc=exc)
     container_id = id(value)
     if container_id in open_containers:
         return CYCLE_TEXT
@@ -282,6 +342,13 @@ def _clean_value(*, value: Any, patterns: tuple[RedactionPattern, ...], open_con
         finally:
             open_containers.discard(container_id)
     # What ``json_fallback`` would have written for it, scrubbed before it is written.
-    return _clean_value(
-        value=str(value), patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters
-    )
+    try:
+        text = str(value)
+    except Exception as exc:  # ruff: ignore[blind-except]
+        return _unrenderable_text(exc=exc)
+    return _clean_value(value=text, patterns=patterns, open_containers=open_containers, is_escaping_control_characters=is_escaping_control_characters)
+
+
+def _unrenderable_text(*, exc: Exception) -> str:
+    """The marker a value that refused to render is carried as: the name of what it raised, and nothing of its text."""
+    return f"{UNRENDERABLE_PREFIX}{type(exc).__name__}]"

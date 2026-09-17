@@ -5,16 +5,12 @@ from __future__ import annotations
 import io
 import logging
 import sys
-from typing import TYPE_CHECKING
 
 import pytest
 from typing_extensions import override
 
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_sink import LogSink, render_json, spell_non_finite, stream_for_target
-
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
 
 
 class _RecordingHandler(logging.Handler):
@@ -59,7 +55,7 @@ class TestLogSink:
         assert isinstance(handler, _RecordingHandler)
         assert handler.seen == ["one|yes", "two|yes"]
 
-    def test_a_processor_that_raises_costs_that_records_processing_and_not_the_log_call(self, mocker: MockerFixture) -> None:
+    def test_a_processor_that_raises_costs_that_records_processing_and_not_the_log_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The stdlib runs a handler's filters outside any ``try``, so an unguarded processor would raise out of ``log.info``."""
         sink = _RecordingSink()
 
@@ -72,16 +68,37 @@ class TestLogSink:
 
         sink.processors.extend([fail, redact])
         handler = sink.handler
-        handle_error = mocker.patch.object(handler, "handleError")
+        reported = io.StringIO()
+        monkeypatch.setattr(sys, "stderr", reported)
 
         handler.handle(_record(message="one"))
 
         assert isinstance(handler, _RecordingHandler)
         assert handler.seen == ["one|yes"]
-        assert handle_error.call_count == 1
+        assert "--- Logging error ---" in reported.getvalue()
+        assert "RuntimeError" in reported.getvalue()
 
-    def test_a_reporter_that_raises_on_a_failed_processor_does_not_raise_out_of_the_log_call(self, mocker: MockerFixture) -> None:
-        """``handleError`` writes to stderr, and a closed stderr makes it raise; the guard swallows that too, and the record is still delivered."""
+    def test_what_a_failed_processor_raised_is_named_by_its_type_and_never_quoted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A processor fails on the record's own values, so its exception is where they end up: the secret the redaction was removing among them."""
+        sink = _RecordingSink()
+
+        def fail(_record: logging.LogRecord) -> None:
+            msg = "cannot scrub sk_live_0123456789abcdef"
+            raise RuntimeError(msg)
+
+        sink.processors.append(fail)
+        handler = sink.handler
+        reported = io.StringIO()
+        monkeypatch.setattr(sys, "stderr", reported)
+
+        handler.handle(_record(message="one"))
+
+        assert "sk_live_0123456789abcdef" not in reported.getvalue()
+        assert "Traceback" not in reported.getvalue()
+        assert "fail" in reported.getvalue()
+
+    def test_a_reporter_that_raises_on_a_failed_processor_does_not_raise_out_of_the_log_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The report writes to stderr, and a closed stderr makes the write raise; the guard swallows that too, and the record is still delivered."""
         sink = _RecordingSink()
 
         def fail(_record: logging.LogRecord) -> None:
@@ -90,7 +107,9 @@ class TestLogSink:
 
         sink.processors.append(fail)
         handler = sink.handler
-        mocker.patch.object(handler, "handleError", side_effect=ValueError("I/O operation on closed file"))
+        closed = io.StringIO()
+        closed.close()
+        monkeypatch.setattr(sys, "stderr", closed)
 
         handler.handle(_record(message="one"))
 

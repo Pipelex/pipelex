@@ -8,19 +8,26 @@ newlines, which are the runtime's own rendering and not a caller's string.
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing_extensions import override
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig, LogRedactionConfig
 from pipelex.tools.log.log_fields import DATA_FIELD
-from pipelex.tools.log.log_redaction import CYCLE_TEXT, REDACTED_TEXT, make_redaction_processor
+from pipelex.tools.log.log_redaction import (
+    ARGUMENTS_WITHHELD_TEXT,
+    CYCLE_TEXT,
+    REDACTED_TEXT,
+    UNRENDERABLE_PREFIX,
+    make_redaction_processor,
+)
 from pipelex.tools.log.log_sink import LogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -74,6 +81,20 @@ class _ListSink(LogSink):
 
     def own_records(self) -> list[logging.LogRecord]:
         return [record for record in self.list_handler.records if record.name == __name__]
+
+
+class _FailingOnceSink(_ListSink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.attempts = 0
+
+    @override
+    def make_handler(self) -> logging.Handler:
+        self.attempts += 1
+        if self.attempts == 1:
+            msg = "handler build failed"
+            raise RuntimeError(msg)
+        return self.list_handler
 
 
 class TestLogRedaction:
@@ -346,12 +367,127 @@ class TestLogRedaction:
         assert record.exc_text is None
         assert "sk_live" not in logging.Formatter().format(record)
 
-    def test_a_record_whose_message_cannot_be_rendered_keeps_its_scrubbed_fields_and_raises_nothing(self) -> None:
-        record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="%d items", args=("not a number",), exc_info=None)
+    def test_a_record_whose_message_cannot_be_rendered_withholds_its_arguments_and_keeps_its_scrubbed_fields(self) -> None:
+        """Left as it was, the handler would fail on it and the stdlib's report would print every argument raw to stderr."""
+        record = logging.LogRecord(
+            name=__name__,
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="%d items for sk_live_0123456789abcdef",
+            args=("plx_sk_0123456789abcdef",),
+            exc_info=None,
+        )
         record.payload = "sk_live_0123456789abcdef"
         processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
 
         processor(record)
 
-        assert record.msg == "%d items"
+        assert record.args == ()
+        assert record.getMessage() == f"%d items for {REDACTED_TEXT} {ARGUMENTS_WITHHELD_TEXT}"
         assert getattr(record, FIELD_NAME) == REDACTED_TEXT
+        assert "sk_" not in logging.Formatter().format(record)
+
+    def test_a_field_whose_own_name_is_a_secrets_loses_its_value_whatever_it_holds(self) -> None:
+        """A mapping entry named like a secret is redacted by its key; a field is the same entry one level up, on the record itself."""
+        record = _record(text="login")
+        record.password = 12345678
+        record.Authorization = "Basic dXNlcjpwYXNz"
+        record.user = "ada"
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        assert getattr(record, "password") == REDACTED_TEXT  # ruff: ignore[get-attr-with-constant]
+        assert getattr(record, "Authorization") == REDACTED_TEXT  # ruff: ignore[get-attr-with-constant]
+        assert getattr(record, "user") == "ada"  # ruff: ignore[get-attr-with-constant]
+
+    def test_a_serialised_secret_entry_is_scrubbed_in_any_case_under_every_secret_name_and_whatever_scalar_it_holds(self) -> None:
+        """Text a call rendered itself, an f-string of a dict or a third-party ``%s``, is judged by the names a mapping key is."""
+        message, _ = _redact(
+            text=(
+                '{"Password": "hunter2", "authorization": "Basic dXNlcjpwYXNz", "refresh-token": "rt", "x_signature": "abc", '
+                '"CLIENT_SECRET": 42, "api_key": true, "retries": 3, "code": "PIPE_NOT_FOUND"}'
+            )
+        )
+
+        assert message == (
+            f'{{"Password": "{REDACTED_TEXT}", "authorization": "{REDACTED_TEXT}", "refresh-token": "{REDACTED_TEXT}", '
+            f'"x_signature": "{REDACTED_TEXT}", "CLIENT_SECRET": {REDACTED_TEXT}, "api_key": {REDACTED_TEXT}, '
+            '"retries": 3, "code": "PIPE_NOT_FOUND"}'
+        )
+
+    def test_a_repr_entry_whose_value_is_quoted_differently_from_its_name_is_scrubbed_whole(self) -> None:
+        message, _ = _redact(text=repr({"password": "it's hunter2", "user": "ada"}))
+
+        assert message == f"{{'password': \"{REDACTED_TEXT}\", 'user': 'ada'}}"
+
+    def test_a_structured_contents_message_is_rendered_from_the_redacted_content_so_it_agrees_with_data(self, fresh_log: Log) -> None:
+        """The message is the content's JSON rendering; a secret held as an object or a number is beyond what the families read back out of text."""
+        log_config = _package_log_config()
+        fresh_log.configure(log_config=log_config)
+        sink = _ListSink()
+        fresh_log.install_sink(sink)
+
+        fresh_log.info({"password": {"nested": "hunter2"}, "pin": {"id_token": 123456789}, "user": "ada"})
+
+        (delivered,) = sink.own_records()
+        expected = {"password": REDACTED_TEXT, "pin": {"id_token": REDACTED_TEXT}, "user": "ada"}
+        assert getattr(delivered, DATA_FIELD) == expected
+        assert delivered.getMessage().endswith(json.dumps(expected, indent=log_config.json_logs_indent))
+        assert "hunter2" not in delivered.getMessage()
+        assert "123456789" not in delivered.getMessage()
+
+    def test_a_structured_content_with_no_secret_entry_keeps_the_helpers_own_rendering(self, fresh_log: Log) -> None:
+        log_config = _package_log_config()
+        fresh_log.configure(log_config=log_config)
+        sink = _ListSink()
+        fresh_log.install_sink(sink)
+        content = {"user": "ada", "tags": ["a", "b"]}
+
+        fresh_log.info(content)
+
+        (delivered,) = sink.own_records()
+        assert getattr(delivered, DATA_FIELD) == content
+        assert delivered.getMessage().endswith(json.dumps(content, indent=log_config.json_logs_indent))
+
+    def test_a_value_that_refuses_to_render_costs_that_value_alone_and_says_nothing_of_what_it_raised(self) -> None:
+        """Quarantining the record for one value would wipe the message and every innocent field beside it."""
+
+        class Creds(BaseModel):
+            token: str
+
+            @field_serializer("token")
+            def _refuse(self, token: str) -> str:
+                msg = f"cannot serialise {token}"
+                raise ValueError(msg)
+
+        class Refusing:
+            @override
+            def __str__(self) -> str:
+                msg = "refusing to render sk_live_0123456789abcdef"
+                raise RuntimeError(msg)
+
+        record = _record(text="processing", value={"creds": Creds(token="sk_live_0123456789abcdef"), "object": Refusing(), "request": "r-1"})
+        processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
+
+        processor(record)
+
+        cleaned = getattr(record, FIELD_NAME)
+        assert record.getMessage() == "processing"
+        assert cleaned["request"] == "r-1"
+        assert cleaned["creds"].startswith(UNRENDERABLE_PREFIX)
+        assert cleaned["object"] == f"{UNRENDERABLE_PREFIX}RuntimeError]"
+        assert "sk_live" not in str(cleaned)
+
+    def test_a_sink_whose_handler_fails_to_build_is_left_without_the_redaction_processor(self, fresh_log: Log) -> None:
+        """The failed sink is not recorded, so ``reset`` never reaches it; installed again, it must not carry a second processor."""
+        fresh_log.configure(log_config=_package_log_config())
+        sink = _FailingOnceSink()
+
+        with pytest.raises(RuntimeError, match="handler build failed"):
+            fresh_log.install_sink(sink)
+        assert sink.processors == []
+        fresh_log.install_sink(sink)
+
+        assert len(sink.processors) == 1

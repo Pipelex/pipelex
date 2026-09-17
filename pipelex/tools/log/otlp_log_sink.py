@@ -159,10 +159,12 @@ class OtlpLogHandler(logging.Handler):
                 attributes[exception_attributes.EXCEPTION_TYPE] = exc_type.__name__
             # The type and the stacktrace, whose last line is the exception's own text, and no message
             # attribute: ``str(exc_value)`` is the one rendering nothing before this sink can scrub,
-            # whereas ``exc_text`` is what the redaction processor rendered and scrubbed, when it ran.
+            # whereas ``exc_text`` is what the redaction processor rendered and scrubbed, when it ran. An
+            # exception that was never raised, or whose traceback was dropped, renders as its last line
+            # alone, which is then the only place its text is exported.
             if record.exc_text:
                 attributes[exception_attributes.EXCEPTION_STACKTRACE] = record.exc_text
-            elif exc_traceback is not None:
+            elif exc_value is not None:
                 attributes[exception_attributes.EXCEPTION_STACKTRACE] = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
         return attributes
 

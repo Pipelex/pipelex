@@ -58,28 +58,40 @@ class _ProcessorFilter(logging.Filter):
 
     The stdlib runs a handler's filters outside any ``try``, so a processor that raised would raise out
     of the ``log.<level>(...)`` call that emitted the record, against the promise that a log call never
-    raises. Each processor is therefore guarded on its own: what it raises goes to the handler's
-    ``handleError``, the stdlib's own channel for a handler that failed, the processors after it still
-    run, and the record is handed to the handler all the same. The reporter is guarded too, since it
-    writes to stderr and a closed stderr makes it raise. A processor that fails costs that record its
-    processing, never the call and never the line; a processor that must not hand on what it failed
-    to process, the redaction, strips the record itself before it raises.
+    raises. Each processor is therefore guarded on its own: what it raises is reported on stderr, the
+    processors after it still run, and the record is handed to the handler all the same. The report
+    names the processor and the type of what it raised, and withholds the exception's text and
+    traceback, which the handler's ``handleError`` would have printed: a processor fails on the record's
+    own values, so its exception is where they end up, the secret the redaction was removing among them.
+    The reporter is guarded too, since a closed stderr makes it raise. A processor that fails costs that
+    record its processing, never the call and never the line; a processor that must not hand on what it
+    failed to process, the redaction, strips the record itself before it raises.
     """
 
-    def __init__(self, *, processors: list[LogRecordProcessor], handler: logging.Handler):
+    def __init__(self, *, processors: list[LogRecordProcessor]):
         super().__init__()
         self._processors = processors
-        self._handler = handler
 
     @override
     def filter(self, record: logging.LogRecord) -> bool:
         for processor in self._processors:
             try:
                 processor(record)
-            except Exception:  # ruff: ignore[blind-except]
+            except Exception as exc:  # ruff: ignore[blind-except]
                 with contextlib.suppress(Exception):
-                    self._handler.handleError(record)
+                    _report_processor_failure(processor=processor, exc=exc)
         return True
+
+
+def _report_processor_failure(*, processor: LogRecordProcessor, exc: Exception) -> None:
+    """Write the stdlib's logging-error banner with the processor and the exception type, when the stdlib would have reported at all."""
+    if not logging.raiseExceptions or not sys.stderr:
+        return
+    processor_name = getattr(processor, "__qualname__", type(processor).__qualname__)
+    sys.stderr.write(
+        f"--- Logging error ---\nThe log record processor {processor_name} raised {type(exc).__name__}, and the record was handed on "
+        "without it. The exception's text is withheld, since it may carry what the processor was removing.\n"
+    )
 
 
 class LogSink(ABC):
@@ -103,7 +115,7 @@ class LogSink(ABC):
         """The sink's handler, built on first read with the processors wired in front of it."""
         if self._handler is None:
             handler = self.make_handler()
-            handler.addFilter(_ProcessorFilter(processors=self.processors, handler=handler))
+            handler.addFilter(_ProcessorFilter(processors=self.processors))
             self._handler = handler
         return self._handler
 

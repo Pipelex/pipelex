@@ -189,12 +189,19 @@ class Log:
         redaction = self._log_config_instance.redaction
         if redaction.is_enabled:
             # Ahead of whatever the sink appended, so a processor that renders or enriches a record
-            # works on one the secrets have already left, and cannot put back what the scrub removed.
-            # Remembered, so ``reset`` takes it back off a sink object a caller installs again.
+            # works on one the secrets have already left. A processor that adds a secret of its own
+            # after the scrub is that sink's to answer for. Remembered, so ``reset`` takes it back off a
+            # sink object a caller installs again.
             self._redaction_processor = make_redaction_processor(config=redaction)
             sink.processors.insert(0, self._redaction_processor)
 
-        handler = sink.handler
+        try:
+            handler = sink.handler
+        except BaseException:
+            # The sink is not recorded when its handler fails to build, so ``reset`` would never reach it:
+            # the processor comes back off here, or the same sink installed again carries two.
+            self._take_back_redaction_processor(sink=sink)
+            raise
         # Ahead of every other filter, so the sink's processors never run on a record it rejects.
         handler.filters.insert(0, ForwardedRecordFilter())
         root_logger = logging.getLogger()
