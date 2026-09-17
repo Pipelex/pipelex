@@ -126,6 +126,26 @@ class FailingFlushTransport(Transport):  # pyright: ignore[reportUntypedBaseClas
         return None
 
 
+class FailingCloseTransport(Transport):  # pyright: ignore[reportUntypedBaseClass]
+    """A transport whose closing drain meets a refused batch, which the library reports through its own logger."""
+
+    def __init__(self) -> None:
+        self.handler: logging.Handler | None = None
+
+    @override
+    def send(self, record: logging.LogRecord, message: dict[str, Any], **kwargs: Any) -> None:  # kw-only: ignore — the library's own signature
+        return None
+
+    @override
+    def flush(self) -> None:
+        return None
+
+    @override
+    def close(self) -> None:
+        assert self.handler is not None
+        self.handler.handle(_library_record(level=logging.ERROR, msg="Failed to submit the last batch"))
+
+
 class CapturingHandler(logging.Handler):
     """Stands in for the stdlib's last-resort handler, keeping what it would have printed on stderr."""
 
@@ -392,6 +412,45 @@ class TestGcpLogSink:
             "The gcp log sink's transport reported 2 more export failures since the last one printed",
             "Failed to submit batch 3",
         ]
+
+    def test_a_count_left_when_the_failures_stop_is_printed_once_its_window_has_passed(self, mocker: MockerFixture) -> None:
+        """An outage that ends leaves its count behind, and no later failure comes to print it."""
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        export_filter = GcpExportPathFilter(report_interval_seconds=0.5)
+
+        for batch_number in range(3):
+            export_filter.filter(_library_record(level=logging.ERROR, msg=f"Failed to submit batch {batch_number}"))
+        assert export_filter.filter(_application_record())
+        assert [record.getMessage() for record in stderr.records] == ["Failed to submit batch 0"]
+
+        time.sleep(0.6)
+        assert export_filter.filter(_application_record())
+        assert [record.getMessage() for record in stderr.records] == [
+            "Failed to submit batch 0",
+            "The gcp log sink's transport reported 2 more export failures since the last one printed",
+        ]
+
+    def test_the_handler_prints_the_count_left_at_close_including_what_the_closing_drain_adds(self, mocker: MockerFixture) -> None:
+        """The close drains the queue, and a refusal met there is counted inside a window nothing else would close."""
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = FailingCloseTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+        transport.handler = handler
+
+        handler.handle(_library_record(level=logging.ERROR, msg="Failed to submit batch 0"))
+        handler.close()
+
+        assert [record.getMessage() for record in stderr.records] == [
+            "Failed to submit batch 0",
+            "The gcp log sink's transport reported 1 more export failures since the last one printed",
+        ]
+
+
+def _application_record() -> logging.LogRecord:
+    """A record the application logs, which the filter passes."""
+    return logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="an ordinary line", args=(), exc_info=None)
 
 
 def _library_record(*, level: int, msg: str) -> logging.LogRecord:

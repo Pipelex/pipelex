@@ -71,7 +71,8 @@ GCP_WORKER_THREAD_NAME = "google.cloud.logging.Worker"
 # How often an export failure is printed on stderr. The library reports a refused batch once per failed
 # commit and never retries it, so a refusal that persists — a missing permission, a revoked key — reports
 # at the rate the application logs. The first report in a window is printed with its traceback, and the
-# ones after it are counted and said in one line when the next window opens. The OpenTelemetry SDK
+# ones after it are counted and said in one line once the window has passed: with the next report, on
+# the next record the handler sees, or when the handler closes, whichever comes first. The OpenTelemetry SDK
 # deduplicates its own exporter's failures over the same window.
 EXPORT_FAILURE_REPORT_INTERVAL_SECONDS = 20.0
 
@@ -153,10 +154,21 @@ class GcpExportPathFilter(logging.Filter):
     @override
     def filter(self, record: logging.LogRecord) -> bool:
         if not self._is_export_path(record=record):
+            # Read outside the lock, which keeps an ordinary record's cost to this one read: a count it
+            # misses is said on a later record, or when the handler closes.
+            if self._unreported_count:
+                self._report_count_once_its_window_has_passed()
             return True
         if record.levelno >= logging.WARNING:
             self._report_on_stderr(record=record)
         return False
+
+    def report_unreported(self) -> None:
+        """Print the failures counted and not yet printed, whatever the window: the handler's last word at close."""
+        with self._report_lock:
+            unreported_count = self._unreported_count
+            self._unreported_count = 0
+        self._print_unreported_count(unreported_count=unreported_count)
 
     @classmethod
     def _is_export_path(cls, *, record: logging.LogRecord) -> bool:
@@ -166,30 +178,51 @@ class GcpExportPathFilter(logging.Filter):
 
     def _report_on_stderr(self, *, record: logging.LogRecord) -> None:
         """Print the export path's report through the last resort, the first one per window in full."""
-        stderr_handler = logging.lastResort
-        if stderr_handler is None:
-            return
         now = time.monotonic()
         with self._report_lock:
-            if self._last_report_at is not None and now - self._last_report_at < self._report_interval_seconds:
+            if self._window_is_open(now=now):
                 self._unreported_count += 1
                 return
             self._last_report_at = now
             unreported_count = self._unreported_count
             self._unreported_count = 0
-        if unreported_count:
-            stderr_handler.handle(
-                logging.makeLogRecord(
-                    {
-                        "name": record.name,
-                        "levelno": logging.WARNING,
-                        "levelname": logging.getLevelName(logging.WARNING),
-                        "msg": "The gcp log sink's transport reported %d more export failures since the last one printed",
-                        "args": (unreported_count,),
-                    }
-                )
+        self._print_unreported_count(unreported_count=unreported_count)
+        stderr_handler = logging.lastResort
+        if stderr_handler is not None:
+            stderr_handler.handle(record)
+
+    def _report_count_once_its_window_has_passed(self) -> None:
+        """Print the count an outage that has ended left behind, since no later failure comes to print it.
+
+        The window is left as it is: the count is one line, and a failure arriving next is still printed
+        in full rather than counted.
+        """
+        with self._report_lock:
+            if self._window_is_open(now=time.monotonic()):
+                return
+            unreported_count = self._unreported_count
+            self._unreported_count = 0
+        self._print_unreported_count(unreported_count=unreported_count)
+
+    def _window_is_open(self, *, now: float) -> bool:
+        return self._last_report_at is not None and now - self._last_report_at < self._report_interval_seconds
+
+    @classmethod
+    def _print_unreported_count(cls, *, unreported_count: int) -> None:
+        stderr_handler = logging.lastResort
+        if not unreported_count or stderr_handler is None:
+            return
+        stderr_handler.handle(
+            logging.makeLogRecord(
+                {
+                    "name": __name__,
+                    "levelno": logging.WARNING,
+                    "levelname": logging.getLevelName(logging.WARNING),
+                    "msg": "The gcp log sink's transport reported %d more export failures since the last one printed",
+                    "args": (unreported_count,),
+                }
             )
-        stderr_handler.handle(record)
+        )
 
 
 def severity_for_level(*, levelno: int) -> GcpLogSeverity:
@@ -291,6 +324,8 @@ class GcpLogHandler(logging.Handler):
         super().__init__(level=logging.NOTSET)
         self._transport = transport
         self._project = project
+        self._export_path_filter = GcpExportPathFilter()
+        self.addFilter(self._export_path_filter)
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
@@ -337,7 +372,12 @@ class GcpLogHandler(logging.Handler):
 
     @override
     def close(self) -> None:
+        """Closes the transport, then prints the export failures still counted.
+
+        In that order, because the close drains the queue and a refusal met there is counted too.
+        """
         self._transport.close()
+        self._export_path_filter.report_unreported()
         super().close()
 
 
@@ -355,9 +395,7 @@ class GcpLogSink(LogSink):
 
     @override
     def make_handler(self) -> logging.Handler:
-        handler = GcpLogHandler(transport=self._transport, project=self._project)
-        handler.addFilter(GcpExportPathFilter())
-        return handler
+        return GcpLogHandler(transport=self._transport, project=self._project)
 
 
 def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
