@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
@@ -91,6 +92,35 @@ _RICH_MODE_BOOT_SCRIPT = _NO_RICH_PRELUDE + textwrap.dedent(
 )
 
 
+# `pipelex.test_extras.shared_pytest_plugins` loads in every session of every project that registers it, so a
+# downstream suite installed without the extra must still collect and run. The blocker goes in at the top of
+# the conftest, before the plugin is imported; `CI` is what puts the placeholder fixture on the path, which is
+# where the console calls that used to break such a session were.
+_DOWNSTREAM_CONFTEST = textwrap.dedent(
+    """
+    import importlib.abc
+    import sys
+
+    class _RichBlocker(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path, target=None):
+            if fullname == "rich" or fullname.startswith("rich."):
+                raise ImportError(f"no-rich guard blocked '{fullname}'")
+            return None
+
+    sys.meta_path.insert(0, _RichBlocker())
+
+    pytest_plugins = ["pipelex.test_extras.shared_pytest_plugins"]
+    """
+)
+
+_DOWNSTREAM_TEST = textwrap.dedent(
+    """
+    def test_a_downstream_project_runs_its_own_test():
+        assert True
+    """
+)
+
+
 def _run_python(*, script: str, args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [sys.executable, "-c", script, *args],
@@ -129,6 +159,26 @@ class TestRichFreeRun:
                 assert any("Hello world!" in line for line in stderr_lines), result.stderr
             case PrettyPrintMode.RICH:
                 pytest.fail("the rich mode is the one this test refuses")
+
+    def test_a_downstream_suite_registering_the_shared_plugin_runs_with_rich_refused(self, tmp_path: Path) -> None:
+        """A project that registers the shared pytest plugin and installs no extra still collects and runs its tests."""
+        (tmp_path / "conftest.py").write_text(_DOWNSTREAM_CONFTEST, encoding="utf-8")
+        (tmp_path / "test_downstream.py").write_text(_DOWNSTREAM_TEST, encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "-p", "no:randomly", "-q", "test_downstream.py"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=tmp_path,
+            timeout=150,
+            # `CI` is what the plugin reads to set the placeholder env vars, and disabling the entry-point
+            # plugins keeps an unrelated third-party plugin's own Rich import out of the measurement.
+            env={**os.environ, "CI": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+        )
+
+        assert result.returncode == 0, f"downstream suite failed:\nstdout={result.stdout}\nstderr={result.stderr}"
+        assert "1 passed" in result.stdout, result.stdout
 
     def test_the_rich_pretty_print_mode_is_refused_at_boot_naming_the_extra(self) -> None:
         """Without Rich, `pretty_print_mode = "rich"` stops the boot with the extra to install and the Rich-free modes."""

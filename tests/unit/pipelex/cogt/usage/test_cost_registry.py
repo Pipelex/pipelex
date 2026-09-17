@@ -9,6 +9,7 @@ from pipelex.cogt.llm.llm_report import LLMTokenCostReportField, LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata
 
 
@@ -495,6 +496,41 @@ class TestCostRegistry:
 
         mock_console.print.assert_not_called()
         assert csv_file.exists()
+        with open(csv_file, encoding="utf-8") as file:
+            rows = list(csv.DictReader(file))
+        assert len(rows) == 1
+        assert rows[0][LLMTokenCostReportField.LLM_NAME] == "test-model"
+
+    def test_the_csv_is_written_even_when_the_console_table_cannot_render(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
+        """Rich is the `cli` extra, and the CSV report does not need it: a console that cannot render loses only itself.
+
+        The shipped default prints to the console, and the caller downgrades a `PipelexError` to a warning, so a
+        console table that raises used to take the CSV report with it silently.
+        """
+        mocker.patch(
+            "pipelex.cogt.usage.cost_registry.get_console",
+            side_effect=MissingDependencyError(dependency_name="rich", extra_name="cli", message="no console here"),
+        )
+
+        llm_tokens_usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={CostCategory.INPUT: 1000, CostCategory.OUTPUT: 2000},
+        )
+
+        csv_file = tmp_path / "costs_without_rich.csv"
+        with pytest.raises(MissingDependencyError):
+            CostRegistry.generate_report(
+                pipeline_run_id="test-pipeline",
+                tokens_usages=[llm_tokens_usage],
+                unit_scale=1.0,
+                cost_report_file_path=csv_file,
+                print_to_console=True,
+            )
+
+        assert csv_file.exists(), "the CSV report is the output that does not need Rich"
         with open(csv_file, encoding="utf-8") as file:
             rows = list(csv.DictReader(file))
         assert len(rows) == 1
