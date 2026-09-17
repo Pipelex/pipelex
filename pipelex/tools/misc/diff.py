@@ -5,11 +5,6 @@ import filecmp
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rich.console import Group
-from rich.syntax import Syntax
-from rich.table import Table
-from rich.text import Text
-
 from pipelex.tools.misc.file_utils import is_excluded_by_name
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 
@@ -238,6 +233,11 @@ def make_diff_dirs_pretty(
         and different files with full diff content. For different files, indicates
         which version is newer based on modification time.
     """
+    from rich.console import Group
+    from rich.syntax import Syntax
+    from rich.table import Table
+    from rich.text import Text
+
     dir1 = Path(dir1)
     dir2 = Path(dir2)
     exclude_dirs = exclude_dirs or set()

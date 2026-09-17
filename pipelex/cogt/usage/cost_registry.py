@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from pydantic import Field, RootModel
-from rich import box
-from rich.table import Table
 
 from pipelex import log
 from pipelex.cogt.exceptions import CostRegistryError
@@ -159,7 +157,11 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             raise CostRegistryError(msg)
 
         if print_to_console:
+            # The console table is the one output here that needs Rich, the `cli` extra: the CSV report does not.
             console = get_console()
+            from rich import box
+            from rich.table import Table
+
             title = f"Costs by model for pipeline '{pipeline_run_id}'"
             table = Table(title=title, box=box.ROUNDED)
 

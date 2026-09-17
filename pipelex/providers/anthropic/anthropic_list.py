@@ -3,9 +3,6 @@ from __future__ import annotations
 import importlib.util
 from typing import TYPE_CHECKING
 
-from rich import box
-from rich.table import Table
-
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.runtime_hub import get_console
@@ -93,6 +90,9 @@ def _display_anthropic_models_table(
     backend_name: str,
 ) -> None:
     """Display Anthropic models in table format."""
+    from rich import box
+    from rich.table import Table
+
     table = Table(
         title=f"Available Models for Backend '{backend_name}' (SDK: {sdk})",
         show_header=True,

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from rich.markup import escape
-
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelListingUnsupportedError, ModelManagerError
 from pipelex.runtime_hub import get_console, get_model_lister_registry, get_models_manager
@@ -23,6 +21,8 @@ class ModelLister:
             backend_name: Name of the backend to list models for
             flat: Whether to output in flat CSV format
         """
+        from rich.markup import escape
+
         try:
             backend = get_models_manager().get_required_inference_backend(backend_name)
         except ModelManagerError as exc:
@@ -94,6 +94,8 @@ class ModelLister:
         flat: bool,
     ) -> None:
         """Display message about unsupported SDKs."""
+        from rich.markup import escape
+
         if not any_listed and unsupported_sdks:
             console = get_console()
             if not flat:

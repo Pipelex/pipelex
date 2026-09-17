@@ -3,8 +3,6 @@ from enum import StrEnum
 
 import pytest
 from pytest import Config, FixtureRequest, Parser
-from rich.console import Console
-from rich.panel import Panel
 
 from pipelex.runtime_hub import get_console
 from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
@@ -121,6 +119,11 @@ def pytest_configure(config: Config) -> None:
     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
 
     if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
+        # Rich is the `cli` extra, and this plugin loads in every test session of a project that registers it:
+        # it is imported only for the panel that stops the session.
+        from rich.console import Console
+        from rich.panel import Panel
+
         console = Console()
         console.print()
         console.print(

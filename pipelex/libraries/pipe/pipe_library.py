@@ -2,8 +2,6 @@ from itertools import groupby
 from typing import Self
 
 from pydantic import RootModel
-from rich import box
-from rich.table import Table
 from typing_extensions import override
 
 from pipelex import pretty_print
@@ -200,6 +198,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def pretty_list_pipes(self) -> None:
+        from rich import box
+        from rich.table import Table
+
         def _format_concept_code(concept_code: str | None, *, current_domain: str) -> str:
             """Format concept code by removing domain prefix if it matches current domain."""
             if not concept_code:

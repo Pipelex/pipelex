@@ -3,9 +3,6 @@ from __future__ import annotations
 import importlib.util
 from typing import TYPE_CHECKING, Any
 
-from rich import box
-from rich.table import Table
-
 from pipelex.runtime_hub import get_console
 from pipelex.system.exceptions import MissingDependencyError
 
@@ -79,6 +76,9 @@ def _display_google_models_table(
     backend_name: str,
 ) -> None:
     """Display Google GenAI models in table format."""
+    from rich import box
+    from rich.table import Table
+
     table = Table(
         title=f"Available Models for Backend '{backend_name}' (SDK: {sdk})",
         show_header=True,

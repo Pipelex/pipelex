@@ -3,9 +3,6 @@ from __future__ import annotations
 import importlib.util
 from typing import TYPE_CHECKING, Any
 
-from rich import box
-from rich.table import Table
-
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.config import get_config
 from pipelex.plugins.model_handle import ModelHandle
@@ -103,6 +100,9 @@ def _display_bedrock_models_table(
     aws_region: str,
 ) -> None:
     """Display Bedrock models in table format."""
+    from rich import box
+    from rich.table import Table
+
     table = Table(
         title=f"Available Bedrock Models in {aws_region} (SDK: {sdk})",
         show_header=True,

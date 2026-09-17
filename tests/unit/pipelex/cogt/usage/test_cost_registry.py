@@ -365,7 +365,8 @@ class TestCostRegistry:
         """Test that unit scaling is applied correctly to cost display."""
         # Mock console to avoid output during tests
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mocker.MagicMock())
-        mock_table_class = mocker.patch("pipelex.cogt.usage.cost_registry.Table")
+        # Rich is imported where the table is built, so the class is patched where it is defined.
+        mock_table_class = mocker.patch("rich.table.Table")
         mock_table = mock_table_class.return_value
 
         # Create test data
