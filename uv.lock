@@ -3591,7 +3591,7 @@ requires-dist = [
     { name = "fal-client", marker = "extra == 'fal'", specifier = ">=0.4.1" },
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "google-auth-oauthlib", marker = "extra == 'google'", specifier = ">=1.2.1" },
-    { name = "google-cloud-logging", marker = "extra == 'gcp-logging'", specifier = ">=3.11.0" },
+    { name = "google-cloud-logging", marker = "extra == 'gcp-logging'", specifier = ">=3.12.0" },
     { name = "google-cloud-storage", marker = "extra == 'gcp-storage'", specifier = ">=2.10.0" },
     { name = "google-genai", marker = "extra == 'google-genai'" },
     { name = "httpx", specifier = ">=0.23.0,<1.0.0" },
