@@ -72,9 +72,11 @@ A value can be anything. It rides the record by reference and the sink serialize
 - Where the [OpenTelemetry semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/logs/) define a key for the concept, use that key verbatim, dots included (`http.response.status_code`, `code.function.name`), so an OTLP sink emits it without translation. The three run identifiers have no such key and keep their payload names.
 - `request_id`, `pipeline_run_id` and `pipe_run_id` are reserved for the [run-scoped context](#the-run-scoped-context), and `data` is reserved for [structured content](#structured-content). A field of one of those names is accepted and takes precedence as described below, but nothing else should use them.
 
-### Names the stdlib owns
+### Names that are not yours to give
 
 The stdlib refuses an `extra` key that would overwrite one of the record's own attributes (`name`, `message`, `lineno`, `module`, `args`, `asctime` and the rest), and a library's log call never raises. An entry of such a name is therefore carried under the prefix `field_`: `fields={"name": "alpha"}` lands as `record.field_name`. What counts as owned is read off the record actually built, through whatever record factory is installed, so an attribute an OpenTelemetry or tracing instrumentation stamps on every record is a collision too, for a field, a context identifier and `data` alike. The prefix is applied until the name lands on an attribute nobody owns, and entries attach in order, so a call that gives both `name` and `field_name` keeps both values whatever their order: the one that arrives second lands on `field_field_name`.
+
+Two kinds of name are reserved though nothing on a fresh record owns them yet, because both are stamped after the entries are attached and the stdlib's refusal therefore cannot cover them: what the formatter sets (`message`, `asctime`) and what Pipelex's own logging machinery sets — `_pipelex_forwarded`, the marker that tells the sink's handler a record reached it through the boot's holding handler already. Both take the same `field_` prefix, and the marker is never handed to a sink as something the record carries. Without that reservation, `fields={"_pipelex_forwarded": True}` would have the sink's own filter read the record as one already delivered and drop it whole.
 
 ## The run-scoped context
 

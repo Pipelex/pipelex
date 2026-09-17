@@ -342,10 +342,15 @@ class TestFixApplierCommentFidelity:
         This is the file shape the bug was reported on: a document seeded from a heavily-commented
         template, migrated by the configuration reshape. Every ``# <Name> config`` banner that
         introduced a section before must introduce the same section after — wherever it moved to.
+
+        A complete pre-reshape document carries the log-mode keys at their old defaults, so the
+        ``unsafe`` retirement entry is reported against it and applies nothing. It is named here
+        rather than tolerated, so that any *other* entry going blocked over this document is a
+        failure rather than a silence.
         """
         ledger = load_ledger(migration_dir=packaged_migration_dir(), surface_id="pipelex-config")
         replay = replay_ledger_over_text(ledger=ledger, text=_PRE_RESHAPE_DEFAULTS.read_text(encoding="utf-8"))
-        assert replay.blocked == []
+        assert [blocked.entry_id for blocked in replay.blocked] == ["pipelex-config@5"]
         rule = "#" * 100
         expected_headers_by_banner = {
             # moved out of [pipelex] into a created root section

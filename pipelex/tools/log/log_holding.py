@@ -15,14 +15,11 @@ import logging
 
 from typing_extensions import override
 
+from pipelex.tools.log.log_fields import FORWARDED_MARK
+
 # The most records held at once; beyond it the oldest are dropped, so a process that configures
 # logging and never installs a sink cannot grow without bound. A boot holds a few dozen lines.
 HOLDING_CAPACITY = 1000
-
-# The attribute a forwarded record carries once the sink's handler has handled it, so the same record
-# reaching that handler again through the root logger is rejected. Underscored so no caller's ``extra``
-# can spell it: the stdlib refuses only the names a ``LogRecord`` already has.
-FORWARDED_MARK = "_pipelex_forwarded"
 
 
 class ForwardedRecordFilter(logging.Filter):
@@ -34,6 +31,10 @@ class ForwardedRecordFilter(logging.Filter):
     so the sink's processors never run on a record it rejects, and it stays installed: after the
     handoff no record is marked again, and a thread that read the root's handler list mid-handoff
     can still be on its way.
+
+    The mark is only ever ours, and that is a property of the attachment rather than of the spelling:
+    the name is reserved in ``log_fields``, so a caller's field spelling it is carried under a prefix
+    and cannot make this filter drop a record nobody delivered.
     """
 
     @override

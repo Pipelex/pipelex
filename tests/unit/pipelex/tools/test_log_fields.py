@@ -15,7 +15,7 @@ import pytest
 
 from pipelex import log
 from pipelex.tools.log.log_context import get_log_context
-from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD, FORWARDED_MARK, carried_attributes
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
 if TYPE_CHECKING:
@@ -199,6 +199,34 @@ class TestLogFields:
         override, plain = _own_records(caplog)
         assert _field(override, name="request_id") == "from-call-site"
         assert _field(plain, name="request_id") == "from-context"
+
+    def test_a_field_named_like_the_forwarding_marker_is_prefixed_and_never_reaches_a_sink(self, caplog: pytest.LogCaptureFixture) -> None:
+        """The marker is Pipelex's own, so a fresh record does not carry the name yet and the stdlib would not refuse it.
+
+        Left unreserved, a caller naming it hands the sink's handler a record its forwarding filter reads as
+        one already delivered, and the whole record is dropped. The name is reserved, so the value is carried
+        under the prefix, the record does not claim to have been forwarded, and the marker is not a field.
+        """
+        with caplog.at_level(logging.INFO):
+            log.info("impersonation", fields={FORWARDED_MARK: True, "safe": 1})
+
+        (record,) = _own_records(caplog)
+        assert record.getMessage() == "impersonation"
+        assert not getattr(record, FORWARDED_MARK, False)
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{FORWARDED_MARK}") is True
+        assert _field(record, name="safe") == 1
+        carried = carried_attributes(record=record)
+        assert FORWARDED_MARK not in carried
+        assert carried[f"{COLLIDING_FIELD_PREFIX}{FORWARDED_MARK}"] is True
+
+    def test_the_forwarding_marker_a_record_already_carries_is_not_a_carried_field(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A structured sink reads the record's own fields; the marker is machinery and belongs on no wire."""
+        with caplog.at_level(logging.INFO):
+            log.info("already forwarded", fields={"safe": 1})
+
+        (record,) = _own_records(caplog)
+        setattr(record, FORWARDED_MARK, True)
+        assert carried_attributes(record=record) == {"safe": 1}
 
     @pytest.mark.parametrize("name", ["__class__", "__dict__", "getMessage"])
     def test_a_name_the_record_class_owns_is_prefixed_and_the_record_survives(self, caplog: pytest.LogCaptureFixture, name: str) -> None:

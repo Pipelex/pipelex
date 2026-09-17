@@ -15,6 +15,7 @@ from typing_extensions import override
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_fields import FORWARDED_MARK
 from pipelex.tools.log.log_holding import HOLDING_CAPACITY, HoldingLogHandler
 from pipelex.tools.log.log_sink import LogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -96,6 +97,16 @@ class TestHoldingLogHandler:
         assert fresh_log.sink is sink
         assert sink.handler in logging.getLogger().handlers
         assert not any(isinstance(handler, HoldingLogHandler) for handler in logging.getLogger().handlers)
+
+    def test_a_field_named_like_the_forwarding_marker_does_not_cost_the_record(self, fresh_log: Log) -> None:
+        """The marker is internal, and a caller's field must never be read as one: the record reaches the sink all the same."""
+        sink = _ListSink()
+        fresh_log.install_sink(sink)
+
+        fresh_log.warning("not lost", fields={FORWARDED_MARK: True})
+        fresh_log.info("nor the next one")
+
+        assert sink.own_messages() == ["not lost", "nor the next one"]
 
     def test_a_processor_edits_the_replayed_and_the_live_records_alike(self, fresh_log: Log) -> None:
         fresh_log.info("held")
