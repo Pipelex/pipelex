@@ -18,17 +18,18 @@ consequences follow, both by design:
   standard moved" — it is not the PR's fault, and the remedy is a dedicated change bringing
   `pinned_blueprints.py` (and the matching runtime content class) to the page, never a tweak to
   whatever PR happened to be open.
-- **Absence is named, never silently passed over.** Without the sibling checkout the comparisons
-  against the page skip with the reason below — kept so a contributor does not need the whole
-  workspace to run the suite. It is not an opt-out: the `MTHDS standard conformance` workflow
-  checks the standard out beside this repo and runs this module on every pull request, so a
-  disagreement with the page fails the merge either way.
+- **Absence is named, never silently passed over.** Without the sibling checkout the module skips
+  with the reason below — kept so a contributor does not need the whole workspace to run the
+  suite. It is not an opt-out: the `MTHDS standard conformance` workflow checks the standard out
+  beside this repo and runs this module on every pull request, so a disagreement with the page
+  fails the merge either way.
 
-`PINNED_NATIVES_MTHDS_VERSION` — the number naming *which* set this is — is held here too, and by
-two different authorities, because a value nothing reads is a value that goes stale in silence (it
-sat at `1.0.0` across the standard's `2.0.0` cut, and no test in this repo could say so). The page
-pins the number and is compared against it below; the installed `mthds` says which standard version
-this engine implements, and that comparison needs no checkout, so it runs for every contributor.
+`PINNED_NATIVES_MTHDS_VERSION` — the number naming *which* set this is — is held here too, because
+a value nothing reads is a value that goes stale in silence: it sat at `1.0.0` across the standard's
+`2.0.0` cut, and no test in this repo could say so. This module holds it to the page, and therefore
+skips with everything else when the checkout is absent; `test_pinned_natives_version.py` holds it to
+the standard version the installed `mthds` reports, which needs no checkout and so runs for every
+contributor.
 """
 
 import re
@@ -37,19 +38,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import PINNED_NATIVES_MTHDS_VERSION, make_pinned_native_blueprint
-from pipelex.tools.misc.semver import parse_version
 
 # This repo and the standard's repo as siblings — the documented workspace layout, reproduced on
 # CI runners by the `MTHDS standard conformance` workflow's double checkout.
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 SPEC_PAGE = _REPO_ROOT.parent / "mthds" / "docs" / "spec" / "native-concepts.md"
 
-_NEEDS_THE_PAGE = pytest.mark.skipif(
+pytestmark = pytest.mark.skipif(
     not SPEC_PAGE.exists(),
     reason=(
         "needs the standard's own repository checked out at ../mthds — without it the pinned set is compared "
@@ -97,8 +96,6 @@ def read_spec_pinned_version() -> str:
 
 
 class TestPinnedNativesAgreeWithTheStandard:
-    pytestmark = _NEEDS_THE_PAGE
-
     def test_names_the_version_the_page_pins_the_set_at(self):
         """The set is a copy; `PINNED_NATIVES_MTHDS_VERSION` is the label on it, and a mislabelled copy misleads.
 
@@ -142,21 +139,4 @@ class TestPinnedNativesAgreeWithTheStandard:
         pinned_keys = list(pinned_structure.keys()) if isinstance(pinned_structure, dict) else []
         assert pinned_keys == list(page_structure.keys()), (
             f"native.{native_code.value}: the pinned structure's field order disagrees with the page — {_DISAGREEMENT_REMEDY}"
-        )
-
-
-class TestPinnedNativesVersionAgreesWithTheEngine:
-    """The one comparison that needs no sibling checkout: the label against the standard this engine implements."""
-
-    def test_pinned_set_is_not_from_a_standard_version_this_engine_does_not_implement(self):
-        """An implementation of standard version `V` materializes the greatest pinned set not above `V`.
-
-        This module holds exactly one pinned set, so the rule reduces to a bound: the set it holds
-        cannot have been pinned by a standard version later than the one the installed `mthds`
-        implements. A pin bump that moves the standard backwards, or a re-pinning transcribed here
-        ahead of the `mthds` bump that carries it, fails this without needing the page.
-        """
-        assert parse_version(PINNED_NATIVES_MTHDS_VERSION) <= parse_version(MTHDS_STANDARD_VERSION), (
-            f"the pinned native set is labelled {PINNED_NATIVES_MTHDS_VERSION!r}, later than the standard version this "
-            f"engine implements ({MTHDS_STANDARD_VERSION!r}) — this engine cannot materialize a set pinned in the future"
         )
