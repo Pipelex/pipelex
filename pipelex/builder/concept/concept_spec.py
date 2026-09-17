@@ -1,11 +1,8 @@
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
-from rich.console import Group
-from rich.table import Table
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
@@ -15,8 +12,11 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStr
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class ConceptStructureSpecFieldType(StrEnum):
@@ -372,7 +372,12 @@ class ConceptSpec(StructuredContent):
                 return field_spec.type
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.table import Table
+        from rich.text import Text
+
         concept_group = Group()
         if title:
             concept_group.renderables.append(Text(title, style="bold"))
