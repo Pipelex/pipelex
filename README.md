@@ -109,9 +109,11 @@ pipelex doctor
 If you just need the Pipelex CLI without agent integration:
 
 ```bash
-uv tool install pipelex
+uv tool install "pipelex[cli]"
 pipelex init
 ```
+
+The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
 
 ## Configure AI Access
 
@@ -522,6 +524,7 @@ Clone it, fork it, and experiment with production-ready methods for various use 
 
 The package supports the following additional features:
 
+- `cli`: Rich, for the `pipelex` and `pipelex-agent` commands, the `console` log sink and the `rich` pretty-print mode. Install it wherever Pipelex runs in a terminal; a server leaves it out and selects the `json` log sink with the `poor` or `silent` pretty-print mode
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `mistralai`: Mistral AI support for text generation and OCR
@@ -533,7 +536,7 @@ The package supports the following additional features:
 Install all extras:
 
 ```bash
-uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
+uv pip install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
 ---
