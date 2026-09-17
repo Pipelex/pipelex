@@ -12,15 +12,24 @@ standard's page itself, read live from the sibling `mthds/` checkout (the `MTHDS
 conformance` CI workflow runs it against a fresh checkout on every pull request), so the day the
 standard moves a definition, this repo goes red instead of a downstream port.
 
-The set below is the MTHDS 1.0.0 pinned set. Version-keyed lookup can come when a second
-standard version exists; today `mthds_version` on the crate records which set was used.
+The set below is the one the standard pinned at MTHDS 2.0.0, named by
+`PINNED_NATIVES_MTHDS_VERSION`. Version-keyed lookup can come when a second pinned set exists;
+until then an implementation of standard version `V` materializes the greatest pinned set not
+above `V`, and this is the only one there is.
 """
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 
-PINNED_NATIVES_MTHDS_VERSION = "1.0.0"
+# The standard version in which the pinned set below last changed — the standard asks each
+# implementation to declare that number once, in one place, naming its source: the page's own
+# "The Pinned Set — Pinned at MTHDS <version>" heading in `mthds/docs/spec/native-concepts.md`.
+# It is NOT the standard version this engine implements (`MTHDS_STANDARD_VERSION`, which is what a
+# crate's `mthds_version` stamp records), and the two only coincide while the set's last re-pinning
+# is the latest release of the standard. `tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py`
+# holds this value to the page, and to the standard version this engine implements.
+PINNED_NATIVES_MTHDS_VERSION = "2.0.0"
 
 
 def make_pinned_native_blueprint(native_code: NativeConceptCode) -> ConceptBlueprint:
