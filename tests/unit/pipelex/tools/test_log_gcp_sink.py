@@ -126,6 +126,18 @@ class FailingFlushTransport(Transport):  # pyright: ignore[reportUntypedBaseClas
         return None
 
 
+class CapturingHandler(logging.Handler):
+    """Stands in for the stdlib's last-resort handler, keeping what it would have printed on stderr."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.records: list[logging.LogRecord] = []
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
 class TestGcpLogSink:
     @pytest.fixture
     def gcp_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, FakeTransport]]:
@@ -343,3 +355,47 @@ class TestGcpLogSink:
 
         with pytest.raises(RuntimeError, match="the API refused the batch"):
             handler.flush()
+
+    def test_an_export_failure_is_printed_on_stderr_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport], mocker: MockerFixture) -> None:
+        """The library reports a refused batch only through this record, and the sink's own handler is never the place it can go."""
+        _, transport = gcp_log
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+
+        logging.getLogger("google.cloud.logging_v2.handlers.transports.background_thread").error("Failed to submit 10 logs.")
+
+        assert [record.getMessage() for record in stderr.records] == ["Failed to submit 10 logs."]
+        assert [entry for entry in transport.entries if entry.record.name.startswith("google.cloud.logging")] == []
+
+    def test_the_export_paths_routine_records_are_not_printed(self, mocker: MockerFixture) -> None:
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        export_filter = GcpExportPathFilter()
+
+        assert not export_filter.filter(_library_record(level=logging.DEBUG, msg="Submitted 10 logs"))
+        assert stderr.records == []
+
+    def test_a_refusal_that_persists_is_counted_rather_than_printed_per_batch(self, mocker: MockerFixture) -> None:
+        """One report per refused commit is one per line the application logs; the stderr it takes must not grow with that."""
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        export_filter = GcpExportPathFilter(report_interval_seconds=0.5)
+
+        for batch_number in range(3):
+            export_filter.filter(_library_record(level=logging.ERROR, msg=f"Failed to submit batch {batch_number}"))
+        assert [record.getMessage() for record in stderr.records] == ["Failed to submit batch 0"]
+
+        time.sleep(0.6)
+        export_filter.filter(_library_record(level=logging.ERROR, msg="Failed to submit batch 3"))
+        assert [record.getMessage() for record in stderr.records] == [
+            "Failed to submit batch 0",
+            "The gcp log sink's transport reported 2 more export failures since the last one printed",
+            "Failed to submit batch 3",
+        ]
+
+
+def _library_record(*, level: int, msg: str) -> logging.LogRecord:
+    """A record as the client library's transport logger emits it."""
+    return logging.LogRecord(
+        name="google.cloud.logging_v2.handlers.transports.background_thread", level=level, pathname="", lineno=0, msg=msg, args=(), exc_info=None
+    )

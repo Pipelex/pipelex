@@ -27,6 +27,7 @@ import json
 import logging
 import math
 import threading
+import time
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -66,6 +67,13 @@ LABEL_ATTRIBUTES = (REQUEST_ID_FIELD, PIPELINE_RUN_ID_FIELD, PIPE_RUN_ID_FIELD)
 # A record from either must not travel out through the sink that emitted it.
 GCP_LOGGING_LOGGER_PREFIXES = ("google.cloud.logging", "google.cloud.logging_v2")
 GCP_WORKER_THREAD_NAME = "google.cloud.logging.Worker"
+
+# How often an export failure is printed on stderr. The library reports a refused batch once per failed
+# commit and never retries it, so a refusal that persists — a missing permission, a revoked key — reports
+# at the rate the application logs. The first report in a window is printed with its traceback, and the
+# ones after it are counted and said in one line when the next window opens. The OpenTelemetry SDK
+# deduplicates its own exporter's failures over the same window.
+EXPORT_FAILURE_REPORT_INTERVAL_SECONDS = 20.0
 
 # The deadline a flush waits for the transport's queue to drain. The client library's ``flush`` ends in
 # ``queue.join()``, which waits unbounded and takes no timeout, so the bound is imposed here rather
@@ -125,13 +133,63 @@ class GcpExportPathFilter(logging.Filter):
     reason: an exporting thread blocking on that lock to report its own failure while the teardown holds
     it and waits for the queue to drain is a deadlock at exit, and it was reproduced here with the
     installed library.
+
+    A rejected record at ``WARNING`` or above is printed on stderr through the stdlib's last-resort
+    handler rather than dropped. The library reports a refused batch only through that record and then
+    marks the batch done, so a flush still succeeds, and the stdlib prints a record through its last
+    resort only when no handler is found, which the sink's handler always is: without this, a process
+    whose writes Cloud Logging refuses would lose every line and say nothing anywhere. The last resort
+    takes its own lock and never this handler's, so the report cannot reintroduce the deadlock, and the
+    reports are rate-limited by ``EXPORT_FAILURE_REPORT_INTERVAL_SECONDS``.
     """
+
+    def __init__(self, *, report_interval_seconds: float = EXPORT_FAILURE_REPORT_INTERVAL_SECONDS) -> None:
+        super().__init__()
+        self._report_interval_seconds = report_interval_seconds
+        self._report_lock = threading.Lock()
+        self._last_report_at: float | None = None
+        self._unreported_count = 0
 
     @override
     def filter(self, record: logging.LogRecord) -> bool:
+        if not self._is_export_path(record=record):
+            return True
+        if record.levelno >= logging.WARNING:
+            self._report_on_stderr(record=record)
+        return False
+
+    @classmethod
+    def _is_export_path(cls, *, record: logging.LogRecord) -> bool:
         if threading.current_thread().name == GCP_WORKER_THREAD_NAME:
-            return False
-        return not any(record.name == prefix or record.name.startswith(f"{prefix}.") for prefix in GCP_LOGGING_LOGGER_PREFIXES)
+            return True
+        return any(record.name == prefix or record.name.startswith(f"{prefix}.") for prefix in GCP_LOGGING_LOGGER_PREFIXES)
+
+    def _report_on_stderr(self, *, record: logging.LogRecord) -> None:
+        """Print the export path's report through the last resort, the first one per window in full."""
+        stderr_handler = logging.lastResort
+        if stderr_handler is None:
+            return
+        now = time.monotonic()
+        with self._report_lock:
+            if self._last_report_at is not None and now - self._last_report_at < self._report_interval_seconds:
+                self._unreported_count += 1
+                return
+            self._last_report_at = now
+            unreported_count = self._unreported_count
+            self._unreported_count = 0
+        if unreported_count:
+            stderr_handler.handle(
+                logging.makeLogRecord(
+                    {
+                        "name": record.name,
+                        "levelno": logging.WARNING,
+                        "levelname": logging.getLevelName(logging.WARNING),
+                        "msg": "The gcp log sink's transport reported %d more export failures since the last one printed",
+                        "args": (unreported_count,),
+                    }
+                )
+            )
+        stderr_handler.handle(record)
 
 
 def severity_for_level(*, levelno: int) -> GcpLogSeverity:
@@ -247,7 +305,8 @@ class GcpLogHandler(logging.Handler):
                 trace=trace,
             )
         except Exception:  # ruff: ignore[blind-except]
-            # The stdlib's own contract for a handler: report through ``handleError`` and never raise
+            # Unbounded code: a third-party SDK with no documented exception types, over values the caller attached.
+            # The stdlib's own contract for a handler is to report through ``handleError`` and never raise
             # out of the log call.
             self.handleError(record)
 
@@ -266,6 +325,8 @@ class GcpLogHandler(logging.Handler):
             try:
                 self._transport.flush()
             except Exception as exc:  # ruff: ignore[blind-except]
+                # Unbounded code: the client library's flush, a third-party SDK with no documented exception types.
+                # Nothing is swallowed: the failure crosses to the caller's thread and is raised there.
                 failure.append(exc)
 
         flushing = threading.Thread(target=drain, name=_FLUSH_THREAD_NAME, daemon=True)
