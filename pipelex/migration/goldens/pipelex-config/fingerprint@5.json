@@ -1044,6 +1044,27 @@
       "default": "INFO",
       "open_node": false
     },
+    "runtime.log.gcp": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.log.gcp.credentials_file_path": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.log.gcp.log_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "pipelex",
+      "open_node": false
+    },
+    "runtime.log.gcp.project_id": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
     "runtime.log.is_caller_info_enabled": {
       "value_type": "bool",
       "required": true,

@@ -1,13 +1,13 @@
 ---
 title: "Log Sink Plugins"
-description: "How Pipelex selects where its log records go by config, the keyed-registry-plus-config-selected-singleton seam a log sink plugin rides, the shipped json, console and otlp sinks, and how to author an out-of-tree sink."
+description: "How Pipelex selects where its log records go by config, the keyed-registry-plus-config-selected-singleton seam a log sink plugin rides, the shipped json, console, otlp and gcp sinks, and how to author an out-of-tree sink."
 ---
 
 # Log Sink Plugins
 
 Every record the runtime emits, a `log.info(...)` in a pipe operator, a warning from a provider, the failure line of a run, leaves the process through a single **log sink** installed on the root logger at boot. Which sink that is comes entirely from data: one config field, `runtime.log.sink`, names a sink, and a **log sink plugin** is what teaches Pipelex how to build it.
 
-Core names no sink by import or by string. The built-in sinks (`json`, `console`, `otlp`) are a plugin too, the always-on `LogSinkPlugin`, riding the exact same seam an out-of-tree package would. This page documents that seam, the contract a plugin registers, what a sink reads off a record, and how to write one.
+Core names no sink by import or by string. The built-in sinks (`json`, `console`, `otlp`, `gcp`) are a plugin too, the always-on `LogSinkPlugin`, riding the exact same seam an out-of-tree package would. This page documents that seam, the contract a plugin registers, what a sink reads off a record, and how to write one.
 
 This is the third application of the mechanism the [storage provider](storage-provider-plugins.md) seam introduced and the [secrets provider](secrets-provider-plugins.md) seam reused; the three pages describe the same shape with the nouns swapped, and this one adds what is particular to logging: the sink is resolved after logging is already configured, and every sink shares one record contract.
 
@@ -115,6 +115,7 @@ class LogSinkPlugin:
         registrar.add_log_sink(method=LogSinkMethod.JSON, factory=_make_json_log_sink)
         registrar.add_log_sink(method=LogSinkMethod.CONSOLE, factory=_make_console_log_sink)
         registrar.add_log_sink(method=LogSinkMethod.OTLP, factory=_make_otlp_log_sink)
+        registrar.add_log_sink(method=LogSinkMethod.GCP, factory=_make_gcp_log_sink)
 ```
 
 | Sink | What it does | Where it reads its settings |
@@ -122,8 +123,9 @@ class LogSinkPlugin:
 | `json` | One JSON object per line on the configured stream: `time`, `severity`, `logger`, `message`, `exception` when there is one, then the fields, the context identifiers and `data` flat beside them, a field named like one of those keys under a `field_` prefix on every line, a non-finite float as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser, and no ANSI ever. What the hosted plane's runner and worker select. | `console_log_target` |
 | `console` | The Rich handler with the emoji formatter and every `[runtime.log.rich_log]` setting, byte for byte what the console showed before sinks existed. Rich is imported when the handler is built, and a process that selects another sink never loads it through this path. | `console_log_target`, `[runtime.log.rich_log]` |
 | `otlp` | The OpenTelemetry logs signal: a `LoggerProvider` carrying the same service identity as the tracer, a `BatchLogRecordProcessor` and the OTLP HTTP log exporter. The message is the body, the level maps onto the OTel severity scale, the fields, identifiers and `data` ride as attributes (a mapping as JSON text), an exception lands under the `exception.*` semantic-convention keys, and a collector receives the logs beside the spans the runtime already exports. A filter on the handler rejects the records of the sink's own export path, the SDK's by logger name and the transport's by the context value the SDK sets around an export, before the handler's lock is taken, so an export failure never re-enters the pipeline and a shutdown never waits on itself. | `[runtime.log.otlp]` |
+| `gcp` | Google Cloud Logging through the `google-cloud-logging` client library, behind the `gcp-logging` extra. Each record becomes one struct entry: the level maps onto the Cloud Logging severity scale (which has nothing below `DEBUG`, so `VERBOSE` and `DEV` both land there), the message, the logger, the exception and the fields become the JSON payload, the run-scoped identifiers become the entry's labels, which is what Cloud Logging indexes, and the entry's `trace` field carries the run's own OpenTelemetry trace id project-qualified, derived from `pipeline_run_id` by the same hash the tracer uses, so a line and the spans of its run agree on it. The entries leave through the client library's background-thread transport, which batches them off the calling thread. **Most processes on Google Cloud want `json` instead**: a platform whose logging agent reads the container's stdout, Cloud Run and GKE among them, ingests what that sink writes and needs no client at all; `gcp` is for a process with no such agent in front of it, or one writing to a log or a project that is not the ambient one. | `[runtime.log.gcp]` |
 
-The `otlp` factory imports the OpenTelemetry logs SDK when it runs, never at register, so registering the built-ins imports none of it, which the import-light guard pins.
+The `otlp` factory imports the OpenTelemetry logs SDK when it runs, and the `gcp` factory the Google Cloud Logging client library, never at register, so registering the built-ins imports neither, which the import-light guard pins.
 
 ### Why `console` is the default
 
@@ -133,7 +135,7 @@ The `otlp` factory imports the OpenTelemetry logs SDK when it runs, never at reg
 
 ## Selecting a sink by config
 
-`runtime.log.sink` is an **open `str` token**, not a closed enum. The built-ins use `"json"`, `"console"` and `"otlp"`; an external plugin registers its own. A config naming an external token **parses fine**, the token is stored verbatim and its installability is validated later, at registry lookup:
+`runtime.log.sink` is an **open `str` token**, not a closed enum. The built-ins use `"json"`, `"console"`, `"otlp"` and `"gcp"`; an external plugin registers its own. A config naming an external token **parses fine**, the token is stored verbatim and its installability is validated later, at registry lookup:
 
 ```toml
 # .pipelex/pipelex.toml

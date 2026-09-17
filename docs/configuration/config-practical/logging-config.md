@@ -1,5 +1,5 @@
 ---
-description: "Select where Pipelex log records go with the sink key, and fine-tune logging levels, the console rendering, the JSON and OTLP sinks and message formatting through TOML configuration settings in pipelex.toml."
+description: "Select where Pipelex log records go with the sink key, and fine-tune logging levels, the console rendering, the JSON, OTLP and Google Cloud Logging sinks and message formatting through TOML configuration settings in pipelex.toml."
 ---
 
 # Logging Configuration
@@ -47,6 +47,7 @@ sink = "console"
 - `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering
 - `"json"`: one JSON object per line, for a server behind a log agent
 - `"otlp"`: the OpenTelemetry logs signal, for a collector
+- `"gcp"`: Google Cloud Logging through the client library, for a process that must write to it directly
 - Any other token an installed plugin registers; a token nobody provides stops the boot naming the registered ones
 - The sink is a plugin capability: how it is discovered, selected and written is in [Log Sink Plugins](../../under-the-hood/log-sink-plugins.md)
 
@@ -180,6 +181,39 @@ headers = { Authorization = "Bearer ..." }
 - The records are exported in batches on the OTLP HTTP protocol, with the same service identity as the spans the runtime already exports, so a collector files the two together
 - The sink never exports its own export path: a record the SDK or the transport emits while an export is in flight is rejected before the handler's lock is taken, so an unreachable collector costs a warning on the export thread and never a loop or a hang at exit. A flush at teardown is bounded by the exporter's own timeout, `OTEL_EXPORTER_OTLP_TIMEOUT`, and whatever the sink raises while it flushes or closes is said on stderr rather than left to interrupt the teardown
 
+## The `gcp` Sink
+
+Configuration section: `[runtime.log.gcp]`, read only when `sink = "gcp"`. The sink writes to Google Cloud Logging through the `google-cloud-logging` client library, which the `gcp-logging` extra installs: `uv pip install "pipelex[gcp-logging]"`. Selecting the sink without the extra stops the boot with the install hint and the `json` alternative named.
+
+### Which of the two to pick
+
+**Most processes on Google Cloud should select `json`, not `gcp`.** Cloud Run, GKE and every platform that runs a logging agent over the container's stdout ingest one JSON object per line with a `severity` and a `message` — exactly what the `json` sink writes — and the lines arrive in Cloud Logging with no client library installed, no credentials to hold and no API call on the logging path. Select `gcp` for the process the agent cannot serve: one with nothing ingesting its stdout, or one that must write to a log name or a project that is not the ambient one.
+
+### Settings
+
+```toml
+[runtime.log.gcp]
+log_name = "pipelex"
+project_id = "my-project"
+credentials_file_path = "gcp_credentials.json"
+```
+
+- `log_name`: the Cloud Logging log the entries land under. Default: `"pipelex"`
+- `project_id`: the project to write to. Left unset, the client library resolves it from the credentials or from the metadata server of the machine the process runs on
+- `credentials_file_path`: a service-account JSON file to build the client from. Left unset, authentication is Application Default Credentials, which is what a process already running on Google Cloud has. This is a plain config value rather than a secret id read through the secrets provider, because the log sink is the first capability boot resolves — deliberately ahead of the secrets provider, so that every later line of the boot goes through the sink the configuration chose — and there is no provider to ask when this section is read
+
+### What each entry carries
+
+Each record becomes one Cloud Logging entry with a JSON payload:
+
+- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's two custom levels, `VERBOSE` and `DEV`, both land there
+- The payload carries `message`, `logger` and `exception` when the record carries one, then every field and the `data` attribute flat beside them. The keys the `json` sink reserves are reserved here too, `time` and `severity` included although the payload carries neither — the client library takes both out of band — so a field named like one of them is carried under a `field_` prefix under either sink rather than under one and not the other; a value JSON cannot carry — a non-finite float, a model, a circular structure — is written as text rather than costing the line
+- The run-scoped identifiers become the entry's **labels** rather than payload keys: `request_id`, `pipeline_run_id` and `pipe_run_id`, whichever of them the record carries. Cloud Logging indexes labels, so these are what a query filters a run by
+- The entry's `trace` field carries the run's own OpenTelemetry trace id, project-qualified as `projects/<project>/traces/<trace-id>`. The id is derived from `pipeline_run_id` by the same hash the tracer uses, so a line and the spans of the run it belongs to agree on it and Cloud Logging files them together
+- The entries leave through the client library's background-thread transport, which batches them off the thread that logged, so no record costs an API round trip on the calling thread. The teardown flushes and closes it, and the flush carries a deadline of its own because the library's does not
+- What the export path logs never leaves through the sink: the library reports a refused batch through a logger of its own, and a report exported through the pipeline it reports on would fail with it and be reported again. The handler rejects those records, and every record emitted on the library's export thread, before its lock is taken — the same guard the `otlp` sink carries, against the same deadlock at exit
+- A refused write is still said: the library marks a refused batch done, so the flush succeeds and nothing else would report it, and the entries in it are lost. The export path's warnings and errors are printed on stderr instead, the first one in each window of time with its traceback and the ones after it counted in a single line once that window has passed — with the next failure, on the next line the process logs, or at the teardown at the latest — so a process whose credentials Cloud Logging refuses says so without printing once per line it logs
+
 ## Example Configuration
 
 ```toml
@@ -214,6 +248,9 @@ keywords_to_hilight = ["error", "warning", "failed"]
 
 [runtime.log.otlp]
 headers = {}
+
+[runtime.log.gcp]
+log_name = "pipelex"
 ```
 
 ## Migrating From the Log Mode
@@ -230,7 +267,7 @@ headers = {}
 
 2. **Production Environment**:
 
-    - Select the `json` sink behind a log agent, or the `otlp` sink in front of a collector
+    - Select the `json` sink behind a log agent, the `otlp` sink in front of a collector, or the `gcp` sink for a process that must write to Google Cloud Logging directly
     - Disable caller info for performance
     - Use INFO or higher log levels
 
