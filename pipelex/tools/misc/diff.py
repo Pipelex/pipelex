@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex.tools.misc.file_utils import is_excluded_by_name
-from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
+from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode, require_rich_for_rendering
 
 if TYPE_CHECKING:
     from collections.abc import Set as AbstractSet
@@ -233,6 +233,7 @@ def make_diff_dirs_pretty(
         and different files with full diff content. For different files, indicates
         which version is newer based on modification time.
     """
+    require_rich_for_rendering()
     from rich.console import Group
     from rich.syntax import Syntax
     from rich.table import Table

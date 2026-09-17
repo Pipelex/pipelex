@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.providers.openai.openai_llms import openai_list_available_models
 from pipelex.runtime_hub import get_console
+from pipelex.tools.misc.rich_extra import RICH_TABLE_MISSING_MESSAGE, require_rich
 
 if TYPE_CHECKING:
     from openai.types import Model
@@ -71,6 +72,7 @@ def _display_openai_models_table(
     backend_name: str,
 ) -> None:
     """Display OpenAI models in table format."""
+    require_rich(message=RICH_TABLE_MISSING_MESSAGE)
     from rich import box
     from rich.table import Table
 

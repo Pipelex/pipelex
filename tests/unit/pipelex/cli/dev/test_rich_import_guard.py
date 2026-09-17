@@ -36,9 +36,19 @@ class TestRichImportGuard:
             ("class body", "class Renderer:\n    from rich.panel import Panel\n", [2]),
             ("else branch of TYPE_CHECKING", "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pass\nelse:\n    import rich\n", [5]),
             ("negated TYPE_CHECKING", "from typing import TYPE_CHECKING\nif not TYPE_CHECKING:\n    import rich\n", [3]),
-            ("function body", "def render():\n    from rich.text import Text\n    return Text()\n", []),
-            ("coroutine body", "async def render():\n    import rich\n", []),
-            ("method body", "class Content:\n    def rendered_pretty(self):\n        from rich.json import JSON\n        return JSON('{}')\n", []),
+            ("guarded function body", "def render():\n    require_rich_for_rendering()\n    from rich.text import Text\n    return Text()\n", []),
+            ("guarded coroutine body", "async def render():\n    require_rich_for_rendering()\n    import rich\n", []),
+            (
+                "guarded method body",
+                (
+                    "class Content:\n"
+                    "    def rendered_pretty(self):\n"
+                    "        require_rich_for_rendering()\n"
+                    "        from rich.json import JSON\n"
+                    "        return JSON('{}')\n"
+                ),
+                [],
+            ),
             ("TYPE_CHECKING block", "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from rich.console import Console\n", []),
             ("typing.TYPE_CHECKING block", "import typing\nif typing.TYPE_CHECKING:\n    from rich.console import Console\n", []),
             ("a package merely named like Rich", "import richer\nfrom rich_extra import thing\n", []),
@@ -100,3 +110,72 @@ class TestRichImportGuard:
         (tmp_path / "module.py").write_text("x = 1\n", encoding="utf-8")
         with pytest.raises(RichImportGuardError, match="allowlist matched nothing"):
             collect_violations(root=tmp_path)
+
+
+class TestDeferredRichImportGuard:
+    """The ordering rule: a deferred Rich import is reached only after something established Rich is installed.
+
+    Deferring the import is what keeps Rich off a server's import path; calling the guard first is what turns a
+    bare `ModuleNotFoundError` into the `MissingDependencyError` that names the extra. The direct rule checks
+    the first and cannot see the second, so this is a rule of its own.
+    """
+
+    @pytest.mark.parametrize(
+        ("topic", "source", "expected_lines"),
+        [
+            ("no guard at all", "def render():\n    from rich.text import Text\n    return Text()\n", [2]),
+            ("guard on the line before", "def render():\n    require_rich(message='x')\n    from rich.text import Text\n", []),
+            ("the rendering guard", "def render():\n    require_rich_for_rendering()\n    from rich.text import Text\n", []),
+            ("a console hands out a guarded object", "def render():\n    console = get_console()\n    from rich.table import Table\n", []),
+            ("guard after the import does not reach it", "def render():\n    from rich.text import Text\n    require_rich(message='x')\n", [2]),
+            (
+                "a guard inside a branch does not cover the function",
+                "def render(flat):\n    from rich.markup import escape\n    if flat:\n        console = get_console()\n",
+                [2],
+            ),
+            (
+                "a top-level guard covers an import inside a branch",
+                "def render(flat):\n    require_rich(message='x')\n    if flat:\n        from rich.text import Text\n",
+                [],
+            ),
+            (
+                "a guard beside the import in the same branch covers it",
+                "def render(missing):\n    if missing:\n        console = get_console()\n        from rich.panel import Panel\n",
+                [],
+            ),
+            (
+                "a guard in one branch does not cover the other",
+                "def render(missing):\n    if missing:\n        require_rich(message='x')\n    else:\n        from rich.panel import Panel\n",
+                [5],
+            ),
+            (
+                "a fallback asks sys.modules rather than raising",
+                "def render(content):\n    if 'rich' not in sys.modules:\n        return None\n    from rich.text import Text\n",
+                [],
+            ),
+            (
+                "a nested function is its own scope",
+                "def outer():\n    require_rich(message='x')\n\n    def inner():\n        from rich.text import Text\n",
+                [5],
+            ),
+            ("a coroutine is checked the same way", "async def render():\n    import rich.box\n", [2]),
+            (
+                "a method is checked the same way",
+                "class Content:\n    def rendered_pretty(self):\n        from rich.json import JSON\n",
+                [3],
+            ),
+            ("a type-only import inside a function needs no guard", "def render():\n    if TYPE_CHECKING:\n        from rich.text import Text\n", []),
+        ],
+    )
+    def test_a_deferred_import_is_flagged_unless_a_guard_precedes_it(self, topic: str, source: str, expected_lines: list[int]) -> None:
+        assert _lines(source) == expected_lines, topic
+
+    def test_the_cli_package_needs_no_guard_before_a_deferred_import(self) -> None:
+        """A CLI module may import Rich at the top of the file, so deferring one inside a function asks nothing of it."""
+        assert _lines("def render():\n    from rich.text import Text\n", relative_path=CLI_PATH) == []
+
+    def test_the_remedy_names_the_guard_a_reader_has_to_call(self) -> None:
+        """The report is what a developer acts on, so it names the call rather than describing the problem."""
+        violations = find_violations_in_source(source="def render():\n    from rich.text import Text\n", relative_path=SERVER_PATH)
+        assert len(violations) == 1
+        assert "require_rich" in violations[0].detail

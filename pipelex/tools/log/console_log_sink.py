@@ -26,6 +26,12 @@ if TYPE_CHECKING:
     from pipelex.system.console_target import ConsoleTarget
     from pipelex.tools.log.log_config import RichLogConfig
 
+#: What this sink says when the extra is missing, named once for every place in it that asks for Rich.
+CONSOLE_SINK_MISSING_MESSAGE = (
+    f"The '{LogSinkMethod.CONSOLE}' log sink renders through Rich. Install the extra, "
+    f"or select the '{LogSinkMethod.JSON}' sink in [runtime.log] for a process with no terminal."
+)
+
 
 class ConsoleLogSink(LogSink):
     """Today's console rendering, byte for byte: a ``RichHandler`` on the configured stream."""
@@ -38,12 +44,7 @@ class ConsoleLogSink(LogSink):
 
     @override
     def make_handler(self) -> logging.Handler:
-        require_rich(
-            message=(
-                f"The '{LogSinkMethod.CONSOLE}' log sink renders through Rich. Install the extra, "
-                f"or select the '{LogSinkMethod.JSON}' sink in [runtime.log] for a process with no terminal."
-            )
-        )
+        require_rich(message=CONSOLE_SINK_MISSING_MESSAGE)
         from rich.console import Console
         from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
         from rich.logging import RichHandler
@@ -90,8 +91,11 @@ class ConsoleLogSink(LogSink):
 
     @override
     def redirect_to_stderr(self) -> None:
-        # The handler is built first, so a process without Rich meets the same named failure as at boot,
-        # and Rich is imported only once the handler that proves it is installed exists.
+        # The handler is built first, so a process without Rich meets the same named failure as at boot. The
+        # guard is spelled out beside the import as well: a handler this sink already holds proves Rich is
+        # there, but that is a fact about the object rather than about this function, and the import guard
+        # reads functions.
+        require_rich(message=CONSOLE_SINK_MISSING_MESSAGE)
         if self._rich_handler is None:
             _ = self.handler
         if self._rich_handler is not None:

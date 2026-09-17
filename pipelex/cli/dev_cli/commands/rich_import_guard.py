@@ -68,6 +68,17 @@ REMEDY = (
     "defers that import into the function that needs it, or moves what it needs out of `pipelex/cli/`"
 )
 
+#: The calls that answer whether Rich is installed, so a deferred import below one of them is reached only
+#: where Rich is there. ``require_rich`` and ``require_rich_for_rendering`` raise ``MissingDependencyError``
+#: naming the extra; ``get_console`` hands out a console whose own construction raised it already;
+#: ``is_rich_installed`` asks without importing, for a rendering that falls back instead of failing.
+GUARD_CALL_NAMES = frozenset({"require_rich", "require_rich_for_rendering", "get_console", "is_rich_installed"})
+
+#: The module the other fallback shape asks: ``if "rich" not in sys.modules: return None`` holds no Rich object
+#: to render, and answers that without paying for an import.
+SYS_MODULE_RECEIVER = "sys"
+SYS_MODULES_ATTRIBUTE = "modules"
+
 
 class RichImportGuardError(Exception):
     """The guard cannot run as configured: a self-check failure, never a violation.
@@ -165,6 +176,137 @@ def _module_level_rich_imports(*, source: str, relative_path: str) -> list[RichI
     return sorted(collector.violations, key=lambda violation: violation.key)
 
 
+def _called_name(*, func: ast.expr) -> str | None:
+    """The bare name a call is made through: ``require_rich(...)`` and ``self.require_rich(...)`` both answer the same."""
+    match func:
+        case ast.Name(id=name):
+            return name
+        case ast.Attribute(attr=attr):
+            return attr
+        case _:
+            return None
+
+
+def _is_sys_modules(*, node: ast.AST) -> bool:
+    """Whether a node is the ``sys.modules`` mapping itself."""
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == SYS_MODULES_ATTRIBUTE
+        and isinstance(node.value, ast.Name)
+        and node.value.id == SYS_MODULE_RECEIVER
+    )
+
+
+def _mentions_a_guard(*, node: ast.AST) -> bool:
+    """Whether one expression asks whether Rich is available, by a guard call or by the ``sys.modules`` mapping."""
+    for child in ast.walk(node):
+        if isinstance(child, ast.Call) and _called_name(func=child.func) in GUARD_CALL_NAMES:
+            return True
+        if _is_sys_modules(node=child):
+            return True
+    return False
+
+
+def _establishes_rich_is_available(*, statement: ast.stmt) -> bool:
+    """Whether one statement asks whether Rich is available, so that what follows it may import Rich.
+
+    The question is asked of the statement itself, not of the branches it opens: an ``if`` is read by its
+    condition, so ``if "rich" not in sys.modules: return None`` and ``if is_rich_installed():`` both count,
+    and a guard *call* buried inside a branch counts for that branch and its sequel rather than for the
+    statements above it. That is deliberately permissive — it settles that the question was asked, not that
+    every path through the answer is sound. What pins the property itself is the Rich-refused pipe run in
+    ``tests/integration/pipelex/test_rich_free_run.py``.
+    """
+    match statement:
+        case ast.If(test=test) | ast.While(test=test):
+            return _mentions_a_guard(node=test)
+        case ast.For() | ast.AsyncFor() | ast.With() | ast.AsyncWith() | ast.Try() | ast.ClassDef():
+            return False
+        case _:
+            return _mentions_a_guard(node=statement)
+
+
+def _nested_bodies(*, statement: ast.stmt) -> Iterator[list[ast.stmt]]:
+    """The statement lists one compound statement runs, excluding an ``if TYPE_CHECKING:`` body, which never runs."""
+    match statement:
+        case ast.If(test=test, body=then, orelse=otherwise):
+            if _is_type_checking_test(test=test):
+                yield otherwise
+                return
+            yield then
+            yield otherwise
+        case ast.For(body=then, orelse=otherwise) | ast.AsyncFor(body=then, orelse=otherwise) | ast.While(body=then, orelse=otherwise):
+            yield then
+            yield otherwise
+        case ast.With(body=then) | ast.AsyncWith(body=then) | ast.ClassDef(body=then):
+            yield then
+        case ast.Try(body=then, handlers=handlers, orelse=otherwise, finalbody=finally_):
+            yield then
+            for handler in handlers:
+                yield handler.body
+            yield otherwise
+            yield finally_
+        case _:
+            return
+
+
+def _rich_import_in(*, statement: ast.stmt) -> str | None:
+    """The Rich module one import statement names, or ``None`` for any other statement."""
+    match statement:
+        case ast.Import(names=names):
+            return next((alias.name for alias in names if is_rich_module(module_name=alias.name)), None)
+        case ast.ImportFrom(level=0, module=str() as module) if is_rich_module(module_name=module):
+            return module
+        case _:
+            return None
+
+
+def _unguarded_deferred_rich_imports(*, source: str, relative_path: str) -> list[RichImportViolation]:
+    """Every deferred Rich import that nothing above it in its own function established Rich for.
+
+    Deferring the import is the direct rule's business; this is the other half of the same contract, the one
+    that turns a bare ``ModuleNotFoundError`` into the ``MissingDependencyError`` that names the extra.
+    """
+    violations: list[RichImportViolation] = []
+    for function in _function_scopes(tree=ast.parse(source)):
+        violations.extend(_unguarded_in_block(body=function.body, guarded=False, function_name=function.name, relative_path=relative_path))
+    return violations
+
+
+def _unguarded_in_block(*, body: list[ast.stmt], guarded: bool, function_name: str, relative_path: str) -> list[RichImportViolation]:
+    """Walk one block in order, carrying whether something above already asked that Rich is available.
+
+    A guard reaches everything after it in its own block and everything nested inside those statements; it
+    does not reach backwards, and it does not reach out of the branch it sits in. A nested ``def`` is skipped,
+    being a scope of its own with a guard of its own: its body runs when it is called, not here.
+    """
+    violations: list[RichImportViolation] = []
+    for statement in body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        module_name = _rich_import_in(statement=statement)
+        if module_name is not None and not guarded:
+            violations.append(
+                RichImportViolation(
+                    relative_path=relative_path,
+                    lineno=statement.lineno,
+                    detail=f"imports `{module_name}` inside `{function_name}` with no `require_rich(...)` above it",
+                )
+            )
+        guarded_here = guarded or _establishes_rich_is_available(statement=statement)
+        for nested in _nested_bodies(statement=statement):
+            violations.extend(_unguarded_in_block(body=nested, guarded=guarded_here, function_name=function_name, relative_path=relative_path))
+        guarded = guarded_here
+    return violations
+
+
+def _function_scopes(*, tree: ast.AST) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef]:
+    """Every function and coroutine in one module, at any depth, each yielded once."""
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            yield node
+
+
 def find_violations_in_source(*, source: str, relative_path: str) -> list[RichImportViolation]:
     """Scan one module's source and return its module-level Rich imports, or none for a CLI module.
 
@@ -178,7 +320,9 @@ def find_violations_in_source(*, source: str, relative_path: str) -> list[RichIm
     """
     if is_allowed_path(relative_path=relative_path):
         return []
-    return _module_level_rich_imports(source=source, relative_path=relative_path)
+    violations = _module_level_rich_imports(source=source, relative_path=relative_path)
+    violations.extend(_unguarded_deferred_rich_imports(source=source, relative_path=relative_path))
+    return sorted(violations, key=lambda violation: violation.key)
 
 
 def shortest_chain_to_any(*, graph: ImportGraph, start: str, targets: frozenset[str]) -> list[str]:
@@ -263,13 +407,16 @@ def collect_violations(*, root: Path) -> list[RichImportViolation]:
     for path in iter_source_files(root=root):
         relative_path = path.as_posix()
         nb_modules += 1
-        rich_imports = _module_level_rich_imports(source=path.read_text(encoding="utf-8"), relative_path=relative_path)
+        source = path.read_text(encoding="utf-8")
+        rich_imports = _module_level_rich_imports(source=source, relative_path=relative_path)
         if is_allowed_path(relative_path=relative_path):
             nb_cli_modules += 1
+            # Only a module-level import puts Rich into this module's importers: a deferred one runs on a call.
             if rich_imports:
                 rich_importers.add(module_qname_for(path=path))
         else:
             violations.extend(rich_imports)
+            violations.extend(_unguarded_deferred_rich_imports(source=source, relative_path=relative_path))
     if nb_modules == 0 or nb_cli_modules == 0:
         msg = (
             f"the Rich import guard scanned {nb_modules} module(s) under `{root}`, {nb_cli_modules} of them under "

@@ -12,6 +12,10 @@ import importlib.util
 # ``rendered_pretty`` renderings and the CLI all render through it.
 RICH_EXTRA_NAME = "cli"
 
+#: What a listing whose result is a Rich table says when the extra is missing. The model listings and the pipe
+#: listing share it: each builds a table and has nothing else to print it as.
+RICH_TABLE_MISSING_MESSAGE = "This listing prints its result in a Rich table."
+
 
 def require_rich(*, message: str) -> None:
     """Import Rich, or raise ``MissingDependencyError`` naming the ``cli`` extra.

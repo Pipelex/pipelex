@@ -285,6 +285,7 @@ class PrettyPrinter:
         Raises:
             MissingDependencyError: If Rich is not installed.
         """
+        require_rich_for_rendering()
         panel = cls.make_pretty_panel(
             content=content,
             title=title,
@@ -327,6 +328,7 @@ class PrettyPrinter:
         Raises:
             MissingDependencyError: If Rich is not installed.
         """
+        require_rich_for_rendering()
         pretty = cls.make_pretty(content, inner_title=inner_title, depth=0)
         # When width is not specified, measure the content to determine optimal console width
         if width is None:

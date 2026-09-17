@@ -7,6 +7,7 @@ from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.runtime_hub import get_console
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.misc.rich_extra import RICH_TABLE_MISSING_MESSAGE, require_rich
 
 if TYPE_CHECKING:
     from anthropic.types import ModelInfo
@@ -90,6 +91,7 @@ def _display_anthropic_models_table(
     backend_name: str,
 ) -> None:
     """Display Anthropic models in table format."""
+    require_rich(message=RICH_TABLE_MISSING_MESSAGE)
     from rich import box
     from rich.table import Table
 

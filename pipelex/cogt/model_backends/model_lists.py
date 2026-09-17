@@ -21,8 +21,6 @@ class ModelLister:
             backend_name: Name of the backend to list models for
             flat: Whether to output in flat CSV format
         """
-        from rich.markup import escape
-
         try:
             backend = get_models_manager().get_required_inference_backend(backend_name)
         except ModelManagerError as exc:
@@ -31,7 +29,10 @@ class ModelLister:
 
         # A backend with no model specs is a valid config state — there is simply nothing to list.
         if not backend.model_specs:
+            # The note renders through Rich; the console hands out the named failure when the extra is missing.
             console = get_console()
+            from rich.markup import escape
+
             if flat:
                 console.print(f"# Note: Backend '{escape(backend_name)}' has no models configured")
             else:
@@ -94,10 +95,11 @@ class ModelLister:
         flat: bool,
     ) -> None:
         """Display message about unsupported SDKs."""
-        from rich.markup import escape
-
         if not any_listed and unsupported_sdks:
+            # As above: nothing renders unless there is something to say, so the guard sits with the printing.
             console = get_console()
+            from rich.markup import escape
+
             if not flat:
                 console.print(
                     f"\n[yellow]Note: Backend '{escape(backend_name)}' has models using SDKs that we don't support for remote listing:[/yellow]"
