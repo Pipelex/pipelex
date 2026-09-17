@@ -15,7 +15,8 @@ from typing_extensions import override
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.tools.log.log_holding import HOLDING_CAPACITY, HoldingLogHandler
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX
+from pipelex.tools.log.log_holding import FORWARDED_MARK, HOLDING_CAPACITY, HoldingLogHandler
 from pipelex.tools.log.log_sink import LogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -245,6 +246,18 @@ class TestHoldingLogHandler:
         holding.handle(logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="after", args=(), exc_info=None))
 
         assert [record.getMessage() for record in target.records] == ["after"]
+
+    def test_a_caller_field_named_like_the_forwarded_mark_is_prefixed_and_the_record_is_still_delivered(self, fresh_log: Log) -> None:
+        """A field is never allowed to make a record vanish: spelled as the mark, it lands prefixed and the sink still sees the line."""
+        sink = _ListSink()
+        fresh_log.install_sink(sink)
+
+        fresh_log.info("still here", fields={FORWARDED_MARK: "whatever the caller meant"})
+
+        (delivered,) = [record for record in sink.list_handler.records if record.name == __name__]
+        assert delivered.getMessage() == "still here"
+        assert getattr(delivered, f"{COLLIDING_FIELD_PREFIX}{FORWARDED_MARK}") == "whatever the caller meant"
+        assert not getattr(delivered, FORWARDED_MARK, False)
 
     def test_the_holding_handler_keeps_the_newest_records_up_to_its_capacity(self) -> None:
         holding = HoldingLogHandler()

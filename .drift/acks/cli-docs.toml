@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:4e3a3113ebb71676388aca4e40e4db21cd634ba7826c26ee29b69f7c1327b450"
+digest = "sha256:88fbc520ddb6fcf758f47eab19f74815386547a78e216c9424f92ddf2c061e92"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-16T21:05:19Z"
-rationale = "The doctor gains a Plugins row and the agent envelope a checks.plugins entry for a plugin registry that did not build, and checks.log_sink now also covers a sink that failed to install; the agent-CLI contract doc describes both, and docs/tools/cli/ describes no per-row shape for doctor."
+reviewed_at = "2026-09-16T22:37:37Z"
+rationale = "install_doctor_log_sink now reads log.sink before retrying, so the checks.log_sink row has a fourth shape: a sink that was installed and then failed while the held records were replayed through it is reported as unhealthy with the sink kept, instead of the fallback raising an already-installed refusal out of the command. pipelex/cli/agent_cli/CLAUDE.md is updated to separate the three cases where the report runs on the console sink on stderr from that one, where it runs on the configured sink. docs/tools/cli/ still describes no per-row shape for doctor, so nothing there is stale; the command's own flags, arguments and formats did not move."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "The doctor gains a Plugins row and the agent envelope a checks.plug
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:a87d2747134ff8c47fb4040a1d47906fb3359bdb"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:150f41fad13af5e54b533a22a1e38f0d255dfd0a"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"

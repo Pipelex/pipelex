@@ -63,6 +63,28 @@ class _NullSink(LogSink):
         return logging.NullHandler()
 
 
+class _UnrecoverableHandler(logging.Handler):
+    """Cannot render a record, and cannot say so either: the shape a closed stderr gives a handler at its ``handleError``."""
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        msg = "this handler cannot render a record"
+        raise RuntimeError(msg)
+
+    @override
+    def handleError(self, record: logging.LogRecord) -> None:
+        msg = "stderr is closed"
+        raise ValueError(msg)
+
+
+class _FailsOnReplaySink(LogSink):
+    """Builds its handler, so the sink is recorded as installed, and then fails on the first record replayed through it."""
+
+    @override
+    def make_handler(self) -> logging.Handler:
+        return _UnrecoverableHandler()
+
+
 def _registry() -> LogSinkRegistry:
     return LogSinkRegistry(
         {
@@ -148,6 +170,20 @@ class TestDoctorLogSink:
         assert "could not be installed" in check.message
         assert "choose stdout or stderr" in check.message
         _assert_the_fallback_console_sink_is_installed_on_stderr()
+
+    @pytest.mark.usefixtures("released_log")
+    def test_a_sink_that_failed_after_being_recorded_is_a_row_and_the_installed_sink_is_kept(self) -> None:
+        """The failure comes out of the replay, past the point where the sink was recorded, so there is nothing for a fallback to install."""
+        log_config = _log_config(sink=LogSinkMethod.JSON)
+        log.configure(log_config=log_config)
+        log.warning("a record held until the sink arrives")
+        registry = LogSinkRegistry({LogSinkMethod.JSON: lambda _config: _FailsOnReplaySink()})
+
+        check = install_doctor_log_sink(registry=registry, log_config=log_config)
+
+        assert not check.is_healthy
+        assert "stderr is closed" in check.message
+        assert isinstance(log.sink, _FailsOnReplaySink)
 
     @pytest.mark.usefixtures("released_log")
     def test_a_plugin_registry_that_does_not_build_is_a_row_and_the_report_goes_on_through_stderr(self, mocker: MockerFixture) -> None:

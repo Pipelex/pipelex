@@ -20,8 +20,11 @@ from typing_extensions import override
 HOLDING_CAPACITY = 1000
 
 # The attribute a forwarded record carries once the sink's handler has handled it, so the same record
-# reaching that handler again through the root logger is rejected. Underscored so no caller's ``extra``
-# can spell it: the stdlib refuses only the names a ``LogRecord`` already has.
+# reaching that handler again through the root logger is rejected. The underscore is a convention and
+# nothing more: a fresh record does not carry the name, so nothing in the stdlib stops a caller's
+# ``extra`` from spelling it and having its own record rejected from every sink. What stops that is
+# ``attach_log_record_extra``, which counts the mark among the names a record owns and carries such an
+# entry under the ``field_`` prefix, exactly as it does for ``message`` and ``asctime``.
 FORWARDED_MARK = "_pipelex_forwarded"
 
 

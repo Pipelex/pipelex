@@ -1116,8 +1116,15 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
     Boot stops on an unregistered token, on a factory that raises and on a registry that did not
     build. The doctor must not, since where its own lines go is one of the things it diagnoses: it
     installs the console sink on stderr instead and reports why in a row of its own, so the rest of
-    the report is still produced. The retry is safe because ``log.install_sink`` builds the handler
-    before it touches the root logger, so a sink that failed to build left nothing installed.
+    the report is still produced.
+
+    Whether a retry is even possible is read off ``log.sink`` rather than assumed from the exception.
+    A sink that failed to *build* left nothing installed, because ``log.install_sink`` builds the
+    handler before it touches the root logger; but the sink is recorded before the held records are
+    replayed through it, so a failure out of that replay — a handler that cannot render a record and
+    whose ``handleError`` cannot say so either, which is what a closed stderr produces — leaves the
+    sink installed. Retrying there would meet the "already installed" refusal and take the whole
+    report down with it, so the row reports the failure and the installed sink is kept.
     """
     if registry is None:
         _install_fallback_log_sink(log_config=log_config)
@@ -1139,6 +1146,9 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
     except Exception as exc:  # ruff: ignore[blind-except]
         # A factory or a handler that raises on this configuration, a console target no sink writes
         # to or a dependency the sink needs: the row says so, and the report goes on.
+        if log.sink is not None:
+            failure = f"was installed but then failed while the records held since logging was configured were replayed through it: {exc}"
+            return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' {failure}")
         _install_fallback_log_sink(log_config=log_config)
         return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' could not be installed: {exc}; {FALLBACK_LOG_SINK_NOTE}")
     return LogSinkCheck(is_healthy=True, message=f"Log sink '{log_config.sink}' installed")

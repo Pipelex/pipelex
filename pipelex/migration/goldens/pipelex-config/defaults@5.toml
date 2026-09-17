@@ -105,6 +105,18 @@ keywords_to_hilight = []
 [runtime.log.otlp]
 headers = {}
 
+# [runtime.log.redaction] governs the one processor every sink is behind: it scrubs the secret shapes
+# the workspace already knows (an Authorization bearer token, an api-key or signature header, an OAuth
+# code parameter, a cookie, a JSON secret entry, and the sk_ / plx_sk_ / pk_ / bl_ key prefixes) out of
+# the message and out of every string a field carries, and neutralises the control characters in a
+# field value so a caller-supplied string cannot forge a line or a field separator. is_enabled = false
+# turns it off for a process that redacts downstream. extra_patterns are regular expressions added to
+# the shipped families for the secret shapes only this deployment knows; every match is replaced by
+# "[REDACTED]", and a pattern the re module refuses is a configuration error named at load.
+[runtime.log.redaction]
+is_enabled = true
+extra_patterns = []
+
 [runtime.aws]
 api_key_method = "env"
 bedrock_access_variant = "aws_access"

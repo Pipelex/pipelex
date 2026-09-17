@@ -20,6 +20,7 @@ from opentelemetry.semconv.attributes import exception_attributes
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_redaction import REDACTED_TEXT
 from pipelex.tools.log.otlp_log_sink import FLUSH_TIMEOUT_MILLIS, ExportPathFilter, OtlpLogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -30,9 +31,10 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _package_log_config() -> LogConfig:
+def _package_log_config(*, is_redaction_enabled: bool = True) -> LogConfig:
     config_dict = load_toml_from_path(ConfigLoader().pipelex_root_dir / "pipelex.toml")
-    return LogConfig.model_validate(config_dict["runtime"]["log"])
+    redaction = {**config_dict["runtime"]["log"]["redaction"], "is_enabled": is_redaction_enabled}
+    return LogConfig.model_validate({**config_dict["runtime"]["log"], "redaction": redaction})
 
 
 def _own_logs(exporter: InMemoryLogExporter) -> list[LogData]:
@@ -104,8 +106,42 @@ class TestOtlpLogSink:
         assert log_data.log_record.severity_number is SeverityNumber.ERROR
         attributes = _attributes(log_data)
         assert attributes[exception_attributes.EXCEPTION_TYPE] == "ValueError"
-        assert attributes[exception_attributes.EXCEPTION_MESSAGE] == "boom"
+        assert exception_attributes.EXCEPTION_MESSAGE not in attributes
         assert "Traceback (most recent call last)" in attributes[exception_attributes.EXCEPTION_STACKTRACE]
+        assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith("ValueError: boom")
+
+    def test_the_stacktrace_is_the_scrubbed_text_and_no_message_attribute_carries_the_secret(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+        """The message attribute would be ``str(exc_value)``, which no sink can scrub; the type and the stacktrace's last line carry what it said."""
+        fresh, exporter = otlp_log
+        try:
+            msg = "refused for sk_live_0123456789abcdef"
+            raise RuntimeError(msg)
+        except RuntimeError:
+            fresh.error("call failed", include_exception=True)
+
+        (log_data,) = _own_logs(exporter)
+        attributes = _attributes(log_data)
+        assert exception_attributes.EXCEPTION_MESSAGE not in attributes
+        assert "sk_live_0123456789abcdef" not in attributes[exception_attributes.EXCEPTION_STACKTRACE]
+        assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith(f"RuntimeError: refused for sk_{REDACTED_TEXT}")
+
+    def test_an_exception_that_carries_no_traceback_still_exports_its_own_text(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``exc_text`` is the processor's rendering; with redaction off there is none and the stacktrace is the only place the text goes."""
+        caplog.set_level(logging.INFO, logger=__name__)
+        exporter = InMemoryLogExporter()
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config(is_redaction_enabled=False))
+        fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
+        try:
+            logging.getLogger(__name__).error("failed", exc_info=ValueError("upstream quota exceeded"))
+
+            (log_data,) = _own_logs(exporter)
+            attributes = _attributes(log_data)
+            assert attributes[exception_attributes.EXCEPTION_TYPE] == "ValueError"
+            assert exception_attributes.EXCEPTION_MESSAGE not in attributes
+            assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip() == "ValueError: upstream quota exceeded"
+        finally:
+            fresh.reset()
 
     @pytest.mark.parametrize(
         ("method_name", "severity_text", "severity_number"),

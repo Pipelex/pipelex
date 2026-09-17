@@ -18,10 +18,11 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex.system.configuration.config_loader import ConfigLoader
-from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, TIME_KEY, JsonLogSink
+from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, TIME_KEY, JsonLogFormatter, JsonLogSink
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
+from pipelex.tools.log.log_redaction import CYCLE_TEXT, REDACTED_TEXT
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
@@ -90,6 +91,16 @@ class TestJsonLogSink:
         assert structured[DATA_FIELD] == {"key": "value", "nested": {"flag": True}}
         assert structured[MESSAGE_KEY].startswith("Config:")
 
+    def test_a_field_value_carrying_a_newline_is_still_one_line_and_forges_nothing(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """Redaction neutralises the control characters in a field value before the sink writes it, so a caller cannot forge a line or a field."""
+        fresh, buffer = json_log
+
+        fresh.info("received", fields={"detail": 'ok\nseve\x1b[31mrity="ERROR"'})
+
+        assert len([line for line in buffer.getvalue().splitlines() if "detail" in line]) == 1
+        (received,) = _own_lines(buffer)
+        assert received["detail"] == 'ok\\nseve\\x1b[31mrity="ERROR"'
+
     def test_the_exception_is_a_field_and_not_part_of_the_message(self, json_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = json_log
         try:
@@ -102,6 +113,19 @@ class TestJsonLogSink:
         assert line[MESSAGE_KEY] == "failed"
         assert "Traceback (most recent call last)" in line[EXCEPTION_KEY]
         assert "ValueError: boom" in line[EXCEPTION_KEY]
+
+    def test_a_secret_in_an_exceptions_message_is_scrubbed_from_the_exception_value(self, json_log: tuple[Log, io.StringIO]) -> None:
+        fresh, buffer = json_log
+        try:
+            msg = "refused: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.body.sig for sk_live_0123456789abcdef"
+            raise RuntimeError(msg)
+        except RuntimeError:
+            fresh.error("call failed", include_exception=True)
+
+        (line,) = _own_lines(buffer)
+        assert "eyJhbGciOiJIUzI1NiJ9" not in line[EXCEPTION_KEY]
+        assert "sk_live_0123456789abcdef" not in line[EXCEPTION_KEY]
+        assert line[EXCEPTION_KEY].endswith(f"RuntimeError: refused: Authorization: Bearer {REDACTED_TEXT} for sk_{REDACTED_TEXT}")
 
     def test_no_ansi_ever_even_for_a_warning_or_an_error(self, json_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = json_log
@@ -123,7 +147,7 @@ class TestJsonLogSink:
         assert line[f"{COLLIDING_FIELD_PREFIX}logger"] == "other"
 
     def test_a_value_json_does_not_know_is_serialized_and_never_lost(self, json_log: tuple[Log, io.StringIO]) -> None:
-        """A model dumps in JSON mode, a datetime becomes text, a cycle keeps the line an object."""
+        """A model dumps in JSON mode, a datetime becomes text, a cycle is cut by the redaction walk and keeps the line an object."""
 
         class Item(BaseModel):
             name: str
@@ -139,8 +163,20 @@ class TestJsonLogSink:
         assert odd["item"] == {"name": "x", "when": "2020-01-02T00:00:00Z"}
         assert odd["when"] == "2021-03-04 00:00:00+00:00"
         assert cyclic_line[MESSAGE_KEY] == "cyclic value"
-        assert isinstance(cyclic_line["loop"], str)
-        assert "{...}" in cyclic_line["loop"]
+        assert cyclic_line["loop"] == {"me": CYCLE_TEXT}
+
+    def test_a_raw_cycle_reaching_the_formatter_keeps_the_line_an_object(self) -> None:
+        """The sink's own guard, for a process with redaction off: a value ``json`` refuses is written as its ``repr``, the line stays one object."""
+        cyclic: dict[str, Any] = {}
+        cyclic["me"] = cyclic
+        record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="cyclic value", args=(), exc_info=None)
+        record.loop = cyclic
+
+        line = json.loads(JsonLogFormatter().format(record))
+
+        assert line[MESSAGE_KEY] == "cyclic value"
+        assert isinstance(line["loop"], str)
+        assert "{...}" in line["loop"]
 
     def test_a_non_finite_float_is_written_as_text_a_strict_parser_accepts(self, json_log: tuple[Log, io.StringIO]) -> None:
         """JSON has no NaN: the bare tokens Python writes by default would cost the whole line, so they are strings."""
@@ -183,7 +219,7 @@ class TestJsonLogSink:
         assert "ValueError: boom" in with_exception[EXCEPTION_KEY]
         assert with_exception[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"] == "supplied"
         assert cycle[MESSAGE_KEY] == "cycle under a reserved name"
-        assert "{...}" in cycle[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"]
+        assert cycle[f"{COLLIDING_FIELD_PREFIX}{EXCEPTION_KEY}"] == {"me": CYCLE_TEXT}
 
     def test_redirect_to_stderr_moves_the_stream(self, json_log: tuple[Log, io.StringIO], capsys: pytest.CaptureFixture[str]) -> None:
         fresh, buffer = json_log
@@ -196,3 +232,26 @@ class TestJsonLogSink:
         assert fresh.sink is not None
         assert isinstance(fresh.sink, JsonLogSink)
         assert fresh.sink.handler.stream is sys.stderr  # type: ignore[attr-defined]
+
+    def test_content_the_serialization_refuses_is_redacted_by_name_before_it_falls_back_to_a_repr(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """The ``repr`` of an entry holding an object is beyond what the string families read back out of text."""
+        fresh, buffer = json_log
+        cyclic: dict[str, Any] = {"password": {"value": "private_credential_12345"}}
+        cyclic["self"] = cyclic
+
+        fresh.info(cyclic)
+
+        (line,) = _own_lines(buffer)
+        assert "private_credential_12345" not in line[MESSAGE_KEY]
+        assert REDACTED_TEXT in line[MESSAGE_KEY]
+
+    def test_a_caller_field_named_like_the_content_attribute_is_carried_under_the_collision_prefix(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """``data`` is the runtime's own rendering and keeps its control characters; a caller's string must not land there."""
+        fresh, buffer = json_log
+
+        fresh.info("string content", fields={DATA_FIELD: "ok\nFAKE LINE", "other": "ok\nFAKE LINE"})
+
+        (line,) = _own_lines(buffer)
+        assert DATA_FIELD not in line
+        assert line[f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}"] == "ok\\nFAKE LINE"
+        assert line["other"] == "ok\\nFAKE LINE"
