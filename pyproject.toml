@@ -75,8 +75,10 @@ Changelog = "https://docs.pipelex.com/changelog/"
 anthropic = ["anthropic>=0.78.0"]
 bedrock = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
 # Rich renders the terminal: the `pipelex` and `pipelex-agent` CLIs, the console log sink and the
-# pretty-print mode "rich". A server selects the json sink and a Rich-free pretty-print mode, and
-# installs pipelex without it.
+# pretty-print mode "rich". Nothing the runtime does on the way to running a method needs it, so a
+# server selects the json sink and a Rich-free pretty-print mode and never reaches for it. Leaving this
+# extra out does not make the environment Rich-free, though: `typer` and `instructor` are core
+# dependencies and both require Rich unconditionally, so a stock install still contains it.
 cli = ["rich>=13.8.1"]
 docling = [
   "docling>=2.94.0",

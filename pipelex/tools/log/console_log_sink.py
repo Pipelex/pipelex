@@ -1,9 +1,13 @@
 """The ``console`` sink: the Rich handler with the emoji formatter and every ``[runtime.log.rich_log]`` setting.
 
-Rich is the ``cli`` extra. It is imported when the handler is built and nowhere else in this module, so a
-process that selects another sink never loads it, and one that selects this sink without Rich installed
-fails at boot with the extra to install and the ``json`` alternative named, per the plugin system's
-fail-at-use rule.
+Rich is the ``cli`` extra. It is imported when the handler is built and nowhere else in this module, so
+this module asks for Rich only where this sink is the one selected; a process that selects another sink
+never reaches that import. One that selects this sink without Rich installed fails at boot with the extra
+to install and the ``json`` alternative named, per the plugin system's fail-at-use rule.
+
+Note that selecting another sink does not leave the process without Rich loaded: ``typer`` and
+``instructor`` are core dependencies that require it, so an ``import pipelex`` loads Rich whatever this
+module does. What is true is that nothing here is the reason.
 """
 
 from __future__ import annotations

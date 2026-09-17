@@ -68,23 +68,33 @@ def require_rich_for_rendering() -> None:
     require_rich(message=RICH_RENDERING_MISSING_MESSAGE)
 
 
-def _normalized_tag_name(*, name: str) -> str:
-    """A tag name as an opening and a closing tag are matched on: case, spacing and word order aside, as Rich's style normalization does."""
-    return " ".join(sorted(name.lower().split()))
-
-
 def plain_markup_text(*, markup: str) -> str | None:
-    """The text Rich console markup renders to, tags dropped, or ``None`` where Rich would refuse the markup.
+    """The text Rich console markup reads as, tags dropped, or ``None`` where it cannot be read as tags at all.
 
-    Rich-free, so the ``poor`` mode reads a title the way the Rich panel would without importing Rich. It
-    follows ``rich.markup.render`` for what a title spells: tags, backslash-escaped brackets, and a closing
-    tag that must close an open one, which is the markup Rich refuses. Emoji codes and style aliases are
-    left as they are written.
+    Rich-free, so the ``poor`` mode reads a title without importing Rich. It follows ``rich.markup``'s own tag
+    pattern and its backslash escaping, and it tracks how deep the tags nest so that a closing tag with
+    nothing open — a bracketed path, say — is reported rather than silently eaten. Anything it accepts, it
+    returns as text.
+
+    Two deliberate differences from Rich, both in the direction of accepting more:
+
+    - **Which tag a close matches is not decided here.** Rich resolves a closing tag through its style
+      grammar, so it knows that ``[b]`` and ``[/bold]`` are one style and that ``[/italic]`` cannot close
+      ``[bold]``. Reproducing that means reproducing ``Style.parse``, which is Rich. This reading closes the
+      innermost open tag whatever either is named, which strips the same text and refuses less.
+    - **A ``@`` tag's parameters are dropped unread**, where Rich parses them and refuses a malformed one.
+
+    Accepting more than Rich costs this caller nothing: the ``poor`` mode prints whatever happens, and a
+    title that reads as text beats one that prints its own tags. Refusing more would cost it the title.
+
+    One thing it does not do at all: an emoji code is left as it is written, since substituting ``:rocket:``
+    needs Rich's own code table. That is a behaviour change of the ``poor`` mode, documented in
+    ``docs/contribute/rich-imports.md``.
     """
     if "[" not in markup:
         return markup
     pieces: list[str] = []
-    open_tags: list[str] = []
+    open_depth = 0
     position = 0
     for match in _MARKUP_TAG_PATTERN.finditer(markup):
         full_text, escapes, tag_text = match.groups()
@@ -99,17 +109,11 @@ def plain_markup_text(*, markup: str) -> str | None:
             continue
         tag_name = tag_text.partition("=")[0]
         if not tag_name.startswith("/"):
-            open_tags.append(_normalized_tag_name(name=tag_name))
+            open_depth += 1
             continue
-        closed_name = _normalized_tag_name(name=tag_name[1:])
-        if not closed_name:
-            if not open_tags:
-                return None
-            open_tags.pop()
-            continue
-        if closed_name not in open_tags:
+        if open_depth == 0:
             return None
-        del open_tags[len(open_tags) - 1 - open_tags[::-1].index(closed_name)]
+        open_depth -= 1
     if position < len(markup):
         pieces.append(markup[position:].replace("\\[", "["))
     return "".join(pieces)
@@ -218,8 +222,11 @@ def pretty_print_url(
     if url.startswith("/"):
         url = "file://" + url
     if PrettyPrinter.mode is PrettyPrintMode.POOR:
-        # The url on a row of its own, so a terminal can linkify it whole.
-        PrettyPrinter.pretty_print_url_without_rich(url, title=title, subtitle=subtitle, width=width, console_width=console_width)
+        # The url on a row of its own, so a terminal can linkify it whole. The border style is the one thing
+        # dropped here: the plain frame is monochrome, so there is nothing for it to colour.
+        PrettyPrinter.pretty_print_url_without_rich(
+            url, title=title, subtitle=subtitle, inner_title=inner_title, width=width, console_width=console_width
+        )
         return
     require_rich_for_rendering()
     from rich.text import Text
@@ -494,7 +501,9 @@ class PrettyPrinter:
         console_width: int | None = None,
     ):
         if isinstance(content, str) and content.startswith(("http://", "https://")):
-            cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle, width=width, console_width=console_width)
+            cls.pretty_print_url_without_rich(
+                content=content, title=title, subtitle=subtitle, inner_title=inner_title, width=width, console_width=console_width
+            )
             return
         # Titles are Rich markup in every mode (a caller writes them once, for the Rich panel), so they are
         # measured and printed as the text they render to, not as the tags they are spelled with.
@@ -595,12 +604,13 @@ class PrettyPrinter:
         *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        inner_title: str | None = None,
         width: int | None = None,
         console_width: int | None = None,
     ):
         # The url itself prints on a row of its own, outside the frame, so a terminal can linkify it whole.
         # Everything around it obeys the same rules as the framed printer: markup titles render to their text,
-        # and nothing is drawn wider than the terminal.
+        # each title sits on a row of its own, and nothing is drawn wider than the terminal.
         title_str = cls._plain_title(title=title) if title else ""
         if subtitle:
             title_str += f" ({cls._plain_title(title=subtitle)})"
@@ -609,13 +619,13 @@ class PrettyPrinter:
         if width:
             frame_width = min(frame_width, width + 6)
         frame_width = max(frame_width, 5)
-        title_str = cls._elide(line=title_str, max_width=frame_width - 4)
+        title_lines = [cls._elide(line=line, max_width=frame_width - 4) for line in (title_str, inner_title or "") if line]
         top_border = "╭" + "─" * (frame_width - 2) + "╮"
         bottom_border = "╰" + "─" * (frame_width - 2) + "╯"
 
         print_to_stderr(f"{BORDER_COLOR}{top_border}{RESET_FONT}")
-        if title_str:
-            title_padding = " " * (frame_width - len(title_str) - 4)
-            print_to_stderr(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title_str}{RESET_FONT}:{title_padding}{BORDER_COLOR}│{RESET_FONT}")
+        for title_line in title_lines:
+            title_padding = " " * (frame_width - len(title_line) - 4)
+            print_to_stderr(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title_line}{RESET_FONT}:{title_padding}{BORDER_COLOR}│{RESET_FONT}")
         print_to_stderr(f"{TEXT_COLOR}{content}{RESET_FONT}")
         print_to_stderr(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")

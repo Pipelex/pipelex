@@ -1,32 +1,45 @@
 """AST core for the Rich import guard.
 
-Rich is the ``cli`` extra: the ``pipelex`` and ``pipelex-agent`` CLIs install it, and a server installs
-pipelex without it. What makes that safe is two rules, which this module checks mechanically:
+Rich is the ``cli`` extra: the ``pipelex`` and ``pipelex-agent`` CLIs install it, and a server leaves it
+out. What the rules below hold is that **no code path the runtime takes on the way to running a method
+needs Rich** — not that a server's environment has none, which is not this repo's to promise: ``typer``
+and ``instructor`` are core dependencies and both require Rich unconditionally, so a stock install still
+contains it and ``import pipelex`` still loads it, through ``httpx``'s optional command-line module.
+
+Three rules, which this module checks mechanically:
 
 1. **The direct rule. Outside ``pipelex/cli/``, no module imports Rich at module level.** Everything else
    that renders through Rich, the console log sink, the pretty-print engine's ``rich`` mode, the
    ``rendered_pretty`` renderings, the model listing and cost tables, imports it inside the function that
-   renders, after checking it is installed, so importing any of those modules costs a server nothing.
+   renders, so importing any of those modules asks a server for nothing.
 2. **The transitive rule. Outside ``pipelex/cli/``, no module reaches Rich through a CLI module either.**
    A module that imports a CLI module at module level loads whatever that module imports, so a CLI module
    importing Rich at the top of its file puts Rich into every importer of it. The rule resolves the
    module-level import graph of ``pipelex/``, the one the hub-layering guard builds, and reports the
    shortest chain from the offending module to a CLI module that imports Rich, at the line of its first hop.
+3. **The ordering rule. A deferred Rich import is reached only after something asked whether Rich is
+   there.** Deferring the import is what the first two rules are about; calling ``require_rich(...)`` or
+   ``require_rich_for_rendering()`` first is what turns a bare ``ModuleNotFoundError`` into the
+   ``MissingDependencyError`` that names the extra. A rendering with a Rich-free fallback asks instead of
+   raising, through ``is_rich_installed()`` or the ``sys.modules`` question, which counts the same.
 
 The human-readable specification lives in ``docs/contribute/rich-imports.md``.
 
 "Module level" means what an ``import`` of the module executes. An import statement counts wherever it sits
 outside a function body: at the top of the file, in a module-level ``try`` or ``if`` block, in a class
 body. Two places are exempt, because nothing in them runs at import time: a function body, and the body
-of an ``if TYPE_CHECKING:`` block (its ``else`` branch is runtime code and is checked). The import graph
-shares those carve-outs, and one more: a statement carrying the hub-layering guard's own
-``# hub-layering: ignore`` marker is no edge in it.
+of an ``if TYPE_CHECKING:`` block (its ``else`` branch is runtime code and is checked).
 
-Both rules read source, so neither sees an import assembled at runtime. What pins the property itself, a
-pipe run with Rich refused, is ``tests/integration/pipelex/test_rich_free_run.py``.
+Every rule reads source, so none of them sees an import assembled at runtime, and the third reads one
+function at a time rather than following calls, so a guard a callee performs is invisible to it and is
+spelled out at the deferred import as well. What pins the property itself, a pipe run with Rich refused,
+is ``tests/integration/pipelex/test_rich_free_run.py``.
 
-There is no escape hatch. A module that genuinely needs Rich at module level is a CLI module and belongs
-under ``pipelex/cli/``.
+**There is one escape hatch, and it is the transitive rule's alone.** That rule walks the import graph the
+hub-layering guard builds, and a statement carrying that guard's ``# hub-layering: ignore`` marker is no
+edge in it — so the marker, whose stated purpose is a different guard, also hides the marked module's path
+to Rich. Nothing else here can be switched off: a module that genuinely needs Rich at module level is a
+CLI module and belongs under ``pipelex/cli/``.
 
 This module depends on the stdlib and on the sibling ``hub_layering_guard``, whose import graph it reuses.
 The presentation layer wired into the ``pipelex-dev`` Typer app lives in ``check_rich_imports_cmd.py``.

@@ -524,7 +524,7 @@ Clone it, fork it, and experiment with production-ready methods for various use 
 
 The package supports the following additional features:
 
-- `cli`: Rich, for the `pipelex` and `pipelex-agent` commands, the `console` log sink and the `rich` pretty-print mode. Install it wherever Pipelex runs in a terminal; a server leaves it out and selects the `json` log sink with the `poor` or `silent` pretty-print mode
+- `cli`: Rich, for the `pipelex` and `pipelex-agent` commands, the `console` log sink and the `rich` pretty-print mode. Install it wherever Pipelex runs in a terminal; a server leaves it out and selects the `json` log sink with the `poor` or `silent` pretty-print mode, and then nothing the runtime does on the way to running a method asks for Rich. Leaving the extra out does not make the environment Rich-free: `typer` and `instructor` are core dependencies and both require Rich, so a stock install still contains it
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `mistralai`: Mistral AI support for text generation and OCR
