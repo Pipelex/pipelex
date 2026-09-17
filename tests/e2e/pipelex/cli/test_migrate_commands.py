@@ -29,13 +29,6 @@ files. The warning is not asserted here and cannot be: this probe is the agent C
 logging process-wide by contract. It is asserted per surface in ``test_boot_tolerance.py``,
 alongside the other half — a configuration the ledger cannot explain still fails the boot.
 
-**Tolerance reaches only what the ledger applies, and one shipped entry is `unsafe`.** A file
-carrying material ``pipelex-config@5`` is about keeps it, so the model refuses it and the boot stops
-rather than warns — deliberately, because one of the keys that entry retires chose silence and
-deleting it would hand a deployment its console output back. That machine is
-``TestAMachineTheLogModeRetirementBlocks``; every other machine planted here is one whose operator
-has already done that by-hand deletion, so that what the reshape does is what those tests measure.
-
 The boot probe is ``pipelex-agent models``: the cheapest command that performs a full Pipelex boot,
 including the telemetry load the old shape sends down the tolerance path. ``pipelex show config``
 is not a probe — it exits 0 on a machine whose telemetry configuration cannot load, because it
@@ -151,20 +144,6 @@ def _old_shape_telemetry_document() -> str:
 _STORAGE_URI_FORMAT_AT_SCHEMA_1 = '"{primary_id}/{secondary_id}/{hash}.{extension}"'
 _STORAGE_URI_FORMAT_TODAY = '"{hash}.{extension}"'
 
-# The four keys the log-mode retirement is about, as schema 1 spelled them. `pipelex-config@5` is
-# `unsafe`, so a file carrying any of them is reported on every run, never written, and refused by
-# the boot — deliberately, since deleting `is_console_logging_enabled = false` would hand a
-# deployment that suppressed its console output that output back. They are struck from the planted
-# document because the machine these tests are about is the *reshape*, and an operator who has
-# already done the by-hand deletion is the machine that lets the reshape be measured. The blocking
-# itself has its own test, `TestAMachineTheLogModeRetirementBlocks`.
-_RETIRED_LOG_MODE_LINES_AT_SCHEMA_1 = (
-    "is_console_logging_enabled = true\n",
-    'log_mode = "rich"\n',
-    "poor_loggers = []\n",
-    'generic_poor_logger = "#poor-log"\n',
-)
-
 
 def _pre_reshape_pipelex_config_document() -> str:
     """The whole main configuration in its pre-reshape shape, read from the package.
@@ -180,20 +159,14 @@ def _pre_reshape_pipelex_config_document() -> str:
     reference document is a byte copy of this one. Naming the version where the document's shape was
     actually cut is the spelling that says what this is, rather than one inherited from a copy.
 
-    Two things are adjusted on the way out, and neither is what the reshape is about. What this
-    fixture needs is a document that is pre-reshape in SHAPE, since the reshape is what it
-    exercises, while still being one a boot carries forward; left unadjusted, the planted machine
+    One value is modernized on the way out, and it is not a shape change, which is why the ledger
+    is silent about it and right to be. `uri_format`'s PLACEHOLDER SET narrowed —
+    `{primary_id}`/`{secondary_id}` gave way to `{storage_scope}` — and a value domain narrowing
+    with no path added, removed or moved is a *content* change, out of scope for a structural
+    vocabulary (see `docs/migration-ledger.md`). The golden stays a true record of schema 1; what
+    this fixture needs is a document that is pre-reshape in SHAPE, since the reshape is what it
+    exercises, while still being one the current models will load. Left as-is, the planted machine
     fails `_assert_boots` before `migrate` is ever reached, and the reshape goes untested.
-
-    One is a value, and the ledger is silent about it and right to be. `uri_format`'s PLACEHOLDER
-    SET narrowed — `{primary_id}`/`{secondary_id}` gave way to `{storage_scope}` — and a value
-    domain narrowing with no path added, removed or moved is a *content* change, out of scope for a
-    structural vocabulary (see `docs/migration-ledger.md`). The golden stays a true record of
-    schema 1.
-
-    The other is the four keys the log-mode retirement blocks: that entry is `unsafe` and a file
-    carrying any of them is one the boot refuses and the command will not write, which is a
-    property of its own and tested as one rather than made the background of every reshape test.
     """
     path = defaults_golden_path(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID, schema_version=1)
     document = path.read_text(encoding="utf-8")
@@ -206,15 +179,6 @@ def _pre_reshape_pipelex_config_document() -> str:
             "plants a document that cannot boot, and the reshape stops being tested."
         )
         raise AssertionError(msg)
-    for retired_line in _RETIRED_LOG_MODE_LINES_AT_SCHEMA_1:
-        if retired_line not in modernized:
-            msg = (
-                f"the schema-1 log-mode key is no longer spelled the way this fixture strikes it:\n{retired_line}"
-                "If the golden's spelling changed, update the constant above — a silent no-op here plants a "
-                "document the log-mode retirement blocks, and the reshape stops being tested."
-            )
-            raise AssertionError(msg)
-        modernized = modernized.replace(retired_line, "")
     return modernized
 
 
@@ -778,67 +742,6 @@ class TestAPreReshapeMachine:
         assert planted not in boot.stdout
         assert planted not in boot.stderr
         assert planted in global_file.read_text(encoding="utf-8"), "nothing was written, so the value is still there"
-
-
-class TestAMachineTheLogModeRetirementBlocks:
-    """The machine `pipelex-config@5` refuses to migrate, and why refusing is the point.
-
-    One of the keys that entry retires chose a behaviour: `is_console_logging_enabled = false`
-    suppressed every record Pipelex's own log calls emitted. Nothing in the migration vocabulary can
-    write that choice back under the new model — the replacement is a value beneath an open mapping,
-    and no operation writes a value at all — so the entry is `unsafe`. A file carrying the key is
-    therefore refused by the boot, named by the command and written by nobody. The alternative was a
-    deletion that leaves the file valid and the console loud again, an operator's deliberate
-    suppression undone by the upgrade before anyone had read a report.
-
-    What is proved here is the whole of that, through the binaries: the refusal, the command that
-    writes nothing, and the replacement the guidance names bringing the machine back up.
-    """
-
-    @staticmethod
-    def _silence_the_console(*, hermetic_home: Path) -> Path:
-        """Put the retired flag back into an otherwise current global file, inside `[runtime.log]`."""
-        global_file = hermetic_home / ".pipelex" / "pipelex.toml"
-        document = global_file.read_text(encoding="utf-8")
-        header = "[runtime.log]\n"
-        if header not in document:
-            msg = f"the kit template no longer carries {header!r}, so this planting would reach no table"
-            raise AssertionError(msg)
-        global_file.write_text(document.replace(header, f"{header}is_console_logging_enabled = false\n", 1), encoding="utf-8")
-        return global_file
-
-    def test_the_boot_refuses_the_command_writes_nothing_and_the_named_replacement_repairs_it(
-        self,
-        hermetic_home: Path,
-        offline_subprocess_env: dict[str, str],
-    ) -> None:
-        global_file = self._silence_the_console(hermetic_home=hermetic_home)
-        planted = global_file.read_text(encoding="utf-8")
-
-        boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
-
-        assert boot.returncode != 0, "material an unsafe entry is about is not something a boot may tolerate"
-        envelope: dict[str, Any] = json.loads(boot.stderr)
-        assert envelope["error_domain"] == "config"
-        block: dict[str, Any] = envelope["migration"]
-        assert block["needs_attention"] is True
-        blocked = [entry for plan in block["plans"] for entry in plan["blocked"]]
-        assert [(entry["entry_id"], entry["reason"]) for entry in blocked] == [("pipelex-config@5", "unsafe")]
-        assert 'pipelex = "OFF"' in blocked[0]["guidance"]
-
-        migrated = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=hermetic_home)
-
-        assert global_file.read_text(encoding="utf-8") == planted, "an unsafe entry is reported, never applied"
-        assert existing_backups_of(path=global_file) == [], "nothing was written, so nothing was backed up"
-        assert "pipelex-config@5" in migrated.stdout + migrated.stderr
-
-        # The by-hand step the guidance names, and the only thing that brings this machine back up.
-        repaired = planted.replace("is_console_logging_enabled = false\n", "")
-        pinned_at_info = 'pipelex = "INFO"\n'
-        assert pinned_at_info in repaired, "the key the recipe overrides is not where this expects it"
-        global_file.write_text(repaired.replace(pinned_at_info, 'pipelex = "OFF"\n', 1), encoding="utf-8")
-
-        _assert_boots(env=offline_subprocess_env, cwd=hermetic_home)
 
 
 class TestAPrePromptingStyleMachine:

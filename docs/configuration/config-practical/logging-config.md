@@ -219,12 +219,12 @@ headers = {}
 
 ## Migrating From the Log Mode
 
-`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone from the schema, and the defaults layer supplies `sink = "console"` in their place. This migration is yours to make by hand: ledger entry `pipelex-config@5` is `unsafe`, so `pipelex migrate` names the file and the entry's guidance on every run and writes nothing. That is deliberate. Two of those keys chose a behaviour their deletion undoes, no operation in the migration vocabulary can write the replacement, and deleting `is_console_logging_enabled = false` would leave the file valid and the console loud again — a deployment's deliberate suppression undone by the upgrade alone, before anyone had read the report.
+`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone from the schema, and the defaults layer supplies `sink = "console"` in their place. Run `pipelex migrate`: ledger entry `pipelex-config@5` deletes the four keys from an existing file, and the defaults then take over.
 
-Having deleted the keys, write what is owed:
+Two of those keys chose a behaviour their deletion undoes, and no operation in the migration vocabulary can write the replacement — so where a choice was made, writing the replacement is yours:
 
-- `is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted. Its equivalent is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone; `default_log_level` governs only the loggers that section does not pin, so on its own it silences none of Pipelex's records. Silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, and sending the records elsewhere instead means selecting the sink that goes there. `is_console_logging_enabled = true` was the default and asks for nothing beyond the deletion.
-- `log_mode = "poor"` chose a plain handler for a process with no terminal; that process now sets `sink = "json"`. `log_mode = "rich"` chose what `console` renders, and asks for nothing beyond the deletion.
+- `is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted. Its equivalent is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone; `default_log_level` governs only the loggers that section does not pin, so on its own it silences none of Pipelex's records. Silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, and sending the records elsewhere instead means selecting the sink that goes there. `is_console_logging_enabled = true` was the default and asks for nothing: the migration deletes it and the new default renders the same console.
+- `log_mode = "poor"` chose a plain handler for a process with no terminal; that process now sets `sink = "json"`. `log_mode = "rich"` chose what `console` renders, and asks for nothing either.
 - `poor_loggers` and `generic_poor_logger` have nothing to carry over: every record goes to the one selected sink.
 
 ## Best Practices
