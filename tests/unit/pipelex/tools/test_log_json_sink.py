@@ -164,6 +164,26 @@ class TestJsonLogSink:
         assert readings["flag"] is True
         assert structured[DATA_FIELD] == {"structured": "Infinity"}
 
+    def test_a_non_finite_float_inside_a_model_costs_no_other_value_its_type(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """A model's dump is a plain mapping that still holds the Python float, which ``json`` refuses under ``allow_nan=False``.
+
+        Unspelled, that refusal reached the line's own recovery, which reprs every value the line carries:
+        one ``NaN`` nested in one field turned an integer into ``"3"`` and a list into its ``repr``, so the
+        whole line lost its structure for it. The fallback spells a dump the way a value given directly is.
+        """
+
+        class Reading(BaseModel):
+            score: float
+            label: str
+
+        fresh, buffer = json_log
+        fresh.info("one bad float", fields={"reading": Reading(score=float("nan"), label="x"), "attempt": 3, "tags": ["a", "b"]})
+
+        (line,) = _own_lines(buffer)
+        assert line["reading"] == {"score": "NaN", "label": "x"}
+        assert line["attempt"] == 3
+        assert line["tags"] == ["a", "b"]
+
     def test_the_sinks_own_keys_are_reserved_with_or_without_an_exception(self, json_log: tuple[Log, io.StringIO]) -> None:
         """A field's wire name must not depend on an exception being active, and a cycle under a reserved name must not cost the line."""
         cyclic: dict[str, Any] = {}

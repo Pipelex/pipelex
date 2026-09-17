@@ -106,9 +106,16 @@ def stream_for_target(*, target: ConsoleTarget) -> TextIO:
 
 
 def json_fallback(value: Any) -> Any:  # kw-only: ignore — json.dumps calls its ``default`` positionally
-    """What ``json.dumps`` writes for a value it does not know: a model's JSON dump, anything else as text."""
+    """What ``json.dumps`` writes for a value it does not know: a model's JSON dump, anything else as text.
+
+    A model's dump is spelled the way a value handed in directly is. ``model_dump(mode="json")`` returns a
+    plain mapping that still holds the Python float, pydantic's own spelling of a non-finite one applying
+    only where pydantic writes the JSON text itself, so a ``NaN`` nested in a model would reach ``json``
+    under ``allow_nan=False`` and cost the whole payload its structure. Spelled here, it costs that one
+    float its type and nothing else anything.
+    """
     if isinstance(value, BaseModel):
-        return value.model_dump(mode="json")
+        return spell_non_finite(value=value.model_dump(mode="json"))
     return str(value)
 
 

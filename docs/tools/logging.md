@@ -70,7 +70,7 @@ A value can be anything. It rides the record by reference and the sink serialize
 
 - A field name is a `snake_case` identifier, spelled the way the value is spelled where it comes from: a field carrying a payload's `pipeline_run_id` is `pipeline_run_id`, not `pipelineRunId` or `run`.
 - Where the [OpenTelemetry semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/logs/) define a key for the concept, use that key verbatim, dots included (`http.response.status_code`, `code.function.name`), so an OTLP sink emits it without translation. The three run identifiers have no such key and keep their payload names.
-- `request_id`, `pipeline_run_id` and `pipe_run_id` are reserved for the [run-scoped context](#the-run-scoped-context), and `data` is reserved for [structured content](#structured-content). A field of one of those names is accepted and takes precedence as described below, but nothing else should use them.
+- `request_id`, `pipeline_run_id` and `pipe_run_id` are reserved for the [run-scoped context](#the-run-scoped-context), and `data` is reserved for [structured content](#structured-content). A field of one of those names is accepted and never dropped: it takes precedence over the context for the three identifiers, and it rides under `field_data` beside structured content. Nothing else should use them.
 
 ### Names that are not yours to give
 
@@ -125,7 +125,7 @@ When the content is not a string, it is rendered as JSON for the message, indent
 
 A `NaN` or an infinity survives the round trip as a float; a wire sink writes it as the string `"NaN"`, `"Infinity"` or `"-Infinity"`, since JSON has no token for it that a strict parser accepts.
 
-Structured content owns `data` outright: a `data` entry in `fields` beside a non-string content is overridden.
+Structured content owns the `data` name: a `data` entry in `fields` beside a non-string content keeps its value and is carried under `field_data`, the same prefix a field named like a record attribute or like a sink's reserved key gets. Nothing passed in `fields` is dropped for a name collision.
 
 ## Logger names and levels
 

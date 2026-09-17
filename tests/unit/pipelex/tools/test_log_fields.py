@@ -200,6 +200,25 @@ class TestLogFields:
         assert _field(override, name="request_id") == "from-call-site"
         assert _field(plain, name="request_id") == "from-context"
 
+    def test_a_data_field_beside_structured_content_is_carried_under_the_prefix_not_destroyed(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``data`` is the content's name, and a field spelling it used to be overwritten where every other collision is prefixed.
+
+        The content keeps the name a sink reads it under, and the field keeps its value beside it. A call
+        that spells both ``data`` and ``field_data`` loses neither, the prefix being applied until the name
+        lands where nothing sits.
+        """
+        with caplog.at_level(logging.INFO):
+            log.info({"from": "content"}, title="Data", fields={DATA_FIELD: "from-fields", "safe": 1})
+            log.info({"from": "content"}, title="Data", fields={DATA_FIELD: "from-fields", f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}": "also-given"})
+
+        one, both = _own_records(caplog)
+        assert _field(one, name=DATA_FIELD) == {"from": "content"}
+        assert _field(one, name=f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}") == "from-fields"
+        assert _field(one, name="safe") == 1
+        assert _field(both, name=DATA_FIELD) == {"from": "content"}
+        assert _field(both, name=f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}") == "also-given"
+        assert _field(both, name=f"{COLLIDING_FIELD_PREFIX}{COLLIDING_FIELD_PREFIX}{DATA_FIELD}") == "from-fields"
+
     def test_a_field_named_like_the_forwarding_marker_is_prefixed_and_never_reaches_a_sink(self, caplog: pytest.LogCaptureFixture) -> None:
         """The marker is Pipelex's own, so a fresh record does not carry the name yet and the stdlib would not refuse it.
 

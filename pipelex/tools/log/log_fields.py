@@ -65,8 +65,11 @@ def build_log_record_extra(
 ) -> dict[str, Any]:
     """The ``extra`` for one record, in precedence order: the bound context, then the call's fields, then the content.
 
-    A field overrides the context for its record, so a call site that names a request it is not
-    running under can say so; structured content owns ``data`` outright.
+    A field overrides the context for its record, so a call site that names a request it is not running
+    under can say so. Structured content owns the ``data`` name, and a field of that name is moved aside
+    under the ``field_`` prefix rather than destroyed — the same discipline the record's own attributes
+    and every wire sink's reserved keys follow, applied until the name lands where nothing sits, so a call
+    passing both ``data`` and ``field_data`` beside structured content loses neither.
     """
     extra: dict[str, Any] = {}
     if context is not None:
@@ -74,6 +77,11 @@ def build_log_record_extra(
     if fields:
         extra.update(fields)
     if data is not None:
+        if DATA_FIELD in extra:
+            displaced = f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}"
+            while displaced in extra:
+                displaced = f"{COLLIDING_FIELD_PREFIX}{displaced}"
+            extra[displaced] = extra[DATA_FIELD]
         extra[DATA_FIELD] = data
     return extra
 
