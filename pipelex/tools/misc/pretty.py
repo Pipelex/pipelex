@@ -1,26 +1,45 @@
+"""The pretty-print engine: the mode, the Rich panels, and the plain-text panels printed without Rich.
+
+Rich is the ``cli`` extra, so this module imports it nowhere at module level: each method of the ``rich``
+mode, and each ``rendered_pretty`` on the model types, checks that Rich is installed and imports what it
+renders with, inside its body. The ``poor`` mode frames plain text itself and never imports Rich; the
+``silent`` mode builds nothing. A process without Rich renders in ``poor`` or ``silent`` and never loads
+it, and one that asks for ``rich`` without it is refused at boot, naming the extra.
+"""
+
+from __future__ import annotations
+
+import re
 import shutil
+import sys
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from io import StringIO
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from kajson import kajson
 from pydantic import BaseModel
-from rich.console import Console, Group
-from rich.errors import MarkupError
-from rich.json import JSON
-from rich.markdown import Markdown
-from rich.measure import Measurement
-from rich.panel import Panel
-from rich.pretty import Pretty
-from rich.style import StyleType
-from rich.syntax import Syntax
-from rich.table import Table
-from rich.text import Text, TextType
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
+from pipelex.tools.misc.rich_extra import require_rich
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor, print_to_stderr
 from pipelex.tools.typing.pydantic_utils import make_truncated_wrapper
+
+if TYPE_CHECKING:
+    from typing import TypeAlias
+
+    from rich.console import Group
+    from rich.json import JSON
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+    from rich.pretty import Pretty
+    from rich.style import StyleType
+    from rich.syntax import Syntax
+    from rich.table import Table
+    from rich.text import Text, TextType
+
+    # The renderables a ``rendered_pretty`` returns and the ``rich`` mode prints as they are.
+    PrettyPrintable: TypeAlias = Markdown | Text | JSON | Table | Group | Syntax | Pretty
 
 TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN
@@ -31,13 +50,79 @@ PRETTY_WIDTH_MIN: int = 125
 PRETTY_WIDTH_FOR_EXPORT: int = 100
 MAX_RENDER_DEPTH = 6
 
-PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
+RICH_RENDERING_MISSING_MESSAGE = (
+    'The pretty-print mode "rich" and the rendered_pretty renderings print through Rich. Install the extra, '
+    'or set pretty_print_mode to "poor" or "silent" in [runtime.log] for a process with no terminal: both render without it.'
+)
+
+# Rich's own console-markup tag pattern, ``rich.markup.RE_TAGS``: a run of backslashes, then a bracketed tag
+# whose name starts with a lowercase letter, ``#``, ``/`` or ``@``.
+_MARKUP_TAG_PATTERN = re.compile(r"((\\*)\[([a-z#/@][^[]*?)])")
+
+
+def require_rich_for_rendering() -> None:
+    """Raise ``MissingDependencyError`` naming the ``cli`` extra and the Rich-free modes when Rich is not installed.
+
+    A ``rendered_pretty`` implementation calls it first, then imports what it renders with.
+    """
+    require_rich(message=RICH_RENDERING_MISSING_MESSAGE)
+
+
+def _normalized_tag_name(*, name: str) -> str:
+    """A tag name as an opening and a closing tag are matched on: case, spacing and word order aside, as Rich's style normalization does."""
+    return " ".join(sorted(name.lower().split()))
+
+
+def plain_markup_text(*, markup: str) -> str | None:
+    """The text Rich console markup renders to, tags dropped, or ``None`` where Rich would refuse the markup.
+
+    Rich-free, so the ``poor`` mode reads a title the way the Rich panel would without importing Rich. It
+    follows ``rich.markup.render`` for what a title spells: tags, backslash-escaped brackets, and a closing
+    tag that must close an open one, which is the markup Rich refuses. Emoji codes and style aliases are
+    left as they are written.
+    """
+    if "[" not in markup:
+        return markup
+    pieces: list[str] = []
+    open_tags: list[str] = []
+    position = 0
+    for match in _MARKUP_TAG_PATTERN.finditer(markup):
+        full_text, escapes, tag_text = match.groups()
+        start, end = match.span()
+        if start > position:
+            pieces.append(markup[position:start].replace("\\[", "["))
+        position = end
+        backslashes, escaped = divmod(len(escapes), 2)
+        pieces.append("\\" * backslashes)
+        if escaped:
+            pieces.append(full_text[len(escapes) :])
+            continue
+        tag_name = tag_text.partition("=")[0]
+        if not tag_name.startswith("/"):
+            open_tags.append(_normalized_tag_name(name=tag_name))
+            continue
+        closed_name = _normalized_tag_name(name=tag_name[1:])
+        if not closed_name:
+            if not open_tags:
+                return None
+            open_tags.pop()
+            continue
+        if closed_name not in open_tags:
+            return None
+        del open_tags[len(open_tags) - 1 - open_tags[::-1].index(closed_name)]
+    if position < len(markup):
+        pieces.append(markup[position:].replace("\\[", "["))
+    return "".join(pieces)
 
 
 class PrettyRenderable(ABC):
     @abstractmethod
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
-        pass
+        """A Rich renderable of this object, for the console.
+
+        Rich is the ``cli`` extra: an implementation calls ``require_rich_for_rendering()`` and then imports
+        what it renders with, inside the method.
+        """
 
     def rendered_pretty_text(self, *, title: str | None = None, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
         """Render as plain ASCII text string.
@@ -48,6 +133,9 @@ class PrettyRenderable(ABC):
 
         Returns:
             Plain text string representation
+
+        Raises:
+            MissingDependencyError: If Rich is not installed.
         """
         pretty = self.rendered_pretty(title=title, depth=0)
         return PrettyPrinter.pretty_text(pretty, width=width)
@@ -94,9 +182,17 @@ def pretty_print_md(
         # A silent printer builds no renderable, and does not measure the terminal to size one.
         return
     width = width or PrettyPrinter.pretty_width()
-    md_content = Markdown(content)
-    PrettyPrinter.pretty_print(
-        content=md_content,
+    if PrettyPrinter.mode is PrettyPrintMode.POOR:
+        # The poor printer renders no Markdown: it frames the source it was given.
+        PrettyPrinter.pretty_print_without_rich(
+            content, title=title, subtitle=subtitle, inner_title=inner_title, width=width, console_width=console_width
+        )
+        return
+    require_rich_for_rendering()
+    from rich.markdown import Markdown
+
+    PrettyPrinter.pretty_print_using_rich(
+        Markdown(content),
         title=title,
         subtitle=subtitle,
         inner_title=inner_title,
@@ -121,7 +217,14 @@ def pretty_print_url(
         return
     if url.startswith("/"):
         url = "file://" + url
-    pretty_print(
+    if PrettyPrinter.mode is PrettyPrintMode.POOR:
+        # The url on a row of its own, so a terminal can linkify it whole.
+        PrettyPrinter.pretty_print_url_without_rich(url, title=title, subtitle=subtitle, width=width, console_width=console_width)
+        return
+    require_rich_for_rendering()
+    from rich.text import Text
+
+    PrettyPrinter.pretty_print_using_rich(
         Text(url, style="link " + url, no_wrap=False),
         title=title,
         subtitle=subtitle,
@@ -177,6 +280,11 @@ class PrettyPrinter:
         width: int | None = None,
         console_width: int | None = None,
     ):
+        """Print the content in a Rich panel on stdout, between two blank lines.
+
+        Raises:
+            MissingDependencyError: If Rich is not installed.
+        """
         panel = cls.make_pretty_panel(
             content=content,
             title=title,
@@ -186,6 +294,7 @@ class PrettyPrinter:
             width=width,
             console_width=console_width,
         )
+        from rich.console import Console
 
         Console(width=console_width).print("", panel, "", sep="\n")
 
@@ -213,15 +322,22 @@ class PrettyPrinter:
         width: int | None = None,
         console_width: int | None = None,
     ) -> Panel:
+        """The Rich panel the ``rich`` mode prints.
+
+        Raises:
+            MissingDependencyError: If Rich is not installed.
+        """
         pretty = cls.make_pretty(content, inner_title=inner_title, depth=0)
         # When width is not specified, measure the content to determine optimal console width
         if width is None:
+            from rich.console import Console
+            from rich.measure import Measurement
+
             # Create a console to measure the panel
             measure_console = Console(width=console_width)
             measurement = Measurement.get(measure_console, measure_console.options, pretty)
             # Use the maximum width that fits the content, with some buffer for panel border rendering
             width = measurement.maximum + 4
-            # print(f"width: {width}")
         if console_width is not None:
             width = min(width, console_width)
         return cls.wrap_in_panel(pretty=pretty, title=title, subtitle=subtitle, border_style=border_style, width=width)
@@ -236,6 +352,10 @@ class PrettyPrinter:
         border_style: StyleType | None = None,
         width: int | None = None,
     ) -> Panel:
+        """Raises MissingDependencyError if Rich is not installed."""
+        require_rich_for_rendering()
+        from rich.panel import Panel
+
         return Panel(
             pretty,
             title=title,
@@ -264,7 +384,13 @@ class PrettyPrinter:
 
         Returns:
             Plain text string representation
+
+        Raises:
+            MissingDependencyError: If Rich is not installed.
         """
+        require_rich_for_rendering()
+        from rich.console import Console
+
         buf = StringIO()
         console = Console(record=True, file=buf, width=width, force_terminal=False)
         console.print(pretty)
@@ -272,6 +398,10 @@ class PrettyPrinter:
 
     @classmethod
     def pretty_svg(cls, pretty: PrettyPrintable, *, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
+        """Raises MissingDependencyError if Rich is not installed."""
+        require_rich_for_rendering()
+        from rich.console import Console
+
         buf = StringIO()
         console = Console(record=True, file=buf, width=width, force_terminal=False)
         console.print(pretty)
@@ -279,9 +409,23 @@ class PrettyPrinter:
 
     @classmethod
     def make_pretty(cls, value: Any, *, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        """The Rich renderable for any value: a renderable as it is, a ``PrettyRenderable`` rendered, anything else by its type.
+
+        Raises:
+            MissingDependencyError: If Rich is not installed.
+        """
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.json import JSON
+        from rich.markdown import Markdown
+        from rich.pretty import Pretty
+        from rich.syntax import Syntax
+        from rich.table import Table
+        from rich.text import Text
+
         pretty: PrettyPrintable
         # Format the value
-        if isinstance(value, PrettyPrintable):
+        if isinstance(value, (Markdown, Text, JSON, Table, Group, Syntax, Pretty)):
             pretty = value
         elif isinstance(value, PrettyRenderable):
             pretty = value.rendered_pretty(depth=depth)
@@ -371,11 +515,9 @@ class PrettyPrinter:
         # A title never widens the frame past the terminal: it is elided to the width the content wraps to, the way
         # Rich's `Panel` truncates an over-wide title, rather than spilling the box it is supposed to sit inside.
         title_lines = [cls._elide(line=line, max_width=max_content_width) for line in title_lines]
-        if isinstance(content, PrettyPrintable):
-            # A caller handing over a Rich renderable gets its text, not the object's repr.
-            content_str = cls.pretty_text(content, width=max_content_width)
-        else:
-            content_str = f"{content}"
+        # A caller handing over a Rich renderable gets its text, not the object's repr.
+        renderable_text = cls._rich_renderable_text(content=content, width=max_content_width)
+        content_str = f"{content}" if renderable_text is None else renderable_text
         wrapped_lines: list[str] = []
         for line in content_str.splitlines():
             if not line:
@@ -404,16 +546,36 @@ class PrettyPrinter:
         print_to_stderr(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")
 
     @classmethod
+    def _rich_renderable_text(cls, *, content: Any, width: int) -> str | None:
+        """The text of a Rich renderable handed to the poor printer, or ``None`` for any other content.
+
+        A Rich object exists only once Rich is imported, so a process that has not imported Rich holds none
+        to hand over, and the check costs it no import.
+        """
+        if "rich" not in sys.modules:
+            return None
+        from rich.console import Group
+        from rich.json import JSON
+        from rich.markdown import Markdown
+        from rich.pretty import Pretty
+        from rich.syntax import Syntax
+        from rich.table import Table
+        from rich.text import Text
+
+        if not isinstance(content, (Markdown, Text, JSON, Table, Group, Syntax, Pretty)):
+            return None
+        return cls.pretty_text(content, width=width)
+
+    @classmethod
     def _plain_title(cls, *, title: TextType) -> str:
         """The text a panel title renders to: markup tags dropped, as Rich's `Panel` would drop them."""
-        if isinstance(title, Text):
+        if not isinstance(title, str):
+            # A Rich `Text`, which exists only where Rich is imported.
             return title.plain
-        try:
-            return Text.from_markup(title).plain
-        except MarkupError:
-            # A title spelling something Rich reads as an unmatched closing tag — a path in brackets, say — is
-            # printed as it stands. The poor mode is the one that prints whatever happens, so it never raises here.
-            return title
+        plain = plain_markup_text(markup=title)
+        # A title spelling something Rich reads as an unmatched closing tag — a path in brackets, say — is
+        # printed as it stands. The poor mode is the one that prints whatever happens, so it never raises here.
+        return title if plain is None else plain
 
     @classmethod
     def _elide(cls, *, line: str, max_width: int) -> str:

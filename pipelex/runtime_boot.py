@@ -124,6 +124,7 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
+from pipelex.tools.misc.pretty import PrettyPrintMode, require_rich_for_rendering
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.urls import URLs
@@ -506,6 +507,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         log_config = get_config().runtime.log
         log_sink_registry = LogSinkRegistry(plugin_registrar.log_sinks)
         log.install_sink(log_sink_registry.get_required(method=log_config.sink)(log_config))
+        # The pretty-print mode is checked beside the sink, for the same reason: Rich is the ``cli`` extra,
+        # and a process asking for the ``rich`` panels without it stops here, naming the extra and the
+        # Rich-free modes, rather than failing at the first pipe that prints its output.
+        if log_config.pretty_print_mode is PrettyPrintMode.RICH:
+            require_rich_for_rendering()
 
         # Secrets provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
