@@ -68,6 +68,7 @@ DryRunObjectFidelityError | Dry run object fidelity | https://docs.pipelex.com/l
 DuplicateBundleValidatorError | Duplicate bundle validator | https://docs.pipelex.com/latest/errors/duplicate-bundle-validator-error/
 DuplicateHttpErrorMapperError | Duplicate http error mapper | https://docs.pipelex.com/latest/errors/duplicate-http-error-mapper-error/
 DuplicateInferenceBackendError | Duplicate inference backend | https://docs.pipelex.com/latest/errors/duplicate-inference-backend-error/
+DuplicateLogSinkError | Duplicate log sink | https://docs.pipelex.com/latest/errors/duplicate-log-sink-error/
 DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/
 DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
 DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
@@ -317,6 +318,7 @@ ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
 UnknownBootOrchestratorError | Unknown boot orchestrator | https://docs.pipelex.com/latest/errors/unknown-boot-orchestrator-error/
 UnknownInputNameError | Unknown input name | https://docs.pipelex.com/latest/errors/unknown-input-name-error/
+UnknownLogSinkError | Unknown log sink | https://docs.pipelex.com/latest/errors/unknown-log-sink-error/
 UnknownPipeFuncExecutionModeError | Unknown pipe func execution mode | https://docs.pipelex.com/latest/errors/unknown-pipe-func-execution-mode-error/
 UnknownSecretsMethodError | Unknown secrets method | https://docs.pipelex.com/latest/errors/unknown-secrets-method-error/
 UnknownStorageMethodError | Unknown storage method | https://docs.pipelex.com/latest/errors/unknown-storage-method-error/

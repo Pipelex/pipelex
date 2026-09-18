@@ -1,23 +1,14 @@
 from __future__ import annotations
 
-import sys
 from enum import StrEnum
 from typing import cast
 
 from pydantic import Field, field_validator
-from rich.console import Console
-from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
-from rich.logging import RichHandler
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.misc.pretty import PrettyPrintMode
-
-
-class LogMode(StrEnum):
-    RICH = "rich"
-    POOR = "poor"
 
 
 class HighlighterName(StrEnum):
@@ -58,6 +49,8 @@ class CallerInfoTemplate(StrEnum):
 
 
 class RichLogConfig(ConfigModel):
+    """The settings of the ``console`` sink's Rich handler. Read by the sink; this module imports no Rich."""
+
     is_show_time: bool
     is_show_level: bool
     is_link_path_enabled: bool
@@ -69,48 +62,28 @@ class RichLogConfig(ConfigModel):
     tracebacks_suppress: list[str]
     keywords_to_hilight: list[str]
 
-    def make_rich_handler(self, target: ConsoleTarget) -> RichHandler:
-        match target:
-            case ConsoleTarget.STDOUT:
-                console = Console(file=sys.stdout)
-            case ConsoleTarget.STDERR:
-                console = Console(file=sys.stderr)
-            # case ConsoleTarget.FILE:
-            #     console = Console(file=target.file_path)
-            case _:
-                msg = f"Invalid console target: {target}"
-                raise ValueError(msg)
-        highlighter: Highlighter
-        match self.highlighter_name:
-            case HighlighterName.JSON:
-                highlighter = JSONHighlighter()
-            case HighlighterName.REPR:
-                highlighter = ReprHighlighter()
 
-        return RichHandler(
-            console=console,
-            show_time=self.is_show_time,
-            show_level=self.is_show_level,
-            enable_link_path=self.is_link_path_enabled,
-            highlighter=highlighter,
-            markup=self.is_markup_enabled,
-            rich_tracebacks=self.is_rich_tracebacks,
-            tracebacks_word_wrap=self.is_tracebacks_word_wrap,
-            tracebacks_show_locals=self.is_tracebacks_show_locals,
-            tracebacks_suppress=self.tracebacks_suppress,
-            keywords=self.keywords_to_hilight,
-        )
+class OtlpLogSinkConfig(ConfigModel):
+    """The settings of the ``otlp`` sink.
+
+    An absent ``endpoint`` leaves the exporter to the OpenTelemetry environment conventions:
+    ``OTEL_EXPORTER_OTLP_LOGS_ENDPOINT``, then ``OTEL_EXPORTER_OTLP_ENDPOINT`` with the ``/v1/logs``
+    path, then the collector default on localhost. Empty ``headers`` likewise leave
+    ``OTEL_EXPORTER_OTLP_HEADERS`` in charge.
+    """
+
+    endpoint: str | None = None
+    headers: dict[str, str]
 
 
 class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
     package_log_levels: dict[str, LogLevel]
-    log_mode: LogMode = Field(strict=False)
+    # The registered log-sink token boot selects: an open string, validated at the registry lookup.
+    sink: str
     pretty_print_mode: PrettyPrintMode = Field(strict=False)
     console_log_target: ConsoleTarget = Field(strict=False)
     console_print_target: ConsoleTarget = Field(strict=False)
-
-    is_console_logging_enabled: bool
 
     json_logs_indent: int
     presentation_line_width: int
@@ -120,10 +93,7 @@ class LogConfig(ConfigModel):
     silenced_problem_ids: list[str]
 
     rich_log: RichLogConfig
-
-    # logger name to use for safe logging without fancy features like code filepath and stuff
-    generic_poor_logger: str
-    poor_loggers: list[str]
+    otlp: OtlpLogSinkConfig
 
     @field_validator("package_log_levels", mode="before")
     @classmethod

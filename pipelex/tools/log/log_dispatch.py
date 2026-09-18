@@ -12,11 +12,11 @@ from __future__ import annotations
 import inspect
 import json
 import logging
-import traceback
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig, LogMode
+from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig
 from pipelex.tools.log.log_context import get_log_context
 from pipelex.tools.log.log_fields import attach_log_record_extra, build_log_record_extra
 from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
@@ -24,6 +24,9 @@ from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import FrameType
+
+    # The triple ``sys.exc_info`` returns while an exception is being handled.
+    ExcInfo = tuple[type[BaseException], BaseException, Any]
 
 # The frames between ``_caller_frame`` and the code that called ``log.<level>(...)``: the helper's own
 # frame, then ``LogDispatch.dispatch``, then the ``Log`` method. A change to that call chain moves this number.
@@ -53,6 +56,14 @@ def _module_name(*, frame: FrameType | None) -> str:
     return module_name or UNKNOWN_MODULE_NAME
 
 
+def _active_exc_info() -> ExcInfo | None:
+    """The exception being handled, as the record's ``exc_info``, or ``None`` outside any ``except`` block."""
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    if exc_type is None or exc_value is None:
+        return None
+    return exc_type, exc_value, exc_traceback
+
+
 class LogDispatch:
     """Turns the facade's calls into records on module-named stdlib loggers."""
 
@@ -62,10 +73,6 @@ class LogDispatch:
     # TODO: more elegant init for log_dispatch / log
     def __init__(self):
         self._log_config_instance: LogConfig | None = None
-        self.log_mode: LogMode = LogMode.RICH
-
-    def set_log_mode(self, mode: LogMode):
-        self.log_mode = mode
 
     def reset(self):
         """Reset the log dispatch."""
@@ -85,7 +92,6 @@ class LogDispatch:
             msg = "LogConfig is already set. You can only call log.configure() once."
             raise RuntimeError(msg)
         self._log_config_instance = log_config
-        self.log_mode = log_config.log_mode
 
     ########################################################
     # Dispatch
@@ -109,16 +115,15 @@ class LogDispatch:
             severity: The severity level of the log message.
             title: A title rendered above the content. Defaults to None.
             inline: A title rendered inline before a string content, used only when ``title`` is None.
-            include_exception: Whether to append the current exception's traceback to the message.
+            include_exception: Whether to carry the exception being handled on the record, as its
+                ``exc_info``, for every sink to render its own way. Nothing is spliced into the message.
             fields: Named values carried as attributes of the record, never rendered into the message.
 
         """
         caller_frame = _caller_frame()
         module_name = _module_name(frame=caller_frame)
         log_config = self._log_config_instance
-        if log_config is not None and not log_config.is_console_logging_enabled:
-            return
-        logger = self._logger_for(module_name=module_name, log_config=log_config)
+        logger = logging.getLogger(module_name)
         if not logger.isEnabledFor(severity):
             return
 
@@ -126,21 +131,14 @@ class LogDispatch:
         if log_config is not None and log_config.is_caller_info_enabled and caller_frame is not None:
             caller_info_str = self._caller_info(frame=caller_frame, module_name=module_name, log_config=log_config)
             message = f"{caller_info_str}: {message}"
-        if include_exception:
-            message += f"\n{traceback.format_exc()}"
+        exc_info = _active_exc_info() if include_exception else None
 
         extra = build_log_record_extra(context=get_log_context(), fields=fields, data=data)
-        self._log_to_console(message=message, severity=severity, logger=logger, caller_frame=caller_frame, extra=extra)
+        self._emit_record(message=message, severity=severity, logger=logger, caller_frame=caller_frame, exc_info=exc_info, extra=extra)
 
     ########################################################
     # Private methods
     ########################################################
-
-    def _logger_for(self, *, module_name: str, log_config: LogConfig | None) -> logging.Logger:
-        """The module-named logger, or the generic poor logger when the dispatch runs in poor mode."""
-        if self.log_mode == LogMode.POOR and log_config is not None:
-            return logging.getLogger(log_config.generic_poor_logger)
-        return logging.getLogger(module_name)
 
     def _render_content(
         self,
@@ -164,16 +162,23 @@ class LogDispatch:
             return "None", None
 
         indent = log_config.json_logs_indent if log_config is not None else None
-        if isinstance(content, dict):
-            _, rendered = purify_json_dict(data=content, indent=indent, is_warning_enabled=True)
-        elif isinstance(content, list):
-            _, rendered = purify_json_list(data=cast("list[Any]", content), indent=indent, is_truncate_bytes_enabled=True)
-        else:
-            _, rendered = purify_json(data=content, indent=indent, is_truncate_bytes_enabled=True, is_warning_enabled=False)
-        # The structure the helpers hand back is the caller's own object whenever it was JSON-clean as
-        # given, and a sink that serializes later would read whatever the caller did to it since. The
-        # data is therefore the rendering re-read: a snapshot of the call, JSON-ready whatever it held.
-        data: Any = json.loads(rendered)
+        data: Any | None
+        try:
+            if isinstance(content, dict):
+                _, rendered = purify_json_dict(data=content, indent=indent, is_warning_enabled=True)
+            elif isinstance(content, list):
+                _, rendered = purify_json_list(data=cast("list[Any]", content), indent=indent, is_truncate_bytes_enabled=True)
+            else:
+                _, rendered = purify_json(data=content, indent=indent, is_truncate_bytes_enabled=True, is_warning_enabled=False)
+            # The structure the helpers hand back is the caller's own object whenever it was JSON-clean as
+            # given, and a sink that serializes later would read whatever the caller did to it since. The
+            # data is therefore the rendering re-read: a snapshot of the call, JSON-ready whatever it held.
+            data = json.loads(rendered)
+        except (TypeError, ValueError):
+            # What ``json`` refuses outright, a circular reference or a mapping with a non-string key,
+            # is rendered as its ``repr`` and carries no ``data``: a log call never raises.
+            rendered = repr(cast("object", content))
+            data = None
         message = f"\n{rendered}"
         if title is not None:
             message = f"{title}:{message}"
@@ -191,13 +196,14 @@ class LogDispatch:
         template_str = CallerInfoTemplate.for_template_key(key=log_config.caller_info_template)
         return template_str.format(file=str(caller_path), line=frame.f_lineno, func=frame.f_code.co_name, module=module_name)
 
-    def _log_to_console(
+    def _emit_record(
         self,
-        message: str,
         *,
+        message: str,
         severity: int,
         logger: logging.Logger,
         caller_frame: FrameType | None,
+        exc_info: ExcInfo | None,
         extra: dict[str, Any],
     ):
         """Build the record at the caller's location, attach what it carries, and hand it to the logger's handlers.
@@ -216,7 +222,7 @@ class LogDispatch:
             lno=lineno,
             msg=message,
             args=(),
-            exc_info=None,
+            exc_info=exc_info,
             func=func_name,
         )
         attach_log_record_extra(record=record, extra=extra)
