@@ -403,6 +403,40 @@ class TestHydrateWorkingMemory:
         with pytest.raises(PipeJobError, match="bad_stuff"):
             hydrate_working_memory(raw)
 
+    def test_hydrate_raises_when_the_structure_class_is_not_registered(self) -> None:
+        """A concept the library holds whose structure class this process never registered still refuses clearly.
+
+        Resolving the ref and finding the content class are two separate failures, and the ref
+        resolving is no guarantee the class is here: a dynamic concept travels to a worker that
+        never loaded the crate that defines it.
+        """
+        concept_library = get_concept_library()
+        concept_library.add_new_concept(
+            Concept(
+                code="Unregistered",
+                domain_code=SpecialDomain.NATIVE,
+                description="A concept whose structure class this process never registered",
+                structure_class_name="NotRegisteredContent",
+            )
+        )
+        raw = {
+            "root": {
+                "bad_stuff": {
+                    "stuff_code": "test",
+                    "stuff_name": "bad_stuff",
+                    "concept": "native.Unregistered",
+                    "content": {"text": "hello"},
+                },
+            },
+            "aliases": {},
+        }
+
+        try:
+            with pytest.raises(PipeJobError, match="bad_stuff"):
+                hydrate_working_memory(raw)
+        finally:
+            concept_library.remove_concepts_by_concept_refs(["native.Unregistered"])
+
     def test_hydrate_raises_on_validation_error(self) -> None:
         """Hydration raises PipeJobError when content doesn't match the expected schema."""
         raw = {
