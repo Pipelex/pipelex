@@ -160,3 +160,13 @@ Rejected, with the reason:
 
 - **The holding handler drops the oldest record on overflow** (code-review), offered again and rejected again on the argument recorded under round 2 above: the lines nearest a failure are at least as often the useful ones, the constant's own comment states the choice and its reason, and a boot holds a few dozen lines against a capacity of a thousand. Nothing new was offered with it.
 - **Caller attribution rides a fixed frame depth** (cubic), `pipelex/tools/log/log_dispatch.py:33`, already traced under the fields member's round 1 and belonging to that member's code rather than this one's. No wrapper exists today, so the claim is about a change nobody has made.
+
+## L-260916-aa6e58, the processor seam, settled by the owner on 2026-09-18
+
+Four consecutive rounds on this member raised the same finding, the last of them from two independent reviewers at confidence 1.0, and each round deferred it with a reasoned rationale rather than a shrug. Louis settled it instead of letting a fifth round take it: **the redaction member `L-260916-4837d4` owns the processor failure policy, and this member ships the seam as it stands.**
+
+The defect is not in dispute and never was. `_ProcessorFilter.filter` runs each registered processor where the stdlib runs a handler's filters, which is outside every `try`, so a processor raising on a live record raises out of `log.info` itself and can abort the application work that made the call; the same processor raising during the holding replay is contained by `_deliver`'s `handleError`, so the two paths disagree about the same failure. Nothing in `pipelex/` registers a processor today, which is what makes shipping possible, but `docs/under-the-hood/log-sink-plugins.md` tells readers to append a redaction one, so the path is reachable for anyone following the documentation.
+
+The reason it belongs there rather than here is that the cure is a contract choice and not a guard. A redaction processor that raises means the record is *unredacted*: rendering it anyway leaks exactly what the processor existed to hide, while dropping it contradicts `LogSink`'s promise that it never drops a record. Only the first registrant of a processor is in a position to take that decision, and it arrives with that member. What it owes is recorded on its item: decide the policy and say why, with fail-closed — drop the record and emit a minimal diagnostic carrying none of the unprocessed payload — as the shape the reviewers converged on; implement the guard at the processor boundary, routed to the handler's error path; and cover both the live and replay paths so they can no longer disagree.
+
+A later round that re-raises this should be closed against this entry rather than argued again.
