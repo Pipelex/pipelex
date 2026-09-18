@@ -1,8 +1,8 @@
 contract = "cli-docs"
 digest = "sha256:106c7b09f674096aaa1c469914b38a86faf7dcb8919ae1d13cedafa12904a481"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-18T17:17:17Z"
-rationale = "The stdin resolver's shape refusal moved off the JSONDecodeError label onto its own synthetic StdinEnvelopeShapeError, with a matching AGENT_ERROR_HINTS/AGENT_ERROR_DOMAINS entry. docs/tools/cli/agent-cli.md's stdin paragraph now names that label and why it is not a decode error; its error envelope block documents error_type generically and needed no change, and pipelex/cli/agent_cli/CLAUDE.md already describes synthetic labels as the sanctioned mechanism for a failure with no exception class, which is exactly what this is."
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-09-18T19:26:40Z"
+rationale = "The stdin resolver's shape refusal moved off the JSONDecodeError label onto its own synthetic StdinEnvelopeShapeError, with a matching AGENT_ERROR_HINTS/AGENT_ERROR_DOMAINS entry. docs/tools/cli/agent-cli.md's stdin paragraph now names that label and why it is not a decode error, and its --with-memory line now says the receiving method must declare the same <domain>.<Code>, since the ref travels with its domain and a method declaring another one refuses it. The error envelope block documents error_type generically and needed no change, and pipelex/cli/agent_cli/CLAUDE.md already describes synthetic labels as the sanctioned mechanism for a failure with no exception class, which is exactly what this is."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
