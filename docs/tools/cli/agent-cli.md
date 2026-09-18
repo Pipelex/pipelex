@@ -38,14 +38,14 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--mock-inputs` - Use mock inputs (requires `--dry-run`)
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
 - `--library-dir`, `-L` - Additional library directory
-- `--with-memory` - Include full working memory in output
+- `--with-memory` - Include full working memory in output, each stuff naming its concept by ref (`"concept": "<domain>.<Code>"`); piped back into another `run` on stdin, the envelope's stuffs become that run's inputs, provided the receiving method declares the same `<domain>.<Code>` — the ref carries its domain, and a method declaring another one refuses it rather than guessing
 - `--format` - Success output format: `markdown` (default) or `json`
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
 !!! note "Stdin inputs stay JSON"
-    The agent CLI can also read inputs from stdin (a flat dict or a `working_memory` envelope). Stdin inputs are **JSON-only** — the extension-based TOML discrimination applies to `--inputs` file paths only. Like the main CLI, `run bundle <dir>` auto-detects `inputs.json` / `inputs.toml` when `--inputs` is omitted, erroring if both exist.
+    The agent CLI can also read inputs from stdin (a flat dict or a `working_memory` envelope). Stdin inputs are **JSON-only** — the extension-based TOML discrimination applies to `--inputs` file paths only. Like the main CLI, `run bundle <dir>` auto-detects `inputs.json` / `inputs.toml` when `--inputs` is omitted, erroring if both exist. In a `working_memory` envelope each stuff must name its concept as the ref string; anything else there — the full concept object an older runtime dumped, for instance — is refused under `"error_type": "StdinEnvelopeShapeError"`, which is the label for an envelope that parsed as JSON but does not hold the shape the contract asks for, as distinct from the `JSONDecodeError` that means the JSON itself did not parse.
 
 ### Validate
 

@@ -152,6 +152,12 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
             return ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(concept_ref.split(".")[-1]))
 
         @override
+        def list_concept_keys_for_ref(self, *, concept_ref):
+            # A library-free provider holds no entries to enumerate: the native set is built on
+            # demand by the factory above, never stored under a key.
+            return []
+
+        @override
         def get_native_concept(self, native_concept):
             return ConceptFactory.make_native_concept(native_concept_code=native_concept)
 

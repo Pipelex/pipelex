@@ -125,6 +125,11 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "FileNotFoundError": "Verify the file path exists and is accessible from the current working directory",
     "ArgumentError": "Check command usage with 'pipelex-agent <command> --help'",
     "JSONDecodeError": "Verify the JSON input is valid (check for trailing commas, unquoted keys, etc.)",
+    "StdinEnvelopeShapeError": (
+        "The JSON parsed — its shape is what the envelope contract refuses. In a 'working_memory' envelope each stuff "
+        "names its concept as the ref string '<domain>.<Code>'; replace a concept object with its ref, or re-pipe the "
+        "output of a current 'pipelex-agent run --with-memory'."
+    ),
     # Interpreter errors
     "MthdsParserError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
     # Configuration/initialization errors
@@ -190,6 +195,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "FixBundleError": "input",
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
+    "StdinEnvelopeShapeError": "input",
     "JsonTypeError": "input",
     "TomlError": "input",
     "ArgumentError": "input",

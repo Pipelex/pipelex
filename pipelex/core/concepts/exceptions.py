@@ -36,3 +36,14 @@ class ConceptRefineError(ConceptError):
 
 class ConceptLibraryConceptNotFoundError(PipelexError):
     pass
+
+
+class ConceptRefAmbiguousError(ConceptError):
+    """A bare `<domain>.<Code>` ref matches more than one concept the provider holds.
+
+    A stuff on the wire names its concept as `<domain>.<Code>`, and that spelling is not unique
+    across a crate: a host bundle and a dependency package may each declare it, the dependency's
+    entry being keyed `<alias>-><domain>.<Code>`. Picking a winner would bind one package's
+    definition to the other's data without a word, so the ambiguity is raised instead, naming
+    every key that matched.
+    """

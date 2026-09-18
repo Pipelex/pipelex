@@ -268,10 +268,6 @@ rationale = "Runs the pipe identified by pipe_code; single operand."
 param = "pipe_code"
 rationale = "Runs the pipe identified by pipe_code via the API; single operand."
 
-["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::_extract_concept_code"]
-param = "concept_data"
-rationale = "Extracts from the concept_data; single operand."
-
 ["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::_extract_stuff_entry"]
 param = "stuff_data"
 rationale = "Extracts from the stuff_data; single operand."

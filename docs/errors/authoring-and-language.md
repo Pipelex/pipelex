@@ -21,6 +21,7 @@ own page. Classes are grouped by subsystem.
 - [`ConceptError`](concept-error.md) — Concept error
 - [`ConceptFactoryError`](concept-factory-error.md) — Concept factory
 - [`ConceptLibraryConceptNotFoundError`](concept-library-concept-not-found-error.md) — Concept library concept not found
+- [`ConceptRefAmbiguousError`](concept-ref-ambiguous-error.md) — Concept ref ambiguous
 - [`ConceptRefineError`](concept-refine-error.md) — Concept refine
 - [`ConceptStringError`](concept-string-error.md) — Concept string
 - [`ConceptStructureGeneratorError`](concept-structure-generator-error.md) — Concept structure generator
