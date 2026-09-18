@@ -19,6 +19,7 @@ from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_hub import get_class_registry
 
@@ -223,7 +224,13 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
     The absence ledger round-trips too: a recorded absence must survive cross-process
     transit, or a resolved-as-absent slot would degrade to a hard miss on the other side.
     """
-    concept_provider: ConceptProviderAbstract | None = get_concept_library() if get_current_library_id_or_none() is not None else None
+    try:
+        concept_provider: ConceptProviderAbstract | None = get_concept_library() if get_current_library_id_or_none() is not None else None
+    except (LibraryError, RuntimeError) as exc:
+        # The contextvar naming a library is not the same fact as that library still being there.
+        # Whichever way it went, this function answers with PipeJobError and never with a raw one.
+        msg = f"Failed to hydrate the working memory: the current library is no longer reachable: {exc}"
+        raise PipeJobError(msg) from exc
     working_memory = WorkingMemory()
 
     raw_root = working_memory_raw.get("root", {})

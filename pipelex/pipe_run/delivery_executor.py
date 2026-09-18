@@ -17,13 +17,13 @@ from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
-from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
-from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
@@ -231,13 +231,14 @@ class DeliveryExecutor:
         design. When a library is current — an in-process run delivering its own result — the
         ref goes through the shared wire-ref rule, so a concept a dependency package contributed
         resolves through its aliased entry; otherwise only the native concepts are known, and they
-        are built from their pinned definitions. ``None`` means "not known here", never a
-        malformed ref.
+        are built from their pinned definitions. ``None`` means "not known here", and it means that
+        for a malformed ref and for a library that has gone away as much as for an unknown one:
+        this reader renders a result and must never fail a delivery, so every way of failing to
+        name a concept ends in the raw render.
 
-        A spelling the library holds more than once is "not known here" too, deliberately: this
-        reader renders a result and must never fail a delivery, so the collision is logged by name
-        and the caller falls back to the raw render rather than binding one package's definition
-        to another package's data.
+        A spelling the library holds more than once is "not known here" too, deliberately: the
+        collision is logged by name and the caller falls back to the raw render rather than binding
+        one package's definition to another package's data.
         """
         if get_current_library_id_or_none() is not None:
             try:
@@ -245,9 +246,19 @@ class DeliveryExecutor:
             except ConceptRefAmbiguousError as exc:
                 log.warning(f"Concept ref '{concept_ref}' is ambiguous in the current library, rendering the delivery raw: {exc}")
                 return None
-            except (ConceptLibraryError, ConceptLibraryConceptNotFoundError):
+            except (LibraryError, ConceptLibraryConceptNotFoundError):
                 return None
-        if not NativeConceptCode.is_valid_native_concept_ref(concept_ref=concept_ref):
+            except RuntimeError as exc:
+                # The contextvar still names a library, but the hub that held it is gone. A delivery
+                # outlives the run it renders, so this is a race to survive, not a state to assert.
+                log.warning(f"The current library is no longer reachable, rendering the delivery raw: {exc}")
+                return None
+        try:
+            is_native_ref = NativeConceptCode.is_valid_native_concept_ref(concept_ref=concept_ref)
+        except QualifiedRefError as exc:
+            log.warning(f"Concept ref '{concept_ref}' is not a valid concept ref, rendering the delivery raw: {exc}")
+            return None
+        if not is_native_ref:
             return None
         native_code = QualifiedRef.parse(concept_ref).local_code
         return ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(native_code))

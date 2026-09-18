@@ -549,6 +549,38 @@ class TestDeliveryExecutor:
         assert result.concept.concept_ref == "native.Text"
         assert result.concept.structure_class_name == "TextContent"
 
+    @pytest.mark.parametrize("malformed_ref", ["native..Text", "native.", ".Text"])
+    async def test_try_local_hydrate_stuff_renders_raw_on_a_malformed_ref(self, malformed_ref: str) -> None:
+        """A malformed ref is "not known here" like any other: rendering a result must never fail a delivery.
+
+        Without a current library the ref goes to the native check, which parses it — and a ref with a
+        leading, trailing or doubled dot raises there. That raise used to escape this method's own
+        handler tuple and kill the delivery before the webhook ever fired.
+        """
+        assert get_current_library_id_or_none() is None
+
+        stuff_raw = {"stuff_code": "test", "stuff_name": "greeting", "concept": malformed_ref, "content": {"text": "Hello!"}}
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is None
+
+    async def test_try_local_hydrate_stuff_renders_raw_when_the_current_library_is_gone(self) -> None:
+        """The contextvar naming a library is not the same fact as that library still being there.
+
+        A delivery outlives the run it renders, so the binding can survive the library it names. That
+        is a race to survive with a raw render, not a reason to fail the delivery.
+        """
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        with scoped_current_library(library_id=library_id):
+            library_manager.teardown(library_id=library_id)
+            stuff_raw = {"stuff_code": "test", "stuff_name": "greeting", "concept": "native.Text", "content": {"text": "Hello!"}}
+
+            result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+            assert result is None
+
     async def test_try_local_hydrate_stuff_resolves_through_the_current_library(self) -> None:
         """When a library is current — an in-process run delivering its own result — the ref is resolved there."""
         library_manager = get_library_manager()

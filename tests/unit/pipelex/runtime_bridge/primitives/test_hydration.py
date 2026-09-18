@@ -16,7 +16,14 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
-from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_current_library_id_or_none, set_current_library
+from pipelex.interpreter_hub import (
+    clear_current_library,
+    get_concept_library,
+    get_current_library_id_or_none,
+    get_library_manager,
+    scoped_current_library,
+    set_current_library,
+)
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_bridge.primitives.hydration import (
     _hydrate_list_item,  # pyright: ignore[reportPrivateUsage]
@@ -436,6 +443,24 @@ class TestHydrateWorkingMemory:
 
         with pytest.raises(PipeJobError, match="bad_stuff"):
             hydrate_working_memory(raw)
+
+    def test_hydrate_raises_pipe_job_error_when_the_current_library_is_gone(self) -> None:
+        """Every failure in this function is normalized to PipeJobError, the stale-binding one included.
+
+        The guard tests whether a library is *named*, not whether it is still *there*, so a binding that
+        outlived its library used to surface a raw LibraryError from the hub — an exception every caller
+        of this function was written not to expect.
+        """
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        with scoped_current_library(library_id=library_id):
+            library_manager.teardown(library_id=library_id)
+            working_memory_raw: dict[str, Any] = {
+                "root": {"greeting": {"stuff_code": "test", "stuff_name": "greeting", "concept": "native.Text", "content": {"text": "Hello!"}}}
+            }
+
+            with pytest.raises(PipeJobError, match="no longer reachable"):
+                hydrate_working_memory(working_memory_raw)
 
     def test_hydrate_raises_when_the_structure_class_is_not_registered(self) -> None:
         """A concept the library holds whose structure class this process never registered still refuses clearly.
