@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:0f04ef9927c69cc0d91d68490a0dfe4f65840553414fd92773028b3192630db4"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-09-16T08:54:19Z"
-rationale = "Round-2 review fix in graph_cmd: the refused-spec handler now escapes its message before handing it to log.error and console.print, so a user path holding square brackets prints as written instead of being swallowed or raising MarkupError; no flag, option, exit code or output contract moved. Listed docs/tools/cli: it has no page for graph render. Grepped pipelex/cli/agent_cli/CLAUDE.md: its graph mentions are the agent run and validate graph options, none of which this touches. Nothing stale."
+digest = "sha256:5cdc5a39ff406890f875c3028208e54ff5a72e0e59273f18e250c71e9a62a9cf"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-09-18T16:15:34Z"
+rationale = "stdin_resolver now passes a stuff's concept ref through with its domain and refuses the object form; docs/tools/cli/agent-cli.md (--with-memory) and run.md (working_memory.json) name the wire form, and pipelex/cli/agent_cli/CLAUDE.md spells no concept shape, so nothing else was stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -45,7 +45,7 @@ rationale = "Round-2 review fix in graph_cmd: the refused-spec handler now escap
 "pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:daf6207146c0ea41fe34bb272ed51350208af790"
 "pipelex/cli/agent_cli/commands/run/method_cmd.py" = "blob:f61145e5706f2b36134aafe844653ae6d719be8c"
 "pipelex/cli/agent_cli/commands/run/pipe_cmd.py" = "blob:df5e7f80a328932ffde901eda8d0585d009678ad"
-"pipelex/cli/agent_cli/commands/run/stdin_resolver.py" = "blob:4bc7f4e91ddb3900a75356f8f8e6ba5a586a3690"
+"pipelex/cli/agent_cli/commands/run/stdin_resolver.py" = "blob:e670961641cc699bb4addf03eb1bb69e40e5082c"
 "pipelex/cli/agent_cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:df07de7f203f57041907e080bc5fd80f9f593301"
 "pipelex/cli/agent_cli/commands/validate/app.py" = "blob:d2d0ed19288c2d1c25be1650dd962189fcdb3b86"

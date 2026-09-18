@@ -43,6 +43,15 @@ This mechanism allows you to chain pipes together, creating a flow of informatio
 *   **Access**: Any pipe can access data from the Working Memory by declaring it in their `inputs` field.
 *   **Disposal**: The Working Memory is cleared when the pipeline run completes.
 
+## In memory and on the wire
+
+A stuff has two shapes, and which one you are looking at depends on which side of the runtime you stand.
+
+*   **In memory**, a `Stuff` holds a resolved `Concept`: the runtime's own concept model, carrying the definition it needs to work — the description, the `structure_class_name` that names the content class, and what the concept `refines`. That definition is the library's: it comes from the bundle the method loaded.
+*   **On the wire**, a stuff *names* its concept and carries no definition. Every dump of a working memory — the `working_memory.json` a run saves, the agent CLI's `--with-memory` envelope, the runner's response — spells each stuff as `{"stuff_code": …, "stuff_name": …, "concept": "<domain>.<Code>", "content": …}`, which is the form the MTHDS [CLI I/O contract](https://mthds.ai/latest/spec/cli-io-contract/) requires.
+
+A dump is therefore one-way: a stuff cannot be rebuilt from its own dump alone. A reader that needs the definition resolves the ref through the library the method loads — exactly how an input envelope's `"concept": "my_domain.Invoice"` is resolved when a run starts (see [Providing Inputs](provide-inputs.md#the-explicit-format-escape-hatch)), which is why the `--with-memory` envelope of one run can be piped straight into the next.
+
 ## Best Practices
 
 *   **Meaningful Names**: Use descriptive names for your `result` values to make your pipeline easier to understand.

@@ -38,7 +38,7 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--mock-inputs` - Use mock inputs (requires `--dry-run`)
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
 - `--library-dir`, `-L` - Additional library directory
-- `--with-memory` - Include full working memory in output
+- `--with-memory` - Include full working memory in output, each stuff naming its concept by ref (`"concept": "<domain>.<Code>"`); piped back into another `run` on stdin, the envelope's stuffs become that run's inputs
 - `--format` - Success output format: `markdown` (default) or `json`
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 

@@ -4,6 +4,8 @@ from kajson.exceptions import KajsonException
 from pydantic import ValidationError
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.composite_content import CompositeContent
@@ -12,6 +14,8 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_hub import get_class_registry
 
@@ -137,22 +141,53 @@ def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: C
     )
 
 
-def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
-    """Reconstruct typed WorkingMemory from a raw dict.
+def resolve_stuff_concept(*, concept_ref: Any, stuff_name: str, concept_provider: ConceptProviderAbstract) -> Concept:
+    """Resolve the concept a transported stuff names.
 
-    Must be called AFTER load_from_crate() has registered dynamic classes
-    in the scoped ClassRegistry. Uses concept.structure_class_name to look up
-    the correct StuffContent subclass from the registry.
+    On the wire a stuff carries ``"concept": "<domain>.<Code>"`` and no definition — the
+    standard's form, which ``StuffAbstract`` emits on every dump — so the definition, the
+    ``structure_class_name`` above all, comes from the concept library the method loaded, the
+    way the input side resolves an input envelope's ``concept``. Anything but a string is
+    refused: the full-object form the runtime once dumped is not a shape a reader accepts.
+
+    Raises:
+        PipeJobError: ``concept_ref`` is not a string, or names no concept of the library.
+    """
+    if not isinstance(concept_ref, str):
+        msg = f"Failed to hydrate stuff '{stuff_name}': 'concept' must be the concept ref string '<domain>.<Code>', got {type(concept_ref).__name__}"
+        raise PipeJobError(msg)
+    try:
+        return concept_provider.get_required_concept(concept_ref=concept_ref)
+    except (ConceptLibraryError, ConceptLibraryConceptNotFoundError) as exc:
+        msg = f"Failed to hydrate stuff '{stuff_name}': concept '{concept_ref}' is not in the loaded library: {exc}"
+        raise PipeJobError(msg) from exc
+
+
+def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
+    """Reconstruct typed WorkingMemory from its transport dump.
+
+    A stuff on the wire names its concept and carries no definition, so each ref is resolved
+    through the concept library of the current library, which must therefore be set and loaded
+    before this is called: ``load_from_crate()`` declares the concepts and registers the dynamic
+    classes in one move, and the resolved concept's ``structure_class_name`` is then looked up in
+    the scoped ClassRegistry to pick the StuffContent subclass.
 
     The absence ledger round-trips too: a recorded absence must survive cross-process
     transit, or a resolved-as-absent slot would degrade to a hard miss on the other side.
     """
+    if get_current_library_id_or_none() is None:
+        msg = (
+            "Cannot hydrate a working memory outside a library scope: a stuff names its concept by ref, "
+            "and the ref is resolved through the concept library of the current library"
+        )
+        raise PipeJobError(msg)
+    concept_library = get_concept_library()
     working_memory = WorkingMemory()
 
     raw_root = working_memory_raw.get("root", {})
     for stuff_name, stuff_dict in raw_root.items():
         try:
-            concept = Concept.model_validate(stuff_dict["concept"])
+            concept = resolve_stuff_concept(concept_ref=stuff_dict["concept"], stuff_name=stuff_name, concept_provider=concept_library)
             content = hydrate_content(concept=concept, raw_content=stuff_dict["content"])
             stuff = Stuff(
                 stuff_code=stuff_dict["stuff_code"],

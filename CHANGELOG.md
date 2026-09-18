@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **A dump of a working memory names each stuff's concept by ref (Breaking)**: every path that serializes a `Stuff` — `model_dump`, `smart_dump`, `dump_for_transport`, the `working_memory.json` a run saves, the agent CLI's `--with-memory` envelope and the runner's `PipeOutput` response — now emits `"concept": "<domain>.<Code>"` beside `stuff_code`, `stuff_name` and `content`, the wire form the MTHDS standard's CLI I/O contract requires, instead of the full `Concept` object with its `description`, `structure_class_name` and `refines`. The definition stays on the runtime's in-memory `Concept`, which declares those fields itself now that the protocol's `ConceptAbstract` holds a name and nothing more, and a dump is one-way: a `Stuff`, a `WorkingMemory` or a `PipeOutput` cannot be validated back from its own dump. The readers resolve the ref through the concept library the method loaded, the way the input side always has — `hydrate_working_memory` now requires a current library and refuses a stuff whose `concept` is not a string, the delivery executor's local hydration resolves a native ref from the pinned native set when no library is current and falls back to the raw render for any other, and the agent CLI's stdin resolver passes the ref through with its domain intact where it used to reduce an object to a bare code. Every consumer that read `concept.code`, `concept.domain_code` or `concept.structure_class_name` off a dumped stuff must read the ref string instead.
+
 ### Fixed
 
 - **`PINNED_NATIVES_MTHDS_VERSION` names the set it labels**: the constant read `1.0.0` while the standard pins the native set at `2.0.0`, so anything taking it as the answer to "which pinned set is this engine's" — a downstream port gating its own native goldens, for one — read a version the standard now describes as predating the pinning regime. It now reads `2.0.0`, and it is no longer a value nothing reads: the standard-conformance suite holds it to the page's own "Pinned at MTHDS" statement, and a check that needs no sibling checkout refuses a label later than the standard version this engine implements.

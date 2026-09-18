@@ -1,5 +1,7 @@
+from collections.abc import Callable
 from typing import cast
 
+import pytest
 from kajson import kajson
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -14,6 +16,11 @@ from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 
 
 class TestCompositeContent:
+    @pytest.fixture(scope="class", autouse=True)
+    def _open_library(self, load_empty_library: Callable[[], str]) -> None:
+        """Hydration resolves each stuff's concept ref through the current library, so one must be open."""
+        load_empty_library()
+
     def test_named_sub_contents_are_top_level_fields(self):
         """Branch names must surface as top-level serialized fields, with no wrapper key."""
         composite = CompositeContent.model_validate(

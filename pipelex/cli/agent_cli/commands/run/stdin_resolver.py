@@ -31,29 +31,18 @@ class ParsedCliInputs(NamedTuple):
     inputs_base_dir: Path | None
 
 
-def _extract_concept_code(concept_data: Any) -> str:
-    """Extract a concept code string from a concept data value.
-
-    Args:
-        concept_data: The concept field from a stuff dict — may be a dict with
-            a ``code`` key, a plain string, or another type.
-
-    Returns:
-        The concept code string.
-    """
-    if isinstance(concept_data, dict):
-        concept_dict = cast("dict[str, Any]", concept_data)
-        return str(concept_dict.get("code", ""))
-    if isinstance(concept_data, str):
-        return concept_data
-    return str(concept_data)
-
-
-def _extract_stuff_entry(stuff_data: dict[str, Any]) -> dict[str, Any] | None:
+def _extract_stuff_entry(stuff_data: dict[str, Any], *, stuff_name: str) -> dict[str, Any] | None:
     """Extract a ``{ concept, content }`` input entry from a serialized stuff dict.
+
+    A serialized stuff names its concept by ref — ``"concept": "<domain>.<Code>"`` — and carries
+    no definition, so the ref passes through untouched: the runner resolves it through the loaded
+    library when it shapes the inputs, exactly as it does for an explicit ``{concept, content}``
+    envelope in an inputs file. Anything but a string is refused rather than reduced: the standard
+    puts no object there, and reducing one to its bare code would drop the domain.
 
     Args:
         stuff_data: A serialized Stuff dict with ``concept`` and ``content`` keys.
+        stuff_name: The key the stuff sits under in ``working_memory.root``, for the error.
 
     Returns:
         A dict with ``concept`` (str) and ``content`` (Any) keys, or None if
@@ -63,8 +52,14 @@ def _extract_stuff_entry(stuff_data: dict[str, Any]) -> dict[str, Any] | None:
     content_data: Any = stuff_data.get("content")
     if concept_data is None or content_data is None:
         return None
+    if not isinstance(concept_data, str):
+        agent_error(
+            f"stdin envelope has invalid 'working_memory.root.{stuff_name}.concept': "
+            f"expected the concept ref string '<domain>.<Code>', got {type(concept_data).__name__}",
+            error_type="JSONDecodeError",
+        )
     return {
-        "concept": _extract_concept_code(concept_data),
+        "concept": concept_data,
         "content": content_data,
     }
 
@@ -79,7 +74,8 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
     - **Full envelope**: a dict with a ``working_memory`` key at the top level
       (from upstream ``--with-memory`` output). Stuffs are extracted from
       ``working_memory.root`` and converted to ``{ concept, content }`` entries
-      suitable for ``PipelineInputs``.
+      suitable for ``PipelineInputs``, each stuff's ``concept`` being the
+      namespaced ref string the upstream run dumped.
 
     Args:
         stdin_data: Parsed JSON dict from stdin.
@@ -113,7 +109,7 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
             continue
         stuff_data = cast("dict[str, Any]", stuff_data_raw)
 
-        entry = _extract_stuff_entry(stuff_data)
+        entry = _extract_stuff_entry(stuff_data, stuff_name=stuff_name)
         if entry is not None:
             resolved[stuff_name] = entry
 
@@ -121,7 +117,7 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
     main_data_raw: Any = root.get(MAIN_STUFF_KEY)
     if main_data_raw is not None and MAIN_STUFF_KEY not in aliases and isinstance(main_data_raw, dict):
         main_data = cast("dict[str, Any]", main_data_raw)
-        entry = _extract_stuff_entry(main_data)
+        entry = _extract_stuff_entry(main_data, stuff_name=MAIN_STUFF_KEY)
         if entry is not None:
             resolved[MAIN_STUFF_KEY] = entry
 

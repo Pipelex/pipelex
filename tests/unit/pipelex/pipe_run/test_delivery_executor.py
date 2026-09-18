@@ -24,6 +24,7 @@ from pipelex.core.pipes.pipe_io_artifacts import (
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
+from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none, get_library_manager, scoped_current_library
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -476,12 +477,7 @@ class TestDeliveryExecutor:
         stuff_raw = {
             "stuff_code": "test",
             "stuff_name": "greeting",
-            "concept": {
-                "code": "Text",
-                "domain_code": "native",
-                "description": "Plain text",
-                "structure_class_name": "TextContent",
-            },
+            "concept": "native.Text",
             "content": {"text": "Hello!"},
         }
 
@@ -491,7 +487,8 @@ class TestDeliveryExecutor:
         assert isinstance(result.content, TextContent)
         assert result.content.text == "Hello!"
 
-    async def test_try_local_hydrate_stuff_returns_none_for_missing_class(self, mocker: MockerFixture) -> None:
+    async def test_try_local_hydrate_stuff_returns_none_for_unknown_concept(self, mocker: MockerFixture) -> None:
+        """A dynamic concept is unknown to a crate-free delivery worker: the ref resolves to nothing, the raw render takes over."""
         from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         warn_spy = mocker.spy(pipelex_log, "warning")
@@ -499,12 +496,7 @@ class TestDeliveryExecutor:
         stuff_raw = {
             "stuff_code": "test",
             "stuff_name": "x",
-            "concept": {
-                "code": "Greeting",
-                "domain_code": "dynamic_test",
-                "description": "Dynamic concept",
-                "structure_class_name": "dynamic_test__Greeting",
-            },
+            "concept": "dynamic_test.Greeting",
             "content": {"message": "hi"},
         }
 
@@ -526,6 +518,72 @@ class TestDeliveryExecutor:
         assert result is None
         assert warn_spy.call_count == 1
 
+    async def test_try_local_hydrate_stuff_returns_none_for_object_form_concept(self, mocker: MockerFixture) -> None:
+        """The full-object concept a stale runtime dumped is not a shape the reader accepts: raw render, with a warning."""
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        warn_spy = mocker.spy(pipelex_log, "warning")
+
+        stuff_raw: dict[str, object] = {
+            "stuff_code": "test",
+            "stuff_name": "greeting",
+            "concept": {"code": "Text", "domain_code": "native", "description": "Plain text", "structure_class_name": "TextContent"},
+            "content": {"text": "Hello!"},
+        }
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is None
+        assert warn_spy.call_count == 1
+        assert "concept ref string" in str(warn_spy.call_args)
+
+    async def test_try_local_hydrate_stuff_resolves_the_native_concept_without_a_library(self) -> None:
+        """A crate-free delivery worker has no current library; a native ref still resolves, from the pinned native set."""
+        assert get_current_library_id_or_none() is None
+
+        stuff_raw = {"stuff_code": "test", "stuff_name": "greeting", "concept": "native.Text", "content": {"text": "Hello!"}}
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is not None
+        assert result.concept.concept_ref == "native.Text"
+        assert result.concept.structure_class_name == "TextContent"
+
+    async def test_try_local_hydrate_stuff_resolves_through_the_current_library(self) -> None:
+        """When a library is current — an in-process run delivering its own result — the ref is resolved there."""
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=library_id):
+                stuff_raw = {"stuff_code": "test", "stuff_name": "greeting", "concept": "native.Text", "content": {"text": "Hello!"}}
+
+                result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+                assert result is not None
+                assert result.concept is get_concept_library().get_required_concept(concept_ref="native.Text")
+                assert isinstance(result.content, TextContent)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+    async def test_try_local_hydrate_stuff_within_a_library_falls_back_on_unknown_ref(self, mocker: MockerFixture) -> None:
+        """A ref the current library does not hold falls back to the raw render rather than raising."""
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        warn_spy = mocker.spy(pipelex_log, "warning")
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=library_id):
+                stuff_raw = {"stuff_code": "test", "stuff_name": "x", "concept": "dynamic_test.Greeting", "content": {"message": "hi"}}
+
+                result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+                assert result is None
+                assert warn_spy.call_count == 1
+                assert "dynamic_test.Greeting" in str(warn_spy.call_args)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
     async def test_raw_fallback_html_escapes_special_chars(self, mocker: MockerFixture) -> None:
         """Fallback HTML rendering must escape HTML-special chars to prevent XSS.
 
@@ -538,12 +596,7 @@ class TestDeliveryExecutor:
             "root": {
                 "main_stuff": {
                     "stuff_code": "main_stuff",
-                    "concept": {
-                        "code": "Unknown",
-                        "domain_code": "dynamic_test",
-                        "description": "Dynamic concept not registered locally",
-                        "structure_class_name": "dynamic_test__Unknown",
-                    },
+                    "concept": "dynamic_test.Unknown",
                     "content": {"payload": "</pre><script>alert(1)</script><pre>"},
                 }
             },
@@ -597,12 +650,7 @@ class TestDeliveryExecutor:
                 "cv_pages": {
                     "stuff_code": "cv_pages",
                     "stuff_name": "cv_pages",
-                    "concept": {
-                        "code": "Page",
-                        "domain_code": "native",
-                        "description": "A page",
-                        "structure_class_name": "PageContent",
-                    },
+                    "concept": "native.Page",
                     "content": [page],
                 }
             },

@@ -1,5 +1,6 @@
 import datetime
 import json
+from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
@@ -8,12 +9,14 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
+from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_current_library_id_or_none, set_current_library
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_bridge.primitives.hydration import (
     _hydrate_list_item,  # pyright: ignore[reportPrivateUsage]
@@ -63,6 +66,11 @@ def _make_date_concept() -> Concept:
 
 
 class TestHydrateWorkingMemory:
+    @pytest.fixture(scope="class", autouse=True)
+    def _open_library(self, load_empty_library: Callable[[], str]) -> None:
+        """A stuff names its concept by ref, and the hydrator resolves it through the current library."""
+        load_empty_library()
+
     @pytest.fixture(autouse=True)
     def _register_content_classes(self) -> None:
         """Ensure TextContent and NumberContent are registered for hydration tests."""
@@ -312,19 +320,80 @@ class TestHydrateWorkingMemory:
         assert isinstance(result, NumberContent)
         assert result.number == 42
 
-    def test_hydrate_raises_on_missing_registry_class(self) -> None:
-        """Hydration raises PipeJobError when the concept's structure_class_name is not in the registry."""
+    def test_every_dump_carries_the_concept_ref_string(self) -> None:
+        """Every dump of a working memory names a stuff's concept by ref: the definition never leaves the runtime."""
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
+        pipe_output = PipeOutput(working_memory=working_memory, pipeline_run_id="run-dump")
+
+        dumps: dict[str, dict[str, Any]] = {
+            "model_dump": working_memory.model_dump(),
+            "smart_dump": working_memory.smart_dump(),
+            "dump_for_transport": working_memory.dump_for_transport(),
+            "json_mode": working_memory.model_dump(mode="json", serialize_as_any=True),
+            "pipe_output": pipe_output.model_dump(mode="json", serialize_as_any=True)["working_memory"],
+        }
+
+        for dump_name, dump in dumps.items():
+            assert dump["root"]["greeting"]["concept"] == "native.Text", dump_name
+        assert working_memory.root["greeting"].model_dump()["concept"] == "native.Text"
+
+    def test_hydrate_resolves_the_concept_through_the_library(self) -> None:
+        """The hydrated stuff carries the library's own Concept, definition and all, not one rebuilt from the wire."""
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
+
+        hydrated = hydrate_working_memory(working_memory.dump_for_transport())
+
+        concept = hydrated.root["greeting"].concept
+        assert concept is get_concept_library().get_required_concept(concept_ref="native.Text")
+        assert concept.structure_class_name == "TextContent"
+
+    def test_hydrate_refuses_the_object_form(self) -> None:
+        """The full-object concept the runtime once dumped is not a shape the reader accepts."""
+        raw = {
+            "root": {
+                "greeting": {
+                    "stuff_code": "test",
+                    "stuff_name": "greeting",
+                    "concept": {
+                        "code": "Text",
+                        "domain_code": "native",
+                        "description": "Plain text",
+                        "structure_class_name": "TextContent",
+                    },
+                    "content": {"text": "hello"},
+                },
+            },
+            "aliases": {},
+        }
+
+        with pytest.raises(PipeJobError, match="concept ref string"):
+            hydrate_working_memory(raw)
+
+    def test_hydrate_requires_a_current_library(self) -> None:
+        """Outside a library scope there is nothing to resolve a ref against: a clear refusal, not a hub error."""
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
+        raw = working_memory.dump_for_transport()
+        library_id = get_current_library_id_or_none()
+        assert library_id is not None
+
+        clear_current_library()
+        try:
+            with pytest.raises(PipeJobError, match="library"):
+                hydrate_working_memory(raw)
+        finally:
+            set_current_library(library_id=library_id)
+
+    def test_hydrate_raises_on_unknown_concept_ref(self) -> None:
+        """Hydration raises PipeJobError when the stuff names a concept the loaded library does not hold."""
         raw = {
             "root": {
                 "bad_stuff": {
                     "stuff_code": "test",
                     "stuff_name": "bad_stuff",
-                    "concept": {
-                        "code": "NonExistent",
-                        "domain_code": "native",
-                        "description": "Missing class",
-                        "structure_class_name": "NonExistentContent",
-                    },
+                    "concept": "native.NonExistent",
                     "content": {"text": "hello"},
                 },
             },
@@ -341,12 +410,7 @@ class TestHydrateWorkingMemory:
                 "invalid_stuff": {
                     "stuff_code": "test",
                     "stuff_name": "invalid_stuff",
-                    "concept": {
-                        "code": "Text",
-                        "domain_code": "native",
-                        "description": "Plain text",
-                        "structure_class_name": "TextContent",
-                    },
+                    "concept": "native.Text",
                     "content": {"completely_wrong_field": 42},
                 },
             },
