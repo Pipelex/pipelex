@@ -176,7 +176,11 @@ class TestStdinResolver:
         assert result == {"contract": {"concept": "legal.Contract", "content": {"title": "NDA"}}}
 
     def test_concept_object_form_is_refused(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """The full-object concept a stale runtime dumped is refused, never reduced to a bare code."""
+        """The full-object concept a stale runtime dumped is refused, never reduced to a bare code.
+
+        The label is a shape error, not a decode error: the envelope parsed, so a consumer must not
+        be told to go hunting for trailing commas in JSON that was valid.
+        """
         set_agent_cli_error_format(CliOutputFormat.JSON)
         data: dict[str, Any] = {
             "working_memory": {
@@ -193,8 +197,9 @@ class TestStdinResolver:
             resolve_stdin_inputs(data)
         assert exc_info.value.exit_code == 1
         envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "JSONDecodeError"
+        assert envelope["error_type"] == "StdinEnvelopeShapeError"
         assert "working_memory.root.item.concept" in envelope["message"]
+        assert "trailing commas" not in envelope["hint"]
 
     def test_stuff_missing_concept_skipped(self) -> None:
         """Stuff entries missing concept or content are silently skipped."""

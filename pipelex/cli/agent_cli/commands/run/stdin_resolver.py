@@ -53,10 +53,13 @@ def _extract_stuff_entry(stuff_data: dict[str, Any], *, stuff_name: str) -> dict
     if concept_data is None or content_data is None:
         return None
     if not isinstance(concept_data, str):
+        # Not a JSONDecodeError: the envelope parsed. What failed is its *shape* — the concept
+        # field holds something the CLI I/O contract does not put there — and the label is a
+        # machine contract, so it must not send a consumer hunting for trailing commas.
         agent_error(
             f"stdin envelope has invalid 'working_memory.root.{stuff_name}.concept': "
             f"expected the concept ref string '<domain>.<Code>', got {type(concept_data).__name__}",
-            error_type="JSONDecodeError",
+            error_type="StdinEnvelopeShapeError",
         )
     return {
         "concept": concept_data,

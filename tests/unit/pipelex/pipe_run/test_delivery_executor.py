@@ -584,6 +584,82 @@ class TestDeliveryExecutor:
         finally:
             library_manager.teardown(library_id=library_id)
 
+    async def test_try_local_hydrate_stuff_resolves_a_dependency_contributed_concept(self) -> None:
+        """A concept only a dependency package declares is keyed under its alias, and the bare wire ref still finds it."""
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        dependency_concept = Concept(
+            code="WeightedScore",
+            domain_code="delivery_scoring",
+            description="the score as the dependency package shapes it",
+            structure_class_name="TextContent",
+        )
+        try:
+            with scoped_current_library(library_id=library_id):
+                get_concept_library().add_dependency_concept(alias="github.com/mthds/scoring-lib/scoring_lib", concept=dependency_concept)
+                stuff_raw = {
+                    "stuff_code": "test",
+                    "stuff_name": "score",
+                    "concept": "delivery_scoring.WeightedScore",
+                    "content": {"text": "87"},
+                }
+
+                result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+                assert result is not None
+                assert result.concept.description == "the score as the dependency package shapes it"
+                assert isinstance(result.content, TextContent)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+    async def test_try_local_hydrate_stuff_renders_raw_on_an_ambiguous_ref(self, mocker: MockerFixture) -> None:
+        """A spelling a host bundle and a dependency share is logged and rendered raw, never bound to one of them.
+
+        This reader must never fail a delivery, so the collision that hydration refuses outright
+        degrades here to the same raw-render fallback an unknown ref takes — with the colliding
+        keys named in the log so the cause is not invisible.
+        """
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        warn_spy = mocker.spy(pipelex_log, "warning")
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=library_id):
+                concept_library = get_concept_library()
+                concept_library.add_new_concept(
+                    Concept(
+                        code="WeightedScore",
+                        domain_code="delivery_scoring",
+                        description="the HOST's weighted score",
+                        structure_class_name="TextContent",
+                    )
+                )
+                concept_library.add_dependency_concept(
+                    alias="github.com/mthds/scoring-lib/scoring_lib",
+                    concept=Concept(
+                        code="WeightedScore",
+                        domain_code="delivery_scoring",
+                        description="the dependency's weighted score",
+                        structure_class_name="TextContent",
+                    ),
+                )
+                stuff_raw = {
+                    "stuff_code": "test",
+                    "stuff_name": "score",
+                    "concept": "delivery_scoring.WeightedScore",
+                    "content": {"text": "87"},
+                }
+
+                result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+                assert result is None
+                logged = " ".join(str(call) for call in warn_spy.call_args_list)
+                assert "ambiguous" in logged
+                assert "github.com/mthds/scoring-lib/scoring_lib->delivery_scoring.WeightedScore" in logged
+        finally:
+            library_manager.teardown(library_id=library_id)
+
     async def test_raw_fallback_html_escapes_special_chars(self, mocker: MockerFixture) -> None:
         """Fallback HTML rendering must escape HTML-special chars to prevent XSS.
 

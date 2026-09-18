@@ -52,6 +52,12 @@ A stuff has two shapes, and which one you are looking at depends on which side o
 
 A dump is therefore one-way: a stuff cannot be rebuilt from its own dump alone. A reader that needs the definition resolves the ref through the library the method loads — exactly how an input envelope's `"concept": "my_domain.Invoice"` is resolved when a run starts (see [Providing Inputs](provide-inputs.md#the-explicit-format-escape-hatch)), which is why the `--with-memory` envelope of one run can be piped straight into the next.
 
+### The limit of `<domain>.<Code>`, and what this runtime does about it
+
+The MTHDS standard defines two spellings for a concept on the wire: `<domain>.<Code>` for a concept the running method's own bundles declare (and for the native set), and `<package_address>::<domain>.<Code>` for a concept a **dependency package** contributes. **This runtime emits only the first, and resolves only the first** — it neither writes nor accepts the `::` form.
+
+That is enough in the ordinary case, because the library a reader resolves against knows which package contributed each concept: a dependency's concept is held under its package address internally, so a bare `<domain>.<Code>` arriving from the wire finds it. What the bare form cannot express is a *collision* — when the running method's own bundle and one of its dependencies both declare, say, `scoring.WeightedScore`, the ref names both and nothing on the wire says which was meant. Rather than pick one and bind the wrong definition to your data, the runtime refuses the hydration and names every candidate it found. Two ways out: rename one of the two concepts, or keep them in methods that do not run together.
+
 ## Best Practices
 
 *   **Meaningful Names**: Use descriptive names for your `result` values to make your pipeline easier to understand.

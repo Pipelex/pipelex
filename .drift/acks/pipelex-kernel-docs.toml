@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:835a768141c5702b53e3924ae1b50d218d89cbf2038049432b7d610738a2123d"
+digest = "sha256:b71924eeeafa924135c4e1658e999cb8591249a729083996bb01291f6f315096"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-27T08:35:00Z"
-rationale = "Reviewed docs/under-the-hood/pipelex-kernel.md against the compose_ops.py change: build_composed_content no longer fabricates an empty css_class for an Html-shaped output class (native.Html made css_class optional per MTHDS v0.9.0). The doc names the function in the surface table only and does not describe the fabricated value, so nothing is stale and no edit is needed."
+reviewed_at = "2026-09-18T17:17:29Z"
+rationale = "ConceptProviderAbstract gained list_concept_keys_for_ref, so the boot-contract test's NativeOnlyConceptProvider implements it, returning an empty list — a provider that builds native concepts on demand stores none under a key. docs/under-the-hood/pipelex-kernel.md describes that smallest provider under shape_inputs and now names the enumeration beside the three capabilities it already listed; nothing else in the doc touches the provider surface."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -25,4 +25,4 @@ rationale = "Reviewed docs/under-the-hood/pipelex-kernel.md against the compose_
 "pipelex/kernel/search_ops.py" = "blob:ed0a8c7953aca1e38de852d0ddef11731b819539"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
 "pipelex/kernel/templating_style_ops.py" = "blob:395473806d600dfc4f124c07f2afebb951fc086b"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:f7520706acd4ba906e30ca5dc2a2c2d5dd1fbf11"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:4f440b21ad51f27c098efff4d3a04433b53914bc"

@@ -371,8 +371,14 @@ class TestHydrateWorkingMemory:
         with pytest.raises(PipeJobError, match="concept ref string"):
             hydrate_working_memory(raw)
 
-    def test_hydrate_requires_a_current_library(self) -> None:
-        """Outside a library scope there is nothing to resolve a ref against: a clear refusal, not a hub error."""
+    def test_hydrate_without_a_library_resolves_a_native_ref(self) -> None:
+        """No current library is a live path, not a fixture, and the pinned native set answers on its own.
+
+        ``Pipelex.make()`` sets no current library, and on the transport boundary
+        ``scoped_library_for_crate(None, …)`` is a documented no-op that falls back to the active
+        class registry — so a precondition demanding a library would break a hydration that has
+        everything it needs.
+        """
         working_memory = WorkingMemory()
         working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
         raw = working_memory.dump_for_transport()
@@ -381,10 +387,38 @@ class TestHydrateWorkingMemory:
 
         clear_current_library()
         try:
-            with pytest.raises(PipeJobError, match="library"):
+            hydrated = hydrate_working_memory(raw)
+        finally:
+            set_current_library(library_id=library_id)
+
+        assert hydrated.root["greeting"].concept.concept_ref == "native.Text"
+        assert hydrated.root["greeting"].content == TextContent(text="Hello!")
+
+    def test_hydrate_without_a_library_refuses_a_non_native_ref(self) -> None:
+        """Only a loaded library holds a bundle-declared concept's definition, so the refusal names the stuff."""
+        raw: dict[str, Any] = {
+            "root": {
+                "invoice": {
+                    "stuff_code": "test",
+                    "stuff_name": "invoice",
+                    "concept": "accounting.Invoice",
+                    "content": {"text": "hello"},
+                },
+            },
+            "aliases": {},
+        }
+        library_id = get_current_library_id_or_none()
+        assert library_id is not None
+
+        clear_current_library()
+        try:
+            with pytest.raises(PipeJobError, match="invoice") as exc_info:
                 hydrate_working_memory(raw)
         finally:
             set_current_library(library_id=library_id)
+
+        assert "accounting.Invoice" in str(exc_info.value)
+        assert "no library is current" in str(exc_info.value)
 
     def test_hydrate_raises_on_unknown_concept_ref(self) -> None:
         """Hydration raises PipeJobError when the stuff names a concept the loaded library does not hold."""

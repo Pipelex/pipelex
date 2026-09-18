@@ -11,7 +11,7 @@ from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptRefAmbiguousError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
@@ -229,12 +229,22 @@ class DeliveryExecutor:
 
         A delivery worker never loads the crate, so a dynamic concept is unknown to it by
         design. When a library is current — an in-process run delivering its own result — the
-        ref is looked up there; otherwise only the native concepts are known, and they are built
-        from their pinned definitions. ``None`` means "not known here", never a malformed ref.
+        ref goes through the shared wire-ref rule, so a concept a dependency package contributed
+        resolves through its aliased entry; otherwise only the native concepts are known, and they
+        are built from their pinned definitions. ``None`` means "not known here", never a
+        malformed ref.
+
+        A spelling the library holds more than once is "not known here" too, deliberately: this
+        reader renders a result and must never fail a delivery, so the collision is logged by name
+        and the caller falls back to the raw render rather than binding one package's definition
+        to another package's data.
         """
         if get_current_library_id_or_none() is not None:
             try:
-                return get_concept_library().get_required_concept(concept_ref=concept_ref)
+                return get_concept_library().resolve_wire_concept_ref(concept_ref=concept_ref)
+            except ConceptRefAmbiguousError as exc:
+                log.warning(f"Concept ref '{concept_ref}' is ambiguous in the current library, rendering the delivery raw: {exc}")
+                return None
             except (ConceptLibraryError, ConceptLibraryConceptNotFoundError):
                 return None
         if not NativeConceptCode.is_valid_native_concept_ref(concept_ref=concept_ref):
