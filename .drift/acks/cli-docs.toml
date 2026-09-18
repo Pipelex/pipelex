@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:4e3a3113ebb71676388aca4e40e4db21cd634ba7826c26ee29b69f7c1327b450"
+digest = "sha256:ec5b37cd2995e688588c6049076f5150bfc035ecca83ed5bf6da96c9bffc2a26"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-16T21:05:19Z"
-rationale = "The doctor gains a Plugins row and the agent envelope a checks.plugins entry for a plugin registry that did not build, and checks.log_sink now also covers a sink that failed to install; the agent-CLI contract doc describes both, and docs/tools/cli/ describes no per-row shape for doctor."
+reviewed_at = "2026-09-18T12:46:47Z"
+rationale = "The doctor's console fallback is now refused when a sink is already recorded, so the agent-CLI contract doc no longer promises that a not-healthy log_sink row means the report ran on the console sink: it says the message names where the report's own lines went, and why a failed installation does not always leave nothing behind. docs/tools/cli/ describes no per-row shape for doctor, so it is unaffected."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "The doctor gains a Plugins row and the agent envelope a checks.plug
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:a87d2747134ff8c47fb4040a1d47906fb3359bdb"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:7ea6e1b0f260a0de8cceae4e5c2deede7b0abbd7"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"

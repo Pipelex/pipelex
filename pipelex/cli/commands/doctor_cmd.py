@@ -1098,16 +1098,29 @@ class DoctorRuntimeSetup(BaseModel):
 
 
 FALLBACK_LOG_SINK_NOTE = f"this report goes through the '{LogSinkMethod.CONSOLE}' sink on stderr instead"
+FALLBACK_LOG_SINK_REFUSED_NOTE = (
+    "a log sink is already recorded, so the console fallback could not stand in and this report's own lines go wherever that one sends them"
+)
 
 
-def _install_fallback_log_sink(*, log_config: LogConfig) -> None:
-    """Install the sink the doctor's own lines fall back to: the console sink, pinned to stderr.
+def _install_fallback_log_sink(*, log_config: LogConfig) -> str:
+    """Install the sink the doctor's own lines fall back to, the console sink pinned to stderr, and say what happened.
 
     Pinned rather than built from the configuration, because the configuration may be exactly what
     made the configured sink fail: a console target no sink can write to fails the console sink too
     when it reads the same field.
+
+    Refused when a sink is already recorded, because ``log.install_sink`` refuses a second one and the
+    doctor would then raise in place of the failure it was called to report. That is reachable rather
+    than theoretical: ``install_sink`` records the sink *before* replaying what the holding handler
+    held, deliberately, so that a replay which raises still leaves the sink findable by ``reset`` — so
+    a failed installation does not always leave nothing behind. The returned note is what the caller
+    interpolates, so a row never promises a fallback that did not stand in.
     """
+    if log.sink is not None:
+        return FALLBACK_LOG_SINK_REFUSED_NOTE
     log.install_sink(ConsoleLogSink(rich_log_config=log_config.rich_log, target=ConsoleTarget.STDERR))
+    return FALLBACK_LOG_SINK_NOTE
 
 
 def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: LogConfig) -> LogSinkCheck:
@@ -1116,31 +1129,30 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
     Boot stops on an unregistered token, on a factory that raises and on a registry that did not
     build. The doctor must not, since where its own lines go is one of the things it diagnoses: it
     installs the console sink on stderr instead and reports why in a row of its own, so the rest of
-    the report is still produced. The retry is safe because ``log.install_sink`` builds the handler
-    before it touches the root logger, so a sink that failed to build left nothing installed.
+    the report is still produced. The retry is usually safe because ``log.install_sink`` builds the
+    handler before it touches the root logger, so a sink that failed to build left nothing installed —
+    but not always, which is why the fallback is the one that decides whether it can stand in and
+    hands back the note the row carries.
     """
     if registry is None:
-        _install_fallback_log_sink(log_config=log_config)
+        note = _install_fallback_log_sink(log_config=log_config)
         return LogSinkCheck(
             is_healthy=False,
-            message=f"The log sink '{log_config.sink}' could not be resolved because the plugin registry did not build; {FALLBACK_LOG_SINK_NOTE}",
+            message=f"The log sink '{log_config.sink}' could not be resolved because the plugin registry did not build; {note}",
         )
     if not registry.has(method=log_config.sink):
-        _install_fallback_log_sink(log_config=log_config)
+        note = _install_fallback_log_sink(log_config=log_config)
         return LogSinkCheck(
             is_healthy=False,
-            message=(
-                f"No log sink is registered for '{log_config.sink}' in [runtime.log]; {FALLBACK_LOG_SINK_NOTE}. "
-                f"Registered sinks: {', '.join(registry.methods)}"
-            ),
+            message=(f"No log sink is registered for '{log_config.sink}' in [runtime.log]; {note}. Registered sinks: {', '.join(registry.methods)}"),
         )
     try:
         log.install_sink(registry.get_required(method=log_config.sink)(log_config))
     except Exception as exc:  # ruff: ignore[blind-except]
         # A factory or a handler that raises on this configuration, a console target no sink writes
         # to or a dependency the sink needs: the row says so, and the report goes on.
-        _install_fallback_log_sink(log_config=log_config)
-        return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' could not be installed: {exc}; {FALLBACK_LOG_SINK_NOTE}")
+        note = _install_fallback_log_sink(log_config=log_config)
+        return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' could not be installed: {exc}; {note}")
     return LogSinkCheck(is_healthy=True, message=f"Log sink '{log_config.sink}' installed")
 
 
