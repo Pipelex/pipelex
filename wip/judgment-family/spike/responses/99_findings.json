@@ -1,9 +1,5 @@
 [
   {
-    "label": "key length",
-    "value": "108"
-  },
-  {
     "label": "GET /v1/models status",
     "value": "200"
   },
@@ -40,12 +36,12 @@
     "value": "true"
   },
   {
-    "label": "request_id present",
+    "label": "request_id present on success",
     "value": "true"
   },
   {
     "label": "request_id",
-    "value": "req_01a0b93dc2b87127a8abf2831cab3f34"
+    "value": "req_01a0b97a865579dc983f812df5113aa9"
   },
   {
     "label": "noul answer (parsed)",
@@ -137,15 +133,15 @@
   },
   {
     "label": "state as object accepted",
-    "value": "{\"enterprise\": 0.99, \"many_customers\": 0.96, \"paying\": 0.99, \"prior_incidents\": 0.98}"
+    "value": "{\"enterprise\": 0.99, \"many_customers\": 0.94, \"paying\": 0.99, \"prior_incidents\": 0.99}"
   },
   {
     "label": "state as string accepted",
-    "value": "{\"enterprise\": 0.99, \"many_customers\": 0.97, \"paying\": 0.99, \"prior_incidents\": 0.99}"
+    "value": "{\"enterprise\": 0.99, \"many_customers\": 0.95, \"paying\": 0.99, \"prior_incidents\": 0.99}"
   },
   {
     "label": "state as array accepted",
-    "value": "{\"enterprise\": 0.98, \"many_customers\": 0.54, \"paying\": 0.86, \"prior_incidents\": 0.27}"
+    "value": "{\"enterprise\": 0.98, \"many_customers\": 0.53, \"paying\": 0.83, \"prior_incidents\": 0.31}"
   },
   {
     "label": "json number read as a number",
@@ -161,11 +157,11 @@
   },
   {
     "label": "choice_null_descriptions",
-    "value": "{\"choice\": \"angry\", \"confidence\": 0.96, \"probabilities\": {\"angry\": 0.98, \"calm\": 0.02}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"angry\", \"confidence\": 0.97, \"probabilities\": {\"angry\": 0.98, \"calm\": 0.02}, \"type\": \"choice\"}"
   },
   {
     "label": "choice_mixed_descriptions",
-    "value": "{\"choice\": \"angry\", \"confidence\": 0.95, \"probabilities\": {\"angry\": 0.98, \"calm\": 0.02}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"angry\", \"confidence\": 0.96, \"probabilities\": {\"angry\": 0.98, \"calm\": 0.02}, \"type\": \"choice\"}"
   },
   {
     "label": "choice_two_options",
@@ -177,7 +173,7 @@
   },
   {
     "label": "choice_empty",
-    "value": "{\"body\": {\"detail\": \"Choice question must have at least one choice: q\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd0dd7db59196dc7df728505f\", \"response_headers\": {\"content-length\": \"61\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:10 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"6\", \"x-typesafe-request-id\": \"req_01a0b93dd0dd7db59196dc7df728505f\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Choice question must have at least one choice: q (request_id=req_01a0b93dd0dd7db59196dc7df728505f)\"}"
+    "value": "{\"body\": {\"detail\": \"Choice question must have at least one choice: q\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97a93df769a8a244afc18ade850\", \"response_headers\": {\"content-length\": \"61\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:33 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"20\", \"x-typesafe-request-id\": \"req_01a0b97a93df769a8a244afc18ade850\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Choice question must have at least one choice: q (request_id=req_01a0b97a93df769a8a244afc18ade850)\"}"
   },
   {
     "label": "score_two_levels",
@@ -200,16 +196,24 @@
     "value": "{\"choice\": \"payments\", \"confidence\": 1.0, \"probabilities\": {\"payments\": 1.0, \"team_00\": 0.0, \"team_01\": 0.0, \"team_02\": 0.0, \"team_03\": 0.0, \"team_04\": 0.0, \"team_05\": 0.0, \"team_06\": 0.0, \"team_07\": 0.0, \"team_08\": 0.0, \"team_09\": 0.0, \"team_10\": 0.0, \"team_11\": 0.0, \"team_12\": 0.0, \"team_13\": 0.0, \"team_14\": 0.0, \"team_15\": 0.0, \"team_16\": 0.0, \"team_17\": 0.0, \"team_18\": 0.0, \"team_19\": 0.0, \"team_20\": 0.0, \"team_21\": 0.0, \"team_22\": 0.0, \"team_23\": 0.0, \"team_24\": 0.0, \"team_25\": 0.0, \"team_26\": 0.0, \"team_27\": 0.0, \"team_28\": 0.0, \"team_29\": 0.0, \"team_30\": 0.0, \"team_31\": 0.0, \"team_32\": 0.0, \"team_33\": 0.0, \"team_34\": 0.0, \"team_35\": 0.0, \"team_36\": 0.0, \"team_37\": 0.0, \"team_38\": 0.0, \"team_39\": 0.0, \"team_40\": 0.0, \"team_41\": 0.0, \"team_42\": 0.0, \"team_43\": 0.0, \"team_44\": 0.0, \"team_45\": 0.0, \"team_46\": 0.0, \"team_47\": 0.0, \"team_48\": 0.0, \"team_49\": 0.0, \"team_50\": 0.0, \"team_51\": 0.0, \"team_52\": 0.0, \"team_53\": 0.0, \"team_54\": 0.0, \"team_55\": 0.0, \"team_56\": 0.0, \"team_57\": 0.0, \"team_58\": 0.0, \"team_59\": 0.0}, \"type\": \"choice\"}"
   },
   {
+    "label": "score_ten_levels",
+    "value": "{\"confidence\": 0.54, \"legend\": {\"0\": \"Severity level 0\", \"1\": \"Severity level 1\", \"2\": \"Severity level 2\", \"3\": \"Severity level 3\", \"4\": \"Severity level 4\", \"5\": \"Severity level 5\", \"6\": \"Severity level 6\", \"7\": \"Severity level 7\", \"8\": \"Severity level 8\", \"9\": \"Severity level 9\"}, \"probabilities\": {\"0\": 0.0, \"1\": 0.0, \"2\": 0.0, \"3\": 0.01, \"4\": 0.03, \"5\": 0.05, \"6\": 0.05, \"7\": 0.12, \"8\": 0.31, \"9\": 0.43}, \"score\": 7.86, \"type\": \"score\"}"
+  },
+  {
+    "label": "score_eleven_levels",
+    "value": "{\"body\": {\"detail\": \"Too many score levels. Must have at most 10 levels.\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97a99c67924bd08c1bce9c2a487\", \"response_headers\": {\"content-length\": \"64\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:34 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"10\", \"x-typesafe-request-id\": \"req_01a0b97a99c67924bd08c1bce9c2a487\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Too many score levels. Must have at most 10 levels. (request_id=req_01a0b97a99c67924bd08c1bce9c2a487)\"}"
+  },
+  {
     "label": "score_many_levels",
-    "value": "{\"body\": {\"detail\": \"Too many score levels. Must have at most 10 levels.\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd5ed71fbb25eda732039ef08\", \"response_headers\": {\"content-length\": \"64\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:11 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"34\", \"x-typesafe-request-id\": \"req_01a0b93dd5ed71fbb25eda732039ef08\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Too many score levels. Must have at most 10 levels. (request_id=req_01a0b93dd5ed71fbb25eda732039ef08)\"}"
+    "value": "{\"body\": {\"detail\": \"Too many score levels. Must have at most 10 levels.\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97a9a9471799a6f69f5466cd25c\", \"response_headers\": {\"content-length\": \"64\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:34 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"43\", \"x-typesafe-request-id\": \"req_01a0b97a9a9471799a6f69f5466cd25c\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Too many score levels. Must have at most 10 levels. (request_id=req_01a0b97a9a9471799a6f69f5466cd25c)\"}"
   },
   {
     "label": "state_200k_chars",
-    "value": "{\"body\": {\"detail\": {\"error_type\": \"max_tokens_exceeded\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd6c676f78d1f06a3abc5a451\", \"response_headers\": {\"content-length\": \"47\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:12 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"34\", \"x-typesafe-request-id\": \"req_01a0b93dd6c676f78d1f06a3abc5a451\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 {\\\"detail\\\":{\\\"error_type\\\":\\\"max_tokens_exceeded\\\"}} (request_id=req_01a0b93dd6c676f78d1f06a3abc5a451)\"}"
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"max_tokens_exceeded\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97a9b537fe18c53d7231f72b913\", \"response_headers\": {\"content-length\": \"47\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:34 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"26\", \"x-typesafe-request-id\": \"req_01a0b97a9b537fe18c53d7231f72b913\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 {\\\"detail\\\":{\\\"error_type\\\":\\\"max_tokens_exceeded\\\"}} (request_id=req_01a0b97a9b537fe18c53d7231f72b913)\"}"
   },
   {
     "label": "state_2m_chars",
-    "value": "{\"body\": {\"detail\": {\"error_type\": \"max_tokens_exceeded\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd9b37524be63615b757947fb\", \"response_headers\": {\"content-length\": \"47\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:12 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"108\", \"x-typesafe-request-id\": \"req_01a0b93dd9b37524be63615b757947fb\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 {\\\"detail\\\":{\\\"error_type\\\":\\\"max_tokens_exceeded\\\"}} (request_id=req_01a0b93dd9b37524be63615b757947fb)\"}"
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"max_tokens_exceeded\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97a9e127364af8059efab732316\", \"response_headers\": {\"content-length\": \"47\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:35 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"96\", \"x-typesafe-request-id\": \"req_01a0b97a9e127364af8059efab732316\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 {\\\"detail\\\":{\\\"error_type\\\":\\\"max_tokens_exceeded\\\"}} (request_id=req_01a0b97a9e127364af8059efab732316)\"}"
   },
   {
     "label": "model 'jev-latest'",
@@ -225,11 +229,11 @@
   },
   {
     "label": "model 'jev-does-not-exist'",
-    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-does-not-exist\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93de0bf74aa90c8e97bd74d1f9e\", \"response_headers\": {\"content-length\": \"89\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:14 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"7\", \"x-typesafe-request-id\": \"req_01a0b93de0bf74aa90c8e97bd74d1f9e\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-does-not-exist (request_id=req_01a0b93de0bf74aa90c8e97bd74d1f9e)\"}"
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-does-not-exist\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97aa532770083aece1331cb7c76\", \"response_headers\": {\"content-length\": \"89\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:37 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"34\", \"x-typesafe-request-id\": \"req_01a0b97aa532770083aece1331cb7c76\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-does-not-exist (request_id=req_01a0b97aa532770083aece1331cb7c76)\"}"
   },
   {
     "label": "one question, one request, latency_s",
-    "value": "0.238"
+    "value": "0.284"
   },
   {
     "label": "one question, usage",
@@ -237,7 +241,7 @@
   },
   {
     "label": "three questions, one request, latency_s",
-    "value": "0.268"
+    "value": "0.283"
   },
   {
     "label": "three questions batched, usage",
@@ -245,7 +249,7 @@
   },
   {
     "label": "three questions, three concurrent requests, latency_s",
-    "value": "0.663"
+    "value": "0.634"
   },
   {
     "label": "three separate requests, summed usage",
@@ -261,7 +265,7 @@
   },
   {
     "label": "eight concurrent requests, latency_s",
-    "value": "0.715"
+    "value": "0.684"
   },
   {
     "label": "noul values",
@@ -301,7 +305,7 @@
   },
   {
     "label": "wrong key",
-    "value": "{\"body\": {\"detail\": {\"error_type\": \"authentication_error\", \"message\": \"Cannot authenticate with the server. Please check your API key and try again.\"}}, \"class\": \"TypeSafeAuthenticationError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93deb9b79bf81b1cff55d5b2d88\", \"response_headers\": {\"content-length\": \"138\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:17 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"2\", \"x-typesafe-request-id\": \"req_01a0b93deb9b79bf81b1cff55d5b2d88\"}, \"status\": 401, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 401 Cannot authenticate with the server. Please check your API key and try again. (request_id=req_01a0b93deb9b79bf81b1cff55d5b2d88)\"}"
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"authentication_error\", \"message\": \"Cannot authenticate with the server. Please check your API key and try again.\"}}, \"class\": \"TypeSafeAuthenticationError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97aaffa7b9d977632354ba0bd9d\", \"response_headers\": {\"content-length\": \"138\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:40 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"22\", \"x-typesafe-request-id\": \"req_01a0b97aaffa7b9d977632354ba0bd9d\"}, \"status\": 401, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 401 Cannot authenticate with the server. Please check your API key and try again. (request_id=req_01a0b97aaffa7b9d977632354ba0bd9d)\"}"
   },
   {
     "label": "empty questions",
@@ -309,7 +313,7 @@
   },
   {
     "label": "malformed question",
-    "value": "{\"body\": {\"detail\": \"Noul question must have criteria or instructions: q\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93deda178b281a50d0d91790e4e\", \"response_headers\": {\"content-length\": \"64\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:17 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"4\", \"x-typesafe-request-id\": \"req_01a0b93deda178b281a50d0d91790e4e\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b93deda178b281a50d0d91790e4e)\"}"
+    "value": "{\"body\": {\"detail\": \"Noul question must have criteria or instructions: q\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b97ab1f575f69871f8b3006b6da2\", \"response_headers\": {\"content-length\": \"64\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 11:43:40 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"10\", \"x-typesafe-request-id\": \"req_01a0b97ab1f575f69871f8b3006b6da2\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b97ab1f575f69871f8b3006b6da2)\"}"
   },
   {
     "label": "timeout 1ms",
@@ -321,15 +325,15 @@
   },
   {
     "label": "401 under retry off",
-    "value": "{\"class\": \"TypeSafeAuthenticationError\", \"elapsed_s\": 0.51}"
+    "value": "{\"class\": \"TypeSafeAuthenticationError\", \"elapsed_s\": 0.556}"
   },
   {
     "label": "401 under retry default",
-    "value": "{\"class\": \"TypeSafeAuthenticationError\", \"elapsed_s\": 0.547}"
+    "value": "{\"class\": \"TypeSafeAuthenticationError\", \"elapsed_s\": 0.545}"
   },
   {
     "label": "timeout retried twice, elapsed_s",
-    "value": "0.279"
+    "value": "0.295"
   },
   {
     "label": "plain httpx status",
@@ -337,11 +341,11 @@
   },
   {
     "label": "plain httpx latency_s",
-    "value": "0.614"
+    "value": "0.714"
   },
   {
     "label": "response headers",
-    "value": "{\"x-typesafe-request-id\": \"req_01a0b93df4ee7abd809d3984a8293d0e\"}"
+    "value": "{\"x-typesafe-request-id\": \"req_01a0b97ab9807d2eb7ec36807d7e1819\"}"
   },
   {
     "label": "plain httpx body keys",

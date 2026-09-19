@@ -14,15 +14,15 @@
     "Exception",
     "BaseException"
   ],
-  "request_id": "req_01a0b93deb9b79bf81b1cff55d5b2d88",
+  "request_id": "req_01a0b97aaffa7b9d977632354ba0bd9d",
   "response_headers": {
     "content-length": "138",
     "content-type": "application/json",
-    "date": "Sat, 19 Sep 2026 10:37:17 GMT",
+    "date": "Sat, 19 Sep 2026 11:43:40 GMT",
     "server": "istio-envoy",
-    "x-envoy-upstream-service-time": "2",
-    "x-typesafe-request-id": "req_01a0b93deb9b79bf81b1cff55d5b2d88"
+    "x-envoy-upstream-service-time": "22",
+    "x-typesafe-request-id": "req_01a0b97aaffa7b9d977632354ba0bd9d"
   },
   "status": 401,
-  "str": "POST https://api.typesafe.ai/v1/systemone: 401 Cannot authenticate with the server. Please check your API key and try again. (request_id=req_01a0b93deb9b79bf81b1cff55d5b2d88)"
+  "str": "POST https://api.typesafe.ai/v1/systemone: 401 Cannot authenticate with the server. Please check your API key and try again. (request_id=req_01a0b97aaffa7b9d977632354ba0bd9d)"
 }

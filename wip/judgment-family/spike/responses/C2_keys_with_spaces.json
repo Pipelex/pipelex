@@ -1,0 +1,18 @@
+{
+  "answers": {
+    "q": {
+      "choice": "needs triage",
+      "confidence": 0.88,
+      "probabilities": {
+        "needs triage": 0.94,
+        "no action": 0.06
+      },
+      "type": "choice"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 340,
+    "output_tokens": 36
+  }
+}

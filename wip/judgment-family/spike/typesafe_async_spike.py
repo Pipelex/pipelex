@@ -66,11 +66,24 @@ def save(name: str, payload: Any) -> None:
 
 
 def raw_body(response: SystemOneResponse) -> Any:
-    """The wire body, which is what phase 2's replay tests want, not the parsed model."""
-    http_response = response.raw_http_response
-    if http_response is None:
+    """The wire body, which is what phase 2's replay tests want, not the parsed model.
+
+    `raw_http_response` is a property that RAISES `TypeSafeError` when no raw response is
+    attached -- it does not return None -- so the fallback has to be an except and not an
+    `is None`. Phase 2's worker inherits the same trap.
+    """
+    try:
+        return response.raw_http_response.json()
+    except TypeSafeError:
         return response.model_dump(mode="json")
-    return http_response.json()
+
+
+def request_id_of(response: SystemOneResponse) -> str | None:
+    """`response.request_id` RAISES when the header was absent, so it is never None."""
+    try:
+        return response.request_id
+    except TypeSafeError:
+        return None
 
 
 def heading(title: str) -> None:
@@ -140,8 +153,9 @@ async def probe_shapes(client: AsyncTypeSafeClient, model: str) -> SystemOneResp
     record("model requested", model)
     record("model reported", response.model)
     record("model reported is versioned", response.model != model)
-    record("request_id present", response.request_id is not None)
-    record("request_id", response.request_id)
+    identifier = request_id_of(response)
+    record("request_id present on success", identifier is not None)
+    record("request_id", identifier)
 
     noul = response.nouls["is_urgent"]
     record("noul answer (parsed)", {"type": noul.type, "noul": noul.noul})
@@ -273,6 +287,8 @@ async def probe_criteria_edges(client: AsyncTypeSafeClient, model: str) -> None:
                 criteria={f"team_{i:02d}": f"Handles topic number {i}" for i in range(60)} | {"payments": "Payment failures"},
             )
         },
+        "score_ten_levels": {"q": Score(instructions="How severe?", criteria=[f"Severity level {i}" for i in range(10)])},
+        "score_eleven_levels": {"q": Score(instructions="How severe?", criteria=[f"Severity level {i}" for i in range(11)])},
         "score_many_levels": {"q": Score(instructions="How severe?", criteria=[f"Severity level {i}" for i in range(24)])},
     }
     for name, case in cases.items():
@@ -289,8 +305,9 @@ async def probe_criteria_edges(client: AsyncTypeSafeClient, model: str) -> None:
 
 async def probe_limits(client: AsyncTypeSafeClient, model: str) -> None:
     heading("4b. Beyond the documented limits")
-    for name, size in (("state_200k_chars", 200_000), ("state_2m_chars", 2_000_000)):
-        filler = ("The quick brown fox jumps over the lazy dog. " * (size // 45))[:size]
+    for name, size in (("state_200k_chars", 200_000), ("state_2m_chars", 2_000_000)):  # exact character counts
+        unit = "The quick brown fox jumps over the lazy dog. "
+        filler = (unit * (size // len(unit) + 1))[:size]
         try:
             response = await client.system_one(
                 state={"message": MESSAGE, "filler": filler},
@@ -581,7 +598,9 @@ async def list_models(api_key: str) -> str:
         entries = body.get("data", body.get("models", []))
         names = [e.get("name", e.get("id")) if isinstance(e, dict) else e for e in entries]
         record("model names listed", names)
-        versioned = [name for name in names if name not in {"jev-latest", "jev-preview"}]
+        # A nameless entry would otherwise become `pinned` and silently re-probe the default model,
+        # since `model=None` means "the client default" rather than an error.
+        versioned = [name for name in names if isinstance(name, str) and name not in {"jev-latest", "jev-preview"}]
         record("a versioned (non-alias) id is listed", bool(versioned))
         pinned = versioned[0] if versioned else "jev-latest"
         record("id chosen for the pinning probe", pinned)
@@ -592,27 +611,28 @@ async def main() -> None:
     api_key = os.environ.get("TYPESAFE_API_KEY")
     if not api_key:
         raise SystemExit(NO_KEY)
-    record("key length", len(api_key))
 
     versioned = await list_models(api_key)
 
-    async with AsyncTypeSafeClient(retry=RetryPolicy(max_retries=0), timeout=60.0) as client:
-        three = await probe_shapes(client, "jev-latest")
-        await probe_usage(client, "jev-latest", three)
-        await probe_state_types(client, "jev-latest")
-        await probe_criteria_edges(client, "jev-latest")
-        await probe_limits(client, "jev-latest")
-        await probe_models(client, versioned)
-        await probe_concurrency(client, "jev-latest")
-        await probe_stability(client, "jev-latest")
+    try:
+        async with AsyncTypeSafeClient(retry=RetryPolicy(max_retries=0), timeout=60.0) as client:
+            three = await probe_shapes(client, "jev-latest")
+            await probe_usage(client, "jev-latest", three)
+            await probe_state_types(client, "jev-latest")
+            await probe_criteria_edges(client, "jev-latest")
+            await probe_limits(client, "jev-latest")
+            await probe_models(client, versioned)
+            await probe_concurrency(client, "jev-latest")
+            await probe_stability(client, "jev-latest")
 
-    await probe_errors("jev-latest")
-    await probe_retries("jev-latest")
-    await probe_plain_httpx("jev-latest", api_key)
-
-    heading("Summary")
-    save("99_findings", [{"label": label, "value": value} for label, value in findings])
-    print(f"{len(findings)} findings, written to {RESPONSES_DIR / '99_findings.json'}")
+        await probe_errors("jev-latest")
+        await probe_retries("jev-latest")
+        await probe_plain_httpx("jev-latest", api_key)
+    finally:
+        # A run costs real calls, so the findings are written even when a probe raises.
+        heading("Summary")
+        save("99_findings", [{"label": label, "value": value} for label, value in findings])
+        print(f"{len(findings)} findings, written to {RESPONSES_DIR / '99_findings.json'}")
 
 
 if __name__ == "__main__":

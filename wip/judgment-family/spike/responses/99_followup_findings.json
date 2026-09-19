@@ -5,15 +5,15 @@
   },
   {
     "label": "model 'jev-1.13'",
-    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-1.13\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b93df9f976549ec1f1cb94c1ca4b\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-1.13 (request_id=req_01a0b93df9f976549ec1f1cb94c1ca4b)\"}"
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-1.13\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97ade0f749fb8b54e303bdd9467\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-1.13 (request_id=req_01a0b97ade0f749fb8b54e303bdd9467)\"}"
   },
   {
     "label": "model 'jev-1'",
-    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-1\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b93dfaa379419f51ac700a51ac32\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-1 (request_id=req_01a0b93dfaa379419f51ac700a51ac32)\"}"
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-1\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97adec779e78b8b69e76d5ad134\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-1 (request_id=req_01a0b97adec779e78b8b69e76d5ad134)\"}"
   },
   {
     "label": "model 'jev'",
-    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b93dfb527c53aede0f6b1bf3c475\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev (request_id=req_01a0b93dfb527c53aede0f6b1bf3c475)\"}"
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97adf81711ea473ad3b20c8c757\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev (request_id=req_01a0b97adf81711ea473ad3b20c8c757)\"}"
   },
   {
     "label": "no model named (SDK default)",
@@ -41,7 +41,7 @@
   },
   {
     "label": "ambiguous choice confidence range",
-    "value": "[0.93, 0.96]"
+    "value": "[0.94, 0.97]"
   },
   {
     "label": "ambiguous score values",
@@ -57,7 +57,7 @@
   },
   {
     "label": "reworded instruction, noul",
-    "value": "0.3"
+    "value": "0.32"
   },
   {
     "label": "true_and_false",
@@ -73,63 +73,63 @@
   },
   {
     "label": "criteria_only_no_instructions",
-    "value": "{\"noul\": 0.28, \"type\": \"noul\"}"
+    "value": "{\"noul\": 0.27, \"type\": \"noul\"}"
   },
   {
     "label": "empty_criteria",
-    "value": "{\"noul\": 0.12, \"type\": \"noul\"}"
+    "value": "{\"noul\": 0.11, \"type\": \"noul\"}"
   },
   {
     "label": "empty_instructions",
-    "value": "{\"body\": {\"detail\": \"Noul question must have criteria or instructions: q\"}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b93e062f70adaca580b4fe134564\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b93e062f70adaca580b4fe134564)\"}"
+    "value": "{\"body\": {\"detail\": \"Noul question must have criteria or instructions: q\"}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97aea227d749f050819707ddda4\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b97aea227d749f050819707ddda4)\"}"
   },
   {
     "label": "structured_instructions",
-    "value": "{\"noul\": 0.39, \"type\": \"noul\"}"
+    "value": "{\"noul\": 0.36, \"type\": \"noul\"}"
   },
   {
     "label": "keys_with_spaces",
-    "value": "{\"choice\": \"needs triage\", \"confidence\": 0.91, \"probabilities\": {\"needs triage\": 0.95, \"no action\": 0.05}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"needs triage\", \"confidence\": 0.88, \"probabilities\": {\"needs triage\": 0.94, \"no action\": 0.06}, \"type\": \"choice\"}"
   },
   {
     "label": "keys_with_dots",
-    "value": "{\"choice\": \"team.reports\", \"confidence\": 0.86, \"probabilities\": {\"team.performance\": 0.07, \"team.reports\": 0.93}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"team.reports\", \"confidence\": 0.83, \"probabilities\": {\"team.performance\": 0.08, \"team.reports\": 0.92}, \"type\": \"choice\"}"
   },
   {
     "label": "unicode_keys",
-    "value": "{\"choice\": \"rapport\", \"confidence\": 0.97, \"probabilities\": {\"rapport\": 0.98, \"r\\u00e9seau\": 0.02}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"rapport\", \"confidence\": 0.96, \"probabilities\": {\"rapport\": 0.98, \"r\\u00e9seau\": 0.02}, \"type\": \"choice\"}"
   },
   {
     "label": "empty_string_key",
-    "value": "{\"choice\": \"other\", \"confidence\": 0.57, \"probabilities\": {\"\": 0.22, \"other\": 0.78}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"other\", \"confidence\": 0.57, \"probabilities\": {\"\": 0.21, \"other\": 0.79}, \"type\": \"choice\"}"
   },
   {
     "label": "duplicate_after_strip",
-    "value": "{\"choice\": \"A\", \"confidence\": 0.54, \"probabilities\": {\"A\": 0.77, \"a\": 0.23}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"A\", \"confidence\": 0.53, \"probabilities\": {\"A\": 0.76, \"a\": 0.24}, \"type\": \"choice\"}"
   },
   {
     "label": "empty_string_description",
-    "value": "{\"choice\": \"reports\", \"confidence\": 0.99, \"probabilities\": {\"other\": 0.01, \"reports\": 0.99}, \"type\": \"choice\"}"
+    "value": "{\"choice\": \"reports\", \"confidence\": 0.98, \"probabilities\": {\"other\": 0.01, \"reports\": 0.99}, \"type\": \"choice\"}"
   },
   {
     "label": "1 questions",
-    "value": "{\"answers\": 1, \"input_tokens\": 323, \"latency_s\": 0.285, \"output_tokens\": 22}"
+    "value": "{\"answers\": 1, \"input_tokens\": 323, \"latency_s\": 0.306, \"output_tokens\": 22}"
   },
   {
     "label": "5 questions",
-    "value": "{\"answers\": 5, \"input_tokens\": 387, \"latency_s\": 0.258, \"output_tokens\": 94}"
+    "value": "{\"answers\": 5, \"input_tokens\": 387, \"latency_s\": 0.233, \"output_tokens\": 94}"
   },
   {
     "label": "20 questions",
-    "value": "{\"answers\": 20, \"input_tokens\": 637, \"latency_s\": 0.257, \"output_tokens\": 364}"
+    "value": "{\"answers\": 20, \"input_tokens\": 637, \"latency_s\": 0.239, \"output_tokens\": 364}"
   },
   {
     "label": "50 questions",
-    "value": "{\"answers\": 50, \"input_tokens\": 1147, \"latency_s\": 0.267, \"output_tokens\": 904}"
+    "value": "{\"answers\": 50, \"input_tokens\": 1147, \"latency_s\": 0.351, \"output_tokens\": 904}"
   },
   {
     "label": "40 concurrent requests, elapsed_s",
-    "value": "0.767"
+    "value": "0.742"
   },
   {
     "label": "failures",

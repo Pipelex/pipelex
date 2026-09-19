@@ -13,15 +13,15 @@
     "Exception",
     "BaseException"
   ],
-  "request_id": "req_01a0b93dd9b37524be63615b757947fb",
+  "request_id": "req_01a0b97a9e127364af8059efab732316",
   "response_headers": {
     "content-length": "47",
     "content-type": "application/json",
-    "date": "Sat, 19 Sep 2026 10:37:12 GMT",
+    "date": "Sat, 19 Sep 2026 11:43:35 GMT",
     "server": "istio-envoy",
-    "x-envoy-upstream-service-time": "108",
-    "x-typesafe-request-id": "req_01a0b93dd9b37524be63615b757947fb"
+    "x-envoy-upstream-service-time": "96",
+    "x-typesafe-request-id": "req_01a0b97a9e127364af8059efab732316"
   },
   "status": 400,
-  "str": "POST https://api.typesafe.ai/v1/systemone: 400 {\"detail\":{\"error_type\":\"max_tokens_exceeded\"}} (request_id=req_01a0b93dd9b37524be63615b757947fb)"
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 {\"detail\":{\"error_type\":\"max_tokens_exceeded\"}} (request_id=req_01a0b97a9e127364af8059efab732316)"
 }

@@ -5,7 +5,7 @@
       "type": "noul"
     },
     "many_customers": {
-      "noul": 0.96,
+      "noul": 0.94,
       "type": "noul"
     },
     "paying": {
@@ -13,7 +13,7 @@
       "type": "noul"
     },
     "prior_incidents": {
-      "noul": 0.98,
+      "noul": 0.99,
       "type": "noul"
     }
   },

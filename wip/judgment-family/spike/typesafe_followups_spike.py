@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul, RetryPolicy, Score, TypeSafeError
+from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul, RetryPolicy, Score, SystemOneResponse, TypeSafeError
 
 RESPONSES_DIR = Path(__file__).parent / "responses"
 findings: list[tuple[str, str]] = []
@@ -36,6 +36,14 @@ def record(label: str, value: Any) -> None:
 def save(name: str, payload: Any) -> None:
     RESPONSES_DIR.mkdir(parents=True, exist_ok=True)
     (RESPONSES_DIR / f"{name}.json").write_text(json.dumps(payload, indent=2, default=str, sort_keys=True) + "\n")
+
+
+def raw_body(response: SystemOneResponse) -> Any:
+    """The wire body. `raw_http_response` raises rather than returning None when unattached."""
+    try:
+        return response.raw_http_response.json()
+    except TypeSafeError:
+        return response.model_dump(mode="json")
 
 
 def describe_exception(exc: BaseException) -> dict[str, Any]:
@@ -62,17 +70,22 @@ AMBIGUOUS = (
 async def probe_versioned_model(client: AsyncTypeSafeClient) -> None:
     heading("A. Can a versioned id be requested?")
     for candidate in ("jev-1.13.0", "jev-1.13", "jev-1", "jev"):
+        slug = candidate.replace("-", "_").replace(".", "_")
         try:
             response = await client.system_one(
                 state={"message": AMBIGUOUS}, questions={"q": Noul(instructions="Is the message urgent?")}, model=candidate
             )
         except TypeSafeError as exc:
-            record(f"model {candidate!r}", describe_exception(exc))
+            detail = describe_exception(exc)
+            record(f"model {candidate!r}", detail)
+            save(f"A_model_{slug}_error", detail)
             continue
         record(f"model {candidate!r} accepted", {"reported": response.model})
+        save(f"A_model_{slug}", raw_body(response))
 
     default = await client.system_one(state={"message": AMBIGUOUS}, questions={"q": Noul(instructions="Is the message urgent?")})
     record("no model named (SDK default)", {"reported": default.model})
+    save("A_model_default", raw_body(default))
 
 
 async def probe_ambiguous_stability(client: AsyncTypeSafeClient, repeats: int = 10) -> None:
@@ -94,7 +107,7 @@ async def probe_ambiguous_stability(client: AsyncTypeSafeClient, repeats: int = 
     }
     state = {"message": AMBIGUOUS}
     responses = await asyncio.gather(*(client.system_one(state=state, questions=questions) for _ in range(repeats)))
-    save("B_ambiguous_stability", [r.model_dump(mode="json") for r in responses])
+    save("B_ambiguous_stability", [raw_body(r) for r in responses])
 
     nouls = [r.nouls["is_urgent"].noul for r in responses]
     choices = [r.choices["team"].choice for r in responses]
@@ -109,11 +122,13 @@ async def probe_ambiguous_stability(client: AsyncTypeSafeClient, repeats: int = 
     record("ambiguous choice confidence range", [round(min(confidences), 4), round(max(confidences), 4)])
     record("ambiguous score values", sorted({round(v, 4) for v in scores}))
     record("ambiguous score spread", round(max(scores) - min(scores), 4))
-    record("ambiguous responses bit-identical", len({json.dumps(r.model_dump(mode="json")["answers"], sort_keys=True) for r in responses}) == 1)
+    # Measured on the wire body, so that this is comparable with the first spike's equivalent.
+    record("ambiguous responses bit-identical", len({json.dumps(raw_body(r)["answers"], sort_keys=True) for r in responses}) == 1)
 
     # The same question under a reworded instruction, to see how far wording moves it.
     reworded = await client.system_one(state=state, questions={"q": Noul(instructions="Does this message need attention today?")})
     record("reworded instruction, noul", round(reworded.nouls["q"].noul, 4))
+    save("B_reworded_instruction", raw_body(reworded))
 
 
 async def probe_criteria_keys(client: AsyncTypeSafeClient) -> None:
@@ -133,9 +148,13 @@ async def probe_criteria_keys(client: AsyncTypeSafeClient) -> None:
         try:
             response = await client.system_one(state={"message": AMBIGUOUS}, questions={"q": question})  # type: ignore[dict-item]
         except TypeSafeError as exc:
-            record(name, describe_exception(exc))
+            detail = describe_exception(exc)
+            record(name, detail)
+            save(f"C_{name}_error", detail)
             continue
-        record(name, response.model_dump(mode="json")["answers"]["q"])
+        body = raw_body(response)
+        record(name, body["answers"]["q"])
+        save(f"C_{name}", body)
 
     heading("C2. Choice option keys")
     for name, criteria in (
@@ -152,9 +171,13 @@ async def probe_criteria_keys(client: AsyncTypeSafeClient) -> None:
                 questions={"q": Choice(instructions="Which team should handle this message?", criteria=criteria)},
             )
         except TypeSafeError as exc:
-            record(name, describe_exception(exc))
+            detail = describe_exception(exc)
+            record(name, detail)
+            save(f"C2_{name}_error", detail)
             continue
-        record(name, response.model_dump(mode="json")["answers"]["q"])
+        body = raw_body(response)
+        record(name, body["answers"]["q"])
+        save(f"C2_{name}", body)
 
 
 async def probe_question_count(client: AsyncTypeSafeClient) -> None:
@@ -177,6 +200,7 @@ async def probe_question_count(client: AsyncTypeSafeClient) -> None:
                 "answers": len(response.answers),
             },
         )
+        save(f"D_{count:02d}_questions", raw_body(response))
 
 
 async def probe_rate_limit(client: AsyncTypeSafeClient, burst: int = 40) -> None:
@@ -195,16 +219,17 @@ async def probe_rate_limit(client: AsyncTypeSafeClient, burst: int = 40) -> None
 
 
 async def main() -> None:
-    async with AsyncTypeSafeClient(retry=RetryPolicy(max_retries=0), timeout=60.0) as client:
-        await probe_versioned_model(client)
-        await probe_ambiguous_stability(client)
-        await probe_criteria_keys(client)
-        await probe_question_count(client)
-        await probe_rate_limit(client)
-
-    heading("Summary")
-    save("99_followup_findings", [{"label": label, "value": value} for label, value in findings])
-    print(f"{len(findings)} findings")
+    try:
+        async with AsyncTypeSafeClient(retry=RetryPolicy(max_retries=0), timeout=60.0) as client:
+            await probe_versioned_model(client)
+            await probe_ambiguous_stability(client)
+            await probe_criteria_keys(client)
+            await probe_question_count(client)
+            await probe_rate_limit(client)
+    finally:
+        heading("Summary")
+        save("99_followup_findings", [{"label": label, "value": value} for label, value in findings])
+        print(f"{len(findings)} findings")
 
 
 if __name__ == "__main__":
