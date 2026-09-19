@@ -149,18 +149,20 @@ Two things, both recorded in `design.md` in the same change.
 - The TypeSafe extractor reads `retry-after` like every other extractor with headers, and the client factory refuses an empty key as well as an absent one.
 - Smaller: the deck-directory docs list the judgment file, a stale generated fixtures file names `make regenerate-test-models` instead of interrupting collection, and the worker contract test imports its data from the root package.
 
-Rejected: the stale `ModelUsageSpec.model_type` comment (2b rewrites it), and an empty `TYPESAFE_API_KEY` reaching the SDK (an empty variable is treated as unset before any backend is built).
+Rejected: the stale `ModelUsageSpec.model_type` comment (2b rewrites it), and an empty `TYPESAFE_API_KEY` reaching the SDK through the kit's `${TYPESAFE_API_KEY}` declaration, since `get_required_env` treats an empty variable as unset. The factory's own empty-key refusal is not dead code: it is the only guard on the paths that do let an empty key through — a literal `api_key = ""` in an override, the `${env:…|secret:…}` fallback form, which returns an empty variable as it is, and a secrets provider other than the environment.
 
-**Deferred from round 1, unverified** — each is a reviewer's claim nobody has checked:
+**Deferred from the review, unverified** — each is a reviewer's claim nobody has checked:
 
 - The status-less `TypeSafeError` verdict sits in the shared classifier's `_STATUSLESS_BY_TYPE_NAME` table (`pipelex/cogt/inference/error_classify.py`) rather than in `classify_typesafe_error`, which splits one provider's verdicts across two modules. Worth deciding with the next backend: either vendor exception names belong in that table or none do.
 - `_from_typesafe_answer` takes `typesafe_answer: Any` (`pipelex/providers/typesafe/typesafe_translation.py`), where the SDK's answer union would let the checker see its three `isinstance` arms.
+- Round 2: `_check_answer_is_offered` (`pipelex/cogt/judgment/judgment_worker_abstract.py`) ends in `case _: pass`, so a fourth question kind with an offered set of its own would pass unchecked. Naming the yes/no pair and raising in the fallback, or matching on the `JudgmentKind` enum so pyright proves exhaustiveness, would make the next kind fail loudly.
+- Round 2: the TypeSafe extractor reads `retry-after` but not `retry-after-ms`, which the SDK's own `parse_retry_after` reads first. Only the rendered retry hint and the API's `Retry-After` projection are affected, and TypeSafe's 429 has never been provoked, so its header is unknown.
 
 **`[typesafe]` ships enabled**, like Linkup, decided on 2026-09-19. It was verified to behave identically: a live boot without `TYPESAFE_API_KEY` fails naming `'typesafe'`, and a keyless boot succeeds. `pipelex update` touches only the deck, so upgraders never receive the table; only a fresh `pipelex init` meets it.
 
 **What is left of phase 2, for a session starting cold.** `make agent-check`, the full `make agent-test` and `make ti PROF=typesafe TEST=judgment` passed before review; the live tests skip under the default profile after `make rtm`. What remains:
 
-- A second review round, which the ladder owes after a round that fixed code. The 2b pass of round 1 is recorded on the commit the reviewers read, which the rebase onto the fixed 2a replaced, so the merge gate does not count it on its own.
+- Review round 2 (profile 4, bar `defects`) read each branch's review-fix commit and found no code defect; it corrected the empty-key rejection above. The 2b pass of round 1 is recorded on a commit the rebase onto the fixed 2a replaced; round 2's passes name commits both branches carry, which is what the merge gate counts. `ledger review-profile` says whether a further round is owed.
 - Open the two pull requests, each targeting the branch below it: 2a with `Advances L-260919-502f36`, 2b with `Closes L-260919-502f36`. Phase 1 (PR #1214) merges first.
 
 **The traps met here**, all worth knowing before touching this branch:
