@@ -1272,6 +1272,10 @@ rationale = "Factory from source: builds the result from the object_class; singl
 param = "output_class"
 rationale = "Factory from source: builds the result from the output_class; single operand."
 
+["pipelex/cogt/content_generation/content_generator_protocol.py::ContentGeneratorProtocol.make_judgment_answers"]
+param = "judgment_assignment"
+rationale = "Worker verb-object: processes the judgment_assignment; single operand, mirroring make_search_sourced_answer."
+
 ["pipelex/cogt/content_generation/content_generator_protocol.py::ContentGeneratorProtocol.make_search_sourced_answer"]
 param = "search_assignment"
 rationale = "Factory from source: builds the result from the search_assignment; single operand."
@@ -1315,6 +1319,10 @@ rationale = "Consumes the extract_assignment; single operand."
 ["pipelex/cogt/content_generation/dry_mock.py::dry_img_gen_image_contents"]
 param = "img_gen_assignment"
 rationale = "Consumes the img_gen_assignment; single operand."
+
+["pipelex/cogt/content_generation/dry_mock.py::dry_judgment_gen_answers"]
+param = "judgment_assignment"
+rationale = "Worker verb-object: processes the judgment_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_llm_gen_object"]
 param = "object_assignment"
@@ -1451,6 +1459,18 @@ rationale = "Processes the img-gen assignment; single operand."
 ["pipelex/cogt/content_generation/img_gen_generate.py::img_gen_single_image_and_store"]
 param = "img_gen_assignment"
 rationale = "Processes the img-gen assignment; single operand."
+
+["pipelex/cogt/content_generation/judgment_generate.py::_make_judgment_job"]
+param = "judgment_assignment"
+rationale = "Factory from source: builds the job from the judgment_assignment; single operand."
+
+["pipelex/cogt/content_generation/judgment_generate.py::_make_judgment_worker"]
+param = "judgment_assignment"
+rationale = "Factory from source: builds the worker from the judgment_assignment; single operand."
+
+["pipelex/cogt/content_generation/judgment_generate.py::judgment_gen_answers"]
+param = "judgment_assignment"
+rationale = "Worker verb-object: processes the judgment_assignment; single operand."
 
 ["pipelex/cogt/content_generation/llm_generate.py::llm_gen_object"]
 param = "object_assignment"
@@ -1932,6 +1952,26 @@ rationale = "Positional-Callable tenacity wait strategy: retry_state is the sing
 param = "send_request"
 rationale = "Runs the send_request callable under transport retry; single operand."
 
+["pipelex/cogt/judgment/judgment_report.py::JudgmentTokenCostReportField.report_field_for_cost_by_category"]
+param = "token_category"
+rationale = "Formatter verb-object: renders the field name for the token_category; single operand."
+
+["pipelex/cogt/judgment/judgment_report.py::JudgmentTokenCostReportField.report_field_for_nb_tokens_by_category"]
+param = "token_category"
+rationale = "Formatter verb-object: renders the field name for the token_category; single operand."
+
+["pipelex/cogt/judgment/judgment_worker_abstract.py::JudgmentWorkerAbstract._judge"]
+param = "judgment_job"
+rationale = "Worker verb-object: processes the judgment_job; single operand."
+
+["pipelex/cogt/judgment/judgment_worker_abstract.py::JudgmentWorkerAbstract.judge"]
+param = "judgment_job"
+rationale = "Worker verb-object: processes the judgment_job; single operand."
+
+["pipelex/cogt/judgment/judgment_worker_factory.py::JudgmentWorkerFactory.make_judgment_worker"]
+param = "inference_model"
+rationale = "Factory from source: builds the worker from the inference_model; single operand."
+
 ["pipelex/cogt/llm/llm_job.py::LLMJob.llm_job_before_start"]
 param = "inference_model"
 rationale = "Prepares the job against the inference_model; single operand."
@@ -2152,6 +2192,10 @@ rationale = "Verb–object: validates/checks the name; single operand."
 param = "name"
 rationale = "Verb–object: validates/checks the name; single operand."
 
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_judgment"]
+param = "name"
+rationale = "Predicate verb-object: warns about the name; single operand, mirroring the sibling per-family warners."
+
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_llm"]
 param = "name"
 rationale = "Verb–object: validates/checks the name; single operand."
@@ -2179,6 +2223,10 @@ rationale = "Keyed accessor by the extract_choice; single operand."
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_img_gen_setting"]
 param = "img_gen_choice"
 rationale = "Keyed accessor by the img_gen_choice; single operand."
+
+["pipelex/cogt/models/model_deck.py::ModelDeck.get_judgment_setting"]
+param = "judgment_choice"
+rationale = "Keyed accessor by the judgment_choice; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_llm_setting"]
 param = "llm_choice"
@@ -2215,6 +2263,10 @@ rationale = "Verb–object: validates/checks the extract_choice; single operand.
 ["pipelex/cogt/models/model_deck_check.py::check_img_gen_choice_with_deck"]
 param = "img_gen_choice"
 rationale = "Verb–object: validates/checks the img_gen_choice; single operand."
+
+["pipelex/cogt/models/model_deck_check.py::check_judgment_choice_with_deck"]
+param = "judgment_choice"
+rationale = "Verb-object: validates the judgment_choice; single operand."
 
 ["pipelex/cogt/models/model_deck_check.py::check_llm_choice_with_deck"]
 param = "llm_choice"

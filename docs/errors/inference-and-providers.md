@@ -38,6 +38,10 @@ own page. Classes are grouped by subsystem.
 - [`InferenceBackendLibraryNotFoundError`](inference-backend-library-not-found-error.md) — Inference backend library not found
 - [`InferenceBackendLibraryValidationError`](inference-backend-library-validation-error.md) — Inference backend library validation
 - [`InferenceModelSpecError`](inference-model-spec-error.md) — Inference model spec
+- [`JudgmentAnswerMismatchError`](judgment-answer-mismatch-error.md) — Judgment answer mismatch
+- [`JudgmentHandleNotFoundError`](judgment-handle-not-found-error.md) — Judgment handle not found
+- [`JudgmentJobFailureError`](judgment-job-failure-error.md) — Judgment job failure
+- [`JudgmentModelNotFoundError`](judgment-model-not-found-error.md) — Judgment model not found
 - [`LLMAssignmentError`](llm-assignment-error.md) — LLM assignment
 - [`LLMCapabilityError`](llm-capability-error.md) — LLM capability
 - [`LLMCompletionError`](llm-completion-error.md) — LLM completion

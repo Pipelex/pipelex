@@ -15,6 +15,7 @@ class ModelCategory(StrEnum):
     EXTRACT = "extract"
     IMG_GEN = "img_gen"
     SEARCH = "search"
+    JUDGMENT = "judgment"
 
 
 CATEGORY_TO_MODEL_TYPE: dict[ModelCategory, ModelType] = {
@@ -22,6 +23,7 @@ CATEGORY_TO_MODEL_TYPE: dict[ModelCategory, ModelType] = {
     ModelCategory.EXTRACT: ModelType.TEXT_EXTRACTOR,
     ModelCategory.IMG_GEN: ModelType.IMG_GEN,
     ModelCategory.SEARCH: ModelType.SEARCH,
+    ModelCategory.JUDGMENT: ModelType.JUDGMENT,
 }
 
 
@@ -116,6 +118,8 @@ def _build_presets_for_category(
             presets_dict = model_deck.img_gen_presets
         case ModelCategory.SEARCH:
             presets_dict = model_deck.search_presets
+        case ModelCategory.JUDGMENT:
+            presets_dict = model_deck.judgment_presets
 
     presets_list: list[dict[str, Any]] = []
     for preset_name, setting in presets_dict.items():
@@ -150,6 +154,8 @@ def _build_aliases_for_category(
             aliases = model_deck.img_gen_aliases
         case ModelCategory.SEARCH:
             aliases = model_deck.search_aliases
+        case ModelCategory.JUDGMENT:
+            aliases = model_deck.judgment_aliases
 
     if backend is not None:
         aliases = _filter_aliases_by_backend(aliases, model_deck=model_deck, model_type=model_type, backend=backend)
@@ -175,6 +181,8 @@ def _build_waterfalls_for_category(
             waterfalls = model_deck.img_gen_waterfalls
         case ModelCategory.SEARCH:
             waterfalls = model_deck.search_waterfalls
+        case ModelCategory.JUDGMENT:
+            waterfalls = model_deck.judgment_waterfalls
 
     if backend is not None:
         waterfalls = _filter_waterfalls_by_backend(waterfalls, model_deck=model_deck, model_type=model_type, backend=backend)
@@ -221,6 +229,10 @@ def list_models(
         presets["search"] = _build_presets_for_category(model_deck=model_deck, category=ModelCategory.SEARCH, backend=backend)
         aliases["search"] = _build_aliases_for_category(model_deck=model_deck, category=ModelCategory.SEARCH, backend=backend)
         waterfalls["search"] = _build_waterfalls_for_category(model_deck=model_deck, category=ModelCategory.SEARCH, backend=backend)
+    if _should_include(ModelCategory.JUDGMENT, categories=categories):
+        presets["judgment"] = _build_presets_for_category(model_deck=model_deck, category=ModelCategory.JUDGMENT, backend=backend)
+        aliases["judgment"] = _build_aliases_for_category(model_deck=model_deck, category=ModelCategory.JUDGMENT, backend=backend)
+        waterfalls["judgment"] = _build_waterfalls_for_category(model_deck=model_deck, category=ModelCategory.JUDGMENT, backend=backend)
 
     return {
         "presets": presets,
@@ -234,6 +246,7 @@ CATEGORY_DISPLAY_NAMES: dict[str, str] = {
     "img_gen": "Image Generation",
     "extract": "Extract",
     "search": "Search",
+    "judgment": "Judgment",
 }
 
 

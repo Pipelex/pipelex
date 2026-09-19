@@ -8,6 +8,8 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.cogt.judgment.judgment_models import JudgmentQuestion, JudgmentState
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -184,3 +186,26 @@ class SearchObjectAssignment(BaseModel):
             output_class_schema=output_class.model_json_schema(),
             search_assignment=search_assignment,
         )
+
+
+class JudgmentAssignment(BaseModel):
+    """Serializable unit for a single judgment leaf call.
+
+    Carries everything the framework-agnostic ``judgment_generate`` core needs to rebuild the
+    ``JudgmentJob`` on the other side of a distributed boundary: the state the questions are asked
+    over, the questions themselves, and the fully resolved ``judgment_setting`` (its ``model`` is the
+    resolved provider handle, also the routing key). Mirrors ``SearchAssignment`` for the search leaf.
+
+    Unlike the structured-search leaf, there is no schema to ship and no dynamic class to rebuild:
+    a judgment's answers are plain models of this package's own, so they cross a boundary as they are.
+    """
+
+    job_metadata: JobMetadata
+    cogt_run_params: CogtRunParams
+    state: JudgmentState
+    questions: dict[str, JudgmentQuestion] = Field(min_length=1)
+    judgment_setting: JudgmentSetting
+
+    @property
+    def judgment_handle(self) -> str:
+        return self.judgment_setting.model

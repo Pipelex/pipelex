@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pipelex.cogt.extract.extract_report import ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
+from pipelex.cogt.judgment.judgment_report import JudgmentTokensUsage
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.search.search_report import SearchTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
@@ -88,8 +89,18 @@ class UsageFixtures:
         )
 
     @classmethod
+    def judgment_usage(cls) -> JudgmentTokensUsage:
+        return JudgmentTokensUsage(
+            job_metadata=cls.full_job_metadata(unit_job_id=UnitJobId.JUDGMENT_ANSWER, job_category=JobCategory.JUDGMENT_JOB),
+            inference_model_name="jev",
+            inference_model_id="jev-1.13.0",
+            nb_tokens_by_category=dict(RATED_NB_TOKENS),
+            unit_costs=dict(RATED_UNIT_COSTS),
+        )
+
+    @classmethod
     def all_variants(cls) -> list[AnyTokensUsage]:
-        return [cls.llm_usage(), cls.img_gen_usage(), cls.extract_usage(), cls.search_usage()]
+        return [cls.llm_usage(), cls.img_gen_usage(), cls.extract_usage(), cls.search_usage(), cls.judgment_usage()]
 
     @classmethod
     def unrated_usage(cls) -> LLMTokensUsage:

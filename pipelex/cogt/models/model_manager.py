@@ -7,6 +7,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
@@ -226,10 +227,18 @@ class ModelManager(ModelManagerAbstract):
         search_default_handle = cls._extract_choice_handle(deck.search_choice_default)
         if search_default_handle is not None:
             references.append((search_default_handle, ModelType.SEARCH))
+        for judgment_setting in deck.judgment_presets.values():
+            references.append((judgment_setting.model, ModelType.JUDGMENT))
+        judgment_default_handle = cls._extract_choice_handle(deck.judgment_choice_default)
+        if judgment_default_handle is not None:
+            references.append((judgment_default_handle, ModelType.JUDGMENT))
         return references
 
     @classmethod
-    def _extract_choice_handle(cls, choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | ModelReference | str | None) -> str | None:
+    def _extract_choice_handle(
+        cls,
+        choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | JudgmentSetting | ModelReference | str | None,
+    ) -> str | None:
         """Normalise a ``*ModelChoice`` union (LLMModelChoice etc.) to a raw handle string.
 
         Choice defaults can be a typed setting object, a parsed ``ModelReference``, or a raw
@@ -433,6 +442,11 @@ class ModelManager(ModelManagerAbstract):
             search_waterfalls=model_deck_blueprint.search.waterfalls,
             search_presets=model_deck_blueprint.search.presets,
             search_choice_default=model_deck_blueprint.search.choice_default,
+            # Judgment
+            judgment_aliases=model_deck_blueprint.judgment.aliases,
+            judgment_waterfalls=model_deck_blueprint.judgment.waterfalls,
+            judgment_presets=model_deck_blueprint.judgment.presets,
+            judgment_choice_default=model_deck_blueprint.judgment.choice_default,
             model_deck_config=get_config().inference.model_deck,
         )
 

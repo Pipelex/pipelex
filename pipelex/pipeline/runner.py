@@ -437,7 +437,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         them would silently drop entries on collision.
 
         Args:
-            category: Optional deck filter (`llm`, `extract`, `img_gen`, `search`).
+            category: Optional deck filter, one of the protocol's own categories.
 
         Returns:
             PipelexModelDeck with the flat model list and the category-keyed
@@ -450,6 +450,13 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         aliases_by_category: dict[str, dict[str, str]] = deck_raw["aliases"]
         waterfalls_by_category: dict[str, dict[str, list[str]]] = deck_raw["waterfalls"]
         for category_key, category_presets in presets_by_category.items():
+            if category_key not in MthdsModelCategory.__members__.values():
+                # A category this runtime serves that the standard's flat list has no word for —
+                # `judgment` today. Its presets are left out of `models` rather than raising, because
+                # one unrepresentable category must not take the whole deck down; its aliases and
+                # waterfalls still travel under the category-keyed routing extensions below. This
+                # branch disappears when the protocol's `ModelCategory` learns the member.
+                continue
             for preset in category_presets:
                 models.append(MthdsModelInfo(name=preset["name"], type=MthdsModelCategory(category_key)))
         return PipelexModelDeck(models=models, aliases=aliases_by_category, waterfalls=waterfalls_by_category)
