@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A manifold error on the native routes keeps its request id under the gateway's pipelex-spelled trace header**: `extract_manifold_metadata` reads the gateway's trace id from `x-pipelex-trace-id` before the inherited `x-portkey-trace-id`, still preferring a provider's own `x-request-id` over both. The gateway emits the two spellings with the same value today, so nothing changes yet; once it drops the vendor one, such an error whose provider sent no `x-request-id` keeps a request id instead of reporting none. `extract_gateway_metadata` is unchanged and still reads the vendor spelling alone — it serves the Portkey cloud and the manifold image path, which travels on `portkey_ai` and keeps that spelling until it is ported off the SDK.
+
 ## [v0.60.0] - 2026-09-19
 
 ### Changed
