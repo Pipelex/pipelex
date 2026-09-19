@@ -66,6 +66,8 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     # SEARCH
     (InferenceFamily.SEARCH, "linkup"),
     (InferenceFamily.SEARCH, "gateway_search"),
+    # JUDGMENT
+    (InferenceFamily.JUDGMENT, "typesafe"),
 ]
 
 

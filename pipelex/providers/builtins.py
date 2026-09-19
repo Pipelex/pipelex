@@ -18,6 +18,7 @@ from pipelex.providers.portkey.portkey_plugin import PortkeyPlugin
 from pipelex.providers.pypdfium2.pypdfium2_plugin import Pypdfium2Plugin
 from pipelex.providers.secrets.secrets_plugin import SecretsPlugin
 from pipelex.providers.storage.storage_plugin import StoragePlugin
+from pipelex.providers.typesafe.typesafe_plugin import TypesafePlugin
 
 # The **kernel-layer** half of the plugins Pipelex ships with: inference backends, extraction and
 # search drivers, storage and secrets. Every one of them adapts a kernel-layer port, so this module
@@ -52,6 +53,7 @@ KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
     DoclingPlugin(),
     Pypdfium2Plugin(),
     LinkupPlugin(),
+    TypesafePlugin(),
 ]
 
 # Kernel-layer built-ins that core requires unconditionally — naming one in ``runtime.plugins.disabled`` is a

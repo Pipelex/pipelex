@@ -114,6 +114,9 @@ own page. Classes are grouped by subsystem.
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
+- [`TypesafeError`](typesafe-error.md) — Typesafe
+- [`TypesafeJudgmentResponseError`](typesafe-judgment-response-error.md) — Typesafe judgment response
+- [`TypesafeQuestionUnsupportedError`](typesafe-question-unsupported-error.md) — Typesafe question unsupported
 - [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
 - [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
 

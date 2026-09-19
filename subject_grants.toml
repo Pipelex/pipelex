@@ -1884,6 +1884,10 @@ rationale = "Extracts from the exc; single operand."
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
+["pipelex/cogt/inference/error_classification.py::extract_typesafe_metadata"]
+param = "exc"
+rationale = "Extracts from the exc; single operand."
+
 ["pipelex/cogt/inference/error_classification.py::extract_underlying_sdk_exception"]
 param = "instructor_exc"
 rationale = "Extracts from the instructor_exc; single operand."
@@ -5427,6 +5431,14 @@ rationale = "Positional-Callable protocol: registered as a StorageProviderFactor
 ["pipelex/providers/storage/storage_plugin.py::_make_s3_storage_provider"]
 param = "config"
 rationale = "Positional-Callable protocol: registered as a StorageProviderFactoryFn."
+
+["pipelex/providers/typesafe/typesafe_error_classification.py::classify_typesafe_error"]
+param = "metadata"
+rationale = "Classifies the metadata; single operand, mirroring classify_inference_error."
+
+["pipelex/providers/typesafe/typesafe_plugin.py::TypesafePlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/reporting/cost_report_renderer.py::render_cost_report_for_output"]
 param = "pipe_output"

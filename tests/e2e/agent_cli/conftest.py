@@ -304,6 +304,7 @@ def offline_subprocess_env(hermetic_home: Path) -> dict[str, str]:
         "PORTKEY_API_KEY": "dummy-portkey-key",
         "SCALEWAY_API_KEY": "dummy-scaleway-key",
         "SCALEWAY_ENDPOINT": "https://example.invalid",
+        "TYPESAFE_API_KEY": "dummy-typesafe-key",
         "XAI_API_KEY": "dummy-xai-key",
     }
     return env

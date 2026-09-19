@@ -19,6 +19,7 @@ from collections.abc import Generator
 
 import pytest
 
+from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -116,6 +117,26 @@ class TestKeylessBootForcedDry:
 
             with pytest.raises(ValueError, match="is_mock_usage"):
                 PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
+        finally:
+            Pipelex.teardown_if_needed()
+
+    def test_keyless_boot_needs_no_key_for_an_enabled_judgment_backend(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An enabled judgment backend whose key is unset is skipped by a keyless boot, as Linkup's is.
+
+        The kit ships `[typesafe]` enabled like every other bring-your-own-key backend, so a machine
+        without `TYPESAFE_API_KEY` must still validate and dry-run. The keyed boot is the one that
+        names the missing key, which the second half pins so the two postures cannot drift apart.
+        """
+        monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+        try:
+            self._boot_keyless()
+            assert is_dry_run_forced()
+        finally:
+            Pipelex.teardown_if_needed()
+
+        try:
+            with pytest.raises(PipelexSetupError, match="'typesafe'"):
+                Pipelex.make(integration_mode=_test_integration_mode())
         finally:
             Pipelex.teardown_if_needed()
 

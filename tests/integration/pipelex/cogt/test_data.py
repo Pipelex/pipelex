@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.image.prompt_image import PromptImageUri
+from pipelex.cogt.judgment.judgment_models import ChoiceQuestion, JudgmentKind, JudgmentQuestion, RatingQuestion, YesNoQuestion
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from tests.cases import ImageTestCases
 from tests.cases.documents import DocumentTestCases
@@ -264,3 +265,65 @@ class LLMReasoningTestCases:
         # """,
         # ),
     ]
+
+
+class JudgmentTestCases:
+    """Live judgment material, and every string in it is pinned on purpose.
+
+    The spike measured what moves an answer: repeating the same request moved a borderline case by
+    0.01, while rewording a single instruction moved it from 0.11 to 0.30. So the wording here is
+    part of the test, copied from the spike's recorded three-question probe, and a failure after an
+    innocent-looking edit to it is telling the truth. Verdicts are asserted exactly; a probability
+    gets ``PROBABILITY_MARGIN``, fifteen times the noise the spike observed.
+    """
+
+    PROBABILITY_MARGIN = 0.05
+
+    STATE: ClassVar[dict[str, Any]] = {
+        "message": (
+            "Our production checkout has been returning 500s for every card payment since 09:14 UTC. "
+            "Nothing is going through. I have three customers on the phone right now. Please help."
+        ),
+        "channel": "support_email",
+    }
+
+    IS_URGENT = YesNoQuestion(
+        instructions="Is the message urgent?",
+        yes_criterion="Needs attention now",
+        no_criterion="Can wait until the next working day",
+    )
+    TEAM = ChoiceQuestion(
+        instructions="Which team should handle this message?",
+        options={
+            "payments": "Charges, invoices, payment processing failures",
+            "shipping": "Delivery status, delays, lost packages",
+            "accounts": "Sign-in, passwords, account settings",
+            "other": "None of the above",
+        },
+    )
+    SEVERITY = RatingQuestion(
+        instructions="How severe is the reported issue?",
+        levels=[
+            "Cosmetic; no impact on functionality",
+            "A feature is degraded, but a workaround exists",
+            "Blocking issue; no workaround exists",
+        ],
+    )
+
+    THREE_QUESTIONS: ClassVar[dict[str, JudgmentQuestion]] = {
+        "is_urgent": IS_URGENT,
+        "team": TEAM,
+        "severity": SEVERITY,
+    }
+
+    # (topic, question, kind) — each kind alone, as a batch of one, on the unambiguous case.
+    EACH_KIND: ClassVar[list[tuple[str, JudgmentQuestion, JudgmentKind]]] = [
+        ("yes_no", IS_URGENT, JudgmentKind.YES_NO),
+        ("choice", TEAM, JudgmentKind.CHOICE),
+        ("rating", SEVERITY, JudgmentKind.RATING),
+    ]
+
+    # What the spike recorded for this material, bit-identical across eight repeats.
+    EXPECTED_IS_URGENT_PROBABILITY = 0.98
+    EXPECTED_TEAM = "payments"
+    EXPECTED_SEVERITY_LEVEL = 2
