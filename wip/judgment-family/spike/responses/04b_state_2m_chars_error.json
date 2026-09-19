@@ -1,0 +1,27 @@
+{
+  "body": {
+    "detail": {
+      "error_type": "max_tokens_exceeded"
+    }
+  },
+  "class": "TypeSafeBadRequestError",
+  "endpoint": "POST https://api.typesafe.ai/v1/systemone",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "TypeSafeAPIError",
+    "TypeSafeError",
+    "Exception",
+    "BaseException"
+  ],
+  "request_id": "req_01a0b93dd9b37524be63615b757947fb",
+  "response_headers": {
+    "content-length": "47",
+    "content-type": "application/json",
+    "date": "Sat, 19 Sep 2026 10:37:12 GMT",
+    "server": "istio-envoy",
+    "x-envoy-upstream-service-time": "108",
+    "x-typesafe-request-id": "req_01a0b93dd9b37524be63615b757947fb"
+  },
+  "status": 400,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 {\"detail\":{\"error_type\":\"max_tokens_exceeded\"}} (request_id=req_01a0b93dd9b37524be63615b757947fb)"
+}

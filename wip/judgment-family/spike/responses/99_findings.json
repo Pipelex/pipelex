@@ -1,0 +1,358 @@
+[
+  {
+    "label": "key length",
+    "value": "108"
+  },
+  {
+    "label": "GET /v1/models status",
+    "value": "200"
+  },
+  {
+    "label": "models",
+    "value": "{\"models\": [{\"description\": \"The latest iteration of TypeSafe's System One Model: Jev\", \"name\": \"jev-latest\", \"release_date\": \"2026-09-10T18:38:01.391457+00:00\"}, {\"description\": \"A preview version of `jev-latest`: should be better in most ways\", \"name\": \"jev-preview\", \"release_date\": \"2026-09-10T18:39:06.057655+00:00\"}]}"
+  },
+  {
+    "label": "model names listed",
+    "value": "[\"jev-latest\", \"jev-preview\"]"
+  },
+  {
+    "label": "a versioned (non-alias) id is listed",
+    "value": "false"
+  },
+  {
+    "label": "id chosen for the pinning probe",
+    "value": "jev-latest"
+  },
+  {
+    "label": "response top-level keys",
+    "value": "[\"answers\", \"model\", \"usage\"]"
+  },
+  {
+    "label": "model requested",
+    "value": "jev-latest"
+  },
+  {
+    "label": "model reported",
+    "value": "jev-1.13.0"
+  },
+  {
+    "label": "model reported is versioned",
+    "value": "true"
+  },
+  {
+    "label": "request_id present",
+    "value": "true"
+  },
+  {
+    "label": "request_id",
+    "value": "req_01a0b93dc2b87127a8abf2831cab3f34"
+  },
+  {
+    "label": "noul answer (parsed)",
+    "value": "{\"noul\": 0.98, \"type\": \"noul\"}"
+  },
+  {
+    "label": "noul answer (wire)",
+    "value": "{\"noul\": 0.98, \"type\": \"noul\"}"
+  },
+  {
+    "label": "noul has confidence field",
+    "value": "false"
+  },
+  {
+    "label": "choice answer (wire)",
+    "value": "{\"choice\": \"payments\", \"confidence\": 1.0, \"probabilities\": {\"accounts\": 0.0, \"other\": 0.0, \"payments\": 1.0, \"shipping\": 0.0}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "choice probability key type on the wire",
+    "value": "[\"str\"]"
+  },
+  {
+    "label": "choice probabilities sum",
+    "value": "1.0"
+  },
+  {
+    "label": "choice covers every declared option",
+    "value": "true"
+  },
+  {
+    "label": "score answer (wire)",
+    "value": "{\"confidence\": 1.0, \"legend\": {\"0\": \"Cosmetic; no impact on functionality\", \"1\": \"A feature is degraded, but a workaround exists\", \"2\": \"Blocking issue; no workaround exists\"}, \"probabilities\": {\"0\": 0.0, \"1\": 0.0, \"2\": 1.0}, \"score\": 2.0, \"type\": \"score\"}"
+  },
+  {
+    "label": "score probability key type on the wire",
+    "value": "[\"str\"]"
+  },
+  {
+    "label": "score probability key type after SDK parse",
+    "value": "[\"int\"]"
+  },
+  {
+    "label": "score legend key type on the wire",
+    "value": "[\"str\"]"
+  },
+  {
+    "label": "score legend present",
+    "value": "true"
+  },
+  {
+    "label": "score legend",
+    "value": "{\"0\": \"Cosmetic; no impact on functionality\", \"1\": \"A feature is degraded, but a workaround exists\", \"2\": \"Blocking issue; no workaround exists\"}"
+  },
+  {
+    "label": "score levels are zero-based",
+    "value": "true"
+  },
+  {
+    "label": "score value",
+    "value": "2.0"
+  },
+  {
+    "label": "answer keys equal question keys",
+    "value": "true"
+  },
+  {
+    "label": "usage on wire (three questions)",
+    "value": "{\"input_tokens\": 506, \"output_tokens\": 78}"
+  },
+  {
+    "label": "usage on wire (one question)",
+    "value": "{\"input_tokens\": 354, \"output_tokens\": 23}"
+  },
+  {
+    "label": "input_tokens reported",
+    "value": "true"
+  },
+  {
+    "label": "output_tokens reported",
+    "value": "true"
+  },
+  {
+    "label": "usage is per request, not per question",
+    "value": "one=354/23 three=506/78"
+  },
+  {
+    "label": "per-answer usage field present",
+    "value": "false"
+  },
+  {
+    "label": "state as object accepted",
+    "value": "{\"enterprise\": 0.99, \"many_customers\": 0.96, \"paying\": 0.99, \"prior_incidents\": 0.98}"
+  },
+  {
+    "label": "state as string accepted",
+    "value": "{\"enterprise\": 0.99, \"many_customers\": 0.97, \"paying\": 0.99, \"prior_incidents\": 0.99}"
+  },
+  {
+    "label": "state as array accepted",
+    "value": "{\"enterprise\": 0.98, \"many_customers\": 0.54, \"paying\": 0.86, \"prior_incidents\": 0.27}"
+  },
+  {
+    "label": "json number read as a number",
+    "value": "0.99"
+  },
+  {
+    "label": "noul_without_criteria",
+    "value": "{\"noul\": 0.98, \"type\": \"noul\"}"
+  },
+  {
+    "label": "noul_true_only",
+    "value": "{\"noul\": 0.98, \"type\": \"noul\"}"
+  },
+  {
+    "label": "choice_null_descriptions",
+    "value": "{\"choice\": \"angry\", \"confidence\": 0.96, \"probabilities\": {\"angry\": 0.98, \"calm\": 0.02}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "choice_mixed_descriptions",
+    "value": "{\"choice\": \"angry\", \"confidence\": 0.95, \"probabilities\": {\"angry\": 0.98, \"calm\": 0.02}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "choice_two_options",
+    "value": "{\"choice\": \"payments\", \"confidence\": 1.0, \"probabilities\": {\"payments\": 1.0, \"shipping\": 0.0}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "choice_one_option",
+    "value": "{\"choice\": \"payments\", \"confidence\": 1.0, \"probabilities\": {\"payments\": 1.0}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "choice_empty",
+    "value": "{\"body\": {\"detail\": \"Choice question must have at least one choice: q\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd0dd7db59196dc7df728505f\", \"response_headers\": {\"content-length\": \"61\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:10 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"6\", \"x-typesafe-request-id\": \"req_01a0b93dd0dd7db59196dc7df728505f\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Choice question must have at least one choice: q (request_id=req_01a0b93dd0dd7db59196dc7df728505f)\"}"
+  },
+  {
+    "label": "score_two_levels",
+    "value": "{\"confidence\": 1.0, \"legend\": {\"0\": \"Minor\", \"1\": \"Severe\"}, \"probabilities\": {\"0\": 0.0, \"1\": 1.0}, \"score\": 1.0, \"type\": \"score\"}"
+  },
+  {
+    "label": "score_one_level",
+    "value": "{\"confidence\": 1.0, \"legend\": {\"0\": \"Minor\"}, \"probabilities\": {\"0\": 1.0}, \"score\": 0.0, \"type\": \"score\"}"
+  },
+  {
+    "label": "score_empty",
+    "value": "{\"class\": \"TypeSafeError\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"Exception\", \"BaseException\"], \"str\": \"Score question \\\"q\\\" has no criteria; at least one score is required.\"}"
+  },
+  {
+    "label": "score_structured_levels",
+    "value": "{\"confidence\": 1.0, \"legend\": {\"0\": {\"level\": \"cosmetic\", \"meaning\": \"No impact on functionality\"}, \"1\": {\"level\": \"degraded\", \"meaning\": \"A workaround exists\"}, \"2\": {\"level\": \"blocking\", \"meaning\": \"No workaround exists\"}}, \"probabilities\": {\"0\": 0.0, \"1\": 0.0, \"2\": 1.0}, \"score\": 2.0, \"type\": \"score\"}"
+  },
+  {
+    "label": "choice_many_options",
+    "value": "{\"choice\": \"payments\", \"confidence\": 1.0, \"probabilities\": {\"payments\": 1.0, \"team_00\": 0.0, \"team_01\": 0.0, \"team_02\": 0.0, \"team_03\": 0.0, \"team_04\": 0.0, \"team_05\": 0.0, \"team_06\": 0.0, \"team_07\": 0.0, \"team_08\": 0.0, \"team_09\": 0.0, \"team_10\": 0.0, \"team_11\": 0.0, \"team_12\": 0.0, \"team_13\": 0.0, \"team_14\": 0.0, \"team_15\": 0.0, \"team_16\": 0.0, \"team_17\": 0.0, \"team_18\": 0.0, \"team_19\": 0.0, \"team_20\": 0.0, \"team_21\": 0.0, \"team_22\": 0.0, \"team_23\": 0.0, \"team_24\": 0.0, \"team_25\": 0.0, \"team_26\": 0.0, \"team_27\": 0.0, \"team_28\": 0.0, \"team_29\": 0.0, \"team_30\": 0.0, \"team_31\": 0.0, \"team_32\": 0.0, \"team_33\": 0.0, \"team_34\": 0.0, \"team_35\": 0.0, \"team_36\": 0.0, \"team_37\": 0.0, \"team_38\": 0.0, \"team_39\": 0.0, \"team_40\": 0.0, \"team_41\": 0.0, \"team_42\": 0.0, \"team_43\": 0.0, \"team_44\": 0.0, \"team_45\": 0.0, \"team_46\": 0.0, \"team_47\": 0.0, \"team_48\": 0.0, \"team_49\": 0.0, \"team_50\": 0.0, \"team_51\": 0.0, \"team_52\": 0.0, \"team_53\": 0.0, \"team_54\": 0.0, \"team_55\": 0.0, \"team_56\": 0.0, \"team_57\": 0.0, \"team_58\": 0.0, \"team_59\": 0.0}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "score_many_levels",
+    "value": "{\"body\": {\"detail\": \"Too many score levels. Must have at most 10 levels.\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd5ed71fbb25eda732039ef08\", \"response_headers\": {\"content-length\": \"64\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:11 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"34\", \"x-typesafe-request-id\": \"req_01a0b93dd5ed71fbb25eda732039ef08\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Too many score levels. Must have at most 10 levels. (request_id=req_01a0b93dd5ed71fbb25eda732039ef08)\"}"
+  },
+  {
+    "label": "state_200k_chars",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"max_tokens_exceeded\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd6c676f78d1f06a3abc5a451\", \"response_headers\": {\"content-length\": \"47\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:12 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"34\", \"x-typesafe-request-id\": \"req_01a0b93dd6c676f78d1f06a3abc5a451\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 {\\\"detail\\\":{\\\"error_type\\\":\\\"max_tokens_exceeded\\\"}} (request_id=req_01a0b93dd6c676f78d1f06a3abc5a451)\"}"
+  },
+  {
+    "label": "state_2m_chars",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"max_tokens_exceeded\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93dd9b37524be63615b757947fb\", \"response_headers\": {\"content-length\": \"47\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:12 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"108\", \"x-typesafe-request-id\": \"req_01a0b93dd9b37524be63615b757947fb\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 {\\\"detail\\\":{\\\"error_type\\\":\\\"max_tokens_exceeded\\\"}} (request_id=req_01a0b93dd9b37524be63615b757947fb)\"}"
+  },
+  {
+    "label": "model 'jev-latest'",
+    "value": "{\"noul\": 0.98, \"reported\": \"jev-1.13.0\"}"
+  },
+  {
+    "label": "model 'jev-preview'",
+    "value": "{\"noul\": 0.98, \"reported\": \"jev-1.13.0\"}"
+  },
+  {
+    "label": "model 'jev-latest'",
+    "value": "{\"noul\": 0.98, \"reported\": \"jev-1.13.0\"}"
+  },
+  {
+    "label": "model 'jev-does-not-exist'",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-does-not-exist\"}}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93de0bf74aa90c8e97bd74d1f9e\", \"response_headers\": {\"content-length\": \"89\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:14 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"7\", \"x-typesafe-request-id\": \"req_01a0b93de0bf74aa90c8e97bd74d1f9e\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-does-not-exist (request_id=req_01a0b93de0bf74aa90c8e97bd74d1f9e)\"}"
+  },
+  {
+    "label": "one question, one request, latency_s",
+    "value": "0.238"
+  },
+  {
+    "label": "one question, usage",
+    "value": "{\"input_tokens\": 354, \"output_tokens\": 23}"
+  },
+  {
+    "label": "three questions, one request, latency_s",
+    "value": "0.268"
+  },
+  {
+    "label": "three questions batched, usage",
+    "value": "{\"input_tokens\": 506, \"output_tokens\": 78}"
+  },
+  {
+    "label": "three questions, three concurrent requests, latency_s",
+    "value": "0.663"
+  },
+  {
+    "label": "three separate requests, summed usage",
+    "value": "{\"input_tokens\": 1138, \"output_tokens\": 85}"
+  },
+  {
+    "label": "same client shared across gather without error",
+    "value": "true"
+  },
+  {
+    "label": "eight concurrent requests on one client, failures",
+    "value": "none"
+  },
+  {
+    "label": "eight concurrent requests, latency_s",
+    "value": "0.715"
+  },
+  {
+    "label": "noul values",
+    "value": "[0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98]"
+  },
+  {
+    "label": "noul spread",
+    "value": "0.0"
+  },
+  {
+    "label": "noul stdev",
+    "value": "0.0"
+  },
+  {
+    "label": "choice verdicts",
+    "value": "[\"payments\"]"
+  },
+  {
+    "label": "choice verdict stable",
+    "value": "true"
+  },
+  {
+    "label": "choice probability spread",
+    "value": "0.0"
+  },
+  {
+    "label": "score values",
+    "value": "[2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]"
+  },
+  {
+    "label": "score spread",
+    "value": "0.0"
+  },
+  {
+    "label": "bit-identical responses",
+    "value": "true"
+  },
+  {
+    "label": "wrong key",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"authentication_error\", \"message\": \"Cannot authenticate with the server. Please check your API key and try again.\"}}, \"class\": \"TypeSafeAuthenticationError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93deb9b79bf81b1cff55d5b2d88\", \"response_headers\": {\"content-length\": \"138\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:17 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"2\", \"x-typesafe-request-id\": \"req_01a0b93deb9b79bf81b1cff55d5b2d88\"}, \"status\": 401, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 401 Cannot authenticate with the server. Please check your API key and try again. (request_id=req_01a0b93deb9b79bf81b1cff55d5b2d88)\"}"
+  },
+  {
+    "label": "empty questions",
+    "value": "{\"class\": \"TypeSafeError\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"Exception\", \"BaseException\"], \"str\": \"At least one question is required.\"}"
+  },
+  {
+    "label": "malformed question",
+    "value": "{\"body\": {\"detail\": \"Noul question must have criteria or instructions: q\"}, \"class\": \"TypeSafeBadRequestError\", \"endpoint\": \"POST https://api.typesafe.ai/v1/systemone\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIError\", \"TypeSafeError\", \"Exception\", \"BaseException\"], \"request_id\": \"req_01a0b93deda178b281a50d0d91790e4e\", \"response_headers\": {\"content-length\": \"64\", \"content-type\": \"application/json\", \"date\": \"Sat, 19 Sep 2026 10:37:17 GMT\", \"server\": \"istio-envoy\", \"x-envoy-upstream-service-time\": \"4\", \"x-typesafe-request-id\": \"req_01a0b93deda178b281a50d0d91790e4e\"}, \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b93deda178b281a50d0d91790e4e)\"}"
+  },
+  {
+    "label": "timeout 1ms",
+    "value": "{\"class\": \"TypeSafeAPITimeoutError\", \"module\": \"typesafe_sdk._core.errors\", \"mro\": [\"TypeSafeAPIConnectionError\", \"TypeSafeError\", \"ConnectionError\", \"TimeoutError\", \"OSError\", \"Exception\", \"BaseException\"], \"str\": \"Request timed out (timeout=0.001).\"}"
+  },
+  {
+    "label": "SDK default RetryPolicy",
+    "value": "{\"api_connection_error\": true, \"api_timeout_error\": true, \"backoff_initial\": 0.5, \"backoff_jitter\": 0.25, \"backoff_max\": 5.0, \"http_statuses\": [408, 429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599], \"max_retries\": 2, \"respect_retry_after\": true, \"timeout\": 30.0}"
+  },
+  {
+    "label": "401 under retry off",
+    "value": "{\"class\": \"TypeSafeAuthenticationError\", \"elapsed_s\": 0.51}"
+  },
+  {
+    "label": "401 under retry default",
+    "value": "{\"class\": \"TypeSafeAuthenticationError\", \"elapsed_s\": 0.547}"
+  },
+  {
+    "label": "timeout retried twice, elapsed_s",
+    "value": "0.279"
+  },
+  {
+    "label": "plain httpx status",
+    "value": "200"
+  },
+  {
+    "label": "plain httpx latency_s",
+    "value": "0.614"
+  },
+  {
+    "label": "response headers",
+    "value": "{\"x-typesafe-request-id\": \"req_01a0b93df4ee7abd809d3984a8293d0e\"}"
+  },
+  {
+    "label": "plain httpx body keys",
+    "value": "[\"answers\", \"model\", \"usage\"]"
+  },
+  {
+    "label": "plain httpx answers match the SDK's shape",
+    "value": "true"
+  },
+  {
+    "label": "plain httpx, wrong key",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"authentication_error\", \"message\": \"Cannot authenticate with the server. Please check your API key and try again.\"}}, \"status\": 401}"
+  }
+]

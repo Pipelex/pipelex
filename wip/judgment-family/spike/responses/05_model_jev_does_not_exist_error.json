@@ -1,0 +1,28 @@
+{
+  "body": {
+    "detail": {
+      "error_type": "api_usage_error",
+      "message": "Unknown model: jev-does-not-exist"
+    }
+  },
+  "class": "TypeSafeBadRequestError",
+  "endpoint": "POST https://api.typesafe.ai/v1/systemone",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "TypeSafeAPIError",
+    "TypeSafeError",
+    "Exception",
+    "BaseException"
+  ],
+  "request_id": "req_01a0b93de0bf74aa90c8e97bd74d1f9e",
+  "response_headers": {
+    "content-length": "89",
+    "content-type": "application/json",
+    "date": "Sat, 19 Sep 2026 10:37:14 GMT",
+    "server": "istio-envoy",
+    "x-envoy-upstream-service-time": "7",
+    "x-typesafe-request-id": "req_01a0b93de0bf74aa90c8e97bd74d1f9e"
+  },
+  "status": 400,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-does-not-exist (request_id=req_01a0b93de0bf74aa90c8e97bd74d1f9e)"
+}

@@ -1,0 +1,14 @@
+{
+  "models": [
+    {
+      "description": "The latest iteration of TypeSafe's System One Model: Jev",
+      "name": "jev-latest",
+      "release_date": "2026-09-10T18:38:01.391457+00:00"
+    },
+    {
+      "description": "A preview version of `jev-latest`: should be better in most ways",
+      "name": "jev-preview",
+      "release_date": "2026-09-10T18:39:06.057655+00:00"
+    }
+  ]
+}

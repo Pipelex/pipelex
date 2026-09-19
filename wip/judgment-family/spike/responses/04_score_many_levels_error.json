@@ -1,0 +1,25 @@
+{
+  "body": {
+    "detail": "Too many score levels. Must have at most 10 levels."
+  },
+  "class": "TypeSafeBadRequestError",
+  "endpoint": "POST https://api.typesafe.ai/v1/systemone",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "TypeSafeAPIError",
+    "TypeSafeError",
+    "Exception",
+    "BaseException"
+  ],
+  "request_id": "req_01a0b93dd5ed71fbb25eda732039ef08",
+  "response_headers": {
+    "content-length": "64",
+    "content-type": "application/json",
+    "date": "Sat, 19 Sep 2026 10:37:11 GMT",
+    "server": "istio-envoy",
+    "x-envoy-upstream-service-time": "34",
+    "x-typesafe-request-id": "req_01a0b93dd5ed71fbb25eda732039ef08"
+  },
+  "status": 400,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 Too many score levels. Must have at most 10 levels. (request_id=req_01a0b93dd5ed71fbb25eda732039ef08)"
+}

@@ -1,0 +1,314 @@
+[
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  },
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  },
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  },
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  },
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  },
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  },
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  },
+  {
+    "answers": {
+      "is_urgent": {
+        "noul": 0.98,
+        "type": "noul"
+      },
+      "severity": {
+        "confidence": 1.0,
+        "legend": {
+          "0": "Cosmetic; no impact on functionality",
+          "1": "A feature is degraded, but a workaround exists",
+          "2": "Blocking issue; no workaround exists"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 1.0
+        },
+        "score": 2.0,
+        "type": "score"
+      },
+      "team": {
+        "choice": "payments",
+        "confidence": 1.0,
+        "probabilities": {
+          "accounts": 0.0,
+          "other": 0.0,
+          "payments": 1.0,
+          "shipping": 0.0
+        },
+        "type": "choice"
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 78
+    }
+  }
+]
