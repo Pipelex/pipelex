@@ -13,6 +13,22 @@
 ### Fixed
 
 - **A log call before `log.configure` no longer raises**: it goes to the stdlib's default handling at the stdlib's default level, so a library that logs before Pipelex boots, or a boot that logs while it configures, cannot crash on the log line itself.
+- **A manifold error on the native routes keeps its request id under the gateway's pipelex-spelled trace header**: `extract_manifold_metadata` reads the gateway's trace id from `x-pipelex-trace-id` before the inherited `x-portkey-trace-id`, still preferring a provider's own `x-request-id` over both. The gateway emits the two spellings with the same value today, so nothing changes yet; once it drops the vendor one, such an error whose provider sent no `x-request-id` keeps a request id instead of reporting none. `extract_gateway_metadata` is unchanged and still reads the vendor spelling alone — it serves the Portkey cloud and the manifold image path, which travels on `portkey_ai` and keeps that spelling until it is ported off the SDK.
+
+## [v0.60.0] - 2026-09-19
+
+### Changed
+
+- **A dump of a working memory names each stuff's concept by ref (Breaking)**: every path that serializes a `Stuff` — `model_dump`, `smart_dump`, `dump_for_transport`, the `working_memory.json` a run saves, the agent CLI's `--with-memory` envelope and the runner's `PipeOutput` response — now emits `"concept": "<domain>.<Code>"` beside `stuff_code`, `stuff_name` and `content` instead of the full `Concept` object. A dump is one-way: a `Stuff`, a `WorkingMemory` or a `PipeOutput` cannot be validated back from its own dump, because the definition no longer travels with the data. Every consumer that read `concept.code`, `concept.domain_code` or `concept.structure_class_name` off a dumped stuff must read the ref string and resolve it instead.
+- **A transported stuff's concept is resolved through the loaded library (Breaking)**: one shared rule matches the ref against every entry the library holds for that spelling — the host or native concept keyed by the ref itself, plus each concept a dependency package contributed, which the library keys under that package's address. One match resolves, none refuses naming the ref, and a spelling that a host bundle and a dependency both declare refuses naming every key that matched, rather than binding one package's definition to the other's data. Outside any library scope the readers answer from the pinned native set alone, so a delivery worker that never loaded the crate now renders a bundle-declared concept as a raw dict where it previously got a typed render from the definition on the wire.
+- **`ConceptProviderAbstract` and `ConceptLibraryAbstract` gained abstract methods (Breaking)**: a provider must now implement `list_concept_keys_for_ref`, and a concept library must implement `add_dependency_concept`. An out-of-tree implementation of either fails to instantiate until it does.
+- **The agent CLI's stdin resolver passes the concept ref through with its domain intact (Breaking)**: it used to reduce the concept object to a bare code, which let a bare code match any domain's concept of that spelling. A `--with-memory` envelope therefore pipes into a receiving method only where that method declares the same `<domain>.<Code>`; the looser behaviour silently bound one domain's definition to another domain's data. A concept the resolver cannot accept is reported under the new `error_type` `StdinEnvelopeShapeError` — the envelope parsed, so labelling it `JSONDecodeError` sent readers hunting for syntax errors in valid JSON.
+
+  Note the limit: the MTHDS standard also defines `<package_address>::<domain>.<Code>` for a concept a dependency contributes, and this runtime neither emits nor resolves that form.
+
+### Fixed
+
+- **`PINNED_NATIVES_MTHDS_VERSION` names the set it labels**: the constant read `1.0.0` while the standard pins the native set at `2.0.0`, so anything taking it as the answer to "which pinned set is this engine's" — a downstream port gating its own native goldens, for one — read a version the standard now describes as predating the pinning regime. It now reads `2.0.0`, and it is no longer a value nothing reads: the standard-conformance suite holds it to the page's own "Pinned at MTHDS" statement, and a check that needs no sibling checkout refuses a label later than the standard version this engine implements.
 
 ## [v0.59.0] - 2026-09-16
 

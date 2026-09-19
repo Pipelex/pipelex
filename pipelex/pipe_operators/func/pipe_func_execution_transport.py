@@ -64,9 +64,9 @@ def pipe_func_execution_result_from_response(response: PipeFuncExecutionResponse
     """Rebind a transported response into a PipeFuncExecutionResult against THIS process's registry.
 
     The output rode back as a transported working memory whose main stuff is the PipeFunc output;
-    hydrating it here rebinds the class from the concept's ``structure_class_name`` (present for
-    native and inline-structure concepts; a customer output class shipped only as .py is a known,
-    deferred limitation).
+    hydrating it here resolves the stuff's concept ref through the current library and rebinds the
+    class from that concept's ``structure_class_name`` (present for native and inline-structure
+    concepts; a customer output class shipped only as .py is a known, deferred limitation).
     """
     output_memory = hydrate_working_memory(response.output_memory_raw)
     content = output_memory.get_main_stuff().content
