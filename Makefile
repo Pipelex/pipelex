@@ -37,7 +37,7 @@ TS_TOOLCHAIN_ZOD_VERSION ?= 4.5.4
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or judgment)) and not pipelex_api"
 # The selection the sharded CI job runs. Shared by gha-tests and store-test-durations so the map
 # can never be balanced against a different set of tests than the one it is measured from.
 GHA_PYTEST_MARKERS := "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)"

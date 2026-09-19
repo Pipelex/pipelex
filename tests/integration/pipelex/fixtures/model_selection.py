@@ -95,6 +95,24 @@ def get_extract_combos() -> list[ModelCombo]:
 
 
 @cache
+def get_judgment_combos() -> list[ModelCombo]:
+    """Get the list of valid (judgment_model, backend) combinations.
+
+    Returns:
+        List of ModelCombo(handle, backend).
+
+    Raises:
+        FileNotFoundError: If the generated fixtures file does not exist.
+    """
+    _ensure_generated_fixtures_exist()
+    from tests.integration.pipelex.fixtures._generated_model_sets import (  # ruff: ignore[import-outside-top-level]
+        JUDGMENT_COMBOS,
+    )
+
+    return _or_skip(list(JUDGMENT_COMBOS), "judgment")
+
+
+@cache
 def get_search_combos() -> list[ModelCombo]:
     """Get the list of valid (search_model, backend) combinations.
 

@@ -6,3 +6,4 @@ class ModelType(StrEnum):
     TEXT_EXTRACTOR = "text_extractor"
     IMG_GEN = "img_gen"
     SEARCH = "search"
+    JUDGMENT = "judgment"

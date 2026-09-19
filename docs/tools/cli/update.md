@@ -47,7 +47,7 @@ Locally-modified files are preserved as `<file>.bak.<UTC-timestamp>` before the 
 
 Pipelex draws a sharp line between deck files it owns and deck files you own.
 
-- **Managed (pipelex-owned)** — `1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`. These are refreshed by `pipelex update`. Local edits are preserved with a `.bak.<timestamp>` backup but will not survive future updates.
+- **Managed (pipelex-owned)** — `1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`, `5_judgment_deck.toml`. These are refreshed by `pipelex update`. Local edits are preserved with a `.bak.<timestamp>` backup but will not survive future updates.
 - **User overrides** — any file in the deck directory whose name starts with `x_custom_` (e.g. `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`). Pipelex never tracks, hashes, copies, or removes these. Add new ones whenever you need to override aliases, presets, or default choices for a backend.
 
 The deck loader merges all `*.toml` files under the deck directory in alphabetical order via deep-merge, so your `x_custom_*.toml` always wins over the numbered defaults.

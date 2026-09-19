@@ -3,13 +3,20 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.llm.llm_report import LLMTokenCostReportField, LLMTokensUsage
+from pipelex.cogt.extract.extract_report import ExtractTokenCostReport
+from pipelex.cogt.img_gen.img_gen_report import ImgGenTokenCostReport
+from pipelex.cogt.judgment.judgment_report import JudgmentTokenCostReport, JudgmentTokenCostReportField
+from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage
+from pipelex.cogt.search.search_report import SearchTokenCostReport
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.job_metadata import JobMetadata
+from tests.unit.pipelex.cogt.usage.test_data import UsageFixtures
 
 
 class TestCostRegistry:
@@ -595,3 +602,35 @@ class TestCostRegistry:
         )
 
         assert CostRegistry.build_cost_summary([dry]) is None
+
+    @pytest.mark.parametrize(
+        ("tokens_usage", "expected_report_class"),
+        [
+            (UsageFixtures.llm_usage(), LLMTokenCostReport),
+            (UsageFixtures.img_gen_usage(), ImgGenTokenCostReport),
+            (UsageFixtures.extract_usage(), ExtractTokenCostReport),
+            (UsageFixtures.search_usage(), SearchTokenCostReport),
+            (UsageFixtures.judgment_usage(), JudgmentTokenCostReport),
+        ],
+        ids=["llm", "img_gen", "extract", "search", "judgment"],
+    )
+    def test_every_family_gets_its_own_cost_report(self, tokens_usage: AnyTokensUsage, expected_report_class: type[BaseModel]):
+        """No family falls through to an extract report.
+
+        The dispatch used to end in a bare extract return, so any usage it did not recognise billed
+        as an extraction — silently, and with the wrong model-type label on the wire. This is the
+        runtime half of the guarantee; the static half is the ``assert_never`` that closes the match.
+        """
+        cost_report = CostRegistry.compute_cost_report(tokens_usage=tokens_usage)
+
+        assert isinstance(cost_report, expected_report_class)
+        assert cost_report.model_type == tokens_usage.model_type
+
+    def test_a_judgment_cost_report_names_its_model_in_the_flat_record(self):
+        """The grouping key reads the family's own name field, so a judgment is not grouped as 'unknown'."""
+        cost_report = CostRegistry.complete_cost_report(tokens_usage=UsageFixtures.judgment_usage())
+        aggregated = CostRegistry.aggregate_costs(tokens_usages=[UsageFixtures.judgment_usage()])
+
+        assert cost_report.as_flat_dictionary()[JudgmentTokenCostReportField.JUDGMENT_NAME] == "jev"
+        assert "jev" in aggregated.grouped_by_model
+        assert aggregated.model_types["jev"] == "judgment"

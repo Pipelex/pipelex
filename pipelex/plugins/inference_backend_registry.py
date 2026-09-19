@@ -13,6 +13,7 @@ class InferenceFamily(StrEnum):
     IMG_GEN = "img_gen"
     EXTRACT = "extract"
     SEARCH = "search"
+    JUDGMENT = "judgment"
 
 
 # The uniform inference-backend factory. A backend plugin registers one of these

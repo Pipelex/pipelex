@@ -48,8 +48,9 @@ class TestTokensUsageRecords:
             (UsageFixtures.img_gen_usage(), "img_gen", "img_gen_job", "img_gen_text_to_image"),
             (UsageFixtures.extract_usage(), "extract", "extract_job", "extract_pages"),
             (UsageFixtures.search_usage(), "search", "search_job", "search_sourced_answer"),
+            (UsageFixtures.judgment_usage(), "judgment", "judgment_job", "judgment_answer"),
         ],
-        ids=["llm", "img_gen", "extract", "search"],
+        ids=["llm", "img_gen", "extract", "search", "judgment"],
     )
     def test_conversion_per_variant(
         self,
@@ -78,7 +79,7 @@ class TestTokensUsageRecords:
     @pytest.mark.parametrize(
         "tokens_usage",
         [*UsageFixtures.all_variants(), UsageFixtures.unrated_usage()],
-        ids=["llm", "img_gen", "extract", "search", "unrated"],
+        ids=["llm", "img_gen", "extract", "search", "judgment", "unrated"],
     )
     def test_leak_regression(self, tokens_usage: AnyTokensUsage):
         """The dumped wire record carries the contract fields exactly — none of the MUST-NOT

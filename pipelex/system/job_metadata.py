@@ -27,6 +27,7 @@ class JobCategory(StrEnum):
     JINJA2_JOB = "jinja2_job"
     EXTRACT_JOB = "extract_job"
     SEARCH_JOB = "search_job"
+    JUDGMENT_JOB = "judgment_job"
 
 
 class UnitJobId(StrEnum):
@@ -36,6 +37,7 @@ class UnitJobId(StrEnum):
     EXTRACT_PAGES = "extract_pages"
     SEARCH_SOURCED_ANSWER = "search_sourced_answer"
     SEARCH_STRUCTURED = "search_structured"
+    JUDGMENT_ANSWER = "judgment_answer"
 
     @property
     def model_kind(self) -> str:
@@ -48,6 +50,8 @@ class UnitJobId(StrEnum):
                 return "Extract"
             case UnitJobId.SEARCH_SOURCED_ANSWER | UnitJobId.SEARCH_STRUCTURED:
                 return "Search"
+            case UnitJobId.JUDGMENT_ANSWER:
+                return "Judgment"
 
 
 class RunMetadata(BaseModel):

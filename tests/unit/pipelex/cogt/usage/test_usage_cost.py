@@ -22,7 +22,7 @@ class TestComputeTokensUsageCost:
     @pytest.mark.parametrize(
         "tokens_usage",
         UsageFixtures.all_variants(),
-        ids=["llm", "img_gen", "extract", "search"],
+        ids=["llm", "img_gen", "extract", "search", "judgment"],
     )
     def test_parity_with_cost_registry_per_record(self, tokens_usage: AnyTokensUsage):
         """The wire cost equals the canonical CostRegistry total for the same record — one cost engine, no drift."""
@@ -43,4 +43,9 @@ class TestComputeTokensUsageCost:
             assert record_cost is not None
             wire_total += record_cost
         aggregated = CostRegistry.aggregate_costs(tokens_usages=tokens_usages)
-        assert wire_total == aggregated.total_cost
+        # Compared to within floating-point noise rather than bit-for-bit: the two totals are the same
+        # sum of the same per-record costs, but they add them up in different orders and in different
+        # groupings, so once there are enough records the last bit diverges. A real drift between the
+        # two — a category one side excludes and the other does not — is many orders of magnitude
+        # larger than this tolerance and still fails here.
+        assert abs(wire_total - aggregated.total_cost) < 1e-12

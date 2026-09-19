@@ -7,6 +7,7 @@ from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import (
     ExtractHandleNotFoundError,
     ImgGenHandleNotFoundError,
+    JudgmentHandleNotFoundError,
     LLMHandleNotFoundError,
     LLMSettingsValidationError,
     ModelChoiceNotFoundError,
@@ -19,6 +20,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
 from pipelex.cogt.llm.llm_setting import (
     LLMModelChoice,
     LLMSetting,
@@ -75,11 +77,29 @@ class SearchDeckBlueprint(ConfigModel):
     choice_default: SearchModelChoice
 
 
+class JudgmentDeckBlueprint(ConfigModel):
+    """The judgment family's half of the deck.
+
+    ``choice_default`` is optional here where every other family requires one, and the reason is
+    that no judgment model is served by default. The other families' defaults name a handle the
+    Pipelex Gateway carries, so they always resolve; a judgment backend is brought by the user, and
+    a deck naming a default that nothing serves fails the gateway's own membership check at boot —
+    for every user, whether or not they ever ask for a judgment. Absent says the honest thing: no
+    model is the default, so a judgment names its own until one is served.
+    """
+
+    aliases: dict[str, str] = Field(default_factory=dict)
+    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    presets: dict[str, JudgmentSetting] = Field(default_factory=dict)
+    choice_default: JudgmentModelChoice | None = None
+
+
 class ModelDeckBlueprint(ConfigModel):
     llm: LLMDeckBlueprint
     extract: ExtractDeckBlueprint
     img_gen: ImgGenDeckBlueprint
     search: SearchDeckBlueprint
+    judgment: JudgmentDeckBlueprint
 
 
 class ModelDeck(ConfigModel):
@@ -119,6 +139,13 @@ class ModelDeck(ConfigModel):
     search_presets: dict[str, SearchSetting] = Field(default_factory=dict)
     search_choice_default: SearchModelChoice
 
+    # Judgment-specific
+    judgment_aliases: dict[str, str] = Field(default_factory=dict)
+    judgment_waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    judgment_presets: dict[str, JudgmentSetting] = Field(default_factory=dict)
+    # Optional, unlike every other family's — see JudgmentDeckBlueprint for why.
+    judgment_choice_default: JudgmentModelChoice | None = None
+
     def get_aliases_and_waterfalls_for_type(self, model_type: ModelType) -> tuple[dict[str, str], dict[str, list[str]]]:
         """Return the type-specific aliases and waterfalls dictionaries."""
         match model_type:
@@ -130,6 +157,8 @@ class ModelDeck(ConfigModel):
                 return self.img_gen_aliases, self.img_gen_waterfalls
             case ModelType.SEARCH:
                 return self.search_aliases, self.search_waterfalls
+            case ModelType.JUDGMENT:
+                return self.judgment_aliases, self.judgment_waterfalls
 
     def is_model_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
         """Check if a model handle is defined in the model deck.
@@ -215,12 +244,26 @@ class ModelDeck(ConfigModel):
                 f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
             )
 
+    def _warn_if_ambiguous_judgment(self, name: str) -> None:
+        """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
+        matches: list[str] = []
+        if name in self.judgment_presets:
+            matches.append(f"judgment preset (use ${name} or preset:{name})")
+        if name in self.judgment_aliases:
+            matches.append(f"alias (use @{name} or alias:{name})")
+        if name in self.judgment_waterfalls:
+            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
+        if matches:
+            log.warning(
+                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
+            )
+
     def _raise_handle_not_found_error(
         self,
         ref: ModelReference,
         *,
         model_type: ModelType,
-        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting],
+        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting] | dict[str, JudgmentSetting],
     ) -> NoReturn:
         """Raise ModelChoiceNotFoundError with migration hints if applicable."""
         msg = f"Model handle '{ref.name}' was not found in the model deck"
@@ -456,6 +499,55 @@ class ModelDeck(ConfigModel):
                     presets=self.search_presets,
                 )
 
+    def get_judgment_setting(self, judgment_choice: JudgmentModelChoice) -> JudgmentSetting:
+        if isinstance(judgment_choice, JudgmentSetting):
+            return judgment_choice
+
+        ref = ensure_model_reference(judgment_choice)
+        match ref.kind:
+            case ModelReferenceKind.PRESET:
+                if preset := self.judgment_presets.get(ref.name):
+                    return preset
+                msg = f"Judgment preset '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.JUDGMENT,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.PRESET,
+                    available_options=list(self.judgment_presets.keys()),
+                )
+            case ModelReferenceKind.ALIAS:
+                if alias_target := self.judgment_aliases.get(ref.name):
+                    return JudgmentSetting(model=alias_target)
+                msg = f"Alias '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.JUDGMENT,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.ALIAS,
+                    available_options=list(self.judgment_aliases.keys()),
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in self.judgment_waterfalls:
+                    return JudgmentSetting(model=ref.name)
+                msg = f"Waterfall '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.JUDGMENT,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.WATERFALL,
+                    available_options=list(self.judgment_waterfalls.keys()),
+                )
+            case ModelReferenceKind.HANDLE:
+                self._warn_if_ambiguous_judgment(ref.name)
+                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.JUDGMENT):
+                    return JudgmentSetting(model=ref.name)
+                self._raise_handle_not_found_error(
+                    ref=ref,
+                    model_type=ModelType.JUDGMENT,
+                    presets=self.judgment_presets,
+                )
+
     def get_img_gen_setting(self, img_gen_choice: ImgGenModelChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
             return img_gen_choice
@@ -609,6 +701,17 @@ class ModelDeck(ConfigModel):
                 )
         return self
 
+    def validate_judgment_presets(self) -> Self:
+        for judgment_preset_id, judgment_setting in self.judgment_presets.items():
+            if not self.is_model_handle_defined(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT):
+                msg = f"Judgment handle '{judgment_setting.model}' for judgment preset '{judgment_preset_id}' was not found in the model deck"
+                raise JudgmentHandleNotFoundError(
+                    message=msg,
+                    preset_id=judgment_preset_id,
+                    model_handle=judgment_setting.model,
+                )
+        return self
+
     def validate_registered_models(self):
         self.validate_inference_models()
         try:
@@ -674,6 +777,22 @@ class ModelDeck(ConfigModel):
                     ) from exc
                 case ProblemReaction.LOG:
                     log.warning(f"Search handle not found: {exc}")
+                case ProblemReaction.NONE:
+                    pass
+        try:
+            self.validate_judgment_presets()
+        except JudgmentHandleNotFoundError as exc:
+            match self.model_deck_config.missing_presets_reaction:
+                case ProblemReaction.RAISE:
+                    msg = f"Failed to validate all Judgment presets: {exc}"
+                    raise ModelDeckPresetValidatonError(
+                        message=msg,
+                        model_type=ModelType.JUDGMENT,
+                        preset_id=exc.preset_id,
+                        model_handle=exc.model_handle,
+                    ) from exc
+                case ProblemReaction.LOG:
+                    log.warning(f"Judgment handle not found: {exc}")
                 case ProblemReaction.NONE:
                     pass
 

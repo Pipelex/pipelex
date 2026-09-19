@@ -8,6 +8,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
+from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.config import get_config
@@ -157,6 +158,15 @@ class ReportingManager(ReportingProtocol):
             return
 
         self._emit_usage_event(search_job, tokens_usage=search_tokens_usage)
+
+    def _report_judgment_job(self, *, judgment_job: JudgmentJob):
+        judgment_tokens_usage = judgment_job.job_report.judgment_tokens_usage
+
+        if not judgment_tokens_usage:
+            log.warning("Judgment job has no judgment_tokens_usage")
+            return
+
+        self._emit_usage_event(judgment_job, tokens_usage=judgment_tokens_usage)
 
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, *, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent for this job.
@@ -318,5 +328,7 @@ class ReportingManager(ReportingProtocol):
             self._report_extract_job(extract_job=inference_job)
         elif isinstance(inference_job, SearchJob):
             self._report_search_job(search_job=inference_job)
+        elif isinstance(inference_job, JudgmentJob):
+            self._report_judgment_job(judgment_job=inference_job)
         else:
             log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")

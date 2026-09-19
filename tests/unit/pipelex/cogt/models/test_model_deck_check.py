@@ -8,6 +8,7 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -16,6 +17,7 @@ from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_deck_check import (
     check_extract_choice_with_deck,
     check_img_gen_choice_with_deck,
+    check_judgment_choice_with_deck,
     check_llm_choice_with_deck,
     check_search_choice_with_deck,
 )
@@ -51,6 +53,7 @@ class TestModelDeckCheck:
                 "extract-engine": self._create_model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
                 "img-painter": self._create_model_spec("img-painter", ModelType.IMG_GEN),
                 "web-searcher": self._create_model_spec("web-searcher", ModelType.SEARCH),
+                "verdict-giver": self._create_model_spec("verdict-giver", ModelType.JUDGMENT),
             },
             # LLM-specific
             llm_default_temperature=0.7,
@@ -78,6 +81,10 @@ class TestModelDeckCheck:
             search_waterfalls={"fallback-search": ["web-searcher"]},
             search_presets={"cheap-search": SearchSetting(model="web-searcher")},
             search_choice_default="@default-search",
+            # Judgment-specific
+            judgment_aliases={"best-judgment": "verdict-giver"},
+            judgment_waterfalls={"fallback-judgment": ["verdict-giver"]},
+            judgment_presets={"cheap-judgment": JudgmentSetting(model="verdict-giver")},
             model_deck_config=ModelDeckConfig(is_model_fallback_enabled=False, missing_presets_reaction=ProblemReaction.NONE),
         )
 
@@ -88,6 +95,7 @@ class TestModelDeckCheck:
             pytest.param(check_extract_choice_with_deck, ExtractSetting(model="extract-engine"), id="extract"),
             pytest.param(check_search_choice_with_deck, SearchSetting(model="web-searcher"), id="search"),
             pytest.param(check_img_gen_choice_with_deck, ImgGenSetting(model="img-painter"), id="img_gen"),
+            pytest.param(check_judgment_choice_with_deck, JudgmentSetting(model="verdict-giver"), id="judgment"),
         ],
     )
     def test_setting_instance_short_circuits_without_deck_lookup(
@@ -122,6 +130,10 @@ class TestModelDeckCheck:
             pytest.param(check_img_gen_choice_with_deck, "@best-img", id="img_gen-alias"),
             pytest.param(check_img_gen_choice_with_deck, "~fallback-img", id="img_gen-waterfall"),
             pytest.param(check_img_gen_choice_with_deck, "img-painter", id="img_gen-handle"),
+            pytest.param(check_judgment_choice_with_deck, "$cheap-judgment", id="judgment-preset"),
+            pytest.param(check_judgment_choice_with_deck, "@best-judgment", id="judgment-alias"),
+            pytest.param(check_judgment_choice_with_deck, "~fallback-judgment", id="judgment-waterfall"),
+            pytest.param(check_judgment_choice_with_deck, "verdict-giver", id="judgment-handle"),
         ],
     )
     def test_found_choice_returns_none(
@@ -230,6 +242,38 @@ class TestModelDeckCheck:
                 ModelType.IMG_GEN,
                 "inference_models",
                 id="img_gen-handle",
+            ),
+            pytest.param(
+                check_judgment_choice_with_deck,
+                "$missing-preset",
+                ModelReferenceKind.PRESET,
+                ModelType.JUDGMENT,
+                "judgment_presets",
+                id="judgment-preset",
+            ),
+            pytest.param(
+                check_judgment_choice_with_deck,
+                "@missing-alias",
+                ModelReferenceKind.ALIAS,
+                ModelType.JUDGMENT,
+                "judgment_aliases",
+                id="judgment-alias",
+            ),
+            pytest.param(
+                check_judgment_choice_with_deck,
+                "~missing-waterfall",
+                ModelReferenceKind.WATERFALL,
+                ModelType.JUDGMENT,
+                "judgment_waterfalls",
+                id="judgment-waterfall",
+            ),
+            pytest.param(
+                check_judgment_choice_with_deck,
+                "missing-handle",
+                ModelReferenceKind.HANDLE,
+                ModelType.JUDGMENT,
+                "inference_models",
+                id="judgment-handle",
             ),
         ],
     )
