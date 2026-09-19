@@ -169,6 +169,23 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         return the_concept
 
     @override
+    def list_concept_keys_for_ref(self, *, concept_ref: str) -> list[str]:
+        """Every key of this library holding a concept spelled `concept_ref`.
+
+        The host-declared or native entry is keyed by the ref itself (`add_new_concept`); a
+        dependency's concept is keyed `<alias>-><domain>.<Code>` (`add_dependency_concept`) and
+        has no unaliased twin — the loader removes the temporary unaliased entries once the child
+        library is built. So a bare ref arriving from the wire matches the host entry, every
+        dependency that contributes that spelling, or both.
+        """
+        candidate_keys: list[str] = []
+        if concept_ref in self.root:
+            candidate_keys.append(concept_ref)
+        aliased_suffix = f"->{concept_ref}"
+        candidate_keys.extend(sorted(key for key in self.root if key.endswith(aliased_suffix)))
+        return candidate_keys
+
+    @override
     def get_native_concept(self, native_concept: NativeConceptCode) -> Concept:
         the_native_concept = self.get_optional_concept(f"{SpecialDomain.NATIVE}.{native_concept}")
         if not the_native_concept:
@@ -304,6 +321,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             raise ConceptLibraryConceptNotFoundError(msg)
         return None
 
+    @override
     def add_dependency_concept(self, *, alias: str, concept: Concept) -> None:
         """Add a concept from a dependency package with an aliased key.
 

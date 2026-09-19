@@ -23,6 +23,13 @@ consequences follow, both by design:
   suite. It is not an opt-out: the `MTHDS standard conformance` workflow checks the standard out
   beside this repo and runs this module on every pull request, so a disagreement with the page
   fails the merge either way.
+
+`PINNED_NATIVES_MTHDS_VERSION` — the number naming *which* set this is — is held here too, because
+a value nothing reads is a value that goes stale in silence: it sat at `1.0.0` across the standard's
+`2.0.0` cut, and no test in this repo could say so. This module holds it to the page, and therefore
+skips with everything else when the checkout is absent; `test_pinned_natives_version.py` holds it to
+the standard version the installed `mthds` reports, which needs no checkout and so runs for every
+contributor.
 """
 
 import re
@@ -34,7 +41,7 @@ import pytest
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
+from pipelex.core.concepts.native.pinned_blueprints import PINNED_NATIVES_MTHDS_VERSION, make_pinned_native_blueprint
 
 # This repo and the standard's repo as siblings — the documented workspace layout, reproduced on
 # CI runners by the `MTHDS standard conformance` workflow's double checkout.
@@ -74,7 +81,34 @@ def read_spec_definitions() -> list[tuple[str, dict[str, Any]]]:
     return definitions
 
 
+def read_spec_pinned_version() -> str:
+    """The standard version the page says the set below it was pinned at.
+
+    The page states it twice — once in prose ("The set below was pinned at MTHDS `2.0.0`") and once
+    in the heading that opens the set ("The Pinned Set — Pinned at MTHDS 2.0.0"). Both spellings are
+    collected and required to agree, so a half-done re-pinning on the page is a failure here rather
+    than a coin toss over which sentence this reader happened to match.
+    """
+    statements: list[str] = re.findall(r"[Pp]inned at MTHDS\s+`?(\d+\.\d+\.\d+)`?", SPEC_PAGE.read_text(encoding="utf-8"))
+    assert statements, "the standard's page no longer states the version its native set is pinned at"
+    assert len(set(statements)) == 1, f"the standard's page states more than one pinned version for its native set: {sorted(set(statements))}"
+    return statements[0]
+
+
 class TestPinnedNativesAgreeWithTheStandard:
+    def test_names_the_version_the_page_pins_the_set_at(self):
+        """The set is a copy; `PINNED_NATIVES_MTHDS_VERSION` is the label on it, and a mislabelled copy misleads.
+
+        Nothing inside this package reads the constant, so a wrong value breaks nothing here — it
+        misleads whoever reads it as the answer to "which pinned set is this", which is what its
+        name promises, and a downstream port that reports it as this reference's natives version
+        then gates its own goldens against a dead number.
+        """
+        assert read_spec_pinned_version() == PINNED_NATIVES_MTHDS_VERSION, (
+            f"PINNED_NATIVES_MTHDS_VERSION says {PINNED_NATIVES_MTHDS_VERSION!r} but the standard's page pins the set at "
+            f"{read_spec_pinned_version()!r} — {_DISAGREEMENT_REMEDY}"
+        )
+
     def test_pins_the_same_natives_in_the_pages_own_section_order(self):
         page_codes = [code for code, _ in read_spec_definitions()]
         assert page_codes == [code.value for code in NativeConceptCode], (

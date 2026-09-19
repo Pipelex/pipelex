@@ -32,6 +32,7 @@ ConceptFactoryError | Concept factory | https://docs.pipelex.com/latest/errors/c
 ConceptLibraryConceptNotFoundError | Concept library concept not found | https://docs.pipelex.com/latest/errors/concept-library-concept-not-found-error/
 ConceptLibraryError | Concept library | https://docs.pipelex.com/latest/errors/concept-library-error/
 ConceptLoadingError | Concept loading | https://docs.pipelex.com/latest/errors/concept-loading-error/
+ConceptRefAmbiguousError | Concept ref ambiguous | https://docs.pipelex.com/latest/errors/concept-ref-ambiguous-error/
 ConceptRefineError | Concept refine | https://docs.pipelex.com/latest/errors/concept-refine-error/
 ConceptSpecError | Concept spec | https://docs.pipelex.com/latest/errors/concept-spec-error/
 ConceptStringError | Concept string | https://docs.pipelex.com/latest/errors/concept-string-error/
