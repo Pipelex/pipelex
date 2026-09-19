@@ -78,11 +78,11 @@ For an LLM, go past `TestLLMInference` and exercise what the entry declares: `Te
 
 This repository cannot add the model to `pipelex_gateway` or `pipelex_manifold`: their catalogs are published by the Pipelex team in the remote config. Tell the user so, and say which handle, model ids and capabilities the catalogs need. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
 
-Once a remote config carrying the model is published at the version this repository pins, regenerate the gateway model reference that ships in the package, then check both copies agree:
+Once a remote config carrying the model is published at the version this repository pins, regenerate the gateway model reference that ships in the package, then check it against that artifact:
 
 ```bash
 make ugm   # update-gateway-models: rewrites pipelex_gateway_models*.md in .pipelex/ and the kit
-make ccs
+make cgm   # check-gateway-models: both copies match the published artifact
 ```
 
 Then `/test-model` on `pipelex_gateway` proves the model end to end through the gateway.
@@ -99,4 +99,4 @@ Show this to the user at the end, each box ticked or explained:
 - [ ] Deck left alone, or the promotion decided by the user, made after the gateway catalog carries the model, and mirrored in `docs/`
 - [ ] Changelog entry under `[Unreleased]`
 - [ ] `make tb` and `make agent-check` green
-- [ ] Gateway and manifold catalogs handed off, and `make ugm` run once they are published
+- [ ] Gateway and manifold catalogs handed off, and `make ugm` then `make cgm` run once they are published
