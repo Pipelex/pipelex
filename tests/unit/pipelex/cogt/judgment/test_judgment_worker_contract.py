@@ -30,8 +30,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
-
-from .test_data import JudgmentTestCases
+from tests.unit.pipelex.cogt.judgment.test_data import JudgmentTestCases
 
 
 class _FakeJudgmentWorker(JudgmentWorkerAbstract):
@@ -134,6 +133,60 @@ class TestJudgmentWorkerContract:
 
         assert "severity" in str(exc_info.value)
         assert "rating" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("answer", "named"),
+        [
+            pytest.param(ChoiceAnswer(choice="storm"), "storm", id="choice"),
+            pytest.param(ChoiceAnswer(choice="fire", probabilities={"fire": 0.7, "storm": 0.3}), "storm", id="choice_distribution"),
+        ],
+    )
+    async def test_it_refuses_an_option_the_question_does_not_offer(self, answer: ChoiceAnswer, named: str) -> None:
+        job = self._job({"topic": ChoiceQuestion(instructions="Which topic?", options={"fire": None, "flood": "water damage"})})
+        worker = _FakeJudgmentWorker(self._model(), answers={"topic": answer})
+
+        with pytest.raises(JudgmentAnswerMismatchError) as exc_info:
+            await worker.judge(job)
+
+        assert "topic" in str(exc_info.value)
+        assert named in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("answer", "named"),
+        [
+            pytest.param(RatingAnswer(level=3), "3", id="level_one_past_the_top"),
+            pytest.param(RatingAnswer(level=1, probabilities={0: 0.2, 1: 0.5, 3: 0.3}), "3", id="level_distribution"),
+            pytest.param(RatingAnswer(level=1, probabilities={-1: 0.2, 1: 0.8}), "-1", id="negative_level_distribution"),
+        ],
+    )
+    async def test_it_refuses_a_level_beyond_the_scale(self, answer: RatingAnswer, named: str) -> None:
+        job = self._job({"severity": RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"])})
+        worker = _FakeJudgmentWorker(self._model(), answers={"severity": answer})
+
+        with pytest.raises(JudgmentAnswerMismatchError) as exc_info:
+            await worker.judge(job)
+
+        assert "severity" in str(exc_info.value)
+        assert f"[{named}]" in str(exc_info.value)
+
+    async def test_it_accepts_the_top_level_and_a_full_distribution(self) -> None:
+        job = self._job(
+            {
+                "severity": RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                "topic": ChoiceQuestion(instructions="Which topic?", options={"fire": None, "flood": "water damage"}),
+            }
+        )
+        worker = _FakeJudgmentWorker(
+            self._model(),
+            answers={
+                "severity": RatingAnswer(level=2, probabilities={0: 0.1, 1: 0.2, 2: 0.7}),
+                "topic": ChoiceAnswer(choice="flood", probabilities={"fire": 0.4, "flood": 0.6}),
+            },
+        )
+
+        answers = await worker.judge(job)
+
+        assert set(answers) == {"severity", "topic"}
 
     async def test_it_reports_on_the_way_out_even_when_the_answers_are_rejected(self) -> None:
         """A rejected answer set was still paid for: the provider answered before the guard ran."""

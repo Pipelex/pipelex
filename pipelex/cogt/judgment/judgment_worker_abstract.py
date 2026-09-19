@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import CogtError, JudgmentAnswerMismatchError
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
+from pipelex.cogt.judgment.judgment_models import ChoiceAnswer, ChoiceQuestion, JudgmentAnswer, JudgmentQuestion, RatingAnswer, RatingQuestion
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.job_metadata import UnitJobId
@@ -66,10 +66,12 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
 def _check_answers_match_questions(*, judgment_job: JudgmentJob, answers: dict[str, JudgmentAnswer]) -> None:
     """Refuse an answer set that does not correspond, question for question, to what was asked.
 
-    Two ways a backend can get this wrong, and both are silent without this check: answering a
-    question nobody asked (or dropping one), and answering the right question in the wrong shape —
-    a choice where a rating was asked for. The caller reads the answers by key and by kind, so
-    either would surface much later, as a missing key or as a verdict of the wrong type.
+    Three ways a backend can get this wrong, and all are silent without this check: answering a
+    question nobody asked (or dropping one), answering the right question in the wrong shape — a
+    choice where a rating was asked for — and naming a verdict the question never offered, such as
+    an option it does not list or a level beyond its scale. The caller reads the answers by key, by
+    kind and by the option or level they name, so any of them would surface much later, as a
+    missing key, a verdict of the wrong type or a verdict routed nowhere.
     """
     asked = set(judgment_job.questions)
     answered = set(answers)
@@ -83,3 +85,32 @@ def _check_answers_match_questions(*, judgment_job: JudgmentJob, answers: dict[s
         if answer.kind != question.kind:
             msg = f"Judgment worker answered question '{question_key}' with a '{answer.kind}' answer, but it asked for '{question.kind}'"
             raise JudgmentAnswerMismatchError(msg)
+        _check_answer_is_offered(question_key=question_key, question=question, answer=answer)
+
+
+def _check_answer_is_offered(*, question_key: str, question: JudgmentQuestion, answer: JudgmentAnswer) -> None:
+    """Refuse a verdict the question did not offer, in the answer itself or in its distribution.
+
+    The answer models cannot check this on their own, since they never see their question: this is
+    the one place that holds both.
+    """
+    match question, answer:
+        case ChoiceQuestion(), ChoiceAnswer():
+            named_options = {answer.choice, *(answer.probabilities or {})}
+            unoffered = sorted(named_options - set(question.options))
+            if unoffered:
+                msg = f"Judgment worker answered question '{question_key}' with options it does not offer: {unoffered}"
+                raise JudgmentAnswerMismatchError(msg)
+        case RatingQuestion(), RatingAnswer():
+            nb_levels = len(question.levels)
+            named_levels = {answer.level, *(answer.probabilities or {})}
+            out_of_scale = sorted(level for level in named_levels if not 0 <= level < nb_levels)
+            if out_of_scale:
+                msg = (
+                    f"Judgment worker answered question '{question_key}' with levels {out_of_scale}, "
+                    f"outside its scale of {nb_levels} levels (0 to {nb_levels - 1})"
+                )
+                raise JudgmentAnswerMismatchError(msg)
+        case _:
+            # A yes/no answer names no option and no level, and its probability is bounded by its model.
+            pass

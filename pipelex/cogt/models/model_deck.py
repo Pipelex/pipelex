@@ -99,7 +99,10 @@ class ModelDeckBlueprint(ConfigModel):
     extract: ExtractDeckBlueprint
     img_gen: ImgGenDeckBlueprint
     search: SearchDeckBlueprint
-    judgment: JudgmentDeckBlueprint
+    # Defaulted where the other families are required: a deck installed before this family
+    # existed has no judgment file, only `pipelex update` installs one, and its absence means
+    # exactly what the kit's own empty section means — no judgment model.
+    judgment: JudgmentDeckBlueprint = Field(default_factory=JudgmentDeckBlueprint)
 
 
 class ModelDeck(ConfigModel):
