@@ -33,14 +33,24 @@ _NO_RICH_PRELUDE = textwrap.dedent(
     sys.meta_path.insert(0, _RichBlocker())
 
     from pipelex.pipelex import Pipelex
-    from pipelex.system.runtime import IntegrationMode, runtime_manager
+    from pipelex.system.runtime import IntegrationMode
 
-    INTEGRATION_MODE = IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST
+    # A pytest-spawned process, and it says so. The session's run mode is set on the in-process
+    # `runtime_manager` and never exported, so a child can neither read it nor claim `IntegrationMode.CI`
+    # on the strength of it; what keeps these boots credential-free is `needs_model_specs=False` below,
+    # not the mode.
+    INTEGRATION_MODE = IntegrationMode.PYTEST
     """
 )
 
 # A live run of an operator pipe that needs no inference, in-process, so the "Output of pipe" panel every
 # operator prints is on the path. Rich must still be absent from the process when the run is over.
+#
+# `needs_model_specs=False` is what makes the boot runnable on a machine that has never configured
+# inference — a CI runner, that is. The bundle below names no model, so the Pipelex service's published
+# specs are of no use to it: the boot takes the dummy-specs branch, which asks for neither the gateway
+# terms nor the network. `needs_inference` stays True on purpose — a keyless boot forces every run to DRY,
+# and the dry path does not print the "Output of pipe" panel, which is the Rich reach under test.
 _RUN_SCRIPT = _NO_RICH_PRELUDE + textwrap.dedent(
     """
     import asyncio
@@ -62,6 +72,7 @@ _RUN_SCRIPT = _NO_RICH_PRELUDE + textwrap.dedent(
 
     Pipelex.make(
         integration_mode=INTEGRATION_MODE,
+        needs_model_specs=False,
         config_overrides={"runtime": {"log": {"sink": "json", "pretty_print_mode": sys.argv[1]}}},
     )
     result = asyncio.run(PipelexMTHDSProtocol().execute(mthds_contents=[BUNDLE], inputs={"name": {"concept": "Text", "content": "world"}}))
@@ -74,7 +85,9 @@ _RUN_SCRIPT = _NO_RICH_PRELUDE + textwrap.dedent(
 )
 
 # The pretty-print mode "rich" needs Rich: a boot without it stops at boot, naming the extra and the
-# Rich-free modes, rather than at the first pipe that prints its output.
+# Rich-free modes, rather than at the first pipe that prints its output. `needs_model_specs=False` for
+# the same reason as above: the refusal under test must be the one Rich's absence raises, on a machine
+# where inference was never set up as much as on one where it was.
 _RICH_MODE_BOOT_SCRIPT = _NO_RICH_PRELUDE + textwrap.dedent(
     """
     from pipelex.system.exceptions import MissingDependencyError
@@ -82,6 +95,7 @@ _RICH_MODE_BOOT_SCRIPT = _NO_RICH_PRELUDE + textwrap.dedent(
     try:
         Pipelex.make(
             integration_mode=INTEGRATION_MODE,
+            needs_model_specs=False,
             config_overrides={"runtime": {"log": {"sink": "json", "pretty_print_mode": "rich"}}},
         )
     except MissingDependencyError as exc:

@@ -107,6 +107,8 @@ The test runs, in a subprocess, what a server does. A meta-path finder installed
 
 A subprocess is required rather than preferred: the test process has Rich loaded, since the suite installs every extra, and evicting it from `sys.modules` would leave duplicate classes behind for every later test.
 
+Every one of those boots asks for no model specs (`needs_model_specs=False`), which is what lets the test run where inference was never set up — a CI runner — because that branch of the boot wants neither the gateway terms nor the network. `needs_inference` stays true on purpose: a keyless boot forces every run this process starts to DRY, and the dry path never prints the "Output of pipe" panel, which is the Rich reach the test is here for.
+
 The test blocks Rich rather than checking that it is absent from an ordinary environment, because an environment is not the measure. Whether Rich is installed also depends on what the other dependencies of `pipelex` require, and some third-party packages import Rich whenever it is installed. What the runtime owns is that it never needs Rich on a server's path, and that is what the blocked run measures.
 
 `tests/unit/pipelex/tools/test_log_console_sink_without_rich.py` pins the `console` sink's own refusal the same way, and `tests/unit/pipelex/tools/misc/test_plain_markup_text.py` compares the Rich-free markup reading with Rich's.
