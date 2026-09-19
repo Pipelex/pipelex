@@ -4,9 +4,10 @@ Logging is configured as soon as the configuration is read, and the sink is a ca
 discovery hands over a little later in the boot. The records emitted in between are held here, in
 order, and replayed through the sink's handler the moment it is installed, so a boot's own lines are
 rendered by the sink the configuration chose rather than dropped or written in a shape nothing chose.
-A boot that dies before a sink arrives closes this handler, and what it still holds gets the stdlib's
-last-resort treatment: a warning or worse reaches stderr and the rest is dropped, exactly as a record
-emitted before ``configure`` would be.
+A boot that dies before a sink arrives closes this handler, and what it still holds reaches stderr
+through the stdlib's last resort — every record of it, since the root logger's level already admitted
+them and that level came from the configuration, so each held line is one this process was asked to
+show. A boot that failed is when that trail is worth most.
 """
 
 from __future__ import annotations
@@ -15,17 +16,11 @@ import logging
 
 from typing_extensions import override
 
+from pipelex.tools.log.log_fields import FORWARDED_MARK
+
 # The most records held at once; beyond it the oldest are dropped, so a process that configures
 # logging and never installs a sink cannot grow without bound. A boot holds a few dozen lines.
 HOLDING_CAPACITY = 1000
-
-# The attribute a forwarded record carries once the sink's handler has handled it, so the same record
-# reaching that handler again through the root logger is rejected. The underscore is a convention and
-# nothing more: a fresh record does not carry the name, so nothing in the stdlib stops a caller's
-# ``extra`` from spelling it and having its own record rejected from every sink. What stops that is
-# ``attach_log_record_extra``, which counts the mark among the names a record owns and carries such an
-# entry under the ``field_`` prefix, exactly as it does for ``message`` and ``asctime``.
-FORWARDED_MARK = "_pipelex_forwarded"
 
 
 class ForwardedRecordFilter(logging.Filter):
@@ -37,6 +32,10 @@ class ForwardedRecordFilter(logging.Filter):
     so the sink's processors never run on a record it rejects, and it stays installed: after the
     handoff no record is marked again, and a thread that read the root's handler list mid-handoff
     can still be on its way.
+
+    The mark is only ever ours, and that is a property of the attachment rather than of the spelling:
+    the name is reserved in ``log_fields``, so a caller's field spelling it is carried under a prefix
+    and cannot make this filter drop a record nobody delivered.
     """
 
     @override
@@ -92,6 +91,11 @@ class HoldingLogHandler(logging.Handler):
 
         One record the handler cannot render, a line Rich reads as unbalanced markup for one, gets the
         stdlib's own recovery, ``handleError``, and costs none of the records after it.
+
+        A drained record is marked after its delivery exactly as a forwarded one is, and for the same
+        reason: a thread that read the root logger's handler list before the handoff can still reach the
+        sink's handler carrying a record this drain has already delivered, and the mark is the only thing
+        that tells the handler's guard so.
         """
         self.acquire()
         try:
@@ -99,12 +103,21 @@ class HoldingLogHandler(logging.Handler):
             self._released_to = handler
             for record in held:
                 _deliver(handler=handler, record=record)
+                setattr(record, FORWARDED_MARK, True)
         finally:
             self.release()
 
     @override
     def close(self) -> None:
-        """Give what is still held the stdlib's last-resort handling: a warning or worse reaches stderr."""
+        """Give what is still held the stdlib's last-resort handling: every held record reaches stderr.
+
+        Every one of them, and not only a warning or worse. The last resort's own level is meant for a
+        record emitted before anything was configured, where nobody has said what is worth seeing; these
+        records passed the root logger's level, which ``configure`` set from the configuration, so each one
+        is a line this process was asked to show. The only moment this runs with anything still held is a
+        boot that died before its sink arrived, which is exactly when the trail a verbose run was turned on
+        to produce is the thing being looked for.
+        """
         self.acquire()
         try:
             held, self._held = self._held, []
@@ -113,6 +126,5 @@ class HoldingLogHandler(logging.Handler):
         last_resort = logging.lastResort
         if last_resort is not None:
             for record in held:
-                if record.levelno >= last_resort.level:
-                    last_resort.handle(record)
+                last_resort.handle(record)
         super().close()

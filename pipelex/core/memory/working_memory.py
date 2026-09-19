@@ -565,7 +565,14 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     ################################################################################################
 
     def smart_dump(self) -> dict[str, Any]:
-        """Serialize the working memory as a dictionary."""
+        """Serialize the working memory as a dictionary.
+
+        Each stuff comes out in the standard's wire form, ``{"concept": "<domain>.<Code>",
+        "content": …}`` beside its ``stuff_code`` and ``stuff_name``: ``StuffAbstract``
+        serializes ``concept`` as the ref string, so the definition the in-memory ``Concept``
+        carries never leaves the runtime. The dump is one-way — a reader resolves each ref
+        through the concept library the method loads.
+        """
         return self.model_dump(serialize_as_any=True)
 
     def dump_for_transport(self) -> dict[str, Any]:
@@ -574,7 +581,8 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         Like smart_dump(), but serializes ListContent as a plain list instead of
         ``{"items": [...]}``.  This removes the ambiguity at hydration time: a
         ``list`` content value is always a ListContent, a ``dict`` is always a
-        single StuffContent.
+        single StuffContent. Each stuff's ``concept`` is the ref string here too;
+        the hydrator resolves it through the library the far side has loaded.
 
         Per-item type metadata for the list path is written under the
         pipelex-private keys ``__pipelex_class__`` / ``__pipelex_module__``

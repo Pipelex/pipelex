@@ -21,6 +21,16 @@ class ConceptLibraryAbstract(ConceptProviderAbstract):
         pass
 
     @abstractmethod
+    def add_dependency_concept(self, *, alias: str, concept: Concept) -> None:
+        """Add a concept a dependency package contributed, keyed under that dependency's alias.
+
+        Declared here rather than on the concrete library because the aliased key is half of what
+        :meth:`ConceptProviderAbstract.resolve_wire_concept_ref` reads back: a bare `<domain>.<Code>`
+        off the wire finds a dependency's concept only through this entry, so a caller holding the
+        abstraction must be able to create one.
+        """
+
+    @abstractmethod
     def remove_concepts_by_concept_refs(self, concept_refs: list[str]) -> None:
         pass
 

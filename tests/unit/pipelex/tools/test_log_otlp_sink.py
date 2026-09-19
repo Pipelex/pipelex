@@ -20,6 +20,7 @@ from opentelemetry.semconv.attributes import exception_attributes
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX
 from pipelex.tools.log.log_redaction import REDACTED_TEXT
 from pipelex.tools.log.otlp_log_sink import FLUSH_TIMEOUT_MILLIS, ExportPathFilter, OtlpLogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -142,6 +143,44 @@ class TestOtlpLogSink:
             assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip() == "ValueError: upstream quota exceeded"
         finally:
             fresh.reset()
+
+    def test_the_semantic_convention_keys_are_reserved_with_or_without_an_exception(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+        """The sink writes these keys itself, so a field named like one is prefixed rather than overwritten.
+
+        Reserved whether or not the record carries an exception, exactly as the json sink reserves its own
+        keys on every line: a field's wire name must not depend on an exception being active, and the same
+        field must not survive one sink and vanish on another. ``exception.message`` is reserved on the same
+        terms though the sink no longer writes it — the rendering it used to carry, ``str(exc_value)``, is
+        the one the redaction processor never sees — so a field named like it is prefixed all the same.
+        """
+        fresh, exporter = otlp_log
+        supplied = {
+            code_attributes.CODE_FILE_PATH: "supplied/path.py",
+            code_attributes.CODE_LINE_NUMBER: 999,
+            code_attributes.CODE_FUNCTION_NAME: "supplied_function",
+            exception_attributes.EXCEPTION_TYPE: "SuppliedError",
+            exception_attributes.EXCEPTION_MESSAGE: "supplied message",
+            exception_attributes.EXCEPTION_STACKTRACE: "supplied stacktrace",
+        }
+        fresh.info("no exception", fields=supplied)
+        try:
+            msg = "boom"
+            raise ValueError(msg)
+        except ValueError:
+            fresh.error("with exception", include_exception=True, fields=supplied)
+
+        without, with_exception = _own_logs(exporter)
+        for log_data in (without, with_exception):
+            attributes = _attributes(log_data)
+            for name, value in supplied.items():
+                assert attributes[f"{COLLIDING_FIELD_PREFIX}{name}"] == value
+            assert attributes[code_attributes.CODE_FILE_PATH] == __file__
+            assert attributes[code_attributes.CODE_LINE_NUMBER] > 0
+            assert attributes[code_attributes.CODE_FUNCTION_NAME] == "test_the_semantic_convention_keys_are_reserved_with_or_without_an_exception"
+        assert _attributes(with_exception)[exception_attributes.EXCEPTION_TYPE] == "ValueError"
+        assert _attributes(with_exception)[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith("ValueError: boom")
+        assert exception_attributes.EXCEPTION_MESSAGE not in _attributes(with_exception)
+        assert exception_attributes.EXCEPTION_TYPE not in _attributes(without)
 
     @pytest.mark.parametrize(
         ("method_name", "severity_text", "severity_number"),

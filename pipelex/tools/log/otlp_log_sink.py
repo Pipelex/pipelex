@@ -3,12 +3,14 @@
 Each record becomes one OTel log record on the logger named after the emitting module: the message
 is the body, the level maps onto the OTel severity scale, the record's fields, context identifiers and
 ``data`` ride as attributes, with a value the wire cannot carry as is written as JSON text, and an
-exception lands under the ``exception.type`` and ``exception.stacktrace`` semantic-convention keys,
-the stacktrace being the record's rendered exception text so that what the redaction processor
-scrubbed is what leaves. The records the sink's own export
-path emits, the SDK's and the transport's, are rejected by a filter on the handler and never
-exported. This module imports the OpenTelemetry SDK at load, which is why the built-in plugin imports
-it inside the ``otlp`` factory and nowhere else.
+exception lands under the ``exception.*`` semantic-convention keys, the stacktrace being the record's
+rendered exception text so that what the redaction processor scrubbed is what leaves. The
+semantic-convention keys the sink writes itself — the source location and the exception — are reserved
+whether or not the record carries an exception, exactly as the ``json`` sink reserves its own keys: a
+field named like one is carried under the same ``field_`` prefix, so the same field survives a change of
+sink. The records the sink's own export path emits, the SDK's and the transport's, are rejected by a
+filter on the handler and never exported. This module imports the OpenTelemetry SDK at load, which is why
+the built-in plugin imports it inside the ``otlp`` factory and nowhere else.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from opentelemetry.semconv._incubating.attributes import code_attributes  # ruff
 from opentelemetry.semconv.attributes import exception_attributes
 from typing_extensions import override
 
-from pipelex.tools.log.log_fields import carried_attributes
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
 from pipelex.tools.log.log_sink import LogSink, render_json
 
@@ -50,6 +52,21 @@ OTEL_LOGGER_PREFIX = "opentelemetry"
 FLUSH_TIMEOUT_MILLIS = 5000
 
 _ATTRIBUTE_SCALAR_TYPES = (str, bool, int, float)
+
+# The semantic-convention keys the sink writes itself, reserved on every record whether or not it carries
+# an exception: a field named like one is carried under the same ``field_`` prefix the record uses for a
+# name the stdlib owns, so no value is lost, a field keeps one wire name whatever the record holds, and the
+# same field survives this sink as it survives the ``json`` one.
+RESERVED_ATTRIBUTE_KEYS = frozenset(
+    {
+        code_attributes.CODE_FILE_PATH,
+        code_attributes.CODE_FUNCTION_NAME,
+        code_attributes.CODE_LINE_NUMBER,
+        exception_attributes.EXCEPTION_TYPE,
+        exception_attributes.EXCEPTION_MESSAGE,
+        exception_attributes.EXCEPTION_STACKTRACE,
+    },
+)
 
 
 class ExportPathFilter(logging.Filter):
@@ -149,10 +166,18 @@ class OtlpLogHandler(logging.Handler):
 
     @staticmethod
     def _attributes(*, record: logging.LogRecord) -> dict[str, Any]:
-        attributes: dict[str, Any] = {name: _attribute_value(value=value) for name, value in carried_attributes(record=record).items()}
-        attributes[code_attributes.CODE_FILE_PATH] = record.pathname
-        attributes[code_attributes.CODE_FUNCTION_NAME] = record.funcName
-        attributes[code_attributes.CODE_LINE_NUMBER] = record.lineno
+        """The record's source location, its exception and everything it carries, the sink's own keys first.
+
+        The sink's keys go down before the carried attributes so that a field named like one is prefixed
+        rather than silently overwriting the location or the exception it names — and the reservation covers
+        every one of them whether or not this record has an exception, so a field's wire name never depends
+        on that.
+        """
+        attributes: dict[str, Any] = {
+            code_attributes.CODE_FILE_PATH: record.pathname,
+            code_attributes.CODE_FUNCTION_NAME: record.funcName,
+            code_attributes.CODE_LINE_NUMBER: record.lineno,
+        }
         if record.exc_info:
             exc_type, exc_value, exc_traceback = record.exc_info
             if exc_type is not None:
@@ -166,6 +191,11 @@ class OtlpLogHandler(logging.Handler):
                 attributes[exception_attributes.EXCEPTION_STACKTRACE] = record.exc_text
             elif exc_value is not None:
                 attributes[exception_attributes.EXCEPTION_STACKTRACE] = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+        for name, value in carried_attributes(record=record).items():
+            key = name
+            while key in attributes or key in RESERVED_ATTRIBUTE_KEYS:
+                key = f"{COLLIDING_FIELD_PREFIX}{key}"
+            attributes[key] = _attribute_value(value=value)
         return attributes
 
 

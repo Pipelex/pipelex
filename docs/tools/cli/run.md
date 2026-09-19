@@ -214,7 +214,7 @@ The output JSON contains the complete working memory after pipeline execution, i
 
 ### The results directory
 
-Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on). With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer.
+Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on). With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer. In `working_memory.json` each stuff names its concept by ref — `{"stuff_code": …, "stuff_name": …, "concept": "<domain>.<Code>", "content": …}` — and carries no concept definition; see [Working Memory](../../building-methods/pipes/working-memory.md#in-memory-and-on-the-wire).
 
 Beside `graphspec.json`, and gated by the same `graphspec_json` flag, the run writes the three files that describe the data the graph carries:
 
