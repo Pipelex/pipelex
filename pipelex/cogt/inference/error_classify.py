@@ -78,6 +78,14 @@ _STATUSLESS_BY_TYPE_NAME: dict[str, tuple[InferenceErrorCategory, UserActionKind
     "LinkupFetchUrlIsFileError": (InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
     "LinkupFailedFetchError": (InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
     "LinkupUnknownError": (InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+    # TypeSafe's client-side refusal: the SDK validates a request it will not send (an empty
+    # questions map, a rating with no levels) and raises the bare base class, with no status, no
+    # body and no request id. Every one of those is a shape our own blueprint validation is
+    # supposed to have refused first, so it is a Pipelex defect rather than a vendor failure —
+    # CONFIGURATION says nothing the caller wrote caused it and CONTACT_SUPPORT says who can fix
+    # it. Its HTTP-reaching siblings (``TypeSafeAPITimeoutError``, ``TypeSafeAPIConnectionError``)
+    # never arrive here: ``is_network_error`` matches their names first.
+    "TypeSafeError": (InferenceErrorCategory.CONFIGURATION, UserActionKind.CONTACT_SUPPORT),
     # FAL's typed credential failure — raised before any HTTP call when the API key is unset
     "MissingCredentialsError": (InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
     # FAL's generic SDK error (base class) — caught last in the worker; HTTP/timeout variants

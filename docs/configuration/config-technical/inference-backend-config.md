@@ -72,6 +72,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── vertexai.toml       # Google Vertex AI models (LLMs)
     │   ├── fal.toml            # FAL models (image generation)
     │   ├── linkup.toml          # Linkup models (web search)
+    │   ├── typesafe.toml       # TypeSafe models (judgment)
     │   ├── internal.toml       # Internal/local models (OCR)
     │   └── ...
     └── deck/                   # Model deck configurations
@@ -257,6 +258,8 @@ GCP_CREDENTIALS_FILE_PATH=gcp_credentials.json
 FAL_API_KEY=
 
 LINKUP_API_KEY=
+
+TYPESAFE_API_KEY=
 # ... (see .env.example for full list)
 ```
 
@@ -285,12 +288,18 @@ api_key = "${FAL_API_KEY}"
 enabled = true
 api_key = "${LINKUP_API_KEY}"
 
+[typesafe]
+enabled = true
+api_key = "${TYPESAFE_API_KEY}"
+
 [internal]
 enabled = true
 # No API key needed for internal/local processing
 ```
 
 The `${VARIABLE_NAME}` syntax automatically loads values from your `.env` file. Set `enabled = true` to activate a backend, or `false` to disable it.
+
+Judgment models are never served by the Pipelex Gateway, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
 
 ### Model Specifications
 

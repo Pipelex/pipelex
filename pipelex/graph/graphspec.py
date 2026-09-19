@@ -279,10 +279,11 @@ class ModelUsageSpec(BaseModel):
 
     inference_model_name: str
     inference_model_id: str
-    # Kind of inference: "llm", "img_gen", "extract", "search". The discriminator a
+    # Kind of inference: "llm", "img_gen", "extract", "search", "judgment". The discriminator a
     # consumer needs before displaying token counts: extract/search/img_gen are billed
     # PER REQUEST, and that price is encoded by putting 1_000_000 in each token
     # category (rates are per-million), so their "tokens" are a scaled request counter.
+    # llm and judgment report the real tokens the provider read and wrote.
     model_type: str
     inference_calls: int = 0
     rated_inference_calls: int = 0

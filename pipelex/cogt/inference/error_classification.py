@@ -385,7 +385,13 @@ class ProviderErrorMetadata(BaseModel):
             case ProviderName.GATEWAY:
                 return _is_quota_exhaustion_gateway(self.message, status_code=self.status_code or 0)
             case (
-                ProviderName.AZURE | ProviderName.FAL | ProviderName.HUGGINGFACE | ProviderName.LINKUP | ProviderName.DOCLING | ProviderName.PYPDFIUM2
+                ProviderName.AZURE
+                | ProviderName.FAL
+                | ProviderName.HUGGINGFACE
+                | ProviderName.LINKUP
+                | ProviderName.TYPESAFE
+                | ProviderName.DOCLING
+                | ProviderName.PYPDFIUM2
             ):
                 return False
 
@@ -1323,6 +1329,69 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds=None,
         provider_error_code=type(exc).__name__,
         body=None,
+    )
+
+
+# The ``error_type`` values TypeSafe puts in an object-shaped ``detail``. Spelled here rather than
+# in the provider package because ``provider_error_code`` is this module's field and the classifier
+# reads it: a value that never appears here is a value nothing downstream can branch on.
+TYPESAFE_AUTHENTICATION_ERROR_TYPE = "authentication_error"
+TYPESAFE_MAX_TOKENS_EXCEEDED_ERROR_TYPE = "max_tokens_exceeded"
+TYPESAFE_API_USAGE_ERROR_TYPE = "api_usage_error"
+
+# What a bare-string ``detail`` is reported as. TypeSafe answers 400 with a plain sentence for the
+# question-shape refusals — "Noul question must have criteria or instructions: q", "Too many score
+# levels. Must have at most 10 levels." — and carries no ``error_type`` at all. The absence is the
+# signal, so it is given a code of its own instead of leaving ``provider_error_code`` empty, which
+# would make "the body said nothing" indistinguishable from "there was no body".
+TYPESAFE_MALFORMED_REQUEST_CODE = "pipelex_typesafe_malformed_request"
+
+
+def _typesafe_detail(*, body: Any) -> Any | None:
+    """The ``detail`` member of a TypeSafe error body, whatever shape it has."""
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(body, dict):
+        return cast("dict[str, Any]", body).get("detail")
+    return None
+
+
+def extract_typesafe_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a TypeSafe SDK exception into a ``ProviderErrorMetadata``.
+
+    Two exception shapes reach here and they carry different things. A ``TypeSafeAPIError``
+    subclass reached the server and carries ``status``, ``body``, ``endpoint`` and a ``request_id``
+    that is declared ``str | None`` and safe to read plainly. A bare ``TypeSafeError`` is the SDK
+    refusing before it sent anything — no status, no body, no request id — and the absent status is
+    what routes it to the status-less arm of the classifier.
+
+    ``provider_error_code`` is the discriminator the status cannot supply. Every validation failure
+    this API produces is a ``400``, covering an illegal question, an oversized state and an unknown
+    model alike, so the code is lifted out of the body: the ``error_type`` of an object-shaped
+    ``detail``, or ``TYPESAFE_MALFORMED_REQUEST_CODE`` when ``detail`` is a bare sentence.
+    """
+    body = getattr(exc, "body", None)
+    detail = _typesafe_detail(body=body)
+    provider_error_code: str | None = None
+    if isinstance(detail, dict):
+        error_type = cast("dict[str, Any]", detail).get("error_type")
+        if isinstance(error_type, str):
+            provider_error_code = error_type
+    elif isinstance(detail, str):
+        provider_error_code = TYPESAFE_MALFORMED_REQUEST_CODE
+    request_id = getattr(exc, "request_id", None)
+    return ProviderErrorMetadata(
+        provider=ProviderName.TYPESAFE,
+        sdk_exception_type=type(exc).__name__,
+        message=str(exc),
+        status_code=getattr(exc, "status", None),
+        request_id=request_id if isinstance(request_id, str) else None,
+        retry_after_seconds=None,
+        provider_error_code=provider_error_code,
+        body=body,
     )
 
 

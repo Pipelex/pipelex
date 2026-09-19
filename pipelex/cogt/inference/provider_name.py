@@ -22,6 +22,7 @@ class ProviderName(StrEnum):
     HUGGINGFACE = "huggingface"
     GATEWAY = "gateway"
     LINKUP = "linkup"
+    TYPESAFE = "typesafe"
     DOCLING = "docling"
     PYPDFIUM2 = "pypdfium2"
 
@@ -47,5 +48,6 @@ class ProviderName(StrEnum):
                 | ProviderName.HUGGINGFACE
                 | ProviderName.GATEWAY
                 | ProviderName.LINKUP
+                | ProviderName.TYPESAFE
             ):
                 return False
