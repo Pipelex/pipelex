@@ -1,4 +1,6 @@
 import pytest
+from httpx2 import Headers
+from typesafe_sdk import TypeSafeAPIError, TypeSafeAuthenticationError, TypeSafeInternalServerError, TypeSafeRateLimitError
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, JudgmentJobFailureError, JudgmentModelNotFoundError
 from pipelex.cogt.inference.error_classification import (
@@ -103,6 +105,47 @@ class TestTypesafeErrorClassification:
         assert classification.category is category
         assert classification.user_action_kind is user_action_kind
         assert classification.is_model_not_found is is_model_not_found
+
+    @pytest.mark.parametrize(
+        ("exception", "category", "user_action_kind"),
+        [
+            pytest.param(
+                TypeSafeRateLimitError(status=429, body={"detail": "Rate limit exceeded"}, headers=Headers()),
+                InferenceErrorCategory.TRANSIENT,
+                UserActionKind.WAIT_AND_RETRY,
+                id="rate_limit",
+            ),
+            pytest.param(
+                TypeSafeInternalServerError(status=503, body={"detail": "Service Unavailable"}, headers=Headers()),
+                InferenceErrorCategory.TRANSIENT,
+                UserActionKind.WAIT_AND_RETRY,
+                id="unavailable",
+            ),
+            pytest.param(
+                TypeSafeAuthenticationError(status=401, body={"detail": "Not authenticated"}, headers=Headers()),
+                InferenceErrorCategory.CONFIGURATION,
+                UserActionKind.CHECK_CREDENTIALS,
+                id="unauthenticated",
+            ),
+        ],
+    )
+    def test_a_bare_sentence_off_a_400_goes_to_the_status_ladder(
+        self,
+        exception: TypeSafeAPIError,
+        category: InferenceErrorCategory,
+        user_action_kind: UserActionKind,
+    ) -> None:
+        """Only a `400` with a bare-sentence detail is a malformed request; any other status keeps its own verdict."""
+        metadata = extract_typesafe_metadata(exception)
+        classification = classify_typesafe_error(metadata)
+
+        assert metadata.provider_error_code is None
+        assert classification.category is category
+        assert classification.user_action_kind is user_action_kind
+
+    def test_a_rate_limit_carries_its_retry_after(self) -> None:
+        exception = TypeSafeRateLimitError(status=429, body={"detail": "Rate limit exceeded"}, headers=Headers({"retry-after": "3"}))
+        assert extract_typesafe_metadata(exception).retry_after_seconds == 3.0
 
     def test_an_api_error_carries_its_request_id(self) -> None:
         """On the error path the request id is a plain attribute, read without the guard the success path needs."""

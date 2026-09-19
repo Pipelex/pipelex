@@ -30,7 +30,7 @@ def make_typesafe_client(*, backend: InferenceBackend) -> AsyncTypeSafeClient:
     with no interference — which is why the plugin caches it in the ``SdkClientRegistry`` rather
     than building one per worker.
     """
-    if backend.api_key is None:
+    if not backend.api_key:
         msg = f"Inference backend '{backend.name}' has no API key configured, so TypeSafe judgments cannot be requested"
         raise TypesafeError(msg)
     return AsyncTypeSafeClient(

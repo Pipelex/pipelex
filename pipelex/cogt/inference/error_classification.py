@@ -10,6 +10,7 @@ import json
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from enum import StrEnum
+from http import HTTPStatus
 from typing import Any, TypeAlias, cast
 
 import httpx
@@ -1339,7 +1340,7 @@ TYPESAFE_AUTHENTICATION_ERROR_TYPE = "authentication_error"
 TYPESAFE_MAX_TOKENS_EXCEEDED_ERROR_TYPE = "max_tokens_exceeded"
 TYPESAFE_API_USAGE_ERROR_TYPE = "api_usage_error"
 
-# What a bare-string ``detail`` is reported as. TypeSafe answers 400 with a plain sentence for the
+# What a bare-string ``detail`` on a ``400`` is reported as. TypeSafe answers 400 with a plain sentence for the
 # question-shape refusals — "Noul question must have criteria or instructions: q", "Too many score
 # levels. Must have at most 10 levels." — and carries no ``error_type`` at all. The absence is the
 # signal, so it is given a code of its own instead of leaving ``provider_error_code`` empty, which
@@ -1371,25 +1372,32 @@ def extract_typesafe_metadata(exc: BaseException) -> ProviderErrorMetadata:
     ``provider_error_code`` is the discriminator the status cannot supply. Every validation failure
     this API produces is a ``400``, covering an illegal question, an oversized state and an unknown
     model alike, so the code is lifted out of the body: the ``error_type`` of an object-shaped
-    ``detail``, or ``TYPESAFE_MALFORMED_REQUEST_CODE`` when ``detail`` is a bare sentence.
+    ``detail``, or ``TYPESAFE_MALFORMED_REQUEST_CODE`` when a ``400``'s ``detail`` is a bare
+    sentence. A bare sentence on any other status says nothing the status does not, so a rate limit
+    or an outage answered in that shape keeps the status ladder's verdict.
     """
     body = getattr(exc, "body", None)
+    status_code = getattr(exc, "status", None)
     detail = _typesafe_detail(body=body)
     provider_error_code: str | None = None
     if isinstance(detail, dict):
         error_type = cast("dict[str, Any]", detail).get("error_type")
         if isinstance(error_type, str):
             provider_error_code = error_type
-    elif isinstance(detail, str):
+    elif isinstance(detail, str) and status_code == HTTPStatus.BAD_REQUEST:
         provider_error_code = TYPESAFE_MALFORMED_REQUEST_CODE
     request_id = getattr(exc, "request_id", None)
+    headers = getattr(exc, "headers", None)
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     return ProviderErrorMetadata(
         provider=ProviderName.TYPESAFE,
         sdk_exception_type=type(exc).__name__,
         message=str(exc),
-        status_code=getattr(exc, "status", None),
+        status_code=status_code,
         request_id=request_id if isinstance(request_id, str) else None,
-        retry_after_seconds=None,
+        retry_after_seconds=retry_after_seconds,
         provider_error_code=provider_error_code,
         body=body,
     )

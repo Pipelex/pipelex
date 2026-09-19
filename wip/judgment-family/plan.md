@@ -141,15 +141,30 @@ Two things, both recorded in `design.md` in the same change.
 
 **What waits elsewhere.** The Temporal activity and queue for the leaf are L-260919-9da413, owned by `pipelex-server/temporal`; the protocol's missing `judgment` model category is L-260919-afb6c0 in `mthds`, which a judgment *preset* would make live — the kit ships none.
 
-**What is left of phase 2, for a session starting cold.** Everything is committed on `feature/Typesafe-backend`, and `make agent-check`, the full `make agent-test` and `make ti PROF=typesafe TEST=judgment` all passed on the committed tree; the live tests skip under the default profile after `make rtm`. What remains:
+**Review round 1 (profile 4, bar `open`).** `ledger review-profile` measures a branch only against `origin/dev`, which would have re-read phase 1 in 2a's review and phases 1 and 2a in 2b's, so each layer was reviewed as a commit target: 2a's "Add the judgment inference family at the cogt level" and 2b's "Serve the judgment family from TypeSafe". Reviewers were cubic and the official code-review at medium; one verifier checked the fix group. Eight confirmed findings were fixed, 2a's in the commit "Apply the round 1 review of the judgment family" and 2b's in "Apply the round 1 review of the TypeSafe backend":
 
-- Run `/rev` on each branch before its pull request opens — 2a's `feature/Judgment-cogt-family` against `feature/Judgment-family`, and 2b's `feature/Typesafe-backend` against `feature/Judgment-cogt-family`. Neither has a recorded review pass.
+- The deck's `judgment` section is defaulted. Required, it failed the boot of every deck installed before `5_judgment_deck.toml` existed — including the checked-in decks of `pipelex-server/worker`, `pipelex-api`, `pipelex-cookbook` and `cocode` — with a remedy pointing at `pipelex init config`.
+- The worker's answer guard refuses an option the question does not list and a level beyond its scale, in the verdict and in its distribution's keys.
+- A plain-sentence `detail` is a malformed request only on a `400`; a rate limit, an outage or a refused key answered in that shape keeps the status ladder's verdict.
+- The TypeSafe extractor reads `retry-after` like every other extractor with headers, and the client factory refuses an empty key as well as an absent one.
+- Smaller: the deck-directory docs list the judgment file, a stale generated fixtures file names `make regenerate-test-models` instead of interrupting collection, and the worker contract test imports its data from the root package.
+
+Rejected: the stale `ModelUsageSpec.model_type` comment (2b rewrites it), and an empty `TYPESAFE_API_KEY` reaching the SDK (an empty variable is treated as unset before any backend is built).
+
+**Deferred from round 1, unverified** — each is a reviewer's claim nobody has checked:
+
+- The status-less `TypeSafeError` verdict sits in the shared classifier's `_STATUSLESS_BY_TYPE_NAME` table (`pipelex/cogt/inference/error_classify.py`) rather than in `classify_typesafe_error`, which splits one provider's verdicts across two modules. Worth deciding with the next backend: either vendor exception names belong in that table or none do.
+- `_from_typesafe_answer` takes `typesafe_answer: Any` (`pipelex/providers/typesafe/typesafe_translation.py`), where the SDK's answer union would let the checker see its three `isinstance` arms.
+
+**`[typesafe]` ships enabled**, like Linkup, decided on 2026-09-19. It was verified to behave identically: a live boot without `TYPESAFE_API_KEY` fails naming `'typesafe'`, and a keyless boot succeeds. `pipelex update` touches only the deck, so upgraders never receive the table; only a fresh `pipelex init` meets it.
+
+**What is left of phase 2, for a session starting cold.** `make agent-check`, the full `make agent-test` and `make ti PROF=typesafe TEST=judgment` passed before review; the live tests skip under the default profile after `make rtm`. What remains:
+
+- A second review round, which the ladder owes after a round that fixed code. The 2b pass of round 1 is recorded on the commit the reviewers read, which the rebase onto the fixed 2a replaced, so the merge gate does not count it on its own.
 - Open the two pull requests, each targeting the branch below it: 2a with `Advances L-260919-502f36`, 2b with `Closes L-260919-502f36`. Phase 1 (PR #1214) merges first.
-- Decide whether `[typesafe]` ships enabled. It ships enabled, like Linkup, which was verified to behave identically: a live boot without `TYPESAFE_API_KEY` fails naming `'typesafe'`, and a keyless boot succeeds. `pipelex update` touches only the deck, so upgraders never receive the table; only a fresh `pipelex init` meets it. This is the one open question for the user.
 
 **The traps met here**, all worth knowing before touching this branch:
 
-- A worktree's e2e CLI tests boot from the machine's **global** `~/.pipelex`, whose deck must carry `5_judgment_deck.toml`; copy the kit's file there if those tests fail with "Missing required fields: 'judgment'".
 - `make agent-check` runs the keyword-only fixer, which rewrote `TypesafePlugin.register` before its grant existed. Grant first (`make sgr FUNC=… RATIONALE=…`).
 - `make gei` and `make gep` must be rerun after any change to an error class; the identity snapshot test fails otherwise.
 
