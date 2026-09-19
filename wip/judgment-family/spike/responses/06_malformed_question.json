@@ -1,0 +1,25 @@
+{
+  "body": {
+    "detail": "Noul question must have criteria or instructions: q"
+  },
+  "class": "TypeSafeBadRequestError",
+  "endpoint": "POST https://api.typesafe.ai/v1/systemone",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "TypeSafeAPIError",
+    "TypeSafeError",
+    "Exception",
+    "BaseException"
+  ],
+  "request_id": "req_01a0b97ab1f575f69871f8b3006b6da2",
+  "response_headers": {
+    "content-length": "64",
+    "content-type": "application/json",
+    "date": "Sat, 19 Sep 2026 11:43:40 GMT",
+    "server": "istio-envoy",
+    "x-envoy-upstream-service-time": "10",
+    "x-typesafe-request-id": "req_01a0b97ab1f575f69871f8b3006b6da2"
+  },
+  "status": 400,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b97ab1f575f69871f8b3006b6da2)"
+}

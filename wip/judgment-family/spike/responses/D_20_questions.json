@@ -1,0 +1,89 @@
+{
+  "answers": {
+    "q00": {
+      "noul": 0.37,
+      "type": "noul"
+    },
+    "q01": {
+      "noul": 0.49,
+      "type": "noul"
+    },
+    "q02": {
+      "noul": 0.3,
+      "type": "noul"
+    },
+    "q03": {
+      "noul": 0.28,
+      "type": "noul"
+    },
+    "q04": {
+      "noul": 0.26,
+      "type": "noul"
+    },
+    "q05": {
+      "noul": 0.23,
+      "type": "noul"
+    },
+    "q06": {
+      "noul": 0.25,
+      "type": "noul"
+    },
+    "q07": {
+      "noul": 0.24,
+      "type": "noul"
+    },
+    "q08": {
+      "noul": 0.25,
+      "type": "noul"
+    },
+    "q09": {
+      "noul": 0.23,
+      "type": "noul"
+    },
+    "q10": {
+      "noul": 0.23,
+      "type": "noul"
+    },
+    "q11": {
+      "noul": 0.25,
+      "type": "noul"
+    },
+    "q12": {
+      "noul": 0.22,
+      "type": "noul"
+    },
+    "q13": {
+      "noul": 0.26,
+      "type": "noul"
+    },
+    "q14": {
+      "noul": 0.26,
+      "type": "noul"
+    },
+    "q15": {
+      "noul": 0.21,
+      "type": "noul"
+    },
+    "q16": {
+      "noul": 0.25,
+      "type": "noul"
+    },
+    "q17": {
+      "noul": 0.24,
+      "type": "noul"
+    },
+    "q18": {
+      "noul": 0.24,
+      "type": "noul"
+    },
+    "q19": {
+      "noul": 0.25,
+      "type": "noul"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 637,
+    "output_tokens": 364
+  }
+}

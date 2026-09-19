@@ -1,0 +1,25 @@
+{
+  "body": {
+    "detail": "Choice question must have at least one choice: q"
+  },
+  "class": "TypeSafeBadRequestError",
+  "endpoint": "POST https://api.typesafe.ai/v1/systemone",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "TypeSafeAPIError",
+    "TypeSafeError",
+    "Exception",
+    "BaseException"
+  ],
+  "request_id": "req_01a0b97a93df769a8a244afc18ade850",
+  "response_headers": {
+    "content-length": "61",
+    "content-type": "application/json",
+    "date": "Sat, 19 Sep 2026 11:43:33 GMT",
+    "server": "istio-envoy",
+    "x-envoy-upstream-service-time": "20",
+    "x-typesafe-request-id": "req_01a0b97a93df769a8a244afc18ade850"
+  },
+  "status": 400,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 Choice question must have at least one choice: q (request_id=req_01a0b97a93df769a8a244afc18ade850)"
+}

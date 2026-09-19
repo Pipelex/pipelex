@@ -1,0 +1,12 @@
+{
+  "body": {
+    "detail": {
+      "error_type": "api_usage_error",
+      "message": "Unknown model: jev"
+    }
+  },
+  "class": "TypeSafeBadRequestError",
+  "request_id": "req_01a0b97adf81711ea473ad3b20c8c757",
+  "status": 400,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev (request_id=req_01a0b97adf81711ea473ad3b20c8c757)"
+}
