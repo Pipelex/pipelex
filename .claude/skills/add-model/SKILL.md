@@ -1,341 +1,103 @@
 ---
 name: add-model
 description: >
-  Add a new AI model to the Pipelex inference system. Guides through all required
-  steps: backend TOML configuration (OpenAI, Azure, Anthropic, Google, etc.), kit
-  sync, test profile collections, and fixture regeneration. Use when the user says
-  "add a model", "add GPT-X", "add Claude X", "new model", "register a model",
-  "add Gemini X", "support model X", "add model to backend", or any variation of
-  introducing a new AI model to the inference configuration. Also use when the user
-  mentions a model name that doesn't exist in the backend configs yet and wants to
-  add it.
+  Add a new AI model to Pipelex's own inference configuration: the backend TOMLs in
+  `.pipelex/inference/backends/` (OpenAI, Azure, Anthropic, Bedrock, Google, Vertex,
+  Mistral and the rest), the kit copy, the test collections, live inference tests on
+  every backend it lands on, and the changelog entry. Use when the user says "add a
+  model", "add GPT-X", "add Claude X", "add Gemini X", "new model", "register a model",
+  "support model X", "add model to backend", or names a model that no backend TOML
+  declares yet and wants it available. The Pipelex Gateway and Manifold catalogs are
+  not in this repository: in the Pipelex workspace, the workspace-level `/add-model`
+  carries a model through them and runs this skill as its pipelex leg.
 ---
 
-# Add a New AI Model
+# Add a model to Pipelex
 
-This skill walks through all the steps needed to register a new AI model in the
-Pipelex inference system. The process touches several files across the codebase
-and must be done in order to keep everything consistent.
+A model is added once per backend that serves it. Each backend TOML under `.pipelex/inference/backends/` declares the models that backend can call, the kit copy under `pipelex/kit/configs/` is what ships in the package, and `.pipelex-dev/test_profiles.toml` decides which models the parametrized inference tests can select. Those are the files that declare a model; the steps below also write the changelog, and regenerate the goldens and references that follow from them.
 
-## Overview of what needs to happen
+Two backends are different: `pipelex_gateway` and `pipelex_manifold` take their model catalogs from the **remote config**, a versioned artifact the runtime fetches at boot from the URL in `pipelex/system/pipelex_service/pipelex_details.py` (overridable with `PIPELEX_REMOTE_CONFIG_URL`). Their local TOMLs only let a user override `sdk` and `structure_method` per model, so a model cannot be added to them from here. See step 8.
 
-1. **Identify the model** — which provider, what capabilities, what costs
-2. **Add to backend TOML(s)** — the model spec in each relevant backend config
-3. **Sync kit configs** — propagate `.pipelex/` changes into `pipelex/kit/configs/`
-4. **Add to test profile collections** — so the model is available for test selection
-5. **Run inference tests** — verify the model works end-to-end with real API calls (fixtures are auto-regenerated when `PROF=` is passed)
-6. **Gateway (manual)** — the user handles this separately since it's remote config
+## 1. Establish the facts, from the provider
 
-## Step 1: Gather model information
+Build a fact sheet before touching a file, and give every fact its source. The provider's own documentation is the primary source: its model page, its pricing page and its API reference name the exact model id, the input and output modalities, the prices, whether it reasons and how that is controlled, and which request parameters it refuses. Fetch those pages. OpenRouter is a useful cross-check for prices and modalities (`references/openrouter-price-lookup.md`), not a substitute: it lags new releases, and it cannot tell you which parameters a model deprecates.
 
-Before editing any files, collect the following from the user. If the user already
-provided some of this, confirm what you have and ask only for the missing pieces.
+| Fact | Where it goes | Watch for |
+|---|---|---|
+| Handle | The TOML table name, e.g. `[claude-5-sonnet]` | Follow the family's existing naming, which is often not the provider's: `claude-5-sonnet`, not `claude-sonnet-5` |
+| Model type | `model_type` when it differs from the file's `[defaults]` | `llm`, `img_gen`, `text_extractor` or `search` |
+| Model id per backend | `model_id`, omitted when it equals the handle | Direct APIs, Azure deployments, Bedrock inference profiles and Vertex ids all differ; copy the shape the sibling uses on that backend |
+| Inputs and outputs | `inputs`, `outputs` | Take the tokens from the sibling, because the runtime reads exact strings and a wrong one fails only when called. An LLM takes `text`, `images`, `pdf` (some hosts add `audio`, `video`) and outputs `text`, `structured`, and `audio` or `image` where it speaks or draws; a text extractor takes `pdf`, `image` (singular) or `web_page` and outputs `pages`; a search model outputs `sourced-answers`, `structured`; image generation outputs `image`. Declare `pdf` per backend: a backend that serves the model can still refuse documents |
+| SDK and structure method | `sdk`, `structure_method` | Both come from the file's `[defaults]`, and an entry overrides them where its family differs: the image-generation entries of `azure_openai.toml` replace the file's `azure_openai_responses` with `azure_rest_img_gen`. `sdk` has no default in code, so a wrong one boots and fails at the first call |
+| Costs | `costs = { input = …, output = … }` | USD per million tokens. Image models may price differently; copy the sibling's shape |
+| Thinking | `thinking_mode` | `none`, `manual` (a budget the caller sets) or `adaptive` (the model decides) |
+| Refused parameters | `listed_constraints`, `valued_constraints` | `temperature_unsupported`, `temperature_must_be_multiplied_by_2`, `max_tokens_must_be_high_enough`; `valued_constraints = { fixed_temperature = 1 }`. The vocabulary is `pipelex/cogt/model_backends/constraints.py` |
+| Limits | `max_tokens`, `max_prompt_images` | Only where the sibling declares them |
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| **Model name** | The handle used in Pipelex (the TOML section header) | `gpt-5.4` |
-| **Model type** | `llm`, `img_gen`, `text_extractor`, or `search` | `llm` |
-| **Provider** | Who made it — determines which backends to add it to | OpenAI |
-| **Backends** | Which backend TOML files to add it to | `openai`, `azure_openai` |
-| **Model ID** | The actual API model identifier (if different from name) | `gpt-5.4-2026-03-01` |
-| **Inputs** | Supported input types | `["text", "images", "pdf"]` |
-| **Outputs** | Supported output types | `["text", "structured"]` |
-| **Costs** | USD per million tokens `{ input = X, output = Y }` | `{ input = 2.0, output = 8.0 }` |
-| **Thinking mode** | `none`, `manual`, or `adaptive` | `manual` |
-| **Constraints** | Any special constraints (e.g. fixed temperature) | `{ fixed_temperature = 1 }` |
+A model spec declares nothing about how its prompts are formatted: templating style is authored on the pipe. And do not invent keys: a key the model-spec blueprint does not know fails the boot, unless it is a hyphenated header name with a plain string value, which is sent to the provider as an outbound HTTP header.
 
-### Looking up costs and capabilities
+## 2. Find the footprint from the nearest sibling
 
-If the user doesn't know the model's pricing or capabilities, look them up on
-OpenRouter. Read `references/openrouter-price-lookup.md` for the full API
-reference, but here's the quick version:
-
-1. Fetch `https://openrouter.ai/api/v1/models` (for LLMs) or
-   `https://openrouter.ai/api/frontend/models?category=image-generation` (for
-   image gen models).
-2. Filter the response for the model by `id` or `name` (e.g., `openai/gpt-5.4`).
-3. Convert prices from **per token** to **per million tokens** (multiply by
-   1,000,000). Example: `"prompt": "0.000002"` becomes `input = 2.0`.
-4. Map modalities: OpenRouter `image` -> our `images` (input) or `image` (output),
-   OpenRouter `file` -> our `pdf`. If `"tools"` is in `supported_parameters`,
-   add `"structured"` to outputs.
-
-### Determining which backends
-
-Each provider typically maps to specific backends:
-
-| Provider | Backends to add to |
-|----------|-------------------|
-| OpenAI | `openai` + `azure_openai` |
-| Anthropic | `anthropic` + `bedrock` |
-| Google | `google` + `vertexai` |
-| Mistral | `mistral` + `scaleway` |
-| Meta (Llama) | `groq`, `bedrock`, `ollama` (varies) |
-| xAI (Grok) | `xai` |
-
-The **gateway** (`pipelex_gateway`) is always a separate manual step — its config
-is fetched remotely. Remind the user about this at the end.
-
-### Backend-specific differences
-
-When adding a model to multiple backends, be aware of these differences:
-
-- **OpenAI direct**: `model_id` is often omitted (defaults to the section name).
-  SDK is `openai_responses`. May support `pdf` in inputs.
-- **Azure OpenAI**: `model_id` is always required (includes a date suffix like
-  `gpt-5.4-2026-03-01`). SDK is `azure_openai_responses`. Inputs typically use
-  `images` but not `pdf`. Image gen models use `azure_rest_img_gen` SDK and need
-  a `.rules` sub-table.
-- **Anthropic direct**: SDK is `anthropic`. Uses
-  `structure_method = "instructor/anthropic_tools"`. Often has `max_tokens` and
-  `max_prompt_images`.
-- **Bedrock**: SDK is `bedrock_converse`.
-- **Google direct**: SDK is `google`. Uses
-  `structure_method = "instructor/genai_tools"`.
-
-A model spec never declares how its prompts are formatted: templating style is an
-authoring decision on the pipe (`templating_style` on `PipeLLM`) with a single
-runtime default. Any key you write that the model-spec blueprint does not know is
-sent to the provider as an outbound HTTP header — so do not invent fields.
-
-Each backend TOML has a `[defaults]` section — the model entry only needs to
-specify fields that differ from those defaults. Read the defaults before writing
-the entry so you include the minimum necessary fields.
-
-## Step 2: Add the model to backend TOML files
-
-The backend config files live in two mirrored locations. Edit the **`.pipelex/`**
-copy (the project config), then sync to kit in the next step.
-
-```
-.pipelex/inference/backends/<backend_name>.toml     # <-- edit this one
-pipelex/kit/configs/inference/backends/<backend_name>.toml  # <-- synced by make
-```
-
-### How to write the TOML entry
-
-1. Read the target backend TOML file to understand its `[defaults]` and the
-   existing model entries — match the style and ordering conventions.
-2. Place the new model in the right section (models are grouped by series with
-   comment headers like `# --- GPT-5.4 Series ---`).
-3. Quote the section header if the model name contains dots: `["gpt-5.4"]`.
-4. Only include fields that differ from `[defaults]`. At minimum you need:
-   `inputs`, `outputs`, `costs`. Add `model_id` if it differs from the name.
-
-**Example — adding `gpt-5.4` to `openai.toml`:**
-
-```toml
-# --- GPT-5.4 Series -----------------------------------------------------------
-["gpt-5.4"]
-inputs = ["text", "images", "pdf"]
-outputs = ["text", "structured"]
-costs = { input = 2.0, output = 8.0 }
-thinking_mode = "manual"
-```
-
-**Example — adding `gpt-5.4` to `azure_openai.toml`:**
-
-```toml
-# --- GPT-5.4 Series -----------------------------------------------------------
-["gpt-5.4"]
-model_id = "gpt-5.4-2026-03-01"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 2.0, output = 8.0 }
-thinking_mode = "manual"
-```
-
-Note: Azure typically does not support `pdf` in inputs and always requires an
-explicit `model_id` with a date suffix.
-
-For **image generation models** on Azure, you also need a `.rules` sub-table:
-
-```toml
-["model-name".rules]
-prompt = "positive_only"
-num_images = "gpt"
-aspect_ratio = "gpt"
-background = "gpt"
-inference = "gpt"
-safety_checker = "unavailable"
-output_format = "gpt"
-```
-
-## Step 3: Sync kit configs
-
-After editing the `.pipelex/` files, sync them into `pipelex/kit/configs/`:
+The nearest sibling is the model the new one succeeds or sits beside: `claude-4.8-opus` for a new Opus, `gpt-5.5` for the next GPT, `gemini-3.5-flash` for the next Flash. Every place the sibling appears is a place the new model probably belongs:
 
 ```bash
-make ukc
+grep -rnF -e '"<sibling>"' -e '[<sibling>]' -e '[<sibling>.' .pipelex/inference .pipelex-dev/test_profiles.toml tests
 ```
 
-This runs `rsync` from `.pipelex/` to `pipelex/kit/configs/`, keeping them in
-sync. Then verify:
+The three fixed strings match the handle as a whole token (a quoted table name or list entry, a bare table name, a bare `.rules` sub-table) and not as a prefix of a longer handle. The hits are the backend TOMLs, the test collection, any deck alias or preset that names the sibling, and the tests that hardcode a handle — the image-generation parametrizations do, so a new image model belongs in those lists too. The sibling's backends are the candidates, not the answer: a new model commonly reaches the provider's own API well before Bedrock, Vertex or Azure serve it, so check that each backend actually serves the new model before adding it there. Present the footprint to the user, backend by backend, with what you verified, and let them cut it down.
+
+## 3. Write the entries
+
+For each backend in the footprint, read the file's `[defaults]` table and the sibling's entry, then write the new entry beside the sibling under the same series comment header. Copy the sibling's shape and change only what the fact sheet says differs. Quote a table name that contains anything but letters, digits, `_` and `-`: `["gpt-5.6"]` for a dot, `["flux-pro/v1.1"]` for a slash. An image-generation entry usually carries a `.rules` sub-table; copy the sibling's and check each rule against the provider's documentation. Edit the `.pipelex/` copy only; the next step syncs the kit.
+
+## 4. Sync the kit
 
 ```bash
-make ccs
+make ukc   # up-kit-configs: .pipelex/ into pipelex/kit/configs/
+make ccs   # check-config-sync: the two must now match
 ```
 
-This checks that the two directories match. If it reports differences, something
-went wrong with the sync.
+**If you edited `portkey.toml`, one migration golden moves with it.** The kit's `portkey.toml` is the reference document of the `inference-backend` migration surface, and the gates byte-compare `pipelex/migration/goldens/inference-backend/defaults@N.toml` against it, so `make check-migration-schemas` (`cmig`) turns red. That is the designed workflow: `make umig` rewrites the head goldens from the live source and `make cmig` is green again. No other backend file is coupled this way.
 
-### If you edited `portkey.toml`, one migration golden moves with it
+## 5. Add it to the test collections
 
-The kit's `portkey.toml` is the `inference-backend` surface's **reference
-document** — the migration gates byte-compare `pipelex/migration/goldens/inference-backend/defaults@N.toml`
-against it, so adding a model to that one file turns `make check-migration-schemas`
-(alias `cmig`) red until the golden is regenerated:
+In `.pipelex-dev/test_profiles.toml`, add the handle to every collection list the sibling is in, next to it. `[collections.llm]`, `[collections.img_gen]` and `[collections.search]` are keyed by manufacturer; `[collections.extract]` is keyed by input kind (`from_web`, `from_pdf`, `from_image`), so an extractor that declares two inputs belongs in two lists, or the tests for the second input never select it. Profiles reference collections and globs, so a profile rarely needs editing.
+
+## 6. Prove it live on every backend
+
+A declared capability nobody has exercised is a claim, and the test fixtures are generated from these files, so run the model for real on every backend it was added to, one backend at a time. `/test-model` owns the procedure: the throwaway profile in the gitignored `.pipelex-dev/test_profiles_override.toml`, fixture regeneration through `PROF=`, the test class per model type, and reading the failures. Run it per backend.
+
+For an LLM, go past `TestLLMInference` and exercise what the entry declares: `TestLLMGenObject` for `structured`, `TestLLMVision` for `images`, `TestLLMDocument` for `pdf`, and `TestLLMReasoning` when `thinking_mode` is not `none`. `/test-model` runs those only when asked, so name them when you hand over: here they are not optional, since each one proves a capability the entry claims. A failure there means the entry claims too much for that backend: fix the entry, or ask the user, rather than moving on.
+
+## 7. Deck, changelog, checks
+
+- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-claude`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once the gateway catalog carries the model (step 8): under the default `all_pipelex_gateway` routing, a preset or choice default reaching a handle the catalog lacks raises `GatewayUnknownModelError` at boot, and `make tb` turns red. An alias no preset or choice default reaches is not checked at all, so a dangling one ships silently: read the deck yourself rather than trusting the boot. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
+- **Changelog.** One bullet under `## [Unreleased]` → `### Added` in `CHANGELOG.md`: the handle, the backends, what it takes and produces, and anything unusual such as a refused parameter.
+- **Checks.** `make tb` boots the config, which parses and validates the backends `backends.toml` enables — and only those, so an entry added to a disabled backend such as `vertexai` is never read. To validate one, enable that backend in the gitignored `.pipelex/inference/backends_override.toml` for the run, and delete the file afterwards. Then stage your changes (the drift digest reads the git index) and run `make agent-check`.
+
+## 8. The gateway and manifold catalogs
+
+This repository cannot add the model to `pipelex_gateway` or `pipelex_manifold`: their catalogs are published by the Pipelex team in the remote config. Tell the user so, and say which handle, model ids and capabilities the catalogs need. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
+
+Once a remote config carrying the model is published at the version this repository pins, regenerate the gateway model reference that ships in the package, then check it against that artifact:
 
 ```bash
-make umig   # rewrites the head goldens from the live source
-make cmig   # then green again
+make ugm   # update-gateway-models: rewrites pipelex_gateway_models*.md in .pipelex/ and the kit
+make cgm   # check-gateway-models: both copies match the published artifact
 ```
 
-That is the designed workflow, not a workaround — the refusal names both the
-golden and the file. No other backend TOML is coupled this way; the rest of the
-directory is only read as convergence witnesses, which adding a model does not
-disturb.
+Then `/test-model` on `pipelex_gateway` proves the model end to end through the gateway.
 
-## Step 4: Add to test profile collections
+## Checklist
 
-Edit `.pipelex-dev/test_profiles.toml` to include the new model in the
-appropriate collection(s).
+Show this to the user at the end, each box ticked or explained:
 
-Collections are organized by model type and manufacturer:
-
-- **LLM models** go under `[collections.llm]` in the right manufacturer list
-  (e.g., `openai`, `anthropic`, `google`).
-- **Image gen models** go under `[collections.img_gen]` in the right list.
-- **Extract models** go under `[collections.extract]`.
-- **Search models** go under `[collections.search]`.
-
-Add the model name to the relevant list, maintaining alphabetical order within
-each series. For example, adding `gpt-5.4` to the OpenAI LLM collection:
-
-```toml
-[collections.llm]
-openai = [
-  # ... existing models ...
-  "gpt-5.3-codex",
-  "gpt-5.4",        # <-- add here
-]
-```
-
-### Optionally add to specific profiles
-
-If the model should be part of a named test profile (like `dev` or `coverage`),
-add it there too. But usually the collections are enough — profiles reference
-collections via `@collection_name` or glob patterns like `gpt-*`.
-
-## Step 5: Run inference tests against the new model
-
-Once the model is registered and fixtures are regenerated, help the user run the
-integration tests to verify the model actually works end-to-end with real API
-calls.
-
-### Create targeted test profiles — one per backend
-
-**IMPORTANT**: You must test the model on **every backend** it was added to, not
-just one. Create a separate temporary profile for each backend in
-`.pipelex-dev/test_profiles_override.toml` (this file is gitignored so it won't
-pollute the shared config).
-
-For example, if the model was added to both `openai` and `azure_openai`:
-
-```toml
-[profiles.new_model_openai]
-description = "Test the newly added model on OpenAI"
-backends = ["openai"]
-llm_models = ["gpt-5.4"]
-img_gen_models = []
-extract_models = []
-search_models = []
-
-[profiles.new_model_azure]
-description = "Test the newly added model on Azure OpenAI"
-backends = ["azure_openai"]
-llm_models = ["gpt-5.4"]
-img_gen_models = []
-extract_models = []
-search_models = []
-```
-
-Adjust the `backends` and model list fields based on what type the model is
-(`llm_models`, `img_gen_models`, `extract_models`, or `search_models`).
-
-### Run tests for EACH backend
-
-For each backend profile, run the inference tests. **No need to call `make rtm`
-separately** — all inference test targets (`ti`, `tip`, `tl`, `te`, etc.)
-automatically regenerate fixtures when `PROF=` is passed on the command line.
-
-```bash
-# Test on first backend
-make test-inference-fast PROF=new_model_openai TEST=TestLLMInference
-
-# Test on second backend
-make test-inference-fast PROF=new_model_azure TEST=TestLLMInference
-```
-
-Use the appropriate test class for the model type:
-
-- **LLM models**: `make test-inference-fast PROF=<profile> TEST=TestLLMInference`
-- **Image gen models**: `make test-inference-fast PROF=<profile> TEST=TestImageGeneration`
-- **Extract models**: `make test-inference-fast PROF=<profile> TEST=TestExtract`
-- **Search models**: `make test-inference-fast PROF=<profile> TEST=TestSearch`
-
-The `PROF` parameter selects the test profile (which controls which models are
-tested), and `TEST` selects the test class or method to run.
-
-These are live API calls, so they require valid API keys for the backend being
-tested. If tests fail, check whether the issue is in the model config (wrong
-model_id, missing capabilities) or in the API key / network setup.
-
-### Clean up after testing
-
-Ask the user if they want the temporary profiles removed from
-`test_profiles_override.toml`. If they do, clean them up. If not, leave them
-in place — the file is gitignored so it won't affect anyone else.
-
-## Step 6: Gateway (manual — user action required)
-
-Remind the user:
-
-> The **Pipelex Gateway** configuration is fetched from a remote server. You
-> cannot add the model to the gateway from this repo. To make the model available
-> through the gateway, it needs to be added to the remote gateway configuration
-> separately. Once it's there, it will be picked up automatically by Pipelex
-> clients using the gateway backend.
-
-The local file `.pipelex/inference/backends/pipelex_gateway.toml` only allows
-overriding `sdk` and `structure_method` per model — you cannot define new models
-in it.
-
-## Step 7: Verify everything works
-
-Run the boot sequence test to make sure config loading succeeds:
-
-```bash
-make tb
-```
-
-This tests the full boot sequence including config loading, which validates that
-all TOML files parse correctly and model specs are well-formed.
-
-Then run the full quality check:
-
-```bash
-make agent-check
-```
-
-## Checklist summary
-
-Present this checklist to the user at the end so they can confirm everything:
-
-- [ ] Model entry added to `<backend>.toml` in `.pipelex/inference/backends/`
-- [ ] Kit configs synced (`make ukc` + `make ccs`)
-- [ ] Model added to collections in `.pipelex-dev/test_profiles.toml`
-- [ ] Inference tests pass on **every backend** the model was added to (`make test-inference-fast PROF=... TEST=...` per backend — fixtures are auto-regenerated)
-- [ ] Boot test passes (`make tb`)
-- [ ] Quality checks pass (`make agent-check`)
-- [ ] Gateway: user will add the model to the remote gateway config separately
+- [ ] Fact sheet, each fact with its source
+- [ ] Entry in every backend TOML of the agreed footprint, under `.pipelex/inference/backends/`
+- [ ] Kit synced (`make ukc`, `make ccs`), and the migration goldens if `portkey.toml` moved (`make umig`, `make cmig`)
+- [ ] Handle in its test collection
+- [ ] Live tests pass on every backend in the footprint, for every capability declared
+- [ ] Deck left alone, or the promotion decided by the user, made after the gateway catalog carries the model, and mirrored in `docs/`
+- [ ] Changelog entry under `[Unreleased]`
+- [ ] `make tb` and `make agent-check` green
+- [ ] Gateway and manifold catalogs handed off, and `make ugm` then `make cgm` run once they are published
