@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`add-model` skill follows the model's nearest sibling**: the skill derives which backend TOMLs, test collection and deck entries a new model belongs in from the model it succeeds, instead of a fixed provider-to-backend table, and checks each backend actually serves the model. It takes the model's facts from the provider's own documentation with OpenRouter as a cross-check, hands the live tests to `/test-model` with a test class per declared capability, and adds the deck and changelog steps and `make ugm` once the gateway catalog carries the model.
+
 ### Fixed
 
 - **A manifold error on the native routes keeps its request id under the gateway's pipelex-spelled trace header**: `extract_manifold_metadata` reads the gateway's trace id from `x-pipelex-trace-id` before the inherited `x-portkey-trace-id`, still preferring a provider's own `x-request-id` over both. The gateway emits the two spellings with the same value today, so nothing changes yet; once it drops the vendor one, such an error whose provider sent no `x-request-id` keeps a request id instead of reporting none. `extract_gateway_metadata` is unchanged and still reads the vendor spelling alone — it serves the Portkey cloud and the manifold image path, which travels on `portkey_ai` and keeps that spelling until it is ported off the SDK.
