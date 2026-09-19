@@ -379,11 +379,19 @@ key = "stuff_html_content"
 # Safe, with one thing it cannot do, said in the title because the title is what a person sees. Two of
 # the retired keys chose a behaviour their deletion undoes: `log_mode = "poor"` chose plain output for a
 # process with no terminal, whose replacement is `sink = "json"`, and `is_console_logging_enabled = false`
-# chose silence, whose replacement is `default_log_level = "OFF"`. No operation in this vocabulary writes
-# a value, and a `remap_value` onto `sink` is refused as `safe` because `sink` is an open token rather
-# than an enumeration. An `unsafe` entry would block every file that still carries the keys at their
-# old defaults, which is every full copy of an older base file, for the sake of the two that chose
-# otherwise; so the keys are deleted, and the file that chose otherwise sets its replacement by hand.
+# chose silence, whose replacement is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`. Neither
+# replacement can be translated by a migration: no operation in this vocabulary writes a value at all, a
+# `remap_value` reaches a string alone where that key holds a bool and is refused as `safe` onto `sink`,
+# an open token rather than an enumeration, and the package level is a concrete key beneath an open node,
+# which no operation may address. So the only lever left is `unsafe`, and `unsafe` is the wrong one here:
+# safety is a property of an entry and this version's link owns all four removals, so it cannot be
+# narrowed to the case that matters, and it would stop the boot of every file still carrying any of these
+# keys at their old defaults — every full copy of an older base file — for the sake of the few that chose
+# otherwise. Nothing chose otherwise. That is the decision, recorded here rather than argued again having
+# been raised and settled on each review round of the branch that retired these keys: no deployment set
+# these keys, nothing depends on the flag outliving its removal, and this project keeps no backward
+# compatibility. So the keys are deleted, and a file that did choose otherwise sets its replacement by
+# hand, which is what the title and the guidance are for.
 [[migration]]
 id = "pipelex-config@5"
 to_schema_version = 5
@@ -406,13 +414,15 @@ now sets `sink = "json"` in `[runtime.log]`, one JSON object per line, which is 
 without a parser. A file that set `log_mode = "rich"` chose what the default, `console`, renders, and \
 needs nothing.
 
-`is_console_logging_enabled = false` silenced every handler on the root logger. To silence Pipelex's \
-own records set `pipelex = "OFF"` under `[runtime.log.package_log_levels]` in the project override: \
-that section pins the `pipelex` logger at `INFO` in the base configuration, the override deep-merges \
-over it and leaves the third-party levels alone, and `default_log_level` governs only the loggers the \
-section does not pin, so on its own it silences none of Pipelex's records. Silence for everything, \
-which is what the old flag did, takes `default_log_level = "OFF"` and every entry of that section at \
-`OFF`. To send the records somewhere else instead, select the sink that goes there.
+`is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted, third-party \
+loggers still reaching the handlers. To suppress them now set `pipelex = "OFF"` under \
+`[runtime.log.package_log_levels]` in the project override: that section pins the `pipelex` logger at \
+`INFO` in the base configuration, the override deep-merges over it and leaves the third-party levels \
+alone, and `default_log_level` governs only the loggers the section does not pin, so on its own it \
+silences none of Pipelex's records. Silence for everything, third-party loggers included, takes \
+`default_log_level = "OFF"` and every entry of that section at `OFF`. To send the records somewhere \
+else instead, select the sink that goes there. `is_console_logging_enabled = true` was the default and \
+asks for nothing beyond the deletion the migration performs.
 
 `poor_loggers` and `generic_poor_logger` routed some records to a plain stream handler beside the \
 console; every record now goes to the one selected sink, so there is nothing to carry over.

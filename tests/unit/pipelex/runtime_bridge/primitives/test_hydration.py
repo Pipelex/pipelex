@@ -1,5 +1,6 @@
 import datetime
 import json
+from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
@@ -8,12 +9,21 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
+from pipelex.interpreter_hub import (
+    clear_current_library,
+    get_concept_library,
+    get_current_library_id_or_none,
+    get_library_manager,
+    scoped_current_library,
+    set_current_library,
+)
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_bridge.primitives.hydration import (
     _hydrate_list_item,  # pyright: ignore[reportPrivateUsage]
@@ -63,6 +73,11 @@ def _make_date_concept() -> Concept:
 
 
 class TestHydrateWorkingMemory:
+    @pytest.fixture(scope="class", autouse=True)
+    def _open_library(self, load_empty_library: Callable[[], str]) -> None:
+        """A stuff names its concept by ref, and the hydrator resolves it through the current library."""
+        load_empty_library()
+
     @pytest.fixture(autouse=True)
     def _register_content_classes(self) -> None:
         """Ensure TextContent and NumberContent are registered for hydration tests."""
@@ -312,19 +327,114 @@ class TestHydrateWorkingMemory:
         assert isinstance(result, NumberContent)
         assert result.number == 42
 
-    def test_hydrate_raises_on_missing_registry_class(self) -> None:
-        """Hydration raises PipeJobError when the concept's structure_class_name is not in the registry."""
+    def test_every_dump_carries_the_concept_ref_string(self) -> None:
+        """Every dump of a working memory names a stuff's concept by ref: the definition never leaves the runtime."""
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
+        pipe_output = PipeOutput(working_memory=working_memory, pipeline_run_id="run-dump")
+
+        dumps: dict[str, dict[str, Any]] = {
+            "model_dump": working_memory.model_dump(),
+            "smart_dump": working_memory.smart_dump(),
+            "dump_for_transport": working_memory.dump_for_transport(),
+            "json_mode": working_memory.model_dump(mode="json", serialize_as_any=True),
+            "pipe_output": pipe_output.model_dump(mode="json", serialize_as_any=True)["working_memory"],
+        }
+
+        for dump_name, dump in dumps.items():
+            assert dump["root"]["greeting"]["concept"] == "native.Text", dump_name
+        assert working_memory.root["greeting"].model_dump()["concept"] == "native.Text"
+
+    def test_hydrate_resolves_the_concept_through_the_library(self) -> None:
+        """The hydrated stuff carries the library's own Concept, definition and all, not one rebuilt from the wire."""
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
+
+        hydrated = hydrate_working_memory(working_memory.dump_for_transport())
+
+        concept = hydrated.root["greeting"].concept
+        assert concept is get_concept_library().get_required_concept(concept_ref="native.Text")
+        assert concept.structure_class_name == "TextContent"
+
+    def test_hydrate_refuses_the_object_form(self) -> None:
+        """The full-object concept the runtime once dumped is not a shape the reader accepts."""
+        raw = {
+            "root": {
+                "greeting": {
+                    "stuff_code": "test",
+                    "stuff_name": "greeting",
+                    "concept": {
+                        "code": "Text",
+                        "domain_code": "native",
+                        "description": "Plain text",
+                        "structure_class_name": "TextContent",
+                    },
+                    "content": {"text": "hello"},
+                },
+            },
+            "aliases": {},
+        }
+
+        with pytest.raises(PipeJobError, match="concept ref string"):
+            hydrate_working_memory(raw)
+
+    def test_hydrate_without_a_library_resolves_a_native_ref(self) -> None:
+        """No current library is a live path, not a fixture, and the pinned native set answers on its own.
+
+        ``Pipelex.make()`` sets no current library, and on the transport boundary
+        ``scoped_library_for_crate(None, …)`` is a documented no-op that falls back to the active
+        class registry — so a precondition demanding a library would break a hydration that has
+        everything it needs.
+        """
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
+        raw = working_memory.dump_for_transport()
+        library_id = get_current_library_id_or_none()
+        assert library_id is not None
+
+        clear_current_library()
+        try:
+            hydrated = hydrate_working_memory(raw)
+        finally:
+            set_current_library(library_id=library_id)
+
+        assert hydrated.root["greeting"].concept.concept_ref == "native.Text"
+        assert hydrated.root["greeting"].content == TextContent(text="Hello!")
+
+    def test_hydrate_without_a_library_refuses_a_non_native_ref(self) -> None:
+        """Only a loaded library holds a bundle-declared concept's definition, so the refusal names the stuff."""
+        raw: dict[str, Any] = {
+            "root": {
+                "invoice": {
+                    "stuff_code": "test",
+                    "stuff_name": "invoice",
+                    "concept": "accounting.Invoice",
+                    "content": {"text": "hello"},
+                },
+            },
+            "aliases": {},
+        }
+        library_id = get_current_library_id_or_none()
+        assert library_id is not None
+
+        clear_current_library()
+        try:
+            with pytest.raises(PipeJobError, match="invoice") as exc_info:
+                hydrate_working_memory(raw)
+        finally:
+            set_current_library(library_id=library_id)
+
+        assert "accounting.Invoice" in str(exc_info.value)
+        assert "no library is current" in str(exc_info.value)
+
+    def test_hydrate_raises_on_unknown_concept_ref(self) -> None:
+        """Hydration raises PipeJobError when the stuff names a concept the loaded library does not hold."""
         raw = {
             "root": {
                 "bad_stuff": {
                     "stuff_code": "test",
                     "stuff_name": "bad_stuff",
-                    "concept": {
-                        "code": "NonExistent",
-                        "domain_code": "native",
-                        "description": "Missing class",
-                        "structure_class_name": "NonExistentContent",
-                    },
+                    "concept": "native.NonExistent",
                     "content": {"text": "hello"},
                 },
             },
@@ -334,6 +444,58 @@ class TestHydrateWorkingMemory:
         with pytest.raises(PipeJobError, match="bad_stuff"):
             hydrate_working_memory(raw)
 
+    def test_hydrate_raises_pipe_job_error_when_the_current_library_is_gone(self) -> None:
+        """Every failure in this function is normalized to PipeJobError, the stale-binding one included.
+
+        The guard tests whether a library is *named*, not whether it is still *there*, so a binding that
+        outlived its library used to surface a raw LibraryError from the hub — an exception every caller
+        of this function was written not to expect.
+        """
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        with scoped_current_library(library_id=library_id):
+            library_manager.teardown(library_id=library_id)
+            working_memory_raw: dict[str, Any] = {
+                "root": {"greeting": {"stuff_code": "test", "stuff_name": "greeting", "concept": "native.Text", "content": {"text": "Hello!"}}}
+            }
+
+            with pytest.raises(PipeJobError, match="no longer reachable"):
+                hydrate_working_memory(working_memory_raw)
+
+    def test_hydrate_raises_when_the_structure_class_is_not_registered(self) -> None:
+        """A concept the library holds whose structure class this process never registered still refuses clearly.
+
+        Resolving the ref and finding the content class are two separate failures, and the ref
+        resolving is no guarantee the class is here: a dynamic concept travels to a worker that
+        never loaded the crate that defines it.
+        """
+        concept_library = get_concept_library()
+        concept_library.add_new_concept(
+            Concept(
+                code="Unregistered",
+                domain_code=SpecialDomain.NATIVE,
+                description="A concept whose structure class this process never registered",
+                structure_class_name="NotRegisteredContent",
+            )
+        )
+        raw = {
+            "root": {
+                "bad_stuff": {
+                    "stuff_code": "test",
+                    "stuff_name": "bad_stuff",
+                    "concept": "native.Unregistered",
+                    "content": {"text": "hello"},
+                },
+            },
+            "aliases": {},
+        }
+
+        try:
+            with pytest.raises(PipeJobError, match="bad_stuff"):
+                hydrate_working_memory(raw)
+        finally:
+            concept_library.remove_concepts_by_concept_refs(["native.Unregistered"])
+
     def test_hydrate_raises_on_validation_error(self) -> None:
         """Hydration raises PipeJobError when content doesn't match the expected schema."""
         raw = {
@@ -341,12 +503,7 @@ class TestHydrateWorkingMemory:
                 "invalid_stuff": {
                     "stuff_code": "test",
                     "stuff_name": "invalid_stuff",
-                    "concept": {
-                        "code": "Text",
-                        "domain_code": "native",
-                        "description": "Plain text",
-                        "structure_class_name": "TextContent",
-                    },
+                    "concept": "native.Text",
                     "content": {"completely_wrong_field": 42},
                 },
             },

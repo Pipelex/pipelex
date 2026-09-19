@@ -1,7 +1,8 @@
 """Records emitted between ``log.configure`` and ``log.install_sink`` are held and replayed, in order, through the sink.
 
-A boot that dies before its sink arrives closes the holding handler, and what it held gets the
-stdlib's last-resort handling: a warning or worse reaches stderr, an info is dropped.
+A boot that dies before its sink arrives closes the holding handler, and every record it held reaches
+stderr through the stdlib's last resort: each one passed the level the configuration set, so each one is
+a line the process was asked to show.
 """
 
 from __future__ import annotations
@@ -15,7 +16,8 @@ from typing_extensions import override
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.tools.log.log_holding import HOLDING_CAPACITY, HoldingLogHandler
+from pipelex.tools.log.log_fields import FORWARDED_MARK
+from pipelex.tools.log.log_holding import HOLDING_CAPACITY, ForwardedRecordFilter, HoldingLogHandler
 from pipelex.tools.log.log_sink import LogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -97,6 +99,16 @@ class TestHoldingLogHandler:
         assert sink.handler in logging.getLogger().handlers
         assert not any(isinstance(handler, HoldingLogHandler) for handler in logging.getLogger().handlers)
 
+    def test_a_field_named_like_the_forwarding_marker_does_not_cost_the_record(self, fresh_log: Log) -> None:
+        """The marker is internal, and a caller's field must never be read as one: the record reaches the sink all the same."""
+        sink = _ListSink()
+        fresh_log.install_sink(sink)
+
+        fresh_log.warning("not lost", fields={FORWARDED_MARK: True})
+        fresh_log.info("nor the next one")
+
+        assert sink.own_messages() == ["not lost", "nor the next one"]
+
     def test_a_processor_edits_the_replayed_and_the_live_records_alike(self, fresh_log: Log) -> None:
         fresh_log.info("held")
         sink = _ListSink()
@@ -111,18 +123,22 @@ class TestHoldingLogHandler:
         own = [record for record in sink.list_handler.records if record.name == __name__]
         assert [getattr(record, "stamped", None) for record in own] == [True, True]
 
-    def test_without_a_sink_a_held_warning_reaches_stderr_at_reset_and_an_info_is_dropped(
-        self, fresh_log: Log, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """The failed-boot path: ``reset`` closes the holding handler and the stdlib's last resort speaks."""
-        fresh_log.info("an info that goes nowhere")
+    def test_without_a_sink_every_held_record_reaches_stderr_at_reset(self, fresh_log: Log, capsys: pytest.CaptureFixture[str]) -> None:
+        """The failed-boot path: ``reset`` closes the holding handler and the stdlib's last resort speaks for all of them.
+
+        Not only a warning or worse. The last resort's own level is meant for a record emitted before
+        anything was configured, where nobody has said what is worth seeing; these passed the root logger's
+        level, which came from the configuration, and a boot that died is exactly when the trail a verbose
+        run was turned on to produce is what is being looked for.
+        """
+        fresh_log.info("an info the configuration asked for")
         fresh_log.warning("a warning that must be seen")
 
         fresh_log.reset()
 
         captured = capsys.readouterr()
         assert "a warning that must be seen" in captured.err
-        assert "an info that goes nowhere" not in captured.err
+        assert "an info the configuration asked for" in captured.err
 
     def test_install_sink_before_configure_and_a_second_sink_are_refused(self) -> None:
         fresh = Log()
@@ -221,6 +237,26 @@ class TestHoldingLogHandler:
 
         assert [record.getMessage() for record in target.records] == ["before", "late", "later still"]
         assert holding.held_count == 0
+
+    def test_a_drained_record_delivered_again_to_the_sinks_handler_is_refused(self) -> None:
+        """The handoff's other side: a thread that picked the sink's handler up mid-handoff must not re-deliver a drained record.
+
+        ``install_sink`` puts the sink's handler on the root logger between the drain and the holding
+        handler's removal, so a thread descheduled inside ``callHandlers`` can resume on the sink's handler
+        carrying a record the drain has already delivered. The forward path marked its records and the drain
+        did not, which left the guard on the handler nothing to read.
+        """
+        holding = HoldingLogHandler()
+        target = _ListHandler()
+        target.filters.insert(0, ForwardedRecordFilter())
+        record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="drained once", args=(), exc_info=None)
+        holding.handle(record)
+
+        holding.release_to(handler=target)
+        target.handle(record)
+
+        assert [delivered.getMessage() for delivered in target.records] == ["drained once"]
+        assert getattr(record, FORWARDED_MARK, False) is True
 
     def test_a_record_below_the_handlers_level_is_neither_replayed_nor_forwarded(self) -> None:
         """``Handler.handle`` checks no level where the root logger's dispatch does, so the replay and the forward check it."""

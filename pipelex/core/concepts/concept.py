@@ -20,13 +20,31 @@ from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 
 
 class Concept(ConceptAbstract):
+    """A concept as the runtime holds it in memory: its name and its definition.
+
+    The protocol model, `ConceptAbstract`, is a name and nothing more — `code`, `domain_code`
+    and the `concept_ref` they form — because the standard keeps a concept's definition in the
+    library a method loads, never beside a stuff. The runtime needs the definition in memory to
+    resolve a structure class, check compatibility and render a representation, so it declares
+    those fields here, on its own subclass.
+
+    The fields declared here never travel beside a stuff: `StuffAbstract` serializes `concept`
+    as the ref string, so every dump of a `Stuff`, of a `WorkingMemory` and of a `PipeOutput`
+    carries `{"concept": "<domain>.<Code>", "content": …}`. A reader of such a dump resolves the
+    ref through the concept library the method loads, the way the input side does.
+    """
+
+    description: str
+    structure_class_name: str
+    refines: str | None = None
+
     @field_validator("code")
     @classmethod
     def validate_code(cls, code: str) -> str:
         try:
             validate_concept_code(concept_code=code)
         except ConceptCodeError as exc:
-            msg = f"Concept code '{code}' is not a valid concept code for concept '{cls.concept_ref}'"
+            msg = f"Concept code '{code}' is not a valid concept code"
             raise ConceptValueError(msg) from exc
         return code
 
@@ -36,7 +54,7 @@ class Concept(ConceptAbstract):
         try:
             validate_domain_code(code=domain_code)
         except DomainCodeError as exc:
-            msg = f"Domain code '{domain_code}' is not a valid domain code for concept '{cls.concept_ref}'"
+            msg = f"Domain code '{domain_code}' is not a valid domain code for a concept"
             raise ConceptValueError(msg) from exc
         return domain_code
 

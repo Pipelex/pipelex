@@ -11,6 +11,7 @@ import io
 import logging
 from typing import Any
 
+import pytest
 from rich.console import Console
 from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
 from rich.logging import RichHandler
@@ -19,7 +20,7 @@ from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import HighlighterName, LogConfig, RichLogConfig
-from pipelex.tools.log.log_fields import attach_log_record_extra
+from pipelex.tools.log.log_fields import VERBATIM_MARK, attach_log_record_extra
 from pipelex.tools.log.log_formatter import EmojiLogFormatter
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -81,6 +82,21 @@ def _fixed_record_set() -> list[logging.LogRecord]:
     return records
 
 
+def _render_one(*, config: RichLogConfig, message: str, extra: dict[str, Any] | None) -> str:
+    """One record through a fresh console sink, so a per-record attribute can be read off the rendering."""
+    buffer = io.StringIO()
+    handler = ConsoleLogSink(rich_log_config=config, target=ConsoleTarget.STDERR).handler
+    assert isinstance(handler, RichHandler)
+    handler.console = Console(file=buffer, width=CONSOLE_WIDTH, force_terminal=False, color_system=None, legacy_windows=False)
+    record = logging.LogRecord(
+        name="pipelex.system.exceptions", level=logging.ERROR, pathname="/repo/pipelex/module.py", lineno=42, msg=message, args=(), exc_info=None
+    )
+    for name, value in (extra or {}).items():
+        setattr(record, name, value)
+    handler.handle(record)
+    return buffer.getvalue()
+
+
 def _render(handler: logging.Handler) -> str:
     buffer = io.StringIO()
     rich_handler = handler
@@ -114,6 +130,55 @@ class TestConsoleLogSink:
 
         assert "🧠: Failed" in rendered
         assert "ValueError: boom" in rendered
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "expected list[int], got str",
+            "no such file: [/etc/pipelex.toml]",
+        ],
+        ids=["a type complaint", "a bracketed path"],
+    )
+    def test_a_message_shaped_like_markup_renders_intact_only_when_the_record_asks_for_verbatim(self, message: str) -> None:
+        """An error message carries text nobody chose, and Rich reads a tag-shaped span in it as markup.
+
+        Rich's tag has to start with a lowercase letter, `#`, `/` or `@`, so `[Errno 2]` is safe and the
+        two shapes this codebase's messages are actually made of are not: `list[int]` loses the bracketed
+        span, and a bracketed path opens what Rich reads as a closing tag and raises inside the handler,
+        where `handleError` costs the whole line. The configuration asks for markup and Pipelex's own
+        lines use it, so the opt-out is per record: Rich reads `markup` off the record ahead of its
+        handler's setting, which is what `TracebackMessageError` stamps through `VERBATIM_MARK`.
+        """
+        config = _package_rich_log_config()
+        assert config.is_markup_enabled, "the mark is an opt-out, so an enabled setting is what it opts out of"
+
+        interpreted = _render_one(config=config, message=message, extra=None)
+        verbatim = _render_one(config=config, message=message, extra={VERBATIM_MARK: False})
+
+        assert message not in interpreted
+        assert message in verbatim
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "expected list[int], got str",
+            "no such file: [/etc/pipelex.toml]",
+        ],
+        ids=["a type complaint", "a bracketed path"],
+    )
+    def test_a_message_rich_refuses_costs_its_rendering_and_never_the_log_call(self, message: str) -> None:
+        """Rich overrides ``emit`` without the stdlib's ``handleError`` guard, so a refusal left the log call.
+
+        A bracketed path reads as a closing tag with nothing open and Rich raises ``MarkupError`` from
+        inside the handler: unguarded, that propagated out of `log.error` and replaced the failure being
+        reported with itself. The sink's handler restores the guard, so the worst a line Rich refuses costs
+        is its own rendering.
+        """
+        config = _package_rich_log_config()
+
+        rendered = _render_one(config=config, message=message, extra=None)
+
+        assert message not in rendered
 
     def test_the_handler_is_a_rich_handler_with_the_emoji_formatter_and_the_same_object_on_every_read(self) -> None:
         sink = ConsoleLogSink(rich_log_config=_package_rich_log_config(), target=ConsoleTarget.STDERR)

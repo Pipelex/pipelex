@@ -179,6 +179,7 @@ headers = { Authorization = "Bearer ..." }
 - `endpoint`: The collector's logs URL. Left unset, the exporter follows the OpenTelemetry environment conventions: `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`, then `OTEL_EXPORTER_OTLP_ENDPOINT` with the `/v1/logs` path, then the collector default on localhost
 - `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge
 - The records are exported in batches on the OTLP HTTP protocol, with the same service identity as the spans the runtime already exports, so a collector files the two together
+- The semantic-convention keys the sink writes itself — the source location `code.file.path`, `code.function.name` and `code.line.number`, and the `exception.*` keys — are reserved on every record whether or not it carries an exception, exactly as the `json` sink reserves its own keys: a field named like one of them is carried under the same `field_` prefix, so nothing is overwritten and a field keeps one wire name whichever sink is selected
 - The sink never exports its own export path: a record the SDK or the transport emits while an export is in flight is rejected before the handler's lock is taken, so an unreachable collector costs a warning on the export thread and never a loop or a hang at exit. A flush at teardown is bounded by the exporter's own timeout, `OTEL_EXPORTER_OTLP_TIMEOUT`, and whatever the sink raises while it flushes or closes is said on stderr rather than left to interrupt the teardown
 
 ## The `gcp` Sink
@@ -255,7 +256,13 @@ log_name = "pipelex"
 
 ## Migrating From the Log Mode
 
-`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone; `pipelex migrate` deletes them from an existing file (ledger entry `pipelex-config@5`), and the defaults layer then supplies `sink = "console"`. Two of those keys chose a behaviour the deletion undoes, and no migration may write the replacement, so it is yours to set: a file that had `log_mode = "poor"` chose a plain handler for a process with no terminal, and that process now sets `sink = "json"`; a file that had `is_console_logging_enabled = false` silenced every handler on the root logger, and to silence Pipelex's own records it now sets `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone, since `default_log_level` governs only the loggers that section does not pin; silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, or the file selects the sink its records should go to instead. A file that had `log_mode = "rich"` needs nothing, and `poor_loggers` and `generic_poor_logger` have nothing to carry over.
+`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone from the schema, and the defaults layer supplies `sink = "console"` in their place. Run `pipelex migrate`: ledger entry `pipelex-config@5` deletes the four keys from an existing file, and the defaults then take over.
+
+Two of those keys chose a behaviour their deletion undoes, and no operation in the migration vocabulary can write the replacement — so where a choice was made, writing the replacement is yours:
+
+- `is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted. Its equivalent is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone; `default_log_level` governs only the loggers that section does not pin, so on its own it silences none of Pipelex's records. Silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, and sending the records elsewhere instead means selecting the sink that goes there. `is_console_logging_enabled = true` was the default and asks for nothing: the migration deletes it and the new default renders the same console.
+- `log_mode = "poor"` chose a plain handler for a process with no terminal; that process now sets `sink = "json"`. `log_mode = "rich"` chose what `console` renders, and asks for nothing either.
+- `poor_loggers` and `generic_poor_logger` have nothing to carry over: every record goes to the one selected sink.
 
 ## Best Practices
 

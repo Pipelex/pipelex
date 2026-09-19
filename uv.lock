@@ -2692,7 +2692,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.14.0"
+version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2701,9 +2701,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/92/59/4ca9539571a2030f9427aeddb01bc334910953ebdfa4ab7db2051a6b8ae7/mthds-0.14.0.tar.gz", hash = "sha256:d2b4a9cd064004dfd5b802bb71c9894601fba9e598426f96e4bede16d52c3900", size = 221186, upload-time = "2026-09-06T21:44:54.585Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/16/1aa1219f44bc469213018478f582eb4eb28f69ea43a09fe73afc9cfb4e34/mthds-0.15.0.tar.gz", hash = "sha256:2e612174b089cae799eb236f5b1bcd183b8847a62a06a265f72f0e50b4c89555", size = 250552, upload-time = "2026-09-18T20:23:09.888Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/0b/32908eeed33396c5aafd4bcb2a1adc38d0ab8d85c2fde3af0bf4c2f73745/mthds-0.14.0-py3-none-any.whl", hash = "sha256:59a706205b6e6df47345caac01038588d21ab9e9c246afc765ee50b5f27f05a8", size = 87192, upload-time = "2026-09-06T21:44:53.022Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/5c/7526815d8bc8cd8690c8cf4de3819e3f322886280af05bf9aed7bdce450c/mthds-0.15.0-py3-none-any.whl", hash = "sha256:98670ca1f97fc2211ace0f404acd416ce5882edb728845d48440d6e73eedc34c", size = 99711, upload-time = "2026-09-18T20:23:08.283Z" },
 ]
 
 [[package]]
@@ -3443,7 +3443,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.59.0"
+version = "0.60.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3616,14 +3616,14 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = "==0.14.0" },
+    { name = "mthds", specifier = "==0.15.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "opentelemetry-semantic-conventions" },
+    { name = "opentelemetry-api", specifier = ">=1.38.0" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.38.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.38.0" },
+    { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
