@@ -14,7 +14,7 @@ description: >
 
 # Add a model to Pipelex
 
-A model is added once per backend that serves it. Each backend TOML under `.pipelex/inference/backends/` declares the models that backend can call, the kit copy under `pipelex/kit/configs/` is what ships in the package, and `.pipelex-dev/test_profiles.toml` decides which models the parametrized inference tests can select. This skill touches those files and nothing else.
+A model is added once per backend that serves it. Each backend TOML under `.pipelex/inference/backends/` declares the models that backend can call, the kit copy under `pipelex/kit/configs/` is what ships in the package, and `.pipelex-dev/test_profiles.toml` decides which models the parametrized inference tests can select. Those are the files that declare a model; the steps below also write the changelog, and regenerate the goldens and references that follow from them.
 
 Two backends are different: `pipelex_gateway` and `pipelex_manifold` take their model catalogs from the **remote config**, a versioned artifact the runtime fetches at boot from the URL in `pipelex/system/pipelex_service/pipelex_details.py` (overridable with `PIPELEX_REMOTE_CONFIG_URL`). Their local TOMLs only let a user override `sdk` and `structure_method` per model, so a model cannot be added to them from here. See step 8.
 
@@ -24,10 +24,11 @@ Build a fact sheet before touching a file, and give every fact its source. The p
 
 | Fact | Where it goes | Watch for |
 |---|---|---|
-| Handle | The TOML table name, e.g. `["claude-5-sonnet"]` | Follow the family's existing naming, which is often not the provider's: `claude-5-sonnet`, not `claude-sonnet-5` |
+| Handle | The TOML table name, e.g. `[claude-5-sonnet]` | Follow the family's existing naming, which is often not the provider's: `claude-5-sonnet`, not `claude-sonnet-5` |
 | Model type | `model_type` when it differs from the file's `[defaults]` | `llm`, `img_gen`, `text_extractor` or `search` |
 | Model id per backend | `model_id`, omitted when it equals the handle | Direct APIs, Azure deployments, Bedrock inference profiles and Vertex ids all differ; copy the shape the sibling uses on that backend |
-| Inputs and outputs | `inputs`, `outputs` | Take the tokens from the sibling, because the runtime reads exact strings and a wrong one fails only when called. An LLM takes `text`, `images`, `pdf` (some hosts add `audio`, `video`) and outputs `text`, `structured`; a text extractor takes `pdf`, `image` (singular) or `web_page` and outputs `pages`; a search model outputs `sourced-answers`, `structured`; image generation outputs `image`. Declare `pdf` per backend: a backend that serves the model can still refuse documents |
+| Inputs and outputs | `inputs`, `outputs` | Take the tokens from the sibling, because the runtime reads exact strings and a wrong one fails only when called. An LLM takes `text`, `images`, `pdf` (some hosts add `audio`, `video`) and outputs `text`, `structured`, and `audio` or `image` where it speaks or draws; a text extractor takes `pdf`, `image` (singular) or `web_page` and outputs `pages`; a search model outputs `sourced-answers`, `structured`; image generation outputs `image`. Declare `pdf` per backend: a backend that serves the model can still refuse documents |
+| SDK and structure method | `sdk`, `structure_method` | Both come from the file's `[defaults]`, and an entry overrides them where its family differs: the image-generation entries of `azure_openai.toml` replace the file's `azure_openai_responses` with `azure_rest_img_gen`. `sdk` has no default in code, so a wrong one boots and fails at the first call |
 | Costs | `costs = { input = …, output = … }` | USD per million tokens. Image models may price differently; copy the sibling's shape |
 | Thinking | `thinking_mode` | `none`, `manual` (a budget the caller sets) or `adaptive` (the model decides) |
 | Refused parameters | `listed_constraints`, `valued_constraints` | `temperature_unsupported`, `temperature_must_be_multiplied_by_2`, `max_tokens_must_be_high_enough`; `valued_constraints = { fixed_temperature = 1 }`. The vocabulary is `pipelex/cogt/model_backends/constraints.py` |
@@ -40,19 +41,19 @@ A model spec declares nothing about how its prompts are formatted: templating st
 The nearest sibling is the model the new one succeeds or sits beside: `claude-4.8-opus` for a new Opus, `gpt-5.5` for the next GPT, `gemini-3.5-flash` for the next Flash. Every place the sibling appears is a place the new model probably belongs:
 
 ```bash
-grep -rnF -e '"<sibling>"' -e '[<sibling>]' -e '[<sibling>.' .pipelex/inference .pipelex-dev/test_profiles.toml
+grep -rnF -e '"<sibling>"' -e '[<sibling>]' -e '[<sibling>.' .pipelex/inference .pipelex-dev/test_profiles.toml tests
 ```
 
-The three fixed strings match the handle as a whole token (a quoted table name or list entry, a bare table name, a bare `.rules` sub-table) and not as a prefix of a longer handle. The hits are the backend TOMLs, the test collection, and any deck alias or preset that names the sibling. The sibling's backends are the candidates, not the answer: a new model commonly reaches the provider's own API well before Bedrock, Vertex or Azure serve it, so check that each backend actually serves the new model before adding it there. Present the footprint to the user, backend by backend, with what you verified, and let them cut it down.
+The three fixed strings match the handle as a whole token (a quoted table name or list entry, a bare table name, a bare `.rules` sub-table) and not as a prefix of a longer handle. The hits are the backend TOMLs, the test collection, any deck alias or preset that names the sibling, and the tests that hardcode a handle — the image-generation parametrizations do, so a new image model belongs in those lists too. The sibling's backends are the candidates, not the answer: a new model commonly reaches the provider's own API well before Bedrock, Vertex or Azure serve it, so check that each backend actually serves the new model before adding it there. Present the footprint to the user, backend by backend, with what you verified, and let them cut it down.
 
 ## 3. Write the entries
 
-For each backend in the footprint, read the file's `[defaults]` table and the sibling's entry, then write the new entry beside the sibling under the same series comment header. Copy the sibling's shape and change only what the fact sheet says differs. Quote a table name that contains a dot: `["gpt-5.6"]`. An image-generation entry usually carries a `.rules` sub-table; copy the sibling's and check each rule against the provider's documentation. Edit the `.pipelex/` copy only; the next step syncs the kit.
+For each backend in the footprint, read the file's `[defaults]` table and the sibling's entry, then write the new entry beside the sibling under the same series comment header. Copy the sibling's shape and change only what the fact sheet says differs. Quote a table name that contains anything but letters, digits, `_` and `-`: `["gpt-5.6"]` for a dot, `["flux-pro/v1.1"]` for a slash. An image-generation entry usually carries a `.rules` sub-table; copy the sibling's and check each rule against the provider's documentation. Edit the `.pipelex/` copy only; the next step syncs the kit.
 
 ## 4. Sync the kit
 
 ```bash
-make ukc   # sync-kit-configs: .pipelex/ into pipelex/kit/configs/
+make ukc   # up-kit-configs: .pipelex/ into pipelex/kit/configs/
 make ccs   # check-config-sync: the two must now match
 ```
 
@@ -60,19 +61,19 @@ make ccs   # check-config-sync: the two must now match
 
 ## 5. Add it to the test collections
 
-In `.pipelex-dev/test_profiles.toml`, add the handle to the collection list the sibling is in: `[collections.llm]`, `[collections.img_gen]`, `[collections.extract]` or `[collections.search]`, under the manufacturer's key and next to the sibling. Profiles reference collections and globs, so a profile rarely needs editing.
+In `.pipelex-dev/test_profiles.toml`, add the handle to every collection list the sibling is in, next to it. `[collections.llm]`, `[collections.img_gen]` and `[collections.search]` are keyed by manufacturer; `[collections.extract]` is keyed by input kind (`from_web`, `from_pdf`, `from_image`), so an extractor that declares two inputs belongs in two lists, or the tests for the second input never select it. Profiles reference collections and globs, so a profile rarely needs editing.
 
 ## 6. Prove it live on every backend
 
 A declared capability nobody has exercised is a claim, and the test fixtures are generated from these files, so run the model for real on every backend it was added to, one backend at a time. `/test-model` owns the procedure: the throwaway profile in the gitignored `.pipelex-dev/test_profiles_override.toml`, fixture regeneration through `PROF=`, the test class per model type, and reading the failures. Run it per backend.
 
-For an LLM, go past `TestLLMInference` and exercise what the entry declares: `TestLLMGenObject` for `structured`, `TestLLMVision` for `images`, `TestLLMDocument` for `pdf`, and `TestLLMReasoning` when `thinking_mode` is not `none`. A failure there means the entry claims too much for that backend: fix the entry, or ask the user, rather than moving on.
+For an LLM, go past `TestLLMInference` and exercise what the entry declares: `TestLLMGenObject` for `structured`, `TestLLMVision` for `images`, `TestLLMDocument` for `pdf`, and `TestLLMReasoning` when `thinking_mode` is not `none`. `/test-model` runs those only when asked, so name them when you hand over: here they are not optional, since each one proves a capability the entry claims. A failure there means the entry claims too much for that backend: fix the entry, or ask the user, rather than moving on.
 
 ## 7. Deck, changelog, checks
 
-- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-claude`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once the gateway catalog carries the model (step 8): under the default `all_pipelex_gateway` routing, a preset or choice default reaching a handle the catalog lacks raises `GatewayUnknownModelError` at boot, and `make tb` turns red. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
+- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-claude`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once the gateway catalog carries the model (step 8): under the default `all_pipelex_gateway` routing, a preset or choice default reaching a handle the catalog lacks raises `GatewayUnknownModelError` at boot, and `make tb` turns red. An alias no preset or choice default reaches is not checked at all, so a dangling one ships silently: read the deck yourself rather than trusting the boot. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
 - **Changelog.** One bullet under `## [Unreleased]` → `### Added` in `CHANGELOG.md`: the handle, the backends, what it takes and produces, and anything unusual such as a refused parameter.
-- **Checks.** `make tb` boots the config, which parses every TOML and validates every spec. Then stage your changes (the drift digest reads the git index) and run `make agent-check`.
+- **Checks.** `make tb` boots the config, which parses and validates the backends `backends.toml` enables — and only those, so an entry added to a disabled backend such as `vertexai` is never read. To validate one, enable that backend in the gitignored `.pipelex/inference/backends_override.toml` for the run, and delete the file afterwards. Then stage your changes (the drift digest reads the git index) and run `make agent-check`.
 
 ## 8. The gateway and manifold catalogs
 
