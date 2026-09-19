@@ -27,13 +27,13 @@ Build a fact sheet before touching a file, and give every fact its source. The p
 | Handle | The TOML table name, e.g. `["claude-5-sonnet"]` | Follow the family's existing naming, which is often not the provider's: `claude-5-sonnet`, not `claude-sonnet-5` |
 | Model type | `model_type` when it differs from the file's `[defaults]` | `llm`, `img_gen`, `text_extractor` or `search` |
 | Model id per backend | `model_id`, omitted when it equals the handle | Direct APIs, Azure deployments, Bedrock inference profiles and Vertex ids all differ; copy the shape the sibling uses on that backend |
-| Inputs and outputs | `inputs`, `outputs` | Inputs are `text`, `images`, `pdf`; outputs are `text`, `structured` for an LLM and `image` for image generation. Declare `pdf` per backend: a backend that serves the model can still refuse documents |
+| Inputs and outputs | `inputs`, `outputs` | Take the tokens from the sibling, because the runtime reads exact strings and a wrong one fails only when called. An LLM takes `text`, `images`, `pdf` (some hosts add `audio`, `video`) and outputs `text`, `structured`; a text extractor takes `pdf`, `image` (singular) or `web_page` and outputs `pages`; a search model outputs `sourced-answers`, `structured`; image generation outputs `image`. Declare `pdf` per backend: a backend that serves the model can still refuse documents |
 | Costs | `costs = { input = …, output = … }` | USD per million tokens. Image models may price differently; copy the sibling's shape |
 | Thinking | `thinking_mode` | `none`, `manual` (a budget the caller sets) or `adaptive` (the model decides) |
 | Refused parameters | `listed_constraints`, `valued_constraints` | `temperature_unsupported`, `temperature_must_be_multiplied_by_2`, `max_tokens_must_be_high_enough`; `valued_constraints = { fixed_temperature = 1 }`. The vocabulary is `pipelex/cogt/model_backends/constraints.py` |
 | Limits | `max_tokens`, `max_prompt_images` | Only where the sibling declares them |
 
-A model spec declares nothing about how its prompts are formatted: templating style is authored on the pipe. And do not invent keys: a key the model-spec blueprint does not know is sent to the provider as an outbound HTTP header.
+A model spec declares nothing about how its prompts are formatted: templating style is authored on the pipe. And do not invent keys: a key the model-spec blueprint does not know fails the boot, unless it is a hyphenated header name with a plain string value, which is sent to the provider as an outbound HTTP header.
 
 ## 2. Find the footprint from the nearest sibling
 
@@ -70,7 +70,7 @@ For an LLM, go past `TestLLMInference` and exercise what the entry declares: `Te
 
 ## 7. Deck, changelog, checks
 
-- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-claude`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again.
+- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-claude`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once the gateway catalog carries the model (step 8): under the default `all_pipelex_gateway` routing, a preset or choice default reaching a handle the catalog lacks raises `GatewayUnknownModelError` at boot, and `make tb` turns red. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
 - **Changelog.** One bullet under `## [Unreleased]` → `### Added` in `CHANGELOG.md`: the handle, the backends, what it takes and produces, and anything unusual such as a refused parameter.
 - **Checks.** `make tb` boots the config, which parses every TOML and validates every spec. Then stage your changes (the drift digest reads the git index) and run `make agent-check`.
 
@@ -96,7 +96,7 @@ Show this to the user at the end, each box ticked or explained:
 - [ ] Kit synced (`make ukc`, `make ccs`), and the migration goldens if `portkey.toml` moved (`make umig`, `make cmig`)
 - [ ] Handle in its test collection
 - [ ] Live tests pass on every backend in the footprint, for every capability declared
-- [ ] Deck left alone, or the promotion decided by the user
+- [ ] Deck left alone, or the promotion decided by the user, made after the gateway catalog carries the model, and mirrored in `docs/`
 - [ ] Changelog entry under `[Unreleased]`
 - [ ] `make tb` and `make agent-check` green
 - [ ] Gateway and manifold catalogs handed off, and `make ugm` run once they are published
