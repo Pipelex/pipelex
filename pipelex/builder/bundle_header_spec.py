@@ -1,12 +1,15 @@
+from typing import TYPE_CHECKING
+
 from pydantic import Field
-from rich.console import Group
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.cogt.content_generation.dry_mock import MOCK_MAIN_PIPE_CODE
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class BundleHeaderSpec(StructuredContent):
@@ -18,7 +21,11 @@ class BundleHeaderSpec(StructuredContent):
     main_pipe: str = Field(description="The main pipe of the domain.", examples=[MOCK_MAIN_PIPE_CODE])
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.text import Text
+
         bundle_group = Group()
         if title:
             bundle_group.renderables.append(Text(title, style="bold"))

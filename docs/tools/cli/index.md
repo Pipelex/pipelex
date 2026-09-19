@@ -7,6 +7,16 @@ description: "Master the `pipelex` runtime CLI and understand where the `mthds` 
 
 The `pipelex` CLI is the runtime and project-configuration CLI for Pipelex. Use it to initialize config, validate methods, run pipes, inspect the runtime state, and generate supporting files.
 
+## Installation
+
+The CLI renders its tables, panels and log lines through Rich, which is the `cli` extra, so install the package with it:
+
+```bash
+uv tool install "pipelex[cli]"
+```
+
+The same extra serves the [`pipelex-agent`](agent-cli.md) CLI. A process that only embeds Pipelex, a server for instance, installs the package without it; see [Rich Imports](../../contribute/rich-imports.md) for what that process gives up and how the runtime keeps Rich out of it.
+
 ## Overview
 
 The Pipelex CLI is organized into several command groups:

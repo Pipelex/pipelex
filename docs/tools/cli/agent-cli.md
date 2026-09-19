@@ -8,6 +8,8 @@ The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CL
 
 It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
+It ships in the same `cli` extra as the main CLI, `uv tool install "pipelex[cli]"`: its own output carries no Rich formatting, but the command modules it shares with `pipelex` import Rich.
+
 ## Global Options
 
 | Option | Description |

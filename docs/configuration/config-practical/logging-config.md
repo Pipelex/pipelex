@@ -44,7 +44,7 @@ sink = "console"
 ```
 
 - Names the registered log sink boot installs on the root logger, the way `runtime.storage.method` names a storage backend
-- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering
+- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the `json` alternative
 - `"json"`: one JSON object per line, for a server behind a log agent
 - `"otlp"`: the OpenTelemetry logs signal, for a collector
 - Any other token an installed plugin registers; a token nobody provides stops the boot naming the registered ones
@@ -67,10 +67,10 @@ pretty_print_mode = "rich"
 ```
 
 - Controls the panels that `pretty_print(...)` renders, such as the "Output of pipe" panel shown after every operator pipe
-- `"rich"`: Rich tables and panels on the console print target
-- `"poor"`: plain text in a drawn frame on stderr, with no Rich panel; a pipe's output prints as its plain rendering
+- `"rich"`: Rich tables and panels on the console print target. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the two modes below
+- `"poor"`: plain text in a drawn frame on stderr, with no Rich panel and no Rich import; a pipe's output prints as its plain rendering
 - `"silent"`: nothing is printed and no renderable is built, for a host with no console or one that must not spend time rendering on the thread that runs pipes
-- Default: `"rich"`. The agent CLI forces `"silent"`
+- Default: `"rich"`. The agent CLI forces `"silent"`, and a server installed without the `cli` extra sets `"poor"` or `"silent"` beside `sink = "json"`
 - Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to the mode the process held before that boot
 
 ### JSON Formatting

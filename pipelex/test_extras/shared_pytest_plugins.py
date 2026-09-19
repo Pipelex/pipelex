@@ -3,14 +3,14 @@ from enum import StrEnum
 
 import pytest
 from pytest import Config, FixtureRequest, Parser
-from rich.console import Console
-from rich.panel import Panel
 
-from pipelex.runtime_hub import get_console
 from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
+from pipelex.tools.misc.pretty import plain_markup_text
+from pipelex.tools.misc.rich_extra import is_rich_installed
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 
 class ClassRegistryMode(StrEnum):
@@ -90,6 +90,40 @@ def pytest_addoption(parser: Parser):
     )
 
 
+#: What a session stopped for the terms agreement says. Written as Rich markup once: the Rich panel renders it,
+#: and the Rich-free path prints the text it renders to, so the message arrives either way.
+_TERMS_REQUIRED_MARKUP = (
+    "[bold yellow]Pipelex Service Terms Agreement Required[/bold yellow]\n\n"
+    "Tests cannot run because Pipelex Gateway is enabled but terms haven't been accepted.\n\n"
+    "[bold]To fix this, choose one option:[/bold]\n\n"
+    "  [cyan]1.[/cyan] Run [green]pipelex init agreement[/green] to accept terms (quick, no config reset)\n\n"
+    "  [cyan]2.[/cyan] Run [green]pipelex init config[/green] to fully reset and configure backends\n\n"
+    "  [cyan]3.[/cyan] Disable gateway in [blue].pipelex/inference/backends.toml[/blue]:\n"
+    "     [dim]Set pipelex_gateway.enabled = false[/dim]\n"
+)
+
+_TERMS_REQUIRED_TITLE = "⚠️  Setup Required"
+
+
+def _print_terms_required() -> None:
+    """Say why the session is stopping, framed by Rich where the extra is installed and plainly where it is not.
+
+    Rich is the ``cli`` extra and this plugin loads in every session of every project that registers it, so the
+    message a stopped session depends on is never allowed to depend on it.
+    """
+    if not is_rich_installed():
+        print_to_stderr("")
+        print_to_stderr(_TERMS_REQUIRED_TITLE)
+        print_to_stderr(plain_markup_text(markup=_TERMS_REQUIRED_MARKUP) or _TERMS_REQUIRED_MARKUP)
+        return
+    from rich.console import Console
+    from rich.panel import Panel
+
+    console = Console()
+    console.print()
+    console.print(Panel(_TERMS_REQUIRED_MARKUP, title=_TERMS_REQUIRED_TITLE, border_style="yellow"))
+
+
 def pytest_configure(config: Config) -> None:
     """Check prerequisites before test collection starts.
 
@@ -121,21 +155,7 @@ def pytest_configure(config: Config) -> None:
     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
 
     if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
-        console = Console()
-        console.print()
-        console.print(
-            Panel(
-                "[bold yellow]Pipelex Service Terms Agreement Required[/bold yellow]\n\n"
-                "Tests cannot run because Pipelex Gateway is enabled but terms haven't been accepted.\n\n"
-                "[bold]To fix this, choose one option:[/bold]\n\n"
-                "  [cyan]1.[/cyan] Run [green]pipelex init agreement[/green] to accept terms (quick, no config reset)\n\n"
-                "  [cyan]2.[/cyan] Run [green]pipelex init config[/green] to fully reset and configure backends\n\n"
-                "  [cyan]3.[/cyan] Disable gateway in [blue].pipelex/inference/backends.toml[/blue]:\n"
-                "     [dim]Set pipelex_gateway.enabled = false[/dim]\n",
-                title="⚠️  Setup Required",
-                border_style="yellow",
-            )
-        )
+        _print_terms_required()
         pytest.exit("Service terms not accepted - run 'pipelex init agreement' first", returncode=1)
 
 
@@ -168,7 +188,9 @@ def _setup_env_var_placeholders(env_var_keys: list[str]) -> None:
             substitutions_counter += 1
 
     if substitutions_counter > 0:
-        get_console().print(f"[yellow]Set {substitutions_counter} placeholder environment variables[/yellow]")
+        # A plain line rather than a console one: this plugin loads in every session of every project that
+        # registers it, and a CI diagnostic must never be the reason a suite cannot run.
+        print_to_stderr(f"Set {substitutions_counter} placeholder environment variables")
 
 
 def _cleanup_placeholder_env_vars(env_var_keys: list[str]) -> None:
@@ -191,7 +213,8 @@ def _cleanup_placeholder_env_vars(env_var_keys: list[str]) -> None:
             removed_counter += 1
 
     if removed_counter > 0:
-        get_console().print(f"[yellow]Cleaned up {removed_counter} placeholder environment variables[/yellow]")
+        # As above: a plain line, for the same reason.
+        print_to_stderr(f"Cleaned up {removed_counter} placeholder environment variables")
 
 
 @pytest.fixture(scope="session", autouse=True)
