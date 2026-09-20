@@ -30,7 +30,7 @@ An LLM handle can be either:
 best-claude = "claude-4.1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
-base-gpt = "gpt-5"
+base-gpt = "gpt-5.5"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.

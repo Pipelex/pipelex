@@ -651,7 +651,7 @@ for_object = "@my-custom-alias"
 
 # Add custom waterfalls - lists of models tried in order
 [llm.waterfalls]
-premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.2"]
+premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.4"]
 small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 ```
 
@@ -665,7 +665,7 @@ document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 When using waterfalls in `.mthds` files, prefix them with `~`:
 
 ```toml
-model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.2
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.4
 model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 

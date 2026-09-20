@@ -14,7 +14,7 @@ When you use **Pipelex Gateway** as your inference backend, identified telemetry
 
 **What we collect:**
 
-- Model names used (e.g., `gpt-5.2`, `claude-4.5-sonnet`) and parameters
+- Model names used (e.g., `gpt-5.4`, `claude-4.5-sonnet`) and parameters
 - Pipe types (e.g., `PipeLLM`, `PipeSequence`, etc.)
 - Token counts (input/output)
 - Latency metrics
