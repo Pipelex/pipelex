@@ -22,6 +22,8 @@
 
 - **A manifold error on the native routes keeps its request id under the gateway's pipelex-spelled trace header**: `extract_manifold_metadata` reads the gateway's trace id from `x-pipelex-trace-id` before the inherited `x-portkey-trace-id`, still preferring a provider's own `x-request-id` over both. The gateway emits the two spellings with the same value today, so nothing changes yet; once it drops the vendor one, such an error whose provider sent no `x-request-id` keeps a request id instead of reporting none. `extract_gateway_metadata` is unchanged and still reads the vendor spelling alone — it serves the Portkey cloud and the manifold image path, which travels on `portkey_ai` and keeps that spelling until it is ported off the SDK.
 
+- **The License page names the versions the Elastic License 2.0 starts at**: the page said ELv2 applies "for every version released after 2026-09-14", which left the first ELv2 releases outside the boundary it drew, since all three were released on that very day. It now names them instead of dating them — `pipelex` from v0.58.0 onward, `pipelex-api` from v0.24.0 onward and `@pipelex/mcp` from v0.15.0 onward — and spells out the last MIT version of each.
+
 ## [v0.60.0] - 2026-09-19
 
 ### Changed
