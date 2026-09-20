@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- **A generated image is stored under its own media type, so a store no longer serves it as `binary/octet-stream`**: `GeneratedContentFactory.make_image_content` resolves the effective mime type once and already used it to mint the storage key's extension, but passed no `content_type` to `StorageProviderAbstract.store` on either the direct-bytes path or the fetched-remote one. The S3 provider only sets `ContentType` when it is given one, so every generated image landed untyped and S3 answered `binary/octet-stream` on the way back out — which reached any consumer that trusts the stored type, a same-origin assets route serving the object to a browser among them. Both calls now pass the resolved mime type, so the key's extension, the object's stored type and the reported `mime_type` cannot diverge.
+
 - **A manifold error on the native routes keeps its request id under the gateway's pipelex-spelled trace header**: `extract_manifold_metadata` reads the gateway's trace id from `x-pipelex-trace-id` before the inherited `x-portkey-trace-id`, still preferring a provider's own `x-request-id` over both. The gateway emits the two spellings with the same value today, so nothing changes yet; once it drops the vendor one, such an error whose provider sent no `x-request-id` keeps a request id instead of reporting none. `extract_gateway_metadata` is unchanged and still reads the vendor spelling alone — it serves the Portkey cloud and the manifold image path, which travels on `portkey_ai` and keeps that spelling until it is ported off the SDK.
 
 ## [v0.60.0] - 2026-09-19

@@ -116,8 +116,12 @@ class GeneratedContentFactory:
         # Resolve the effective mime type ONCE, before any storage key is built:
         # the provider's actual answer first (reported mime, then base64-extracted),
         # the REQUESTED image format only as a fallback. The storage-key extension
-        # derives from this same resolution, so key and mime cannot diverge when a
-        # provider returns a different format than requested.
+        # and the content type the object is stored under both derive from this same
+        # resolution, so key, stored type and mime cannot diverge when a provider
+        # returns a different format than requested. Passing it to `store` is not
+        # optional: a store that receives no content type falls back to its own
+        # default (S3 answers `binary/octet-stream`), and every consumer that trusts
+        # the stored type then serves the wrong one.
         mime_type: str
         if raw_details.mime_type:
             mime_type = raw_details.mime_type
@@ -139,7 +143,7 @@ class GeneratedContentFactory:
                 data=actual_bytes,
                 mime_type=mime_type,
             )
-            url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
+            url = await self.storage_provider.store(data=actual_bytes, key=storage_key, content_type=mime_type)
             is_remote_url = False
         else:
             msg = "No URL or bytes found"
@@ -158,7 +162,7 @@ class GeneratedContentFactory:
                     data=actual_bytes,
                     mime_type=mime_type,
                 )
-                url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
+                url = await self.storage_provider.store(data=actual_bytes, key=storage_key, content_type=mime_type)
                 public_url = await self.storage_provider.public_url(uri=url)
         elif not is_remote_url:
             public_url = await self.storage_provider.public_url(uri=url)

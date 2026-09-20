@@ -9,7 +9,7 @@ FAKE_IMAGE_BYTES = b"fake-image-bytes-for-hashing"
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestGeneratedContentFactoryStorageKey:
+class TestGeneratedContentFactoryStoredObject:
     @pytest.mark.parametrize(
         ("reported_mime_type", "requested_image_format", "expected_extension", "expected_mime_type"),
         [
@@ -17,7 +17,7 @@ class TestGeneratedContentFactoryStorageKey:
             pytest.param(None, "png", "png", "image/png", id="provider-silent-requested-format-wins"),
         ],
     )
-    async def test_storage_key_extension_follows_resolved_mime_type(
+    async def test_stored_object_and_key_follow_resolved_mime_type(
         self,
         mocker: MockerFixture,
         reported_mime_type: str | None,
@@ -25,11 +25,13 @@ class TestGeneratedContentFactoryStorageKey:
         expected_extension: str,
         expected_mime_type: str,
     ):
-        """The storage-key extension derives from the same mime resolution the result reports.
+        """The stored object's content type and the key's extension follow the reported mime.
 
         The provider's actual mime type wins over the requested image format, and the requested
-        format only fills in when the provider is silent — so the minted key's extension and the
-        resulting `mime_type` can never diverge (e.g. a `.png` key holding `image/jpeg` bytes).
+        format only fills in when the provider is silent — so the minted key's extension, the
+        object's stored content type and the resulting `mime_type` can never diverge (e.g. a
+        `.png` key holding `image/jpeg` bytes, or an object a store serves as
+        `binary/octet-stream` because it was written without one).
         """
         storage_provider = mocker.MagicMock(spec=StorageProviderAbstract)
         storage_provider.store = mocker.AsyncMock(return_value="pipelex-storage://stored-uri")
@@ -54,5 +56,6 @@ class TestGeneratedContentFactoryStorageKey:
         stored_key: str = store_call.kwargs["key"]
         assert stored_key.startswith("test/scope/generated/")
         assert stored_key.endswith(f".{expected_extension}")
+        assert store_call.kwargs["content_type"] == expected_mime_type
         assert image_content.mime_type == expected_mime_type
         assert image_content.url == "pipelex-storage://stored-uri"
