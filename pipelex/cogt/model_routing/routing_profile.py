@@ -34,7 +34,8 @@ class RoutingProfile(ConfigModel):
             Backend name to use for this model
 
         """
-        possible_routes = self.routes
+        # A copy: the enabled optional routes are merged for this match only, never into the declared `routes`.
+        possible_routes = dict(self.routes)
         for pattern, backend in self.optional_routes.items():
             if backend not in enabled_backends:
                 continue

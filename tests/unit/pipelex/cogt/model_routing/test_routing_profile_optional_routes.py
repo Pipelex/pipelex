@@ -65,3 +65,37 @@ class TestRoutingProfileOptionalRoutes:
         assert result is not None
         assert result.backend_name == "openai"
         assert result.matching_method == BackendMatchingMethod.DEFAULT
+
+    def test_a_pattern_optional_route_serves_a_whole_family_of_versions(self):
+        """`jev-*` sends every versioned judgment model to its backend while that backend is enabled."""
+        routing_profile = RoutingProfile(
+            name="test_profile",
+            default="pipelex_gateway",
+            optional_routes={"jev-*": "typesafe"},
+        )
+
+        result = routing_profile.get_backend_match_for_model(enabled_backends=["pipelex_gateway", "typesafe"], model_name="jev-1.13.0")
+
+        assert result is not None
+        assert result.backend_name == "typesafe"
+        assert result.matching_method == BackendMatchingMethod.PATTERN_MATCH
+        assert result.matched_pattern == "jev-*"
+
+    def test_matching_leaves_the_declared_routes_untouched(self):
+        """Regression: matching used to merge the enabled optional routes into `routes` in place.
+
+        The merge survived the call, so after the first match the profile's `routes` no longer said
+        what its file said — a pattern declared optional had silently become unconditional in the
+        model, and it was only the per-match enablement checks that kept that from mattering.
+        """
+        routing_profile = RoutingProfile(
+            name="test_profile",
+            default="pipelex_gateway",
+            routes={"gpt-*": "openai"},
+            optional_routes={"jev-*": "typesafe"},
+        )
+
+        routing_profile.get_backend_match_for_model(enabled_backends=["pipelex_gateway", "openai", "typesafe"], model_name="jev-1.13.0")
+
+        assert routing_profile.routes == {"gpt-*": "openai"}
+        assert routing_profile.optional_routes == {"jev-*": "typesafe"}

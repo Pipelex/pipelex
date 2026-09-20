@@ -320,6 +320,9 @@ TemplateSigilSyntaxError | Template sigil syntax | https://docs.pipelex.com/late
 TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error/
 ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
+TypesafeError | Typesafe | https://docs.pipelex.com/latest/errors/typesafe-error/
+TypesafeJudgmentResponseError | Typesafe judgment response | https://docs.pipelex.com/latest/errors/typesafe-judgment-response-error/
+TypesafeQuestionUnsupportedError | Typesafe question unsupported | https://docs.pipelex.com/latest/errors/typesafe-question-unsupported-error/
 UnknownBootOrchestratorError | Unknown boot orchestrator | https://docs.pipelex.com/latest/errors/unknown-boot-orchestrator-error/
 UnknownInputNameError | Unknown input name | https://docs.pipelex.com/latest/errors/unknown-input-name-error/
 UnknownPipeFuncExecutionModeError | Unknown pipe func execution mode | https://docs.pipelex.com/latest/errors/unknown-pipe-func-execution-mode-error/

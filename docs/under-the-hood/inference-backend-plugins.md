@@ -65,7 +65,7 @@ registrar.add_inference_backend(
 
 A registry key is `(family, sdk)`. The same `sdk` string may appear in two families (e.g. `google` serves both `LLM` and `IMG_GEN`); they are distinct keys. A duplicate `(family, sdk)` fails loud with `DuplicateInferenceBackendError` naming **both** contributing plugins.
 
-One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves `LLM`, `IMG_GEN`, `EXTRACT` and `SEARCH`, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`. This is the cross-family-vendor coordination point: one plugin, many backends.
+One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves `LLM`, `IMG_GEN`, `EXTRACT` and `SEARCH`, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`, and `typesafe` serves `JUDGMENT` alone. This is the cross-family-vendor coordination point: one plugin, many backends.
 
 ---
 
@@ -87,7 +87,7 @@ The factory always passes all four keyword arguments. A stateless backend simply
 
 Two invariants shape what goes *inside* the closure:
 
-- **Import-light.** The plugin module must import no backend SDK at module load. Do the SDK import **inside** the closure (`# noqa: PLC0415`), so merely discovering the plugin never pulls a heavy/optional dependency. Booting Pipelex with the built-ins registered imports none of `anthropic`, `mistralai`, `google.genai`, `boto3`, `fal_client`, `huggingface_hub`, `docling`, `linkup`, … — enforced by a subprocess import-blocker guard.
+- **Import-light.** The plugin module must import no backend SDK at module load. Do the SDK import **inside** the closure (`# noqa: PLC0415`), so merely discovering the plugin never pulls a heavy/optional dependency. Booting Pipelex with the built-ins registered imports none of `anthropic`, `mistralai`, `google.genai`, `boto3`, `fal_client`, `huggingface_hub`, `docling`, `linkup`, `typesafe_sdk`, … — enforced by a subprocess import-blocker guard.
 - **Fail at use, not at boot.** Guard an optional dependency with `require_sdk(...)` *inside* the closure. A missing extra then raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) only when the backend is actually used.
 
 Client memoization goes through `sdk_clients.get_or_create(handle=…, build=lambda: …)` — the registry caches one SDK client per `ModelHandle`, so repeated worker construction reuses the connection.

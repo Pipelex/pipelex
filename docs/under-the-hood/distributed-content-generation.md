@@ -7,7 +7,7 @@ description: "How Pipelex serializes dynamic Pydantic models and large binary co
 
 This page is for contributors working on Pipelex internals. For the capability overview, see the user-facing [Distributed Execution](../distributed-execution/index.md) page instead.
 
-When content generation (LLM structured output, image generation, PDF extraction, web search) runs on a separate worker process, two serialization problems appear that single-process execution never faces. This page covers them backend-neutrally — the mechanisms live in open core and are the same regardless of which host runtime carries the payload. The concrete activity dispatch is a [commercial platform capability](https://pipelex.com/products#durable-execution); each backend (Temporal, Mistral Workflows) realizes it in its own plugin.
+When content generation (LLM structured output, image generation, PDF extraction, web search, judgment) runs on a separate worker process, two serialization problems appear that single-process execution never faces. This page covers them backend-neutrally — the mechanisms live in open core and are the same regardless of which host runtime carries the payload. The concrete activity dispatch is a [commercial platform capability](https://pipelex.com/products#durable-execution); each backend (Temporal, Mistral Workflows) realizes it in its own plugin.
 
 !!! note "Every inference leaf goes through the same seam"
     All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction (`pipelex/cogt/content_generation/content_generator.py`): direct inline, or — on a host runtime — wrapped as an activity by the runtime's in-workflow content generator. The backend choice is independent of the run mode: under `run_mode=DRY` the chosen backend still dispatches and the leaf mocks inside it. Wrapping the leaf as a host-runtime activity is what makes it replay-safe (the result is recorded in the run's history) and lets a leaf failure cross the worker boundary as a classified error, instead of re-executing on every replay and hanging the submitter with an unclassified fault.
@@ -127,6 +127,10 @@ Structured web search (`PipeSearch` with a non-text output concept) faces the id
 
 The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
 
+### Judgments need neither mechanism
+
+A judgment's leaf, `judgment_gen_answers`, has one entry point where search has three, because nothing about it is dynamic. Its `JudgmentAssignment` carries the state as a JSON object, the questions as the family's own discriminated models and the resolved `JudgmentSetting`; its result is a map of answers that are plain models of the same package. No caller class travels down and no schema is shipped, so the in-process arm and the boundary arm would be the same function, and there is nothing to split.
+
 ---
 
 ## Large payload management
@@ -164,6 +168,7 @@ What gets stored vs. what crosses the boundary, by content type:
 | LLM object | Nothing (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
 | Search sourced answer | Nothing (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
+| Judgment answers | Nothing (verdicts are small) | `dict[str, JudgmentAnswer]` keyed as the questions were |
 
 Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
 
@@ -206,6 +211,7 @@ Resolution order:
 | Content generator (type bridge) | `pipelex/cogt/content_generation/content_generator.py` |
 | LLM generation functions | `pipelex/cogt/content_generation/llm_generate.py` |
 | Search generation functions | `pipelex/cogt/content_generation/search_generate.py` |
+| Judgment generation function | `pipelex/cogt/content_generation/judgment_generate.py` |
 | Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
 | Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |

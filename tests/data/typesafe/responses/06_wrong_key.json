@@ -1,0 +1,28 @@
+{
+  "body": {
+    "detail": {
+      "error_type": "authentication_error",
+      "message": "Cannot authenticate with the server. Please check your API key and try again."
+    }
+  },
+  "class": "TypeSafeAuthenticationError",
+  "endpoint": "POST https://api.typesafe.ai/v1/systemone",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "TypeSafeAPIError",
+    "TypeSafeError",
+    "Exception",
+    "BaseException"
+  ],
+  "request_id": "req_01a0b97aaffa7b9d977632354ba0bd9d",
+  "response_headers": {
+    "content-length": "138",
+    "content-type": "application/json",
+    "date": "Sat, 19 Sep 2026 11:43:40 GMT",
+    "server": "istio-envoy",
+    "x-envoy-upstream-service-time": "22",
+    "x-typesafe-request-id": "req_01a0b97aaffa7b9d977632354ba0bd9d"
+  },
+  "status": 401,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 401 Cannot authenticate with the server. Please check your API key and try again. (request_id=req_01a0b97aaffa7b9d977632354ba0bd9d)"
+}
