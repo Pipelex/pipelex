@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The GPT-5.6 series and GPT-6 Astra are served on OpenAI, Azure OpenAI, the Pipelex Gateway and Pipelex Manifold**: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` are registered on the two direct backends and, through the remote config, on both hosted routing profiles. All four take text, images and PDF, produce text and structured output, and reason under `thinking_mode = "manual"` with a fixed temperature of 1. The Azure entries carry the dated deployment ids the hosted profiles also use as their wire model ids.
+
 ### Changed
 
 - **`add-model` skill follows the model's nearest sibling**: the skill derives which backend TOMLs, test collection and deck entries a new model belongs in from the model it succeeds, instead of a fixed provider-to-backend table, and checks each backend actually serves the model. It takes the model's facts from the provider's own documentation with OpenRouter as a cross-check, hands the live tests to `/test-model` with a test class per declared capability, and adds the deck and changelog steps and `make ugm` once the gateway catalog carries the model.
