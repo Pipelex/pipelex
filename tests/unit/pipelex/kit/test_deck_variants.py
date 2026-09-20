@@ -107,21 +107,27 @@ def list_declared_backend_handles() -> set[str]:
 
 
 def extract_model_handles(blueprint: ModelDeckBlueprint) -> set[str]:
-    """Every concrete handle a deck names, from its alias targets and its presets' models.
+    """Every concrete handle a deck names, from its alias targets, its waterfall entries and its presets' models.
 
-    A preset whose model is an alias, a preset or a waterfall names no handle of its own: it
-    resolves through one of the other two, which this function reads directly.
+    A reference naming an alias, a preset or a waterfall carries no handle of its own: it resolves
+    through one of the three collections this function reads directly. A waterfall's own entries do
+    carry handles, which is why they are read here and not only through whatever names the waterfall.
     """
     family_blueprints: list[DeckFamilyBlueprint] = [blueprint.llm, blueprint.extract, blueprint.img_gen, blueprint.search]
     references: list[str] = []
     for family_blueprint in family_blueprints:
         references.extend(family_blueprint.aliases.values())
+        for waterfall_entries in family_blueprint.waterfalls.values():
+            references.extend(waterfall_entries)
         references.extend(setting.model for setting in family_blueprint.presets.values())
     handles: set[str] = set()
     for reference in references:
         parsed = ModelReference.parse(reference)
-        if parsed.kind == ModelReferenceKind.HANDLE:
-            handles.add(parsed.name)
+        match parsed.kind:
+            case ModelReferenceKind.HANDLE:
+                handles.add(parsed.name)
+            case ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL | ModelReferenceKind.PRESET:
+                continue
     return handles
 
 
@@ -168,6 +174,19 @@ class TestDeckVariants:
         declared_handles = list_declared_backend_handles()
         undeclared = sorted(handle for handle in variant_only_handles if handle not in declared_handles)
         assert not undeclared, f"Variant '{variant_dir.name}' names handles no backend file declares any more: {', '.join(undeclared)}"
+
+    def test_handle_collection_reads_waterfall_entries(self):
+        """A handle a deck names only inside a waterfall must still reach the retirement check above.
+
+        No deck declares a waterfall today, so nothing else in this module would notice the
+        collector skipping them, and the guard would go quietly blind the moment one does.
+        """
+        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files()))
+        probe_handle = "handle-named-only-by-a-waterfall"
+        assert probe_handle not in extract_model_handles(blueprint)
+
+        blueprint.llm.waterfalls["waterfall-parity-probe"] = [probe_handle]
+        assert probe_handle in extract_model_handles(blueprint), "A handle named inside a waterfall escaped the handle collection"
 
     def test_comparator_reports_a_preset_the_variant_is_missing(self):
         differences = compare_vocabularies(
