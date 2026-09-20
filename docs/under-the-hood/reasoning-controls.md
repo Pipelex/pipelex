@@ -30,7 +30,7 @@ Define a reusable preset in your LLM deck, then reference it with the `$` prefix
 ```toml
 # In .pipelex/inference/deck/1_llm_deck.toml
 [llm.presets]
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high" }
 ```
 
 ```toml

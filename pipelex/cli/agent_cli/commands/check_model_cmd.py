@@ -54,7 +54,7 @@ def _format_check_markdown(result: dict[str, Any]) -> str:
 def agent_check_model_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Model reference to check (e.g. $writing-creative, @best-claude, gpt-4o)"),
+        typer.Argument(help="Model reference to check (e.g. $writing-creative, @best-gpt, gpt-4o)"),
     ],
     model_type: Annotated[
         ModelCategory,

@@ -37,6 +37,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **claude-4.8-opus**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **claude-5-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **claude-5-sonnet**
   - inputs: text, images, pdf
   - outputs: text, structured
@@ -73,49 +76,10 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gemini-pro-latest**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **gpt-4.1**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-4.1-mini**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-4.1-nano**
-  - inputs: text, images, pdf
-  - outputs: text, structured
 - **gpt-4o**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-4o-mini**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5-chat**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5-mini**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5-nano**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5.1**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5.1-chat**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5.1-codex**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5.2**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5.2-chat**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **gpt-5.2-codex**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.3-codex**
@@ -134,6 +98,18 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.5**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.6-luna**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.6-sol**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.6-terra**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-6-astra**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-oss-120b**
@@ -162,21 +138,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
   - outputs: text, structured
 - **mistral-large**
   - inputs: text, images, pdf
-  - outputs: text, structured
-- **o1**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **o1-mini**
-  - inputs: text, images
-  - outputs: text, structured
-- **o3**
-  - inputs: text, images, pdf
-  - outputs: text, structured
-- **o3-mini**
-  - inputs: text
-  - outputs: text, structured
-- **o4-mini**
-  - inputs: text
   - outputs: text, structured
 - **phi-4**
   - inputs: text
@@ -232,6 +193,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-07-27T01:18:06Z
+> Last updated: 2026-09-20T22:54:34Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

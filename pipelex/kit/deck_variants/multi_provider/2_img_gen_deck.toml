@@ -32,9 +32,10 @@ choice_default = "$gen-image"
 
 [img_gen.aliases]
 best-gpt = "gpt-image-2"
+best-gemini = "nano-banana-2"
 
-default-general = "gpt-image-2"
-default-premium = "gpt-image-2"
+default-general = "nano-banana"
+default-premium = "nano-banana-2"
 default-small = "gpt-image-1-mini"
 
 ####################################################################################################
@@ -50,7 +51,7 @@ gen-image-high-quality = { model = "@default-premium", quality = "high", descrip
 
 # Testing
 gen-image-testing = { model = "@default-small", quality = "low", description = "Testing preset for image generation" }
-gen-image-testing-img2img = { model = "@default-premium", description = "Testing preset for image-to-image" }
+gen-image-testing-img2img = { model = "nano-banana-pro", description = "Testing preset for image-to-image" }
 synthesize-photo = { model = "@default-small", quality = "low", description = "Synthesize realistic photos for testing" }
-synthesize-ui = { model = "@default-premium", description = "Synthesize UI screenshots for testing" }
-synthesize-chart = { model = "@default-premium", description = "Synthesize charts and graphs for testing" }
+synthesize-ui = { model = "nano-banana-pro", description = "Synthesize UI screenshots for testing" }
+synthesize-chart = { model = "nano-banana-pro", description = "Synthesize charts and graphs for testing" }
