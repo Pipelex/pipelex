@@ -10,6 +10,8 @@ on:
   # expired token) is otherwise unrecoverable: re-running a run replays the
   # workflow file it started with, and the only other trigger is merging a PR
   # into main — which the branch guard restricts to release/vX.Y.Z branches.
+  # A dispatch is a new run and so holds no artifact of its own; the build job
+  # below recovers the bytes this version published rather than rebuilding them.
   workflow_dispatch:
 
 jobs:
@@ -20,7 +22,18 @@ jobs:
 
     permissions:
       contents: read
-      actions: read # reading this run's own artifact list, below
+      actions: read # reading artifact lists — this run's, and the repository's
+
+    env:
+      # The commit whose build this job is looking for, resolved into HEAD_SHA
+      # below. The two triggers name it differently: on the `pull_request` path
+      # `github.sha` is the event's own merge ref, while the run — and so the
+      # artifact it stores — records the release branch's last commit as its
+      # `head_sha`. Deliberately NOT a `${{ cond && a || b }}` expression, for the
+      # reason spelled out in `github-release`: that idiom falls through to `b`
+      # whenever `a` is empty. Two plain inputs and a shell branch fail loudly.
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      DISPATCH_SHA: ${{ github.sha }}
 
     steps:
       # A manual run can target any ref that contains this workflow, and every
@@ -41,73 +54,246 @@ jobs:
             echo "::error::Manual publish is allowed only from main, release/vX.Y.Z or pre-release/v*. Got: $REF"
             exit 1
           fi
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read the package, the version and the commit being shipped
+        id: project
+        run: |
+          set -euo pipefail
+          NAME=$(grep -m 1 '^name = ' pyproject.toml | cut -d '"' -f 2)
+          VERSION=$(grep -m 1 '^version = ' pyproject.toml | cut -d '"' -f 2)
+          if [ -z "$NAME" ] || [ -z "$VERSION" ]; then
+            echo "::error::Could not read the package name and version out of pyproject.toml."
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            HEAD_SHA="$PR_HEAD_SHA"
+          else
+            HEAD_SHA="$DISPATCH_SHA"
+          fi
+          if [ -z "$HEAD_SHA" ]; then
+            echo "::error::Could not determine which commit this run is shipping ($GITHUB_EVENT_NAME). Refusing to look for, or make, a build without it."
+            exit 1
+          fi
+          {
+            echo "name=$NAME"
+            echo "version=$VERSION"
+            echo "head_sha=$HEAD_SHA"
+          } >> "$GITHUB_OUTPUT"
+          echo "Shipping $NAME $VERSION from $HEAD_SHA"
       # A recovery re-run — the one the signing fallback in `github-release`
-      # prescribes — must attach and sign the exact bytes the first attempt
-      # published, because PyPI's copies of them are immutable. Rebuilding cannot
-      # promise that: `[build-system] requires = ["hatchling"]` names no version,
-      # so a hatchling release landing between two attempts changes the output of
-      # the same commit, and GitHub would then serve — and Sigstore would attest —
-      # dists that differ from the ones on PyPI. Artifacts are scoped to the run
-      # rather than to the attempt, so the build the first attempt stored is still
-      # here; reuse it and skip the rest of this job.
+      # prescribes — must attach and sign the exact bytes this version published,
+      # because PyPI's copies of them are immutable. Rebuilding cannot promise
+      # that: `[build-system] requires = ["hatchling"]` names no version and
+      # `actions/setup-python` asks for `3.x`, so a backend or interpreter release
+      # landing between two attempts changes the output of the same commit, and
+      # GitHub would then serve — and Sigstore would attest — dists that differ
+      # from the ones on PyPI. So this job looks for those bytes in three places
+      # before it builds anything, each layer weaker than the one before it, and
+      # builds fresh only once the last of them has established that nothing has
+      # been published at all.
       #
-      # This covers "Re-run all jobs". It cannot cover the `workflow_dispatch`
-      # retry, which is a NEW run and so holds no earlier artifact and rebuilds.
-      # The tag guard in `github-release` does not close that gap either — it
-      # compares commits, and this is the same commit built twice. Open as
-      # L-260920-487091; prefer re-running this run over dispatching a new one.
-      - name: Look for a build stored by an earlier attempt
-        id: earlier_build
+      # Layer 1: an attempt of THIS run. Artifacts are scoped to the run rather
+      # than to the attempt, so "Re-run all jobs" finds the build the first
+      # attempt stored — still in place, already downloadable by the jobs below —
+      # and this job has nothing left to do.
+      - name: Reuse the build an earlier attempt of this run stored
+        id: this_run
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           STATE=$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
             --jq '[.artifacts[] | select(.name == "python-package-distributions")]
                   | if length == 0 then "absent"
-                    elif any(.expired) then "expired"
+                    elif all(.expired) then "expired"
                     else "present" end')
           case "$STATE" in
             present)
-              echo "An earlier attempt stored a build — reusing it."
-              echo "reuse=true" >> "$GITHUB_OUTPUT"
+              echo "An earlier attempt of this run stored a build — reusing it."
+              echo "found=true" >> "$GITHUB_OUTPUT"
+              echo "The dists come from the build an earlier attempt of this run stored." >> "$GITHUB_STEP_SUMMARY"
               ;;
             expired)
-              echo "::error::The build stored by an earlier attempt has expired, so this run cannot attach the bytes it built, and a rebuild here cannot be shown to match whatever reached PyPI. Check whether this version is on PyPI: if it is, bump the version; if it is not, dispatch this workflow again."
-              exit 1
+              # No longer a dead end: the layers below can still recover the bytes
+              # this version published. The artifact record does hold this run's
+              # name, though, so the upload at the end has to replace it.
+              echo "::notice::The build stored by an earlier attempt of this run has expired; recovering the published bytes instead."
+              echo "expired=true" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "reuse=false" >> "$GITHUB_OUTPUT"
+              echo "This run holds no build yet."
               ;;
           esac
-      - uses: actions/checkout@v4
-        if: steps.earlier_build.outputs.reuse != 'true'
-        with:
-          persist-credentials: false
+      # Layer 2: an earlier RUN of the same commit. A `workflow_dispatch` retry is
+      # a new run, so layer 1 finds nothing there. Artifacts are listed
+      # repository-wide and each carries the head commit of the run that stored
+      # it, so the build a previous attempt at this same release made is still
+      # reachable. A dispatch from the branch the release was cut on matches it; a
+      # dispatch from `main` after the back-merge names a different commit and
+      # falls through to layer 3, which is the stronger answer anyway.
+      - name: Reuse a build an earlier run stored for this commit
+        id: earlier_run
+        if: steps.this_run.outputs.found != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.project.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          # Piped through the runner's own `jq` rather than `gh --jq`, so the
+          # commit can be passed in with `--arg` instead of read out of the
+          # environment. `pipefail` is what makes a failed `gh` call fail the
+          # pipeline rather than quietly yielding an empty list.
+          if ! CANDIDATES=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts?name=python-package-distributions&per_page=100" \
+            | jq -r --arg head "$HEAD_SHA" \
+              '.artifacts[]
+               | select(.expired == false and .workflow_run.head_sha == $head)
+               | "\(.created_at) \(.id)"'); then
+            # Reading an outage as "no earlier build" only sends this job down to
+            # layer 3, which reuses what PyPI itself serves — a strictly better
+            # source than either an artifact or a rebuild. A warning is enough.
+            echo "::warning::Could not list this repository's artifacts, so the earlier-run layer is being skipped."
+            CANDIDATES=""
+          fi
+          ARTIFACT_ID=$(printf '%s\n' "$CANDIDATES" | sort | tail -1 | cut -d ' ' -f 2)
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "No earlier run holds a build for $HEAD_SHA."
+            exit 0
+          fi
+          echo "Reusing artifact $ARTIFACT_ID, stored by an earlier run of $HEAD_SHA."
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            > "$RUNNER_TEMP/earlier-build.zip"
+          mkdir -p dist
+          unzip -q -o "$RUNNER_TEMP/earlier-build.zip" -d dist
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "The dists come from artifact $ARTIFACT_ID, stored by an earlier run of $HEAD_SHA." >> "$GITHUB_STEP_SUMMARY"
+      # Layer 3: PyPI itself. A published version's files are immutable there, so
+      # when PyPI serves this version those files ARE what was released —
+      # downloading them and checking each one against the digest PyPI publishes
+      # beside it makes the GitHub Release assets provably the bytes PyPI serves,
+      # rather than a build that probably matches them. This is the layer that
+      # closes the gap a rebuild leaves open, and it needs no artifact to have
+      # survived.
+      - name: Take the files PyPI already publishes for this version
+        id: pypi
+        if: steps.this_run.outputs.found != 'true' && steps.earlier_run.outputs.found != 'true'
+        env:
+          NAME: ${{ steps.project.outputs.name }}
+          VERSION: ${{ steps.project.outputs.version }}
+        run: |
+          set -euo pipefail
+          META="$RUNNER_TEMP/pypi-release.json"
+          # `--retry` covers a transient 5xx or a rate limit; a 404 is not an
+          # error to curl without `-f`, so the "never published" answer below is
+          # reached on the first call rather than after three.
+          CODE=$(curl -sS --retry 3 --retry-delay 2 --retry-all-errors \
+            -o "$META" -w '%{http_code}' \
+            "https://pypi.org/pypi/$NAME/$VERSION/json" || echo " transport-failure")
+          case "$CODE" in
+            200)
+              echo "PyPI serves $NAME $VERSION — taking its files."
+              ;;
+            404)
+              # Nothing has been published under this version, so there are no
+              # immutable bytes to disagree with and a fresh build is the only
+              # thing this job can do. This is the ordinary first pass.
+              echo "PyPI serves no $NAME $VERSION, so nothing has been published yet."
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            *)
+              # A guard that reads an outage as "never published" would rebuild
+              # exactly when it is least able to tell what it is replacing.
+              echo "::error::Could not ask PyPI whether $NAME $VERSION is published (got '$CODE'). Refusing to build bytes that might disagree with files PyPI is already serving — re-run this job once PyPI answers."
+              exit 1
+              ;;
+          esac
+          mkdir -p dist
+          COUNT=0
+          while read -r SHA256 FILENAME URL; do
+            echo "Downloading $FILENAME"
+            curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "dist/$FILENAME" "$URL"
+            # PyPI's own digest for the file it serves. Verifying it is what makes
+            # this a copy of the release rather than a download that happened to
+            # succeed, and it is also the check a truncated transfer fails.
+            printf '%s  %s\n' "$SHA256" "dist/$FILENAME" | sha256sum -c -
+            COUNT=$((COUNT + 1))
+          done < <(jq -r '.urls[] | "\(.digests.sha256) \(.filename) \(.url)"' "$META")
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::PyPI knows $NAME $VERSION but served no files for it. Refusing to guess at what this release published."
+            exit 1
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "The dists are the files PyPI publishes for $NAME $VERSION, verified against its own sha256 digests." >> "$GITHUB_STEP_SUMMARY"
+      # Layer 4: build. Reached only when the PyPI layer above ran and reported
+      # that nothing has been published under this version — which is why the
+      # condition reads that one output rather than all three: a layer that was
+      # skipped because an earlier one succeeded leaves its outputs empty, so
+      # `found == 'false'` is set by the last layer and only by it.
       - name: Set up Python
-        if: steps.earlier_build.outputs.reuse != 'true'
+        if: steps.pypi.outputs.found == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - name: Install pypa/build
-        if: steps.earlier_build.outputs.reuse != 'true'
+        if: steps.pypi.outputs.found == 'false'
         run: >-
           python3 -m
           pip install
           build
           --user
       - name: Build a binary wheel and a source tarball
-        if: steps.earlier_build.outputs.reuse != 'true'
-        run: python3 -m build
-      # Deliberately no `overwrite`: artifacts are immutable in v4, and the guard
-      # above means this step is reached only when the run holds no build yet. A
-      # second attempt reuses the first one's bytes rather than replacing them.
+        if: steps.pypi.outputs.found == 'false'
+        env:
+          HEAD_SHA: ${{ steps.project.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          python3 -m build
+          echo "The dists are a fresh build of $HEAD_SHA — this version had not been published." >> "$GITHUB_STEP_SUMMARY"
+      # Whichever layer filled dist/, what is in it now is what the jobs below
+      # will publish, attach and sign — so check that it is this version's release
+      # and nothing else. A recovered artifact is the case worth guarding: it was
+      # built by a run this one did not watch.
+      - name: Verify the dists are this version's
+        if: steps.this_run.outputs.found != 'true'
+        env:
+          VERSION: ${{ steps.project.outputs.version }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          WHEELS=(dist/*.whl)
+          SDISTS=(dist/*.tar.gz)
+          LISTING=$(printf '%s ' dist/*)
+          if [ "${#WHEELS[@]}" -ne 1 ] || [ "${#SDISTS[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one wheel and one source tarball in dist/, found: ${LISTING:-nothing}"
+            exit 1
+          fi
+          for DIST in "${WHEELS[@]}" "${SDISTS[@]}"; do
+            case "${DIST##*/}" in
+              *-"$VERSION"-*.whl|*-"$VERSION".tar.gz) ;;
+              *)
+                echo "::error::$DIST is not a $VERSION distribution. Refusing to publish it as v$VERSION."
+                exit 1
+                ;;
+            esac
+          done
+          ls -l dist
+      # Artifacts are immutable in v4, and layer 1 above means this step is
+      # reached only when this run holds no usable build — so an ordinary second
+      # attempt reuses the first one's bytes rather than replacing them.
+      # `overwrite` opens for exactly one case: the record is still here but its
+      # contents have expired, and the name it holds has to be freed before the
+      # recovered bytes can take it.
       - name: Store the distribution packages
-        if: steps.earlier_build.outputs.reuse != 'true'
+        if: steps.this_run.outputs.found != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+          overwrite: ${{ steps.this_run.outputs.expired == 'true' }}
 
   publish-to-pypi:
     name: >-
@@ -397,7 +583,8 @@ jobs:
         run: >-
           echo "::warning::Sigstore signing failed. v$VERSION is released and its
           dists are attached, but it carries no signature bundles. Once Sigstore is
-          healthy, use 'Re-run all jobs' on this run to attach them — signing is
-          non-fatal, so this job succeeded and 'Re-run failed jobs' is not offered.
-          Re-running this run reuses the build it already published rather than
-          making a new one, so prefer it over a fresh manual dispatch."
+          healthy, run this workflow again to attach them — either 'Re-run all jobs'
+          on this run or a manual dispatch from this ref, since the build job
+          recovers the bytes this version published instead of making new ones.
+          Signing is non-fatal, so this job succeeded and 'Re-run failed jobs' is
+          not offered."
