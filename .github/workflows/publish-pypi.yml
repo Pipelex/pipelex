@@ -166,6 +166,15 @@ jobs:
       contents: write # IMPORTANT: mandatory for making GitHub Releases
       id-token: write # IMPORTANT: mandatory for sigstore
 
+    env:
+      # Resolved into RELEASE_SHA below. Deliberately NOT a
+      # `${{ cond && a || b }}` expression: that idiom falls through to `b`
+      # whenever `a` is empty, so a missing merge commit would silently become
+      # `github.sha` — the exact wrong value, and indistinguishable from the
+      # right one afterwards. Two plain inputs and a shell branch fail loudly.
+      MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+      DISPATCH_SHA: ${{ github.sha }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -206,6 +215,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          # The commit this run ships, and the one the tag must name. `github.sha`
+          # is NOT it on the path this repo actually releases by: the trigger is a
+          # merged pull request, where `github.sha` is the event's own merge ref
+          # rather than the commit that landed on the base. v0.60.0 is the worked
+          # example — the tag names 97694a9b, the merge commit of #1212 on `main`,
+          # while that run's head was 2a72bd7f, the `release/v0.60.0` branch. A tag
+          # compared against `github.sha` would refuse every recovery re-run of a
+          # release, which is the one thing the signing fallback exists to allow.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            RELEASE_SHA="$MERGE_COMMIT_SHA"
+          else
+            RELEASE_SHA="$DISPATCH_SHA"
+          fi
+          if [ -z "$RELEASE_SHA" ]; then
+            echo "::error::Could not determine which commit this run is shipping ($GITHUB_EVENT_NAME). Refusing to create or touch a release without it."
+            exit 1
+          fi
+          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
+          echo "This run ships $RELEASE_SHA"
           # `gh` writes its error body to stdout rather than stderr, so a failed
           # call still fills $BODY — with the failure, not with a commit.
           if BODY=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$VERSION" 2>/dev/null); then
@@ -228,8 +256,8 @@ jobs:
                 ;;
             esac
           fi
-          if [ -n "$TAGGED_SHA" ] && [ "$TAGGED_SHA" != "$GITHUB_SHA" ]; then
-            echo "::error::v$VERSION is already tagged at $TAGGED_SHA, but this run is building $GITHUB_SHA. Refusing to replace that release's artifacts with a different commit's build. Bump the version instead of re-running this workflow."
+          if [ -n "$TAGGED_SHA" ] && [ "$TAGGED_SHA" != "$RELEASE_SHA" ]; then
+            echo "::error::v$VERSION is already tagged at $TAGGED_SHA, but this run is shipping $RELEASE_SHA. Refusing to replace that release's artifacts with a different commit's build. Bump the version instead of re-running this workflow."
             exit 1
           fi
       - name: Extract changelog notes for current version
@@ -311,8 +339,17 @@ jobs:
               --notes "$NOTES" \
               $PRERELEASE_FLAG
           else
+            # `--target` is not optional here. Without it `gh` creates the tag on
+            # the repository's DEFAULT branch head, which is neither necessarily
+            # the commit that produced these dists — a publish from a
+            # `pre-release/v*` merge or a `release/vX.Y.Z` dispatch is not on
+            # `main` at all — nor stable, since any unrelated merge landing
+            # between this release's merge and this step would move it. Naming
+            # the commit makes the tag the record of what actually shipped, and
+            # makes the guard above a comparison of like with like.
             gh release create "v$VERSION" \
               --repo "$GITHUB_REPOSITORY" \
+              --target "$RELEASE_SHA" \
               --title "v$VERSION$TITLE_SUFFIX" \
               --generate-notes \
               --notes "$NOTES" \
