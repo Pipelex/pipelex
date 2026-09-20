@@ -6332,6 +6332,10 @@ rationale = "Inner helper: filters the file list; single operand."
 param = "exc"
 rationale = "Factory from source: builds the result from the exc; single operand."
 
+["pipelex/tools/misc/file_fetch_utils.py::fetch_file_and_content_type_from_url_httpx"]
+param = "url"
+rationale = "Fetches the file at the URL; single operand."
+
 ["pipelex/tools/misc/file_fetch_utils.py::fetch_file_from_url_httpx"]
 param = "url"
 rationale = "Fetches the file at the URL; single operand."
