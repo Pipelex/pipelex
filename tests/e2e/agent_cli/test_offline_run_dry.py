@@ -247,7 +247,7 @@ class TestOfflineDryRun:
         """Gateway enabled + no network + primed cache → an image-gen pipe dry-runs offline.
 
         Companion to ``test_gateway_known_with_cache_succeeds_offline``, but the bundle's pipe is a
-        ``PipeImgGen`` referencing a gateway image handle (``nano-banana``). It proves the derived
+        ``PipeImgGen`` referencing a gateway image handle (``gpt-image-2``). It proves the derived
         cache covers img_gen handles too — not just LLMs — so the gateway-membership check passes for
         an image model and the offline dry-run completes.
 
