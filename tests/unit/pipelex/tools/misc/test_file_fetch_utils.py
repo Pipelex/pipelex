@@ -70,3 +70,29 @@ class TestFetchFileAndContentTypeFromUrl:
 
         assert raw_bytes == b"\x89PNG"
         assert content_type == expected
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestFetchTimeout:
+    """The timeout that the caller-facing timeout error depends on actually being set."""
+
+    @staticmethod
+    def _transport_recording(seen: dict[str, object]) -> httpx.MockTransport:
+        def _handler(request: httpx.Request) -> httpx.Response:
+            seen["timeout"] = request.extensions.get("timeout")
+            return httpx.Response(200, content=b"ok")
+
+        return httpx.MockTransport(_handler)
+
+    async def test_no_request_timeout_leaves_the_client_default_in_force(self) -> None:
+        """An explicit `timeout=None` would mean NO timeout in httpx, which is not the intent."""
+        seen: dict[str, object] = {}
+        await fetch_file_from_url_httpx(url=URL, transport=self._transport_recording(seen))
+
+        assert seen["timeout"] == {"connect": 5.0, "read": 5.0, "write": 5.0, "pool": 5.0}
+
+    async def test_an_explicit_request_timeout_is_honoured(self) -> None:
+        seen: dict[str, object] = {}
+        await fetch_file_from_url_httpx(url=URL, request_timeout=30, transport=self._transport_recording(seen))
+
+        assert seen["timeout"] == {"connect": 30, "read": 30, "write": 30, "pool": 30}

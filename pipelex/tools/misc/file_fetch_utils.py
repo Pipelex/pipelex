@@ -1,5 +1,5 @@
 import httpx
-from httpx import Response
+from httpx import USE_CLIENT_DEFAULT, Response, Timeout
 
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.http_utils import get_user_agent
@@ -26,11 +26,16 @@ async def fetch_file_and_content_type_from_url_httpx(
             connection, or did not answer in time.
     """
     user_agent = get_user_agent()
+    # httpx reads an explicit `timeout=None` as NO timeout, not as "use the client's
+    # default" — that is what its `USE_CLIENT_DEFAULT` sentinel is for. Passing the
+    # bare `None` this signature defaults to left a hanging server able to block a
+    # caller forever, and the `TimeoutException` branch below unreachable.
+    timeout = Timeout(request_timeout) if request_timeout is not None else USE_CLIENT_DEFAULT
     try:
         async with httpx.AsyncClient(headers={"User-Agent": user_agent}, transport=transport) as client:
             response: Response = await client.get(
                 url,
-                timeout=request_timeout,
+                timeout=timeout,
                 follow_redirects=True,
             )
             response.raise_for_status()
@@ -47,9 +52,11 @@ async def fetch_file_and_content_type_from_url_httpx(
         msg = f"Could not fetch '{url}': the request failed ({type(exc).__name__})"
         raise RemoteFileFetchError(msg) from exc
 
-    declared_content_type = response.headers.get("content-type")
-    content_type = declared_content_type.split(";")[0].strip().lower() or None if declared_content_type else None
-    return response.content, content_type
+    declared_content_type: str | None = response.headers.get("content-type")
+    if declared_content_type is None:
+        return response.content, None
+    media_type = declared_content_type.split(";")[0].strip().lower()
+    return response.content, media_type or None
 
 
 async def fetch_file_from_url_httpx(

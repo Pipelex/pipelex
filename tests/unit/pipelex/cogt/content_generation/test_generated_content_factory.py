@@ -83,7 +83,9 @@ class TestGeneratedContentFactoryFetchedRemoteImage:
         [
             pytest.param(None, None, "image/png", "png", "image/png", id="served-type-settles-an-undeclared-image"),
             pytest.param(None, "jpeg", "image/png", "png", "image/png", id="served-type-beats-requested-format"),
-            pytest.param(None, None, "application/octet-stream", "jpg", "image/jpeg", id="unsupported-served-type-is-not-stored"),
+            pytest.param(None, None, "image/gif", "gif", "image/gif", id="served-type-we-do-not-generate-is-still-stored"),
+            pytest.param(None, None, "application/octet-stream", "jpg", "image/jpeg", id="non-image-served-type-is-dropped"),
+            pytest.param(None, None, "text/html", "jpg", "image/jpeg", id="error-page-dressed-as-a-200-is-dropped"),
             pytest.param(None, None, None, "jpg", "image/jpeg", id="silent-server-falls-back-to-default"),
             pytest.param("image/webp", None, "image/png", "webp", "image/webp", id="declared-type-beats-served-type"),
         ],
