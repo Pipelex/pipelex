@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260918-941a99
 ---
 
@@ -29,7 +29,9 @@ An edition selector (an `init` flag, an `edition` field in the manifest, and `up
 
 ### 3. Today's deck is parked as an unloaded variant, guarded by a parity test
 
-Today's numbered files move, unchanged, to `pipelex/kit/configs/inference/deck_variants/multi_provider/`. Nothing loads that directory: not `init`, not `update`, not the manifest. Re-enabling it is a directory swap.
+Today's numbered files move, unchanged, to `pipelex/kit/deck_variants/multi_provider/`. Nothing loads that directory: not `init`, not `update`, not the manifest. Re-enabling it is a directory swap.
+
+The directory sits beside `pipelex/kit/configs/`, not inside it. Everything under `configs/` is treated as a template: `ensure_global_config_exists` copies the whole tree into a new `~/.pipelex/`, and `check-config-sync` holds this repository's `.pipelex/` to the same contents. It must never sit under a `deck/` directory either, because the deck loader reads its directory recursively.
 
 A unit test keeps "disabled" from meaning "rotting": for every directory under `deck_variants/`, it loads the variant's numbered files through the same loader as the shipped deck, checks that they validate as a `ModelDeckBlueprint`, and asserts that the variant defines exactly the same alias names and preset names, per model type, as the shipped deck. The only permitted difference is the set of provider-named aliases the shipped deck drops (decision 8), listed explicitly in the test. A preset added to one deck and not the other fails the test.
 
@@ -68,7 +70,7 @@ Document extraction already defaults to `azure-document-intelligence`. The two `
 
 ### 8. The provider-named aliases are removed from the shipped deck
 
-`best-claude`, `best-gemini` and `best-mistral` name a provider in the alias itself and cannot honestly resolve to a GPT model. They leave the shipped deck and stay defined in the parked variant. A method that references one fails validation with the usual alias-not-found error. The few tests that reference `@best-claude` are adjusted. Nothing in the cookbook or the authoring skills names them.
+`best-claude`, `best-gemini` and `best-mistral` name a provider in the alias itself and cannot honestly resolve to a GPT model. They leave the shipped deck and stay defined in the parked variant. A method that references one fails validation with the usual alias-not-found error. A project that wants one back defines it in an `x_custom_*` deck file. The tests that reference `@best-claude` build their own decks or parse syntax only, so they are unaffected. The user-visible examples that name `@best-claude` (the `check-model` argument help, two docstrings, and the promotion example in the `add-model` skill) move to `@best-gpt`. Downstream, the cookbook uses `@best-gemini` in two extract bundles and `mthds-plugins` uses `@best-claude` as its example alias. Both are filed as follow-ups, because they break only once those repositories take the release.
 
 ### 9. The `x_custom_*` templates keep their examples
 
@@ -79,21 +81,22 @@ The commented waterfall examples in `x_custom_llm_deck.toml` and `x_custom_extra
 - **Routing.** The Gateway already serves the OpenAI language and image models from Azure. The deck decides which handles are named, not where a request goes, and nothing about the routing profiles or the remote config changes here.
 - **Fixed-temperature constraints.** Several gpt-5.x handles carry `fixed_temperature = 1`. When a preset carries its own temperature, the worker forces the model's value and logs a warning. That is accepted.
 - **An edition selector.** Declined, see decision 2.
+- **The GPT-5.6 and GPT-6 generation.** `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` joined the Azure backend in pipelex v0.61.0 and the gateway serves them since the remote config published on 2026-09-20. The tiers stay on the 5.4 and 5.5 handles all the same. Every 5.6 and 6 handle carries `fixed_temperature = 1`, while `gpt-5.4` and `gpt-5.4-nano` carry no constraint, so keeping the general and small tiers on 5.4 keeps the temperature of every preset that rides them, which is most of the deck. Premium is fixed-temperature already at `gpt-5.5`, so moving it and `best-gpt` to `gpt-6-astra` would cost nothing in warnings; that move is a pricing and quality call on its own and is not made here.
 
-## The backend model list moves first
+## The backend model list moved first
 
-The backend model lists under `pipelex/kit/configs/inference/backends/` are about to be updated by Louis, before or alongside this campaign, and the remote config in `pipelex-remote-config` is the authority on what a handle means. The tier structure and the vocabulary decisions above hold regardless. The concrete handles in the two tables are re-read against the updated backend lists when the build starts, and a handle that moved or was renamed is replaced by the tier's current equivalent, with the tables here updated to match.
+The backend model lists under `pipelex/kit/configs/inference/backends/` were refreshed ahead of the build, in pipelex v0.61.0: the GPT-5.6 series and GPT-6 Astra were added (#1218) and the GPT-4.1, o-series and GPT-5 to 5.2 generations were retired (#1219). The remote config in `pipelex-remote-config`, the authority on what a handle means, followed with the same roster at its commit `ae91eb8` and was published on 2026-09-20. The handles in the two tables were re-read against both after that publish: every one of them is still declared on the Azure backend and still served by the gateway, so the tables stand as written and no tier was substituted.
 
 ## What the build changes
 
 - The numbered deck files under `pipelex/kit/configs/inference/deck/`, per decisions 4 to 6, and the copy this repo keeps under `.pipelex/inference/deck/`.
 - The parked variant directory and its parity test, per decision 3.
-- The tests that reference `@best-claude` or a removed handle.
+- The one test that asserts what the shipped deck resolves to (`@default-general`), and the user-visible examples that name `@best-claude`, the `add-model` skill's among them.
 - The docs that name the current defaults: `docs/get-started/configure-ai-providers.md`, `docs/configuration/config-technical/inference-config.md`, `docs/building-methods/configure-ai-llm-to-optimize-methods.md`, and `docs/tools/cli/update.md` where it describes what an update run reports.
 - A changelog entry marked breaking: the defaults move to Azure-served models, and three aliases are gone.
 
 ## Rollout notes
 
 - Every existing install reports its numbered deck files as behind on its next `pipelex update`, and a user who edited a numbered file gets the usual timestamped backup. That is the mechanism working as designed, and the changelog entry says so.
-- The consumers that keep their own deck copies (the hosted worker in `pipelex-server`, `pipelex-api`, the cookbook) pick the change up through the pin bump and `pipelex update`. The worker's numbered files are byte-identical to the kit's today, so nothing there needs hand-editing. The cookbook carries an extra `cookbook.toml` deck file to check for direct model names.
-- The implementation tracker (`plan.md` beside this document) is written by the build session.
+- The consumers that keep their own deck copies (the hosted worker in `pipelex-server`, `pipelex-api`, the cookbook) pick the change up through the pin bump and `pipelex update`. The worker's numbered files are byte-identical to the kit's today, so nothing there needs hand-editing. The cookbook carries an extra `cookbook.toml` deck file to check for direct model names, and two bundles that reference `@best-gemini`.
+- The implementation tracker is [`plan.md`](plan.md), beside this document.
