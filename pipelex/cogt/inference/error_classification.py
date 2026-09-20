@@ -1072,6 +1072,26 @@ def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
+# The headers the Pipelex Manifold gateway stamps its trace id on, in the order the native routes'
+# distiller below reads them.
+#
+# Every answer a provider gave carries that id twice, with the same value under each spelling: the
+# pipelex one the dialect owns, and the inherited vendor one the gateway still emits because
+# `portkey_ai` reads it on the image path — a refusal the gateway raised before trying a provider
+# carries neither. Reading the pipelex spelling first is what makes the gateway's eventual dropping
+# of the vendor one a no-op for the native routes, at which point the second name and its lookup go
+# away. It is not a no-op for this file: `extract_gateway_metadata` carries the vendor spelling as a
+# literal of its own, and that one serves the manifold image path as well as the Portkey cloud, so
+# it can only move once the image path is off `portkey_ai`.
+#
+# They are named here rather than beside `MANIFOLD_AUTH_HEADER` in `providers/manifold/`, where the
+# dialect names the header it *sends*, because `cogt` may not import `pipelex.providers`: the edges
+# between the two are a pinned golden set, and a new one is a defect
+# (`tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py`).
+MANIFOLD_TRACE_ID_HEADER = "x-pipelex-trace-id"
+MANIFOLD_VENDOR_TRACE_ID_HEADER = "x-portkey-trace-id"
+
+
 def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
     """Distill a raw-httpx failure against the Pipelex Manifold service into metadata.
 
@@ -1093,6 +1113,17 @@ def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
     code with ``invalid_request_error``. The gateway's fail-closed ``pig-0N`` shape carries no
     ``type`` at all, so it reads the same either way.
 
+    **The request id is read in the manifold dialect's own spelling.** The provider's ``x-request-id``
+    comes first when a provider named its call, and the gateway's trace id is the fallback for the
+    answers that carried none — under ``MANIFOLD_TRACE_ID_HEADER`` before the inherited vendor
+    spelling, which holds the same value and is only still read because the gateway still emits it.
+    ``extract_gateway_metadata`` below keeps the vendor spelling alone, and that is not only about
+    the Portkey cloud, whose trace header is not ours to rename: it also distils the *manifold
+    image* failures, which still travel on ``portkey_ai``, and that SDK reads
+    ``x-portkey-trace-id`` off the response itself. So the image path cannot take the pipelex
+    spelling until it is ported off the SDK, and until then it is the manifold traffic that still
+    depends on the vendor one.
+
     **It reports ``ProviderName.GATEWAY``**, and that is a decision rather than an oversight: the
     manifold service *is* the same gateway codebase, so it phrases quota exhaustion and rate
     limiting identically, and every ``match`` on ``ProviderName`` would need a second arm with the
@@ -1107,7 +1138,7 @@ def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
     request_id: str | None = None
     retry_after_seconds: float | None = None
     if headers is not None:
-        request_id_value = headers.get("x-request-id") or headers.get("x-portkey-trace-id")
+        request_id_value = headers.get("x-request-id") or headers.get(MANIFOLD_TRACE_ID_HEADER) or headers.get(MANIFOLD_VENDOR_TRACE_ID_HEADER)
         if isinstance(request_id_value, str):
             request_id = request_id_value
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))

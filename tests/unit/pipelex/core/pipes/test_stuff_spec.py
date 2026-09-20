@@ -125,6 +125,11 @@ class _RefusingConceptProvider(ConceptProviderAbstract):
         raise AssertionError(msg)
 
     @override
+    def list_concept_keys_for_ref(self, *, concept_ref: str) -> list[str]:
+        msg = "list_concept_keys_for_ref must not be called for a structureless render"
+        raise AssertionError(msg)
+
+    @override
     def get_required_entry_concept(self, concept_ref_or_code: str, *, search_scope: str | None = None) -> Concept:
         msg = "get_required_entry_concept must not be called for a structureless render"
         raise AssertionError(msg)

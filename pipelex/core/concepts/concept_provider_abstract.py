@@ -14,7 +14,9 @@ See ``docs/contribute/hub-layering.md``.
 from abc import ABC, abstractmethod
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.exceptions import ConceptRefAmbiguousError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.stuff_content import StuffContent
 
 
@@ -24,6 +26,17 @@ class ConceptProviderAbstract(ABC):
     @abstractmethod
     def get_required_concept(self, concept_ref: str) -> Concept:
         """Resolve a fully-qualified concept ref, raising when it is not known."""
+
+    @abstractmethod
+    def list_concept_keys_for_ref(self, *, concept_ref: str) -> list[str]:
+        """Every key under which this provider holds a concept spelled `<domain>.<Code>`.
+
+        A host-declared or native concept is keyed by the ref itself; a concept a dependency
+        package contributes is keyed `<alias>-><domain>.<Code>`, and on the live route the alias
+        is the dependency's whole package address. One spelling can therefore have several
+        entries, and only an enumeration says so — which is what
+        :meth:`resolve_wire_concept_ref` needs to tell one candidate from several.
+        """
 
     @abstractmethod
     def get_native_concept(self, native_concept: NativeConceptCode) -> Concept:
@@ -44,6 +57,44 @@ class ConceptProviderAbstract(ABC):
     @abstractmethod
     def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         """Whether `tested_concept` satisfies `wanted_concept` (refinement only when `strict`)."""
+
+    def resolve_wire_concept_ref(self, *, concept_ref: str) -> Concept:
+        """Resolve the concept ref a transported stuff carries, the one rule both readers share.
+
+        On the wire a stuff names its concept `<domain>.<Code>` — the form this runtime emits, and
+        the one the MTHDS standard defines for a host-declared or native concept. The standard also
+        defines `<package_address>::<domain>.<Code>` for a concept a *dependency* contributes; this
+        runtime neither emits nor resolves that form, so a dependency's concept arrives spelled
+        exactly like a host's, and the library is what tells them apart:
+
+        * one candidate — the host/native entry, or a single dependency's aliased entry — is the
+          answer, which is what kept a dependency-contributed concept hydrating back when the
+          definition rode along on the wire;
+        * several candidates mean a host bundle and a dependency (or two dependencies) spell the
+          same `<domain>.<Code>`, and the ref cannot say which is meant, so it raises naming every
+          key that matched rather than silently binding the wrong definition to the data;
+        * no candidate raises the way it always has, naming the ref.
+
+        A ref that already carries the internal `alias->` prefix is not a wire spelling at all and
+        goes straight to its direct lookup.
+
+        Raises:
+            ConceptRefAmbiguousError: the spelling matches more than one entry.
+        """
+        if QualifiedRef.has_cross_package_prefix(concept_ref):
+            return self.get_required_concept(concept_ref=concept_ref)
+
+        candidate_keys = self.list_concept_keys_for_ref(concept_ref=concept_ref)
+        if len(candidate_keys) > 1:
+            msg = (
+                f"Concept ref '{concept_ref}' is ambiguous: this library holds it under {sorted(candidate_keys)}. "
+                "A stuff on the wire names its concept '<domain>.<Code>', which cannot tell a host concept from a "
+                "dependency's concept of the same spelling — rename one of them, or run the two bundles apart."
+            )
+            raise ConceptRefAmbiguousError(msg)
+        if len(candidate_keys) == 1:
+            return self.get_required_concept(concept_ref=candidate_keys[0])
+        return self.get_required_concept(concept_ref=concept_ref)
 
     @abstractmethod
     def get_structure_class(self, *, concept: Concept) -> type[StuffContent]:
