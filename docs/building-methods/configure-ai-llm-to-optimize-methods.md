@@ -50,7 +50,7 @@ An LLM Preset is simply a name for a LLM Settings that you have predefined in or
 
 engineering-structured = {
     model = "@default-premium-structured",
-    temperature = 0.2
+    temperature = 1
 }
 
 retrieval = {
@@ -65,9 +65,11 @@ LLM Settings support `reasoning_effort` and `reasoning_budget` parameters for en
 
 ```toml
 [llm.presets]
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
-quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
+quick-reasoning = { model = "@default-premium", temperature = 1, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 ```
+
+Both declare `temperature = 1` because the premium tier resolves to a model that fixes its temperature at that value. The deck states the temperature the model will actually use, rather than one the runtime would override on every call.
 
 `reasoning_effort` accepts values from `"none"` to `"max"`. For an explicit token budget, use `reasoning_budget` instead (mutually exclusive with `reasoning_effort`). For provider-specific behavior and model examples, see [Reasoning Controls](../under-the-hood/reasoning-controls.md).
 
