@@ -73,7 +73,7 @@ jobs:
               echo "reuse=true" >> "$GITHUB_OUTPUT"
               ;;
             expired)
-              echo "::error::The build stored by an earlier attempt has expired, so this run can no longer reproduce the dists it published. Publish a new version instead of re-running this one."
+              echo "::error::The build stored by an earlier attempt has expired, so this run cannot attach the bytes it built, and a rebuild here cannot be shown to match whatever reached PyPI. Check whether this version is on PyPI: if it is, bump the version; if it is not, dispatch this workflow again."
               exit 1
               ;;
             *)
