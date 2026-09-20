@@ -1,8 +1,9 @@
 ####################################################################################################
-# Pipelex Model Deck - Image Generation Configuration
+# Pipelex Model Deck - Search Configuration
 ####################################################################################################
 #
-# This file defines model aliases and presets for image generation models
+# This file defines model aliases and presets for Search models, including
+# web search providers like Linkup.
 #
 # Managed by `pipelex update`. To customize without conflict, create an
 # x_custom_*.toml file in this directory — pipelex never tracks or
@@ -19,38 +20,23 @@
 ####################################################################################################
 
 ####################################################################################################
-# Image Generation Default Choices
+# Search Default Choices
 ####################################################################################################
 
-[img_gen]
-default_quality = "medium"
-choice_default = "$gen-image"
+[search]
+choice_default = "@default-search"
 
 ####################################################################################################
-# Image Generation Aliases
+# Aliases
 ####################################################################################################
 
-[img_gen.aliases]
-best-gpt = "gpt-image-2"
-
-default-general = "gpt-image-2"
-default-premium = "gpt-image-2"
-default-small = "gpt-image-1-mini"
+[search.aliases]
+default-search = "linkup-standard"
 
 ####################################################################################################
-# Image Generation Presets
+# Search Presets
 ####################################################################################################
 
-[img_gen.presets]
-
-# General purpose
-gen-image = { model = "@default-general", quality = "medium", description = "Standard image generation" }
-gen-image-fast = { model = "@default-small", quality = "low", description = "Fast image generation with lower quality" }
-gen-image-high-quality = { model = "@default-premium", quality = "high", description = "High-quality image generation" }
-
-# Testing
-gen-image-testing = { model = "@default-small", quality = "low", description = "Testing preset for image generation" }
-gen-image-testing-img2img = { model = "@default-premium", description = "Testing preset for image-to-image" }
-synthesize-photo = { model = "@default-small", quality = "low", description = "Synthesize realistic photos for testing" }
-synthesize-ui = { model = "@default-premium", description = "Synthesize UI screenshots for testing" }
-synthesize-chart = { model = "@default-premium", description = "Synthesize charts and graphs for testing" }
+[search.presets]
+standard = { model = "linkup-standard", include_images = false, include_inline_citations = true }
+deep = { model = "linkup-deep", include_images = false, include_inline_citations = true }

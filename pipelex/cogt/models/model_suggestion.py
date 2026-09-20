@@ -86,7 +86,7 @@ def suggest_model_alternatives(
     Returns:
         A tuple of three lists:
         - suggestions: fuzzy matches within the same collection, with sigil prefix
-        - wrong_sigil_hints: exact matches found in other collections (e.g. "best-claude exists as @best-claude (alias)")
+        - wrong_sigil_hints: exact matches found in other collections (e.g. "best-gpt exists as @best-gpt (alias)")
         - cross_collection_suggestions: fuzzy matches in other collections, with sigil and label
     """
     sigil = KIND_SIGILS[kind]

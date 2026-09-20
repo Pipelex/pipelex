@@ -79,3 +79,16 @@ def get_kit_migrations_dir() -> Traversable:
         Traversable object pointing to pipelex.kit/migrations
     """
     return get_kit_root() / "migrations"
+
+
+def get_kit_deck_variants_dir() -> Traversable:
+    """Get the parked deck variants directory within the kit package.
+
+    A deck variant is an alternative edition of the numbered model deck files that nothing
+    loads: `init`, `update` and the deck manifest ignore it. It sits beside `configs/` rather
+    than inside it precisely so that no installer picks it up. See the directory's README.
+
+    Returns:
+        Traversable object pointing to pipelex.kit/deck_variants
+    """
+    return get_kit_root() / "deck_variants"

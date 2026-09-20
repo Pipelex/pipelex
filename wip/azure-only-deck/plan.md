@@ -41,30 +41,39 @@ This is a short gate before any file changes.
 
 The test is written before the Azure deck exists, so it goes red on the aliases the shipped deck still carries, and Phase 3 turns it green.
 
-- [ ] Copy today's numbered files, byte for byte, from `pipelex/kit/configs/inference/deck/` to `pipelex/kit/deck_variants/multi_provider/`. Copy only the numbered files and not the `x_custom_*` templates, which stay single-sourced in the kit (design decision 9).
-- [ ] Add `pipelex/kit/deck_variants/README.md`. It should say, in a few sentences, what a variant is, that nothing loads it, that the parity test guards it, and that re-enabling one means swapping its numbered files into `configs/inference/deck/`. It should also warn against placing a variant under any `deck/` directory, because the loader is recursive.
-- [ ] Write `tests/unit/pipelex/kit/test_deck_variants.py`:
+- [x] Copy today's numbered files, byte for byte, from `pipelex/kit/configs/inference/deck/` to `pipelex/kit/deck_variants/multi_provider/`. Copy only the numbered files and not the `x_custom_*` templates, which stay single-sourced in the kit (design decision 9).
+- [x] Add `pipelex/kit/deck_variants/README.md`. It should say, in a few sentences, what a variant is, that nothing loads it, that the parity test guards it, and that re-enabling one means swapping its numbered files into `configs/inference/deck/`. It should also warn against placing a variant under any `deck/` directory, because the loader is recursive.
+- [x] Write `tests/unit/pipelex/kit/test_deck_variants.py`:
     - A comparator that takes two `ModelDeckBlueprint`s and the permitted drops, and returns the differences in alias, preset and waterfall names for each family (`llm`, `img_gen`, `extract`, `search`).
     - The permitted drops, written out in the test: `best-claude`, `best-gemini` and `best-mistral` for `llm`, and `best-gemini` for `img_gen`. Each dropped name must be present in the variant and absent from the shipped deck, so an entry that goes stale fails the test.
     - A test parametrized over every directory under `pipelex/kit/deck_variants/`. For each one, it asserts that the numbered filenames match the kit deck's, loads both sets with `load_model_deck_blueprint` (the same loader the runtime uses), and asserts that the comparator reports no differences.
     - A guard that at least one variant exists, so the parametrized test can never pass by running zero cases.
     - Negative tests that feed the comparator a blueprint with an extra preset, a missing alias and a dropped name that is still present, and assert that each is reported. This is the mutation check, written as tests so it runs every time rather than once by hand.
-- [ ] Run the new test file and confirm it fails only on the dropped aliases.
+- [x] Run the new test file and confirm it fails only on the dropped aliases.
 
 ## Phase 3 — Write the Azure deck
 
-- [ ] Edit `pipelex/kit/configs/inference/deck/1_llm_deck.toml` according to design decision 4: set the aliases from the table, remove `best-claude`, `best-gemini` and `best-mistral`, and repoint the presets that name a model directly (`retrieval-premium`, `retrieval-cheap`, `engineering-code-cheap`, `engineering-code-cheaper`, and `engineering-codebase-analysis`, which moves from `@best-gemini` to `@default-premium`). Keep every alias and preset name, every temperature and every `reasoning_effort`.
-- [ ] Edit `pipelex/kit/configs/inference/deck/2_img_gen_deck.toml` according to design decision 5: set the aliases, remove `best-gemini`, and repoint the presets that name `nano-banana-pro` to `@default-premium`.
-- [ ] Leave `3_extract_deck.toml` and `4_search_deck.toml` untouched (design decision 6).
-- [ ] Mirror the kit into this repository's `.pipelex/inference/deck/` with `.venv/bin/pipelex update --local --yes --no-backup`. That command copies the numbered files and restamps `.kit_manifest.json`, which also clears the pre-existing staleness. Then run `make check-config-sync`.
-- [ ] Run the parity test and confirm it passes.
-- [ ] Change `tests/unit/pipelex/kernel/test_llm_ops_model_resolution.py:13` to expect `gpt-5.4`.
-- [ ] Replace `@best-claude` with `@best-gpt` in the user-visible examples: `check_model_cmd.py:57`, `model_reference.py:9`, `model_suggestion.py:89` and the promotion example in `.claude/skills/add-model/SKILL.md` (section 7). If a CLI help snapshot changes as a result, regenerate it.
-- [ ] Run `make tb` to test the boot sequence against the new deck, then `make agent-check`, then the touched test modules.
+- [x] Edit `pipelex/kit/configs/inference/deck/1_llm_deck.toml` according to design decision 4: set the aliases from the table, remove `best-claude`, `best-gemini` and `best-mistral`, and repoint the presets that name a model directly (`retrieval-premium`, `retrieval-cheap`, `engineering-code-cheap`, `engineering-code-cheaper`, and `engineering-codebase-analysis`, which moves from `@best-gemini` to `@default-premium`). Keep every alias and preset name, every temperature and every `reasoning_effort`.
+- [x] Edit `pipelex/kit/configs/inference/deck/2_img_gen_deck.toml` according to design decision 5: set the aliases, remove `best-gemini`, and repoint the presets that name `nano-banana-pro` to `@default-premium`.
+- [x] Leave `3_extract_deck.toml` and `4_search_deck.toml` untouched (design decision 6).
+- [x] Mirror the kit into this repository's `.pipelex/inference/deck/` with `.venv/bin/pipelex update --local --yes --no-backup`. That command copies the numbered files and restamps `.kit_manifest.json`, which also clears the pre-existing staleness. Then run `make check-config-sync`.
+- [x] Run the parity test and confirm it passes.
+- [x] Change `tests/unit/pipelex/kernel/test_llm_ops_model_resolution.py:13` to expect `gpt-5.4`.
+- [x] Replace `@best-claude` with `@best-gpt` in the user-visible examples: `check_model_cmd.py:57`, `model_reference.py:9`, `model_suggestion.py:89` and the promotion example in `.claude/skills/add-model/SKILL.md` (section 7). If a CLI help snapshot changes as a result, regenerate it.
+- [x] Run `make tb` to test the boot sequence against the new deck, then `make agent-check`, then the touched test modules.
 
 ### Checkpoint A — the deck is in place
 
-Record here the SHA the deck landed in, any handle substituted in Phase 1 and why, and anything the checks reported that was not anticipated above. Open questions go here too. The next phase is documentation only and can start in a fresh session from this record.
+The deck landed in the commit subject-titled "Azure-only deck: park the multi-provider deck and ship the Azure one" on `feature/Azure-only-deck`. No handle was substituted: the five confirmed in Phase 1 are exactly the ones written, premium on `gpt-6-astra` and general and small on `gpt-5.4` / `gpt-5.4-nano`.
+
+Four things the checks reported that the plan did not anticipate:
+
+- **The editable install's version metadata was stale.** `pipelex update --local` reads `importlib.metadata`, which still said `0.59.0` while `pyproject.toml` says `0.61.0`, so the first run stamped the manifest with the wrong kit version. `uv pip install -e . --no-deps` refreshed it and the manifest was restamped at `0.61.0`.
+- **The kit ships a deck manifest of its own**, at `pipelex/kit/configs/inference/deck/.kit_manifest.json`, and `check-config-sync` holds it identical to the one in `.pipelex/`. `pipelex update --local` only writes the `.pipelex/` side, so the kit copy had to be updated by hand. Both were stale at kit version `0.25.1`, which this change clears.
+- **mypy joins the four family blueprint types to their common `ConfigModel` base**, which has no `aliases`, `presets` or `waterfalls`. The test annotates its family mapping with an explicit `DeckFamilyBlueprint` union to keep the attributes visible.
+- **The `cli-docs` drift contract opened**, triggered by the one-word change to the `check-model` argument help. Both review targets describe the command generically and name no alias, so the ack records a no-doc-change rationale.
+
+The parity test went red on exactly the four dropped aliases before Phase 3 and green after, which is the behaviour Phase 2 was written to produce.
 
 - [ ] Run `/rev` on the deck change before the docs phase starts, and record the pass here.
 
