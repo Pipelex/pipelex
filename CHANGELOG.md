@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The GPT-5.6 series and GPT-6 Astra are served on OpenAI, Azure OpenAI, the Pipelex Gateway and Pipelex Manifold**: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` are registered on the two direct backends and, through the remote config, on both hosted routing profiles. All four take text, images and PDF, produce text and structured output, and reason under `thinking_mode = "manual"` with a fixed temperature of 1. The Azure entries carry the dated deployment ids the hosted profiles also use as their wire model ids.
+
 ### Fixed
 
 - **A manifold error on the native routes keeps its request id under the gateway's pipelex-spelled trace header**: `extract_manifold_metadata` reads the gateway's trace id from `x-pipelex-trace-id` before the inherited `x-portkey-trace-id`, still preferring a provider's own `x-request-id` over both. The gateway emits the two spellings with the same value today, so nothing changes yet; once it drops the vendor one, such an error whose provider sent no `x-request-id` keeps a request id instead of reporting none. `extract_gateway_metadata` is unchanged and still reads the vendor spelling alone — it serves the Portkey cloud and the manifold image path, which travels on `portkey_ai` and keeps that spelling until it is ported off the SDK.
