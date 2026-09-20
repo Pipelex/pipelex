@@ -18,6 +18,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      actions: read # reading this run's own artifact list, below
+
     steps:
       # A manual run can target any ref that contains this workflow, and every
       # job below builds and publishes whatever it checks out — so an unguarded
@@ -37,22 +41,69 @@ jobs:
             echo "::error::Manual publish is allowed only from main, release/vX.Y.Z or pre-release/v*. Got: $REF"
             exit 1
           fi
+      # A recovery re-run — the one the signing fallback in `github-release`
+      # prescribes — must attach and sign the exact bytes the first attempt
+      # published, because PyPI's copies of them are immutable. Rebuilding cannot
+      # promise that: `[build-system] requires = ["hatchling"]` names no version,
+      # so a hatchling release landing between two attempts changes the output of
+      # the same commit, and GitHub would then serve — and Sigstore would attest —
+      # dists that differ from the ones on PyPI. Artifacts are scoped to the run
+      # rather than to the attempt, so the build the first attempt stored is still
+      # here; reuse it and skip the rest of this job.
+      #
+      # This covers "Re-run all jobs". It cannot cover the `workflow_dispatch`
+      # retry, which is a NEW run and so holds no earlier artifact and rebuilds.
+      # The tag guard in `github-release` does not close that gap either — it
+      # compares commits, and this is the same commit built twice. Open as
+      # L-260920-487091; prefer re-running this run over dispatching a new one.
+      - name: Look for a build stored by an earlier attempt
+        id: earlier_build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STATE=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name == "python-package-distributions")]
+                  | if length == 0 then "absent"
+                    elif any(.expired) then "expired"
+                    else "present" end')
+          case "$STATE" in
+            present)
+              echo "An earlier attempt stored a build — reusing it."
+              echo "reuse=true" >> "$GITHUB_OUTPUT"
+              ;;
+            expired)
+              echo "::error::The build stored by an earlier attempt has expired, so this run cannot attach the bytes it built, and a rebuild here cannot be shown to match whatever reached PyPI. Check whether this version is on PyPI: if it is, bump the version; if it is not, dispatch this workflow again."
+              exit 1
+              ;;
+            *)
+              echo "reuse=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
       - uses: actions/checkout@v4
+        if: steps.earlier_build.outputs.reuse != 'true'
         with:
           persist-credentials: false
       - name: Set up Python
+        if: steps.earlier_build.outputs.reuse != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - name: Install pypa/build
+        if: steps.earlier_build.outputs.reuse != 'true'
         run: >-
           python3 -m
           pip install
           build
           --user
       - name: Build a binary wheel and a source tarball
+        if: steps.earlier_build.outputs.reuse != 'true'
         run: python3 -m build
+      # Deliberately no `overwrite`: artifacts are immutable in v4, and the guard
+      # above means this step is reached only when the run holds no build yet. A
+      # second attempt reuses the first one's bytes rather than replacing them.
       - name: Store the distribution packages
+        if: steps.earlier_build.outputs.reuse != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
@@ -82,6 +133,25 @@ jobs:
         # previous pin did not, so the first v0.43.0 upload was rejected on a
         # wheel hatchling had built correctly.
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          # Only a retry may skip an already-published version, which is what the
+          # signing fallback below tells the operator to do: PyPI files are
+          # immutable, so on a second pass this step would otherwise die on the
+          # already-published version and `github-release` — which needs this job —
+          # would never get to attach the missing signatures.
+          #
+          # Both of this repo's retry paths are named, and neither implies the
+          # other. "Re-run all jobs" reuses the run, so it raises `run_attempt`.
+          # The `workflow_dispatch` above is the retry this workflow documents for
+          # itself, and it is a NEW run whose `run_attempt` is 1.
+          #
+          # It stays off for an ordinary merge deliberately. Letting a merge that
+          # kept the current version publish "successfully" would carry it into
+          # `github-release`, where `--clobber` would replace the tagged release's
+          # dists with a build of the newer commit while PyPI kept serving the
+          # originals. Failing here is what keeps that release intact — and the tag
+          # guard there is what keeps it intact on the two paths this flag opens.
+          skip-existing: ${{ github.run_attempt > 1 || github.event_name == 'workflow_dispatch' }}
 
   github-release:
     name: >-
@@ -95,6 +165,15 @@ jobs:
     permissions:
       contents: write # IMPORTANT: mandatory for making GitHub Releases
       id-token: write # IMPORTANT: mandatory for sigstore
+
+    env:
+      # Resolved into RELEASE_SHA below. Deliberately NOT a
+      # `${{ cond && a || b }}` expression: that idiom falls through to `b`
+      # whenever `a` is empty, so a missing merge commit would silently become
+      # `github.sha` — the exact wrong value, and indistinguishable from the
+      # right one afterwards. Two plain inputs and a shell branch fail loudly.
+      MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+      DISPATCH_SHA: ${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -113,6 +192,73 @@ jobs:
           else
             echo "IS_PRERELEASE=false" >> $GITHUB_ENV
             echo "Detected stable version: $VERSION"
+          fi
+      # `skip-existing` above opens on a re-run and on a manual dispatch, which
+      # separates a retry from a first pass but not a legitimate recovery (this
+      # commit published, Sigstore then failed) from a retry of a pass that failed
+      # *because* an earlier commit had already published this version. In that
+      # second case skipping turns PyPI's duplicate rejection into success and
+      # carries the run down here, where `--clobber` would replace the tagged
+      # release's dists with this commit's build while PyPI kept serving the
+      # originals. The tag settles which case this is: it exists only once a
+      # release has shipped this version, and it names the commit that shipped it.
+      # Absent — the first pass died between the PyPI upload and `gh release
+      # create` — is allowed through, because blocking it would break the very
+      # recovery the fallback exists to enable. Pointing elsewhere is not.
+      #
+      # Uses the commits endpoint so an annotated tag resolves to its commit
+      # rather than to the tag object, and distinguishes "no such tag" from "the
+      # API could not answer": a guard that reads an outage, a rate limit or a bad
+      # token as "untagged" disarms itself exactly when it is least able to tell
+      # what it is letting through.
+      - name: Refuse to touch a release that shipped a different commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # The commit this run ships, and the one the tag must name. `github.sha`
+          # is NOT it on the path this repo actually releases by: the trigger is a
+          # merged pull request, where `github.sha` is the event's own merge ref
+          # rather than the commit that landed on the base. v0.60.0 is the worked
+          # example — the tag names 97694a9b, the merge commit of #1212 on `main`,
+          # while that run's head was 2a72bd7f, the `release/v0.60.0` branch. A tag
+          # compared against `github.sha` would refuse every recovery re-run of a
+          # release, which is the one thing the signing fallback exists to allow.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            RELEASE_SHA="$MERGE_COMMIT_SHA"
+          else
+            RELEASE_SHA="$DISPATCH_SHA"
+          fi
+          if [ -z "$RELEASE_SHA" ]; then
+            echo "::error::Could not determine which commit this run is shipping ($GITHUB_EVENT_NAME). Refusing to create or touch a release without it."
+            exit 1
+          fi
+          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
+          echo "This run ships $RELEASE_SHA"
+          # `gh` writes its error body to stdout rather than stderr, so a failed
+          # call still fills $BODY — with the failure, not with a commit.
+          if BODY=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$VERSION" 2>/dev/null); then
+            TAGGED_SHA=$(jq -r '.sha' <<<"$BODY")
+          else
+            case "$(jq -r '.status // empty' <<<"$BODY" 2>/dev/null || true)" in
+              404|422)
+                # No such tag: the first pass died between the PyPI upload and
+                # `gh release create`. This is the recovery path, and it proceeds.
+                TAGGED_SHA=""
+                ;;
+              *)
+                # Anything else — 5xx, a rate limit, a bad token, or a transport
+                # failure that left no body at all — leaves the question open.
+                # `//` cannot supply the fallback here: on an empty body `jq`
+                # emits nothing rather than null, so the shell applies it instead.
+                REASON=$(jq -r '.message // empty' <<<"$BODY" 2>/dev/null || true)
+                echo "::error::Could not determine whether v$VERSION is already tagged: ${REASON:-the GitHub API call returned no response body}. Refusing to touch the release without knowing which commit it shipped."
+                exit 1
+                ;;
+            esac
+          fi
+          if [ -n "$TAGGED_SHA" ] && [ "$TAGGED_SHA" != "$RELEASE_SHA" ]; then
+            echo "::error::v$VERSION is already tagged at $TAGGED_SHA, but this run is shipping $RELEASE_SHA. Refusing to replace that release's artifacts with a different commit's build. Bump the version instead of re-running this workflow."
+            exit 1
           fi
       - name: Extract changelog notes for current version
         id: get_changelog
@@ -193,8 +339,17 @@ jobs:
               --notes "$NOTES" \
               $PRERELEASE_FLAG
           else
+            # `--target` is not optional here. Without it `gh` creates the tag on
+            # the repository's DEFAULT branch head, which is neither necessarily
+            # the commit that produced these dists — a publish from a
+            # `pre-release/v*` merge or a `release/vX.Y.Z` dispatch is not on
+            # `main` at all — nor stable, since any unrelated merge landing
+            # between this release's merge and this step would move it. Naming
+            # the commit makes the tag the record of what actually shipped, and
+            # makes the guard above a comparison of like with like.
             gh release create "v$VERSION" \
               --repo "$GITHUB_REPOSITORY" \
+              --target "$RELEASE_SHA" \
               --title "v$VERSION$TITLE_SUFFIX" \
               --generate-notes \
               --notes "$NOTES" \
@@ -225,17 +380,24 @@ jobs:
         if: steps.sign.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        # Upload to GitHub Release using the `gh` CLI.
-        # `dist/` contains the built packages, and the
-        # sigstore-produced signatures and certificates.
+        # Only the bundles signing just produced (`{input}.sigstore.json`). The
+        # `dist/**` glob this used to carry expands as `dist/*` in the runner's
+        # bash, which has no `globstar` — so it also matched the wheel and sdist
+        # attached above, and `--clobber` deletes an asset before uploading its
+        # replacement. A transient failure here therefore stripped the release of
+        # the very dists the previous step exists to secure, undoing that step's
+        # own guarantee.
         run: >-
           gh release upload
-          "v$VERSION" dist/**
+          "v$VERSION" dist/*.sigstore.json
           --repo "$GITHUB_REPOSITORY"
           --clobber
       - name: Report an unsigned release
         if: steps.sign.outcome != 'success'
         run: >-
           echo "::warning::Sigstore signing failed. v$VERSION is released and its
-          dists are attached, but it carries no signature bundles. Re-run this
-          workflow once Sigstore is healthy to attach them."
+          dists are attached, but it carries no signature bundles. Once Sigstore is
+          healthy, use 'Re-run all jobs' on this run to attach them — signing is
+          non-fatal, so this job succeeded and 'Re-run failed jobs' is not offered.
+          Re-running this run reuses the build it already published rather than
+          making a new one, so prefer it over a fresh manual dispatch."
