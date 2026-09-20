@@ -167,6 +167,18 @@ To keep the configuration inside a project instead, run `pipelex init --local`: 
 
 Learn more in our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) guide.
 
+### What the deck resolves to out of the box
+
+The deck files `pipelex init` installs resolve every default alias and preset to models the Pipelex Gateway serves from Azure, so a fresh install runs inside one provider's scope without you choosing anything:
+
+- **Language models** — the premium tier and `best-gpt` are GPT-6 Astra, the general and large-context tiers are GPT-5.4, and the small tiers are GPT-5.4 nano.
+- **Image generation** — the general and premium tiers are GPT Image 2, the small tier is GPT Image 1 mini.
+- **Document extraction** — Azure Document Intelligence, which was already the default.
+
+**Web search is the exception**: Azure serves no search model, so `4_search_deck.toml` resolves to Linkup, and a method that searches the web needs a Linkup key or the Gateway.
+
+Nothing about this locks you in. The deck is a vocabulary of aliases and presets, not a provider commitment: point any of them at a model from any backend you have enabled, by editing `x_custom_llm_deck.toml`, which `pipelex update` never touches. That is also how you bring back an alias the shipped deck does not define.
+
 ---
 
 ## Next Steps

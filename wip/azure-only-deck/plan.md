@@ -75,20 +75,34 @@ Four things the checks reported that the plan did not anticipate:
 
 The parity test went red on exactly the four dropped aliases before Phase 3 and green after, which is the behaviour Phase 2 was written to produce.
 
-- [ ] Run `/rev` on the deck change before the docs phase starts, and record the pass here.
+- [x] Run `/rev` on the deck change before the docs phase starts, and record the pass here.
+
+**Round 1, profile 3, bar `open`, outcome `fixed`, full coverage** — `code-review` (low) and Codex (`gpt-5.6-sol`, effort high) both found nothing; cubic raised five, of which three needed verification and all three were confirmed. Two findings were the campaign's own Phase 4, unstarted by design at this checkpoint.
+
+The pass changed three things, in the commit subject-titled "Azure-only deck: answer the premium tier's fixed temperature, drop a dead validator":
+
+- **The premium tier's fixed temperature was a real regression the design had mis-argued.** `gpt-6-astra` carries `fixed_temperature = 1`, and the worker overrides any other value while logging a warning per call. On `origin/dev` no preset sat in that position — `claude-4.8-opus` declares no constraint and `gpt-5.5` was reachable only through `best-gpt`, which no preset names — so this change took the count from zero to twelve. `writing-factual` and `writing-creative` were issuing the identical call, and `engineering-structured` was running structured extraction at temperature 1 while declaring 0.2. Louis chose to keep the flagship and declare `temperature = 1` on the twelve, since no Azure handle above `gpt-5.4` is free of the constraint. Design decision 10 records it.
+- **`ModelDeck.final_validate` was deleted**, with `_validate_llm_setting` and both `subject_grants.toml` entries. It raised on exactly this conflict, had had no caller since `944bce8d8` orphaned it on 2025-09-17, and its `except ConfigValidationError` clause was unreachable because `LLMSettingsValidationError` descends from `CogtError` rather than `FatalError`.
+- **The parity test gained a second check**: every handle a variant names and the shipped deck does not must still be declared by a backend file. Scoped to variant-only handles, because a shared handle is already exercised at boot and some are gateway-served with no backend section. Mutation-tested: a retired handle in the variant turns it red.
+
+One finding was deferred, with its trace in [`deferred.md`](deferred.md): two inference error classes now have no raise site.
+
+The next-round verdict is **round 2 at bar `defects`, profile 3**, which Phase 5's `/rev` will run once the docs land.
 
 ## Phase 4 — Docs and changelog
 
-- [ ] Update the pages that state what the deck resolves to by default:
+- [x] Update the pages that state what the deck resolves to by default:
     - `docs/get-started/configure-ai-providers.md`: this is the one place that states the Azure scope, meaning language models, image generation and document extraction are served from Azure while web search stays on Linkup (design decision 6).
     - `docs/configuration/config-technical/inference-config.md`.
     - `docs/configuration/config-technical/inference-backend-config.md`: its deck example lists `best-claude` and `best-gemini` (around lines 472-486).
     - `docs/building-methods/configure-ai-llm-to-optimize-methods.md`: its alias list (lines 30-32) was already stale, naming `claude-4.1-opus` and `gemini-2.5-pro`.
     - `docs/building-methods/pipes/pipe-operators/PipeImgGen.md:65`, which lists `best-gemini`.
     - `docs/tools/cli/update.md`, only if it describes what an update run reports in a way this change alters.
-- [ ] Review the other pages that name the affected aliases or handles: `docs/under-the-hood/reasoning-controls.md`, `per-node-usage-attribution.md`, `test-profile-configuration.md`, `docs/features/validation-dry-run.md`, `docs/cookbook/generate-image.md`, `PipeLLM.md` and `PipeStructure.md`. Change only statements about what a name resolves to by default. A handle used as an explicit example of naming a model stays.
-- [ ] Follow the MkDocs rule of a blank line before every list.
-- [ ] Add a `CHANGELOG.md` entry under `[Unreleased]`, `### Changed`, marked Breaking and written in the condensed form: the default aliases and presets now resolve to Azure-served models (with the tiers named), and `best-claude`, `best-gemini` and `best-mistral` (and `best-gemini` for image generation) are removed. For migration, `pipelex update` refreshes the numbered deck files and backs up any that were edited locally, and a project that wants a removed alias back defines it in `x_custom_llm_deck.toml`, or in an `x_custom_*` file for image generation.
+
+  What the sweep actually found, against what the plan expected: `inference-config.md` names no alias and no model handle anywhere, so it needed nothing — the plan listed it speculatively. `docs/tools/cli/update.md` describes the managed/override split generically and names no alias either; that reading was already recorded in the `cli-docs` drift ack. `configure-ai-providers.md` had no statement of what the deck resolves to at all, so the Azure scope is a new section there rather than an edit. `inference-backend-config.md`'s preset example also had to move to `temperature = 1`, which the plan did not anticipate because the premium tier's fixed temperature was found in review, not in planning.
+- [x] Review the other pages that name the affected aliases or handles: `docs/under-the-hood/reasoning-controls.md`, `per-node-usage-attribution.md`, `test-profile-configuration.md`, `docs/features/validation-dry-run.md`, `docs/cookbook/generate-image.md`, `PipeLLM.md` and `PipeStructure.md`. Change only statements about what a name resolves to by default. A handle used as an explicit example of naming a model stays. None of them needed a change: every hit in `reasoning-controls.md`, `per-node-usage-attribution.md`, `test-profile-configuration.md`, `validation-dry-run.md`, `generate-image.md`, `PipeLLM.md` and `PipeStructure.md` is either a direct model name used as an example or a test-profile handle, which decision 7 leaves alone. Only `PipeImgGen.md`, which stated what each image alias resolves to, was in the first list and is updated there.
+- [x] Follow the MkDocs rule of a blank line before every list.
+- [x] Add a `CHANGELOG.md` entry under `[Unreleased]`, `### Changed`, marked Breaking and written in the condensed form: the default aliases and presets now resolve to Azure-served models (with the tiers named), and `best-claude`, `best-gemini` and `best-mistral` (and `best-gemini` for image generation) are removed. For migration, `pipelex update` refreshes the numbered deck files and backs up any that were edited locally, and a project that wants a removed alias back defines it in `x_custom_llm_deck.toml`, or in an `x_custom_*` file for image generation.
 
 ## Phase 5 — Verify, review, and file the follow-ups
 

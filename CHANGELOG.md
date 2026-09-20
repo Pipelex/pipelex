@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The shipped model deck resolves only to models the Pipelex Gateway serves from Azure (Breaking)**: every default alias and preset keeps its name, but the premium tier and `best-gpt` now resolve to `gpt-6-astra`, the general and large-context tiers to `gpt-5.4`, the small tiers to `gpt-5.4-nano`, and image generation's general and premium tiers to `gpt-image-2`. Document extraction was already `azure-document-intelligence` and web search stays on Linkup, which Azure has no equivalent for. `pipelex update` refreshes the numbered deck files and backs up any you edited; a project that wants the previous models keeps them by naming them in `x_custom_llm_deck.toml`, which pipelex never touches.
+- **The premium tier's presets declare `temperature = 1` (Breaking)**: `gpt-6-astra` fixes its temperature at 1, so every preset on that tier states that value instead of one the worker would override while warning on every call. `$writing-factual` and `$writing-creative` therefore issue the same call, and `$engineering-structured` runs at temperature 1 — a method that needs a temperature of its own should name a model that accepts one, such as `@default-general`.
+
+### Removed
+
+- **`best-claude`, `best-gemini` and `best-mistral` are gone from the shipped deck (Breaking)**: an alias naming a provider cannot honestly resolve to a GPT model, and the image deck's `best-gemini` goes with them. A method referencing one fails validation with the usual alias-not-found error; define it in an `x_custom_*` deck file to keep it.
+- **`ModelDeck.final_validate` is removed**: it raised when a preset's temperature differed from its model's fixed temperature, but it had had no caller since 2025-09-17 and its `except` clause could never match the exception its helper raised, so it protected nothing.
+
 ## [v0.61.0] - 2026-09-20
 
 ### Added

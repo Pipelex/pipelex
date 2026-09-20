@@ -27,10 +27,9 @@ An LLM handle can be either:
 
 ```toml
 [llm.aliases]
-best-claude = "claude-4.1-opus"
-best-gemini = "gemini-2.5-pro"
-best-mistral = "mistral-large"
-base-gpt = "gpt-5.5"
+best-gpt = "gpt-6-astra"
+default-general = "gpt-5.4"
+default-small = "gpt-5.4-nano"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
