@@ -4,14 +4,22 @@ from kajson.exceptions import KajsonException
 from pydantic import ValidationError
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptRefAmbiguousError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_hub import get_class_registry
 
@@ -137,22 +145,98 @@ def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: C
     )
 
 
-def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
-    """Reconstruct typed WorkingMemory from a raw dict.
+def _resolve_native_stuff_concept(*, concept_ref: str, stuff_name: str) -> Concept:
+    """Resolve a transported stuff's concept ref with the pinned native set alone.
 
-    Must be called AFTER load_from_crate() has registered dynamic classes
-    in the scoped ClassRegistry. Uses concept.structure_class_name to look up
-    the correct StuffContent subclass from the registry.
+    A reader outside any library scope is a live path, not a fixture: ``Pipelex.make()`` sets no
+    current library, and on the transport boundary ``scoped_library_for_crate(None, …)`` is a true
+    no-op that falls back to the active class registry. What such a reader can honestly answer is
+    the native set, which the runtime pins and no bundle declares — the same answer
+    ``DeliveryExecutor._resolve_concept_locally`` gives in the same situation. A ref a bundle
+    declares is refused by name instead, because only a loaded library holds its definition.
+
+    Raises:
+        PipeJobError: the ref is malformed, or names a non-native concept.
+    """
+    try:
+        is_native_ref = NativeConceptCode.is_valid_native_concept_ref(concept_ref=concept_ref)
+    except QualifiedRefError as exc:
+        msg = f"Failed to hydrate stuff '{stuff_name}': '{concept_ref}' is not a valid concept ref: {exc}"
+        raise PipeJobError(msg) from exc
+    if not is_native_ref:
+        msg = (
+            f"Failed to hydrate stuff '{stuff_name}': concept '{concept_ref}' is not native and no library is current — "
+            "a stuff whose concept a bundle declares can only be hydrated against the loaded library that declares it"
+        )
+        raise PipeJobError(msg)
+    native_code = QualifiedRef.parse(concept_ref).local_code
+    return ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(native_code))
+
+
+def resolve_stuff_concept(*, concept_ref: Any, stuff_name: str, concept_provider: ConceptProviderAbstract | None) -> Concept:
+    """Resolve the concept a transported stuff names.
+
+    On the wire a stuff carries ``"concept": "<domain>.<Code>"`` and no definition — the
+    standard's form, which ``StuffAbstract`` emits on every dump — so the definition, the
+    ``structure_class_name`` above all, comes from the concept library the method loaded, the
+    way the input side resolves an input envelope's ``concept``. Anything but a string is
+    refused: the full-object form the runtime once dumped is not a shape a reader accepts.
+
+    ``concept_provider`` is ``None`` when no library is current, and the native set then answers
+    on its own — see :func:`_resolve_native_stuff_concept`. With a provider, the shared rule on
+    :meth:`ConceptProviderAbstract.resolve_wire_concept_ref` decides, so a concept a dependency
+    package contributed resolves through its aliased entry and a spelling two packages share is
+    refused rather than bound to whichever one the reader happened to reach first.
+
+    Raises:
+        PipeJobError: ``concept_ref`` is not a string, names no concept of the library, or names
+            a spelling the library holds more than once.
+    """
+    if not isinstance(concept_ref, str):
+        msg = f"Failed to hydrate stuff '{stuff_name}': 'concept' must be the concept ref string '<domain>.<Code>', got {type(concept_ref).__name__}"
+        raise PipeJobError(msg)
+    if concept_provider is None:
+        return _resolve_native_stuff_concept(concept_ref=concept_ref, stuff_name=stuff_name)
+    try:
+        return concept_provider.resolve_wire_concept_ref(concept_ref=concept_ref)
+    except ConceptRefAmbiguousError as exc:
+        msg = f"Failed to hydrate stuff '{stuff_name}': {exc}"
+        raise PipeJobError(msg) from exc
+    except (ConceptLibraryError, ConceptLibraryConceptNotFoundError) as exc:
+        msg = f"Failed to hydrate stuff '{stuff_name}': concept '{concept_ref}' is not in the loaded library: {exc}"
+        raise PipeJobError(msg) from exc
+
+
+def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
+    """Reconstruct typed WorkingMemory from its transport dump.
+
+    A stuff on the wire names its concept and carries no definition, so each ref is resolved
+    through the concept library of the current library when there is one: ``load_from_crate()``
+    declares the concepts and registers the dynamic classes in one move, and the resolved
+    concept's ``structure_class_name`` is then looked up in the scoped ClassRegistry to pick the
+    StuffContent subclass.
+
+    A current library is not a precondition, because a caller legitimately has none — ``Pipelex.make()``
+    sets no current library, and the transport boundary's ``scoped_library_for_crate(None, …)`` is a
+    documented no-op that falls back to the active class registry. Such a reader resolves the native
+    refs from the pinned native set and refuses anything a bundle declares, naming the stuff.
 
     The absence ledger round-trips too: a recorded absence must survive cross-process
     transit, or a resolved-as-absent slot would degrade to a hard miss on the other side.
     """
+    try:
+        concept_provider: ConceptProviderAbstract | None = get_concept_library() if get_current_library_id_or_none() is not None else None
+    except (LibraryError, RuntimeError) as exc:
+        # The contextvar naming a library is not the same fact as that library still being there.
+        # Whichever way it went, this function answers with PipeJobError and never with a raw one.
+        msg = f"Failed to hydrate the working memory: the current library is no longer reachable: {exc}"
+        raise PipeJobError(msg) from exc
     working_memory = WorkingMemory()
 
     raw_root = working_memory_raw.get("root", {})
     for stuff_name, stuff_dict in raw_root.items():
         try:
-            concept = Concept.model_validate(stuff_dict["concept"])
+            concept = resolve_stuff_concept(concept_ref=stuff_dict["concept"], stuff_name=stuff_name, concept_provider=concept_provider)
             content = hydrate_content(concept=concept, raw_content=stuff_dict["content"])
             stuff = Stuff(
                 stuff_code=stuff_dict["stuff_code"],

@@ -50,6 +50,7 @@ _NON_PIPELEX_ERROR_KEYS: frozenset[str] = frozenset(
         "CodegenDriftError",  # synthetic error_type label (a drift verdict, not an exception)
         "CodegenLockNotFoundError",  # synthetic error_type label
         "InitConfigError",  # synthetic error_type label
+        "StdinEnvelopeShapeError",  # synthetic error_type label
         "UnknownCommandError",  # synthetic error_type label
     }
 )

@@ -10,15 +10,20 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptRefAmbiguousError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
+from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
+from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
@@ -27,6 +32,7 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
 
 if TYPE_CHECKING:
+    from pipelex.core.concepts.concept import Concept
     from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
@@ -92,11 +98,12 @@ class DeliveryExecutor:
         Supports two `pipe_output` shapes:
         - Typed: `working_memory` populated (in-process / same-worker path).
         - Raw: `working_memory_raw` populated (cross-process Temporal path,
-          where the activity worker may not have the dynamic concept classes
-          loaded). The activity tries to locally hydrate using only globally
-          registered classes; on failure it falls back to a generic dict
-          render so built-in content types still get typed rendering and
-          dynamic concepts produce a readable JSON dump.
+          where the activity worker may not have the method's library loaded).
+          The activity tries to locally hydrate the main stuff with the concepts
+          this process knows — the current library when one is set, the native
+          set otherwise — and the globally registered classes; on failure it
+          falls back to a generic dict render so built-in content types still
+          get typed rendering and dynamic concepts produce a readable JSON dump.
 
         A completed run always resolves its declared output: a value or a
         recorded absence. The main_stuff.* artifact files are always produced —
@@ -217,17 +224,69 @@ class DeliveryExecutor:
         files["main_stuff.html"] = ResultFile(data=build_absence_html(absence_record).encode("utf-8"), content_type="text/html")
 
     @classmethod
-    def try_local_hydrate_stuff(cls, stuff_raw: dict[str, Any]) -> Stuff | None:
-        """Attempt to hydrate a single Stuff dict using only globally-registered classes.
+    def _resolve_concept_locally(cls, *, concept_ref: str) -> Concept | None:
+        """Resolve a transported stuff's concept ref with what this process holds.
 
-        Returns None when the structure class isn't available locally (typically
-        a dynamic concept class missing from the activity worker's registry) —
-        callers then fall back to a generic raw-dict render. A warning is
-        emitted on the fallback path so silent regressions on built-in
-        hydration surface in logs.
+        A delivery worker never loads the crate, so a dynamic concept is unknown to it by
+        design. When a library is current — an in-process run delivering its own result — the
+        ref goes through the shared wire-ref rule, so a concept a dependency package contributed
+        resolves through its aliased entry; otherwise only the native concepts are known, and they
+        are built from their pinned definitions. ``None`` means "not known here", and it means that
+        for a malformed ref and for a library that has gone away as much as for an unknown one:
+        this reader renders a result and must never fail a delivery, so every way of failing to
+        name a concept ends in the raw render.
+
+        A spelling the library holds more than once is "not known here" too, deliberately: the
+        collision is logged by name and the caller falls back to the raw render rather than binding
+        one package's definition to another package's data.
+        """
+        if get_current_library_id_or_none() is not None:
+            try:
+                return get_concept_library().resolve_wire_concept_ref(concept_ref=concept_ref)
+            except ConceptRefAmbiguousError as exc:
+                log.warning(f"Concept ref '{concept_ref}' is ambiguous in the current library, rendering the delivery raw: {exc}")
+                return None
+            except (LibraryError, ConceptLibraryConceptNotFoundError):
+                return None
+            except RuntimeError as exc:
+                # The contextvar still names a library, but the hub that held it is gone. A delivery
+                # outlives the run it renders, so this is a race to survive, not a state to assert.
+                log.warning(f"The current library is no longer reachable, rendering the delivery raw: {exc}")
+                return None
+        try:
+            is_native_ref = NativeConceptCode.is_valid_native_concept_ref(concept_ref=concept_ref)
+        except QualifiedRefError as exc:
+            log.warning(f"Concept ref '{concept_ref}' is not a valid concept ref, rendering the delivery raw: {exc}")
+            return None
+        if not is_native_ref:
+            return None
+        native_code = QualifiedRef.parse(concept_ref).local_code
+        return ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(native_code))
+
+    @classmethod
+    def try_local_hydrate_stuff(cls, stuff_raw: dict[str, Any]) -> Stuff | None:
+        """Attempt to hydrate a single Stuff dict with the concepts and classes this process holds.
+
+        The stuff names its concept by ref (``"concept": "<domain>.<Code>"``); the ref is
+        resolved locally — the current library when one is set, the native set otherwise —
+        and the concept's structure class is then looked up in the class registry. Returns
+        None when the concept or its class isn't available locally (typically a dynamic
+        concept the activity worker never loaded) — callers then fall back to a generic
+        raw-dict render. A warning is emitted on the fallback path so silent regressions
+        on built-in hydration surface in logs.
         """
         try:
-            concept = Concept.model_validate(stuff_raw["concept"])
+            concept_ref = stuff_raw["concept"]
+            if not isinstance(concept_ref, str):
+                log.warning(
+                    f"Local hydration failed for delivery main stuff, falling back to raw render: "
+                    f"'concept' must be the concept ref string, got {type(concept_ref).__name__}"
+                )
+                return None
+            concept = cls._resolve_concept_locally(concept_ref=concept_ref)
+            if concept is None:
+                log.warning(f"Local hydration failed for delivery main stuff, falling back to raw render: concept '{concept_ref}' not known locally")
+                return None
             registry = get_class_registry()
             item_class = registry.get_class(name=concept.structure_class_name)
             if item_class is None or not issubclass(item_class, StuffContent):
