@@ -106,9 +106,20 @@ The next-round verdict is **round 2 at bar `defects`, profile 3**, which Phase 5
 
 ## Phase 5 — Verify, review, and file the follow-ups
 
-- [ ] Re-read the handles against `pipelex/kit/configs/inference/backends/` in case the backend update landed during the build, and adjust both the deck and the design's tables if it did.
-- [ ] Run `make agent-check` and `make agent-test`.
-- [ ] Run a live smoke check through the gateway, limited to a few inference-marked tests that ride the default tiers: one LLM text case with no model named, one structured case, one vision case and one `$gen-image` case (`.venv/bin/pytest --pipe-run-mode live -m inference -k <names> -x`). The goal is to see gpt-6-astra, gpt-5.4 and gpt-image-2 answer. A fixed-temperature warning is expected and accepted.
+- [x] Re-read the handles against `pipelex/kit/configs/inference/backends/` in case the backend update landed during the build, and adjust both the deck and the design's tables if it did. Nothing landed during the build — `#1218` and `#1219` remain the last two commits on the backends directory — and all five handles are still declared on `azure_openai`.
+- [x] Run `make agent-check` and `make agent-test`. Both green, but only after two real problems the plan did not foresee.
+
+    **This worktree's venv was stale, and it made the suite lie.** The first full `agent-test` reported failures in `test_hydration.py`, `test_composite_content.py` and `test_wire_concept_ref_resolution.py` — none of which this branch touches, all byte-identical to `origin/dev`. They passed in a fresh detached snapshot of `origin/dev` and failed here, which is what a code defect looks like. The cause was the environment: this worktree's venv carried `mthds` 0.14.0 while the lock pins 0.15.0, so the concept-ref wire format the tests assert had never been installed here. `make install` fixed it. Every check run before that point was run against the wrong `mthds`, so all of them were re-run afterwards.
+
+    **Two offline dry-run fixtures named handles the new deck strands.** `gateway_known_model` named `gpt-4o-mini` and `gateway_img_gen_model` named `nano-banana`. Their cached gateway specs come from `gateway_backend_model_specs_for_kit_deck()`, derived from the shipped deck exactly so the fixture cannot go stale when an alias is promoted — which means a handle leaving the deck removes it from the fixture's served set. They now name `gpt-5.4-nano` and `gpt-image-2`.
+- [x] Run a live smoke check through the gateway, limited to a few inference-marked tests that ride the default tiers. All four cases answered through the gateway:
+
+    - `test_pipe_llm_json_concept` — names no model, so it rides `@default-general` → `gpt-5.4`.
+    - `test_pipe_llm_object_list` — `@default-small-creative` → `gpt-5.4-nano`, structured output.
+    - `test_pipe_llm_vision` — `$vision-diagram` → `@default-premium-vision` → `gpt-6-astra`, and `$vision-cheap` → `gpt-5.4-nano`.
+    - `test_pipe_img_gen -k 'testing or img2img'` — `$gen-image-testing` → `gpt-image-1-mini` and `$gen-image-testing-img2img` → `@default-premium` → `gpt-image-2`.
+
+    No fixed-temperature warning appeared, because the premium presets now declare the temperature the model fixes. `pipelex-agent models -t llm --format json` against the booted runtime confirms every alias resolves as design decision 4's table says.
 - [ ] Run `/rev` on the branch before the pull request opens.
 - [ ] File the downstream follow-ups in the ledger, each `--discovered-from L-260918-941a99` and blocked on the pipelex release that carries this change:
     - `pipelex-cookbook`: replace `@best-gemini` in the two extract bundles and the `answer_from_documents` README, run `pipelex update` at the pin bump, and check `cookbook.toml`'s direct model names against the Azure scope.
