@@ -1,8 +1,6 @@
 import base64
 import hashlib
 
-import httpx
-
 from pipelex import log
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -14,7 +12,8 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.storage_scope import GENERATED_CONTENT_LEAF
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
+from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -76,8 +75,18 @@ class GeneratedContentFactory:
         filename = uri_format.format(hash=hash_digest, extension=extension)
         return f"{storage_scope}/{GENERATED_CONTENT_LEAF}/{filename}"
 
-    async def _fetch_remote_content(self, url: str) -> bytes:
-        return await fetch_file_from_url_httpx(url=url)
+    async def _fetch_remote_content(self, url: str) -> tuple[bytes, str | None]:
+        """Fetch the bytes at `url` and the image media type the server declared for them.
+
+        The declared type is kept only when it is one this runtime supports as an image:
+        a remote URL may answer `application/octet-stream`, `text/html` for an error page
+        a server dressed as a 200, or an image format we do not handle, and none of those
+        is a media type generated content may be stored under.
+        """
+        raw_bytes, content_type = await fetch_file_and_content_type_from_url_httpx(url)
+        if content_type and ImageFormat.is_supported_mime_type(content_type):
+            return raw_bytes, content_type
+        return raw_bytes, None
 
     async def make_image_content(
         self,
@@ -114,19 +123,26 @@ class GeneratedContentFactory:
             raise NeitherUrlNorDataError(msg)
 
         # Resolve the effective mime type ONCE, before any storage key is built:
-        # the provider's actual answer first (reported mime, then base64-extracted),
-        # the REQUESTED image format only as a fallback. The storage-key extension
-        # and the content type the object is stored under both derive from this same
-        # resolution, so key, stored type and mime cannot diverge when a provider
-        # returns a different format than requested. Passing it to `store` is not
-        # optional: a store that receives no content type falls back to its own
-        # default (S3 answers `binary/octet-stream`), and every consumer that trusts
-        # the stored type then serves the wrong one.
+        # what the provider actually declared about these bytes first (its reported
+        # mime, then the one a base64 data-URL carries), the REQUESTED image format
+        # only as a fallback, and a hardcoded default only when nothing said anything.
+        # The storage-key extension and the content type the object is stored under
+        # both derive from this same resolution, so key, stored type and mime cannot
+        # diverge when a provider returns a different format than requested. Passing
+        # it to `store` is not optional: a store that receives no content type falls
+        # back to its own default (S3 answers `binary/octet-stream`), and every
+        # consumer that trusts the stored type then serves the wrong one.
+        #
+        # A remote URL is the one case where nothing has declared anything yet, which
+        # `GeneratedImageRawDetails` permits on purpose — the type is settled when the
+        # bytes are downloaded, below, from the response's own `Content-Type`. That
+        # answer beats the requested format and the default, and loses to a declared
+        # one: storing a fetched PNG as the `image/jpeg` somebody asked for is not a
+        # smaller error than storing it untyped, it is the same error made confidently.
+        declared_mime_type: str | None = raw_details.mime_type or base64_extracted_mime_type
         mime_type: str
-        if raw_details.mime_type:
-            mime_type = raw_details.mime_type
-        elif base64_extracted_mime_type:
-            mime_type = base64_extracted_mime_type
+        if declared_mime_type:
+            mime_type = declared_mime_type
         elif image_format:
             mime_type = image_format.as_mime_type
         else:
@@ -152,11 +168,17 @@ class GeneratedContentFactory:
         public_url: str | None
         if is_remote_url and get_config().runtime.storage.is_fetch_remote_content_enabled:
             try:
-                actual_bytes = await self._fetch_remote_content(url=url)
-            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                # `RemoteFileFetchError` is the ONLY exception this can raise: the fetch
+                # helper converts every httpx failure into it. Catching the httpx classes
+                # here, as this used to, caught nothing — a 404 or a timeout on a remote
+                # image escaped and failed the whole pipe instead of degrading to the URL.
+                actual_bytes, fetched_mime_type = await self._fetch_remote_content(url=url)
+            except RemoteFileFetchError as exc:
                 log.warning(f"Failed to fetch a remote image: {exc}")
                 public_url = url
             else:
+                if not declared_mime_type and fetched_mime_type:
+                    mime_type = fetched_mime_type
                 storage_key = self._build_storage_key(
                     storage_scope=storage_scope,
                     data=actual_bytes,
