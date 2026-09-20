@@ -101,6 +101,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
+<td>claude-5-opus</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
 <td>claude-5-sonnet</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -197,30 +205,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
-<td>gpt-4.1</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-4.1-mini</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-4.1-nano</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
 <td>gpt-4o</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -230,86 +214,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </tr>
 <tr>
 <td>gpt-4o-mini</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5-chat</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5-mini</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5-nano</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5.1</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5.1-chat</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5.1-codex</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5.2</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5.2-chat</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gpt-5.2-codex</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -358,6 +262,38 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </tr>
 <tr>
 <td>gpt-5.5</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gpt-5.6-luna</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gpt-5.6-sol</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gpt-5.6-terra</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gpt-6-astra</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -433,46 +369,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>o1</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>o1-mini</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>o3</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>o3-mini</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>o4-mini</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -620,6 +516,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-07-27T01:18:06Z
+> Last updated: 2026-09-20T22:54:34Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
