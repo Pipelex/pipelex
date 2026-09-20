@@ -39,14 +39,14 @@ A unit test keeps "disabled" from meaning "rotting": for every directory under `
 
 | Alias | Today | Azure deck | Why |
 | --- | --- | --- | --- |
-| `default-premium`, `default-premium-vision`, `default-premium-structured` | claude-4.8-opus | gpt-5.5 | The flagship. Its fixed temperature only produces a warning when a preset carries its own temperature. |
+| `default-premium`, `default-premium-vision`, `default-premium-structured` | claude-4.8-opus | gpt-6-astra | The flagship, served on the gateway since the remote config publish of 2026-09-20. Its fixed temperature only produces a warning when a preset carries its own temperature. |
 | `default-general` (the choice default for `for_text` and `for_object`) | claude-4.6-sonnet | gpt-5.4 | The model every unnamed pipe gets. One step below premium, mirroring today's sonnet-below-opus shape. |
 | `default-large-context-text`, `default-large-context-code` | gemini-flash-latest, gemini-pro-latest | gpt-5.4 | General tier. |
 | `default-small`, `default-small-structured`, `default-small-vision`, `default-small-creative` | gpt-4o-mini, gpt-4o-mini, gemini-flash-latest, gemini-flash-latest | gpt-5.4-nano | Current generation with image and PDF input, at a small-tier price. |
-| `best-gpt` | gpt-5.5 | gpt-5.5 | Unchanged. |
+| `best-gpt` | gpt-5.5 | gpt-6-astra | The best GPT the gateway serves. |
 | `best-claude`, `best-gemini`, `best-mistral` | claude-4.8-opus, gemini-pro-latest, mistral-large | removed | Decision 8. |
 
-Presets that name a model directly move to the tier they belong to: `retrieval-premium` to gpt-5.5, `engineering-codebase-analysis` (today `@best-gemini`) to `@default-premium`, `engineering-code-cheap` to gpt-5.4, `retrieval-cheap` and `engineering-code-cheaper` to gpt-5.4-nano. The two reasoning presets (`deep-analysis`, `quick-reasoning`) keep their `reasoning_effort` and follow `@default-premium`.
+Presets that name a model directly move to the tier they belong to: `retrieval-premium` to gpt-6-astra, `engineering-codebase-analysis` (today `@best-gemini`) to `@default-premium`, `engineering-code-cheap` to gpt-5.4, `retrieval-cheap` and `engineering-code-cheaper` to gpt-5.4-nano. The two reasoning presets (`deep-analysis`, `quick-reasoning`) keep their `reasoning_effort` and follow `@default-premium`.
 
 ### 5. Image generation aliases
 
@@ -81,11 +81,11 @@ The commented waterfall examples in `x_custom_llm_deck.toml` and `x_custom_extra
 - **Routing.** The Gateway already serves the OpenAI language and image models from Azure. The deck decides which handles are named, not where a request goes, and nothing about the routing profiles or the remote config changes here.
 - **Fixed-temperature constraints.** Several gpt-5.x handles carry `fixed_temperature = 1`. When a preset carries its own temperature, the worker forces the model's value and logs a warning. That is accepted.
 - **An edition selector.** Declined, see decision 2.
-- **The GPT-5.6 and GPT-6 generation.** `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` joined the Azure backend in pipelex v0.61.0 and the gateway serves them since the remote config published on 2026-09-20. The tiers stay on the 5.4 and 5.5 handles all the same. Every 5.6 and 6 handle carries `fixed_temperature = 1`, while `gpt-5.4` and `gpt-5.4-nano` carry no constraint, so keeping the general and small tiers on 5.4 keeps the temperature of every preset that rides them, which is most of the deck. Premium is fixed-temperature already at `gpt-5.5`, so moving it and `best-gpt` to `gpt-6-astra` would cost nothing in warnings; that move is a pricing and quality call on its own and is not made here.
+- **The GPT-5.6 generation for the general and small tiers.** `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` joined the Azure backend in pipelex v0.61.0 and the gateway serves them since the remote config published on 2026-09-20. The premium tier takes `gpt-6-astra` (decision 4), but the general and small tiers stay on 5.4. Every 5.6 and 6 handle carries `fixed_temperature = 1`, while `gpt-5.4` and `gpt-5.4-nano` carry no constraint, so keeping those two tiers on 5.4 keeps the temperature of every preset that rides them, which is most of the deck. Premium was fixed-temperature already at `gpt-5.5`, so its move costs nothing in warnings.
 
 ## The backend model list moved first
 
-The backend model lists under `pipelex/kit/configs/inference/backends/` were refreshed ahead of the build, in pipelex v0.61.0: the GPT-5.6 series and GPT-6 Astra were added (#1218) and the GPT-4.1, o-series and GPT-5 to 5.2 generations were retired (#1219). The remote config in `pipelex-remote-config`, the authority on what a handle means, followed with the same roster at its commit `ae91eb8` and was published on 2026-09-20. The handles in the two tables were re-read against both after that publish: every one of them is still declared on the Azure backend and still served by the gateway, so the tables stand as written and no tier was substituted.
+The backend model lists under `pipelex/kit/configs/inference/backends/` were refreshed ahead of the build, in pipelex v0.61.0: the GPT-5.6 series and GPT-6 Astra were added (#1218) and the GPT-4.1, o-series and GPT-5 to 5.2 generations were retired (#1219). The remote config in `pipelex-remote-config`, the authority on what a handle means, followed with the same roster at its commit `ae91eb8` and was published on 2026-09-20. The handles in the two tables were re-read against both after that publish: every one of them is still declared on the Azure backend and still served by the gateway. The one change the refresh brought is the premium tier, which takes `gpt-6-astra` now that the gateway serves it; the general and small tiers stand as first written.
 
 ## What the build changes
 
