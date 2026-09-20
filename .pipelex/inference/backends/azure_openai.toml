@@ -225,6 +225,40 @@ costs = { input = 5.0, output = 30.0 }
 valued_constraints = { fixed_temperature = 1 }
 thinking_mode = "manual"
 
+# --- GPT-5.6 Series -----------------------------------------------------------
+["gpt-5.6-sol"]
+model_id = "gpt-5.6-sol-2026-07-09"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 4.0, output = 20.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+["gpt-5.6-terra"]
+model_id = "gpt-5.6-terra-2026-07-09"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2.0, output = 12.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+["gpt-5.6-luna"]
+model_id = "gpt-5.6-luna-2026-07-09"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 1.2 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+# --- GPT-6 Series -------------------------------------------------------------
+["gpt-6-astra"]
+model_id = "gpt-6-astra-2026-09-03"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 10.0, output = 50.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
 ################################################################################
 # IMAGE GENERATION MODELS
 ################################################################################
