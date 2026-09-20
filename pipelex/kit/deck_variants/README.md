@@ -8,7 +8,11 @@ The files keep their header comment about being managed by `pipelex update`, bec
 
 ## What keeps a variant from rotting
 
-`tests/unit/pipelex/kit/test_deck_variants.py` loads every variant through the same loader the runtime uses and asserts that it defines exactly the same alias, preset and waterfall names, per model family, as the shipped deck. The only differences it tolerates are the names the shipped deck deliberately dropped, which the test lists explicitly, so a stale entry in that list fails too. Adding a preset to the shipped deck and not to a variant turns the test red.
+`tests/unit/pipelex/kit/test_deck_variants.py` loads every variant through the same loader the runtime uses and holds it to the shipped deck two ways.
+
+The first is the vocabulary: the variant must define exactly the same alias, preset and waterfall names, per model family, as the shipped deck. The only differences it tolerates are the names the shipped deck deliberately dropped, which the test lists explicitly, so a stale entry in that list fails too. Adding a preset to the shipped deck and not to a variant turns the test red.
+
+The second is the handles: every model handle a variant names and the shipped deck does not must still be declared by one of the kit's backend files. This is how a parked deck actually goes stale — pipelex v0.61.0 retired the GPT-4.1, o-series and GPT-5 to 5.2 generations, and a variant naming one of those would otherwise pass the vocabulary check forever. The check is scoped to the handles only the variant names, because a handle the shipped deck names too is already exercised at boot, and some of those are gateway-served with no backend section of their own.
 
 ## Re-enabling a variant
 

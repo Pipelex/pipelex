@@ -39,7 +39,7 @@ A unit test keeps "disabled" from meaning "rotting": for every directory under `
 
 | Alias | Today | Azure deck | Why |
 | --- | --- | --- | --- |
-| `default-premium`, `default-premium-vision`, `default-premium-structured` | claude-4.8-opus | gpt-6-astra | The flagship, served on the gateway since the remote config publish of 2026-09-20. Its fixed temperature only produces a warning when a preset carries its own temperature. |
+| `default-premium`, `default-premium-vision`, `default-premium-structured` | claude-4.8-opus | gpt-6-astra | The flagship, served on the gateway since the remote config publish of 2026-09-20. It fixes the temperature at 1, which decision 10 answers. |
 | `default-general` (the choice default for `for_text` and `for_object`) | claude-4.6-sonnet | gpt-5.4 | The model every unnamed pipe gets. One step below premium, mirroring today's sonnet-below-opus shape. |
 | `default-large-context-text`, `default-large-context-code` | gemini-flash-latest, gemini-pro-latest | gpt-5.4 | General tier. |
 | `default-small`, `default-small-structured`, `default-small-vision`, `default-small-creative` | gpt-4o-mini, gpt-4o-mini, gemini-flash-latest, gemini-flash-latest | gpt-5.4-nano | Current generation with image and PDF input, at a small-tier price. |
@@ -76,12 +76,22 @@ Document extraction already defaults to `azure-document-intelligence`. The two `
 
 The commented waterfall examples in `x_custom_llm_deck.toml` and `x_custom_extract_deck.toml` list Claude, Gemini and Mistral handles. They exist for a user who brings their own provider keys and are left as they are.
 
+### 10. The premium tier declares `temperature = 1`, because its model fixes it there
+
+`gpt-6-astra` carries `valued_constraints = { fixed_temperature = 1 }` on the Azure and OpenAI backends and on both hosted routing profiles. `_apply_constraints` (`pipelex/cogt/llm/llm_worker_abstract.py:338-369`) overrides any other value and logs a warning, once per call, with no memoisation. Today's shipped deck has no preset in that position: `claude-4.8-opus` declares no constraint, and the one fixed-temperature handle it names, `gpt-5.5` behind `best-gpt`, is reached by no preset. This change would put twelve presets there.
+
+So the twelve presets that ride the premium tier declare `temperature = 1` — the value the model will use — instead of a value the worker discards. The deck stops asserting something untrue and stops warning on every premium call. What it costs is real and is accepted: `writing-factual` and `writing-creative` now issue the same call, and `engineering-structured` runs structured extraction at temperature 1, `_gen_object` passing the temperature unconditionally on that path. The premium tier has no temperature control until it resolves to a model that accepts one, and `1_llm_deck.toml` says so above its preset table.
+
+The alternative was moving premium down to `gpt-5.4`, which accepts a temperature but is the general tier's own model. Keeping the flagship was the call.
+
+The repository already had the validator for exactly this conflict — `ModelDeck.final_validate`, which raises when a preset's temperature differs from a model's `fixed_temperature`. It had had no caller since 2025-09-17, and its `except ConfigValidationError` clause was unreachable, `LLMSettingsValidationError` descending from `CogtError` rather than `FatalError`. A guard nothing calls reads as protection that does not exist, so it was deleted rather than revived.
+
 ## Out of scope, and why
 
 - **Routing.** The Gateway already serves the OpenAI language and image models from Azure. The deck decides which handles are named, not where a request goes, and nothing about the routing profiles or the remote config changes here.
-- **Fixed-temperature constraints.** Several gpt-5.x handles carry `fixed_temperature = 1`. When a preset carries its own temperature, the worker forces the model's value and logs a warning. That is accepted.
+- **Fixed-temperature constraints.** Several gpt-5.x handles carry `fixed_temperature = 1`, `gpt-6-astra` among them, so the premium tier has one. The worker forces the model's value and logs a warning on every call where a preset declares a different one, so the twelve presets on the premium tier declare `temperature = 1` outright rather than a value the deck cannot honour. Decision 10 records that, and what it costs.
 - **An edition selector.** Declined, see decision 2.
-- **The GPT-5.6 generation for the general and small tiers.** `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` joined the Azure backend in pipelex v0.61.0 and the gateway serves them since the remote config published on 2026-09-20. The premium tier takes `gpt-6-astra` (decision 4), but the general and small tiers stay on 5.4. Every 5.6 and 6 handle carries `fixed_temperature = 1`, while `gpt-5.4` and `gpt-5.4-nano` carry no constraint, so keeping those two tiers on 5.4 keeps the temperature of every preset that rides them, which is most of the deck. Premium was fixed-temperature already at `gpt-5.5`, so its move costs nothing in warnings.
+- **The GPT-5.6 generation for the general and small tiers.** `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` joined the Azure backend in pipelex v0.61.0 and the gateway serves them since the remote config published on 2026-09-20. The premium tier takes `gpt-6-astra` (decision 4), but the general and small tiers stay on 5.4. Every 5.6 and 6 handle carries `fixed_temperature = 1`, while `gpt-5.4` and `gpt-5.4-nano` carry no constraint, so keeping those two tiers on 5.4 keeps the temperature of every preset that rides them, which is most of the deck. The premium tier, by contrast, has no fixed-temperature-free option: on Azure every handle above `gpt-5.4` carries the constraint, so taking the flagship means taking it (decision 10).
 
 ## The backend model list moved first
 

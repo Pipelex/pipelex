@@ -1,9 +1,16 @@
 """Parity guard for the parked deck variants under `pipelex/kit/deck_variants/`.
 
 Nothing loads a variant at runtime, so nothing else would notice it rotting. This module loads
-every variant through the same loader the runtime uses and asserts that it defines exactly the
-same alias, preset and waterfall names, per model family, as the deck the kit ships — except for
-the names the shipped deck deliberately dropped, which are listed here by variant.
+every variant through the same loader the runtime uses and holds it to the shipped deck two ways:
+
+- the same alias, preset and waterfall names, per model family, except for the names the shipped
+  deck deliberately dropped, which are listed here by variant;
+- every model handle the variant names and the shipped deck does not is still declared by one of
+  the kit's backend files, because handle retirement is how a parked deck actually goes stale.
+
+The second check is scoped to the handles only the variant names. A handle the shipped deck names
+too is already exercised at boot, and some of those are gateway-served with no backend section of
+their own, so holding them to a backend declaration would fail on a deck that is perfectly live.
 """
 
 from collections.abc import Mapping
@@ -20,7 +27,9 @@ from pipelex.cogt.models.model_deck import (
     SearchDeckBlueprint,
 )
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
-from pipelex.kit.paths import get_kit_deck_variants_dir
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
+from pipelex.kit.paths import get_kit_configs_dir, get_kit_deck_variants_dir
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 # A vocabulary coordinate: the model family, then the kind of name within it.
 DeckFamilyBlueprint = LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint
@@ -87,6 +96,35 @@ def load_deck_from_dir(deck_dir: Path, *, filenames: list[str]) -> ModelDeckBlue
     return load_model_deck_blueprint([str(deck_dir / filename) for filename in sorted(filenames)])
 
 
+def list_declared_backend_handles() -> set[str]:
+    """Every model handle the kit's backend files declare. Each top-level table is one, bar `defaults`."""
+    backends_dir = Path(str(get_kit_configs_dir())) / "inference" / "backends"
+    handles: set[str] = set()
+    for backend_path in sorted(backends_dir.glob("*.toml")):
+        backend_dict = load_toml_from_path(str(backend_path))
+        handles.update(name for name, value in backend_dict.items() if isinstance(value, dict) and name != "defaults")
+    return handles
+
+
+def extract_model_handles(blueprint: ModelDeckBlueprint) -> set[str]:
+    """Every concrete handle a deck names, from its alias targets and its presets' models.
+
+    A preset whose model is an alias, a preset or a waterfall names no handle of its own: it
+    resolves through one of the other two, which this function reads directly.
+    """
+    family_blueprints: list[DeckFamilyBlueprint] = [blueprint.llm, blueprint.extract, blueprint.img_gen, blueprint.search]
+    references: list[str] = []
+    for family_blueprint in family_blueprints:
+        references.extend(family_blueprint.aliases.values())
+        references.extend(setting.model for setting in family_blueprint.presets.values())
+    handles: set[str] = set()
+    for reference in references:
+        parsed = ModelReference.parse(reference)
+        if parsed.kind == ModelReferenceKind.HANDLE:
+            handles.add(parsed.name)
+    return handles
+
+
 def make_vocabulary(*, aliases: set[str], presets: set[str]) -> Vocabulary:
     """A minimal single-family vocabulary, for the comparator's own tests."""
     return {("llm", "aliases"): aliases, ("llm", "presets"): presets, ("llm", "waterfalls"): set()}
@@ -116,6 +154,20 @@ class TestDeckVariants:
             permitted_drops=PERMITTED_DROPS_BY_VARIANT.get(variant_dir.name, {}),
         )
         assert not differences, f"Variant '{variant_dir.name}' has drifted from the shipped deck:\n" + "\n".join(differences)
+
+    @pytest.mark.parametrize("variant_dir", list_variant_dirs(), ids=lambda path: path.name)
+    def test_variant_only_handles_are_still_declared_by_a_backend(self, variant_dir: Path):
+        """Name parity says nothing about a handle that was retired from the backends underneath it."""
+        managed_filenames = list(list_managed_kit_files())
+        shipped_handles = extract_model_handles(load_deck_from_dir(kit_deck_dir(), filenames=managed_filenames))
+        variant_handles = extract_model_handles(load_deck_from_dir(variant_dir, filenames=managed_filenames))
+
+        variant_only_handles = variant_handles - shipped_handles
+        assert variant_only_handles, f"Variant '{variant_dir.name}' names no handle of its own, which makes this guard vacuous"
+
+        declared_handles = list_declared_backend_handles()
+        undeclared = sorted(handle for handle in variant_only_handles if handle not in declared_handles)
+        assert not undeclared, f"Variant '{variant_dir.name}' names handles no backend file declares any more: {', '.join(undeclared)}"
 
     def test_comparator_reports_a_preset_the_variant_is_missing(self):
         differences = compare_vocabularies(

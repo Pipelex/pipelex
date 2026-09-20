@@ -50,39 +50,44 @@ default-small-creative = "gpt-5.4-nano"
 # LLM Presets
 ####################################################################################################
 
+# Every preset on the premium tier carries temperature = 1, because the model that tier resolves to
+# fixes its temperature at 1. Declaring anything else would be overridden by the worker and warned
+# about on every single call, so the deck states the value the model will actually use. If the
+# premium tier ever moves to a model that accepts a temperature, these are the presets to revisit.
+
 [llm.presets]
 
 # Writing
-writing-factual = { model = "@default-premium", temperature = 0.1, description = "Factual writing with high accuracy" }
+writing-factual = { model = "@default-premium", temperature = 1, description = "Factual writing with high accuracy" }
 writing-factual-cheap = { model = "@default-small", temperature = 0.1, description = "Cheap factual writing with high accuracy" }
-writing-creative = { model = "@default-premium", temperature = 0.9, description = "Creative writing with high variability" }
+writing-creative = { model = "@default-premium", temperature = 1, description = "Creative writing with high variability" }
 writing-creative-cheap = { model = "@default-small-creative", temperature = 0.9, description = "Cheap creative writing with high variability" }
 
 # Retrieval
 retrieval = { model = "@default-large-context-text", temperature = 0.1, description = "Data retrieval from large text corpora" }
 retrieval-cheap = { model = "gpt-5.4-nano", temperature = 0.1, description = "Cheap data retrieval from large text corpora" }
-retrieval-premium = { model = "gpt-6-astra", temperature = 0.1, description = "Premium data retrieval with highest accuracy" }
+retrieval-premium = { model = "gpt-6-astra", temperature = 1, description = "Premium data retrieval with highest accuracy" }
 
 # Engineering
-engineering-structured = { model = "@default-premium-structured", temperature = 0.2, description = "Structured engineering output (JSON, schemas)" }
-engineering-code = { model = "@default-premium", temperature = 0.1, description = "Code generation and analysis" }
+engineering-structured = { model = "@default-premium-structured", temperature = 1, description = "Structured engineering output (JSON, schemas)" }
+engineering-code = { model = "@default-premium", temperature = 1, description = "Code generation and analysis" }
 engineering-code-cheap = { model = "gpt-5.4", temperature = 0.1, description = "Cheap code generation and analysis" }
 engineering-code-cheaper = { model = "gpt-5.4-nano", temperature = 0.1, description = "Cheapest code generation and analysis" }
-engineering-codebase-analysis = { model = "@default-premium", temperature = 0.1, description = "Large codebase analysis" }
+engineering-codebase-analysis = { model = "@default-premium", temperature = 1, description = "Large codebase analysis" }
 
 # Vision
-vision = { model = "@default-premium-vision", temperature = 0.5, description = "Understanding and interpreting images" }
+vision = { model = "@default-premium-vision", temperature = 1, description = "Understanding and interpreting images" }
 vision-cheap = { model = "@default-small-vision", temperature = 0.5, description = "Cheap image understanding for simple tasks" }
-vision-diagram = { model = "@default-premium-vision", temperature = 0.3, description = "Diagram and chart interpretation" }
-vision-table = { model = "@default-premium-vision", temperature = 0.3, description = "Table extraction from images" }
+vision-diagram = { model = "@default-premium-vision", temperature = 1, description = "Diagram and chart interpretation" }
+vision-table = { model = "@default-premium-vision", temperature = 1, description = "Table extraction from images" }
 
 # Image generation prompting
-img-gen-prompting = { model = "@default-premium", temperature = 0.5, description = "Crafting image generation prompts" }
+img-gen-prompting = { model = "@default-premium", temperature = 1, description = "Crafting image generation prompts" }
 img-gen-prompting-cheap = { model = "@default-small-creative", temperature = 0.5, description = "Cheap image prompt generation" }
 
 # Reasoning
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
-quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
+quick-reasoning = { model = "@default-premium", temperature = 1, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 
 # Testing
 testing-text = { model = "@default-small", temperature = 0.5, description = "Testing preset for text generation" }
