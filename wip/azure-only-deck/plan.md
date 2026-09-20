@@ -129,6 +129,28 @@ The next-round verdict is **round 2 at bar `defects`, profile 3**, which Phase 5
     - `cocode`, `conformance` and `mthds-ui` get no item. The stale-deck notice prompts them on their next pin bump, and none of them references a removed alias.
 - [ ] Open the pull request against `dev` as `feature/Azure-only-deck · L-260918-941a99`, with `Closes L-260918-941a99` in the body.
 
+### Checkpoint B — built, verified, waiting on one review round
+
+The build is finished and pushed. Phases 1 to 5 are done except the two items still unticked above, and both are one gesture each. A session starting cold needs nothing from the conversation that produced this.
+
+**Where the work is.** Branch `feature/Azure-only-deck` in the worktree `_pipelex--azure-only-deck`, pushed and tracking `origin/feature/Azure-only-deck`. The tree is clean and the branch carries five commits of this campaign's build, on top of the two that ratified the documents. No pull request is open.
+
+**What is done.** The kit's numbered deck files resolve only to Azure-served handles, with every alias and preset name kept; the three provider-named aliases are gone; today's deck is parked at `pipelex/kit/deck_variants/multi_provider/` under a parity test that checks both the vocabulary and, for variant-only handles, that a backend still declares them. The premium tier's presets declare `temperature = 1` and `ModelDeck.final_validate` is deleted, both settled at Checkpoint A. Docs and the changelog are written, the downstream follow-ups are filed, and one `/rev` round is recorded on the item.
+
+**What is left, in order.**
+
+1. **Run `/rev 3` from this worktree.** Round 2 is owed at bar `defects` — confirmed defects only, no improvements. It did not run in the building session because `agent-watch-headroom` refused: that session stood at 307187 tokens against a 300000 threshold, so a round would have been paid for and arrived into a context nobody could triage from. Nothing about the code caused the refusal. Record the pass with `ledger review-pass` as the skill directs.
+2. **Open the pull request** against `dev`, titled `feature/Azure-only-deck · L-260918-941a99`, with `Closes L-260918-941a99` in the body. `/ledger-land --merge` refuses a merge whose head branch carries no recorded review, so step 1 comes first.
+
+**Open questions: none.** The two decisions this campaign raised were both put to Louis and both answered — the premium tier keeps `gpt-6-astra` with the temperatures declared at 1, and the dead validator is deleted rather than revived. Design decision 10 records the reasoning and what it costs.
+
+**Two things to know before running anything here.**
+
+- **Check the venv before trusting a red suite.** `.venv/bin/python -c "from importlib.metadata import version; print(version('mthds'))"` must agree with `uv.lock`; it did not in this worktree, and the mismatch failed tests in `runtime_bridge` and `core/stuffs` that this branch does not touch. `make install` is the fix.
+- **A deck edit is a four-file gesture.** Edit the kit under `pipelex/kit/configs/inference/deck/`, then `.venv/bin/pipelex update --local --yes --no-backup` to mirror it into `.pipelex/`, then copy `.pipelex/inference/deck/.kit_manifest.json` over the kit's own copy — `check-config-sync` holds the two manifests identical and `pipelex update` only writes the `.pipelex/` side. `make check-config-sync` confirms.
+
+**One loose end outside this repo.** `_pipelex--ref-dev` is a detached snapshot of `origin/dev` made to check whether a suite failure was pre-existing. It is clean, and no `wt` gesture removes a `ref`-genre worktree, which is what [L-260920-362d4e] against `workspace` is for. Deleting the directory by hand is safe whenever somebody wants the disk back.
+
 ## Decisions taken during planning
 
 - **The variant lives at `pipelex/kit/deck_variants/multi_provider/`**, for the reasons in the first finding above. The design is amended.
