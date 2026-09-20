@@ -121,7 +121,7 @@ The next-round verdict is **round 2 at bar `defects`, profile 3**, which Phase 5
 
     No fixed-temperature warning appeared, because the premium presets now declare the temperature the model fixes. `pipelex-agent models -t llm --format json` against the booted runtime confirms every alias resolves as design decision 4's table says.
 - [ ] Run `/rev` on the branch before the pull request opens.
-- [ ] File the downstream follow-ups in the ledger, each `--discovered-from L-260918-941a99` and blocked on the pipelex release that carries this change:
+- [x] File the downstream follow-ups in the ledger, each `--discovered-from L-260918-941a99` and blocked on the pipelex release that carries this change. Filed: L-260920-e22f54 (pipelex-cookbook), L-260920-eeb0f1 (mthds-plugins), L-260920-9a4fe2 (pipelex-server, member `worker/`), L-260920-cfa51a (pipelex-api). A fifth was filed that the plan did not anticipate, L-260920-362d4e against `workspace`: `wt` has no gesture that removes a `ref`-genre worktree, found while making a detached snapshot of `origin/dev` to check whether a suite failure was pre-existing.
     - `pipelex-cookbook`: replace `@best-gemini` in the two extract bundles and the `answer_from_documents` README, run `pipelex update` at the pin bump, and check `cookbook.toml`'s direct model names against the Azure scope.
     - `mthds-plugins`: change the example alias in the `model-references.md` source, not in its generated copies, from `@best-claude` to `@best-gpt`.
     - `pipelex-server`, member `worker/`: run `pipelex update` in the worker's `.pipelex/` at the pin bump. Its numbered files match the kit byte for byte today, so the update should apply cleanly.
