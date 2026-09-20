@@ -83,7 +83,7 @@ description = "Generate a creative response"
 inputs = { question = "Question" }
 output = "Response"
 model = {
-    model = "gpt-4-turbo",  # Using inline LLM settings
+    model = "gpt-5.4",  # Using inline LLM settings
     temperature = 0.8,
 }
 prompt = """

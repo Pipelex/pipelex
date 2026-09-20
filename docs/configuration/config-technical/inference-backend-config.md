@@ -305,11 +305,11 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
-[gpt-4-turbo]
-model_id = "gpt-4-turbo"
-inputs = ["text"]
+["gpt-5.4"]
+model_id = "gpt-5.4"
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
-costs = { input = 10.0, output = 30.0 }
+costs = { input = 2.5, output = 15.0 }
 
 [gpt-image-1]
 model_id = "gpt-image-1"

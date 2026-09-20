@@ -147,6 +147,40 @@ max_tokens = 64000
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
-costs = { input = 3.0, output = 15.0 }
+costs = { input = 2.0, output = 10.0 }
 thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+[claude-5-opus]
+model_id = "claude-opus-5"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+[claude-5-fable]
+model_id = "claude-fable-5"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 10.0, output = 50.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+# --- Claude 5.1 Series --------------------------------------------------------
+["claude-5.1-fable"]
+model_id = "claude-fable-5-1"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 10.0, output = 50.0 }
+thinking_mode = "adaptive"
+# Fable 5.1 refuses tool_choice "tool" and "any", which is what the section default
+# instructor/anthropic_tools forces; the reasoning variant leaves tool_choice on auto.
+structure_method = "instructor/anthropic_reasoning_tools"
 listed_constraints = ["temperature_unsupported"]

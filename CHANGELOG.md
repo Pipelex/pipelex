@@ -4,14 +4,20 @@
 
 ### Added
 
+- **Claude Opus 5, Claude Fable 5 and Claude Fable 5.1 join the Anthropic backend, and Opus 5 the two hosted profiles**: `claude-5-opus`, `claude-5-fable` and `claude-5.1-fable` are served on Anthropic's own model ids, and all three are reachable on Pipelex Manifold through Bedrock's `global.anthropic.*` endpoints, the way every other Claude already is. Only Opus 5 is served on the Pipelex Gateway: Bedrock refuses both Fables through Portkey with `data retention mode 'default' is not available for this model`, a mode no model spec can set, so listing them there would publish handles that fail on every request. All of them take text, images and PDF, cap output at 128k tokens, and think adaptively with the temperature parameter refused. Fable 5.1 additionally declares `structure_method = "instructor/anthropic_reasoning_tools"`, because it rejects the forced `tool_choice` that the backend's default `instructor/anthropic_tools` sends and structured output fails without it.
 - **The GPT-5.6 series and GPT-6 Astra are served on OpenAI, Azure OpenAI, the Pipelex Gateway and Pipelex Manifold**: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` are registered on the two direct backends and, through the remote config, on both hosted routing profiles. All four take text, images and PDF, produce text and structured output, and reason under `thinking_mode = "manual"` with a fixed temperature of 1. The Azure entries carry the dated deployment ids the hosted profiles also use as their wire model ids.
 
 ### Changed
 
 - **`add-model` skill follows the model's nearest sibling**: the skill derives which backend TOMLs, test collection and deck entries a new model belongs in from the model it succeeds, instead of a fixed provider-to-backend table, and checks each backend actually serves the model. It takes the model's facts from the provider's own documentation with OpenRouter as a cross-check, hands the live tests to `/test-model` with a test class per declared capability, and adds the deck and changelog steps and `make ugm` once the gateway catalog carries the model.
 
+### Removed
+
+- **The superseded GPT generations are retired from the direct and hosted rosters (Breaking)**: the GPT-4.1 series, the `o1`, `o3` and `o4` reasoning models and the GPT-5, GPT-5.1 and GPT-5.2 generations are gone from `azure_openai`, from `openai` — which also loses `gpt-3.5-turbo`, `gpt-4`, `gpt-4-turbo`, the codex variants of those generations and the dated `gpt-4o` aliases — and from the gateway and manifold catalogs. `o4-mini` is retired from `portkey` in the same pass, since no other backend served it. A method naming a retired model now fails to resolve one, with no deprecation window. `gpt-4o` and `gpt-4o-mini` stay on both direct backends; the retired names that `portkey` and `blackboxai` still declare remain reachable through those, and `openrouter`'s bulk third-party catalog is untouched.
+
 ### Fixed
 
+- **Claude Sonnet 5 is priced at its standard rate**: `claude-5-sonnet` carried the $3 / $15 per million tokens it was announced at, but its $2 / $10 introductory rate became the standard price and the scheduled increase was cancelled. The entry is corrected on the Anthropic backend and in both hosted catalogs, so cost reporting and budget ceilings no longer overstate a Sonnet 5 run.
 - **A manifold error on the native routes keeps its request id under the gateway's pipelex-spelled trace header**: `extract_manifold_metadata` reads the gateway's trace id from `x-pipelex-trace-id` before the inherited `x-portkey-trace-id`, still preferring a provider's own `x-request-id` over both. The gateway emits the two spellings with the same value today, so nothing changes yet; once it drops the vendor one, such an error whose provider sent no `x-request-id` keeps a request id instead of reporting none. `extract_gateway_metadata` is unchanged and still reads the vendor spelling alone — it serves the Portkey cloud and the manifold image path, which travels on `portkey_ai` and keeps that spelling until it is ported off the SDK.
 
 ## [v0.60.0] - 2026-09-19
