@@ -2203,8 +2203,8 @@ Get your Gateway API key at [app.pipelex.com](https://app.pipelex.com/) or [join
 
 Direct integration with major providers using your own API keys:
 
-- **OpenAI** — GPT-4o, GPT-4.1, o1, o3, o4-mini, etc.
-- **Anthropic** — Claude Sonnet 4, Claude Haiku, etc.
+- **OpenAI** — GPT-4o, GPT-5.4, GPT-5.5, GPT-5.6, GPT-6, etc.
+- **Anthropic** — Claude Opus 5, Claude Fable 5, Claude Sonnet 5, etc.
 - **Google** — Gemini 2.5 Pro, Gemini 2.5 Flash, etc.
 - **Mistral** — Mistral Large, Mistral Medium, etc.
 - **Azure OpenAI** — Azure-hosted OpenAI models
@@ -9402,7 +9402,7 @@ An LLM handle can be either:
 best-claude = "claude-4.1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
-base-gpt = "gpt-5"
+base-gpt = "gpt-5.5"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
@@ -9455,7 +9455,7 @@ description = "Generate a creative response"
 inputs = { question = "Question" }
 output = "Response"
 model = {
-    model = "gpt-4-turbo",  # Using inline LLM settings
+    model = "gpt-5.4",  # Using inline LLM settings
     temperature = 0.8,
 }
 prompt = """
@@ -13190,11 +13190,11 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
-[gpt-4-turbo]
-model_id = "gpt-4-turbo"
-inputs = ["text"]
+["gpt-5.4"]
+model_id = "gpt-5.4"
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
-costs = { input = 10.0, output = 30.0 }
+costs = { input = 2.5, output = 15.0 }
 
 [gpt-image-1]
 model_id = "gpt-image-1"
@@ -13536,7 +13536,7 @@ for_object = "@my-custom-alias"
 
 # Add custom waterfalls - lists of models tried in order
 [llm.waterfalls]
-premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.2"]
+premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.4"]
 small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 ```
 
@@ -13550,7 +13550,7 @@ document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 When using waterfalls in `.mthds` files, prefix them with `~`:
 
 ```toml
-model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.2
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.4
 model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 
@@ -14544,7 +14544,7 @@ When you use **Pipelex Gateway** as your inference backend, identified telemetry
 
 **What we collect:**
 
-- Model names used (e.g., `gpt-5.2`, `claude-4.5-sonnet`) and parameters
+- Model names used (e.g., `gpt-5.4`, `claude-4.5-sonnet`) and parameters
 - Pipe types (e.g., `PipeLLM`, `PipeSequence`, etc.)
 - Token counts (input/output)
 - Latency metrics
@@ -17485,13 +17485,13 @@ Effort maps to a `ThinkingLevel` enum sent to the Google SDK:
 model = { model = "gemini-3.1-pro", temperature = 0.3, reasoning_effort = "high" }
 ```
 
-**GPT-5.2 — manual mode**
+**GPT-5.4 — manual mode**
 
 Effort maps directly to OpenAI's `reasoning_effort` parameter:
 
 ```toml
 # Manual: effort "max" -> reasoning_effort = "xhigh" in the SDK call
-model = { model = "gpt-5.2", temperature = 0.1, reasoning_effort = "max" }
+model = { model = "gpt-5.4", temperature = 0.1, reasoning_effort = "max" }
 ```
 
 !!! note "Structured Generation"
