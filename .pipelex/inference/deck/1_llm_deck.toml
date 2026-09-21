@@ -36,18 +36,18 @@ for_object = "@default-general"
 # LLM Aliases
 ####################################################################################################
 #
-# The ladder runs over the GPT-5.6 range, whose three tiers are luna (cheap), terra (intermediate)
-# and sol (strong), with the premium tier on the GPT-6 flagship. Read an alias as the job it names
+# The ladder runs over the GPT-5.6 range and nothing else: luna is the cheap tier, terra the
+# intermediate one, and sol both the strong and the premium tier. Read an alias as the job it names
 # rather than as a model: repointing a tier is a one-line change here and every preset follows.
 
 [llm.aliases]
-best-gpt = "gpt-6-astra"
+best-gpt = "gpt-5.6-sol"
 
 # Default aliases (first choice from waterfalls)
 default-general = "gpt-5.6-terra"
-default-premium = "gpt-6-astra"
-default-premium-vision = "gpt-6-astra"
-default-premium-structured = "gpt-6-astra"
+default-premium = "gpt-5.6-sol"
+default-premium-vision = "gpt-5.6-sol"
+default-premium-structured = "gpt-5.6-sol"
 default-large-context-code = "gpt-5.6-sol"
 default-large-context-text = "gpt-5.6-terra"
 default-small = "gpt-5.6-luna"
@@ -77,7 +77,7 @@ writing-creative-cheap = { model = "@default-small-creative", temperature = 1, d
 # Retrieval
 retrieval = { model = "@default-large-context-text", temperature = 1, description = "Data retrieval from large text corpora" }
 retrieval-cheap = { model = "gpt-5.6-luna", temperature = 1, description = "Cheap data retrieval from large text corpora" }
-retrieval-premium = { model = "gpt-6-astra", temperature = 1, description = "Premium data retrieval with highest accuracy" }
+retrieval-premium = { model = "gpt-5.6-sol", temperature = 1, description = "Premium data retrieval with highest accuracy" }
 
 # Engineering
 engineering-structured = { model = "@default-premium-structured", temperature = 1, description = "Structured engineering output (JSON, schemas)" }

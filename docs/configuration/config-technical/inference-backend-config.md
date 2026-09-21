@@ -469,11 +469,11 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 ```toml
 [llm.aliases]
 # Simple aliases map to a single model
-best-gpt = "gpt-6-astra"
+best-gpt = "gpt-5.6-sol"
 
 # Default aliases (used in presets)
 default-general = "gpt-5.6-terra"
-default-premium = "gpt-6-astra"
+default-premium = "gpt-5.6-sol"
 default-large-context-text = "gpt-5.6-terra"
 default-small = "gpt-5.6-luna"
 ```

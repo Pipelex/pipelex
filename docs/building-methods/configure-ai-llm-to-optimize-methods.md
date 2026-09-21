@@ -27,7 +27,7 @@ An LLM handle can be either:
 
 ```toml
 [llm.aliases]
-best-gpt = "gpt-6-astra"
+best-gpt = "gpt-5.6-sol"
 default-general = "gpt-5.6-terra"
 default-small = "gpt-5.6-luna"
 ```
