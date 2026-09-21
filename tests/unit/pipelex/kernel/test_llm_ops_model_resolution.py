@@ -10,7 +10,7 @@ class TestConcreteLlmModelHandle:
     """The reported model must be the same whether or not the pipe actually ran."""
 
     def test_an_alias_resolves_in_one_hop(self) -> None:
-        assert concrete_llm_model_handle("@default-general") == "gpt-5.4"
+        assert concrete_llm_model_handle("@default-general") == "gpt-5.6-terra"
 
     def test_a_preset_follows_the_chain_past_its_alias(self) -> None:
         """The case that made DRY and LIVE disagree: a preset's model is itself an alias."""
