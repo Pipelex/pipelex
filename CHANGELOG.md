@@ -11,6 +11,7 @@
 ### Removed
 
 - **`best-claude`, `best-gemini` and `best-mistral` are gone from the shipped deck (Breaking)**: an alias naming a provider cannot honestly resolve to a GPT model, and the image deck's `best-gemini` goes with them. A method referencing one fails validation with the usual alias-not-found error; define it in an `x_custom_*` deck file to keep it.
+- **GPT-6 Astra is no longer served on the Pipelex Gateway (Breaking)**: `gpt-6-astra` is out of the remote config and out of the shipped Gateway roster, so a method naming it on the Gateway now fails the boot-time membership check. It stays declared on the `azure_openai` and `openai` backends, where a project holding its own key reaches it as before.
 - **`ModelDeck.final_validate` is removed**: it raised when a preset's temperature differed from its model's fixed temperature, but it had had no caller since 2025-09-17 and its `except` clause could never match the exception its helper raised, so it protected nothing.
 
 ## [v0.61.0] - 2026-09-20

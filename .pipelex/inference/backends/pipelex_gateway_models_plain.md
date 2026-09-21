@@ -109,9 +109,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gpt-5.6-terra**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **gpt-6-astra**
-  - inputs: text, images, pdf
-  - outputs: text, structured
 - **gpt-oss-120b**
   - inputs: text
   - outputs: text, structured
@@ -193,6 +190,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-09-20T22:54:34Z
+> Last updated: 2026-09-21T10:54:05Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
