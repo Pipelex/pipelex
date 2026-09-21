@@ -491,13 +491,13 @@ Presets combine model selection with optimized parameters for specific tasks. De
 
 ```toml
 [llm.presets]
-# Writing presets. The premium tier's model fixes its temperature at 1, so these
-# declare that value rather than one the worker would override.
+# Every model this deck resolves to fixes its temperature at 1, so every preset
+# declares that value rather than one the worker would override.
 writing-factual = { model = "@default-premium", temperature = 1 }
 writing-creative = { model = "@default-premium", temperature = 1 }
 
 # Retrieval
-retrieval = { model = "@default-large-context-text", temperature = 0.1 }
+retrieval = { model = "@default-large-context-text", temperature = 1 }
 
 # Engineering
 engineering-structured = { model = "@default-premium-structured", temperature = 1 }
@@ -505,7 +505,7 @@ engineering-code = { model = "@default-premium", temperature = 1 }
 
 # Vision
 vision = { model = "@default-premium-vision", temperature = 1 }
-vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
+vision-cheap = { model = "@default-small-vision", temperature = 1 }
 vision-diagram = { model = "@default-premium-vision", temperature = 1 }
 ```
 

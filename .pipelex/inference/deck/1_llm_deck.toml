@@ -22,8 +22,13 @@
 # LLM Default Choices
 ####################################################################################################
 
+# `default_temperature` is the temperature paired with a model named outside a preset — an alias, a
+# waterfall or a bare handle written straight into a pipe, and the `for_text` / `for_object` choices
+# below. Every model this deck resolves to fixes its temperature at 1, so any other value here would
+# be overridden by the worker and warned about on every single call.
+
 [llm.choice_defaults]
-default_temperature = 0.5
+default_temperature = 1
 for_text = "@default-general"
 for_object = "@default-general"
 

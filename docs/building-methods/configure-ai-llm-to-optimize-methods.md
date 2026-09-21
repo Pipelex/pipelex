@@ -55,7 +55,7 @@ engineering-structured = {
 
 retrieval = {
     model = "@default-large-context-text",
-    temperature = 0.1
+    temperature = 1
 }
 ```
 
@@ -69,7 +69,7 @@ deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort 
 quick-reasoning = { model = "@default-premium", temperature = 1, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 ```
 
-Both declare `temperature = 1` because the premium tier resolves to a model that fixes its temperature at that value. The deck states the temperature the model will actually use, rather than one the runtime would override on every call.
+Both declare `temperature = 1` because every model the shipped deck resolves to fixes its temperature at that value. The deck states the temperature the model will actually use, rather than one the runtime would override on every call. A method that needs a temperature of its own names a model that accepts one directly.
 
 `reasoning_effort` accepts values from `"none"` to `"max"`. For an explicit token budget, use `reasoning_budget` instead (mutually exclusive with `reasoning_effort`). For provider-specific behavior and model examples, see [Reasoning Controls](../under-the-hood/reasoning-controls.md).
 
