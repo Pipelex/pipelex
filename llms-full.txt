@@ -568,6 +568,18 @@ To keep the configuration inside a project instead, run `pipelex init --local`: 
 
 Learn more in our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) guide.
 
+### What the deck resolves to out of the box
+
+The deck files `pipelex init` installs resolve the language, image-generation and document-extraction defaults to models the Pipelex Gateway serves from Azure, so a fresh install runs inside one provider's scope without you choosing anything:
+
+- **Language models** — the whole ladder is the GPT-5.6 range: the premium tier and `best-gpt` are GPT-5.6 Sol, the general and large-context tiers are GPT-5.6 Terra, and the small tiers are GPT-5.6 Luna.
+- **Image generation** — the general and premium tiers are GPT Image 2, the small tier is GPT Image 1 mini.
+- **Document extraction** — Azure Document Intelligence. `default-text-from-pdf` and `default-no-inference` are the exception within that family: they read the PDF locally with pypdfium2 and call no model, so they need no key of any kind.
+
+**Where the deck leaves Azure, it goes to Linkup**, and it does so in two families rather than one. Azure serves no search model, so everything in `4_search_deck.toml` resolves to Linkup; and `default-extract-web-page` in `3_extract_deck.toml` resolves to `linkup-fetch`, which pulls a web page through Linkup rather than through Azure Document Intelligence. A method that searches the web, or that extracts from a web page, needs a Linkup key or the Gateway.
+
+Nothing about this locks you in. The deck is a vocabulary of aliases and presets, not a provider commitment: point any of them at a model from any backend you have enabled, by editing `x_custom_llm_deck.toml`, which `pipelex update` never touches. That is also how you bring back an alias the shipped deck does not define.
+
 ---
 
 ## Next Steps
@@ -7985,11 +7997,10 @@ PipeImgGen uses the unified inference backend system to manage image generation 
 
 Common image generation model handles:
 
-- `default-general`: General-purpose image generation model (alias for nano-banana)
-- `default-premium`: Premium image generation model (alias for nano-banana-2)
+- `default-general`: General-purpose image generation model (alias for gpt-image-2)
+- `default-premium`: Premium image generation model (alias for gpt-image-2)
 - `default-small`: Small, fast image generation model (alias for gpt-image-1-mini)
 - `best-gpt`: Best OpenAI image generation model (alias for gpt-image-2)
-- `best-gemini`: Best Gemini image generation model (alias for nano-banana-2)
 
 Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 
@@ -9399,10 +9410,9 @@ An LLM handle can be either:
 
 ```toml
 [llm.aliases]
-best-claude = "claude-4.1-opus"
-best-gemini = "gemini-2.5-pro"
-best-mistral = "mistral-large"
-base-gpt = "gpt-5.5"
+best-gpt = "gpt-5.6-sol"
+default-general = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
@@ -9423,12 +9433,12 @@ An LLM Preset is simply a name for a LLM Settings that you have predefined in or
 
 engineering-structured = {
     model = "@default-premium-structured",
-    temperature = 0.2
+    temperature = 1
 }
 
 retrieval = {
     model = "@default-large-context-text",
-    temperature = 0.1
+    temperature = 1
 }
 ```
 
@@ -9438,9 +9448,11 @@ LLM Settings support `reasoning_effort` and `reasoning_budget` parameters for en
 
 ```toml
 [llm.presets]
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
-quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
+quick-reasoning = { model = "@default-premium", temperature = 1, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 ```
+
+Both declare `temperature = 1` because every model the shipped deck resolves to fixes its temperature at that value. The deck states the temperature the model will actually use, rather than one the runtime would override on every call. A method that needs a temperature of its own writes an inline LLM settings table, shown below: a bare model name is paired with `[llm.choice_defaults].default_temperature`, which this deck sets to 1, so naming a handle on its own does not give the author control of the temperature.
 
 `reasoning_effort` accepts values from `"none"` to `"max"`. For an explicit token budget, use `reasoning_budget` instead (mutually exclusive with `reasoning_effort`). For provider-specific behavior and model examples, see [Reasoning Controls](../under-the-hood/reasoning-controls.md).
 
@@ -13354,21 +13366,19 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 ```toml
 [llm.aliases]
 # Simple aliases map to a single model
-best-claude = "claude-4.8-opus"
-best-gpt = "gpt-5.5"
-best-gemini = "gemini-pro-latest"
+best-gpt = "gpt-5.6-sol"
 
 # Default aliases (used in presets)
-default-general = "claude-4.6-sonnet"
-default-premium = "claude-4.8-opus"
-default-large-context-text = "gemini-flash-latest"
-default-small = "gpt-4o-mini"
+default-general = "gpt-5.6-terra"
+default-premium = "gpt-5.6-sol"
+default-large-context-text = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 When using aliases in `.mthds` files or other configurations, prefix them with `@`:
 
 ```toml
-model = "@best-claude"           # References the best-claude alias
+model = "@best-gpt"              # References the best-gpt alias
 model = "@default-general"       # References the default-general alias
 ```
 
@@ -13378,21 +13388,22 @@ Presets combine model selection with optimized parameters for specific tasks. De
 
 ```toml
 [llm.presets]
-# Writing presets
-writing-factual = { model = "@default-premium", temperature = 0.1 }
-writing-creative = { model = "@default-premium", temperature = 0.9 }
+# Every model this deck resolves to fixes its temperature at 1, so every preset
+# declares that value rather than one the worker would override.
+writing-factual = { model = "@default-premium", temperature = 1 }
+writing-creative = { model = "@default-premium", temperature = 1 }
 
 # Retrieval
-retrieval = { model = "@default-large-context-text", temperature = 0.1 }
+retrieval = { model = "@default-large-context-text", temperature = 1 }
 
 # Engineering
-engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
-engineering-code = { model = "@default-premium", temperature = 0.1 }
+engineering-structured = { model = "@default-premium-structured", temperature = 1 }
+engineering-code = { model = "@default-premium", temperature = 1 }
 
 # Vision
-vision = { model = "@default-premium-vision", temperature = 0.5 }
-vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
-vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
+vision = { model = "@default-premium-vision", temperature = 1 }
+vision-cheap = { model = "@default-small-vision", temperature = 1 }
+vision-diagram = { model = "@default-premium-vision", temperature = 1 }
 ```
 
 When using presets in `.mthds` files, prefix them with `$`:
@@ -17428,7 +17439,7 @@ Define a reusable preset in your LLM deck, then reference it with the `$` prefix
 ```toml
 # In .pipelex/inference/deck/1_llm_deck.toml
 [llm.presets]
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high" }
 ```
 
 ```toml
