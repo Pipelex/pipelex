@@ -31,7 +31,6 @@
 [collections.backends]
 # --- All Available Backends ---
 all = [
-  "pipelex_gateway",
   "anthropic",
   "azure_openai",
   "bedrock",
@@ -286,7 +285,7 @@ search_models = []
 ################################################################################
 [profiles.dev]
 description = "Quick dev testing with fast and cheap models from key providers"
-backends = ["pipelex_gateway", "internal"]
+backends = ["anthropic", "openai", "google", "mistral", "linkup", "internal"]
 llm_models = [
   "claude-4.5-haiku",
   "gpt-4o-mini",
@@ -300,8 +299,8 @@ search_models = ["linkup-standard"]
 ################################################################################
 # Manifold Profile
 ################################################################################
-# The `dev` profile's shape, served by Pipelex Manifold instead of the Pipelex
-# Gateway. Deliberately not a copy of `dev`: the two catalogs are allowed to
+# The `dev` profile's shape, served by Pipelex Manifold instead of the BYOK
+# backends. Deliberately not a copy of `dev`: the two catalogs are allowed to
 # diverge, so this names what the manifold section actually serves. `linkup` is
 # absent from it, and `@from_pdf` is not used because most of that collection is
 # other backends' — the manifold text extractors are named directly.
@@ -343,7 +342,7 @@ search_models = ["linkup-standard"]
 ################################################################################
 [profiles.claude_latest]
 description = "All Claude 4.5 models"
-backends = ["anthropic", "pipelex_gateway"]
+backends = ["anthropic"]
 llm_models = ["claude-4.5-*"]
 img_gen_models = []
 extract_models = []
@@ -354,7 +353,7 @@ search_models = []
 ################################################################################
 [profiles.gpt_no_codex]
 description = "All GPT models except codex variants"
-backends = ["openai", "pipelex_gateway"]
+backends = ["openai"]
 llm_models = ["gpt-*", "!*-codex", "!*-codex-*"]
 img_gen_models = ["gpt-image-*"]
 extract_models = []
@@ -377,30 +376,3 @@ search_models = ["@linkup"]
 [profiles.full]
 description = "All available models"
 include_all = true
-
-################################################################################
-# All Configs GW Profile - One model per Portkey config and model type
-################################################################################
-[profiles.all_configs_gw]
-description = "One model per Portkey config (auto-generated)"
-backends = ["pipelex_gateway"]
-llm_models = [
-  "gpt-4o-mini",
-  "gpt-oss-20b",
-  "claude-4-sonnet",
-  "deepseek-v3.2",
-  "gemini-2.5-pro",
-  "grok-3",
-]
-img_gen_models = [
-  "nano-banana-2",
-  "gpt-image-1",
-  "nano-banana",
-]
-extract_models = [
-  "azure-document-intelligence",
-  "deepseek-ocr",
-]
-search_models = [
-  "linkup-standard",
-]

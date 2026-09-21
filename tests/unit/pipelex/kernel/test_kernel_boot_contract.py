@@ -34,7 +34,7 @@ Run in a **subprocess** for the reason its two siblings state: a suite-level boo
 process singletons, and both hubs are sticky class attributes that `teardown` deliberately does not
 clear — so an in-process check would answer from a stale `Pipelex` and pass vacuously.
 
-`needs_inference=False` keeps the boot offline (no gateway terms gate, no model-deck validation), and
+`needs_inference=False` keeps the boot offline (no first-run gate, no model-deck validation), and
 `PipeRunMode.DRY` keeps the call offline: every cogt leaf mocks before a worker is looked up, so each
 setting below names a model the deck never has to resolve. The settings are built literally rather
 than through the `resolve_*_setting` helpers for that same reason — those read the deck, which is a

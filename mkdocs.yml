@@ -77,7 +77,6 @@ plugins:
         'home/1-features/cost-tracking.md': 'features/cost-tracking.md'
         'home/1-features/document-extraction.md': 'features/document-extraction.md'
         'home/1-features/execution-graph.md': 'features/execution-graph.md'
-        'home/1-features/gateway.md': 'features/gateway.md'
         'home/1-features/image-generation.md': 'features/image-generation.md'
         'home/1-features/index.md': 'features/index.md'
         'home/1-features/llm-integration.md': 'features/llm-integration.md'
@@ -111,7 +110,6 @@ plugins:
         'cookbook/invoice-extractor.md': 'cookbook/extract-invoice.md'
         'home/4-cookbook-examples/write-tweet.md': 'cookbook/write-tweet.md'
         'home/5-setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
-        'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
         'home/5-setup/index.md': 'get-started/build-with-claude-code.md'
         'home/5-setup/project-organization.md': 'get-started/build-with-claude-code.md'
         'home/5-setup/telemetry.md': 'setup/telemetry.md'
@@ -222,7 +220,6 @@ plugins:
         - features/concepts.md: "Concepts & Structured Types"
         - features/pipe-operators.md: "Pipe Operators"
         - features/pipeline-orchestration.md: "Pipeline Orchestration"
-        - features/gateway.md: "Pipelex Gateway & Model Access"
         - features/llm-integration.md: "LLM Integration"
         - features/document-extraction.md: "Document Extraction"
         - features/image-generation.md: "Image Generation"
@@ -305,7 +302,6 @@ plugins:
         - tools/logging.md: "Logging"
         - analytics/data-extraction.md: "Observer Data Extraction"
         - setup/telemetry.md: "Telemetry"
-        - setup/gateway-models.md: "Gateway Available Models"
         Advanced:
         - advanced/index.md: "Advanced Customizations Overview"
         - advanced/secrets-provider-injection.md: "Secrets Provider"
@@ -446,7 +442,6 @@ nav:
         - Pipe Operators: features/pipe-operators.md
         - Pipeline Orchestration: features/pipeline-orchestration.md
       - AI Capabilities:
-        - Pipelex Gateway & Model Access: features/gateway.md
         - LLM Integration: features/llm-integration.md
         - Document Extraction: features/document-extraction.md
         - Image Generation: features/image-generation.md
@@ -513,7 +508,6 @@ nav:
       - Durable Execution: reliability/durable-execution.md
     - Distributed Execution: distributed-execution/index.md
   - Reference:
-    - Gateway Available Models: setup/gateway-models.md
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md

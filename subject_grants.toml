@@ -344,10 +344,6 @@ rationale = "Verb-object: fixes the bundle at bundle_path; options stay keyword.
 param = "input_file"
 rationale = "Renders the input file to a graph; single operand."
 
-["pipelex/cli/commands/init/backends.py::disable_managed_gateway_backends"]
-param = "backends_toml_path"
-rationale = "Edits the backends TOML at the path to disable the managed gateway backends; single operand."
-
 ["pipelex/cli/commands/init/backends.py::get_selected_backend_keys"]
 param = "backends_toml_path"
 rationale = "Derives from the backends_toml_path; single operand."
@@ -403,14 +399,6 @@ rationale = "Derives from the remaining_backends; single operand."
 ["pipelex/cli/commands/init/ui/routing_ui.py::build_primary_backend_panel"]
 param = "backend_keys"
 rationale = "Derives from the backend_keys; single operand."
-
-["pipelex/cli/commands/login/command.py::save_api_key"]
-param = "api_key"
-rationale = "File op keyed by the api_key path; single operand."
-
-["pipelex/cli/commands/login/command.py::serve_until_callback"]
-param = "server"
-rationale = "Serves the HTTP server until the callback fires; single operand."
 
 ["pipelex/cli/commands/run/_inputs_file_loader.py::_convert_temporal_inputs"]
 param = "inputs_dict"
@@ -575,38 +563,6 @@ rationale = "File op keyed by the repo_root path; single operand."
 ["pipelex/cli/dev_cli/commands/drift/models.py::save_ack"]
 param = "ack"
 rationale = "File op keyed by the ack path; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::extract_reference_data"]
-param = "model_specs"
-rationale = "Extracts from the model_specs; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_markdown_table"]
-param = "models"
-rationale = "Renders the models as a markdown table; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_markdown_table.sort_by_preferred"]
-param = "items"
-rationale = "Sorts the items by the preferred order; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_pure_markdown_list"]
-param = "models"
-rationale = "Renders the models as a plain markdown list; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_pure_markdown_list.sort_by_preferred"]
-param = "items"
-rationale = "Sorts the items by the preferred order; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_reference_markdown"]
-param = "model_specs"
-rationale = "Renders the model_specs; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_reference_pure_markdown"]
-param = "model_specs"
-rationale = "Renders the model_specs; single operand."
-
-["pipelex/cli/dev_cli/commands/gateway_models_generator.py::normalize_for_comparison"]
-param = "content"
-rationale = "Normalizes the content for comparison; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_Collector._visit_function"]
 param = "node"
@@ -788,25 +744,9 @@ rationale = "Renders the result; single operand."
 param = "value"
 rationale = "Renders the value; single operand."
 
-["pipelex/cli/dev_cli/commands/update_gateway_models_cmd.py::_all_references_up_to_date"]
-param = "reference_files"
-rationale = "Predicate: whether the reference files are current; single operand."
-
 ["pipelex/cli/error_handlers.py::_validation_category_header"]
 param = "category"
 rationale = "Noun-named derivation: the header text for the category; single operand."
-
-["pipelex/cli/error_handlers.py::handle_gateway_api_key_missing_error"]
-param = "exc"
-rationale = "Error handler: the exc is the single operand handled."
-
-["pipelex/cli/error_handlers.py::handle_gateway_do_not_track_conflict_error"]
-param = "exc"
-rationale = "Error handler: the exc is the single operand handled."
-
-["pipelex/cli/error_handlers.py::handle_gateway_terms_not_accepted_error"]
-param = "exc"
-rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_gateway_unknown_model_error"]
 param = "exc"
@@ -2127,10 +2067,6 @@ rationale = "Deck/file op on the manifest; single operand."
 ["pipelex/cogt/models/model_deck.py::ModelDeck._get_optional_inference_model"]
 param = "model_handle"
 rationale = "Keyed accessor by the model_handle; single operand."
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._is_model_available_in_backend"]
-param = "model_handle"
-rationale = "Predicate on the model_handle; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._raise_handle_not_found_error"]
 param = "ref"
@@ -4916,102 +4852,6 @@ rationale = "Predicate on the exc; single operand."
 param = "response_dict"
 rationale = "Parses/consumes the response_dict; single operand."
 
-["pipelex/providers/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._extract_content_string_from_response"]
-param = "response"
-rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
-
-["pipelex/providers/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._extract_pages_from_choices_content"]
-param = "response"
-rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
-
-["pipelex/providers/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_azure"]
-param = "response"
-rationale = "Factory from source: builds the result from the response; single operand."
-
-["pipelex/providers/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_deepseek"]
-param = "response"
-rationale = "Factory from source: builds the result from the response; single operand."
-
-["pipelex/providers/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch"]
-param = "response"
-rationale = "Factory from source: builds the result from the response; single operand."
-
-["pipelex/providers/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_mistral"]
-param = "response"
-rationale = "Factory from source: builds the result from the response; single operand."
-
-["pipelex/providers/gateway/gateway_completions_factory.py::GatewayCompletionsFactory.make_portkey_openai_client_for_completions"]
-param = "model_handle"
-rationale = "Factory from source: builds the result from the model_handle; single operand."
-
-["pipelex/providers/gateway/gateway_constants.py::GatewayOpenAISdkVariant.is_completions"]
-param = "sdk"
-rationale = "Predicate on the sdk; single operand."
-
-["pipelex/providers/gateway/gateway_constants.py::GatewayOpenAISdkVariant.is_responses"]
-param = "sdk"
-rationale = "Predicate on the sdk; single operand."
-
-["pipelex/providers/gateway/gateway_deck.py::GatewayDeck.get_config_id"]
-param = "headers"
-rationale = "Derives the gateway config id from the request headers; single operand."
-
-["pipelex/providers/gateway/gateway_extract_worker.py::GatewayExtractWorker._extract_base64_url"]
-param = "extract_job"
-rationale = "Extracts from the extract_job; single operand (qualifiers keyword-only)."
-
-["pipelex/providers/gateway/gateway_extract_worker.py::GatewayExtractWorker._extract_document"]
-param = "extract_job"
-rationale = "Extracts from the extract_job; single operand (qualifiers keyword-only)."
-
-["pipelex/providers/gateway/gateway_extract_worker.py::GatewayExtractWorker._extract_web_fetch"]
-param = "extract_job"
-rationale = "Extracts from the extract_job; single operand (qualifiers keyword-only)."
-
-["pipelex/providers/gateway/gateway_factory.py::GatewayFactory._make_gemini_image_config"]
-param = "inference_model"
-rationale = "Factory from source: builds the result from the inference_model; single operand."
-
-["pipelex/providers/gateway/gateway_factory.py::GatewayFactory.get_api_key"]
-param = "backend"
-rationale = "Derives the value from the backend config; single operand."
-
-["pipelex/providers/gateway/gateway_factory.py::GatewayFactory.get_endpoint"]
-param = "backend"
-rationale = "Derives the value from the backend config; single operand."
-
-["pipelex/providers/gateway/gateway_factory.py::GatewayFactory.is_debug_enabled"]
-param = "backend"
-rationale = "Predicate: reports whether debug logging is enabled for the backend; single operand."
-
-["pipelex/providers/gateway/gateway_factory.py::GatewayFactory.make_extras"]
-param = "inference_model"
-rationale = "Factory from source: builds the result from the inference_model; single operand."
-
-["pipelex/providers/gateway/gateway_factory.py::GatewayFactory.make_portkey_client"]
-param = "backend"
-rationale = "Factory from source: builds the result from the backend; single operand."
-
-["pipelex/providers/gateway/gateway_plugin.py::GatewayPlugin.register"]
-param = "registrar"
-rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
-
-["pipelex/providers/gateway/gateway_protocols.py::GatewayExtractProtocol.make_from_model_handle"]
-param = "model_handle"
-rationale = "Factory from source: builds the result from the model_handle; single operand."
-
-["pipelex/providers/gateway/gateway_responses_factory.py::GatewayResponsesFactory.make_portkey_openai_client_for_responses"]
-param = "model_handle"
-rationale = "Factory from source: builds the result from the model_handle; single operand."
-
-["pipelex/providers/gateway/gateway_search_worker.py::GatewaySearchWorker._extract_content"]
-param = "response"
-rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
-
-["pipelex/providers/gateway/gateway_search_worker.py::GatewaySearchWorker._extract_usage"]
-param = "response"
-rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
-
 ["pipelex/providers/google/google_config.py::GoogleConfig.get_reasoning_level"]
 param = "effort"
 rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
@@ -5612,10 +5452,6 @@ rationale = "Predicate on the var named by the key; single operand."
 param = "gateway_model_specs"
 rationale = "Verb-object: merges the gateway model specs; merge context stays keyword."
 
-["pipelex/system/pipelex_service/pipelex_details.py::PipelexDetails.make_distinct_id"]
-param = "gateway_api_key"
-rationale = "Derivation: hashes the gateway API key into a distinct id; single operand."
-
 ["pipelex/system/pipelex_service/pipelex_service_config.py::load_pipelex_service_config_if_exists"]
 param = "config_dir"
 rationale = "Verb-object: loads from the config dir; single operand."
@@ -5776,14 +5612,6 @@ rationale = "Setter: installs the run mode; single self-labelling operand."
 param = "worker_mode"
 rationale = "Setter: installs the worker mode; single self-labelling operand."
 
-["pipelex/system/telemetry/exception_capture.py::DualClientExceptionCapture._capture_exception"]
-param = "exc_info"
-rationale = "Verb-object: captures the exc info; single operand."
-
-["pipelex/system/telemetry/exception_capture.py::DualClientExceptionCapture._thread_exception_handler"]
-param = "args"
-rationale = "Positional Callable protocol: threading.excepthook handler, invoked hook(args)."
-
 ["pipelex/system/telemetry/otel_constants.py::make_otel_gen_ai_output_type"]
 param = "output_type"
 rationale = "Conversion: maps the output type; single operand."
@@ -5880,10 +5708,6 @@ rationale = "Verb-object: tracks the event named; properties stay keyword."
 param = "event_name"
 rationale = "Verb-object: tracks the event named; properties stay keyword."
 
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._track_to_pipelex"]
-param = "event_name"
-rationale = "Verb-object: tracks the event named; properties stay keyword."
-
 ["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._wrap_capture_exception"]
 param = "client"
 rationale = "Verb-object: wraps the client's capture; single operand."
@@ -5918,10 +5742,6 @@ rationale = "Predicate inspecting the pytest request; single operand."
 
 ["pipelex/test_extras/shared_pytest_plugins.py::pytest_addoption"]
 param = "parser"
-rationale = "Framework-owned pytest hook signature; pluggy binds by parameter name."
-
-["pipelex/test_extras/shared_pytest_plugins.py::pytest_configure"]
-param = "config"
 rationale = "Framework-owned pytest hook signature; pluggy binds by parameter name."
 
 ["pipelex/tools/jinja2/image_registry.py::ImageRegistry.get_image_placeholder"]

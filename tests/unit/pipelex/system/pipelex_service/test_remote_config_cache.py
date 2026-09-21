@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_cache import (
@@ -29,13 +30,7 @@ if TYPE_CHECKING:
 def _valid_remote_config_payload(extra: dict[str, object] | None = None) -> dict[str, object]:
     """Build a minimal remote-config dict that ``RemoteConfig.model_validate`` accepts."""
     payload: dict[str, object] = {
-        "posthog": {
-            "project_api_key": "test-key",
-            "endpoint": "https://posthog.example.com",
-            "is_geoip_enabled": False,
-            "is_debug_enabled": False,
-        },
-        "backend_model_specs": {},
+        MANIFOLD_MODEL_SPECS_SECTION: {},
         "aws_region": "eu-west-3",
     }
     if extra is not None:
@@ -76,7 +71,7 @@ class TestRemoteConfigCache:
         # to_remote_config() must produce a valid RemoteConfig
         remote_config = loaded.to_remote_config()
         assert isinstance(remote_config, RemoteConfig)
-        assert remote_config.aws_region == "eu-west-3"
+        assert remote_config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {}
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_read_missing_returns_none(self) -> None:

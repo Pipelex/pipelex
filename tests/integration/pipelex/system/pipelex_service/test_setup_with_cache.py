@@ -1,14 +1,11 @@
-"""Phase 3 contract: gateway-cache fallback flows through ``Pipelex.make``.
+"""Phase 3 contract: the remote-config cache fallback flows through ``Pipelex.make``.
 
 These tests pin the post-refactor behaviour at the Pipelex-setup boundary (the fetcher-level
 contract is locked in by ``test_remote_config_fetcher.py``):
 
 - Dry-run setup ``(needs_inference=False, needs_model_specs=True)`` succeeds with a primed
   cache and emits ``RemoteConfigStaleWarning``; cold cache raises ``RemoteConfigUnavailableError``.
-- Pipelex telemetry must be disabled whenever the gateway config is cached, even when
-  ``needs_inference=True``. Stale config implies stale model identities, so phoning home about
-  pipe runs against possibly-stale specs would pollute metrics.
-- BYOK with the gateway disabled never reaches ``fetch_remote_config``, regardless of
+- BYOK with no managed gateway enabled never reaches ``fetch_remote_config``, regardless of
   ``needs_model_specs``. Explicit regression guard so future refactors can't reintroduce the
   phantom network call described in the original offline-mode bug.
 """
@@ -16,7 +13,6 @@ contract is locked in by ``test_remote_config_fetcher.py``):
 from __future__ import annotations
 
 import warnings
-from datetime import UTC, datetime
 from pathlib import Path  # ruff: ignore[typing-only-standard-library-import] — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
@@ -24,26 +20,18 @@ import httpx
 import pytest
 
 from pipelex import log
-from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, PipelexBackend
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigStaleWarning,
     RemoteConfigUnavailableError,
 )
-from pipelex.system.pipelex_service.pipelex_service_agreement import (
-    PipelexServiceAgreement,
-    PipelexServiceOnboarding,
-)
 from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
+from pipelex.system.pipelex_service.pipelex_service_onboarding import PipelexServiceOnboarding
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
-from pipelex.system.pipelex_service.remote_config_fetcher import (
-    RemoteConfigFetcher,
-    RemoteConfigResult,
-)
-from pipelex.system.pipelex_service.types import RemoteConfigSource
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerNoOp
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -58,11 +46,8 @@ RUNTIME_BOOT_MODULE = "pipelex.runtime_boot"
 _ORIGINAL_FETCH_REMOTE_CONFIG = RemoteConfigFetcher.fetch_remote_config
 
 
-def _accepted_service_config() -> PipelexServiceConfig:
-    return PipelexServiceConfig(
-        agreement=PipelexServiceAgreement(terms_accepted=True),
-        onboarding=PipelexServiceOnboarding(inference_setup_completed=True),
-    )
+def _onboarded_service_config() -> PipelexServiceConfig:
+    return PipelexServiceConfig(onboarding=PipelexServiceOnboarding(inference_setup_completed=True))
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -93,7 +78,7 @@ class TestSetupWithCache:
         self,
         mocker: MockerFixture,
     ) -> None:
-        """Gateway enabled, network down, cache primed → setup completes and emits
+        """Managed gateway enabled, network down, cache primed → setup completes and emits
         ``RemoteConfigStaleWarning``. Validates the end-to-end stale-cache UX (dry-run).
         """
         Pipelex.teardown_if_needed()
@@ -107,11 +92,11 @@ class TestSetupWithCache:
 
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
+            return_value=_onboarded_service_config(),
         )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
@@ -144,18 +129,18 @@ class TestSetupWithCache:
         self,
         mocker: MockerFixture,
     ) -> None:
-        """Gateway enabled, network down, no cache → ``RemoteConfigUnavailableError`` surfaces
+        """Managed gateway enabled, network down, no cache → ``RemoteConfigUnavailableError`` surfaces
         from ``Pipelex.make`` (not silently swallowed).
         """
         Pipelex.teardown_if_needed()
 
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
+            return_value=_onboarded_service_config(),
         )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
@@ -177,52 +162,8 @@ class TestSetupWithCache:
             Pipelex.teardown_if_needed()
             log.reset()
 
-    def test_telemetry_disabled_when_source_cached(self, mocker: MockerFixture) -> None:
-        """``Pipelex.make(needs_inference=True)`` with a cached gateway config → telemetry
-        manager is the no-op variant. Stale specs imply stale model identities; phoning home
-        about pipe runs in that state would pollute metrics, so the guard is stricter than
-        the plain ``needs_inference and gateway_enabled`` check.
-        """
-        Pipelex.teardown_if_needed()
-
-        # Reuse the session-cached gateway config so deck validation passes, but re-wrap with
-        # ``source=CACHED`` to exercise the stricter telemetry guard.
-        session_result = RemoteConfigFetcher.fetch_remote_config()
-        cached_result = RemoteConfigResult(
-            config=session_result.config,
-            source=RemoteConfigSource.CACHED,
-            cached_at=datetime.now(tz=UTC),
-        )
-
-        mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
-        mocker.patch(
-            "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
-            new_callable=mocker.PropertyMock,
-            return_value=False,
-        )
-        mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", return_value=cached_result)
-
-        try:
-            pipelex_instance = Pipelex.make(
-                integration_mode=IntegrationMode.PYTEST,
-                needs_inference=True,
-            )
-            assert isinstance(pipelex_instance.telemetry_manager, TelemetryManagerNoOp), (
-                "cached gateway config must downgrade telemetry to no-op, even when needs_inference=True"
-            )
-        finally:
-            Pipelex.teardown_if_needed()
-            log.reset()
-
     def test_byok_offline_regression_guard(self, mocker: MockerFixture) -> None:
-        """Gateway disabled in ``backends.toml`` → ``fetch_remote_config`` is never invoked,
+        """No managed gateway enabled in ``backends.toml`` → ``fetch_remote_config`` is never invoked,
         even with ``needs_model_specs=True``. Without this guard a future refactor could
         reintroduce the phantom network call that originally motivated the offline-mode work.
         """
@@ -247,5 +188,5 @@ class TestSetupWithCache:
             Pipelex.teardown_if_needed()
             log.reset()
 
-        assert fetch_spy.call_count == 0, "fetch_remote_config must never be invoked when the gateway is disabled"
-        assert httpx_get_mock.call_count == 0, "httpx.get must never be invoked when the gateway is disabled"
+        assert fetch_spy.call_count == 0, "fetch_remote_config must never be invoked when no managed gateway is enabled"
+        assert httpx_get_mock.call_count == 0, "httpx.get must never be invoked when no managed gateway is enabled"

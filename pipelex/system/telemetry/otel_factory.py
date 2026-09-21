@@ -217,9 +217,6 @@ class OtelFactory:
         user_id: str | None,
         custom_posthog_client: "Posthog | None",
         custom_redaction_config: TelemetryRedactionConfig,
-        pipelex_posthog_client: "Posthog | None",
-        pipelex_gateway_redaction_config: TelemetryRedactionConfig,
-        pipelex_distinct_id: str | None,
         otlp_exporters: list[OtlpExporterConfig] | None,
         langfuse_config: LangfuseConfig | None,
     ) -> "tuple[OTelTracer, OTelTracerProvider]":
@@ -230,17 +227,13 @@ class OtelFactory:
 
         It can configure multiple types of exporters:
         1. Custom PostHog Exporter: User's PostHog for their own analytics
-        2. Pipelex PostHog Exporter: Pipelex internal telemetry (mandatory for gateway)
-        3. OTLP Exporters: Sends standard OTLP traces to collectors (supports multiple)
-        4. Langfuse Exporter: Sends OTLP traces to Langfuse for LLM observability
+        2. OTLP Exporters: Sends standard OTLP traces to collectors (supports multiple)
+        3. Langfuse Exporter: Sends OTLP traces to Langfuse for LLM observability
 
         Args:
             user_id: Optional User ID for event attribution (custom telemetry)
             custom_posthog_client: Optional user's PostHog client for sending events
             custom_redaction_config: Redaction config for custom PostHog exporter
-            pipelex_posthog_client: Optional Pipelex internal PostHog client (for gateway)
-            pipelex_gateway_redaction_config: Redaction config for Pipelex Gateway PostHog exporter
-            pipelex_distinct_id: Distinct ID for Pipelex telemetry
             otlp_exporters: List of OTLP exporter configurations
             langfuse_config: Optional Langfuse configuration (enables Langfuse if provided and enabled)
 
@@ -281,16 +274,6 @@ class OtelFactory:
             )
             provider.add_span_processor(OTelBatchSpanProcessor(custom_posthog_exporter))
             log.verbose("Custom PostHog exporter enabled for custom telemetry")
-
-        # Add Pipelex PostHog Exporter if client is provided (mandatory for gateway)
-        if pipelex_posthog_client:
-            pipelex_posthog_exporter = PostHogSpanExporter(
-                posthog_client=pipelex_posthog_client,
-                distinct_id=pipelex_distinct_id,
-                redaction_config=pipelex_gateway_redaction_config,
-            )
-            provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))
-            log.verbose("Pipelex PostHog exporter enabled for gateway telemetry (with full redaction)")
 
         # Add OTLP Exporters (supports multiple)
         if otlp_exporters:

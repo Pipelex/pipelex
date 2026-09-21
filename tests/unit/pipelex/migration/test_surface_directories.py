@@ -6,7 +6,7 @@ name in two directories is two different files, and only the surface that owns t
 sits in may claim it.
 
 The specimen is real and it is the reason this exists at all:
-`inference/backends/pipelex_gateway.toml` matches the `pipelex-config` tier glob `pipelex_*.toml`
+`inference/backends/pipelex_manifold.toml` matches the `pipelex-config` tier glob `pipelex_*.toml`
 exactly. Before the walk reached subdirectories, depth alone kept it safe. Now that the walk goes
 there on purpose, the *directory* is what has to keep it safe — and if it ever stops doing so, the
 main configuration's ledger gets replayed over an inference backend definition and rewrites it.
@@ -37,7 +37,7 @@ class TestADirectoryIsHalfTheClaim:
         (root / "pipelex.toml").write_text("", encoding="utf-8")
         (root / "pipelex_override.toml").write_text("", encoding="utf-8")
         (root / BACKENDS).mkdir(parents=True)
-        (root / BACKENDS / "pipelex_gateway.toml").write_text("", encoding="utf-8")
+        (root / BACKENDS / "pipelex_manifold.toml").write_text("", encoding="utf-8")
         (root / BACKENDS / "openai.toml").write_text("", encoding="utf-8")
         (root / BACKENDS / "notes.md").write_text("", encoding="utf-8")
         (root / "inference" / "deck").mkdir(parents=True)
@@ -47,7 +47,7 @@ class TestADirectoryIsHalfTheClaim:
     def test_each_file_goes_to_the_surface_that_owns_the_directory_it_sits_in(self, tmp_path: Path, build_surface: SurfaceBuilder) -> None:
         """One assertion for the whole rule, because every line of it is a separate way to get this wrong.
 
-        `pipelex_gateway.toml` is claimed by the backend surface and *not* by the root surface whose
+        `pipelex_manifold.toml` is claimed by the backend surface and *not* by the root surface whose
         glob its name matches; `notes.md` falls out by extension; `deck/` is a directory no surface
         owns and is never entered; `inference/backends.toml` sits one level above the directory the
         backend surface owns and is nobody's.
@@ -60,19 +60,19 @@ class TestADirectoryIsHalfTheClaim:
             ("pipelex-config", "pipelex.toml"),
             ("pipelex-config", "pipelex_override.toml"),
             ("inference-backend", "inference/backends/openai.toml"),
-            ("inference-backend", "inference/backends/pipelex_gateway.toml"),
+            ("inference-backend", "inference/backends/pipelex_manifold.toml"),
         ]
 
     def test_the_same_name_resolves_to_a_different_surface_in_each_directory(self, build_surface: SurfaceBuilder) -> None:
         """The claim is the pair, so the specimen's name alone answers nothing.
 
-        Without the directory in the question, `pipelex_gateway.toml` is a `pipelex_*.toml` match
+        Without the directory in the question, `pipelex_manifold.toml` is a `pipelex_*.toml` match
         and the root surface takes it wherever it lives.
         """
         registry = self._registry(build_surface)
 
-        at_the_root = registry.surface_for_file(subdirectory=Path(), file_name="pipelex_gateway.toml")
-        in_the_backends_directory = registry.surface_for_file(subdirectory=BACKENDS, file_name="pipelex_gateway.toml")
+        at_the_root = registry.surface_for_file(subdirectory=Path(), file_name="pipelex_manifold.toml")
+        in_the_backends_directory = registry.surface_for_file(subdirectory=BACKENDS, file_name="pipelex_manifold.toml")
 
         assert at_the_root is not None
         assert at_the_root.surface_id == "pipelex-config"
@@ -83,7 +83,7 @@ class TestADirectoryIsHalfTheClaim:
         """The other direction of the same rule: the backend directory is not the root surface's to claim in."""
         registry = SurfaceRegistry(surfaces=[build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml")])
 
-        assert registry.surface_for_file(subdirectory=BACKENDS, file_name="pipelex_gateway.toml") is None
+        assert registry.surface_for_file(subdirectory=BACKENDS, file_name="pipelex_manifold.toml") is None
         assert registry.surface_for_file(subdirectory=BACKENDS, file_name="pipelex.toml") is None
 
     def test_a_subdirectory_that_does_not_exist_is_skipped_rather_than_refused(self, tmp_path: Path, build_surface: SurfaceBuilder) -> None:

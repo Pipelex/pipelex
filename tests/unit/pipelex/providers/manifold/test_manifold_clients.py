@@ -126,7 +126,7 @@ class TestManifoldImageClient:
     def test_debug_is_read_from_the_backend_and_from_nothing_else(self, mocker: MockerFixture) -> None:
         """One configuration block must not govern two services.
 
-        The Portkey-path sibling routes this through the telemetry manager's `pipelex_gateway.portkey`
+        The Portkey-path sibling routes this through the telemetry manager's Portkey-path
         knobs; reading those here would make a change meant for the cloud path silently alter the
         manifold one.
         """

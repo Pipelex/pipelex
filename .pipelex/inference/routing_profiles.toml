@@ -12,25 +12,43 @@
 # which routing profile you select. See the documentation for details.
 
 # Which profile to use (change this to switch routing)
-active = "all_pipelex_gateway"
+active = "all_enabled_backends"
 
-# We recommend using the "all_pipelex_gateway" profile to get a head start with all models.
-# To use the Pipelex Gateway backend:
-# 1. Get your API key at https://app.pipelex.com (free credits included)
-# 2. Add it to your .env file: PIPELEX_GATEWAY_API_KEY=your-key-here
-# 3. Run `pipelex init` and accept the Gateway terms of service
+# The default profile needs no Pipelex account: it routes each model to the first enabled backend
+# that serves it, in the order its `fallback_order` lists. `pipelex init` narrows this to the
+# backend you configure (`all_<backend>`), and the one-key path is OpenRouter: set
+# OPENROUTER_API_KEY in your .env file and switch to the "all_openrouter" profile.
 
 # =========================================================================================
 # Routing Profiles
 # =========================================================================================
 
-[profiles.all_pipelex_gateway]
-description = "Use Pipelex Gateway for all its supported models"
-default = "pipelex_gateway"
+[profiles.all_enabled_backends]
+description = "Route each model to the first enabled backend that serves it, in this order"
+fallback_order = [
+  "openai",
+  "anthropic",
+  "google",
+  "mistral",
+  "bedrock",
+  "azure_openai",
+  "xai",
+  "groq",
+  "fal",
+  "huggingface",
+  "linkup",
+  "openrouter",
+  "portkey",
+  "blackboxai",
+  "minimax",
+  "scaleway",
+  "ollama",
+  "vertexai",
+  "pipelex_manifold",
+]
 
-# The same model names, served by the Pipelex-operated inference service instead. Switching between
-# this profile and the one above needs no other edit: a model's wire id and sdk are per-backend, so
-# decks, aliases and presets keep naming the same handles.
+# The Pipelex-operated inference service (private beta). A model's wire id and sdk are per-backend,
+# so decks, aliases and presets keep naming the same handles whichever profile is active.
 [profiles.all_pipelex_manifold]
 description = "Use Pipelex Manifold (private beta) for all its supported models"
 default = "pipelex_manifold"
@@ -132,7 +150,7 @@ default = "internal"
 # =========================================================================================
 [profiles.example_routing_using_patterns]
 description = "Example routing profile using patterns"
-default = "pipelex_gateway"
+default = "openrouter"
 
 [profiles.example_routing_using_patterns.routes]
 # Pattern matching: "model-pattern" = "backend-name"
@@ -152,17 +170,17 @@ default = "pipelex_gateway"
 description = "Example routing profile using specific models"
 
 [profiles.example_routing_using_specific_models.routes]
-"gpt-5.4-nano" = "pipelex_gateway"
+"gpt-5.4-nano" = "openrouter"
 "gpt-4o-mini" = "blackboxai"
 "gpt-5.4-mini" = "openai"
 "gpt-5.5" = "azure_openai"
 
-"claude-4-sonnet" = "pipelex_gateway"
+"claude-4-sonnet" = "openrouter"
 "claude-3.7-sonnet" = "blackboxai"
 
-"gemini-2.5-flash-lite" = "pipelex_gateway"
+"gemini-2.5-flash-lite" = "openrouter"
 "gemini-2.5-flash" = "blackboxai"
 "gemini-2.5-pro" = "vertexai"
 
-"grok-3" = "pipelex_gateway"
+"grok-3" = "openrouter"
 "grok-3-mini" = "xai"

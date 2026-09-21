@@ -16,9 +16,6 @@ from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.pipelex_service.exceptions import (
-    GatewayApiKeyMissingError,
-    GatewayDoNotTrackConflictError,
-    GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
     RemoteConfigStaleWarning,
     RemoteConfigUnavailableError,
@@ -111,7 +108,7 @@ def silence_logging_for_agent_cli() -> None:
     Idempotent. The primary call site is ``app_callback`` in
     ``pipelex.cli.agent_cli._agent_cli`` — Typer routes every ``pipelex-agent``
     subcommand through that callback, so the cutoff is armed before any command body
-    runs (including commands like ``init`` and ``accept-gateway-terms`` that bypass
+    runs (including commands like ``init`` that bypass
     ``make_pipelex_for_agent_cli``). The additional invocations at the top of
     ``make_pipelex_for_agent_cli`` and ``agent_doctor_cmd`` are belt-and-braces
     defense for direct library callers that bypass the Typer entry point (and for
@@ -198,7 +195,7 @@ def make_pipelex_for_agent_cli(
 
     Args:
         library_dirs: Optional library directories to use for the Pipelex instance.
-        needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
+        needs_inference: When False, skip inference setup (credentials, managed gateways, telemetry).
         needs_model_specs: When True, load real model specs even without inference.
 
     Returns:
@@ -239,12 +236,6 @@ def make_pipelex_for_agent_cli(
         raise typer.Exit(0) from None
     except TelemetryConfigValidationError as exc:
         agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
-    except GatewayTermsNotAcceptedError as exc:
-        agent_error(exc.message, error_type="GatewayTermsNotAcceptedError", cause=exc)
-    except GatewayApiKeyMissingError as exc:
-        agent_error(exc.message, error_type="GatewayApiKeyMissingError", cause=exc)
-    except GatewayDoNotTrackConflictError as exc:
-        agent_error(exc.message, error_type="GatewayDoNotTrackConflictError", cause=exc)
     except RemoteConfigUnavailableError as exc:
         agent_error(exc.message, error_type="RemoteConfigUnavailableError", cause=exc)
     except RemoteConfigValidationError as exc:

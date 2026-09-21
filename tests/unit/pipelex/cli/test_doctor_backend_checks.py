@@ -228,8 +228,8 @@ class TestDoctorBackendChecks:
         assert reports["vertexai"].is_valid is True
 
     def test_backend_files_stock_kit_is_healthy(self, tmp_path: Path) -> None:
-        """The shipped defaults enable the gateway and ship its override file; the probe hands the
-        loader no gateway config, and that must not be reported as a malformed file.
+        """The shipped defaults ship the manifold backend's override file; the probe hands the loader
+        no gateway config, and that must not be reported as a malformed file.
         """
         self._copy_kit_inference(tmp_path)
 
@@ -237,11 +237,11 @@ class TestDoctorBackendChecks:
 
         assert healthy is True
         assert message == "All backend files are valid"
-        assert reports["pipelex_gateway"].is_valid is True
+        assert reports["pipelex_manifold"].is_valid is True
         assert all(report.is_valid for report in reports.values())
 
     def test_backend_files_malformed_file_still_caught_under_leniency(self, tmp_path: Path) -> None:
-        """Leniency skips the gateway, not a malformed file — and the gateway no longer hides one behind it."""
+        """Leniency skips the managed gateway, not a malformed file — and the gateway no longer hides one behind it."""
         backends_dir = self._copy_kit_inference(tmp_path)
         anthropic_file = backends_dir / "anthropic.toml"
         anthropic_file.write_text(anthropic_file.read_text(encoding="utf-8") + '\n[bogus_key_table]\nfoo = "bar"\n', encoding="utf-8")
@@ -253,7 +253,7 @@ class TestDoctorBackendChecks:
         assert reports["anthropic"].is_valid is False
         assert reports["anthropic"].error_message is not None
         assert "anthropic" in reports["anthropic"].error_message
-        assert reports["pipelex_gateway"].is_valid is True
+        assert reports["pipelex_manifold"].is_valid is True
 
     def test_kit_template_exists_for_shipped_backend(self) -> None:
         """The kit ships an openai backend template."""

@@ -19,9 +19,9 @@ import pytest
 from tests.e2e.agent_cli.conftest import (
     OFFLINE_BUNDLES_DIR,
     PIPELEX_AGENT_BIN,
-    gateway_backend_model_specs_for_kit_deck,
     load_kit_model_deck_blueprint,
-    set_gateway_enabled,
+    manifold_model_specs_for_kit_deck,
+    set_manifold_enabled,
     write_active_routing_profile,
     write_remote_config_cache,
 )
@@ -109,19 +109,13 @@ def _parse_agent_json(output: str) -> dict[str, object]:
 def _cached_remote_config_payload() -> dict[str, object]:
     """A structurally complete cached remote-config payload for the primed-cache scenarios.
 
-    ``backend_model_specs`` is derived from the shipped kit deck (see
-    ``gateway_backend_model_specs_for_kit_deck``) so the gateway-membership check in
+    The manifold section is derived from the shipped kit deck (see
+    ``manifold_model_specs_for_kit_deck``) so the gateway-membership check in
     ``Pipelex.setup`` accepts the cache without a hand-maintained handle list that goes
     stale whenever the deck promotes an alias to a new model.
     """
     return {
-        "posthog": {
-            "project_api_key": "test-key",
-            "endpoint": "https://example.invalid",
-            "is_geoip_enabled": False,
-            "is_debug_enabled": False,
-        },
-        "backend_model_specs": gateway_backend_model_specs_for_kit_deck(),
+        "manifold_model_specs": manifold_model_specs_for_kit_deck(),
         "aws_region": "us-east-1",
     }
 
@@ -159,9 +153,9 @@ class TestOfflineDryRun:
         assert "warnings" in parsed, f"the outer envelope (with 'warnings') must be returned: {parsed!r}"
 
     def test_byok_offline_succeeds(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Gateway disabled + no network + no cache → dry-run exits 0 with structured success JSON."""
+        """No managed gateway + no network + no cache → dry-run exits 0 with structured success JSON."""
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
         write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_anthropic")
 
         staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "byok_simple", hermetic_home)
@@ -174,68 +168,70 @@ class TestOfflineDryRun:
         assert "error" not in payload, payload
         assert "text" in payload, payload
 
-    def test_gateway_no_cache_no_network_fails_with_unavailable(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Gateway enabled + no network + no cache → ``RemoteConfigUnavailableError`` with remediation hint."""
+    def test_manifold_no_cache_no_network_fails_with_unavailable(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
+        """Manifold enabled + no network + no cache → ``RemoteConfigUnavailableError`` with remediation hint."""
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
 
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "gateway_known_model", hermetic_home)
+        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_known_model", hermetic_home)
         result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
 
-        assert result.returncode != 0, f"Gateway offline with no cache must fail.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        assert result.returncode != 0, f"Manifold offline with no cache must fail.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
         payload = _parse_agent_json(result.stderr or result.stdout)
         assert payload.get("error_type") == "RemoteConfigUnavailableError", payload
         message = str(payload.get("message", ""))
         assert "pipelex init" in message.lower(), f"Error must mention `pipelex init` remediation; got: {message!r}"
 
     def test_primed_cache_specs_track_kit_deck_premium_alias(self) -> None:
-        """Regression: the primed gateway cache is derived from the kit deck, so it tracks alias promotions.
+        """Regression: the primed manifold cache is derived from the kit deck, so it tracks alias promotions.
 
         Reads the deck's own ``default-premium`` target — whatever model it currently points
-        to — and asserts the derived gateway specs cover it, without hardcoding the model name.
+        to — and asserts the derived manifold specs cover it, without hardcoding the model name.
         If a future deck promotes the premium alias to a new handle this keeps passing; if the
         derivation ever stops covering a referenced handle it fails fast here (a unit-speed
         check) instead of deep inside a subprocess setup with an opaque GatewayUnknownModelError.
         """
         blueprint = load_kit_model_deck_blueprint()
         premium_target = blueprint.llm.aliases["default-premium"]
-        specs = gateway_backend_model_specs_for_kit_deck()
+        specs = manifold_model_specs_for_kit_deck()
         assert premium_target in specs, (
-            f"Derived gateway specs must cover the kit deck's default-premium target '{premium_target}'; got handles: {sorted(specs)}"
+            f"Derived manifold specs must cover the kit deck's default-premium target '{premium_target}'; got handles: {sorted(specs)}"
         )
 
     def test_primed_cache_excludes_software_only_internal_handles(self) -> None:
-        """Regression: the gateway cache must not claim software-only internal extractors as gateway models.
+        """Regression: the manifold cache must not claim software-only internal extractors as manifold models.
 
         ``@default-no-inference`` / ``@default-text-from-pdf`` resolve to an extractor served by the
         local ``internal`` backend (``PipelexBackend.INTERNAL`` — "runs internally, without AI"), which
-        the Pipelex Gateway never provides. If the derived gateway specs claimed it, an offline dry-run
-        could resolve the alias to the fake ``gateway_extract`` worker instead of exercising the real
-        internal backend. The companion assertion guards the other direction: a genuinely gateway-served
+        Pipelex Manifold never provides. If the derived manifold specs claimed it, an offline dry-run
+        could resolve the alias to the fake ``manifold_extract`` worker instead of exercising the real
+        internal backend. The companion assertion guards the other direction: a genuinely manifold-served
         extract model (the ``default-extract-document`` target) must stay covered, so the exclusion does
-        not over-reach onto provider-backed models the gateway does proxy.
+        not over-reach onto provider-backed models the manifold does proxy.
         """
         blueprint = load_kit_model_deck_blueprint()
         software_only_target = blueprint.extract.aliases["default-no-inference"]
-        gateway_extract_target = blueprint.extract.aliases["default-extract-document"]
-        specs = gateway_backend_model_specs_for_kit_deck()
+        manifold_extract_target = blueprint.extract.aliases["default-extract-document"]
+        specs = manifold_model_specs_for_kit_deck()
         assert software_only_target not in specs, (
-            f"Derived gateway specs must exclude software-only internal handle '{software_only_target}'; got handles: {sorted(specs)}"
+            f"Derived manifold specs must exclude software-only internal handle '{software_only_target}'; got handles: {sorted(specs)}"
         )
-        assert gateway_extract_target in specs, (
-            f"Gateway-served extract target '{gateway_extract_target}' must remain covered; got handles: {sorted(specs)}"
+        assert manifold_extract_target in specs, (
+            f"Manifold-served extract target '{manifold_extract_target}' must remain covered; got handles: {sorted(specs)}"
         )
 
-    def test_gateway_known_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Gateway enabled + no network + primed cache → dry-run exits 0 with stale-cache warning."""
+    def test_manifold_known_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
+        """Manifold enabled + no network + primed cache → dry-run exits 0 with stale-cache warning."""
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
         write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
 
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "gateway_known_model", hermetic_home)
+        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_known_model", hermetic_home)
         result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
 
-        assert result.returncode == 0, f"Gateway dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        assert result.returncode == 0, f"Manifold dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
         payload = _parse_agent_json(result.stdout)
         assert "error" not in payload, payload
         rendered = json.dumps(payload)
@@ -243,11 +239,11 @@ class TestOfflineDryRun:
             f"Cached-source setup must surface a RemoteConfigStale warning on the envelope; got: {payload!r}"
         )
 
-    def test_gateway_img_gen_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Gateway enabled + no network + primed cache → an image-gen pipe dry-runs offline.
+    def test_manifold_img_gen_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
+        """Manifold enabled + no network + primed cache → an image-gen pipe dry-runs offline.
 
-        Companion to ``test_gateway_known_with_cache_succeeds_offline``, but the bundle's pipe is a
-        ``PipeImgGen`` referencing a gateway image handle (``gpt-image-2``). It proves the derived
+        Companion to ``test_manifold_known_with_cache_succeeds_offline``, but the bundle's pipe is a
+        ``PipeImgGen`` referencing a manifold image handle (``gpt-image-2``). It proves the derived
         cache covers img_gen handles too — not just LLMs — so the gateway-membership check passes for
         an image model and the offline dry-run completes.
 
@@ -257,32 +253,34 @@ class TestOfflineDryRun:
         runtime (non-dry) concern.
         """
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
         write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
 
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "gateway_img_gen_model", hermetic_home)
+        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_img_gen_model", hermetic_home)
         result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
 
         assert result.returncode == 0, (
-            f"Gateway img-gen dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+            f"Manifold img-gen dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
         )
         payload = _parse_agent_json(result.stdout)
         assert "error" not in payload, payload
 
-    def test_gateway_unknown_with_cache_fails_with_clear_error(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Bundle pipe references a model absent from the cached gateway specs → clear error.
+    def test_manifold_unknown_with_cache_fails_with_clear_error(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
+        """Bundle pipe references a model absent from the cached manifold specs → clear error.
 
-        The default kit deck only references "known" gateway handles, so this scenario fires
+        The default kit deck only references "known" manifold handles, so this scenario fires
         at the pipe-operator layer (the membership check at ``ModelManager.setup`` looks at
         deck presets/choice defaults, not raw per-pipe model strings). Either way the agent
         CLI must surface a structured error with the unknown handle visible — that is the
         user-facing contract.
         """
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
         write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
 
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "gateway_unknown_model", hermetic_home)
+        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_unknown_model", hermetic_home)
         result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
 
         assert result.returncode != 0, f"Unknown-model bundle must fail.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"

@@ -1,6 +1,6 @@
-"""Unit tests for doctor's check_models — gateway gating and model deck validation paths.
+"""Unit tests for doctor's check_models — managed-gateway gating and model deck validation paths.
 
-All inference-adjacent collaborators (backend files probe, gateway config fetch,
+All inference-adjacent collaborators (backend files probe, remote config fetch,
 ModelManager) are mocked at the doctor module namespace: these tests cover the
 decision tree, not the model loading itself.
 """
@@ -19,9 +19,9 @@ from pipelex.cogt.exceptions import (
     ModelDeckValidationError,
     RoutingProfileLibraryError,
 )
-from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, PipelexBackend
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
-from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 if TYPE_CHECKING:
@@ -70,8 +70,8 @@ class TestCheckModels:
         manager_class_mock.assert_not_called()
 
     @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
-    def test_gateway_disabled_happy_path(self, models_manager: Any) -> None:
-        """With the gateway disabled and a valid deck, models are healthy."""
+    def test_managed_gateway_disabled_happy_path(self, models_manager: Any) -> None:
+        """With no managed gateway enabled and a valid deck, models are healthy."""
         healthy, message, reports = check_models()
 
         assert healthy is True
@@ -82,43 +82,12 @@ class TestCheckModels:
         models_manager.validate_model_deck.assert_called_once()
 
     @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_missing_service_config(self, mocker: MockerFixture) -> None:
-        """Gateway enabled without a service config is unhealthy."""
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=None)
-
-        healthy, message, _ = check_models()
-
-        assert healthy is False
-        assert message == "Pipelex Gateway is enabled but service configuration is missing"
-
-    @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_terms_not_accepted(self, mocker: MockerFixture) -> None:
-        """Gateway enabled with unaccepted terms is unhealthy."""
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        service_config = SimpleNamespace(agreement=SimpleNamespace(terms_accepted=False))
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=service_config)
-
-        healthy, message, _ = check_models()
-
-        assert healthy is False
-        assert message == "Pipelex Gateway is enabled but terms have not been accepted"
-
-    @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_remote_fetch_failure(self, mocker: MockerFixture) -> None:
+    def test_managed_gateway_enabled_remote_fetch_failure(self, mocker: MockerFixture) -> None:
         """A failed remote-config fetch is unhealthy with the fetch error in the message."""
         mocker.patch(
             "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
-        service_config = SimpleNamespace(agreement=SimpleNamespace(terms_accepted=True))
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=service_config)
         mocker.patch(
             "pipelex.cli.commands.doctor_cmd.RemoteConfigFetcher.fetch_remote_config",
             side_effect=RemoteConfigUnavailableError("offline, cold cache"),
@@ -127,23 +96,17 @@ class TestCheckModels:
         healthy, message, _ = check_models()
 
         assert healthy is False
-        assert message == "Failed to fetch Pipelex Gateway remote configuration: offline, cold cache"
+        assert message == "Failed to fetch the Pipelex remote configuration: offline, cold cache"
 
     @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_passes_gateway_config_to_setup(self, mocker: MockerFixture, models_manager: Any) -> None:
+    def test_managed_gateway_enabled_passes_gateway_config_to_setup(self, mocker: MockerFixture, models_manager: Any) -> None:
         """A successful fetch builds one GatewayConfig per managed backend and threads them into the model setup."""
         mocker.patch(
             "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
-        service_config = SimpleNamespace(agreement=SimpleNamespace(terms_accepted=True))
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=service_config)
         fetch_result = SimpleNamespace(
-            config=RemoteConfig(
-                posthog=PipelexPosthogConfig(project_api_key="", endpoint="", is_geoip_enabled=False, is_debug_enabled=False),
-                backend_model_specs={},
-                aws_region="eu-west-3",
-            ),
+            config=RemoteConfig(**{MANIFOLD_MODEL_SPECS_SECTION: {"gpt-5": {"model_id": "gpt-5"}}}),
             source=RemoteConfigSource.FRESH,
         )
         mocker.patch("pipelex.cli.commands.doctor_cmd.RemoteConfigFetcher.fetch_remote_config", return_value=fetch_result)
@@ -155,7 +118,7 @@ class TestCheckModels:
         setup_kwargs = models_manager.setup.call_args.kwargs
         managed_gateway_configs = setup_kwargs["managed_gateway_configs"]
         assert managed_gateway_configs is not None
-        assert managed_gateway_configs[PipelexBackend.GATEWAY].aws_region == "eu-west-3"
+        assert set(managed_gateway_configs[PipelexBackend.MANIFOLD].model_specs) == {"gpt-5"}
         assert setup_kwargs["gateway_config_source"] == RemoteConfigSource.FRESH
 
     @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")

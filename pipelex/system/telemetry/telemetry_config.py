@@ -124,37 +124,6 @@ class OtlpExporterConfig(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict, description="Headers for OTLP export")
 
 
-class PipelexGatewayTelemetryConfig(BaseModel):
-    """Pipelex Gateway telemetry configuration for internal maintainer use.
-
-    NOTE TO CONTRIBUTORS: This config class exists to support personal overrides used by
-    maintainers for improved observability while debugging and demoing Pipelex. It is NOT
-    included in the base `.pipelex/telemetry.toml` installed via `pipelex init telemetry`.
-
-    Maintainers can enable this by adding a `[pipelex_gateway]` section to their personal
-    `telemetry_override.toml` file, which is loaded after and merged with the base config.
-
-    IMPORTANT DISTINCTIONS:
-
-    - **This config** (`pipelex_gateway`): Internal maintainer tooling, applied via personal overrides
-    - **Custom telemetry** (`custom_posthog`, `langfuse`, `otlp`): User-controlled destinations
-    - **Gateway telemetry** (automatic): When using Pipelex Gateway as inference backend,
-      identified telemetry is automatically enabled (tied to Gateway API key, hashed for security)
-
-    Using Pipelex Gateway is entirely optional—you can BYOK (Bring Your Own Keys) with direct
-    provider backends (OpenAI, Anthropic, Azure, Bedrock, etc.) instead.
-
-    See Also:
-        - docs/setup/telemetry.md: Overview of telemetry streams
-        - docs/configuration/config-practical/telemetry-config.md: Custom telemetry configuration
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    posthog: PostHogConfig = Field(description="Pipelex Gateway PostHog configuration")
-    portkey: PortkeyConfig = Field(description="Pipelex Gateway Portkey SDK configuration")
-
-
 class TelemetryConfig(ConfigModel):
     """Main telemetry configuration with nested sections."""
 
@@ -177,7 +146,6 @@ class TelemetryConfig(ConfigModel):
         "Defaults live here so a project-level telemetry.toml that omits the section "
         "doesn't silently disable custom telemetry for everyone.",
     )
-    pipelex_gateway: PipelexGatewayTelemetryConfig | None = Field(default=None, description="Pipelex Gateway telemetry configuration")
 
     def is_custom_telemetry_allowed_for_mode(self, mode: str) -> bool:
         """Check if custom telemetry is allowed for the given integration mode.

@@ -14,7 +14,7 @@ Two independent format axes:
   in stays machine-parseable.
 
 Commands that don't accept ``--format`` (``inputs``, ``concept``, ``pipe``,
-``fmt``, ``lint``, ``accept-gateway-terms``) never touch the ContextVar and
+``fmt``, ``lint``) never touch the ContextVar and
 therefore emit JSON errors via the default.
 """
 
@@ -145,15 +145,13 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "False means the migration would write nothing and its 'plans' name what to correct by hand. "
         "Without a 'migration' field, correct the telemetry.toml settings named in the message."
     ),
-    "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
-    "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",
-    "GatewayDoNotTrackConflictError": "Unset the DO_NOT_TRACK environment variable, or disable pipelex_gateway in backends.toml",
     "BinaryNotFoundError": "Install pipelex-tools: uv tool install pipelex-tools",
     "RemoteConfigUnavailableError": (
-        "Run `pipelex init` while online to prime the cache, or disable pipelex_gateway in backends.toml to operate offline (BYOK)"
+        "Run `pipelex init` while online to prime the cache, or disable the Pipelex-managed gateway backends in backends.toml "
+        "to operate offline (BYOK)"
     ),
     "RemoteConfigValidationError": (
-        "This is a server-side issue; report it on Discord/GitHub. Disable pipelex_gateway in backends.toml as a workaround"
+        "This is a server-side issue; report it on Discord/GitHub. Disable the Pipelex-managed gateway backends in backends.toml as a workaround"
     ),
     "GatewayUnknownModelError": (
         "The deck references a model the gateway doesn't expose. If the source is `cached`, run `pipelex init` while online to refresh; "
@@ -408,7 +406,7 @@ def agent_error(message: str, *, error_type: str, cause: BaseException | None = 
 def agent_success(result: dict[str, Any]) -> None:
     """Print a structured JSON success result to stdout.
 
-    Any pending setup warnings (e.g. stale gateway cache) recorded via ``record_setup_warning``
+    Any pending setup warnings (e.g. a stale remote-config cache) recorded via ``record_setup_warning``
     are drained into a top-level ``warnings`` array on the envelope so machine consumers can
     surface them without parsing stderr. Callers may pre-populate ``result["warnings"]`` (must
     be a list) — the captured ones are appended. The caller's ``result`` dict is NOT mutated;

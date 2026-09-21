@@ -8,11 +8,8 @@ description: "Set up custom telemetry destinations for observability data — se
 
 Telemetry configuration is stored in `.pipelex/telemetry.toml`. This file controls **your custom telemetry** destinations—where you want to send observability data for your own analytics and monitoring.
 
-!!! info "Two Telemetry Streams"
-    Pipelex has two independent telemetry streams:
-
-    1. **Gateway Telemetry** (Pipelex-controlled): Automatic when using Pipelex Gateway, tied to your API key
-    2. **Custom Telemetry** (User-controlled): Configured in this file, sent to your own backends
+!!! info "One Telemetry Stream, Yours"
+    The runtime has a single telemetry stream, and it is the one you configure in this file and send to your own backends. Nothing reports to Pipelex.
 
     For an overview, see [Telemetry Setup](../../setup/telemetry.md).
 
@@ -140,7 +137,7 @@ Privacy controls for what data is included in spans sent to **your** PostHog.
 
 ## Portkey SDK Configuration
 
-The `[custom_portkey]` section configures the Portkey SDK behavior when using a custom Portkey backend (not the Pipelex Gateway).
+The `[custom_portkey]` section configures the Portkey SDK behavior when using the Portkey backend.
 
 ### `[custom_portkey]` Settings
 
@@ -247,7 +244,6 @@ set DO_NOT_TRACK=1
 When set, this disables:
 
 - All custom telemetry (PostHog, Langfuse, OTLP)
-- Gateway telemetry (note: Gateway won't work without telemetry)
 
 ---
 

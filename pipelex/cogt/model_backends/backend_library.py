@@ -201,14 +201,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 backend_name=backend_name,
                 declared_section=declared_model_specs_section,
             )
-            # **The tolerance below keys on the DECLARATION, not on the resolved section**, and the
-            # two come apart on exactly one name. `pipelex_gateway` is handed a section by
-            # compatibility default so a `backends.toml` written before the field keeps working, so
-            # it is managed without declaring anything — and keying on managed-ness would hand it a
-            # tolerance it never had: an unset `PIPELEX_GATEWAY_API_KEY` would stop being a boot
-            # failure with a remediation message and become a silently missing backend, which is the
-            # behaviour delta on the Portkey-cloud path this work must not make. A declaration is
-            # something only the kit writes, and only for a backend it also ships disabled.
+            # **The tolerance below keys on the DECLARATION.** A declaration is something only the
+            # kit writes, and only for a backend it also ships disabled, so it is the one signal that
+            # an installation may legitimately carry a managed backend without its variables.
             tolerates_missing_variables = declared_model_specs_section is not None
             try:
                 inference_backend_blueprint_dict = apply_to_strings_recursive(
@@ -241,12 +236,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     # joined never reaches here at all: a disabled backend is skipped above, and the
                     # one loader that asks for disabled backends asks leniently.)
                     #
-                    # Every other backend keeps today's fatal boot — `pipelex_gateway` included,
-                    # since it declares no section — because widening this would mean a user who
-                    # typos ANTHROPIC_API_KEY or PIPELEX_GATEWAY_API_KEY stops getting a boot
-                    # failure and starts getting a silently missing backend that resurfaces much
-                    # later as a model-resolution error, a behaviour delta on paths this work must
-                    # not touch.
+                    # Every other backend keeps today's fatal boot, because widening this would mean
+                    # a user who typos ANTHROPIC_API_KEY stops getting a boot failure and starts
+                    # getting a silently missing backend that resurfaces much later as a
+                    # model-resolution error.
                     log.warning(
                         f"Backend '{backend_name}' is disabled: it is a Pipelex-managed gateway backend and the variable "
                         f"'{var_not_found_exc.var_name}' it needs is not set. Set it to enable this backend, or set "
@@ -319,11 +312,6 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         # it skipped. Disabled here, quietly, because that warning was already said.
                         log.verbose(f"Skipping backend '{backend_name}': the Pipelex configuration carries no '{model_specs_section}' section")
                         continue
-                    # Only when the artifact actually carried one. The manifold service is built
-                    # without a region on purpose: nothing on its path reads it back, because its
-                    # Bedrock credentials live gateway-side.
-                    if gateway_config.aws_region is not None:
-                        extra_config["aws_region"] = gateway_config.aws_region
                     model_spec_source = ModelSpecSource.REMOTE_GATEWAY
                     model_specs_dict, backend_config_source = self._load_gateway_model_specs(
                         gateway_config=gateway_config,
@@ -477,9 +465,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         **One file, and only a local one.** The helper deep-merges the paths it is given, which is
         right for a tier stack and wrong here — backend files are independent documents that share no
-        keys, so they are replayed one at a time. And the gateway backend is left out on purpose:
+        keys, so they are replayed one at a time. And a managed gateway backend is left out on purpose:
         `GatewayConfigMerger` ignores a local `[defaults]` outright and keeps only `sdk` and
-        `structure_method` from a per-model override, so a stale key in `pipelex_gateway.toml` is
+        `structure_method` from a per-model override, so a stale key in `pipelex_manifold.toml` is
         filtered out before any spec is built and can never be what refused the load. `pipelex
         migrate` still repairs that file on disk — the surface claims every `*.toml` in the directory
         — but at boot there is nothing there to carry forward.
@@ -520,10 +508,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[BackendModelSpecs, str]:
-        """Load model specs for pipelex_gateway from remote config.
+        """Load a managed gateway backend's model specs from the remote config.
 
         Args:
-            gateway_config: Gateway configuration for Pipelex Gateway backend.
+            gateway_config: The backend's slice of the fetched artifact.
             backend_name: Name the backend library gives this gateway backend.
             backends_dir_path: Path to directory containing local override file.
             substitute_vars_with_provider: Function to substitute variables.
@@ -535,9 +523,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             InferenceBackendCredentialsError: If variable substitution fails.
         """
         # Load local overrides if they exist. The path follows the *backend's own name*, so
-        # `backends/pipelex_manifold.toml` overrides the manifold backend exactly as
-        # `backends/pipelex_gateway.toml` overrides the legacy one — and neither can reach the
-        # other's models. Built through the shared helper for the reason its docstring gives: a
+        # `backends/pipelex_manifold.toml` overrides the manifold backend and no other managed
+        # backend's models. Built through the shared helper for the reason its docstring gives: a
         # backend name is an unvalidated top-level TOML key, and a quoted absolute-path key would
         # otherwise escape the backends directory.
         path_to_local_overrides = str(backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name))

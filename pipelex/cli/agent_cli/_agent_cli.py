@@ -8,7 +8,6 @@ from mthds.runners.types import RunnerType
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.cli.agent_cli.commands.accept_gateway_terms_cmd import agent_accept_gateway_terms_cmd
 from pipelex.cli.agent_cli.commands.agent_cli_factory import silence_logging_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
@@ -47,7 +46,6 @@ class PipelexAgentCLI(TyperGroup):
             "pipe",
             "models",
             "check-model",
-            "accept-gateway-terms",
             "migrate",
             "doctor",
         ]
@@ -109,7 +107,7 @@ def app_callback(
     Free-floating logs would corrupt those channels, so Python's logging system is
     cut off process-wide via ``silence_logging_for_agent_cli`` as the very first
     action in this callback — covering every subcommand invocation (including ones
-    like ``init`` and ``accept-gateway-terms`` that bypass
+    like ``init`` that bypass
     ``make_pipelex_for_agent_cli``). The ``--version`` eager option short-circuits
     before this body runs, but its callback only does ``typer.echo`` + ``Exit`` and
     touches no log path. For verbose debugging, use the human ``pipelex`` CLI instead.
@@ -148,6 +146,5 @@ app.command(name="concept", help="Structure a concept from JSON spec and output 
 app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)
 app.command(name="models", help="List available model presets, aliases, and waterfalls")(agent_models_cmd)
 app.command(name="check-model", help="Check if a model reference is valid and suggest alternatives")(agent_check_model_cmd)
-app.command(name="accept-gateway-terms", help="Accept Pipelex Gateway terms and mark inference setup complete")(agent_accept_gateway_terms_cmd)
 app.command(name="migrate", help="Migrate this machine's Pipelex configuration files to the current schema")(agent_migrate_cmd)
 app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")(agent_doctor_cmd)

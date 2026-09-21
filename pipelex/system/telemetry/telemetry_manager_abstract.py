@@ -111,14 +111,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         pass
 
     @abstractmethod
-    def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
-        pass
-
-    @abstractmethod
-    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
-        pass
-
-    @abstractmethod
     def get_otel_tracer(self) -> "OTelTracer | None":
         """Get the OpenTelemetry tracer for GenAI spans, if configured."""
 
@@ -146,11 +138,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     @abstractmethod
     def is_langfuse_enabled(self) -> bool:
         """Whether Langfuse OTLP exporter is enabled."""
-
-    @property
-    @abstractmethod
-    def is_pipelex_telemetry_enabled(self) -> bool:
-        """Whether Pipelex internal telemetry is enabled (for gateway usage)."""
 
     @abstractmethod
     def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
@@ -192,14 +179,6 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
-        return False
-
-    @override
-    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
-        return False
-
-    @override
     def get_otel_tracer(self) -> "OTelTracer | None":
         return None
 
@@ -226,11 +205,6 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @property
     @override
     def is_langfuse_enabled(self) -> bool:
-        return False
-
-    @property
-    @override
-    def is_pipelex_telemetry_enabled(self) -> bool:
         return False
 
     @override

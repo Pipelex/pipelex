@@ -13,8 +13,6 @@ from typing import TYPE_CHECKING
 from mistralai.utils import RetryConfig
 
 from pipelex.providers.anthropic.anthropic_factory import AnthropicFactory
-from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory
-from pipelex.providers.gateway.gateway_responses_factory import GatewayResponsesFactory
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.providers.mistral.mistral_factory import MistralFactory
 from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory
@@ -134,35 +132,3 @@ class TestTransportRetryWiring:
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 8
-
-    def test_gateway_completions_factory_passes_max_retries(self, mocker: MockerFixture) -> None:
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_completions_factory.get_config",
-            return_value=_config_with(mocker, 4),
-        )
-        mocker.patch("pipelex.providers.gateway.gateway_completions_factory.GatewayFactory.is_debug_enabled", return_value=False)
-        mocker.patch("pipelex.providers.gateway.gateway_completions_factory.GatewayFactory.get_endpoint", return_value="https://gateway.test")
-        mocker.patch("pipelex.providers.gateway.gateway_completions_factory.GatewayFactory.get_api_key", return_value="gw-test")
-        mocker.patch("pipelex.providers.gateway.gateway_completions_factory.GatewayOpenAISdkVariant.is_completions", return_value=True)
-        mock_client = mocker.patch("openai.AsyncOpenAI")
-
-        GatewayCompletionsFactory.make_portkey_openai_client_for_completions(model_handle=mocker.MagicMock(), backend=mocker.MagicMock())
-
-        mock_client.assert_called_once()
-        assert mock_client.call_args.kwargs["max_retries"] == 4
-
-    def test_gateway_responses_factory_passes_max_retries(self, mocker: MockerFixture) -> None:
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_responses_factory.get_config",
-            return_value=_config_with(mocker, 9),
-        )
-        mocker.patch("pipelex.providers.gateway.gateway_responses_factory.GatewayFactory.is_debug_enabled", return_value=False)
-        mocker.patch("pipelex.providers.gateway.gateway_responses_factory.GatewayFactory.get_endpoint", return_value="https://gateway.test")
-        mocker.patch("pipelex.providers.gateway.gateway_responses_factory.GatewayFactory.get_api_key", return_value="gw-test")
-        mocker.patch("pipelex.providers.gateway.gateway_responses_factory.GatewayOpenAISdkVariant.is_responses", return_value=True)
-        mock_client = mocker.patch("openai.AsyncOpenAI")
-
-        GatewayResponsesFactory.make_portkey_openai_client_for_responses(model_handle=mocker.MagicMock(), backend=mocker.MagicMock())
-
-        mock_client.assert_called_once()
-        assert mock_client.call_args.kwargs["max_retries"] == 9

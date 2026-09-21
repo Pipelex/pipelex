@@ -1,4 +1,4 @@
-"""Fetch the Pipelex Gateway remote config with retry, cache, and provenance tracking.
+"""Fetch the Pipelex remote config with retry, cache, and provenance tracking.
 
 The fetcher is the single entry point used by ``Pipelex.setup`` and the dev/doctor CLIs.
 Its public method returns a :class:`RemoteConfigResult` carrying the parsed config plus the
@@ -44,7 +44,7 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigValidationError,
 )
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
-from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import runtime_manager
@@ -116,25 +116,15 @@ class RemoteConfigFetcher:
     def make_dummy_remote_config(cls) -> RemoteConfig:
         """Create a default RemoteConfig for testing in offline environments.
 
-        **Every managed gateway's section is present and empty, not just the legacy one.** An absent
-        section means "this backend's specs were not published" and earns a disabling warning; on
-        this path that would be a warning about a backend nobody asked for, since the boots that
-        take this branch (``pipelex-agent models``, validation, dry runs) need no specs at all.
+        **Every managed gateway's section is present and empty.** An absent section means "this
+        backend's specs were not published" and earns a disabling warning; on this path that would
+        be a warning about a backend nobody asked for, since the boots that take this branch
+        (``pipelex-agent models``, validation, dry runs) need no specs at all.
 
         Returns:
-            A minimal RemoteConfig with analytics disabled and empty model specs.
+            A minimal RemoteConfig with empty model specs.
         """
-        return RemoteConfig(
-            posthog=PipelexPosthogConfig(
-                project_api_key="",
-                endpoint="https://dummy-endpoint.pipelex.com",
-                is_geoip_enabled=False,
-                is_debug_enabled=False,
-            ),
-            backend_model_specs={},
-            aws_region="us-east-1",
-            **{MANIFOLD_MODEL_SPECS_SECTION: {}},
-        )
+        return RemoteConfig(**{MANIFOLD_MODEL_SPECS_SECTION: {}})
 
     @classmethod
     def _fetch_fresh(cls, url: str) -> tuple[dict[str, Any], RemoteConfig]:
@@ -194,12 +184,12 @@ class RemoteConfigFetcher:
         else:
             location = f"and no usable local cache is available at {cache_path}"
         msg = (
-            f"Pipelex Gateway is enabled but the remote configuration is unreachable "
+            f"A Pipelex-managed gateway backend is enabled but the remote configuration is unreachable "
             f"{location}.\n"
             f"Underlying error: {fetch_error}\n"
             "Remediation:\n"
             "  - Run `pipelex init` while online to prime the cache.\n"
-            "  - Or disable pipelex_gateway in .pipelex/inference/backends.toml to operate "
+            "  - Or disable the Pipelex-managed gateway backends in .pipelex/inference/backends.toml to operate "
             "permanently offline with your own API keys (BYOK)."
         )
         return RemoteConfigUnavailableError(msg)

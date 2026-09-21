@@ -22,7 +22,7 @@ user would be told one thing by their boot and another by their tool.
 > `inference/deck/` — is never entered at all.
 >
 > **A file is claimed by the pair (directory, name), never by its name alone.**
-> `.pipelex/inference/backends/pipelex_gateway.toml` is the specimen: its name matches the
+> `.pipelex/inference/backends/pipelex_manifold.toml` is the specimen: its name matches the
 > `pipelex-config` tier glob `pipelex_*.toml` exactly, and the directory it sits in is what says
 > it belongs to `inference-backend` instead. Depth used to be what protected it, back when no
 > surface owned a subdirectory; now the claim rule is.

@@ -84,7 +84,7 @@ class TestABackendFileIsADocumentNotAModel:
         assert describe_model_spec_document_rejection(document=document) is None
 
     def test_a_document_with_no_model_at_all_is_accepted(self) -> None:
-        """`pipelex_gateway.toml` in the kit is comments only, and the loader loads it without complaint."""
+        """`pipelex_manifold.toml` in the kit is comments only, and the loader loads it without complaint."""
         assert describe_model_spec_document_rejection(document={}) is None
 
     @pytest.mark.parametrize(

@@ -11,11 +11,9 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
-from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
-from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.exception_capture import DualClientExceptionCapture
+from pipelex.system.telemetry.exception_capture import ExceptionCapture
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
@@ -28,27 +26,16 @@ if TYPE_CHECKING:
 class TelemetryManager(TelemetryManagerAbstract):
     PRIVACY_NOTICE = "[Privacy: exception message redacted]"
 
-    def __init__(
-        self,
-        telemetry_config: TelemetryConfig,
-        remote_config: RemoteConfig | None,
-        pipelex_telemetry_enabled: bool = False,
-        gateway_api_key: str | None = None,
-    ):
-        """Initialize the TelemetryManager with custom and optional Pipelex telemetry.
+    def __init__(self, telemetry_config: TelemetryConfig):
+        """Initialize the TelemetryManager with the user's own telemetry destinations.
 
         Args:
             telemetry_config: User's telemetry configuration.
-            remote_config: Remote configuration for Pipelex Service (including telemetry).
-            pipelex_telemetry_enabled: Whether Pipelex internal telemetry is enabled (for gateway).
-            gateway_api_key: The user's Pipelex Gateway API key (required if pipelex_telemetry_enabled).
         """
         self.telemetry_config = telemetry_config
-        self._pipelex_telemetry_enabled = pipelex_telemetry_enabled
-        self._pipelex_distinct_id: str | None = None
-        self._exception_capture: DualClientExceptionCapture | None = None
+        self._exception_capture: ExceptionCapture | None = None
 
-        # Create custom PostHog client only if user's telemetry is enabled
+        # Create the PostHog client only if the user's event tracking is enabled
         self.custom_posthog_client: Posthog | None = None
         if telemetry_config.custom_posthog.mode.is_enabled:
             if not telemetry_config.custom_posthog.api_key:
@@ -62,44 +49,16 @@ class TelemetryManager(TelemetryManagerAbstract):
                 on_error=self._handle_transmission_error,
             )
 
-        # Create Pipelex PostHog client if gateway telemetry is enabled
-        self.pipelex_posthog_client: Posthog | None = None
-        if pipelex_telemetry_enabled:
-            if gateway_api_key:
-                self._pipelex_distinct_id = PipelexDetails.make_distinct_id(gateway_api_key)
-            if not remote_config:
-                msg = "Pipelex Gateway telemetry is enabled but remote config is not set"
-                raise PipelexUnexpectedError(msg)
-            pipelex_posthog_config = remote_config.posthog
-            self.pipelex_posthog_client = Posthog(
-                project_api_key=pipelex_posthog_config.project_api_key,
-                host=pipelex_posthog_config.endpoint,
-                disable_geoip=not pipelex_posthog_config.is_geoip_enabled,
-                debug=pipelex_posthog_config.is_debug_enabled,
-                on_error=self._handle_pipelex_transmission_error,
-            )
-            log.verbose("Pipelex Gateway telemetry enabled")
-
         # Create OTel tracer for AI tracing if enabled
         self._otel_tracer: OTelTracer | None
         self._tracer_provider: OTelTracerProvider | None
-        if telemetry_config.custom_posthog.tracing.enabled or pipelex_telemetry_enabled:
-            # AI tracing is enabled if either custom or pipelex telemetry wants it
-            # Create redaction config from user settings for custom telemetry
+        if telemetry_config.custom_posthog.tracing.enabled:
+            # Create redaction config from user settings
             custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
-            if telemetry_config.pipelex_gateway:
-                pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(
-                    posthog_config=telemetry_config.pipelex_gateway.posthog
-                )
-            else:
-                pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=None)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 user_id=telemetry_config.custom_posthog.user_id,
-                custom_posthog_client=self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None,
+                custom_posthog_client=self.custom_posthog_client,
                 custom_redaction_config=custom_redaction_config,
-                pipelex_posthog_client=self.pipelex_posthog_client,
-                pipelex_gateway_redaction_config=pipelex_gateway_redaction_config,
-                pipelex_distinct_id=self._pipelex_distinct_id,
                 otlp_exporters=telemetry_config.otlp,
                 langfuse_config=telemetry_config.langfuse,
             )
@@ -109,23 +68,19 @@ class TelemetryManager(TelemetryManagerAbstract):
             self._tracer_provider = None
             log.verbose("AI tracing disabled: No OpenTelemetry tracer created")
 
-        # Wrap capture_exception to sanitize before sending (for whichever clients are enabled)
+        # Wrap capture_exception to sanitize before sending
         if self.custom_posthog_client:
             self._wrap_capture_exception(self.custom_posthog_client)
-        if self.pipelex_posthog_client:
-            self._wrap_capture_exception(self.pipelex_posthog_client)
 
-        # Set global PostHog settings (prefer custom client, fall back to pipelex client)
+        # Set global PostHog settings
         posthog.privacy_mode = True
-        posthog.default_client = self.custom_posthog_client or self.pipelex_posthog_client
+        posthog.default_client = self.custom_posthog_client
 
-        # Set up dual-client exception autocapture if any client is enabled
-        if self.custom_posthog_client or self.pipelex_posthog_client:
-            self._exception_capture = DualClientExceptionCapture(
-                custom_posthog_client=self.custom_posthog_client,
-                custom_distinct_id=self.telemetry_config.custom_posthog.user_id,
-                pipelex_posthog_client=self.pipelex_posthog_client,
-                pipelex_distinct_id=self._pipelex_distinct_id,
+        # Set up exception autocapture if the client is enabled
+        if self.custom_posthog_client:
+            self._exception_capture = ExceptionCapture(
+                posthog_client=self.custom_posthog_client,
+                distinct_id=self.telemetry_config.custom_posthog.user_id,
             )
 
     def _handle_transmission_error(  # kw-only: ignore — PostHog on_error callback, invoked positionally as (error, items)
@@ -139,18 +94,6 @@ class TelemetryManager(TelemetryManagerAbstract):
         """
         if error:
             log.error(f"Telemetry transmission error: {error}")
-
-    def _handle_pipelex_transmission_error(  # kw-only: ignore — PostHog on_error callback, invoked positionally as (error, items)
-        self, error: Exception | None, _items: list[dict[str, Any]]
-    ) -> None:
-        """Handle errors that occur during Pipelex telemetry transmission.
-
-        Args:
-            error: The transmission error that occurred
-            _items: List of telemetry items that failed to send
-        """
-        if error:
-            log.debug(f"Pipelex telemetry transmission error: {error}")
 
     def _wrap_capture_exception(self, client: Posthog) -> None:
         """Wrap a PostHog client's capture_exception method to sanitize exception messages.
@@ -215,21 +158,13 @@ class TelemetryManager(TelemetryManagerAbstract):
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during TracerProvider shutdown: {exc}")
 
-        # Then shutdown custom PostHog client
+        # Then shutdown the PostHog client
         if self.custom_posthog_client:
             try:
                 self.custom_posthog_client.shutdown()
             except Exception as exc:  # ruff: ignore[blind-except]
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during custom PostHog shutdown: {exc}")
-
-        # Then shutdown Pipelex PostHog client
-        if self.pipelex_posthog_client:
-            try:
-                self.pipelex_posthog_client.shutdown()
-            except Exception as exc:  # ruff: ignore[blind-except]
-                # Suppress any shutdown errors to avoid cascading failures
-                log.debug(f"Error during Pipelex PostHog shutdown: {exc}")
 
         # Clear singleton instance
         TelemetryManagerAbstract.clear_instance()
@@ -245,7 +180,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         else:
             tracked_properties = {}
 
-        # Track to custom PostHog based on user's posthog.mode
+        # Track to PostHog based on the user's posthog.mode
         match self.telemetry_config.custom_posthog.mode:
             case PostHogMode.ANONYMOUS:
                 self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
@@ -262,10 +197,6 @@ class TelemetryManager(TelemetryManagerAbstract):
             case PostHogMode.OFF:
                 log.verbose(f"Custom telemetry is off, skipping event '{event_name}' for custom client")
 
-        # Always track to Pipelex PostHog if enabled (independent of posthog.mode)
-        if self._pipelex_telemetry_enabled:
-            self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
-
     def _track_anonymous_event(self, event_name: str, *, properties: dict[str, Any]):
         if not self.custom_posthog_client:
             log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
@@ -280,14 +211,6 @@ class TelemetryManager(TelemetryManagerAbstract):
             return
         self.custom_posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
         log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
-
-    def _track_to_pipelex(self, event_name: str, *, properties: dict[str, Any]):
-        """Track event to Pipelex's PostHog (always identified)."""
-        if not self.pipelex_posthog_client or not self._pipelex_distinct_id:
-            log.error("Could not track event to Pipelex telemetry because pipelex_posthog_client or _pipelex_distinct_id is not set")
-            return
-        self.pipelex_posthog_client.capture(event_name, distinct_id=self._pipelex_distinct_id, properties=properties)
-        log.verbose(f"Tracked event '{event_name}' to Pipelex telemetry")
 
     @override
     @contextmanager
@@ -314,43 +237,6 @@ class TelemetryManager(TelemetryManagerAbstract):
     def is_custom_portkey_tracing_enabled(self) -> bool:
         if self.telemetry_config.custom_portkey.force_tracing_enabled and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
             log.info("Force-enabling Portkey tracing because custom_portkey.force_tracing_enabled is set in telemetry configuration")
-            return True
-        else:
-            return False
-
-    @override
-    def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
-        is_debug: bool = is_debug_configured
-        if (
-            not is_debug
-            and self.telemetry_config.pipelex_gateway
-            and self.telemetry_config.pipelex_gateway.portkey
-            and self.telemetry_config.pipelex_gateway.portkey.force_debug_enabled
-        ):
-            log.verbose(
-                "Force-enabling Portkey logging (debug mode) because pipelex_gateway.portkey.force_debug_enabled is set in telemetry configuration"
-            )
-            is_debug = True
-        if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
-            log.warning(
-                f"Disabling Pipelex Gateway Portkey logging (debug mode) "
-                f"because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence"
-            )
-            is_debug = False
-        return is_debug
-
-    @override
-    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
-        if (
-            self.telemetry_config.pipelex_gateway
-            and self.telemetry_config.pipelex_gateway.portkey
-            and self.telemetry_config.pipelex_gateway.portkey.force_tracing_enabled
-            and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
-        ):
-            log.verbose(
-                "Force-enabling Pipelex Gateway Portkey tracing "
-                "because pipelex_gateway.portkey.force_tracing_enabled is set in telemetry configuration"
-            )
             return True
         else:
             return False
@@ -384,11 +270,6 @@ class TelemetryManager(TelemetryManagerAbstract):
     def is_langfuse_enabled(self) -> bool:
         return self.telemetry_config.langfuse.enabled
 
-    @property
-    @override
-    def is_pipelex_telemetry_enabled(self) -> bool:
-        return self._pipelex_telemetry_enabled
-
     @override
     def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         """Hook to do something when a trace starts.
@@ -399,8 +280,8 @@ class TelemetryManager(TelemetryManagerAbstract):
         before any batched pipe spans, establishing the correct trace name.
 
         Args:
-            trace_name: Full trace name with pipe code (for custom telemetry).
-            trace_name_redacted: Redacted trace name without pipe code (for Pipelex telemetry).
+            trace_name: Full trace name with pipe code.
+            trace_name_redacted: Redacted trace name without pipe code, used when pipe codes are not captured.
             trace_id: The trace ID.
         """
         log.verbose(
@@ -410,7 +291,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             f"  trace_id={trace_id:032x}"
         )
 
-        # Send to custom PostHog if configured (uses full trace name based on user's capture settings)
+        # Send to PostHog if configured (uses full trace name based on user's capture settings)
         if self.custom_posthog_client and self.telemetry_config.custom_posthog.tracing.enabled:
             # Use full or redacted trace name based on user's capture_pipe_codes setting
             custom_trace_name = trace_name if self.telemetry_config.custom_posthog.tracing.capture.pipe_codes else trace_name_redacted
@@ -430,24 +311,4 @@ class TelemetryManager(TelemetryManagerAbstract):
                 self.custom_posthog_client.capture(
                     event=PostHogEvent.SPAN,
                     properties=custom_properties,
-                )
-
-        # Send to Pipelex PostHog if gateway telemetry is enabled (always uses redacted trace name)
-        if self.pipelex_posthog_client:
-            pipelex_properties: dict[str, Any] = {
-                PostHogAttr.TRACE_ID: f"{trace_id:032x}",
-                PostHogAttr.SPAN_NAME: trace_name_redacted,
-                PostHogAttr.TRACE_NAME: trace_name_redacted,
-            }
-            if self._pipelex_distinct_id:
-                self.pipelex_posthog_client.capture(
-                    distinct_id=self._pipelex_distinct_id,
-                    event=PostHogEvent.SPAN,
-                    properties=pipelex_properties,
-                )
-            else:
-                pipelex_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
-                self.pipelex_posthog_client.capture(
-                    event=PostHogEvent.SPAN,
-                    properties=pipelex_properties,
                 )

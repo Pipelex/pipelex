@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.kit.paths import get_kit_configs_dir
@@ -53,13 +53,15 @@ enabled = true
 api_key = "sk-not-a-real-key-either"
 """
 
-GATEWAY_BACKENDS_TOML = """
-[pipelex_gateway]
+MANIFOLD_BACKENDS_TOML = f"""
+[pipelex_manifold]
 enabled = true
+model_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"
+endpoint = "https://manifold.example.com"
 api_key = "sk-not-a-real-key"
 """
 
-GATEWAY_SERVED_SPECS: dict[str, Any] = {
+MANIFOLD_SERVED_SPECS: dict[str, Any] = {
     "defaults": {"model_type": "llm", "sdk": "openai_responses", "thinking_mode": "none"},
     "gpt-4o": {"model_id": "gpt-4o"},
 }
@@ -252,8 +254,8 @@ class TestAStaleBackendDirectory:
 
         assert retry.call_count == 0
 
-    def test_a_stale_gateway_override_never_reaches_the_loader_at_all(self, machine: Path) -> None:
-        """The gateway's local file is the one backend file a stale key cannot break, and here is why.
+    def test_a_stale_managed_gateway_override_never_reaches_the_loader_at_all(self, machine: Path) -> None:
+        """A managed gateway's local file is the one backend file a stale key cannot break, and here is why.
 
         `GatewayConfigMerger` ignores a local `[defaults]` outright and keeps only `sdk` and
         `structure_method` from a per-model override, so the retired key is filtered out before any
@@ -262,17 +264,17 @@ class TestAStaleBackendDirectory:
         path would need one too. `pipelex migrate` still repairs the file on disk: it is a `*.toml`
         in the directory the surface owns, and the walk claims it like any other.
         """
-        gateway_file = self._backends_dir(machine) / f"{PipelexBackend.GATEWAY}.toml"
+        gateway_file = self._backends_dir(machine) / f"{PipelexBackend.MANIFOLD}.toml"
         gateway_file.write_text(f'[defaults]\n{RETIRED_KEY} = "openai"\n\n[gpt-4o]\n{RETIRED_KEY} = "openai"\n', encoding="utf-8")
 
         library = self._load(
             machine,
             lenient=False,
-            library_body=GATEWAY_BACKENDS_TOML,
-            managed_gateway_configs={PipelexBackend.GATEWAY: GatewayConfig(model_specs=GATEWAY_SERVED_SPECS, aws_region="eu-west-1")},
+            library_body=MANIFOLD_BACKENDS_TOML,
+            managed_gateway_configs={PipelexBackend.MANIFOLD: GatewayConfig(model_specs=MANIFOLD_SERVED_SPECS)},
         )
 
-        backend = library.get_inference_backend(backend_name=PipelexBackend.GATEWAY)
+        backend = library.get_inference_backend(backend_name=PipelexBackend.MANIFOLD)
         assert backend is not None
         assert backend.model_specs["gpt-4o"].model_id == "gpt-4o", "the served spec is what loads, untouched"
         assert library.take_stale_configuration_warning() is None

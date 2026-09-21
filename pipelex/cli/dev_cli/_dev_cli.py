@@ -11,7 +11,6 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
-from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.check_hub_layering_cmd import check_hub_layering_cmd
 from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import check_keyword_only_cmd
 from pipelex.cli.dev_cli.commands.check_ledger_cmd import check_ledger_cmd
@@ -33,7 +32,6 @@ from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import trace_input_semantics_cmd
-from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.update_migration_schemas_cmd import update_migration_schemas_cmd
 from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
@@ -47,7 +45,6 @@ class PipelexDevCLI(TyperGroup):
         """List commands in proper order."""
         return [
             "check-config-sync",
-            "check-gateway-models",
             "check-hub-layering",
             "check-keyword-only",
             "check-ledger",
@@ -69,7 +66,6 @@ class PipelexDevCLI(TyperGroup):
             "sync-kit-configs",
             "sync-main-config",
             "trace-input-semantics",
-            "update-gateway-models",
             "update-migration-schemas",
         ]
 
@@ -258,27 +254,6 @@ def generate_mthds_schema_command(
     try:
         output_path = Path(output) if output else None
         generate_mthds_schema_cmd(output=output_path, quiet=quiet)
-    except (typer.Exit, typer.Abort):
-        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
-        raise
-    except Exception:  # ruff: ignore[blind-except]
-        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
-        console = get_console()
-        console.print()
-        console.print("[bold red]Unexpected error occurred[/bold red]")
-        console.print()
-        console.print(Traceback())
-        sys.exit(1)
-
-
-@app.command(name="check-gateway-models", help="Verify that gateway models reference is up-to-date")
-def check_gateway_models_command(
-    show_diff: Annotated[bool, typer.Option("--show-diff/--no-diff", help="Show differences if found")] = True,
-    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
-) -> None:
-    """Verify that the Pipelex Gateway models reference file is up-to-date."""
-    try:
-        check_gateway_models_cmd(show_diff=show_diff, quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
@@ -572,26 +547,6 @@ def refresh_graph_ui_sri_command(
             elkjs_version=elkjs_version,
             quiet=quiet,
         )
-    except (typer.Exit, typer.Abort):
-        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
-        raise
-    except Exception:  # ruff: ignore[blind-except]
-        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
-        console = get_console()
-        console.print()
-        console.print("[bold red]Unexpected error occurred[/bold red]")
-        console.print()
-        console.print(Traceback())
-        sys.exit(1)
-
-
-@app.command(name="update-gateway-models", help="Update the gateway models reference file")
-def update_gateway_models_command(
-    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
-) -> None:
-    """Update the Pipelex Gateway models reference file from remote config."""
-    try:
-        update_gateway_models_cmd(quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

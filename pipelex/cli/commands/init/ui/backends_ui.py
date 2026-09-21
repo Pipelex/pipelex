@@ -13,6 +13,9 @@ from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
+# The backend `pipelex init` pre-selects on a first-time setup: the one-key path to most of the catalog.
+RECOMMENDED_INIT_BACKEND = "openrouter"
+
 
 def get_backend_options_from_toml(template_path: Path, *, existing_path: Path | None = None) -> list[tuple[str, str]]:
     """Get backend options dynamically from TOML files.
@@ -56,6 +59,24 @@ def get_backend_options_from_toml(template_path: Path, *, existing_path: Path | 
                 seen_backends.add(backend_key)
 
     return backend_options
+
+
+def default_backend_index(*, backend_options: list[tuple[str, str]]) -> int:
+    """The 0-based index of the backend a first-time setup pre-selects.
+
+    OpenRouter is the one-key path: a single key reaches most of the catalog, and it needs no
+    Pipelex account. Falls back to the first option when the template does not list it.
+
+    Args:
+        backend_options: List of tuples (backend_key, display_name).
+
+    Returns:
+        The index of the recommended backend in ``backend_options``.
+    """
+    for index, (backend_key, _) in enumerate(backend_options):
+        if backend_key == RECOMMENDED_INIT_BACKEND:
+            return index
+    return 0
 
 
 def get_currently_enabled_backends(backends_toml_path: Path, *, backend_options: list[tuple[str, str]]) -> list[int]:
@@ -140,7 +161,7 @@ def build_backend_selection_panel(
         description = Text(
             "Select which inference backends you have access to.\n"
             "Enter numbers separated by commas or spaces (e.g., '1,5,6' or '1 5 6'), 'a' for all.\n"
-            "Press Enter for the recommended default (1).",
+            f"Press Enter for the recommended default ({default_backend_index(backend_options=backend_options) + 1}).",
             style="dim",
         )
 
@@ -171,14 +192,14 @@ def prompt_backend_select(
     Raises:
         typer.Exit: If user chooses to quit.
     """
-    # Determine default based on current selection or fallback to first option (pipelex_gateway)
+    # Determine default based on current selection, or fall back to the recommended backend
     if currently_enabled and not is_first_time_setup:
         default_indices = sorted(currently_enabled)
         default_str = ",".join(str(i + 1) for i in default_indices)
     else:
-        # For first-time setup or no current selection, default to pipelex_gateway (index 0)
-        default_indices = [0]
-        default_str = "1"
+        # For first-time setup or no current selection, default to the recommended backend
+        default_indices = [default_backend_index(backend_options=backend_options)]
+        default_str = str(default_indices[0] + 1)
 
     selected_indices: list[int] = []
     while True:

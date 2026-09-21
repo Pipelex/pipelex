@@ -7,7 +7,7 @@ description: >
   every backend it lands on, and the changelog entry. Use when the user says "add a
   model", "add GPT-X", "add Claude X", "add Gemini X", "new model", "register a model",
   "support model X", "add model to backend", or names a model that no backend TOML
-  declares yet and wants it available. The Pipelex Gateway and Manifold catalogs are
+  declares yet and wants it available. The Pipelex Manifold catalog is
   not in this repository: in the Pipelex workspace, the workspace-level `/add-model`
   carries a model through them and runs this skill as its pipelex leg.
 ---
@@ -16,7 +16,7 @@ description: >
 
 A model is added once per backend that serves it. Each backend TOML under `.pipelex/inference/backends/` declares the models that backend can call, the kit copy under `pipelex/kit/configs/` is what ships in the package, and `.pipelex-dev/test_profiles.toml` decides which models the parametrized inference tests can select. Those are the files that declare a model; the steps below also write the changelog, and regenerate the goldens and references that follow from them.
 
-Two backends are different: `pipelex_gateway` and `pipelex_manifold` take their model catalogs from the **remote config**, a versioned artifact the runtime fetches at boot from the URL in `pipelex/system/pipelex_service/pipelex_details.py` (overridable with `PIPELEX_REMOTE_CONFIG_URL`). Their local TOMLs only let a user override `sdk` and `structure_method` per model, so a model cannot be added to them from here. See step 8.
+One backend is different: `pipelex_manifold` takes its model catalog from the **remote config**, a versioned artifact the runtime fetches at boot from the URL in `pipelex/system/pipelex_service/pipelex_details.py` (overridable with `PIPELEX_REMOTE_CONFIG_URL`). Its local TOML only lets a user override `sdk` and `structure_method` per model, so a model cannot be added to it from here. See step 8.
 
 ## 1. Establish the facts, from the provider
 
@@ -71,22 +71,16 @@ For an LLM, go past `TestLLMInference` and exercise what the entry declares: `Te
 
 ## 7. Deck, changelog, checks
 
-- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-gpt`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once the gateway catalog carries the model (step 8): under the default `all_pipelex_gateway` routing, a preset or choice default reaching a handle the catalog lacks raises `GatewayUnknownModelError` at boot, and `make tb` turns red. An alias no preset or choice default reaches is not checked at all, so a dangling one ships silently: read the deck yourself rather than trusting the boot. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
+- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-gpt`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once a shipped backend serves the model: under the default `all_enabled_backends` routing, a preset or choice default reaching a handle no enabled backend serves is dropped from the deck with a warning, and under `all_pipelex_manifold` a handle the manifold catalog lacks raises `GatewayUnknownModelError` at boot, so `make tb` turns red. An alias no preset or choice default reaches is not checked at all, so a dangling one ships silently: read the deck yourself rather than trusting the boot. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
 - **Changelog.** One bullet under `## [Unreleased]` → `### Added` in `CHANGELOG.md`: the handle, the backends, what it takes and produces, and anything unusual such as a refused parameter.
 - **Checks.** `make tb` boots the config, which parses and validates the backends `backends.toml` enables — and only those, so an entry added to a disabled backend such as `vertexai` is never read. To validate one, enable that backend in the gitignored `.pipelex/inference/backends_override.toml` for the run, and delete the file afterwards. Then stage your changes (the drift digest reads the git index) and run `make agent-check`.
 
-## 8. The gateway and manifold catalogs
+## 8. The manifold catalog
 
-This repository cannot add the model to `pipelex_gateway` or `pipelex_manifold`: their catalogs are published by the Pipelex team in the remote config. Tell the user so, and say which handle, model ids and capabilities the catalogs need. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
+This repository cannot add the model to `pipelex_manifold`: its catalog is published by the Pipelex team in the remote config. Tell the user so, and say which handle, model ids and capabilities the catalogs need. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
 
-Once a remote config carrying the model is published at the version this repository pins, regenerate the gateway model reference that ships in the package, then check it against that artifact:
+Once a remote config carrying the model is published at the version this repository pins, `/test-model` on `pipelex_manifold` proves the model end to end through the service.
 
-```bash
-make ugm   # update-gateway-models: rewrites pipelex_gateway_models*.md in .pipelex/ and the kit
-make cgm   # check-gateway-models: both copies match the published artifact
-```
-
-Then `/test-model` on `pipelex_gateway` proves the model end to end through the gateway.
 
 ## Checklist
 
@@ -97,7 +91,7 @@ Show this to the user at the end, each box ticked or explained:
 - [ ] Kit synced (`make ukc`, `make ccs`), and the migration goldens if `portkey.toml` moved (`make umig`, `make cmig`)
 - [ ] Handle in its test collection
 - [ ] Live tests pass on every backend in the footprint, for every capability declared
-- [ ] Deck left alone, or the promotion decided by the user, made after the gateway catalog carries the model, and mirrored in `docs/`
+- [ ] Deck left alone, or the promotion decided by the user, made after a shipped backend serves the model, and mirrored in `docs/`
 - [ ] Changelog entry under `[Unreleased]`
 - [ ] `make tb` and `make agent-check` green
-- [ ] Gateway and manifold catalogs handed off, and `make ugm` then `make cgm` run once they are published
+- [ ] Manifold catalog handed off, and `/test-model` on `pipelex_manifold` run once it is published

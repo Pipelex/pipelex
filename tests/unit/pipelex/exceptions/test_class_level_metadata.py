@@ -29,7 +29,6 @@ from pipelex.plugins.exceptions import UnknownSecretsMethodError, UnknownStorage
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.pipelex_service.exceptions import (
-    GatewayTermsNotAcceptedError,
     PipelexServiceConfigValidationError,
     PipelexServiceError,
     RemoteConfigFetchError,
@@ -65,7 +64,6 @@ class TestClassLevelMetadata:
             ("service_base", PipelexServiceError("boom"), ErrorDomain.CONFIG),
             ("service_config_validation", PipelexServiceConfigValidationError("boom"), ErrorDomain.CONFIG),
             ("remote_config_fetch", RemoteConfigFetchError("boom"), ErrorDomain.CONFIG),
-            ("gateway_terms", GatewayTermsNotAcceptedError(), ErrorDomain.CONFIG),
             ("env_var_not_found", EnvVarNotFoundError("boom"), ErrorDomain.CONFIG),
         ],
     )

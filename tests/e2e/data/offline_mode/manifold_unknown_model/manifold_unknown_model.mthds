@@ -1,0 +1,12 @@
+domain      = "offline_manifold_unknown"
+description = "Pipeline referencing a manifold model that does NOT exist in the cached manifold specs"
+main_pipe   = "manifold_unknown_pipe"
+
+[pipe]
+[pipe.manifold_unknown_pipe]
+type        = "PipeLLM"
+description = "Single LLM step using a manifold model handle that is intentionally absent from the test fixture"
+inputs      = { topic = "Text" }
+output      = "Text"
+model       = "gpt-future-fake-99"
+prompt      = "Write a single sentence about $topic.text."

@@ -127,15 +127,11 @@ make generate-error-pages     - Generate one docs page per PipelexError subclass
 make gep                      - Shorthand -> generate-error-pages
 make generate-error-identity  - Regenerate the committed PipelexError wire-identity snapshot
 make gei                      - Shorthand -> generate-error-identity
-make update-gateway-models    - Update gateway models reference
-make ugm                      - Shorthand -> update-gateway-models
-make check-gateway-models     - Check gateway models reference is up-to-date
-make cgm                      - Shorthand -> check-gateway-models
 make regenerate-test-models   - Regenerate test model fixtures from backend configs
 make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
-make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
+make up                       - Shorthand -> generate-mthds-schema up-kit-configs rules
 make cleanenv                 - Remove virtual env
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
@@ -166,7 +162,6 @@ make tp                       - Shorthand -> test-with-prints
 make tb                       - Shorthand -> `make test-with-prints TEST=test_boot`
 make test-inference           - Run unit tests only for inference (with prints)
 make ti                       - Shorthand -> test-inference
-make ticc                     - Shorthand -> test config coverage (all Portkey configs)
 make tip                      - Shorthand -> test-inference-with-prints (parallelized inference tests)
 make test-llm			      - Run unit tests only for llm (with prints)
 make tl                       - Shorthand -> test-llm
@@ -240,7 +235,7 @@ export HELP
 	check-ledger cl check-migration-schemas cmig up-migration-schemas up-migration-schemas-force umig umigf \
 	generate-error-pages generate-error-pages-quiet gep \
 	generate-error-identity generate-error-identity-quiet gei \
-	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
+	up \
 	test-count check-test-badge \
 	ts-toolchain test-ts-gates ttg \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -493,23 +488,6 @@ generate-error-identity-quiet: env
 
 gei: generate-error-identity
 	@echo "> done: gei = generate-error-identity"
-
-update-gateway-models: env
-	$(call PRINT_TITLE,"Updating gateway models reference")
-	$(VENV_PIPELEX_DEV) update-gateway-models
-
-update-gateway-models-quiet: env
-	$(VENV_PIPELEX_DEV) update-gateway-models --quiet
-
-ugm: update-gateway-models
-	@echo "> done: ugm = update-gateway-models"
-
-check-gateway-models: env
-	$(call PRINT_TITLE,"Checking gateway models reference is up-to-date")
-	$(VENV_PIPELEX_DEV) check-gateway-models --quiet
-
-cgm: check-gateway-models
-	@echo "> done: cgm = check-gateway-models"
 
 sync-main-config: env
 	$(call PRINT_TITLE,"Syncing main config to kit and project configs")
@@ -791,12 +769,6 @@ tip: test-inference-with-prints
 
 ti: test-inference-fast
 	@echo "> done: ti-fast = test-inference-fast"
-
-ticc: env
-	$(call PRINT_TITLE,"Config coverage inference testing")
-	@$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile all_configs_gw --quiet
-	$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE -k "TestConfigCoverage" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,)))
-	@echo "> done: ticc = test-inference config coverage (all Portkey configs)"
 
 ti-dry: env
 	$(call PRINT_TITLE,"Unit testing")
@@ -1263,17 +1235,17 @@ vg: view-graph
 c: check-keyword-only format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet c
-	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema generate-corpus-vocabulary update-gateway-models format lint pyright mypy"
+cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet generate-corpus-vocabulary-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema generate-corpus-vocabulary format lint pyright mypy"
 
 # `up-migration-schemas` is deliberately NOT part of this aggregate. Every other regenerator here
 # rewrites a derived artifact from a live source; the migration head golden is a *proof obligation*
 # the coverage gate reads, so folding it into a habitual bulk regeneration would let a removal be
 # erased by muscle memory. Run `make umig` on purpose, and read its diff.
-up: generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet up-kit-configs rules
-	@echo "> done: up = generate-mthds-schema generate-corpus-vocabulary update-gateway-models up-kit-configs rules"
+up: generate-mthds-schema-quiet generate-corpus-vocabulary-quiet up-kit-configs rules
+	@echo "> done: up = generate-mthds-schema generate-corpus-vocabulary up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet check-unused-imports check-config-sync check-rules check-urls check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
 agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering drift-check

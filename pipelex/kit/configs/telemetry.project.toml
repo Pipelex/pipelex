@@ -10,9 +10,7 @@
 # Leave it commented out to inherit your global telemetry settings unchanged.
 # Uncomment a key (or whole section) to override it for this project only.
 #
-# NOTE: When using Pipelex Gateway, identified telemetry is automatically enabled
-# (tied to your Gateway API key, hashed for security). This is independent of the
-# settings below — you can have both.
+# Everything below is off unless you turn it on, and nothing here reports to Pipelex.
 #
 # To disable all telemetry, set the DO_NOT_TRACK=1 environment variable.
 #
