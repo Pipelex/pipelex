@@ -38,8 +38,10 @@ for_object = "@default-general"
 #
 # The ladder runs over the GPT-5.6 range and nothing else: luna is the cheap tier, terra the
 # intermediate one that carries most of the deck, and sol the premium tier. Read an alias as the job
-# it names rather than as a model: repointing a tier is a one-line change here and every preset
-# follows.
+# it names rather than as a model: repointing a tier is a one-line change here, and every preset
+# that goes through an alias follows. The four that name a handle outright — `retrieval-cheap`,
+# `retrieval-premium`, `engineering-code-cheap` and `engineering-code-cheaper` — do not, and have to
+# be repointed with it.
 
 [llm.aliases]
 best-gpt = "gpt-5.6-sol"
@@ -61,7 +63,7 @@ default-small-creative = "gpt-5.6-luna"
 ####################################################################################################
 
 # Every preset here carries temperature = 1, because every model this deck resolves to — the whole
-# GPT-5.6 range and the GPT-6 flagship — fixes its temperature at 1. Declaring anything else would be
+# GPT-5.6 range — fixes its temperature at 1. Declaring anything else would be
 # overridden by the worker and warned about on every single call, so the deck states the value the
 # model will actually use. Presets are therefore distinguished by their model tier and their
 # reasoning effort, not by temperature. If a tier ever moves to a model that accepts a temperature,
@@ -78,7 +80,7 @@ writing-creative-cheap = { model = "@default-small-creative", temperature = 1, d
 # Retrieval
 retrieval = { model = "@default-large-context-text", temperature = 1, description = "Data retrieval from large text corpora" }
 retrieval-cheap = { model = "gpt-5.6-luna", temperature = 1, description = "Cheap data retrieval from large text corpora" }
-retrieval-premium = { model = "gpt-5.6-terra", temperature = 1, description = "Premium data retrieval with highest accuracy" }
+retrieval-premium = { model = "gpt-5.6-terra", temperature = 1, reasoning_effort = "high", description = "Premium data retrieval with highest accuracy" }
 
 # Engineering
 engineering-structured = { model = "@default-premium-structured", temperature = 1, description = "Structured engineering output (JSON, schemas)" }
