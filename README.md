@@ -115,8 +115,8 @@ pipelex init
 
 ## Configure AI Access
 
-- **Pipelex Gateway (Recommended)** — Free credits, single API key for LLMs, OCR / document extraction, and image generation across all major providers. [Get your key](https://app.pipelex.com/), add `PIPELEX_GATEWAY_API_KEY=your-key-here` to `~/.pipelex/.env`, run `pipelex init`.
-- **Bring Your Own Keys** — Use existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
+- **Bring Your Own Keys (Recommended)** — Use your own API keys from OpenAI, Anthropic, Google, Mistral and the other providers, one key per provider; or a single [OpenRouter](https://openrouter.ai/) key to reach many models at once. Add them to `~/.pipelex/.env` and run `pipelex init`. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
+- **Hosted Pipelex API** — Run your methods on Pipelex's infrastructure with no provider keys of your own: sign up at [app.pipelex.com](https://app.pipelex.com/), create a Pipelex API key, and call the API. See the [Pipelex API documentation](https://docs.pipelex.com/).
 - **Local AI** — Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 
 
@@ -538,7 +538,7 @@ uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,link
 
 ---
 
-**Privacy & Telemetry** — Pipelex Gateway collects only technical data (model names, token counts, latency) — never prompts or business data. If you want to avoid Gateway telemetry, disable `pipelex_gateway` and use your own provider keys or local AI instead. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/)
+**Privacy & Telemetry** — When you run a method locally with your own provider keys, your prompts and your data go straight from your machine to the provider you configured. Telemetry is opt-in and yours: point Pipelex at your own PostHog project if you want event tracking or AI span traces, and configure exactly what those spans carry. It is off until you turn it on, and `DO_NOT_TRACK=1` keeps it off everywhere. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/)
 
 **Contributing** — We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md).
 
