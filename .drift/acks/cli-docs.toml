@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:106c7b09f674096aaa1c469914b38a86faf7dcb8919ae1d13cedafa12904a481"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-09-18T19:26:40Z"
-rationale = "The stdin resolver's shape refusal moved off the JSONDecodeError label onto its own synthetic StdinEnvelopeShapeError, with a matching AGENT_ERROR_HINTS/AGENT_ERROR_DOMAINS entry. docs/tools/cli/agent-cli.md's stdin paragraph now names that label and why it is not a decode error, and its --with-memory line now says the receiving method must declare the same <domain>.<Code>, since the ref travels with its domain and a method declaring another one refuses it. The error envelope block documents error_type generically and needed no change, and pipelex/cli/agent_cli/CLAUDE.md already describes synthetic labels as the sanctioned mechanism for a failure with no exception class, which is exactly what this is."
+digest = "sha256:3bbf5f40906a0b8af13238f3f78a01fdeb90eed363620f7f881dfd7ec46b59c0"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-09-20T20:19:19Z"
+rationale = "Reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md against the trigger. The only change to check_model_cmd.py is the argument-help example, which moves from the retired @best-claude alias to @best-gpt now that the shipped deck is Azure-only. Neither review target quotes that example or any deck alias: agent-cli.md and the agent-CLI contract doc describe check-model's flags and output modes generically, and update.md describes the managed/override file split without naming a single alias or model handle. No doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -14,7 +14,7 @@ rationale = "The stdin resolver's shape refusal moved off the JSONDecodeError la
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:ba63ff317613e9be35677fca949f0991a6f6c47e"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:3dc0283ef1daee4e17183b01f8a5c9d92f2688af"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:ff33446143044332983a0cb7b204b8eca349795a"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:91589e517509248a4639a37e82f46a69538f8071"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"

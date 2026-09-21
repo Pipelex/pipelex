@@ -2140,10 +2140,6 @@ rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
 param = "waterfall_name"
 rationale = "Operates on the waterfall_name; single operand (qualifiers keyword-only)."
 
-["pipelex/cogt/models/model_deck.py::ModelDeck._validate_llm_setting"]
-param = "llm_setting"
-rationale = "Verb–object: validates/checks the llm_setting; single operand."
-
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_extract"]
 param = "name"
 rationale = "Verb–object: validates/checks the name; single operand."
@@ -2163,10 +2159,6 @@ rationale = "Verb–object: validates/checks the name; single operand."
 ["pipelex/cogt/models/model_deck.py::ModelDeck.check_llm_choice"]
 param = "llm_choice"
 rationale = "Verb–object: validates/checks the llm_choice; single operand."
-
-["pipelex/cogt/models/model_deck.py::ModelDeck.final_validate"]
-param = "deck"
-rationale = "Verb–object: validates/checks the deck; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_aliases_and_waterfalls_for_type"]
 param = "model_type"
