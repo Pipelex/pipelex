@@ -49,7 +49,7 @@ Raised by the official code review in round 3. `engineering-codebase-analysis` n
 
 The reviewer read this as an unremarked side effect of the sweep, and the verifier refuted that reading: `design.md` decision 4 names the repointing explicitly and `plan.md` Phase 3 repeats it as an instruction, and it was forced, since `best-gemini` is one of the provider-named aliases decision 8 removes. The alias was equally unreachable on `origin/dev`, where the preset reached its model through `@best-gemini`. So the framing is rejected and the design question is what remains: the preset's description is still "Large codebase analysis", the alias exists for exactly that job, and the cost and determinism deltas are real.
 
-**Resolved**: the follow-up deck change that moved the ladder onto the GPT-5.6 range repointed `engineering-codebase-analysis` at `@default-large-context-code`, which now resolves to `gpt-5.6-sol` (input 4.0 / output 20.0). The alias is reached by a preset, so the boot-time membership check exercises it and it can no longer rot silently.
+**Resolved**: the follow-up deck change that moved the ladder onto the GPT-5.6 range repointed `engineering-codebase-analysis` at `@default-large-context-code`, which now resolves to `gpt-5.6-terra` (input 2.0 / output 12.0). The alias is reached by a preset, so the boot-time membership check exercises it and it can no longer rot silently.
 
 ## Unverified deferrals from round 3
 

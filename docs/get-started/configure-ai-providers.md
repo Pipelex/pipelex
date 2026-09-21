@@ -171,7 +171,7 @@ Learn more in our [Inference Backend Configuration](../configuration/config-tech
 
 The deck files `pipelex init` installs resolve the language, image-generation and document-extraction defaults to models the Pipelex Gateway serves from Azure, so a fresh install runs inside one provider's scope without you choosing anything:
 
-- **Language models** — the whole ladder is the GPT-5.6 range: the premium tier, `best-gpt` and the large-context-code tier are GPT-5.6 Sol, the general and large-context-text tiers are GPT-5.6 Terra, and the small tiers are GPT-5.6 Luna.
+- **Language models** — the whole ladder is the GPT-5.6 range: the premium tier and `best-gpt` are GPT-5.6 Sol, the general and large-context tiers are GPT-5.6 Terra, and the small tiers are GPT-5.6 Luna.
 - **Image generation** — the general and premium tiers are GPT Image 2, the small tier is GPT Image 1 mini.
 - **Document extraction** — Azure Document Intelligence. `default-text-from-pdf` and `default-no-inference` are the exception within that family: they read the PDF locally with pypdfium2 and call no model, so they need no key of any kind.
 
