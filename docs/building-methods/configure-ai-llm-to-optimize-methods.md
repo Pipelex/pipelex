@@ -28,8 +28,8 @@ An LLM handle can be either:
 ```toml
 [llm.aliases]
 best-gpt = "gpt-6-astra"
-default-general = "gpt-5.4"
-default-small = "gpt-5.4-nano"
+default-general = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.

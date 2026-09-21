@@ -472,10 +472,10 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 best-gpt = "gpt-6-astra"
 
 # Default aliases (used in presets)
-default-general = "gpt-5.4"
+default-general = "gpt-5.6-terra"
 default-premium = "gpt-6-astra"
-default-large-context-text = "gpt-5.4"
-default-small = "gpt-5.4-nano"
+default-large-context-text = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 When using aliases in `.mthds` files or other configurations, prefix them with `@`:
