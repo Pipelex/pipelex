@@ -10,6 +10,7 @@ from pipelex.system.telemetry.telemetry_identity import TelemetryIdentity
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
     from posthog import Posthog
+    from posthog.args import ExceptionArg
 
 
 class DualClientExceptionCapture:
@@ -29,7 +30,7 @@ class DualClientExceptionCapture:
 
     # What PostHog stamps onto an error once a client has captured it. Every
     # later `capture_exception` of that same object returns without sending.
-    _POSTHOG_CAPTURE_MARKS = ("__posthog_exception_captured", "__posthog_exception_uuid")
+    POSTHOG_CAPTURE_MARKS = ("__posthog_exception_captured", "__posthog_exception_uuid")
 
     def __init__(
         self,
@@ -77,11 +78,18 @@ class DualClientExceptionCapture:
         self,
         exc_info: tuple[type[BaseException], BaseException | None, TracebackType | None],
     ) -> None:
-        """Capture exception to both PostHog clients."""
+        """Capture exception to both PostHog clients.
+
+        An error already marked when the hook runs was captured by the host
+        before it escaped, and is not sent again. Otherwise the mark the first
+        stream leaves is cleared before the second, and only then.
+        """
         exc_type, exc_value, exc_traceback = exc_info
 
         # Skip if no actual exception value (can happen with threading.excepthook)
         if exc_value is None:
+            return
+        if self.is_marked_as_captured(exception=exc_value):
             return
 
         # Create the properly typed tuple for PostHog
@@ -102,6 +110,7 @@ class DualClientExceptionCapture:
 
         # Send to Pipelex PostHog client
         if self._pipelex_client:
+            self._forget_posthog_capture_marks(exc_value=exc_value)
             self._capture_to_client(
                 client=self._pipelex_client,
                 identity=self._pipelex_identity,
@@ -125,7 +134,6 @@ class DualClientExceptionCapture:
         rejects a null one and would otherwise mint a person for it.
         """
         try:
-            self._forget_posthog_capture_marks(exc_value=posthog_exc_info[1])
             if identity.distinct_id:
                 client.capture_exception(posthog_exc_info, distinct_id=identity.distinct_id, groups=identity.groups or None)
             else:
@@ -145,9 +153,33 @@ class DualClientExceptionCapture:
         all, and the Gateway stream, which is always second, would never record
         a crash on a machine that also reports to an operator's own project.
 
-        The marks left by the last stream to capture stay in place, so the
-        guard still holds for anything downstream of this class.
+        It runs only between the two streams, never before the first: a mark
+        already present when the hook ran is the host's own capture, and
+        `_capture_exception` has skipped that error. The marks left by the last
+        stream to capture stay in place, so the guard still holds for anything
+        downstream of this class.
         """
-        for mark in cls._POSTHOG_CAPTURE_MARKS:
+        for mark in cls.POSTHOG_CAPTURE_MARKS:
             if hasattr(exc_value, mark):
                 delattr(exc_value, mark)
+
+    @classmethod
+    def is_marked_as_captured(cls, *, exception: "ExceptionArg") -> bool:
+        """Whether PostHog has already sent this error, from any client, bare or as the triple."""
+        exception_value = exception[1] if isinstance(exception, tuple) else exception
+        return exception_value is not None and hasattr(exception_value, cls.POSTHOG_CAPTURE_MARKS[0])
+
+    @classmethod
+    def carry_capture_marks(cls, *, source: "ExceptionArg | None", target: "ExceptionArg | None") -> None:
+        """Copy PostHog's capture marks from the error that was sent onto the error the caller holds.
+
+        The two differ when the sent one is a redacted copy. Either argument may
+        be bare or the `(type, value, traceback)` triple, as PostHog accepts both.
+        """
+        source_value = source[1] if isinstance(source, tuple) else source
+        target_value = target[1] if isinstance(target, tuple) else target
+        if source_value is None or target_value is None or source_value is target_value:
+            return
+        for mark in cls.POSTHOG_CAPTURE_MARKS:
+            if hasattr(source_value, mark):
+                setattr(target_value, mark, getattr(source_value, mark))

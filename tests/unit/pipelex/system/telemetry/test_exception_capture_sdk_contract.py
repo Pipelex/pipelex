@@ -159,3 +159,112 @@ class TestExceptionCaptureSdkContract:
 
         assert custom_capture.call_args.kwargs["distinct_id"] == "operator-user"
         assert pipelex_capture.call_args.kwargs["distinct_id"] == "gateway-hash"
+
+    def test_a_pipelex_error_raised_as_the_cause_is_redacted(self, mocker: MockerFixture) -> None:
+        """PostHog sends every error it reaches through `__cause__`, not only the one at the top."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        pipelex_client, pipelex_capture = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
+        capture = _make_dual_capture(custom_client=custom_client, pipelex_client=pipelex_client)
+
+        try:
+            try:
+                raise ToolError(_CONFIDENTIAL_MESSAGE)
+            except ToolError as pipelex_error:
+                wrapper_message = "wrapper"
+                raise RuntimeError(wrapper_message) from pipelex_error
+        except RuntimeError as crash:
+            _crash(capture=capture, error=crash)
+
+        for capture_mock in (custom_capture, pipelex_capture):
+            sent = _sent_exception_values(capture_mock=capture_mock)
+            assert _CONFIDENTIAL_MESSAGE not in sent
+            assert TelemetryManager.PRIVACY_NOTICE in sent
+            assert "wrapper" in sent
+
+    def test_a_pipelex_error_being_handled_when_another_is_raised_is_redacted(self, mocker: MockerFixture) -> None:
+        """An error raised inside `except PipelexError` carries it as `__context__`, which PostHog sends too."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        pipelex_client, pipelex_capture = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
+        capture = _make_dual_capture(custom_client=custom_client, pipelex_client=pipelex_client)
+
+        try:
+            try:
+                raise ToolError(_CONFIDENTIAL_MESSAGE)
+            except ToolError:
+                handling_message = "while handling"
+                raise RuntimeError(handling_message)  # ruff: ignore[raise-without-from-inside-except] — the implicit __context__ is what this test exercises
+        except RuntimeError as crash:
+            _crash(capture=capture, error=crash)
+
+        for capture_mock in (custom_capture, pipelex_capture):
+            assert _CONFIDENTIAL_MESSAGE not in _sent_exception_values(capture_mock=capture_mock)
+
+    def test_a_pipelex_error_inside_an_exception_group_is_redacted(self, mocker: MockerFixture) -> None:
+        """PostHog expands an exception group's members, and a `TaskGroup` wraps whatever its tasks raised."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        pipelex_client, pipelex_capture = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
+        capture = _make_dual_capture(custom_client=custom_client, pipelex_client=pipelex_client)
+
+        _crash(capture=capture, error=ExceptionGroup("tasks failed", [ToolError(_CONFIDENTIAL_MESSAGE), ValueError("other")]))
+
+        for capture_mock in (custom_capture, pipelex_capture):
+            sent = _sent_exception_values(capture_mock=capture_mock)
+            assert _CONFIDENTIAL_MESSAGE not in sent
+            assert TelemetryManager.PRIVACY_NOTICE in sent
+
+    def test_a_capture_with_no_argument_is_redacted(self, mocker: MockerFixture) -> None:
+        """Given `None`, the SDK reads `sys.exc_info()` itself, past any wrapper that did not resolve it first.
+
+        `None` is what the module-level `posthog.capture_exception()` passes.
+        """
+        client, capture_mock = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+
+        try:
+            raise ToolError(_CONFIDENTIAL_MESSAGE)
+        except ToolError:
+            client.capture_exception(None)
+
+        assert _CONFIDENTIAL_MESSAGE not in _sent_exception_values(capture_mock=capture_mock)
+
+    def test_the_live_exception_is_left_as_it_was(self, mocker: MockerFixture) -> None:
+        """Only a copy of the chain is redacted: the interpreter prints the original after the hook returns."""
+        custom_client, _ = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        pipelex_client, _ = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
+        capture = _make_dual_capture(custom_client=custom_client, pipelex_client=pipelex_client)
+        pipelex_error = ToolError(_CONFIDENTIAL_MESSAGE)
+        crash = RuntimeError("wrapper")
+        crash.__cause__ = pipelex_error
+
+        _crash(capture=capture, error=crash)
+
+        assert crash.__cause__ is pipelex_error
+        assert str(pipelex_error) == _CONFIDENTIAL_MESSAGE
+
+    def test_an_error_the_host_already_captured_is_not_sent_again(self, mocker: MockerFixture) -> None:
+        """A host that captures an error and re-raises it has sent it once, and the hook must not add a second."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        pipelex_client, pipelex_capture = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
+        capture = _make_dual_capture(custom_client=custom_client, pipelex_client=pipelex_client)
+        error = ValueError("boom")
+
+        custom_client.capture_exception(error)
+        _crash(capture=capture, error=error)
+
+        assert custom_capture.call_count == 1
+        assert pipelex_capture.call_count == 0
+
+    def test_a_redacted_error_the_host_already_captured_is_not_sent_again(self, mocker: MockerFixture) -> None:
+        """The SDK marks the redacted copy it sent, so the mark has to reach the error the host holds."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        pipelex_client, pipelex_capture = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
+        capture = _make_dual_capture(custom_client=custom_client, pipelex_client=pipelex_client)
+        error = ToolError(_CONFIDENTIAL_MESSAGE)
+
+        custom_client.capture_exception(error)
+        custom_client.capture_exception(error)
+        _crash(capture=capture, error=error)
+
+        assert custom_capture.call_count == 1
+        assert pipelex_capture.call_count == 0

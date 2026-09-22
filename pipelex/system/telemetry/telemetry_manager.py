@@ -1,5 +1,6 @@
+import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any, Generator, cast
 
 import posthog
 from opentelemetry.trace import Tracer as OTelTracer
@@ -192,8 +193,20 @@ class TelemetryManager(TelemetryManagerAbstract):
             exception: ExceptionArg | None = None,
             **kwargs: Unpack[OptionalCaptureArgs],
         ) -> Any:
-            """Capture exception with message sanitization for PipelexError subclasses."""
-            return original_capture_exception(self._sanitized_exception_arg(exception=exception), **kwargs)
+            """Capture exception with message sanitization for PipelexError subclasses.
+
+            PostHog marks what it sent so a second capture of the same error is
+            dropped, and what it sent may be a redacted copy rather than the
+            error the caller holds. The mark is carried back onto the original,
+            so the guard still works for a caller that captures an error and
+            then lets it escape.
+            """
+            if exception is not None and DualClientExceptionCapture.is_marked_as_captured(exception=exception):
+                return None
+            sanitized = self._sanitized_exception_arg(exception=exception)
+            result = original_capture_exception(sanitized, **kwargs)
+            DualClientExceptionCapture.carry_capture_marks(source=sanitized, target=exception)
+            return result
 
         client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
@@ -202,22 +215,98 @@ class TelemetryManager(TelemetryManagerAbstract):
         """Return what may go out in place of `exception`, in whichever form PostHog was handed.
 
         PostHog takes an error either bare or as the `(type, value, traceback)`
-        triple an interpreter excepthook receives, and both forms arrive here:
-        the autocapture in `exception_capture.py` holds nothing but the triple.
-        A `PipelexError` message may repeat whatever the caller passed in — the
-        path it was reading, a slice of the document that would not parse — so
-        it is replaced by the privacy notice in either form. Redacting only the
-        bare form would leave the crash path, the one place the triple is used,
-        sending the message as it was written.
+        triple an interpreter excepthook receives, or nothing at all, in which
+        case it reads `sys.exc_info()` itself — so that case is resolved here,
+        where it can still be redacted. And it does not send one exception: it
+        walks `__cause__`, `__context__` and the members of an exception group,
+        and sends the message of every error it reaches. A `PipelexError`
+        message may repeat whatever the caller passed in — the path it was
+        reading, a slice of the document that would not parse — so every one of
+        them in that graph is replaced by the privacy notice, wherever it sits.
+        Redacting only the error at the top would leave `raise RuntimeError(...)
+        from pipelex_error`, or any error raised while handling one, sending the
+        message as it was written.
         """
+        if exception is None:
+            current_type, current_value, current_traceback = sys.exc_info()
+            if current_type is None or current_value is None:
+                return None
+            exception = (current_type, current_value, current_traceback)
+        if isinstance(exception, BaseException):
+            return cls._redacted_exception_graph(exception=exception)
+        _, exception_value, exception_traceback = exception
+        if exception_value is None:
+            return exception
+        redacted_value = cls._redacted_exception_graph(exception=exception_value)
+        if redacted_value is exception_value:
+            return exception
+        return (type(redacted_value), redacted_value, exception_traceback)
+
+    @classmethod
+    def _redacted_exception_graph(cls, *, exception: BaseException) -> BaseException:
+        """Return `exception` itself when nothing it reaches is a `PipelexError`, else a redacted copy of all of it.
+
+        The copy is never written back: the live exception is the one the
+        interpreter goes on to print and a host may still be holding, so only a
+        copy of the graph has its links pointed at the stand-ins.
+        """
+        if not cls._reaches_pipelex_error(exception=exception, visited=set()):
+            return exception
+        redacted = cls._redacted_link(exception=exception, copies={})
+        # The root is never cut: only a link back to an exception still being copied is.
+        assert redacted is not None
+        return redacted
+
+    @classmethod
+    def _reaches_pipelex_error(cls, *, exception: BaseException | None, visited: set[int]) -> bool:
+        """Whether a `PipelexError` sits anywhere PostHog would walk from `exception`."""
+        if exception is None or id(exception) in visited:
+            return False
+        visited.add(id(exception))
         if isinstance(exception, PipelexError):
-            return cls._redacted_stand_in(exception=exception)
-        if isinstance(exception, tuple):
-            _, exception_value, exception_traceback = exception
-            if isinstance(exception_value, PipelexError):
-                stand_in = cls._redacted_stand_in(exception=exception_value)
-                return (type(stand_in), stand_in, exception_traceback)
-        return exception
+            return True
+        linked: list[BaseException | None] = [exception.__cause__, exception.__context__, *cls._group_members(exception=exception)]
+        return any(cls._reaches_pipelex_error(exception=each, visited=visited) for each in linked)
+
+    @classmethod
+    def _group_members(cls, *, exception: BaseException) -> tuple[BaseException, ...]:
+        """The members PostHog expands out of an exception group, or nothing for any other error."""
+        if isinstance(exception, BaseExceptionGroup):
+            return cast("BaseExceptionGroup[BaseException]", exception).exceptions
+        return ()
+
+    @classmethod
+    def _redacted_link(cls, *, exception: BaseException | None, copies: dict[int, BaseException | None]) -> BaseException | None:
+        """Copy one exception of the graph, with its own links redacted in turn.
+
+        `copies` maps an original to its copy so a shared or cyclic link is
+        copied once. An entry of `None` means that exception is still being
+        copied, and a link back to it is cut rather than followed forever.
+        """
+        if exception is None:
+            return None
+        exception_id = id(exception)
+        if exception_id in copies:
+            return copies[exception_id]
+        copies[exception_id] = None
+        copied: BaseException
+        if isinstance(exception, PipelexError):
+            copied = cls._redacted_stand_in(exception=exception)
+        elif isinstance(exception, BaseExceptionGroup):
+            group = cast("BaseExceptionGroup[BaseException]", exception)
+            members = [cls._redacted_link(exception=member, copies=copies) for member in cls._group_members(exception=group)]
+            kept_members = [member for member in members if member is not None]
+            copied = cast("BaseException", group.derive(kept_members)) if kept_members else Exception(type(group).__name__)
+            if hasattr(group, "__notes__"):
+                copied.__notes__ = list(group.__notes__)
+        else:
+            copied = cls._plain_copy(exception=exception)
+        copied.__traceback__ = exception.__traceback__
+        copies[exception_id] = copied
+        copied.__cause__ = cls._redacted_link(exception=exception.__cause__, copies=copies)
+        copied.__context__ = cls._redacted_link(exception=exception.__context__, copies=copies)
+        copied.__suppress_context__ = exception.__suppress_context__
+        return copied
 
     @classmethod
     def _redacted_stand_in(cls, *, exception: PipelexError) -> PipelexError:
@@ -233,6 +322,26 @@ class TelemetryManager(TelemetryManagerAbstract):
         stand_in.args = (cls.PRIVACY_NOTICE,)
         stand_in.__traceback__ = exception.__traceback__
         return stand_in
+
+    @classmethod
+    def _plain_copy(cls, *, exception: BaseException) -> BaseException:
+        """Copy an error that is not a `PipelexError`, message and attributes included, without running its `__init__`.
+
+        Its own message is not confidential, and its attributes stay because a
+        subclass's `__str__` may read them. Only the links are the caller's
+        business, and `_redacted_link` rewrites those.
+        """
+        exception_type = type(exception)
+        try:
+            copied = exception_type.__new__(exception_type, *exception.args)
+            copied.args = exception.args
+            copied.__dict__.update(
+                {name: value for name, value in exception.__dict__.items() if name not in DualClientExceptionCapture.POSTHOG_CAPTURE_MARKS}
+            )
+        except Exception:  # ruff: ignore[blind-except]
+            # A class whose construction cannot be reproduced keeps its name and message, and nothing else.
+            return Exception(f"{exception_type.__name__}: {exception}")
+        return copied
 
     @override
     def setup(self, *, integration_mode: IntegrationMode):
