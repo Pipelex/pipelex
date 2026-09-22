@@ -15,8 +15,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
-# Import-light by design (see module docstring): `storage_scope` pulls in `re`
-# and nothing else, so validating here costs the boundary nothing.
+# Import-light by design (see module docstring): `storage_scope` and
+# `analytics_groups` each pull in `re` and nothing else, so validating here
+# costs the boundary nothing.
+from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.storage_scope import validate_storage_scope
 
 
@@ -49,6 +51,26 @@ class PipelexPipeRunInput(BaseModel):
         failure inside whichever call first pastes the value into a storage key.
         """
         return validate_storage_scope(value=value)
+
+    # The opaque groups this run's telemetry belongs to. Unlike the two fields
+    # above it DEFAULTS: a host with no groups to send invents nothing by
+    # staying silent, whereas a missing identity or scope used to be invented
+    # for it. See `pipelex.system.analytics_groups`.
+    analytics_groups: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("analytics_groups")
+    @classmethod
+    def _validate_analytics_groups(cls, value: dict[str, str]) -> dict[str, str]:
+        """Refuse a malformed mapping at the WIRE, not inside a telemetry capture.
+
+        Declaring the field `dict[str, str]` says nothing about its contents,
+        and the contents are whatever the other side of the boundary put there.
+        A key with a newline in it, or a mapping with a thousand entries, would
+        decode happily here and surface much later, far from the payload that
+        carried it. Validating at construction makes it a decoding error naming
+        the field.
+        """
+        return validate_analytics_groups(value=value)
 
     library_crate_dump: dict[str, Any] | None = None
     # Two orthogonal axes: which orchestrator runs the pipe (open token, defaults to the
