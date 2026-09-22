@@ -22,7 +22,10 @@ are three — the enum below says which stream carries which, and why:
    capture.
 3. `NAMESPACED` — the run's `user_id` is folded one way into the stream's own
    id. The capture stays per-run, but it is never a raw caller value and can
-   never collide with another deployment's. The run's groups do not travel.
+   never collide with another deployment's. The run's own groups do not travel;
+   the stream's own id travels in their place, as the deployment group, so a
+   capture that names a caller is still counted under the deployment that
+   produced it.
 
 **A run that names nobody** reports under the stream's configured fallback, and
 so does an event that belongs to no run at all — a CLI command, a dry-run sweep.
@@ -75,6 +78,19 @@ if TYPE_CHECKING:
 _NON_DISTINGUISHING_RUN_USER_IDS = frozenset({LOCAL_USER_ID, DRY_RUN_USER_ID})
 
 
+# The group type Pipelex's own stream carries its deployment under.
+#
+# `NAMESPACED` folds the gateway-key hash into the `distinct_id`, which is what
+# makes that id per-caller and unable to collide across deployments — and which
+# consumes the hash, because the fold is one-way. Nothing else on the capture
+# would carry it back: the identity is deliberately kept out of every property,
+# and the Pipelex project is one shared project that cannot partition itself by
+# deployment. So the hash travels as a group, the one facet PostHog can still
+# aggregate on after the fact, and the stream stays what it is documented to be
+# — tied to the Gateway API key that produced it.
+PIPELEX_DEPLOYMENT_GROUP_TYPE = "deployment"
+
+
 class RunIdentityPolicy(StrEnum):
     """What one stream may do with a run's identity.
 
@@ -95,7 +111,11 @@ class RunIdentityPolicy(StrEnum):
     its own business vocabulary and PostHog's group types are project-global, so
     they do not belong there either. Hence `NAMESPACED`: Pipelex still tells two
     callers of one deployment apart, but only through a one-way digest taken
-    inside that deployment's gateway-key hash, and the groups stay home.
+    inside that deployment's gateway-key hash, and the host's own groups stay
+    home. The deployment itself does travel, as the one group this stream sets:
+    the fold consumes the gateway-key hash, and without a facet carrying it back
+    Pipelex could no longer count a deployment's usage under the key that paid
+    for it.
     """
 
     NONE = "none"
@@ -120,8 +140,15 @@ def _make_namespaced_distinct_id(*, namespace: str, run_user_id: str) -> str:
     The result tells two callers of the same deployment apart, and can never
     equal another deployment's id for a caller of the same name, because the
     namespace is inside the digest rather than beside it. It is not reversible,
-    so a caller id that happens to be an e-mail address does not leave the
-    deployment that holds it.
+    so a caller id that happens to be an e-mail address never leaves the
+    deployment that holds it as a value anyone can read.
+
+    It is a pseudonym and not a secret, and the difference is worth stating: the
+    namespace is itself sent in the clear, as the `distinct_id` of every capture
+    that names nobody, so a party who already holds a candidate caller id can
+    fold it the same way and see whether the result is present. Making a guess
+    useless would take a key that never reaches the stream — the raw gateway key
+    rather than its hash — which is a wider change than this function.
 
     Args:
         namespace: The stream's own id for this deployment — the gateway-key hash.
@@ -151,15 +178,18 @@ def make_run_identity_span_attributes(*, run_metadata: "RunMetadata", is_langfus
 
     Returns:
         The attributes to merge into the span's attribute dict. The groups entry
-        is absent — not empty — when the run carries no groups. The user id is
-        written as the run states it, placeholders included: a span attribute
+        is absent — not empty — when the run carries no groups. `pipelex.run.user_id`
+        is written as the run states it, placeholders included: a span attribute
         records what the run IS, and whether that value may be attributed to a
-        person is a separate decision, taken once in `_resolve` below.
+        person is a separate decision, taken once in `_resolve` below. Langfuse's
+        own field is the opposite case — it IS that decision, with no `_resolve`
+        behind it to take it later — so a placeholder is withheld from it rather
+        than becoming a person named `local` in the operator's project.
     """
     attributes: dict[str, str] = {PipelexSpanAttr.RUN_USER_ID: run_metadata.user_id}
     if run_metadata.analytics_groups:
         attributes[PipelexSpanAttr.RUN_ANALYTICS_GROUPS] = pure_json_str(data=run_metadata.analytics_groups)
-    if is_langfuse_enabled:
+    if is_langfuse_enabled and run_metadata.user_id not in _NON_DISTINGUISHING_RUN_USER_IDS:
         attributes[LangfuseSpanAttr.USER_ID] = run_metadata.user_id
     return attributes
 
@@ -178,8 +208,8 @@ class TelemetryIdentity(BaseModel):
 
     # The entities the capture belongs to, forwarded through the backend's own
     # groups facet. Empty on an anonymous capture, which has no person for a
-    # group to qualify, and on a `NAMESPACED` stream, which does not receive a
-    # host's own vocabulary at all.
+    # group to qualify. On a `NAMESPACED` stream it holds exactly one entry — the
+    # deployment — and never a host's own vocabulary.
     groups: dict[str, str] = Field(default_factory=dict)
 
     @property
@@ -213,12 +243,17 @@ class TelemetryIdentity(BaseModel):
                 # shared project, so the capture goes out with none rather than
                 # under a raw caller value.
                 return cls.make_anonymous()
+            # The deployment travels as a group whether or not the run names a
+            # caller, so one query counts a deployment's whole usage — the runs
+            # that name somebody, under their digests, and the runs that name
+            # nobody, under the hash itself.
+            deployment_groups = {PIPELEX_DEPLOYMENT_GROUP_TYPE: fallback_distinct_id}
             if distinguishing_user_id:
                 return cls(
                     distinct_id=_make_namespaced_distinct_id(namespace=fallback_distinct_id, run_user_id=distinguishing_user_id),
-                    groups={},
+                    groups=deployment_groups,
                 )
-            return cls(distinct_id=fallback_distinct_id, groups={})
+            return cls(distinct_id=fallback_distinct_id, groups=deployment_groups)
 
         resolved_distinct_id = distinguishing_user_id or fallback_distinct_id
         if not resolved_distinct_id:

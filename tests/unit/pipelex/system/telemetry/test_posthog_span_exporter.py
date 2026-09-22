@@ -19,7 +19,7 @@ from pytest_mock import MockerFixture
 from pipelex.system.telemetry.otel_constants import PipelexSpanAttr, PostHogAttr, PostHogEvent, SpanCategory
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
-from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
+from pipelex.system.telemetry.telemetry_identity import PIPELEX_DEPLOYMENT_GROUP_TYPE, RunIdentityPolicy
 from pipelex.tools.misc.hash_utils import hash_sha256
 
 _FULL_CAPTURE = TelemetryRedactionConfig(
@@ -167,8 +167,14 @@ class TestPostHogSpanExporter:
         assert "groups" not in capture_kwargs
         assert capture_kwargs["properties"][PostHogAttr.PROCESS_PERSON_PROFILE] is False
 
-    def test_a_namespaced_stream_digests_the_user_and_drops_the_groups(self, mocker: MockerFixture) -> None:
-        """Pipelex's own exporter writes into one shared project across every deployment."""
+    def test_a_namespaced_stream_digests_the_user_and_keeps_only_its_own_group(self, mocker: MockerFixture) -> None:
+        """Pipelex's own exporter writes into one shared project across every deployment.
+
+        The host's group keys are its own business vocabulary and PostHog group
+        types are project-global, so none of them travel. The deployment does:
+        the digest consumes the gateway hash, and the group facet is what carries
+        it back.
+        """
         client = mocker.MagicMock(spec=Posthog)
         exporter = _make_exporter(client=client, fallback_distinct_id="deployment-hash", run_identity_policy=RunIdentityPolicy.NAMESPACED)
 
@@ -186,7 +192,7 @@ class TestPostHogSpanExporter:
 
         capture_kwargs = client.capture.call_args.kwargs
         assert capture_kwargs["distinct_id"] == hash_sha256(data="deployment-hash:user-42", length=16)
-        assert capture_kwargs["groups"] is None
+        assert capture_kwargs["groups"] == {PIPELEX_DEPLOYMENT_GROUP_TYPE: "deployment-hash"}
         assert "acme-corp" not in repr(capture_kwargs)
 
     def test_neither_the_user_nor_the_groups_appear_in_the_properties(self, mocker: MockerFixture) -> None:

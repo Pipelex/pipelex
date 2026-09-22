@@ -4,15 +4,18 @@ onto :class:`JobMetadata`.
 The groups ride the ``PipeJob``
 (``arg.pipe_job.job_metadata.run_metadata.analytics_groups``) — the same payload-first
 route ``request_id`` takes, and for the same reason: there is no ContextVar layer
-and the worker on the far side of a Temporal hop rehydrates the whole job. No
-exporter reads them yet; this test pins the dispatcher-side contract, which is
-what the hosted runner will call once it accepts the field on the wire.
+and the worker on the far side of a Temporal hop rehydrates the whole job. The
+PostHog exporters read them back off the span attributes; this test pins the
+dispatcher-side contract, which is what the hosted runner will call once it
+accepts the field on the wire.
 
 It also pins WHERE the refusal happens. Validation sits above
-``add_new_pipeline`` and above ``handle_trace_start`` deliberately: a malformed
-mapping must not register a run or emit a trace-start event that cannot be
-unsent. Asserting only that a ``ValueError`` escapes would pass with the
-validation at the bottom of ``prepare_pipe_job``, which is where it used to be.
+``add_new_pipeline`` deliberately: a malformed mapping must not register a run.
+Asserting only that a ``ValueError`` escapes would pass with the validation at
+the bottom of ``prepare_pipe_job``, which is where it used to be. It sits above
+``handle_trace_start`` too, but that clause no longer distinguishes anything —
+the trace-start has since moved below ``prepare_pipe_job``, so every gate in
+this function precedes it.
 """
 
 import pytest
@@ -91,9 +94,12 @@ class TestPipelineRunSetupAnalyticsGroups:
         """A rejected mapping must leave NOTHING behind — not a pipeline entry, not a telemetry event.
 
         The teardown can release a registered pipeline and an opened tracer; it cannot
-        unsend a ``handle_trace_start`` that already reached the backend. So the gate has
-        to sit above both, and this test fails if it is moved back down into
-        ``prepare_pipe_job`` where the mapping was first validated.
+        unsend a ``handle_trace_start`` that already reached the backend. The pipeline
+        half is what bites today: ``add_new_pipeline`` runs above ``prepare_pipe_job``,
+        so this test fails if the gate is moved back down there, where the mapping was
+        first validated. The telemetry half is now satisfied by the ordering whatever
+        the gate does — the trace-start sits below ``prepare_pipe_job`` — and stays as a
+        guard against that ordering moving back.
         """
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,

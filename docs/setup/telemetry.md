@@ -12,7 +12,7 @@ Pipelex supports two independent telemetry streams that serve different purposes
 
 When you use **Pipelex Gateway** as your inference backend, identified telemetry is **automatically enabled**. This telemetry is tied to your Gateway API key (hashed for security) and operates independently from your `telemetry.toml` settings.
 
-A run that names a caller of its own is still distinguished on this stream, but never by a value you supplied: the caller's `user_id` is folded one way into your key's hash, so we can tell two of your callers apart without learning who either is, and the same caller name at another deployment is a different person here. Your `analytics_groups` are not forwarded to this stream at all — they are your own vocabulary about your own customers, and they stay on the destinations you control.
+A run that names a caller of its own is still distinguished on this stream, but never by a value you supplied: the caller's `user_id` is folded one way into your key's hash, so the value you spelled never reaches us, and the same caller name at another deployment is a different person here. Your key's own hash travels beside the fold, so your usage stays countable as yours. Read the fold as a pseudonym rather than as a promise of anonymity: it cannot be reversed, but it is a digest and not a secret, so it is not proof against somebody who already holds a candidate id and wants to check it. Your `analytics_groups` are not forwarded to this stream at all — they are your own vocabulary about your own customers, and they stay on the destinations you control.
 
 **What we collect:**
 

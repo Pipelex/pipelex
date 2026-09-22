@@ -22,6 +22,7 @@ from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.telemetry.events import EventName
 from pipelex.system.telemetry.otel_constants import PostHogAttr
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, PostHogTracingConfig, TelemetryConfig
+from pipelex.system.telemetry.telemetry_identity import PIPELEX_DEPLOYMENT_GROUP_TYPE
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 from pipelex.tools.misc.hash_utils import hash_sha256
 
@@ -128,7 +129,7 @@ class TestTelemetryManagerIdentity:
 
         capture_kwargs = pipelex_client.capture.call_args.kwargs
         assert capture_kwargs["distinct_id"] == hash_sha256(data="gateway-hash:user-42", length=16)
-        assert capture_kwargs["groups"] is None
+        assert capture_kwargs["groups"] == {PIPELEX_DEPLOYMENT_GROUP_TYPE: "gateway-hash"}
         assert "org_acme" not in repr(capture_kwargs)
 
     def test_two_deployments_never_merge_on_the_same_caller_name(self, mocker: MockerFixture) -> None:
@@ -249,7 +250,7 @@ class TestTelemetryManagerIdentity:
 
         capture_kwargs = pipelex_client.capture.call_args.kwargs
         assert capture_kwargs["distinct_id"] == hash_sha256(data="gateway-hash:user-42", length=16)
-        assert capture_kwargs["groups"] is None
+        assert capture_kwargs["groups"] == {PIPELEX_DEPLOYMENT_GROUP_TYPE: "gateway-hash"}
 
     def test_the_identity_never_becomes_a_property(self, mocker: MockerFixture) -> None:
         manager, custom_client, _ = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")

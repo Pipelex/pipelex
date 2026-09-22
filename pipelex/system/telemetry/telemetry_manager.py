@@ -125,12 +125,36 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         # Set up dual-client exception autocapture if any client is enabled
         if self.custom_posthog_client or self.pipelex_posthog_client:
-            self._exception_capture = DualClientExceptionCapture(
-                custom_posthog_client=self.custom_posthog_client,
-                custom_distinct_id=self.telemetry_config.custom_posthog.user_id,
-                pipelex_posthog_client=self.pipelex_posthog_client,
-                pipelex_distinct_id=self._pipelex_distinct_id,
-            )
+            self._exception_capture = self._make_exception_capture()
+
+    def _make_exception_capture(self) -> DualClientExceptionCapture:
+        """Build the exception autocapture, with each stream's runless identity resolved.
+
+        An unhandled exception belongs to no run that the interpreter hooks can
+        see — they are handed `(type, value, traceback)` and there is no
+        ContextVar layer to read a run out of — so what each stream sends is the
+        identity it uses for a capture that names nobody, resolved through the
+        same `TelemetryIdentity` as every other path. That is what carries
+        `anonymous` mode onto this path: a stream that identifies nobody must not
+        identify somebody when the process crashes.
+
+        Stated as its own method so the resolution can be exercised without the
+        constructor, which builds live clients and registers a singleton.
+        """
+        return DualClientExceptionCapture(
+            custom_posthog_client=self.custom_posthog_client,
+            custom_identity=TelemetryIdentity.make_from_run_metadata(
+                run_metadata=None,
+                fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
+                run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=self.telemetry_config.custom_posthog.mode),
+            ),
+            pipelex_posthog_client=self.pipelex_posthog_client,
+            pipelex_identity=TelemetryIdentity.make_from_run_metadata(
+                run_metadata=None,
+                fallback_distinct_id=self._pipelex_distinct_id,
+                run_identity_policy=RunIdentityPolicy.NAMESPACED,
+            ),
+        )
 
     def _handle_transmission_error(  # kw-only: ignore — PostHog on_error callback, invoked positionally as (error, items)
         self, error: Exception | None, _items: list[dict[str, Any]]

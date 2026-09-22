@@ -80,8 +80,13 @@ DRY_RUN_USER_ID = "dry-run-no-user"
 # laptop separates nothing — there is exactly one tenant — while the run id is
 # the only thing that has to be distinct, because anything stored under a fixed
 # name (`results/main_stuff.json`) would otherwise be overwritten by the next
-# run. `LOCAL_USER_ID` is not a sentinel: it is an identity, it is true, and it
-# is reported as-is.
+# run. `LOCAL_USER_ID` is not a sentinel either: it is an identity, it is true,
+# and it is carried and stored as-is. Telemetry is the one place that declines
+# it — it is the same string on every machine, so honouring it as a person would
+# collapse every Pipelex user's local runs onto one, and both PostHog streams
+# report under their own fallback instead. See
+# `_NON_DISTINGUISHING_RUN_USER_IDS` in
+# `pipelex.system.telemetry.telemetry_identity`.
 LOCAL_USER_ID = "local"
 LOCAL_STORAGE_SCOPE = "local"
 
