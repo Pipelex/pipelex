@@ -193,30 +193,46 @@ class TelemetryManager(TelemetryManagerAbstract):
             **kwargs: Unpack[OptionalCaptureArgs],
         ) -> Any:
             """Capture exception with message sanitization for PipelexError subclasses."""
-            if exception and isinstance(exception, PipelexError):
-                # Create a new exception with sanitized message while preserving the class type
-                # Use __new__ to create an instance without calling __init__, which may require extra args
-                # This creates a "shell" instance with NO custom attributes
-                exception_type = type(exception)
-                sanitized_exception = exception_type.__new__(exception_type)
-
-                # Set the exception args to our privacy notice
-                # This is what str(exception) will return
-                sanitized_exception.args = (self.PRIVACY_NOTICE,)
-
-                # Preserve the traceback so we still get stack trace information
-                if hasattr(exception, "__traceback__"):
-                    sanitized_exception.__traceback__ = exception.__traceback__
-
-                # Note: No custom attributes (tested_concept, wanted_concept, etc.) are present
-                # because we used __new__() without calling __init__(). The __dict__ is already empty.
-
-                return original_capture_exception(sanitized_exception, **kwargs)
-            else:
-                # For non-PipelexError, capture as-is (or auto-detect current exception)
-                return original_capture_exception(exception, **kwargs)
+            return original_capture_exception(self._sanitized_exception_arg(exception=exception), **kwargs)
 
         client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
+
+    @classmethod
+    def _sanitized_exception_arg(cls, *, exception: ExceptionArg | None) -> ExceptionArg | None:
+        """Return what may go out in place of `exception`, in whichever form PostHog was handed.
+
+        PostHog takes an error either bare or as the `(type, value, traceback)`
+        triple an interpreter excepthook receives, and both forms arrive here:
+        the autocapture in `exception_capture.py` holds nothing but the triple.
+        A `PipelexError` message may repeat whatever the caller passed in — the
+        path it was reading, a slice of the document that would not parse — so
+        it is replaced by the privacy notice in either form. Redacting only the
+        bare form would leave the crash path, the one place the triple is used,
+        sending the message as it was written.
+        """
+        if isinstance(exception, PipelexError):
+            return cls._redacted_stand_in(exception=exception)
+        if isinstance(exception, tuple):
+            _, exception_value, exception_traceback = exception
+            if isinstance(exception_value, PipelexError):
+                stand_in = cls._redacted_stand_in(exception=exception_value)
+                return (type(stand_in), stand_in, exception_traceback)
+        return exception
+
+    @classmethod
+    def _redacted_stand_in(cls, *, exception: PipelexError) -> PipelexError:
+        """Build a same-class stand-in for `exception` whose message is the privacy notice.
+
+        `__new__` without `__init__` is the point: the instance comes out with an
+        empty `__dict__`, so none of the subclass's own attributes — the
+        concepts it was comparing, the file it was reading — travel with it. What
+        goes out is the class name, the notice and the traceback.
+        """
+        exception_type = type(exception)
+        stand_in = exception_type.__new__(exception_type)
+        stand_in.args = (cls.PRIVACY_NOTICE,)
+        stand_in.__traceback__ = exception.__traceback__
+        return stand_in
 
     @override
     def setup(self, *, integration_mode: IntegrationMode):

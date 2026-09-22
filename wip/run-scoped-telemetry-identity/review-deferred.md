@@ -5,7 +5,7 @@ item: L-260922-75299c
 
 # Deferred review findings — run-scoped telemetry identity
 
-Findings from the `/rev` passes on this branch (profile 4) that were real but did not meet the round's bar, kept here so nothing is dropped without somewhere to chase it. Round 1 ran at bar `open`, round 2 at bar `defects`.
+Findings from the `/rev` passes on this branch (profile 4) that were real but did not meet the round's bar, kept here so nothing is dropped without somewhere to chase it. Round 1 ran at bar `open`, round 2 at bar `defects`, round 3 at bar `necessity`.
 
 ## One capture helper instead of the hand-rolled branches
 
@@ -16,6 +16,8 @@ The identified-versus-anonymous capture shape is written out by hand at several 
 cubic's argument for folding them into one `capture_under_identity(client, event, properties, identity)` is that the two streams cannot then drift apart again, and that the anonymous-mode defect round 1 fixed would have been a one-line change. That argument held twice: round 1's fix had to be made once in `_resolve` and then checked at every one of those sites, and round 2 found the one site nobody had checked — the exception autocapture, which was not on cubic's list because it did not resolve an identity at all.
 
 Round 2's fix added a site rather than removing one: `DualClientExceptionCapture._capture_to_client` now writes the same branch a sixth time, though it at least collapses what used to be two copies inside that class into one. The case for the helper is therefore stronger than it was, not weaker.
+
+cubic raised it again in round 3, unprompted and from a clean context, making it the only finding to appear in all three passes.
 
 It stays deferred because it is a structural refactor rather than a defect, and `RunIdentityPolicy` concentrates the part that was actually drifting — which branch a stream takes — in one place. Worth doing when that file is next opened for another reason.
 
@@ -49,6 +51,28 @@ Deferred because no deployment shape was found that reaches it: the default is s
 
 Raised by cubic in round 2, and correct today by its own account. `RunIdentityPolicy.make_for_operator_stream` documents itself as the single place the operator stream's policy is derived, and `track_event` is the one of those sites that writes `RunIdentityPolicy.DIRECT` literally instead of calling it. It is inside `case PostHogMode.IDENTIFIED`, so it cannot currently be wrong; a fourth mode, or a change to that mapping, would diverge there silently. An improvement, and cheap whenever that method is next edited.
 
-## Settled in round 2, kept for the record
+## Anonymous mode is a claim about PostHog, and the prose does not always say so
+
+Raised by `code-review` in round 3. Real but narrower than reported, and **not verified** — it sorted to deferral before the verifier ran.
+
+`make_run_identity_span_attributes` writes `pipelex.run.user_id` and `pipelex.run.analytics_groups` onto every span unconditionally, and sets `langfuse.user.id` on `is_langfuse_enabled` alone. The operator's `custom_posthog.mode` is read only by the PostHog exporters, through `RunIdentityPolicy.NONE`. So an operator running `mode = "anonymous"` with Langfuse or an OTLP exporter enabled does see per-caller ids at those destinations.
+
+Whether that is a defect turns on what the mode is a claim about. `custom_posthog.mode` governs the operator's PostHog stream, and the docs site scopes it correctly — "the runtime identifies nobody **on your stream**". Langfuse is a separate opt-in with its own configuration, and prompts and completions already reach it unredacted, so an operator who enabled it has already consented to far more than a user id. `code-review`'s own reading is that the prose overreaches rather than the code misbehaving.
+
+What is genuinely loose is the CHANGELOG sentence, which sits in a paragraph that also states the span behaviour plainly and so can be read either way. The cure is either to scope the claim to PostHog in that entry, or to gate the Langfuse attribute on the same decision the PostHog exporter takes — a design question about whether one operator setting should reach a second vendor's destination, which is why it was not settled inside a review pass.
+
+## `TelemetryIdentity.is_anonymous` is a second way of asking one question
+
+Raised by `code-review` in round 3 as a cosmetic sibling of its freeze finding, and **not verified**.
+
+All the capture sites branch on `identity.distinct_id` being truthy; `is_anonymous` is referenced only from tests. Two ways of asking the same question, with nothing keeping them in step — either make it the one the capture sites use, or drop it. Cheap either way, and a judgement about which reads better at the call sites rather than a defect.
+
+## Settled in rounds 2 and 3, kept for the record
 
 **The stale docstrings in the two integration-test modules** — `test_pipeline_run_setup_analytics_groups.py` and `test_pipeline_run_setup_storage_scope_gate.py` — were deferred in round 1 as unverified. Round 2 verified them: the docstrings were stale (the exporters do read the groups, and `handle_trace_start` did move below `prepare_pipe_job`), but cubic's stronger claim, that the tests would no longer fail if the gate moved back, was **refuted** — both modules also spy `get_pipeline_manager`, and `add_new_pipeline` still runs above `prepare_pipe_job`, so the pipeline half of each assertion still bites. Only the telemetry half went vacuous. Both docstrings were corrected in round 2 and say so.
+
+**Round 3 found two defects on the exception path, both predating the branch and both fixed.** The privacy redaction replaced a `PipelexError`'s message only when the error arrived bare, never in the `(type, value, traceback)` form an excepthook produces — which is the only form the autocapture has — so a message repeating the caller's own input went out verbatim, reachable on the shipped default because `custom_posthog.mode = "off"` still builds the Gateway client that installs the hooks. And PostHog stamps an error once a client has captured it and drops any later capture of that object, so of the two streams only the first ever recorded a crash, which meant round 2's deployment group was never recorded anywhere. `git` dates both to v0.18.0; the branch changed their shape without introducing either, and made the second consequential by adding the group that never shipped. `tests/unit/pipelex/system/telemetry/test_exception_capture_sdk_contract.py` now exercises both against real PostHog clients, because round 2's `MagicMock(spec=Posthog)` could see neither.
+
+**The `analytics_groups` module docstring** said "no exporter reads the mapping yet, so do not take the field's presence as evidence that a span or an event is already grouped by it" — false as of this branch, and the file is outside the diff, which is why rounds 1 and 2 swept past it. Corrected in round 3.
+
+**The `RunMetadata` freeze** was raised by cubic and `code-review` as an unrecorded breaking change, and `code-review` additionally warned that a dependent repo might reassign a field, `RunMetadata` being on the import surface `pipelex-server/transport/` consumes. That half was **refuted**: `pipelex-server/transport/` and `pipelex-api` contain no `RunMetadata` field assignment, `pipelex-server`'s four sites are all on `mocker.MagicMock()` stubs in `pipelex_temporal` tests, and there are no `setattr` or `object.__setattr__` escape hatches anywhere. The documentation half was taken — the freeze now has a `Changed` entry.

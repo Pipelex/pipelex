@@ -27,6 +27,10 @@ class DualClientExceptionCapture:
     that identifies nobody must not identify somebody when the process crashes.
     """
 
+    # What PostHog stamps onto an error once a client has captured it. Every
+    # later `capture_exception` of that same object returns without sending.
+    _POSTHOG_CAPTURE_MARKS = ("__posthog_exception_captured", "__posthog_exception_uuid")
+
     def __init__(
         self,
         custom_posthog_client: "Posthog | None",
@@ -121,6 +125,7 @@ class DualClientExceptionCapture:
         rejects a null one and would otherwise mint a person for it.
         """
         try:
+            self._forget_posthog_capture_marks(exc_value=posthog_exc_info[1])
             if identity.distinct_id:
                 client.capture_exception(posthog_exc_info, distinct_id=identity.distinct_id, groups=identity.groups or None)
             else:
@@ -128,3 +133,21 @@ class DualClientExceptionCapture:
         except Exception as capture_exc:  # ruff: ignore[blind-except]
             # Telemetry must never break the app: a failed exception capture is logged at debug and swallowed.
             log.debug(f"Failed to capture exception to {stream_name} PostHog: {capture_exc}")
+
+    @classmethod
+    def _forget_posthog_capture_marks(cls, *, exc_value: BaseException) -> None:
+        """Let this stream judge the error for itself, whatever the other one did with it.
+
+        Both streams are handed the same exception object, and PostHog drops a
+        capture of an error it has already sent — a guard meant for one stream
+        seeing one error twice. Two clients are two destinations rather than a
+        repeat, so without this whichever stream goes second receives nothing at
+        all, and the Gateway stream, which is always second, would never record
+        a crash on a machine that also reports to an operator's own project.
+
+        The marks left by the last stream to capture stay in place, so the
+        guard still holds for anything downstream of this class.
+        """
+        for mark in cls._POSTHOG_CAPTURE_MARKS:
+            if hasattr(exc_value, mark):
+                delattr(exc_value, mark)
