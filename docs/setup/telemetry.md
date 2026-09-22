@@ -12,6 +12,8 @@ Pipelex supports two independent telemetry streams that serve different purposes
 
 When you use **Pipelex Gateway** as your inference backend, identified telemetry is **automatically enabled**. This telemetry is tied to your Gateway API key (hashed for security) and operates independently from your `telemetry.toml` settings.
 
+A run that names a caller of its own is still distinguished on this stream, but never by a value you supplied: the caller's `user_id` is folded one way into your key's hash, so we can tell two of your callers apart without learning who either is, and the same caller name at another deployment is a different person here. Your `analytics_groups` are not forwarded to this stream at all — they are your own vocabulary about your own customers, and they stay on the destinations you control.
+
 **What we collect:**
 
 - Model names used (e.g., `gpt-5.4`, `claude-4.5-sonnet`) and parameters
@@ -25,6 +27,7 @@ When you use **Pipelex Gateway** as your inference backend, identified telemetry
 - Your prompts or completions
 - Your pipe codes or output class names
 - File contents or business data
+- A run's `user_id` as you spell it, or its `analytics_groups` in any form
 
 This telemetry allows us to:
 
@@ -112,8 +115,14 @@ The run-level metadata every run carries (`RunMetadata`) has an `analytics_group
 analytics_groups = {"organization": "org_acme"}
 ```
 
-!!! note "What this field does today"
-    The runtime validates the mapping, carries it through every nested pipe, and keeps it on the run's metadata across a process boundary. It does **not** yet attach it to the events and spans the built-in PostHog and OpenTelemetry integrations emit — so setting it today will not group anything in your backend. Supply it if you want your runs to carry the labels from now on; wait if you want to see them in PostHog.
+On **your own** PostHog stream, every span and every event the run produces is then captured under that run's `user_id`, with the groups attached through PostHog's own groups facet — so a generation made for one of your customers appears on that customer's timeline and inside their organization, instead of under one identity per deployment. The same values reach every OpenTelemetry exporter as the span attributes `pipelex.run.user_id` and `pipelex.run.analytics_groups`, and Langfuse receives the user id in the field it reserves for it. Pipelex's own Gateway stream is the one exception, and it is described above: it receives a one-way digest of the caller and none of your groups.
+
+Anything that names no caller of its own keeps reporting under the `user_id` you configured in `telemetry.toml`, which is what that setting now means: the identity of everything that is not one caller's run. That covers an event outside any run — a CLI command listing your pipes — and a run whose caller is not a distinguishable person either: a run on your own machine is attributed to the literal `local`, the same string on every machine, so Pipelex declines it as an identity and uses your configured id instead. Per-run attribution is for a host that passes a real `user_id` per run.
+
+The groups do not depend on that. A run that leaves `user_id` at its default still carries its `analytics_groups` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
+
+!!! note "Anonymous mode covers your users too"
+    With `mode = "anonymous"`, the runtime identifies nobody on your stream: no run's `user_id` is applied, no groups are sent, and the `user_id` you configured is not sent either — a mode that identifies nobody would not be one that still named you. Leaving a `user_id` in `telemetry.toml` while switching to `anonymous` therefore changes nothing. Per-run attribution needs `mode = "identified"`.
 
 The rules it follows:
 
@@ -122,7 +131,7 @@ The rules it follows:
 - **It is optional.** Omitting it leaves the group facet empty, which misattributes nothing. Unlike `user_id` and `storage_scope`, which have no default because a missing one used to be invented, a missing group invents nothing.
 - **It travels with the run.** The mapping rides the job through every nested pipe, and the bridge payload that crosses a process boundary carries it, so a distributed worker is handed the same groups the entry point was given.
 
-These are labels for grouping, not content: they belong in the reserved identity fields of whichever backend understands groups, never in an event property or a span name.
+These are labels for grouping, not content: they land in the reserved identity fields of whichever backend understands groups, never in an event property or a span name.
 
 ## Privacy
 

@@ -248,7 +248,11 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
                 EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
             }
-            get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
+            get_telemetry_manager().track_event(
+                event_name=EventName.PIPELINE_COMPLETE,
+                properties=properties,
+                run_metadata=pipe_job.job_metadata.run_metadata,
+            )
             raise PipelineExecutionError(
                 message=exc.message,
                 run_mode=pipe_job.pipe_run_params.run_mode,
@@ -269,7 +273,11 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
                 EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
             }
-            get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
+            get_telemetry_manager().track_event(
+                event_name=EventName.PIPELINE_COMPLETE,
+                properties=properties,
+                run_metadata=pipe_job.job_metadata.run_metadata,
+            )
             raise PipelineExecutionError(
                 message=exc.message,
                 run_mode=pipe_job.pipe_run_params.run_mode,
@@ -326,7 +334,11 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
             EventProperty.PIPELINE_OUTCOME: Outcome.SUCCESS,
         }
-        get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
+        get_telemetry_manager().track_event(
+            event_name=EventName.PIPELINE_COMPLETE,
+            properties=properties,
+            run_metadata=pipe_job.job_metadata.run_metadata,
+        )
 
         finished_at = datetime.now(UTC).isoformat()
         return PipelexRunResultExecute.from_pipe_output(

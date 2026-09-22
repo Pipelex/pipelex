@@ -19,10 +19,13 @@ from pipelex.system.telemetry.exception_capture import DualClientExceptionCaptur
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
+
+    from pipelex.system.job_metadata import RunMetadata
 
 
 class TelemetryManager(TelemetryManagerAbstract):
@@ -94,7 +97,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             else:
                 pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=None)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
-                user_id=telemetry_config.custom_posthog.user_id,
+                custom_fallback_distinct_id=telemetry_config.custom_posthog.user_id,
+                custom_run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=telemetry_config.custom_posthog.mode),
                 custom_posthog_client=self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None,
                 custom_redaction_config=custom_redaction_config,
                 pipelex_posthog_client=self.pipelex_posthog_client,
@@ -235,7 +239,13 @@ class TelemetryManager(TelemetryManagerAbstract):
         TelemetryManagerAbstract.clear_instance()
 
     @override
-    def track_event(self, event_name: EventName, *, properties: dict[EventProperty, Any] | None = None):
+    def track_event(
+        self,
+        event_name: EventName,
+        *,
+        properties: dict[EventProperty, Any] | None = None,
+        run_metadata: "RunMetadata | None" = None,
+    ):
         # We copy the incoming properties to avoid modifying the original dictionary
         # and to convert the keys to str
         # and to remove the properties that are in the redact list
@@ -248,45 +258,78 @@ class TelemetryManager(TelemetryManagerAbstract):
         # Track to custom PostHog based on user's posthog.mode
         match self.telemetry_config.custom_posthog.mode:
             case PostHogMode.ANONYMOUS:
-                self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
+                # The operator chose not to identify people, and that choice covers
+                # their users too: no run identity is applied and no groups are sent.
+                self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
             case PostHogMode.IDENTIFIED:
                 if not self.telemetry_config.custom_posthog.user_id:
                     log.error(f"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous")
-                    self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
+                    self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
                 else:
-                    self._track_identified_event(
-                        event_name=event_name,
+                    self._capture_custom_event(
+                        event_name,
                         properties=tracked_properties,
-                        user_id=self.telemetry_config.custom_posthog.user_id,
+                        identity=TelemetryIdentity.make_from_run_metadata(
+                            run_metadata=run_metadata,
+                            fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
+                            run_identity_policy=RunIdentityPolicy.DIRECT,
+                        ),
                     )
             case PostHogMode.OFF:
                 log.verbose(f"Custom telemetry is off, skipping event '{event_name}' for custom client")
 
         # Always track to Pipelex PostHog if enabled (independent of posthog.mode)
         if self._pipelex_telemetry_enabled:
-            self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
+            self._track_to_pipelex(event_name, properties=tracked_properties, run_metadata=run_metadata)
 
-    def _track_anonymous_event(self, event_name: str, *, properties: dict[str, Any]):
+    def _capture_custom_event(self, event_name: str, *, properties: dict[str, Any], identity: TelemetryIdentity):
+        """Capture one event on the operator's stream, under the identity resolved for it.
+
+        Captures a COPY of the properties, because the same dict is offered to
+        both streams and the anonymous branch below stamps
+        `$process_person_profile` on the one it sends. Without the copy that mark
+        travelled on to the Pipelex capture, labelling an event sent WITH a
+        distinct_id as having no person profile.
+        """
         if not self.custom_posthog_client:
             log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
             return
-        properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
-        self.custom_posthog_client.capture(event_name, properties=properties)
-        log.verbose(f"Tracked anonymous event '{event_name}' with properties: {properties}")
+        capture_properties = dict(properties)
+        if identity.distinct_id:
+            self.custom_posthog_client.capture(
+                event_name,
+                distinct_id=identity.distinct_id,
+                properties=capture_properties,
+                groups=identity.groups or None,
+            )
+            log.verbose(f"Tracked identified event '{event_name}' with properties: {capture_properties}")
+        else:
+            capture_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
+            self.custom_posthog_client.capture(event_name, properties=capture_properties)
+            log.verbose(f"Tracked anonymous event '{event_name}' with properties: {capture_properties}")
 
-    def _track_identified_event(self, event_name: str, *, properties: dict[str, Any], user_id: str):
-        if not self.custom_posthog_client:
-            log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
-            return
-        self.custom_posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
-        log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
+    def _track_to_pipelex(self, event_name: str, *, properties: dict[str, Any], run_metadata: "RunMetadata | None" = None):
+        """Track event to Pipelex's PostHog (always identified, always namespaced).
 
-    def _track_to_pipelex(self, event_name: str, *, properties: dict[str, Any]):
-        """Track event to Pipelex's PostHog (always identified)."""
+        The stream has no mode to turn identification off, but it is a shared
+        project: a run's own user reaches it only as a digest taken inside the
+        gateway-key hash, and the hash itself is what an event with no run
+        reports under. The run's groups do not travel here at all.
+        """
         if not self.pipelex_posthog_client or not self._pipelex_distinct_id:
             log.error("Could not track event to Pipelex telemetry because pipelex_posthog_client or _pipelex_distinct_id is not set")
             return
-        self.pipelex_posthog_client.capture(event_name, distinct_id=self._pipelex_distinct_id, properties=properties)
+        identity = TelemetryIdentity.make_from_run_metadata(
+            run_metadata=run_metadata,
+            fallback_distinct_id=self._pipelex_distinct_id,
+            run_identity_policy=RunIdentityPolicy.NAMESPACED,
+        )
+        self.pipelex_posthog_client.capture(
+            event_name,
+            distinct_id=identity.distinct_id,
+            properties=dict(properties),
+            groups=identity.groups or None,
+        )
         log.verbose(f"Tracked event '{event_name}' to Pipelex telemetry")
 
     @override
@@ -390,7 +433,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         return self._pipelex_telemetry_enabled
 
     @override
-    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
         """Hook to do something when a trace starts.
 
         Emits a trace start event to establish the trace name in PostHog.
@@ -402,6 +445,10 @@ class TelemetryManager(TelemetryManagerAbstract):
             trace_name: Full trace name with pipe code (for custom telemetry).
             trace_name_redacted: Redacted trace name without pipe code (for Pipelex telemetry).
             trace_id: The trace ID.
+            run_metadata: The run this trace belongs to. Carries the identity the
+                event is attributed to, resolved exactly as every pipe span under
+                the same trace will be, so the trace's first event and its spans
+                land on the same person. None leaves the stream's fallback.
         """
         log.verbose(
             f"[Telemetry] Emitting trace start event:\n"
@@ -419,11 +466,17 @@ class TelemetryManager(TelemetryManagerAbstract):
                 PostHogAttr.SPAN_NAME: custom_trace_name,
                 PostHogAttr.TRACE_NAME: custom_trace_name,
             }
-            if self.telemetry_config.custom_posthog.user_id:
+            custom_identity = TelemetryIdentity.make_from_run_metadata(
+                run_metadata=run_metadata,
+                fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
+                run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=self.telemetry_config.custom_posthog.mode),
+            )
+            if custom_identity.distinct_id:
                 self.custom_posthog_client.capture(
-                    distinct_id=self.telemetry_config.custom_posthog.user_id,
+                    distinct_id=custom_identity.distinct_id,
                     event=PostHogEvent.SPAN,
                     properties=custom_properties,
+                    groups=custom_identity.groups or None,
                 )
             else:
                 custom_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
@@ -439,11 +492,17 @@ class TelemetryManager(TelemetryManagerAbstract):
                 PostHogAttr.SPAN_NAME: trace_name_redacted,
                 PostHogAttr.TRACE_NAME: trace_name_redacted,
             }
-            if self._pipelex_distinct_id:
+            pipelex_identity = TelemetryIdentity.make_from_run_metadata(
+                run_metadata=run_metadata,
+                fallback_distinct_id=self._pipelex_distinct_id,
+                run_identity_policy=RunIdentityPolicy.NAMESPACED,
+            )
+            if pipelex_identity.distinct_id:
                 self.pipelex_posthog_client.capture(
-                    distinct_id=self._pipelex_distinct_id,
+                    distinct_id=pipelex_identity.distinct_id,
                     event=PostHogEvent.SPAN,
                     properties=pipelex_properties,
+                    groups=pipelex_identity.groups or None,
                 )
             else:
                 pipelex_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False

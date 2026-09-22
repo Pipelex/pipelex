@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.storage_scope import validate_storage_scope
@@ -66,7 +66,29 @@ class RunMetadata(BaseModel):
     ``JobMetadata`` it was produced under, so a transport that offloads an
     oversized result to storage can key it inside the run's own namespace
     instead of at the root of a bucket.
+
+    **Frozen**, so the field validators below are the last word on every value
+    here rather than a check at construction that a later assignment undoes.
+    Nothing ever needed to reassign one — these are the facts that are constant
+    for a whole run, which is the definition this class exists to draw — and
+    since telemetry began forwarding ``analytics_groups`` to a backend and
+    composing ``storage_scope`` into storage keys, "validated at construction"
+    has to mean "validated, full stop".
+
+    **What the freeze does not close**, named here so nobody mistakes any of it
+    for closed. Freezing refuses a REASSIGNMENT and nothing else, so an in-place
+    edit of the mapping (``run_metadata.analytics_groups[k] = v``) still reaches
+    a backend unvalidated, and pydantic's two deliberate bypasses —
+    ``model_copy(update=...)`` and ``model_construct`` — still build an instance
+    without running a validator. The runtime does none of the three, and a
+    future consumer must not start: ``copy_with_update`` only ever carries
+    already-validated values forward, and a value that arrives from request data
+    is constructed here or not at all. Closing them properly means re-validating
+    at the point of use, which would put a raise inside a span site, where
+    telemetry must never break the app.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     user_id: str
     pipeline_run_id: str
@@ -136,14 +158,13 @@ class RunMetadata(BaseModel):
         ARRIVED through construction is safe, which is the case that matters:
         every mapping crossing the wire or a call site is built here.
 
-        The guarantee stops at construction, and deliberately so. This model is
-        neither frozen nor `validate_assignment`, so mutating the mapping in
-        place — `run_metadata.analytics_groups[k] = v` — bypasses this
-        validator, exactly as reassigning `storage_scope` bypasses its own.
-        `model_copy` does not re-run validators either, which is fine:
-        `copy_with_update` only ever carries an already-validated mapping
-        forward. Nothing in the runtime mutates the mapping after construction;
-        a future consumer that forwards it must not start.
+        The guarantee stops at construction, and deliberately so. The model is
+        frozen, so reassigning the field raises — but freezing does not reach
+        inside the mapping, and mutating it in place
+        (`run_metadata.analytics_groups[k] = v`) still bypasses this validator.
+        See the class docstring for that hole and for pydantic's two others.
+        Nothing in the runtime mutates the mapping after construction; a future
+        consumer that forwards it must not start.
         """
         return validate_analytics_groups(value=value)
 

@@ -121,6 +121,15 @@ class PipelexSpanAttr(StrEnum):
     OUTCOME = "pipelex.outcome"  # "success" or "failure"
     OUTPUT_CLASS_NAME = "pipelex.output.class_name"
 
+    # The run's identity, set at every span site from `RunMetadata` so the identity
+    # rides the span object to every exporter instead of being correlated back to a
+    # run through shared state. RUN_USER_ID is who started the run; the groups are
+    # the host's opaque labels, serialized as a JSON string because an OTel attribute
+    # is a scalar or a homogeneous list, never a mapping. The groups attribute is
+    # omitted entirely when a run carries none.
+    RUN_USER_ID = "pipelex.run.user_id"
+    RUN_ANALYTICS_GROUPS = "pipelex.run.analytics_groups"
+
 
 class LangfuseSpanAttr(StrEnum):
     """Langfuse-specific span attribute keys for enhanced observability.
