@@ -25,6 +25,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
+from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
@@ -57,6 +58,7 @@ async def pipeline_run_setup(
     is_mock_usage: bool = False,
     user_id: str,
     storage_scope: str,
+    analytics_groups: dict[str, str] | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
@@ -123,6 +125,14 @@ async def pipeline_run_setup(
         Opaque prefix under which every byte this run writes must land. REQUIRED,
         validated at ``JobMetadata`` construction. See
         :mod:`pipelex.system.storage_scope`.
+    analytics_groups:
+        Opaque, host-supplied mapping of group type to group key that this run's
+        telemetry belongs to — the hosted platform sends its organization, a
+        single-user deployment sends nothing. Never read by name here. Validated
+        at the TOP of this function, above the pipeline registration and above
+        the trace-start event, so a malformed mapping registers nothing and
+        emits nothing. Optional, and omitting it leaves the group facet empty.
+        See :mod:`pipelex.system.analytics_groups`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -162,6 +172,19 @@ async def pipeline_run_setup(
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
+
+    # Validate the groups HERE, before this function causes anything observable.
+    #
+    # `RunMetadata` validates them too, and `prepare_pipe_job` validates them at
+    # its own top — but BOTH run below `add_new_pipeline`, the open tracer and
+    # `handle_trace_start`, which emits a telemetry event that cannot be unsent.
+    # So a malformed mapping used to abort a run that had already registered
+    # itself and announced its own trace to the backend. The teardown below
+    # releases the local state; the emitted event it cannot take back.
+    #
+    # This is the same lesson `storage_scope` learned one seam lower, and the
+    # same cure: ordering, not absence, was the defect.
+    analytics_groups = validate_analytics_groups(value=analytics_groups or {})
 
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
@@ -323,6 +346,7 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             storage_scope=storage_scope,
+            analytics_groups=analytics_groups,
             inputs=inputs,
             search_scope=search_scope,
             trace_context=trace_context,

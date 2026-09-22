@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A run carries opaque analytics groups the runtime never parses**: `RunMetadata` and the runtime-bridge payload gain `analytics_groups`, a host-supplied mapping of group type to group key — `{"organization": "org_acme"}` on a multi-tenant host, nothing at all on a single-user one — threaded through `pipeline_run_setup`, `prepare_pipe_job` and `PipelexKernel.make` beside `user_id` and `storage_scope`. No key is privileged and the runtime never reads one by name, the same boundary that keeps `storage_scope` opaque. It is validated where it enters, on the type and at the wire: a lowercase snake_case group type, a group key from `A-Za-z0-9_-`, and a small fixed number of group types per run, so a malformed mapping is a construction error naming the field rather than a failure inside a telemetry capture.
+
 ## [v0.62.0] - 2026-09-21
 
 ### Added

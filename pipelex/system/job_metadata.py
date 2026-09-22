@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
@@ -51,9 +52,9 @@ class UnitJobId(StrEnum):
 
 
 class RunMetadata(BaseModel):
-    """Who is running, which run it is, and where its bytes go.
+    """Who is running, which run it is, where its bytes go, and what it belongs to.
 
-    **The four facts that are constant for a whole run**, split out from
+    **The facts that are constant for a whole run**, split out from
     :class:`JobMetadata` — which mixes them with per-job facts that change at
     every step (``pipe_code``, ``pipe_run_id``, ``otel_context``,
     ``content_generation_job_id``). Grouping them says which is which: a copy
@@ -95,6 +96,19 @@ class RunMetadata(BaseModel):
     # characters into the log lines or ``ErrorReport`` envelopes that quote it.
     request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
 
+    # The opaque groups this run's telemetry belongs to, supplied by the host.
+    # Forwarded to whichever consumer understands groups and never read by name
+    # — see `pipelex.system.analytics_groups` for why the host's own concepts
+    # (organization, tenant, plan tier) deliberately do not cross this boundary,
+    # and for the charset and the size bound.
+    #
+    # It DEFAULTS, unlike `user_id` and `storage_scope` above, and the asymmetry
+    # is the point: those two refuse to default because a missing identity once
+    # became a present-looking one and a shared storage prefix. An absent group
+    # creates no namespace and misattributes nothing — it only leaves the group
+    # facet empty — so a caller with no groups to send says nothing.
+    analytics_groups: dict[str, str] = Field(default_factory=dict)
+
     @field_validator("storage_scope")
     @classmethod
     def _validate_storage_scope(cls, value: str) -> str:
@@ -109,6 +123,29 @@ class RunMetadata(BaseModel):
         request data after this point.
         """
         return validate_storage_scope(value=value)
+
+    @field_validator("analytics_groups")
+    @classmethod
+    def _validate_analytics_groups(cls, value: dict[str, str]) -> dict[str, str]:
+        """Refuse a mapping the runtime could not safely forward, at construction.
+
+        On the TYPE for the same reason as `storage_scope`: the value is caller
+        data that ends up quoted into log lines and handed to a telemetry
+        backend, so a newline in it forges a log line and an unbounded mapping
+        is an unbounded capture payload. Validating here means a mapping that
+        ARRIVED through construction is safe, which is the case that matters:
+        every mapping crossing the wire or a call site is built here.
+
+        The guarantee stops at construction, and deliberately so. This model is
+        neither frozen nor `validate_assignment`, so mutating the mapping in
+        place — `run_metadata.analytics_groups[k] = v` — bypasses this
+        validator, exactly as reassigning `storage_scope` bypasses its own.
+        `model_copy` does not re-run validators either, which is fine:
+        `copy_with_update` only ever carries an already-validated mapping
+        forward. Nothing in the runtime mutates the mapping after construction;
+        a future consumer that forwards it must not start.
+        """
+        return validate_analytics_groups(value=value)
 
 
 class JobMetadata(BaseModel):
