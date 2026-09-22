@@ -30,7 +30,7 @@ from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE
+from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, validate_storage_scope
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -186,6 +186,20 @@ async def pipeline_run_setup(
     # same cure: ordering, not absence, was the defect.
     analytics_groups = validate_analytics_groups(value=analytics_groups or {})
 
+    # And the scope, for the same reason and with more at stake.
+    #
+    # `prepare_pipe_job` gates it too, and that gate stays — but it runs below
+    # everything listed above, so until now the OPAQUE mapping was refused
+    # earlier than the field that decides where a tenant's bytes land. A scope
+    # carrying `..` registered a pipeline, opened a library and a tracer and
+    # announced its trace before anything looked at it.
+    #
+    # ADDITIVE, never a move: the value validated here is the caller's raw one,
+    # and the sentinel below rebinds it to something else that only the lower
+    # gate sees. `LOCAL_STORAGE_SCOPE` passes this gate unharmed — it is itself
+    # a valid one-segment scope — so the sentinel is not disturbed.
+    storage_scope = validate_storage_scope(value=storage_scope)
+
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
         if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
@@ -212,7 +226,13 @@ async def pipeline_run_setup(
     # Keyed on the sentinel EXACTLY, never a prefix test: a host that serves more
     # than one tenant passes its own scope and is untouched here.
     if storage_scope == LOCAL_STORAGE_SCOPE:
-        storage_scope = pipeline_run_id
+        # The rebound value is caller data too: `pipeline_run_id` is a parameter
+        # of this function, so a caller passing the sentinel alongside its own id
+        # chooses the storage scope through the back door. The gate above saw
+        # only the sentinel, so this is the first look at what the scope has
+        # actually become — and it still sits above the library, the tracer and
+        # the trace-start.
+        storage_scope = validate_storage_scope(value=pipeline_run_id)
 
     if not library_id:
         library_id = pipeline_run_id

@@ -6,6 +6,10 @@
 
 - **A run carries opaque analytics groups the runtime never parses**: `RunMetadata` and the runtime-bridge payload gain `analytics_groups`, a host-supplied mapping of group type to group key — `{"organization": "org_acme"}` on a multi-tenant host, nothing at all on a single-user one — threaded through `pipeline_run_setup`, `prepare_pipe_job` and `PipelexKernel.make` beside `user_id` and `storage_scope`. No key is privileged and the runtime never reads one by name, the same boundary that keeps `storage_scope` opaque. It is validated where it enters, on the type and at the wire: a lowercase snake_case group type, a group key from `A-Za-z0-9_-`, and a small fixed number of group types per run, so a malformed mapping is a construction error naming the field rather than a failure inside a telemetry capture.
 
+### Fixed
+
+- **A malformed `storage_scope` is refused before the run registers itself**: it was validated only inside `prepare_pipe_job`, which runs below the pipeline registration, the library acquire, the tracer open and the trace-start emission, so a scope carrying `..` announced a trace that cannot be unsent before anything looked at it. `pipeline_run_setup` now gates the caller's scope at its top, and gates the rebound value again when the local sentinel turns it into the caller's `pipeline_run_id`. The existing gate in `prepare_pipe_job` stays: it is the first one for a caller reaching that seam directly.
+
 ## [v0.62.0] - 2026-09-21
 
 ### Added
