@@ -17,6 +17,8 @@ It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which its
 
 There is no `--log-level` flag: `pipelex-agent` is machine-consumed, so logging is cut off process-wide by design.
 
+With `--runner api`, a run is sent to the MTHDS runner at `MTHDS_BASE_URL` (authenticated with `MTHDS_API_KEY`, or the values in `~/.mthds/config`) through `mthds`'s `MthdsAPIClient`. Every request the CLI sends that way identifies it in its `User-Agent`, outermost first: `pipelex-cli/<pipelex version> mthds-python/<mthds version> python/<version> (<os>; <arch>)`. The header is analytics only, so the hosted API can tell a CLI run from one started by an SDK script or the web app; it carries no secret and no user identifier. Only the CLI names itself `pipelex-cli`: a program that uses `pipelex` as a library and builds its own client is not labelled that way.
+
 ## Commands Overview
 
 The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`, and `inputs`, each with `pipe`, `bundle`, and `method` subcommands. It also provides `fix bundle` for deterministic in-place repairs.

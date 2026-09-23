@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:3bbf5f40906a0b8af13238f3f78a01fdeb90eed363620f7f881dfd7ec46b59c0"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-20T20:19:19Z"
-rationale = "Reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md against the trigger. The only change to check_model_cmd.py is the argument-help example, which moves from the retired @best-claude alias to @best-gpt now that the shipped deck is Azure-only. Neither review target quotes that example or any deck alias: agent-cli.md and the agent-CLI contract doc describe check-model's flags and output modes generically, and update.md describes the managed/override file split without naming a single alias or model handle. No doc change needed."
+digest = "sha256:b3cc9b4e7fbb2dc0a895ab80d0f9d0dcb56f437c75f4634686e69537a778503b"
+reviewed_by = "thomashebrard"
+reviewed_at = "2026-09-23T13:48:54Z"
+rationale = "The agent CLI's API runner passes its MthdsAPIClient an app_info named pipelex-cli, so its User-Agent reads pipelex-cli/<v> mthds-python/<v>. docs/tools/cli/agent-cli.md gains a paragraph under Global Options describing the --runner api User-Agent, and the agent-CLI contract doc's code layout notes it for _run_core_api.py. No other CLI surface changed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -40,7 +40,7 @@ rationale = "Reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md agains
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:40ed1700e0d5e86d7696eadd7f9887baeb8059f6"
 "pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:3721f0e9288fc7611917839ab303418a983a6883"
-"pipelex/cli/agent_cli/commands/run/_run_core_api.py" = "blob:78a27e0ba91e6bbf99c11caedb29ad4cf20ac78b"
+"pipelex/cli/agent_cli/commands/run/_run_core_api.py" = "blob:0e0e4de92e1662a858946b70b02575dc6ca61961"
 "pipelex/cli/agent_cli/commands/run/app.py" = "blob:64b2ecc02007cda11b526d8d3fc139593875dd9d"
 "pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:daf6207146c0ea41fe34bb272ed51350208af790"
 "pipelex/cli/agent_cli/commands/run/method_cmd.py" = "blob:f61145e5706f2b36134aafe844653ae6d719be8c"
