@@ -1,0 +1,35 @@
+pipelex/cli/cli_api_client.py
+  s_249569b913e311::t_910d3ee17f26b2 1-39
+tests/unit/pipelex/cli/test_cli_api_client.py
+  s_249569b913e311::t_29c7db9c933f2d 1-81
+.drift/acks/cli-docs.toml
+  s_249569b913e311::t_295940a7f6587a 2-5,43,56
+CHANGELOG.md
+  s_249569b913e311::t_c9f131cd070e56 7,13
+docs/tools/cli/agent-cli.md
+  s_249569b913e311::t_023cc1e3306c67 20-21
+pipelex/cli/agent_cli/CLAUDE.md
+  s_249569b913e311::t_489a017a621694 50
+pipelex/cli/agent_cli/commands/run/_run_core_api.py
+  s_249569b913e311::t_eb787eab4f728b 14,41
+pyproject.toml
+  s_249569b913e311::t_3dc902b2770c95 34
+uv.lock
+  s_249569b913e311::t_bdd45ce838938c 2555,2564,2566,3475
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7bf009be46cfbd3b01e53265e48e3db8302d0ae9",
+  "prompts": {},
+  "sessions": {
+    "s_249569b913e311": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c96db657-dce9-4864-8d99-e33151cd32db",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
