@@ -29,7 +29,6 @@ from pipelex.tools.misc.package_utils import get_package_version
 
 # Core commands in display order (natural ordering doesn't work between Typer groups and commands).
 _CORE_COMMAND_ORDER: list[str] = [
-    "login",
     "init",
     "doctor",
     "update",
@@ -152,7 +151,7 @@ def app_callback(
 """
         )
     # Skip checks if no command is being run (e.g., just --help) or if running setup/diagnostic commands
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor", "update", "migrate", "which"}:
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "doctor", "update", "migrate", "which"}:
         return
 
     # Check system readiness (dependencies and venv for dev installs)
