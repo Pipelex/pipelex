@@ -22,75 +22,89 @@
 # LLM Default Choices
 ####################################################################################################
 
+# `default_temperature` is the temperature paired with a model named outside a preset — an alias, a
+# waterfall or a bare handle written straight into a pipe, and the `for_text` / `for_object` choices
+# below. Every model this deck resolves to fixes its temperature at 1, so any other value here would
+# be overridden by the worker and warned about on every single call.
+
 [llm.choice_defaults]
-default_temperature = 0.5
+default_temperature = 1
 for_text = "@default-general"
 for_object = "@default-general"
 
 ####################################################################################################
 # LLM Aliases
 ####################################################################################################
+#
+# The ladder runs over the GPT-5.6 range and nothing else: luna is the cheap tier, terra the
+# intermediate one that carries most of the deck, and sol the premium tier. Read an alias as the job
+# it names rather than as a model: repointing a tier is a one-line change here, and every preset
+# that goes through an alias follows. The four that name a handle outright — `retrieval-cheap`,
+# `retrieval-premium`, `engineering-code-cheap` and `engineering-code-cheaper` — do not, and have to
+# be repointed with it.
 
 [llm.aliases]
-best-gpt = "gpt-6-astra"
+best-gpt = "gpt-5.6-sol"
 
 # Default aliases (first choice from waterfalls)
-default-general = "gpt-5.4"
-default-premium = "gpt-6-astra"
-default-premium-vision = "gpt-6-astra"
-default-premium-structured = "gpt-6-astra"
-default-large-context-code = "gpt-5.4"
-default-large-context-text = "gpt-5.4"
-default-small = "gpt-5.4-nano"
-default-small-structured = "gpt-5.4-nano"
-default-small-vision = "gpt-5.4-nano"
-default-small-creative = "gpt-5.4-nano"
+default-general = "gpt-5.6-terra"
+default-premium = "gpt-5.6-sol"
+default-premium-vision = "gpt-5.6-sol"
+default-premium-structured = "gpt-5.6-sol"
+default-large-context-code = "gpt-5.6-terra"
+default-large-context-text = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
+default-small-structured = "gpt-5.6-luna"
+default-small-vision = "gpt-5.6-luna"
+default-small-creative = "gpt-5.6-luna"
 
 ####################################################################################################
 # LLM Presets
 ####################################################################################################
 
-# Every preset on the premium tier carries temperature = 1, because the model that tier resolves to
-# fixes its temperature at 1. Declaring anything else would be overridden by the worker and warned
-# about on every single call, so the deck states the value the model will actually use. If the
-# premium tier ever moves to a model that accepts a temperature, these are the presets to revisit.
+# Every preset here carries temperature = 1, because every model this deck resolves to — the whole
+# GPT-5.6 range — fixes its temperature at 1. Declaring anything else would be
+# overridden by the worker and warned about on every single call, so the deck states the value the
+# model will actually use. Presets are therefore distinguished by their model tier and their
+# reasoning effort, not by temperature. If a tier ever moves to a model that accepts a temperature,
+# these are the presets to revisit.
 
 [llm.presets]
 
 # Writing
 writing-factual = { model = "@default-premium", temperature = 1, description = "Factual writing with high accuracy" }
-writing-factual-cheap = { model = "@default-small", temperature = 0.1, description = "Cheap factual writing with high accuracy" }
+writing-factual-cheap = { model = "@default-small", temperature = 1, description = "Cheap factual writing with high accuracy" }
 writing-creative = { model = "@default-premium", temperature = 1, description = "Creative writing with high variability" }
-writing-creative-cheap = { model = "@default-small-creative", temperature = 0.9, description = "Cheap creative writing with high variability" }
+writing-creative-cheap = { model = "@default-small-creative", temperature = 1, description = "Cheap creative writing with high variability" }
 
 # Retrieval
-retrieval = { model = "@default-large-context-text", temperature = 0.1, description = "Data retrieval from large text corpora" }
-retrieval-cheap = { model = "gpt-5.4-nano", temperature = 0.1, description = "Cheap data retrieval from large text corpora" }
-retrieval-premium = { model = "gpt-6-astra", temperature = 1, description = "Premium data retrieval with highest accuracy" }
+retrieval = { model = "@default-large-context-text", temperature = 1, description = "Data retrieval from large text corpora" }
+retrieval-cheap = { model = "gpt-5.6-luna", temperature = 1, description = "Cheap data retrieval from large text corpora" }
+retrieval-premium = { model = "gpt-5.6-terra", temperature = 1, reasoning_effort = "high", description = "Premium data retrieval with highest accuracy" }
 
 # Engineering
 engineering-structured = { model = "@default-premium-structured", temperature = 1, description = "Structured engineering output (JSON, schemas)" }
 engineering-code = { model = "@default-premium", temperature = 1, description = "Code generation and analysis" }
-engineering-code-cheap = { model = "gpt-5.4", temperature = 0.1, description = "Cheap code generation and analysis" }
-engineering-code-cheaper = { model = "gpt-5.4-nano", temperature = 0.1, description = "Cheapest code generation and analysis" }
-engineering-codebase-analysis = { model = "@default-premium", temperature = 1, description = "Large codebase analysis" }
+engineering-code-cheap = { model = "gpt-5.6-terra", temperature = 1, description = "Cheap code generation and analysis" }
+engineering-code-cheaper = { model = "gpt-5.6-luna", temperature = 1, description = "Cheapest code generation and analysis" }
+engineering-codebase-analysis = { model = "@default-large-context-code", temperature = 1, description = "Large codebase analysis" }
 
 # Vision
 vision = { model = "@default-premium-vision", temperature = 1, description = "Understanding and interpreting images" }
-vision-cheap = { model = "@default-small-vision", temperature = 0.5, description = "Cheap image understanding for simple tasks" }
+vision-cheap = { model = "@default-small-vision", temperature = 1, description = "Cheap image understanding for simple tasks" }
 vision-diagram = { model = "@default-premium-vision", temperature = 1, description = "Diagram and chart interpretation" }
 vision-table = { model = "@default-premium-vision", temperature = 1, description = "Table extraction from images" }
 
 # Image generation prompting
 img-gen-prompting = { model = "@default-premium", temperature = 1, description = "Crafting image generation prompts" }
-img-gen-prompting-cheap = { model = "@default-small-creative", temperature = 0.5, description = "Cheap image prompt generation" }
+img-gen-prompting-cheap = { model = "@default-small-creative", temperature = 1, description = "Cheap image prompt generation" }
 
 # Reasoning
 deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
 quick-reasoning = { model = "@default-premium", temperature = 1, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 
 # Testing
-testing-text = { model = "@default-small", temperature = 0.5, description = "Testing preset for text generation" }
-testing-structured = { model = "@default-small-structured", temperature = 0.1, description = "Testing preset for structured output" }
-testing-vision = { model = "@default-small-vision", temperature = 0.5, description = "Testing preset for vision tasks" }
-testing-vision-structured = { model = "@default-small-vision", temperature = 0.5, description = "Testing preset for structured vision output" }
+testing-text = { model = "@default-small", temperature = 1, description = "Testing preset for text generation" }
+testing-structured = { model = "@default-small-structured", temperature = 1, description = "Testing preset for structured output" }
+testing-vision = { model = "@default-small-vision", temperature = 1, description = "Testing preset for vision tasks" }
+testing-vision-structured = { model = "@default-small-vision", temperature = 1, description = "Testing preset for structured vision output" }
