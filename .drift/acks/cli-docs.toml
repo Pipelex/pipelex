@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:63b8d267e379868d314c19b262f8f28bb0f22b6ce18d14471c5cb99d585d8e3a"
+digest = "sha256:b3cc9b4e7fbb2dc0a895ab80d0f9d0dcb56f437c75f4634686e69537a778503b"
 reviewed_by = "thomashebrard"
-reviewed_at = "2026-09-23T13:26:43Z"
-rationale = "The API runner's client is now built by pipelex/cli/cli_api_client.py with app_info pipelex-cli. docs/tools/cli/agent-cli.md gains a paragraph under Global Options describing the --runner api User-Agent, and the agent-CLI contract doc's code layout names the new client module for _run_core_api.py. No other CLI surface changed."
+reviewed_at = "2026-09-23T13:48:54Z"
+rationale = "The agent CLI's API runner passes its MthdsAPIClient an app_info named pipelex-cli, so its User-Agent reads pipelex-cli/<v> mthds-python/<v>. docs/tools/cli/agent-cli.md gains a paragraph under Global Options describing the --runner api User-Agent, and the agent-CLI contract doc's code layout notes it for _run_core_api.py. No other CLI surface changed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -53,7 +53,6 @@ rationale = "The API runner's client is now built by pipelex/cli/cli_api_client.
 "pipelex/cli/agent_cli/commands/validate/method_cmd.py" = "blob:794914167c13975bc0cdff7b301a8268ff1b79b6"
 "pipelex/cli/agent_cli/commands/validate/pipe_cmd.py" = "blob:2f7dce6a1d3d9987aa14146bac79d6b0e7e985e1"
 "pipelex/cli/bundle_target_resolution.py" = "blob:8dccc50b700b877968ed1b2c1c3652ab1c32e956"
-"pipelex/cli/cli_api_client.py" = "blob:1c74b3b5d8d69ac402de2a6bf19ea67d11fb461d"
 "pipelex/cli/cli_factory.py" = "blob:1f859ab3b995e1a67e5fdc812a168d56c338e970"
 "pipelex/cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/build/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

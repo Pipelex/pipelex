@@ -1,10 +1,9 @@
-"""The CLIs' API runner names itself `pipelex-cli` in its `User-Agent`, and only on the CLI path."""
+"""The agent CLI's API run path names itself `pipelex-cli` in its `User-Agent`."""
 
 from __future__ import annotations
 
 import asyncio
 import platform
-import re
 import sys
 from typing import TYPE_CHECKING, Any
 
@@ -14,7 +13,6 @@ from mthds.runners.api.client import MthdsAPIClient
 from mthds.version import __version__ as mthds_version
 
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api  # pyright: ignore[reportPrivateUsage]
-from pipelex.cli.cli_api_client import PIPELEX_CLI_APP_NAME, make_pipelex_cli_api_client, pipelex_cli_app_info
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -37,22 +35,9 @@ def api_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestPipelexCliApiClient:
-    def test_app_info_names_the_cli_with_the_package_version(self) -> None:
-        app_info = pipelex_cli_app_info()
-        assert app_info.name == PIPELEX_CLI_APP_NAME == "pipelex-cli"
-        assert app_info.version == get_package_version()
-        assert app_info.url is None
-        assert app_info.details == ()
-
-    @pytest.mark.usefixtures("api_credentials")
-    def test_cli_client_user_agent_leads_with_pipelex_cli(self) -> None:
-        client = make_pipelex_cli_api_client()
-        assert client.user_agent == _expected_user_agent()
-        assert re.fullmatch(r"pipelex-cli/\S+ mthds-python/\S+ python/\d+\.\d+\.\d+( \(.+\))?", client.user_agent)
-
     @pytest.mark.usefixtures("api_credentials")
     def test_library_client_is_not_labelled_pipelex_cli(self) -> None:
-        """A client built without the CLI factory, as a library user builds it, carries no `pipelex-cli` token."""
+        """A client built as a library user builds it carries no `pipelex-cli` token."""
         client = MthdsAPIClient()
         assert "pipelex-cli" not in client.user_agent
         assert client.user_agent.startswith(f"mthds-python/{mthds_version} ")
