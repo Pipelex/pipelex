@@ -1,0 +1,40 @@
+pipelex/pipeline/pipeline_run_setup.py
+  h_ad2a9d0839b83e 222-223
+pipelex/temporal/tprl_pipe/act_assemble_graph.py
+  h_ad2a9d0839b83e 53
+pipelex/temporal/tprl_pipe/temporal_pipe_run.py
+  h_ad2a9d0839b83e 60
+pipelex/pipeline/pipeline_manager.py
+  h_ad2a9d0839b83e 16-19,49-51
+pipelex/temporal/tprl/workflow_caller.py
+  h_ad2a9d0839b83e 114
+pipelex/pipeline/validate_bundle.py
+  h_ad2a9d0839b83e 129,136,153
+pipelex/temporal/tprl_pipe/wf_pipe_run.py
+  h_ad2a9d0839b83e 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "0ed6aa5bd1cdbaa096b4d59d72306136b1118bf4",
+  "prompts": {
+    "2b4e0554afe1b0fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a8488013-c45f-47a8-aaed-44b3aa9f6eb3",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 6,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

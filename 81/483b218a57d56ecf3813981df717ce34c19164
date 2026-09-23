@@ -1,0 +1,36 @@
+tests/integration/pipelex/temporal/library_crate/helpers.py
+  4b1c854340dcf46b 6-7,13,19,22-30,32-55,58-64,68-73,91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "81483b218a57d56ecf3813981df717ce34c19164",
+  "prompts": {
+    "4b1c854340dcf46b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c21a1bcf-41f3-43e5-bdd1-78544ee9f1ad",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 5,
+      "accepted_lines": 53,
+      "overriden_lines": 0
+    },
+    "c740a875f3d0d9f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0488a5e7-46ff-40b2-b1d1-6b22570e8ac0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

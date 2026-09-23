@@ -1,0 +1,28 @@
+pipelex/cli/commands/build/structures_cmd.py
+  s_abe3de648d88e6::t_603b9c6ec005d6 234
+tests/unit/pipelex/cli/commands/build/test_structures_cmd_cross_package_refines.py
+  s_abe3de648d88e6::t_59c53221ebf7fb 1-17,20-21,26-33,44-72,74-80
+  s_abe3de648d88e6::t_fb27f27717626f 73
+  s_abe3de648d88e6::t_ad68dc2172c068 18-19,22-25,34-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "a277ae25c6b6e3a42aaa05110458967a96dc8d9f",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_abe3de648d88e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5205801-d1d8-4b34-bf35-0370daac6e99",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

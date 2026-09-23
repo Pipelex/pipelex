@@ -1,0 +1,27 @@
+tests/e2e/pipelex/concepts/nested_concepts/test_structure_generator_cli.py
+  s_b729a924f3cac0::t_c277b5a107db0b 73-75,80-82,84-90,94-95
+  s_b729a924f3cac0::t_d2411fec6781c1 105-106,110,115-116
+CHANGELOG.md
+  s_b729a924f3cac0::t_3198969c8f5c43 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "e988301130b5db046117ad80ef4772e25aab07ad",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_b729a924f3cac0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b7a805d-1065-44d9-89ec-ad3257ac46ad",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

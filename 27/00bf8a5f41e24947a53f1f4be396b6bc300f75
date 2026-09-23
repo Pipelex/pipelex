@@ -1,0 +1,53 @@
+.pipelex/inference/backends/openai.toml
+  9e8a698bfe9ccf16 199-206
+.pipelex-dev/test_profiles.toml
+  9e8a698bfe9ccf16 160
+.pipelex/inference/backends/azure_openai.toml
+  9e8a698bfe9ccf16 173-174,176-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "2700bf8a5f41e24947a53f1f4be396b6bc300f75",
+  "prompts": {
+    "4ca8a731ff5f048c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8796b3a-2907-4500-8c4c-8e6d2833d3ef",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    },
+    "5df94ab73a7662d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7f415e7-1001-4282-926d-9b38fe495755",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 166,
+      "total_deletions": 13,
+      "accepted_lines": 152,
+      "overriden_lines": 1
+    },
+    "9e8a698bfe9ccf16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bde702d0-42a7-4418-bfe0-14aeeed323b7",
+        "model": "claude-4.6-opus-high-thinking"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 0,
+      "accepted_lines": 17,
+      "overriden_lines": 1
+    }
+  }
+}

@@ -1,0 +1,23 @@
+pipelex/pipelex.py
+  3052f2a386af771d 199-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "acbf53d71ceedf6c0cd745ee5536bc0cd12d3534",
+  "prompts": {
+    "3052f2a386af771d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3db4064-ae66-47bc-8dba-09eea1d17009",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

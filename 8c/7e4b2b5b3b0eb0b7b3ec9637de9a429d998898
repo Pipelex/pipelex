@@ -1,0 +1,27 @@
+pipelex/builder/operations/validate_ops.py
+  73448560fb81c199 150,154,185,190
+pipelex/builder/operations/models_ops.py
+  73448560fb81c199 117-122
+pipelex/builder/operations/inputs_ops.py
+  73448560fb81c199 47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "8c7e4b2b5b3b0eb0b7b3ec9637de9a429d998898",
+  "prompts": {
+    "73448560fb81c199": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1fde1ccc-828f-4341-97eb-ecff737cc648",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 8,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}

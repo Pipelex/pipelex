@@ -1,0 +1,25 @@
+pipelex/builder/operations/pipe_ops.py
+  5c77b917aa3d0398 30-35,77-78,83,91
+tests/unit/pipelex/builder/operations/test_parse_pipe_spec.py
+  5c77b917aa3d0398 175-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "942b8de2f01709b2aad4d20becdfeeea6c999f0e",
+  "prompts": {
+    "5c77b917aa3d0398": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dac8482d-1e35-4da7-b6f2-405dba00b712",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 61,
+      "total_deletions": 20,
+      "accepted_lines": 45,
+      "overriden_lines": 0
+    }
+  }
+}

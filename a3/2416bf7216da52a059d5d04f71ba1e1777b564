@@ -1,0 +1,23 @@
+tests/integration/pipelex/temporal/conftest.py
+  d82db6f263a4e572 104-107,116-121,123-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "a32416bf7216da52a059d5d04f71ba1e1777b564",
+  "prompts": {
+    "d82db6f263a4e572": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ca70e488-cc19-4932-bbe9-d87a9563495a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 2,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}

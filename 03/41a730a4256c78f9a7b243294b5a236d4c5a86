@@ -1,0 +1,29 @@
+.pipelex/pipelex.toml
+  c2486f6f68b1f8db 87,94
+pipelex/plugins/openai/vertexai_factory.py
+  c2486f6f68b1f8db 68
+pipelex/kit/configs/pipelex.toml
+  c2486f6f68b1f8db 87,94
+pipelex/system/exceptions.py
+  c2486f6f68b1f8db 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "0341a730a4256c78f9a7b243294b5a236d4c5a86",
+  "prompts": {
+    "c2486f6f68b1f8db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0525cc66-2ea7-4673-ae56-4bd05220980d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 6,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}

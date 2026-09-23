@@ -1,0 +1,73 @@
+docs/setup/index.md
+  e395e37fe1fb5793 2-3,19
+docs/features/mthds-language.md
+  e395e37fe1fb5793 24,36-42
+docs/features/document-extraction.md
+  e395e37fe1fb5793 38-43
+docs/get-started/write-methods-manually.md
+  e395e37fe1fb5793 3,8,10,37
+docs/features/web-search.md
+  e395e37fe1fb5793 24-28
+docs/building-methods/packages.md
+  e395e37fe1fb5793 2-3,8,10-11,13,15,17-18,22,31,44-48,50-52,56,60-61,65,75,77,79,81-82,85,88-93,96,98,100,109,115,117,119,122-124,127,130,133,135,138,141,143,146,149,151,153,156-158,161,163,165,172
+docs/building-methods/pipes/pipe-operators/PipeSearch.md
+  e395e37fe1fb5793 42,109
+docs/building-methods/llm-structured-generation-config.md
+  e395e37fe1fb5793 2,6,98-103
+docs/tools/cli/show.md
+  e395e37fe1fb5793 7,30,39
+docs/building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+  e395e37fe1fb5793 2,6,63-68
+docs/features/cli.md
+  e395e37fe1fb5793 28-35,61-66
+docs/index.md
+  e395e37fe1fb5793 12,14,60
+docs/features/claude-code-skills-plugin.md
+  e395e37fe1fb5793 12,28,40-45
+docs/configuration/config-technical/library-config.md
+  e395e37fe1fb5793 2-3,6,139,470,520
+docs/tools/cli/index.md
+  e395e37fe1fb5793 2-3,8,22-26,43,57
+docs/tools/cli/init.md
+  e395e37fe1fb5793 7,13,16,25,27,35,38-40,44-46,52-54,59,71,73-77
+docs/building-methods/pipes/pipe-operators/PipeImgGen.md
+  e395e37fe1fb5793 72,75-77
+docs/tools/cli/agent-cli.md
+  e395e37fe1fb5793 98,104-106,110-111,116,119
+docs/under-the-hood/execution-graph-tracing.md
+  e395e37fe1fb5793 33,49,52,55,58
+docs/tools/cli/pkg.md
+  e395e37fe1fb5793 2-3,6,8,10,12,15-17,20,22,25-26,29,31,33-37,39,41,44-45,48,50,52-54,56,58,61-62,65,67,69,71,73-75,77,81-82
+docs/features/pipe-operators.md
+  e395e37fe1fb5793 2
+docs/tools/logging.md
+  e395e37fe1fb5793 2-3
+docs/building-methods/pipes/pipe-operators/PipeExtract.md
+  e395e37fe1fb5793 11,13,51,74,79,81
+docs/building-methods/pipes/executing-pipelines.md
+  e395e37fe1fb5793 169,230,232
+docs/building-methods/pipes/pipe-operators/PipeCompose.md
+  e395e37fe1fb5793 9,20,33,35,37,49,53,61
+docs/features/index.md
+  e395e37fe1fb5793 72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "07736f0abe26acb33af5a2bb5aaf231806fca22c",
+  "prompts": {
+    "e395e37fe1fb5793": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e6c657a5-9c94-40c9-8dbe-620cb3357de6",
+        "model": "gpt-5.4-medium"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 283,
+      "total_deletions": 614,
+      "accepted_lines": 268,
+      "overriden_lines": 0
+    }
+  }
+}

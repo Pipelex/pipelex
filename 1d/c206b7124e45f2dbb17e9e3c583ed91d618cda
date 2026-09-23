@@ -1,0 +1,279 @@
+tests/integration/pipelex/test_data.py
+  64f3a2c92cabe45c 169
+.pipelex/inference/deck/1_llm_deck.toml
+  64f3a2c92cabe45c 7-11,36-37,41-46,49-50,60,62,66-67,72-73,77-78,84
+pipelex/cli/commands/run/_run_core.py
+  64f3a2c92cabe45c 54,131,250,278
+tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_dynamic_output.py
+  64f3a2c92cabe45c 1-155
+pipelex/cli/commands/init/credentials.py
+  64f3a2c92cabe45c 13,139-140
+tests/integration/pipelex/cogt/test_img_gen.py
+  64f3a2c92cabe45c 10,36,74,106
+tests/unit/pipelex/tools/misc/test_http_utils.py
+  64f3a2c92cabe45c 1-4,12-24,26,65-94
+pipelex/cogt/models/model_deck.py
+  64f3a2c92cabe45c 864-871
+pipelex/tools/misc/http_utils.py
+  64f3a2c92cabe45c 30-34,39,62-77
+pipelex/kit/configs/inference/backends/huggingface.toml
+  64f3a2c92cabe45c 42
+pipelex/plugins/openai/openai_img_gen_factory.py
+  64f3a2c92cabe45c 1,5,7-8,10-12,16-42,44-57,60-69,71-82,85-121,124,126,129-131,133,136-138
+pipelex/kit/configs/inference/backends/pipelex_gateway_models_plain.md
+  64f3a2c92cabe45c 31-32,34-35,37,49,55-69,119,122,125,128-131,211-213,226
+tests/unit/pipelex/cogt/llm/test_llm_config_reasoning.py
+  64f3a2c92cabe45c 8-9,18,28,34,38,48,115,141,228,289
+pipelex/cli/commands/run/bundle_cmd.py
+  64f3a2c92cabe45c 76-83,176
+tests/unit/pipelex/core/stuffs/test_document_content_url_validation.py
+  64f3a2c92cabe45c 3-4,18-19,21,23
+tests/integration/pipelex/cogt/test_img_gen_param_support.py
+  64f3a2c92cabe45c 1-165
+.pipelex/inference/backends/pipelex_gateway_models_plain.md
+  64f3a2c92cabe45c 34-36,49,55-69,119,122,125,128-131,211-213,226
+pipelex/cli/agent_cli/commands/init_cmd.py
+  64f3a2c92cabe45c 18,120
+.pipelex/inference/backends/fal.toml
+  64f3a2c92cabe45c 41,57,73,89,106
+.vscode/settings.json
+  64f3a2c92cabe45c 2-3,45-46
+pipelex/plugins/gateway/gateway_img_gen_worker.py
+  64f3a2c92cabe45c 71
+pipelex/kit/configs/inference/backends/pipelex_gateway_models.md
+  64f3a2c92cabe45c 80-82,88-90,96,128,144-183,344-351,573-578,601
+.pipelex/inference/deck/2_img_gen_deck.toml
+  64f3a2c92cabe45c 7-11,34
+pipelex/cogt/img_gen/img_gen_job_components.py
+  64f3a2c92cabe45c 5,30-34,51,54
+CHANGELOG.md
+  64f3a2c92cabe45c 40-143,413-415,418-422,489-491,493-501,503,505,507,511,513,515,519,521,523,526-530,596-598,640-644,648-650,732-735,791-795,798-816,819-834,837-849,852-857,865-867,869-877,879,881,883,887,889,891,895,897,899,902-906,930-932,959-963,967-969,1015-1018,1098,1124-1125,1130-1131,1134-1139,1141,1144-1149,1152-1153,1156-1159,1164-1168,1171-1174,1178-1181,1185,1190,1196,1202,1211-1219,1222-1225,1228-1229,1232-1233,1238-1241,1244-1246,1250-1251,1256,1260,1266,1272-1279,1282-1288,1400,1426-1456,1459-1499,1502-1508,1511-1529,1541-1545,1547,1549-1553,1556-1557,1560-1566,1573,1660-1661,1664-1671,1674-1682,1685-1686,1698-1700,1716,1777,1808-1813,1816-1820,1823-1824,1828-1829,1843,1850,1860,1866,1872,1877,1882,1898,1904,1910,1920-1921,1928,2029,2040,2048-2049,2054,2057,2064,2069,2074,2079,2086,2091,2096,2115-2118,2120-2123,2162,2170,2172,2180-2181,2183-2186,2215-2216,2222,2259,2266,2285
+tests/cases/documents.py
+  64f3a2c92cabe45c 45,48-50
+tests/unit/pipelex/plugins/mistral/test_mistral_reasoning.py
+  64f3a2c92cabe45c 15,71
+.github/workflows/dependency-review.yml
+  64f3a2c92cabe45c 1-35
+pipelex/kit/configs/inference/backends/anthropic.toml
+  64f3a2c92cabe45c 104-112,121-131
+pipelex/plugins/anthropic/anthropic_config.py
+  64f3a2c92cabe45c 13
+pipelex/plugins/openai/openai_img_gen_worker.py
+  64f3a2c92cabe45c 1-2,7-8,11,17-19,54-63,65-74,80,111-116,121,125-154
+tests/unit/pipelex/core/stuffs/test_image_content_url_validation.py
+  64f3a2c92cabe45c 3-4,18-19,21,23
+.pipelex/inference/backends/azure_openai.toml
+  64f3a2c92cabe45c 193,200,208,215,220-228,244-247,249-251,263-266,268-270,282-303,305-308
+pipelex/graph/reactflow/assets/graph-viewer.css
+  64f3a2c92cabe45c 889-890,895-899,901,903-905,1253-1296,1328-1385,1401,1418-1431,1556-1583,1587-1588,1595,1601-1666
+pipelex/kit/configs/inference/backends/google.toml
+  64f3a2c92cabe45c 65,73-109
+.pipelex/inference/backends/pipelex_gateway_models.md
+  64f3a2c92cabe45c 88-95,128,144-183,315,323,331,339-347,573-578,601
+pipelex/plugins/openai/openai_completions_llm_worker.py
+  64f3a2c92cabe45c 15,131,134,185,188
+pyproject.toml
+  64f3a2c92cabe45c 3,32,67-70,72-84,103,109
+pipelex/cli/commands/run/method_cmd.py
+  64f3a2c92cabe45c 75-82,146
+pipelex/core/concepts/structure_generation/generator.py
+  64f3a2c92cabe45c 2,18-22,202-239,278,317,489
+pipelex/cli/commands/update_cmd.py
+  64f3a2c92cabe45c 1-187
+tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator_escaping.py
+  64f3a2c92cabe45c 518-522
+Makefile
+  64f3a2c92cabe45c 140-144,197-199,1067-1114
+pipelex/plugins/gateway/gateway_extract_worker.py
+  64f3a2c92cabe45c 184-187,267-269
+.github/dependabot.yml
+  64f3a2c92cabe45c 1-38
+tests/unit/pipelex/cli/test_update_cmd.py
+  64f3a2c92cabe45c 1-189
+pipelex/pipe_operators/img_gen/pipe_img_gen.py
+  64f3a2c92cabe45c 10-11,70-108
+pipelex/graph/reactflow/assets/graph-viewer.js
+  64f3a2c92cabe45c 1,3,6,8-9,14-17
+pipelex/cogt/img_gen/img_gen_args_factory.py
+  64f3a2c92cabe45c 14,18,25,27,29,55,66-67,101-102,111,139-146,156-157,162,172-180,191-194,203,238,240,244,246-247,250-256,258,260-264,267-273,322-329,331-335,415-416,435-439,451,455-456,464-465,476-477,488-489,492-494,497-498,501-516,574-593
+tests/unit/pipelex/cli/test_doctor_cmd.py
+  64f3a2c92cabe45c 19,54-61,73
+tests/unit/pipelex/cogt/models/test_deck_manifest.py
+  64f3a2c92cabe45c 1-301
+pipelex/cogt/models/deck_manifest.py
+  64f3a2c92cabe45c 1-280
+tests/unit/pipelex/plugins/openai/test_openai_responses_reasoning.py
+  64f3a2c92cabe45c 15,58
+package.json
+  64f3a2c92cabe45c 1-10
+.pipelex/inference/backends/huggingface.toml
+  64f3a2c92cabe45c 42
+pipelex/kit/configs/inference/deck/.kit_manifest.json
+  64f3a2c92cabe45c 1-9
+pipelex/plugins/fal/fal_img_gen_worker.py
+  64f3a2c92cabe45c 45,47-50
+tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator_wrapping.py
+  64f3a2c92cabe45c 1-227
+pipelex/kit/configs/inference/deck/4_search_deck.toml
+  64f3a2c92cabe45c 8-12
+tests/e2e/pipelex/pipes/pipe_operators/pipe_extract/test_pipe_extract.py
+  64f3a2c92cabe45c 1-59
+.pipelex/inference/backends/openai.toml
+  64f3a2c92cabe45c 240-247,256,260-272,276,280-292,297,300-352
+tests/e2e/pipelex/pipes/pipe_operators/pipe_extract/test_data.py
+  64f3a2c92cabe45c 1-19
+docs/configuration/config-technical/aws-config.md
+  64f3a2c92cabe45c 18
+tests/integration/pipelex/pipes/operator/pipe_img_gen/test_pipe_img_gen_blueprint_validation.py
+  64f3a2c92cabe45c 1-204
+pipelex/pipe_run/pipe_run_params_factory.py
+  64f3a2c92cabe45c 15,24
+tests/unit/pipelex/cogt/img_gen/test_img_gen_args_factory.py
+  64f3a2c92cabe45c 11,15,25-26,29-30,33-34,36-41,44-47,49,51,62-68,76-77,79-80,120,152,173,193,197-535
+pipelex/kit/configs/inference/backends/openai.toml
+  64f3a2c92cabe45c 240-247,256,260-272,276,280-292,297,300-352
+pipelex/plugins/anthropic/anthropic_llm_worker.py
+  64f3a2c92cabe45c 19,197-203,231,236,305,312
+.pipelex/inference/deck/3_extract_deck.toml
+  64f3a2c92cabe45c 8-12
+pipelex/pipe_operators/pipe_operator.py
+  64f3a2c92cabe45c 45-48,53-55
+.pipelex/inference/backends/anthropic.toml
+  64f3a2c92cabe45c 104-112,121-131
+.github/workflows/graph-ui-check.yml
+  64f3a2c92cabe45c 1-25
+.pipelex-dev/test_profiles.toml
+  64f3a2c92cabe45c 69,71,90-95,187,228,288-293,295
+pipelex/pipeline/runner.py
+  64f3a2c92cabe45c 82,111-112,147,236
+.pipelex/inference/backends/google.toml
+  64f3a2c92cabe45c 65,73-109
+pipelex/cli/deck_notice.py
+  64f3a2c92cabe45c 1-38
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  64f3a2c92cabe45c 11,16,80,101,106-120
+pipelex/kit/configs/inference/deck/2_img_gen_deck.toml
+  64f3a2c92cabe45c 7-11,34
+.pipelex/inference/backends/bedrock.toml
+  64f3a2c92cabe45c 128-137,147-158
+pipelex/core/concepts/concept_factory.py
+  64f3a2c92cabe45c 225,227
+tests/integration/pipelex/cogt/test_llm_inference.py
+  64f3a2c92cabe45c 2,58-85
+mkdocs.yml
+  64f3a2c92cabe45c 262,442
+tests/e2e/pipelex/pipes/pipe_operators/pipe_llm/test_pipe_llm_object_list.py
+  64f3a2c92cabe45c 1-34
+pipelex/kit/configs/inference/deck/1_llm_deck.toml
+  64f3a2c92cabe45c 7-11,36-37,41-46,49-50,60,62,66-67,72-73,77-78,84
+tests/unit/pipelex/builder/operations/test_parse_pipe_spec.py
+  64f3a2c92cabe45c 116-145
+pipelex/pipe_run/pipe_run_params.py
+  64f3a2c92cabe45c 142
+pipelex/kit/configs/inference/backends/fal.toml
+  64f3a2c92cabe45c 41,57,73,89,106
+pipelex/graph/reactflow/assets/.graph-ui-version
+  64f3a2c92cabe45c 1
+tests/e2e/pipelex/pipes/pipe_operators/pipe_extract/pipe_extract.mthds
+  64f3a2c92cabe45c 1-9
+pipelex/cogt/img_gen/img_gen_model_rules.py
+  64f3a2c92cabe45c 25,33,36,44,48,78-79,87-88,99,106,114,119,126-128,131-132,142-143,149-150,153-154,156-159,162-174,191-201
+tests/integration/pipelex/cogt/test_data.py
+  64f3a2c92cabe45c 125
+pipelex/plugins/huggingface/huggingface_img_gen_worker.py
+  64f3a2c92cabe45c 45,48-51
+docs/configuration/config-technical/inference-backend-config.md
+  64f3a2c92cabe45c 86-90
+pipelex/system/pipelex_service/pipelex_details.py
+  64f3a2c92cabe45c 5
+tests/integration/pipelex/cogt/test_img2img.py
+  64f3a2c92cabe45c 17,95,152,214,271
+.github/workflows/publish-pypi.yml
+  64f3a2c92cabe45c 8,58,96,99,105,108,117,122,125,136
+pipelex/cli/commands/run/pipe_cmd.py
+  64f3a2c92cabe45c 72-79,141
+.vscode/launch.json
+  64f3a2c92cabe45c 103
+pipelex/kit/configs/inference/backends/azure_openai.toml
+  64f3a2c92cabe45c 193,200,208,215,220-228,244-247,249-251,263-266,268-270,282-303,305-308
+pipelex/pipelex.toml
+  64f3a2c92cabe45c 120,155,167,172,176,185,197,206
+pipelex/tools/aws/aws_config.py
+  64f3a2c92cabe45c 21-25,30-31,35,65-79
+.gitignore
+  64f3a2c92cabe45c 78-81
+pipelex/pipe_operators/llm/pipe_llm.py
+  64f3a2c92cabe45c 26,156-181,193,321
+pipelex/cogt/llm/llm_job_components.py
+  64f3a2c92cabe45c 14
+pipelex/cli/_cli.py
+  64f3a2c92cabe45c 17,21,121-122,128-130,179-194
+tests/e2e/pipelex/pipes/pipe_operators/pipe_llm/pipe_llm_object_list.mthds
+  64f3a2c92cabe45c 1-28
+docs/tools/cli/index.md
+  64f3a2c92cabe45c 17
+.pipelex/inference/deck/.kit_manifest.json
+  64f3a2c92cabe45c 1-9
+pipelex/cli/commands/doctor_cmd.py
+  64f3a2c92cabe45c 22,27,414-416,434-436,440,541-554,580,587,603-605,661-695,813,828-830,835,858-860,904-912
+tests/unit/pipelex/cogt/img_gen/test_img_gen_param_support.py
+  64f3a2c92cabe45c 1-301
+tests/unit/pipelex/plugins/openai/test_openai_completions_reasoning.py
+  64f3a2c92cabe45c 15,58
+tests/unit/pipelex/plugins/google/test_google_reasoning.py
+  64f3a2c92cabe45c 13,17,58,90,94
+pipelex/system/configuration/config_loader.py
+  64f3a2c92cabe45c 163-168
+pipelex/kit/configs/inference/backends/bedrock.toml
+  64f3a2c92cabe45c 128-137,147-158
+pipelex/cogt/model_backends/constraints.py
+  64f3a2c92cabe45c 6
+pipelex/builder/operations/pipe_ops.py
+  64f3a2c92cabe45c 33-35,55-64,95-96
+docs/features/cli.md
+  64f3a2c92cabe45c 20
+pipelex/cogt/img_gen/img_gen_param_support.py
+  64f3a2c92cabe45c 1-223
+.badges/tests.json
+  64f3a2c92cabe45c 4
+.pipelex/inference/deck/4_search_deck.toml
+  64f3a2c92cabe45c 8-12
+tests/integration/pipelex/fixtures/img_gen_fixtures.py
+  64f3a2c92cabe45c 6-27,37-46,50-51,53,55,57-66
+pipelex/cli/commands/init/command.py
+  64f3a2c92cabe45c 30,258-260
+pipelex/core/pipes/inputs/input_stuff_specs_factory.py
+  64f3a2c92cabe45c 86
+pipelex/plugins/google/google_config.py
+  64f3a2c92cabe45c 18,46-47
+pipelex/plugins/anthropic/anthropic_factory.py
+  64f3a2c92cabe45c 22,59-70
+docs/tools/cli/update.md
+  64f3a2c92cabe45c 1-99
+tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen/test_pipe_img_gen_validation.py
+  64f3a2c92cabe45c 1-140
+pipelex/kit/configs/inference/deck/3_extract_deck.toml
+  64f3a2c92cabe45c 8-12
+pipelex/pipeline/pipeline_run_setup.py
+  64f3a2c92cabe45c 60,108-109,314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "1dc206b7124e45f2dbb17e9e3c583ed91d618cda",
+  "prompts": {
+    "64f3a2c92cabe45c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a4423870-0b1c-4496-b7fb-05a4a1911fb9",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 6651,
+      "total_deletions": 1225,
+      "accepted_lines": 6567,
+      "overriden_lines": 6
+    }
+  }
+}

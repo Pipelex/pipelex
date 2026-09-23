@@ -1,0 +1,79 @@
+docs/configuration/config-practical/pipe-run-config.md
+  0ebfd8aea3ef8cc3 39-43
+docs/configuration/config-technical/aws-config.md
+  0ebfd8aea3ef8cc3 67-71
+docs/building-methods/pipes/pipe-operators/PipeFunc.md
+  0ebfd8aea3ef8cc3 114-118
+docs/configuration/config-practical/logging-config.md
+  0ebfd8aea3ef8cc3 198-201
+docs/building-methods/pipes/pipe-operators/PipeCompose.md
+  0ebfd8aea3ef8cc3 144-148
+docs/building-methods/pipes/pipe-controllers/PipeBatch.md
+  0ebfd8aea3ef8cc3 74-77
+docs/cookbook/extract-dpe.md
+  0ebfd8aea3ef8cc3 89-93
+docs/cookbook/extract-generic.md
+  0ebfd8aea3ef8cc3 58-63
+docs/configuration/config-advanced/feature-config.md
+  0ebfd8aea3ef8cc3 47-51
+docs/building-methods/pipes/pipe-operators/PipeExtract.md
+  0ebfd8aea3ef8cc3 82-88
+docs/building-methods/pipes/pipe-controllers/PipeParallel.md
+  0ebfd8aea3ef8cc3 87-90
+docs/configuration/config-technical/cogt-config.md
+  0ebfd8aea3ef8cc3 197-203
+docs/cookbook/invoice-extractor.md
+  0ebfd8aea3ef8cc3 127-134
+docs/configuration/config-practical/telemetry-config.md
+  0ebfd8aea3ef8cc3 256-260
+docs/cookbook/simple-ocr.md
+  0ebfd8aea3ef8cc3 33-37
+docs/building-methods/pipes/pipe-controllers/PipeSequence.md
+  0ebfd8aea3ef8cc3 77-84
+docs/building-methods/pipes/pipe-operators/PipeSearch.md
+  0ebfd8aea3ef8cc3 110-113
+docs/building-methods/pipes/pipe-operators/PipeImgGen.md
+  0ebfd8aea3ef8cc3 137-141
+docs/configuration/config-practical/reporting-config.md
+  0ebfd8aea3ef8cc3 95-99
+docs/configuration/config-technical/inference-backend-config.md
+  0ebfd8aea3ef8cc3 656-661
+docs/configuration/config-technical/library-config.md
+  0ebfd8aea3ef8cc3 553-557
+docs/cookbook/extract-proof-of-purchase.md
+  0ebfd8aea3ef8cc3 83-87
+docs/building-methods/pipes/pipe-operators/PipeLLM.md
+  0ebfd8aea3ef8cc3 378-386
+docs/cookbook/extract-gantt.md
+  0ebfd8aea3ef8cc3 215-220
+docs/cookbook/hello-world.md
+  0ebfd8aea3ef8cc3 90-94
+docs/cookbook/extract-table.md
+  0ebfd8aea3ef8cc3 95-99
+docs/cookbook/write-tweet.md
+  0ebfd8aea3ef8cc3 118-122
+docs/building-methods/pipes/pipe-controllers/PipeCondition.md
+  0ebfd8aea3ef8cc3 178-182
+docs/configuration/config-pipeline-validation/dry-run-config.md
+  0ebfd8aea3ef8cc3 87-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "92b66bdf819297b8943837d76f215926fac39d7f",
+  "prompts": {
+    "0ebfd8aea3ef8cc3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6093c43-4d8e-4c3f-b4ae-75cc650b1a98",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 165,
+      "total_deletions": 11,
+      "accepted_lines": 158,
+      "overriden_lines": 0
+    }
+  }
+}

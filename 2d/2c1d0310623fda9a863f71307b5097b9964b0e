@@ -1,0 +1,31 @@
+tests/unit/pipelex/cli/test_agent_models_cmd.py
+  8faf1315f8ccf6a9 12,14,17-18,100-102
+pipelex/cli/agent_cli/commands/models_cmd.py
+  8faf1315f8ccf6a9 3,7,36,40,42
+tests/unit/pipelex/cli/test_format_models_markdown.py
+  8faf1315f8ccf6a9 7,11,40,45,50,55,60,65,70,75,81,92,103,110,115
+pipelex/builder/operations/models_ops.py
+  8faf1315f8ccf6a9 1,180,187,220-273
+pipelex/builder/CLAUDE.md
+  8faf1315f8ccf6a9 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "2d2c1d0310623fda9a863f71307b5097b9964b0e",
+  "prompts": {
+    "8faf1315f8ccf6a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41d7b844-94c5-4865-a2ad-cfab7db5197c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 87,
+      "total_deletions": 392,
+      "accepted_lines": 87,
+      "overriden_lines": 0
+    }
+  }
+}

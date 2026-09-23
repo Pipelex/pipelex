@@ -1,0 +1,23 @@
+.claude/skills/test-model/SKILL.md
+  7aebd153115e84f1 1-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "c9f587478119c4d08bf85c1e85b5289e086fd306",
+  "prompts": {
+    "7aebd153115e84f1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "85fb77aa-ffb4-4e4a-b3d1-0c8522a2309b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 156,
+      "total_deletions": 0,
+      "accepted_lines": 156,
+      "overriden_lines": 0
+    }
+  }
+}

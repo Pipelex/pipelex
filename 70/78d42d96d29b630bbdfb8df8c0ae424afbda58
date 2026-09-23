@@ -1,0 +1,23 @@
+pipelex/cli/agent_cli/commands/agent_cli_factory.py
+  953d6d11635b3ce3 38-41,52-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "7078d42d96d29b630bbdfb8df8c0ae424afbda58",
+  "prompts": {
+    "953d6d11635b3ce3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42a2afeb-ecc8-4be1-a10a-6ed26148a20f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 1,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}

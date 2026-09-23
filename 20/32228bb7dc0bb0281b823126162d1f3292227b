@@ -1,0 +1,57 @@
+docs/under-the-hood/mistralai-workflows-plugin.md
+  s_32b3e46b894d8d::t_8624273ab91bb0 1-148
+tests/integration/pipelex/plugins/mistralai_workflows/test_bridge_temporal_blocking.py
+  s_32b3e46b894d8d::t_1cd37c3ebad047 46
+  s_32b3e46b894d8d::t_0004c41f956d97 41
+  s_32b3e46b894d8d::t_f30325ec03061e 83-84
+  s_32b3e46b894d8d::t_77776ed01fe55c 29-31
+  s_32b3e46b894d8d::t_8129b49bd23575 1-22,24,40,42-45,47-64,66-82,85-149
+  s_32b3e46b894d8d::t_9ecba606a6a572 23,25-28,32-39,65
+tests/integration/pipelex/plugins/mistralai_workflows/test_data/bridge_test.mthds
+  s_32b3e46b894d8d::t_7ae79add13a4e8 15
+  s_32b3e46b894d8d::t_5255a4cdd8caf1 6,9-14
+CHANGELOG.md
+  s_32b3e46b894d8d::t_18d25f9f60a54b 3-6,8
+  s_bd2bcd103eec5c::t_41de896c85a878 7
+tests/integration/pipelex/plugins/mistralai_workflows/test_bridge_temporal_fire_and_forget.py
+  s_32b3e46b894d8d::t_f313768731ba84 1-17,20,26-28,37-42,44-56,58-145
+  s_32b3e46b894d8d::t_6311b511dbcc90 43
+  s_32b3e46b894d8d::t_9ecba606a6a572 18-19,21-25,29-36,57
+docs/under-the-hood/mistralai-workflows-recipes.md
+  s_32b3e46b894d8d::t_7c0d1522d48988 1-170
+TODOS.md
+  s_32b3e46b894d8d::t_bad42b92a928a3 626-632,635-646
+  s_32b3e46b894d8d::t_ed531e414e0cf2 575,577-582,584-622
+mkdocs.yml
+  s_32b3e46b894d8d::t_85126e7c95357b 500-501
+  s_32b3e46b894d8d::t_14cfdc6e246f46 310-311
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "2032228bb7dc0bb0281b823126162d1f3292227b",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_32b3e46b894d8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1834240c-b0b4-440c-86dc-b8910ce1aef6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_bd2bcd103eec5c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "78887b8a-1fb3-4c0a-a828-225a51acd4d0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

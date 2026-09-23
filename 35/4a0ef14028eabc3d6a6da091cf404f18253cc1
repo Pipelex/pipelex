@@ -1,0 +1,55 @@
+docs/overrides/main.html
+  2cf14462edcfbd5b 7-9
+Makefile
+  d7af56667aa9b8aa 805-807
+docs/overrides/404.html
+  2cf14462edcfbd5b 1-7
+docs/404.html
+  2cf14462edcfbd5b 5-81,138,140-145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "354a0ef14028eabc3d6a6da091cf404f18253cc1",
+  "prompts": {
+    "2cf14462edcfbd5b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "241a24a0-fff5-4148-9170-4563273793d4",
+        "model": "gpt-5.4-medium"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 13,
+      "accepted_lines": 94,
+      "overriden_lines": 0
+    },
+    "a33a42c45da0a0e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc1d37ae-c86b-4a73-87d8-bea9f6d31049",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 8,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "d7af56667aa9b8aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "47d4c1a3-b928-4218-afcd-950beb2b03cb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

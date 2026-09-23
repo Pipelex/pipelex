@@ -1,0 +1,27 @@
+tests/unit/pipelex/cli/test_cli_factory.py
+  b0adb6beaea7edd6 1-42
+pipelex/cli/error_handlers.py
+  b0adb6beaea7edd6 17,225-236,238-249
+pipelex/cli/cli_factory.py
+  b0adb6beaea7edd6 10,22,57-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "e18eaf599383cddd459a9ef19f6a19463606f098",
+  "prompts": {
+    "b0adb6beaea7edd6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9240ea31-f4d6-4f98-a613-5218d672edfd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 77,
+      "total_deletions": 8,
+      "accepted_lines": 71,
+      "overriden_lines": 0
+    }
+  }
+}

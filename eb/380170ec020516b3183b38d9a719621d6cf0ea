@@ -1,0 +1,25 @@
+pipelex/cli/agent_cli/commands/agent_cli_factory.py
+  eca66b4a7622ba30 79
+pipelex/tools/log/log.py
+  eca66b4a7622ba30 2,140-145,149-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "eb380170ec020516b3183b38d9a719621d6cf0ea",
+  "prompts": {
+    "eca66b4a7622ba30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64b7807c-3f71-4cc1-907c-18296d4c4d84",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 0,
+      "accepted_lines": 10,
+      "overriden_lines": 1
+    }
+  }
+}

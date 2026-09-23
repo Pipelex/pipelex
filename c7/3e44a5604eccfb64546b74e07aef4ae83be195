@@ -1,0 +1,42 @@
+TODOS.md
+  643b1e1e1074880c 17,348-350
+tests/unit/pipelex/reporting/test_reporting_event_emission.py
+  6a14424fe7bc09ca 165,188
+tests/unit/pipelex/reporting/test_no_orphan_registries.py
+  6a14424fe7bc09ca 1-120
+pipelex/reporting/reporting_manager.py
+  6a14424fe7bc09ca 119-128,130-137,141-155,164,179,194,209,237,381
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "c73e44a5604eccfb64546b74e07aef4ae83be195",
+  "prompts": {
+    "643b1e1e1074880c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "550d0ca5-9ef9-4f60-912c-8e0f8c34ad17",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 630,
+      "total_deletions": 4,
+      "accepted_lines": 630,
+      "overriden_lines": 0
+    },
+    "6a14424fe7bc09ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44facf5b-15d2-4ee9-9969-4bac699eafd7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 161,
+      "total_deletions": 14,
+      "accepted_lines": 161,
+      "overriden_lines": 0
+    }
+  }
+}

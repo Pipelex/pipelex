@@ -1,0 +1,24 @@
+wip/mistral-workflows-plugin-extract.md
+  s_0f5c448d96565e::t_22b070a6405bf9 1-215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "e33b468c6e4966f702be420597d9fccd985bbbcd",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_0f5c448d96565e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9cfbaa89-64a8-4b72-94ca-d0766750d762",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

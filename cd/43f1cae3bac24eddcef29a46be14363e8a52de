@@ -1,0 +1,25 @@
+tests/integration/pipelex/temporal/conftest.py
+  64da8b2d50839a34 45-65
+tests/integration/pipelex/fixtures/pipe_job_helpers.py
+  64da8b2d50839a34 7,17,26,30,45-50,60-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "cd43f1cae3bac24eddcef29a46be14363e8a52de",
+  "prompts": {
+    "64da8b2d50839a34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c49028ec-73d3-4809-b9f0-82c4568e91b6",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 40,
+      "total_deletions": 7,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    }
+  }
+}

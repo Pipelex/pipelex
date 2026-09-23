@@ -1,0 +1,31 @@
+pipelex/system/telemetry/otel_factory.py
+  078b6ff304c94013 8,22-26,153,186-187,197,199,204,230-238
+pipelex/plugins/docling/docling_factory.py
+  078b6ff304c94013 1,6-7,18,28-29
+pipelex/plugins/openai/openai_config.py
+  078b6ff304c94013 1,10-11,31
+pipelex/hub.py
+  078b6ff304c94013 41
+pipelex/system/telemetry/exception_capture.py
+  078b6ff304c94013 4,8-9,21,23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "b905519361f4f442b5de2813fd23d720b61d6b20",
+  "prompts": {
+    "078b6ff304c94013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c6b09de-0d43-4ac0-a56b-e692df74bc0a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 44,
+      "total_deletions": 29,
+      "accepted_lines": 42,
+      "overriden_lines": 0
+    }
+  }
+}

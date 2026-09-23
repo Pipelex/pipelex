@@ -1,0 +1,29 @@
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  37f031072c06c8e6 1,30,339,409
+pipelex/cli/agent_cli/CLAUDE.md
+  37f031072c06c8e6 48-49,65-66,72
+pipelex/cli/agent_cli/commands/agent_output.py
+  37f031072c06c8e6 48
+pipelex/cli/agent_cli/commands/concept_cmd.py
+  37f031072c06c8e6 1,13,148,194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "6ecd5ca02237da4c187fed76e6a723e358343575",
+  "prompts": {
+    "37f031072c06c8e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9eb99991-472d-4d40-8b21-a4449818bc01",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 32,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    }
+  }
+}

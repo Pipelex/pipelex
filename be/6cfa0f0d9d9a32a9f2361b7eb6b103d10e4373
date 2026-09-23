@@ -1,0 +1,23 @@
+pyproject.toml
+  e08a88b2df89da3e 47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "be6cfa0f0d9d9a32a9f2361b7eb6b103d10e4373",
+  "prompts": {
+    "e08a88b2df89da3e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "02669d49-a995-49b9-9be6-a4be3bf0ec78",
+        "model": "composer-1.5"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

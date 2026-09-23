@@ -1,0 +1,65 @@
+docs/home/1-features/concepts.md
+  d9925b46e07f832f 1-56
+docs/home/1-features/llm-integration.md
+  d9925b46e07f832f 1-52
+docs/home/1-features/cli.md
+  d9925b46e07f832f 1-42
+docs/home/1-features/plxt.md
+  d9925b46e07f832f 1-37
+docs/home/1-features/telemetry.md
+  d9925b46e07f832f 1-47
+docs/home/1-features/index.md
+  d9925b46e07f832f 1-125
+docs/home/1-features/configuration.md
+  d9925b46e07f832f 1-42
+docs/home/10-advanced-customizations/index.md
+  d9925b46e07f832f 30
+docs/home/1-features/gateway.md
+  d9925b46e07f832f 1-49
+docs/home/1-features/cost-tracking.md
+  d9925b46e07f832f 1-33
+docs/home/1-features/image-generation.md
+  d9925b46e07f832f 1-34
+docs/home/1-features/execution-graph.md
+  d9925b46e07f832f 1-46
+docs/home/1-features/validation-dry-run.md
+  d9925b46e07f832f 1-47
+docs/home/1-features/pipe-operators.md
+  d9925b46e07f832f 1-61
+docs/home/1-features/pipeline-orchestration.md
+  d9925b46e07f832f 1-61
+docs/home/1-features/document-extraction.md
+  d9925b46e07f832f 1-41
+docs/home/1-features/web-search.md
+  d9925b46e07f832f 1-27
+docs/home/1-features/pipe-builder.md
+  d9925b46e07f832f 1-38
+docs/home/1-features/advanced-customizations.md
+  d9925b46e07f832f 1-32
+mkdocs.yml
+  d9925b46e07f832f 94-119
+docs/home/1-features/cloud-storage.md
+  d9925b46e07f832f 1-35
+docs/home/1-features/mthds-language.md
+  d9925b46e07f832f 1-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "20aeb1b6742e8d3890055c0a9160cda62058be5a",
+  "prompts": {
+    "d9925b46e07f832f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "363e10fb-3041-4297-b431-926a0409c6eb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1107,
+      "total_deletions": 83,
+      "accepted_lines": 1036,
+      "overriden_lines": 0
+    }
+  }
+}

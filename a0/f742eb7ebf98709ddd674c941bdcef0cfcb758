@@ -1,0 +1,27 @@
+tests/integration/pipelex/temporal/library_crate/test_wf_multi_concept_isolation.py
+  dae979a756a7a63c 40-45,49-64,82,96,119-120,149,151
+CLAUDE.md
+  dae979a756a7a63c 81,89,94,98
+pipelex/core/stuffs/stuff.py
+  dae979a756a7a63c 120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "a0f742eb7ebf98709ddd674c941bdcef0cfcb758",
+  "prompts": {
+    "dae979a756a7a63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "247c5b87-b5b1-4475-b682-08141111532d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 33,
+      "total_deletions": 74,
+      "accepted_lines": 33,
+      "overriden_lines": 0
+    }
+  }
+}

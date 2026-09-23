@@ -1,0 +1,31 @@
+.pipelex/inference/deck/2_img_gen_deck.toml
+  abf5636409e31576 7-11
+pipelex/kit/configs/inference/backends/pipelex_gateway_models_plain.md
+  abf5636409e31576 119,122,125,128,131,226
+.pipelex/inference/deck/4_search_deck.toml
+  abf5636409e31576 8-12
+.pipelex/inference/deck/3_extract_deck.toml
+  abf5636409e31576 8-12
+.pipelex/inference/deck/1_llm_deck.toml
+  abf5636409e31576 7-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "1d37d42ac0ec10b36bccb8a073ce9b546a959071",
+  "prompts": {
+    "abf5636409e31576": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "057b4f25-3b26-4c9f-8f34-fa8e40418805",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 26,
+      "total_deletions": 6,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    }
+  }
+}

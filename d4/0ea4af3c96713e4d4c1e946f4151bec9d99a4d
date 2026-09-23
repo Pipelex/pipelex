@@ -1,0 +1,33 @@
+pipelex/graph/graph_rendering.py
+  3a18df1e9de65d77 26-38,235-237
+tests/unit/pipelex/cli/test_concept_cmd.py
+  3a18df1e9de65d77 163,165-172
+tests/unit/pipelex/cli/test_pipe_cmd.py
+  3a18df1e9de65d77 106-120,159,161-174,204,206-207
+tests/unit/pipelex/graph/test_graph_rendering.py
+  3a18df1e9de65d77 1-31
+pipelex/cli/agent_cli/commands/concept_cmd.py
+  3a18df1e9de65d77 106-110
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  3a18df1e9de65d77 213,215-216,259-262,276-280
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "d40ea4af3c96713e4d4c1e946f4151bec9d99a4d",
+  "prompts": {
+    "3a18df1e9de65d77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49698329-6865-4691-90a2-218b7af5ef4a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 108,
+      "total_deletions": 22,
+      "accepted_lines": 106,
+      "overriden_lines": 0
+    }
+  }
+}

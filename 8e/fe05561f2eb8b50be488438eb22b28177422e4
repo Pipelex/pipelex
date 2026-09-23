@@ -1,0 +1,29 @@
+pipelex/cli/commands/build/structures_cmd.py
+  s_3e7e9ddd3904f8::t_f70c76dc42cccd 197-198,246-247,277-278
+pipelex/core/concepts/concept_factory.py
+  s_3e7e9ddd3904f8::t_47a323a5546ff8 322
+pipelex/core/concepts/structure_generation/generator.py
+  s_3e7e9ddd3904f8::t_2bcef3e78677dd 54,62-64,74
+  s_3e7e9ddd3904f8::t_d58705d8137e69 440-447
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "8efe05561f2eb8b50be488438eb22b28177422e4",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_3e7e9ddd3904f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8da009d-86eb-4f86-b0f2-845613d009a0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

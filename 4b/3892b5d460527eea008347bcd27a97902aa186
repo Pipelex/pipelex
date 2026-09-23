@@ -1,0 +1,33 @@
+pipelex/cli/method_resolver.py
+  dc224f2e75875e87 129
+pipelex/cli/commands/validate/pipe_cmd.py
+  dc224f2e75875e87 85,87-93
+pipelex/cli/agent_cli/commands/inputs/pipe_cmd.py
+  dc224f2e75875e87 54,56,58
+pipelex/cli/agent_cli/commands/run/pipe_cmd.py
+  dc224f2e75875e87 81-87
+pipelex/cli/commands/run/pipe_cmd.py
+  dc224f2e75875e87 98,100-106
+pipelex/cli/agent_cli/commands/validate/pipe_cmd.py
+  dc224f2e75875e87 112,114,116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "4b3892b5d460527eea008347bcd27a97902aa186",
+  "prompts": {
+    "dc224f2e75875e87": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab4cc76f-9ada-4263-8d74-b10bc82ceb16",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 35,
+      "total_deletions": 21,
+      "accepted_lines": 32,
+      "overriden_lines": 0
+    }
+  }
+}

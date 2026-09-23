@@ -1,0 +1,31 @@
+pipelex/deep_flow/tprl_pipe/pipe_router_top.py
+  bdbd0abff2bd2422 13,36,40,44-45,51
+pipelex/deep_flow/tprl_pipe/wf_pipe_router.py
+  bdbd0abff2bd2422 32
+pipelex/pipe_run/pipe_router_protocol.py
+  bdbd0abff2bd2422 50,55,74
+pipelex/deep_flow/tprl_pipe/pipe_router_child.py
+  bdbd0abff2bd2422 1,10,16-19,21,25-26,28
+pipelex/pipe_run/pipe_router.py
+  bdbd0abff2bd2422 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "cd951d066a13c28031533074dfd629c5271d75f0",
+  "prompts": {
+    "bdbd0abff2bd2422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "31b144de-61e7-44b0-a734-e1fff3c8d872",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 51,
+      "total_deletions": 43,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}

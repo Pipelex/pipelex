@@ -1,0 +1,25 @@
+pipelex/cli/commands/init/command.py
+  ba1a9f25f059ec47 69
+pipelex/pipelex.py
+  ba1a9f25f059ec47 201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "9b4bab1ef7189e698bf64d987983496960026052",
+  "prompts": {
+    "ba1a9f25f059ec47": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "064c7758-8b95-400c-9ed8-f9c2807a7837",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

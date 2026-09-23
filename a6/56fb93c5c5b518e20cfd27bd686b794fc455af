@@ -1,0 +1,25 @@
+docs/home/1-features/execution-graph.md
+  544c80d14269dc3c 36
+docs/home/6-build-reliable-ai-workflows/concepts/python-classes.md
+  544c80d14269dc3c 258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "a656fb93c5c5b518e20cfd27bd686b794fc455af",
+  "prompts": {
+    "544c80d14269dc3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97f8407e-ab34-4958-b043-14c119758dbe",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

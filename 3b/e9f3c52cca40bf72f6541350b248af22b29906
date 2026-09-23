@@ -1,0 +1,27 @@
+wip/00-master-plan.md
+  1ca8e080588fe962 350-354
+pipelex/temporal/storage_payload_codec.py
+  1ca8e080588fe962 42
+tests/unit/pipelex/temporal/test_storage_payload_codec.py
+  1ca8e080588fe962 6,8,41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "3be9f3c52cca40bf72f6541350b248af22b29906",
+  "prompts": {
+    "1ca8e080588fe962": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07d93ef7-26cb-4139-8fd6-9da8306c1a22",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 12,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,40 @@
+pipelex/cli/agent_cli/commands/doctor_cmd.py
+  706abf726642cdff 60
+docs/home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
+  338b70faa0ff3912 300
+pipelex/cli/commands/doctor_cmd.py
+  706abf726642cdff 343
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "a3b20289e8fa22e34f6cdaac09f87b98de71911c",
+  "prompts": {
+    "338b70faa0ff3912": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f71ebd79-bc32-405d-8d84-9cb669202bb0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "706abf726642cdff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e21bd822-f876-42eb-b851-5afe2037239f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

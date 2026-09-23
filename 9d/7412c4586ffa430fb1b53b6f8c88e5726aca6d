@@ -1,0 +1,23 @@
+pipelex/pipelex.toml
+  7e928a839d3bc8c9 479
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "9d7412c4586ffa430fb1b53b6f8c88e5726aca6d",
+  "prompts": {
+    "7e928a839d3bc8c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a3e23d1-c0fa-45cc-b86f-18fd08edb558",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

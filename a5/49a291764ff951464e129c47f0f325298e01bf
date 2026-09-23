@@ -1,0 +1,30 @@
+pipelex/cogt/img_gen/img_gen_args_factory.py
+  ace76ca2f338b342 192
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  ace76ca2f338b342 110-113,115-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a549a291764ff951464e129c47f0f325298e01bf",
+  "prompts": {
+    "ace76ca2f338b342": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "268a25e9-fc34-4475-bd2d-90bc98e62af5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 4,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

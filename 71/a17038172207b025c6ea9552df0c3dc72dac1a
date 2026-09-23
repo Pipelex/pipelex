@@ -1,0 +1,31 @@
+wip/00-master-plan.md
+  b877386d6377fb57 356
+tests/integration/pipelex/temporal/library_crate/test_wf_combined_pipeline.py
+  b877386d6377fb57 10,62
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_condition.py
+  b877386d6377fb57 9,60
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_compose.py
+  b877386d6377fb57 9,65
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_batch.py
+  b877386d6377fb57 8,39,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "71a17038172207b025c6ea9552df0c3dc72dac1a",
+  "prompts": {
+    "b877386d6377fb57": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a15501ba-c2af-44a6-9f3a-6509419ab22d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 9,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

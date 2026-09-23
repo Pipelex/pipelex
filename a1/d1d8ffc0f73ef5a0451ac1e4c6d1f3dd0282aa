@@ -1,0 +1,27 @@
+pipelex/cli/agent_cli/commands/run/_run_core.py
+  5210c58aff410d5f 9,77-86
+pipelex/cli/agent_cli/commands/run/_output_helpers.py
+  5210c58aff410d5f 1-35
+pipelex/cli/agent_cli/commands/run/_run_core_api.py
+  5210c58aff410d5f 10-11,53-54,56,58-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "a1d1d8ffc0f73ef5a0451ac1e4c6d1f3dd0282aa",
+  "prompts": {
+    "5210c58aff410d5f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec27ae12-30b9-4312-90e2-86a10e606049",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 21,
+      "accepted_lines": 57,
+      "overriden_lines": 0
+    }
+  }
+}

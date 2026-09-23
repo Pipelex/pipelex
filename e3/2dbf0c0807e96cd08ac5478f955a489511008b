@@ -1,0 +1,31 @@
+pipelex/cli/dev_cli/commands/kit_cmd.py
+  d6b33bda7f92d222 41,43-53,55-63,70,79,81,86-87,90
+pipelex/cli/dev_cli/commands/check_rules_sync_cmd.py
+  d6b33bda7f92d222 7,18-19,22-25,28,33-36,50-51,53-66
+pipelex/pipelex.toml
+  d6b33bda7f92d222 429-433
+pipelex/system/configuration/configs.py
+  d6b33bda7f92d222 2,36-53
+CHANGELOG.md
+  d6b33bda7f92d222 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "e32dbf0c0807e96cd08ac5478f955a489511008b",
+  "prompts": {
+    "d6b33bda7f92d222": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e427c1f-c301-4ba7-bf04-c1b58c8d27c9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 451,
+      "total_deletions": 75,
+      "accepted_lines": 445,
+      "overriden_lines": 1
+    }
+  }
+}

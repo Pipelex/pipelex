@@ -1,0 +1,25 @@
+tests/unit/pipelex/tracing/test_assembler_equivalence.py
+  62d12b0bae56fb38 1-103,105-484
+TODOS.md
+  62d12b0bae56fb38 309
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "c842f1f9459c3d8af7f45bfc994671abca62f28f",
+  "prompts": {
+    "62d12b0bae56fb38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2562335b-468e-44ae-b01a-975375863feb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 518,
+      "total_deletions": 28,
+      "accepted_lines": 484,
+      "overriden_lines": 1
+    }
+  }
+}

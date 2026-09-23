@@ -1,0 +1,33 @@
+pipelex/cli/agent_cli/commands/inputs/pipe_cmd.py
+  3422f26f94fc01e9 52-57,114-116
+pipelex/cli/commands/validate/bundle_cmd.py
+  3422f26f94fc01e9 86
+pipelex/cli/agent_cli/CLAUDE.md
+  3422f26f94fc01e9 7
+pipelex/cli/agent_cli/commands/validate/bundle_cmd.py
+  3422f26f94fc01e9 108
+pipelex/cli/agent_cli/commands/inputs/bundle_cmd.py
+  3422f26f94fc01e9 134-136
+docs/home/9-tools/cli/run.md
+  3422f26f94fc01e9 36,85,131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "7b78d20dc370a3652df0ca7f18877816924c176d",
+  "prompts": {
+    "3422f26f94fc01e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "539ca69a-c7a7-4958-bb68-aaae5f5b6454",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 21,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,49 @@
+CHANGELOG.md
+  2b1dfbbad4549b40 3-8
+tests/unit/pipelex/cogt/img_gen/test_img_gen_args_factory.py
+  2b1dfbbad4549b40 38,67,80,327-379,435-513
+.pipelex/inference/backends/azure_openai.toml
+  2b1dfbbad4549b40 241,260,279,298
+pipelex/plugins/openai/openai_img_gen_worker.py
+  2b1dfbbad4549b40 7,68-69
+  h_ad2a9d0839b83e 65
+.pipelex/inference/backends/openai.toml
+  2b1dfbbad4549b40 261,281,302,322,342
+pipelex/kit/configs/inference/backends/openai.toml
+  2b1dfbbad4549b40 261,281,302,322,342
+pipelex/cogt/img_gen/img_gen_args_factory.py
+  2b1dfbbad4549b40 29,137-144,410,445,449-450,458-459,470-471,482-483,487-488,495-510
+pipelex/plugins/openai/openai_img_gen_factory.py
+  2b1dfbbad4549b40 8
+pipelex/cogt/img_gen/img_gen_model_rules.py
+  2b1dfbbad4549b40 33,153-164
+TODOS.md
+  2b1dfbbad4549b40 11,17,22,37,45,54,56,68,82-87,99,106-108,120-122
+pipelex/kit/configs/inference/backends/azure_openai.toml
+  2b1dfbbad4549b40 241,260,279,298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "758798645daffe206a8f3419d97036d024a3a9c3",
+  "prompts": {
+    "2b1dfbbad4549b40": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71ec7525-93a3-45d9-aa5a-eec1b9a36291",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 1365,
+      "total_deletions": 99,
+      "accepted_lines": 1339,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+tests/integration/pipelex/fixtures/img_gen_fixtures.py
+  h_ad2a9d0839b83e 38-46,51,58-66
+tests/integration/pipelex/test_data.py
+  h_ad2a9d0839b83e 169
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  h_ad2a9d0839b83e 16,100
+  076d18067394852f 11,105-114
+pipelex/plugins/gateway/gateway_img_gen_worker.py
+  h_ad2a9d0839b83e 24,76-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "5f97687c4d9fb737788b0063748da55a29a6541d",
+  "prompts": {
+    "076d18067394852f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ef450856-2d36-4ea9-b694-cac2415facec",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 0,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

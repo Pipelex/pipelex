@@ -1,0 +1,55 @@
+pipelex/plugins/linkup/linkup_search_worker.py
+  2f94a18dd60aee26 9,24,34,36,38-39,43,49-52,75,77,80-81,85,91-94
+  4991a2c10b54c82f 15,78,88
+pipelex/plugins/gateway/gateway_search_worker.py
+  4991a2c10b54c82f 24,107,113
+  2f94a18dd60aee26 36,60,62,64-65,68,73-76,104,106,109-110,116,121-124
+pipelex/cogt/search/search_job_factory.py
+  2f94a18dd60aee26 1-2,10-16,19-25,27-29
+pipelex/pipe_operators/search/pipe_search.py
+  2f94a18dd60aee26 10,115-119,124-126,129,135
+  4991a2c10b54c82f 132
+tests/integration/pipelex/cogt/test_search.py
+  2f94a18dd60aee26 6,38,43,64
+  4991a2c10b54c82f 69
+pipelex/cogt/search/search_worker_abstract.py
+  4991a2c10b54c82f 13,51,59,78
+  2f94a18dd60aee26 4-9,11,14,16-23,25-28,32,34-38,40,42-46,50,53-58,60-63,65,67-77,79-80
+pipelex/cogt/search/search_job.py
+  2f94a18dd60aee26 9,12-17,25-26
+.claude/skills/test-model/SKILL.md
+  4991a2c10b54c82f 106,113-116,118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "a5e525832ad9b90c2f04846549b3d566b515f36a",
+  "prompts": {
+    "2f94a18dd60aee26": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f540c3d0-0f96-4a3d-b95d-0519ee1ed3ac",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 209,
+      "total_deletions": 214,
+      "accepted_lines": 151,
+      "overriden_lines": 0
+    },
+    "4991a2c10b54c82f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5a7b5d0-31c7-487c-a3d8-36cdcc87ce7f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 36,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}

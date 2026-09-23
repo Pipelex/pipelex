@@ -1,0 +1,25 @@
+pipelex/cli/agent_cli/CLAUDE.md
+  28200e5a398ea2e7 50-51,68-69
+pipelex/cogt/models/model_deck_check.py
+  28200e5a398ea2e7 3-4,25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "b178fc6a2f8b833803ca8f0e6b7264d0a476e09d",
+  "prompts": {
+    "28200e5a398ea2e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4a1c01d1-d253-4963-b57a-d7c8a0dec33c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 3,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}

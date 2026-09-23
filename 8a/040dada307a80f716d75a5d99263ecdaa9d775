@@ -1,0 +1,28 @@
+pipelex/graph/reactflow/standalone_assets.py
+  95ecc1fcc1325e47 8,13-14,21-22,25,32-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8a040dada307a80f716d75a5d99263ecdaa9d775",
+  "prompts": {
+    "95ecc1fcc1325e47": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c745acee-e12b-43da-b977-ac93773ef198",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 13,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+pipelex/cogt/search/search_report.py
+  28dc457c8af3d200 1,35,67
+pipelex/reporting/reporting_manager.py
+  28dc457c8af3d200 18
+pipelex/tracing/trace_events.py
+  28dc457c8af3d200 1-164
+pipelex/cogt/extract/extract_report.py
+  28dc457c8af3d200 1,35,67
+pipelex/cogt/llm/llm_report.py
+  28dc457c8af3d200 1,35,67
+pipelex/cogt/img_gen/img_gen_report.py
+  28dc457c8af3d200 1,35,67
+tests/unit/pipelex/tracing/test_trace_events.py
+  28dc457c8af3d200 1-23,25-337
+pipelex/reporting/reporting_types.py
+  28dc457c8af3d200 1-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "5c74301a0318c0e4a25fa0d840e8ec6edd98d5c3",
+  "prompts": {
+    "28dc457c8af3d200": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aab71cbd-7b8d-4918-a877-fbe7084e3f98",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 559,
+      "total_deletions": 46,
+      "accepted_lines": 531,
+      "overriden_lines": 1
+    }
+  }
+}

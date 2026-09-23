@@ -1,0 +1,42 @@
+docs/features/claude-code-skills-plugin.md
+  c2486f6f68b1f8db 14,34,40
+CHANGELOG.md
+  8faf1315f8ccf6a9 30-33
+README.md
+  c2486f6f68b1f8db 83,89,478
+docs/get-started/build-with-claude-code.md
+  c2486f6f68b1f8db 17,21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "e5dcaaef27d72730729f383d536d428f4efe8ac3",
+  "prompts": {
+    "8faf1315f8ccf6a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41d7b844-94c5-4865-a2ad-cfab7db5197c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 17,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "c2486f6f68b1f8db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0525cc66-2ea7-4673-ae56-4bd05220980d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 8,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+pipelex/temporal/tprl_pipe/hydration.py
+  d9cd70a67b5edc67 1,8,10,12,16-36,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "938a45654c73da2612acdb050478c5fa91c94797",
+  "prompts": {
+    "d9cd70a67b5edc67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "47d14d96-bd74-4739-9626-2400f07315b1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 30,
+      "total_deletions": 8,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    }
+  }
+}

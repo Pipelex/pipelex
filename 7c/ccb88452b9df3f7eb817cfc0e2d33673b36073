@@ -1,0 +1,40 @@
+pyproject.toml
+  0c255f110e832e81 3
+CHANGELOG.md
+  0c255f110e832e81 3-8
+pipelex/cli/agent_cli/commands/run/_run_core.py
+  6f5525beae9338b6 117,141-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "7cccb88452b9df3f7eb817cfc0e2d33673b36073",
+  "prompts": {
+    "0c255f110e832e81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "355b8b24-a82f-4c43-b9f2-c20de1387768",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 1,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    },
+    "6f5525beae9338b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6628213-f208-4f98-87b6-3ab91aa21a7f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 1,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,25 @@
+CHANGELOG.md
+  35535645f936a11d 3-8
+pyproject.toml
+  35535645f936a11d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "8094a2348c943ef8cf09236851b1c38608b9aa64",
+  "prompts": {
+    "35535645f936a11d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "539d2f74-2077-49d9-a4ba-df92e332c98a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 1,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}

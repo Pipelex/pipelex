@@ -1,0 +1,29 @@
+pipelex/kit/configs/inference/deck/3_extract_deck.toml
+  75753217eb0f3103 34
+.pipelex/inference/deck/3_extract_deck.toml
+  75753217eb0f3103 34
+pipelex/pipelex.toml
+  75753217eb0f3103 75
+pipelex/cogt/extract/extract_worker_factory.py
+  75753217eb0f3103 97-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "b3350df85deda529b56e4318bde36fe4fdfad891",
+  "prompts": {
+    "75753217eb0f3103": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a6a9751-56bf-4b37-acb7-25076b291491",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 3,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,29 @@
+Makefile
+  71d03c3ff8a81d16 893,895-896
+docs/overrides/main.html
+  71d03c3ff8a81d16 4-36,40,53,64,75
+docs/CLAUDE.md
+  71d03c3ff8a81d16 8,41,45
+mkdocs.yml
+  71d03c3ff8a81d16 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "62ed147b43d20ed77d3143e6e56df8b17d3800e2",
+  "prompts": {
+    "71d03c3ff8a81d16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "05d028b6-de89-4c61-9cbd-c16da8ecf622",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 49,
+      "total_deletions": 14,
+      "accepted_lines": 44,
+      "overriden_lines": 0
+    }
+  }
+}

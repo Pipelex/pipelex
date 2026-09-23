@@ -1,0 +1,23 @@
+tests/unit/pipelex/deep_flow/tprl/test_conditional_worker.py
+  c883afeffa65f5c8 40,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "cb8733e591eb92f60e16df0aa3b0e6d19f6cbc9b",
+  "prompts": {
+    "c883afeffa65f5c8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b3e6f801-65d4-4a31-94d4-6d7709d6f5eb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

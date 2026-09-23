@@ -1,0 +1,97 @@
+docs/building-methods/concepts/python-classes.md
+  defbde80f9fd1ff2 259
+pipelex/urls.py
+  defbde80f9fd1ff2 11-15
+docs/index.md
+  defbde80f9fd1ff2 60
+docs/building-methods/pipes/pipe-operators/PipeLLM.md
+  defbde80f9fd1ff2 242
+.pipelex/inference/backends/pipelex_gateway.toml
+  defbde80f9fd1ff2 33
+pyproject.toml
+  defbde80f9fd1ff2 82
+docs/get-started/write-methods-manually.md
+  defbde80f9fd1ff2 225,230,336-337,341,346-347
+docs/404.html
+  defbde80f9fd1ff2 18-40,42-44
+README.md
+  defbde80f9fd1ff2 114,118,538-539,543
+docs/cookbook/index.md
+  defbde80f9fd1ff2 26
+docs/building-methods/configure-ai-llm-to-optimize-methods.md
+  defbde80f9fd1ff2 69
+pipelex/core/concepts/structure_generation/generator.py
+  defbde80f9fd1ff2 93
+docs/under-the-hood/image-handling-in-llm-prompts.md
+  defbde80f9fd1ff2 456
+docs/configuration/config-technical/aws-config.md
+  defbde80f9fd1ff2 45,57
+docs/contribute/configuration-defaults-and-overrides.md
+  defbde80f9fd1ff2 5
+CHANGELOG.md
+  defbde80f9fd1ff2 185,208,455,557
+mkdocs.yml
+  defbde80f9fd1ff2 2,55-157,247-249,251-255,257-264,266-272,274-281,325
+.github/workflows/doc-check.yml
+  defbde80f9fd1ff2 37
+docs/setup/configure-ai-providers.md
+  defbde80f9fd1ff2 169
+docs/analytics/data-extraction.md
+  defbde80f9fd1ff2 48
+docs/configuration/index.md
+  defbde80f9fd1ff2 40
+pipelex/kit/configs/inference/backends/pipelex_gateway.toml
+  defbde80f9fd1ff2 33
+docs/setup/project-organization.md
+  defbde80f9fd1ff2 41,59
+pipelex/system/telemetry/telemetry_config.py
+  defbde80f9fd1ff2 144-145
+docs/features/execution-graph.md
+  defbde80f9fd1ff2 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "079d34c3f2a3228e92832c11ebc6c84d4df27927",
+  "prompts": {
+    "04c70924b6780a0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a005b34-17ef-49f4-a830-1ef729f4b50a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "d839d40366687bbe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "007bf686-68d4-4e1d-a3dd-7485a32f245e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "defbde80f9fd1ff2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6038964e-1606-4dea-bdf8-2dc34a0f6dda",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 291,
+      "total_deletions": 163,
+      "accepted_lines": 205,
+      "overriden_lines": 0
+    }
+  }
+}

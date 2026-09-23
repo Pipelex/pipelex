@@ -1,0 +1,131 @@
+tests/unit/pipelex/plugins/mistralai_workflows/test_dispatch.py
+  s_0992143b51df11::t_89cbd204584ff2 1-5,7,10-13,34-36,38,41-46,48-57,61,63-68,71,74-79,81,83-91,93-95,98,101-102,105-121
+  s_0992143b51df11::t_bbe61c8eb46bf5 96
+  s_0992143b51df11::t_e3a8789bea8e35 58-60
+  s_0992143b51df11::t_66627bba5c68d2 47
+  s_0992143b51df11::t_96e57cc90bb765 103-104
+  s_0992143b51df11::t_76e20b9d488ed5 6,8-9,14-33,37,39-40,62,69-70,72-73,80,82,92,97,99-100
+tests/unit/pipelex/plugins/mistralai_workflows/test_validation.py
+  s_0992143b51df11::t_3461d4060ed3bb 1-4,6,10-75
+  s_0992143b51df11::t_125ccf6fb1adc5 5
+  s_0992143b51df11::t_0bc7f37d368b9d 7-9
+pyproject.toml
+  s_0992143b51df11::t_259a69738b8712 154-165
+  s_a06c248840f1c7::t_3ed17a3afa2b54 308
+pipelex/plugins/mistralai_workflows/bridge.py
+  s_0992143b51df11::t_ba485ea6e440cb 132
+  s_0992143b51df11::t_31c864783851e7 184
+  s_0992143b51df11::t_70035ace2f0cf1 22
+  s_0992143b51df11::t_6aba63fc89125a 19,163,312
+  s_0992143b51df11::t_1103e765bf32a3 277,289-305
+  s_0992143b51df11::t_93cc5eb03f89a9 147-148,150-157,159
+  s_0992143b51df11::t_8d38748423b5ae 45
+  s_0992143b51df11::t_9d874cd92af024 272,275
+  s_0992143b51df11::t_d9d2778e8a3b35 1-18,20-21,23-44,46-49,51-131,133-146,149,158,160-162,164-183,185-271,273-274,276,278-288,306-311,313
+  s_0992143b51df11::t_b43fa82611720d 50
+pipelex/plugins/mistralai_workflows/execution_mode.py
+  s_0992143b51df11::t_9c9fad12bbe220 1-37
+.claude/skills/workflows/scripts/test_workflow.py
+  s_202cd6db4773d6::t_374b45d5b53b97 68,79,85,91,97,136,149,151,173,178,184,193,222,228-229,245,256,280,292,313,319,321,325,352-353,357-359,363-365,369-370,374-377,409,433
+pipelex/plugins/mistralai_workflows/exceptions.py
+  s_0992143b51df11::t_80a0455cf50ab1 1-17
+tests/integration/pipelex/plugins/mistralai_workflows/test_data/bridge_test.mthds
+  s_32b3e46b894d8d::t_5255a4cdd8caf1 6
+  s_0992143b51df11::t_b450bc34e487c3 1-5,7-8
+pipelex/plugins/mistralai_workflows/bootstrap.py
+  s_0992143b51df11::t_3d68faa9bea288 5-6,17
+  s_0992143b51df11::t_d24b45f68bc5aa 1-4,7-8,10-14,16,18-24,26-39
+  s_0992143b51df11::t_92c83a8f003dd3 9,15,25
+tests/integration/pipelex/plugins/mistralai_workflows/test_data/bridge_funcs.py
+  s_0992143b51df11::t_b76a90c0ada37b 1-14
+tests/integration/pipelex/plugins/mistralai_workflows/conftest.py
+  s_0992143b51df11::t_334cc17a4cc602 1-35
+tests/integration/pipelex/plugins/mistralai_workflows/test_activities_direct.py
+  s_0992143b51df11::t_27ef267598de6d 19-30
+  s_0992143b51df11::t_6ea3042c3158e0 16
+  s_0992143b51df11::t_9eb6a4e1904c0b 69-72,74-75
+  s_0992143b51df11::t_84a51e1cd7329e 36-39
+  s_0992143b51df11::t_240b2566fc4f68 15
+  s_0992143b51df11::t_2344daee3a3067 1-14,31-35,40-41,43,46-47,67,76-112
+  s_0992143b51df11::t_a921ed8bce2619 44-45
+  s_0992143b51df11::t_90d4c832692e8e 48,50-66
+  s_0992143b51df11::t_fc5afb3d9ddfbf 17-18,68
+  s_0992143b51df11::t_34d7eba8d83c48 42
+  s_0992143b51df11::t_e0e58df0f7b743 49,73
+tests/integration/pipelex/plugins/mistralai_workflows/test_bridge_direct.py
+  s_0992143b51df11::t_7bc1bccf4ae787 66-67
+  s_0992143b51df11::t_0d0d37dd43b40f 38-39
+  s_0992143b51df11::t_e1267b59c937fa 1-37,40-51,53-65,68-85
+  s_0992143b51df11::t_5b3ec2afafccf7 52
+pipelex/plugins/mistralai_workflows/activities.py
+  s_0992143b51df11::t_4457baa6f92960 1-40
+TODOS.md
+  s_0992143b51df11::t_c2820badf076f3 440-459
+  s_32b3e46b894d8d::t_ed531e414e0cf2 575-582,584-622
+  s_0992143b51df11::t_4c72d3bd042327 519,521-524,526-573
+  s_294e098cf6553d::t_df79d97ba288fd 2,5,137,182,263,271,273,279,460-461,464,466-467,489,574,623,625,633-634,647,649-651,653,658,660,666,668,670,672-676,678,709-710,712-713,715,719,721,725-727,729-730
+  s_0992143b51df11::t_1ab31fa3d61762 90-94
+  s_0992143b51df11::t_802ad947a1445f 683,685,687-695,697,702-703
+  s_32b3e46b894d8d::t_bad42b92a928a3 626-632,635-646
+  s_294e098cf6553d::t_69c0b34259a57e 1,3-4,6-89,95-136,138-181,183-262,264-270,272,274-278,280-439,462-463,468-470,491,516,518,520,525,583,624,648,652,654-657,659,661-665,667,669,671,677,679-682,684,686,696,698-701,704-708,711,714,716-718,720,722-724,728
+  s_0992143b51df11::t_b24ba56b606845 465,471-488,490,492-515,517
+tests/unit/pipelex/plugins/mistralai_workflows/test_execution_mode.py
+  s_0992143b51df11::t_605b9f65434e62 1-18
+uv.lock
+  ai_agent 215,227,229,748,779,782,785,791,794,797,800,803,806,809,1508,1552-1619,1900,1905,1907,2605,2617,2647-2649,2661,2737,2749,2751,3269-3270,3278
+tests/unit/pipelex/plugins/mistralai_workflows/test_input_models.py
+  s_0992143b51df11::t_a3d6431c92bbd1 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "539726b70b70f0578e3396e479403f7d69430e81",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_0992143b51df11": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8745eb9a-0325-4f3c-9412-31be2ce082cd",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_202cd6db4773d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7a6e62dc-59f9-4a94-907e-a16dd9c4468b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_294e098cf6553d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49435a4b-0351-4dc0-9f32-bb380ac05b5a",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_32b3e46b894d8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1834240c-b0b4-440c-86dc-b8910ce1aef6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_a06c248840f1c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ab50a53-031c-49cf-bc7e-757c0e10260e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

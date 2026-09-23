@@ -1,0 +1,25 @@
+.pipelex/inference/backends/mistral.toml
+  bc3d8f59134261e6 103-118,121-122,124-125
+.pipelex-dev/test_profiles.toml
+  bc3d8f59134261e6 120-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "36e27adf1d731a98a925ccb7f4d09f31c98ac9be",
+  "prompts": {
+    "bc3d8f59134261e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99b22cd8-f511-4908-a222-38ff7d0ce758",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 3,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,35 @@
+.claude/skills/temporal-e2e-validate/SKILL.md
+  5caa8fb173216ca8 27,546,597
+pipelex/cogt/content_generation/schema_to_model.py
+  5caa8fb173216ca8 9,80-87,90
+pipelex/libraries/library_manager.py
+  5caa8fb173216ca8 448-451
+tests/unit/pipelex/libraries/test_library_crate_accumulation.py
+  5caa8fb173216ca8 3-7,9,120-151
+pipelex/temporal/codec/storage_payload_codec.py
+  5caa8fb173216ca8 4,71-75,81-83
+tests/unit/pipelex/temporal/test_storage_payload_codec.py
+  5caa8fb173216ca8 235-259,261,263-276
+tests/unit/pipelex/cogt/content_generation/test_schema_to_model.py
+  5caa8fb173216ca8 3,108-110,112-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "8ce602b7500123ba3ca13c05f9408db4c1d91109",
+  "prompts": {
+    "5caa8fb173216ca8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "93cef57a-f06c-49ed-967f-27f93fa7a25c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 130,
+      "total_deletions": 20,
+      "accepted_lines": 110,
+      "overriden_lines": 5
+    }
+  }
+}

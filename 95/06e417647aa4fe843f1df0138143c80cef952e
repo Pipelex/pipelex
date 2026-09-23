@@ -1,0 +1,31 @@
+pyproject.toml
+  8b664bc474bd8862 3
+CHANGELOG.md
+  8b664bc474bd8862 3-8
+tests/unit/pipelex/cogt/models/test_deck_manifest.py
+  8b664bc474bd8862 77,87-88,102,198-209
+.badges/tests.json
+  8b664bc474bd8862 4
+pipelex/cogt/models/deck_manifest.py
+  8b664bc474bd8862 10-12,99,101-103,107-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "9506e417647aa4fe843f1df0138143c80cef952e",
+  "prompts": {
+    "8b664bc474bd8862": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dda86f95-890e-4724-870a-486596ceb29a",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 14,
+      "accepted_lines": 33,
+      "overriden_lines": 0
+    }
+  }
+}

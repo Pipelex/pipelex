@@ -1,0 +1,512 @@
+pipelex/kit/configs/inference/backends/openai.toml
+  4e48ade7f750fe35 240-247,256,260-272,276,280-292,297,300-352
+tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator_escaping.py
+  4e48ade7f750fe35 518-522
+pipelex/cli/commands/run/method_cmd.py
+  4e48ade7f750fe35 71-78,141
+pipelex/plugins/openai/openai_completions_llm_worker.py
+  4e48ade7f750fe35 19,136,139,225,228
+tests/unit/pipelex/cogt/llm/test_llm_config_reasoning.py
+  4e48ade7f750fe35 8-9,18,28,34,38,48,115,141,228,289
+pipelex/kit/configs/traces/119581a5-08a3-42c2-b2f9-3cbc3698b002/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/175cd76b-bd90-4f28-ab00-9f92754b3c36/wf_direct.ndjson
+  4e48ade7f750fe35 1-36
+pipelex/kit/configs/traces/5e4a5800-164e-44b6-9b17-c6ac53e9d48c/wf_direct.ndjson
+  4e48ade7f750fe35 1-12
+tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator_wrapping.py
+  4e48ade7f750fe35 1-227
+pipelex/builder/operations/pipe_ops.py
+  4e48ade7f750fe35 33-35,55-64,95-96
+pipelex/kit/configs/traces/cd44556e-f6d0-44ba-96f7-3acde893a828/wf_direct.ndjson
+  4e48ade7f750fe35 1-62
+pipelex/kit/configs/traces/da4362a0-c5af-4424-91da-f59114cc045e/wf_direct.ndjson
+  4e48ade7f750fe35 1-23
+pipelex/kit/configs/inference/backends/anthropic.toml
+  4e48ade7f750fe35 121-131
+pipelex/kit/configs/traces/68b77be4-81d7-4644-abf9-ef22123eb941/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/tools/misc/http_utils.py
+  4e48ade7f750fe35 3,26-30,35,58-73
+tests/unit/pipelex/cogt/img_gen/test_img_gen_param_support.py
+  4e48ade7f750fe35 1-301
+.pipelex/inference/backends/pipelex_gateway_models_plain.md
+  4e48ade7f750fe35 34-36,49,55-69,119,122,125,128-131,211-213,226
+tests/unit/pipelex/plugins/openai/test_openai_completions_reasoning.py
+  4e48ade7f750fe35 15,58
+pipelex/kit/configs/traces/9f8c14c5-7959-4258-abe5-3b2eeb61c51b/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.pipelex/inference/backends/google.toml
+  4e48ade7f750fe35 65,73-109
+tests/unit/pipelex/builder/operations/test_parse_pipe_spec.py
+  4e48ade7f750fe35 116-145
+.pipelex/inference/backends/openai.toml
+  4e48ade7f750fe35 240-247,256,260-272,276,280-292,297,300-352
+.github/workflows/dependency-review.yml
+  4e48ade7f750fe35 1-35
+pipelex/kit/configs/traces/674ee807-b6a3-419c-ac61-a444383385e5/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/7942138f-3a60-4cbe-875b-0c326d4376e4/wf_direct.ndjson
+  4e48ade7f750fe35 1-36
+pipelex/kit/configs/traces/8ab024bc-30ed-4a64-a559-f10dddec228c/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.pipelex/inference/backends/azure_openai.toml
+  4e48ade7f750fe35 193,200,208,215,220-228,244-247,249-251,263-266,268-270,282-303,305-308
+pipelex/kit/configs/traces/44a7a9c0-d509-43a1-b88f-3a75b54db35c/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.vscode/settings.json
+  4e48ade7f750fe35 2-3
+pipelex/plugins/openai/openai_img_gen_factory.py
+  4e48ade7f750fe35 1,5,7-8,10-12,16-42,44-57,60-69,71-82,85-121,124,126,129-131,133,136-138
+pipelex/cogt/model_backends/constraints.py
+  4e48ade7f750fe35 6
+pipelex/kit/configs/traces/2cc4cac7-8cbc-4273-94fe-c8c40ecca5d0/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen/test_pipe_img_gen_validation.py
+  4e48ade7f750fe35 1-140
+pipelex/kit/configs/traces/6b23b7a6-34be-436e-9de5-394a6b474f0f/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/3fbb0e4c-9ebb-4033-b080-8908562f79bc/wf_direct.ndjson
+  4e48ade7f750fe35 1-36
+pipelex/kit/configs/traces/7346700b-8158-4785-8f77-a127cd598b2c/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/pipelex.toml
+  4e48ade7f750fe35 120,155,167,172,176,185,197,206
+pipelex/kit/configs/traces/a304dedf-3eec-481e-94a0-68173ab3ecc4/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/0838609b-9d85-495b-9fd8-03054666dafa/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/inference/backends/google.toml
+  4e48ade7f750fe35 65,73-109
+pipelex/kit/configs/traces/4b622013-b56a-43f0-99e8-c9c98b454489/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/plugins/anthropic/anthropic_config.py
+  4e48ade7f750fe35 13
+pipelex/kit/configs/traces/5fac34e9-5595-4497-84e1-28642b7f6e79/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/833bf333-432a-4749-ac97-aa624465aa94/wf_direct.ndjson
+  4e48ade7f750fe35 1-66
+pipelex/kit/configs/traces/9d4dd70f-633e-4185-9114-11c83fdaed76/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/d2c569fd-d6ca-413c-8358-c351cdac84b8/wf_direct.ndjson
+  4e48ade7f750fe35 1-54
+pipelex/kit/configs/traces/dd5dfd3e-d44c-445c-b851-90c31fed15d4/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/feea43d0-d877-42dd-9099-9e195a069673/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/plugins/gateway/gateway_img_gen_worker.py
+  4e48ade7f750fe35 71
+tests/cases/documents.py
+  4e48ade7f750fe35 45,48-50
+pipelex/pipeline/pipeline_run_setup.py
+  4e48ade7f750fe35 56,103-104,286
+tests/e2e/pipelex/pipes/pipe_operators/pipe_extract/test_data.py
+  4e48ade7f750fe35 1-19
+tests/unit/pipelex/core/stuffs/test_document_content_url_validation.py
+  4e48ade7f750fe35 3-4,18-19,21,23
+pipelex/cli/commands/doctor_cmd.py
+  4e48ade7f750fe35 22,27,414-416,434-436,440,541-554,580,587,603-605,661-695,813,828-830,835,858-860,904-912
+pipelex/kit/configs/traces/222265a9-225c-4347-a64d-b4687483980a/wf_direct.ndjson
+  4e48ade7f750fe35 1-12
+pipelex/kit/configs/traces/b7bf257e-ba24-47e2-823c-123a79b44149/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pyproject.toml
+  4e48ade7f750fe35 3,31,66-69,71-83,100,106
+pipelex/kit/configs/traces/44fd0026-a64a-497e-94e5-d610e1d43920/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/6db1b974-052c-42f4-aa2a-a351982a0f38/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/6960043d-8ab0-4648-bb12-fd691b63a45c/wf_direct.ndjson
+  4e48ade7f750fe35 1-69
+tests/unit/pipelex/plugins/openai/test_openai_worker_error_handling.py
+  4e48ade7f750fe35 108,113,117-119
+pipelex/kit/configs/traces/e18b5ef1-569a-4d7c-ad9b-60ea58ad3551/wf_direct.ndjson
+  4e48ade7f750fe35 1-66
+pipelex/kit/configs/traces/2b167305-dbb8-4306-9648-7d80dd28a1c2/wf_direct.ndjson
+  4e48ade7f750fe35 1-62
+pipelex/kit/configs/traces/4e6770df-7a28-4b17-a8db-b88f277663b8/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/0e21f097-dbff-4e4a-8764-0dab54ab8644/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/6388a589-00ed-477d-8b47-1fbc1564c33e/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/8cc400c3-ac99-45e4-aa88-6b919537012c/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/dc2812e0-2691-4bb2-aff4-666b9936e30c/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+tests/unit/pipelex/plugins/fal/test_fal_worker_error_handling.py
+  4e48ade7f750fe35 93,122,151,180,199
+pipelex/plugins/anthropic/anthropic_llm_worker.py
+  4e48ade7f750fe35 33,208-214,242,247
+pipelex/kit/configs/traces/931b2d51-4abb-4103-bee1-f5f6bd2152a5/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/f879d766-ef98-47e9-8752-f32b0c355e43/wf_direct.ndjson
+  4e48ade7f750fe35 1-54
+pipelex/core/concepts/concept_factory.py
+  4e48ade7f750fe35 217,219
+pipelex/cogt/img_gen/img_gen_param_support.py
+  4e48ade7f750fe35 1-223
+tests/unit/pipelex/cli/test_update_cmd.py
+  4e48ade7f750fe35 1-189
+pipelex/kit/configs/inference/backends/azure_openai.toml
+  4e48ade7f750fe35 193,200,208,215,220-228,244-247,249-251,263-266,268-270,282-303,305-308
+pipelex/kit/configs/traces/f9c3f84c-b0f8-489c-b261-678fb60caa46/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/inference/backends/pipelex_gateway_models.md
+  4e48ade7f750fe35 88-95,128,144-183,315,323,331,339-347,573-578,601
+pipelex/kit/configs/traces/5916f4ad-3f77-46a6-bce0-ee0cc5538bb4/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/74791cf9-44b2-4ac5-a161-2dc062ed26d3/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/2016ffd7-5c66-4155-9880-4264764cc312/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/ce0fe104-dfa3-4fd5-9b4a-0e1d3e78e677/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/eb4862f7-df0b-47b7-a514-0df5fa3ffd3f/wf_direct.ndjson
+  4e48ade7f750fe35 1-12
+pipelex/kit/configs/traces/07b33e49-464b-4958-8d2d-0d5b9bd01c26/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+docs/tools/cli/index.md
+  4e48ade7f750fe35 17
+tests/unit/pipelex/plugins/mistral/test_mistral_reasoning.py
+  4e48ade7f750fe35 15,71
+pipelex/kit/configs/inference/deck/2_img_gen_deck.toml
+  4e48ade7f750fe35 7-11,34
+pipelex/kit/configs/traces/5f307ace-11b2-4884-a3a9-9af1efca0585/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/cli/agent_cli/commands/init_cmd.py
+  4e48ade7f750fe35 18,120
+pipelex/pipe_run/pipe_run_params.py
+  4e48ade7f750fe35 142
+tests/integration/pipelex/pipes/operator/pipe_img_gen/test_pipe_img_gen_blueprint_validation.py
+  4e48ade7f750fe35 1-204
+pipelex/kit/configs/traces/f4ea899c-9d42-409f-a1b3-e3bd00f67972/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/39ffe24e-1d20-41dc-b7d4-3883aeb7833b/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+tests/unit/pipelex/cogt/img_gen/test_img_gen_args_factory.py
+  4e48ade7f750fe35 11,15,25-26,29-30,33-34,36-41,44-47,49,51,62-68,76-77,79-80,120,152,173,193,197-535
+pipelex/core/concepts/structure_generation/generator.py
+  4e48ade7f750fe35 2,17-21,193-230,269,308,476
+pipelex/kit/configs/traces/ccd96aa2-2731-46fd-83ab-1124f91f5b53/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/cogt/img_gen/img_gen_args_factory.py
+  4e48ade7f750fe35 14,18,25,27,29,55,66-67,101-102,111,139-146,156-157,162,172-180,191-194,203,238,240,244,246-247,250-256,258,260-264,267-273,322-329,331-335,415-416,435-439,451,455-456,464-465,476-477,488-489,492-494,497-498,501-516,574-593
+pipelex/cogt/img_gen/img_gen_job_components.py
+  4e48ade7f750fe35 5,30-34,51,54
+pipelex/kit/configs/traces/f1584dd1-b034-45ac-8238-0e63c3a6f6ea/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/cogt/models/model_deck.py
+  4e48ade7f750fe35 864-871
+pipelex/system/pipelex_service/pipelex_details.py
+  4e48ade7f750fe35 5
+pipelex/kit/configs/traces/473f5b1c-eefd-4849-a594-c53598fe498d/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/f330cc19-6ef3-4f7e-b6fa-ab56d5ad624a/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/pipe_operators/img_gen/pipe_img_gen.py
+  4e48ade7f750fe35 10-11,70-108
+pipelex/kit/configs/traces/b2625ee8-2019-46d3-a561-f537506fda51/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/pipe_run/pipe_run_params_factory.py
+  4e48ade7f750fe35 15,24
+pipelex/kit/configs/traces/76e1ecc7-1eb6-4411-8f83-23c368312260/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.github/workflows/graph-ui-check.yml
+  4e48ade7f750fe35 23-24
+pipelex/kit/configs/traces/635f05cf-398f-4802-9835-308ed914c081/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/f1ddac1d-deec-47b3-a68c-358e29762b9f/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/4c80d2b6-eca1-4890-b9ca-faa3ad988ba0/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/bfb68d46-4ae9-441d-ba79-adcfe1d568ce/wf_direct.ndjson
+  4e48ade7f750fe35 1-54
+.pipelex/inference/deck/3_extract_deck.toml
+  4e48ade7f750fe35 8-12
+pipelex/kit/configs/traces/c88c7e24-5d95-4308-992f-c16af5fee5d2/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/inference/backends/huggingface.toml
+  4e48ade7f750fe35 42
+pipelex/kit/configs/traces/5a52912a-0d13-4e7a-a15c-3b75aff0a9f2/wf_direct.ndjson
+  4e48ade7f750fe35 1-25
+pipelex/pipe_operators/pipe_operator.py
+  4e48ade7f750fe35 43-46,52
+.pipelex/inference/backends/bedrock.toml
+  4e48ade7f750fe35 147-158
+pipelex/kit/configs/traces/20d85e9c-404d-4c2d-8bd5-66b1bc07a20b/wf_direct.ndjson
+  4e48ade7f750fe35 1-54
+pipelex/plugins/google/google_config.py
+  4e48ade7f750fe35 18,46-47
+pipelex/cli/deck_notice.py
+  4e48ade7f750fe35 1-38
+pipelex/cli/commands/run/bundle_cmd.py
+  4e48ade7f750fe35 72-79,171
+pipelex/kit/configs/traces/f441b925-b396-4bc1-a79a-299cd94d5f28/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/cc272941-1f74-4ca2-ac15-5b76f80a9ae9/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/f2f7367b-4383-44b1-93bc-a72b74d03eaa/wf_direct.ndjson
+  4e48ade7f750fe35 1-12
+pipelex/plugins/fal/fal_img_gen_worker.py
+  4e48ade7f750fe35 48,50-53
+tests/unit/pipelex/cogt/models/test_deck_manifest.py
+  4e48ade7f750fe35 1-301
+pipelex/plugins/openai/openai_img_gen_worker.py
+  4e48ade7f750fe35 1-2,8,12,22-24,60-61,74-80,119,125,156-161,166,170-199
+docs/tools/cli/update.md
+  4e48ade7f750fe35 1-99
+pipelex/kit/configs/traces/eebbf9b2-3747-4b9d-bfc9-6ed2a62c5dad/wf_direct.ndjson
+  4e48ade7f750fe35 1-12
+pipelex/kit/configs/traces/2dce41a5-8b1f-412e-bd1a-8936f197e418/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/tools/aws/aws_config.py
+  4e48ade7f750fe35 69-73,75-79
+pipelex/pipe_operators/llm/pipe_llm.py
+  4e48ade7f750fe35 26,156-181,193,321
+pipelex/kit/configs/traces/75db50bf-c39a-48fc-8609-13f81940dd91/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/e8a99227-3707-46d0-80ad-9ac5a31d4077/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/f149e206-8706-4d59-93b1-aec0c4ae7264/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/30fe0b42-cd5d-4f7d-a12d-fdc1ddf40adb/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/60849827-b4e1-49ce-9816-cd039f51add5/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/52cdcefd-e60a-4609-8708-1fff59ee7c52/wf_direct.ndjson
+  4e48ade7f750fe35 1-25
+pipelex/kit/configs/traces/621b97de-461c-4b29-8a9f-f604ab1c1f95/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/6ce1494e-2f35-4eeb-8bd1-35f315fd1268/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/f987bc76-b645-4a6f-ac22-4289be10e28b/wf_direct.ndjson
+  4e48ade7f750fe35 1-62
+pipelex/kit/configs/traces/067dfeff-f7a6-4104-97dd-6acfd26ef0e9/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/cli/commands/init/command.py
+  4e48ade7f750fe35 30,258-260
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  4e48ade7f750fe35 12,17,81,103,145-159
+pipelex/kit/configs/traces/61f6429a-2c9b-4c1b-9f33-ff84c7f4fd68/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/42a842e7-a168-4388-885d-d8d3f3641570/wf_direct.ndjson
+  4e48ade7f750fe35 1-12
+pipelex/kit/configs/traces/a761625d-5532-4e96-ab23-51f153fec8c0/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/19bb1c24-3714-4c99-97cb-8f9cb1eafad7/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/e96e89fb-fe26-491b-83ba-b07535433d89/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/3e92f5d4-29e5-436c-aa5d-82f7bc826d56/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+tests/e2e/pipelex/pipes/pipe_operators/pipe_extract/pipe_extract.mthds
+  4e48ade7f750fe35 1-9
+pipelex/kit/configs/traces/2ea02d3b-8599-46ef-b86f-5cd5b04ee920/wf_direct.ndjson
+  4e48ade7f750fe35 1-54
+pipelex/kit/configs/traces/a905f35f-0508-4b79-a423-472ec71ad99e/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/a643c997-be1b-460d-96cb-e34d07745186/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/ddd70ce8-5435-4561-8849-30e42acf26e3/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+docs/features/cli.md
+  4e48ade7f750fe35 20
+.pipelex/inference/backends/pipelex_gateway_models.md
+  4e48ade7f750fe35 88-95,128,144-183,315,323,331,339-347,573-578,601
+pipelex/kit/configs/traces/846c8ad7-21b6-462d-9ae5-6dab35a4ad42/wf_direct.ndjson
+  4e48ade7f750fe35 1-23
+.pipelex/inference/backends/huggingface.toml
+  4e48ade7f750fe35 42
+pipelex/kit/configs/traces/745906ef-dae7-42bb-b6b6-3e10a8deb122/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/8f93980e-aa8c-48ac-8830-30d52f1f0c57/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/0b1b2306-cbec-476a-8480-9c3bcc229562/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/cli/commands/run/pipe_cmd.py
+  4e48ade7f750fe35 68-75,136
+pipelex/kit/configs/inference/backends/bedrock.toml
+  4e48ade7f750fe35 147-158
+pipelex/kit/configs/traces/db73b9c8-ad41-4c53-9892-cfa35657e35d/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.github/dependabot.yml
+  4e48ade7f750fe35 1-38
+pipelex/kit/configs/inference/backends/pipelex_gateway_models_plain.md
+  4e48ade7f750fe35 34-36,49,55-69,119,122,125,128-131,211-213,226
+tests/integration/pipelex/cogt/test_img_gen.py
+  4e48ade7f750fe35 10,36,74,106
+pipelex/cli/commands/update_cmd.py
+  4e48ade7f750fe35 1-187
+pipelex/kit/configs/traces/f5527c2b-3395-4796-a523-b451a3bd2f3a/wf_direct.ndjson
+  4e48ade7f750fe35 1-36
+tests/unit/pipelex/tools/misc/test_http_utils.py
+  4e48ade7f750fe35 1-55
+pipelex/kit/configs/traces/bcc932b1-cf81-4cdc-a39a-ce13a9e2e470/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/system/configuration/config_loader.py
+  4e48ade7f750fe35 162-167
+.pipelex-dev/test_profiles.toml
+  4e48ade7f750fe35 71,90-95,187,228,288-293,295
+pipelex/graph/reactflow/standalone_assets.py
+  4e48ade7f750fe35 8,13,20-21,24,31-32
+pipelex/kit/configs/traces/2504f82f-4264-48c6-8e5b-e6a350af5820/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/69ae5aae-ea1e-4cd7-838c-11de63ff8414/wf_direct.ndjson
+  4e48ade7f750fe35 1-36
+pipelex/pipeline/runner.py
+  4e48ade7f750fe35 77,105-106,142,230
+pipelex/kit/configs/inference/deck/.kit_manifest.json
+  4e48ade7f750fe35 1-9
+pipelex/kit/configs/traces/239c1773-be48-48fb-b439-38c007501425/wf_direct.ndjson
+  4e48ade7f750fe35 1-25
+pipelex/kit/configs/traces/1e7bdd6d-ff1c-4d14-8a93-128ccaebe772/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+tests/unit/pipelex/plugins/huggingface/test_hf_worker_error_handling.py
+  4e48ade7f750fe35 86,115,134
+tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_dynamic_output.py
+  4e48ade7f750fe35 1-155
+tests/unit/pipelex/plugins/google/test_google_reasoning.py
+  4e48ade7f750fe35 13,17,58,90,94
+pipelex/kit/configs/traces/63d4cdf8-fb36-41d2-a806-31d31554da22/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/inference/backends/fal.toml
+  4e48ade7f750fe35 41,57,73,89,106
+tests/unit/pipelex/cli/test_doctor_cmd.py
+  4e48ade7f750fe35 19,54-61,73
+docs/configuration/config-technical/inference-backend-config.md
+  4e48ade7f750fe35 86-90
+mkdocs.yml
+  4e48ade7f750fe35 262,439
+pipelex/kit/configs/traces/6140c1e4-276f-4a2e-89d6-28a7a36a1e8c/wf_direct.ndjson
+  4e48ade7f750fe35 1-23
+pipelex/kit/configs/traces/f5ce0f95-4a3d-4ccf-8146-59d2fc6f4d82/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/plugins/huggingface/huggingface_img_gen_worker.py
+  4e48ade7f750fe35 46,49-52
+tests/integration/pipelex/cogt/test_img2img.py
+  4e48ade7f750fe35 17,95,152,214,271
+pipelex/kit/configs/traces/6e654db7-8843-495b-9eed-944cfe24ab1f/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.pipelex/inference/backends/fal.toml
+  4e48ade7f750fe35 41,57,73,89,106
+pipelex/cli/_cli.py
+  4e48ade7f750fe35 17,20,32,120-121,127-129,178-193
+tests/unit/pipelex/core/stuffs/test_image_content_url_validation.py
+  4e48ade7f750fe35 3-4,18-19,21,23
+.github/workflows/publish-pypi.yml
+  4e48ade7f750fe35 8,58,96,99,105,108,117,122,125,136
+pipelex/kit/configs/traces/420393fc-a453-43ab-97ea-48d261c29634/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/inference/deck/4_search_deck.toml
+  4e48ade7f750fe35 8-12
+tests/integration/pipelex/fixtures/img_gen_fixtures.py
+  4e48ade7f750fe35 6-27,37-46,50-51,53,55,57-66
+.pipelex/inference/deck/2_img_gen_deck.toml
+  4e48ade7f750fe35 7-11,34
+pipelex/core/pipes/inputs/input_stuff_specs_factory.py
+  4e48ade7f750fe35 86
+pipelex/kit/configs/traces/5193b984-10d7-482d-833a-a8b64377b6d7/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/5610a95a-2c94-4ac9-a31b-db72a00f965c/wf_direct.ndjson
+  4e48ade7f750fe35 1-36
+pipelex/kit/configs/traces/a772dff7-0876-491d-a06f-e09660654a80/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/inference/deck/1_llm_deck.toml
+  4e48ade7f750fe35 7-11,36-37,42-46,49-50,60,62,66-67,72-73,77-78,84
+.pipelex/inference/deck/1_llm_deck.toml
+  4e48ade7f750fe35 7-11,36-37,42-46,49-50,60,62,66-67,72-73,77-78,84
+pipelex/cogt/models/deck_manifest.py
+  4e48ade7f750fe35 1-280
+.badges/tests.json
+  4e48ade7f750fe35 4
+pipelex/kit/configs/traces/1c797091-be22-4ca7-b9f5-70add259483a/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/49cab2ae-e585-43ad-94e1-56ba79c58224/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+tests/unit/pipelex/plugins/openai/test_openai_responses_reasoning.py
+  4e48ade7f750fe35 15,58
+pipelex/kit/configs/traces/19b72c0a-d21f-430e-bf64-fa44c4d91070/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/59fd0a52-abb8-453e-beb5-e7ccc2a7ef50/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.pipelex/inference/deck/4_search_deck.toml
+  4e48ade7f750fe35 8-12
+pipelex/cli/commands/run/_run_core.py
+  4e48ade7f750fe35 54,131,249,277
+pipelex/kit/configs/traces/6ba19b50-6b95-4796-9547-701385733471/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/8558b4a2-5de3-44ca-8306-0d78f2e58ba1/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/45412510-8b24-44b5-a6f1-208863067782/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/7e6ba705-1db8-403b-b6f4-97e72be37db1/wf_direct.ndjson
+  4e48ade7f750fe35 1-69
+pipelex/kit/configs/traces/a4a21cd7-5bf5-4a45-ba90-01524d740e78/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+.pipelex/inference/deck/.kit_manifest.json
+  4e48ade7f750fe35 1-9
+pipelex/kit/configs/inference/deck/3_extract_deck.toml
+  4e48ade7f750fe35 8-12
+pipelex/kit/configs/traces/0914e04d-5b95-4967-a1e6-49e860a44398/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/61e7c0a1-a043-44b0-a0e1-6b5e1c304aef/wf_direct.ndjson
+  4e48ade7f750fe35 1-66
+pipelex/kit/configs/traces/f82848e2-bb0d-4b2f-be47-34ab945b57bf/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/plugins/gateway/gateway_extract_worker.py
+  4e48ade7f750fe35 155-158,239-241
+.pipelex/inference/backends/anthropic.toml
+  4e48ade7f750fe35 121-131
+pipelex/cogt/llm/llm_job_components.py
+  4e48ade7f750fe35 14
+tests/e2e/pipelex/pipes/pipe_operators/pipe_extract/test_pipe_extract.py
+  4e48ade7f750fe35 1-59
+tests/integration/pipelex/test_data.py
+  4e48ade7f750fe35 169
+pipelex/cogt/img_gen/img_gen_model_rules.py
+  4e48ade7f750fe35 25,33,36,44,48,78-79,87-88,99,106,114,119,126-128,131-132,142-143,149-150,153-154,156-159,162-174,191-201
+pipelex/kit/configs/traces/0fc1949c-ffa1-446b-a18c-1b07b8857fb1/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/2b3baa87-6481-4272-a447-8a66f4d4dfac/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/3450400e-ad98-4dba-8e4c-8ecc0c2df744/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/7373dd37-4daf-408f-9d12-a21040890f6a/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/76c547c3-0c84-4d54-a44c-440bef7058c0/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/9b7f232d-5406-414e-a0fb-db24489f1474/wf_direct.ndjson
+  4e48ade7f750fe35 1-54
+pipelex/kit/configs/traces/9db3698e-9757-4d92-b02a-163ac90d8210/wf_direct.ndjson
+  4e48ade7f750fe35 1-3
+pipelex/kit/configs/traces/b27d509c-a437-45c3-bcfc-c4bb4bb00c08/wf_direct.ndjson
+  4e48ade7f750fe35 1-69
+tests/integration/pipelex/cogt/test_img_gen_param_support.py
+  4e48ade7f750fe35 1-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "e4772e992c026942b06b703ae1c32f24891c81b3",
+  "prompts": {
+    "4e48ade7f750fe35": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d48c7b03-6a0d-4cfd-8777-29c4eb8d1831",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 11573,
+      "total_deletions": 4215,
+      "accepted_lines": 8060,
+      "overriden_lines": 3
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+CLAUDE.md
+  34104b5fc5ee8cd7 33-35
+tests/CLAUDE.md
+  34104b5fc5ee8cd7 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "b11d8633b88a0a9068e7f6f23a3f76c237836a86",
+  "prompts": {
+    "34104b5fc5ee8cd7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "100485f6-de8f-4e52-ab3a-d13e96340f2a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 68,
+      "total_deletions": 2,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    }
+  }
+}

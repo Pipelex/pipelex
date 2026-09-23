@@ -1,0 +1,25 @@
+docs/root-index.html
+  0efcf6e376ffd3e5 1-72
+Makefile
+  0efcf6e376ffd3e5 882
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "86992bb3abe85b3ca10ebeb3957b5498becb0129",
+  "prompts": {
+    "0efcf6e376ffd3e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a79352d-eedc-476f-a870-c1b8fe6ec323",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 73,
+      "total_deletions": 77,
+      "accepted_lines": 73,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+pipelex/cli/dev_cli/commands/check_mthds_schema_cmd.py
+  4af45552571cb057 40,106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "50b3c9ee114d403a553fa8ebf79d200c59d8c957",
+  "prompts": {
+    "4af45552571cb057": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e29cdf5a-24d7-41aa-8345-07e1244fa667",
+        "model": "claude-4.6-opus-high-thinking"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

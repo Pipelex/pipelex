@@ -1,0 +1,25 @@
+pipelex/urls.py
+  e654ef0d539ac472 13
+docs/404.html
+  e654ef0d539ac472 54-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "ce3fc05f96fa455d6f24edb85d0d8a54b0f68440",
+  "prompts": {
+    "e654ef0d539ac472": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dce45d13-29cf-42d3-9714-41dc64402cfc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 2,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

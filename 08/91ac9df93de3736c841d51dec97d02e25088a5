@@ -1,0 +1,29 @@
+pipelex/cogt/models/model_deck.py
+  h_ad2a9d0839b83e 866
+  ef0e396aae7afc2b 864-865,867-871
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "0891ac9df93de3736c841d51dec97d02e25088a5",
+  "prompts": {
+    "ef0e396aae7afc2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a2b1a38e-ffbe-4200-b024-db7c7631c479",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 5,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

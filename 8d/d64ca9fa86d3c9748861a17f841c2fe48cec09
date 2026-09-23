@@ -1,0 +1,23 @@
+Makefile
+  c2afd020d1a9406e 424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "8dd64ca9fa86d3c9748861a17f841c2fe48cec09",
+  "prompts": {
+    "c2afd020d1a9406e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0fd0fb2d-058a-4eae-91ae-8d1e77175ddd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

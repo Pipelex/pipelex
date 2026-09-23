@@ -1,0 +1,27 @@
+CHANGELOG.md
+  73448560fb81c199 19-24
+pipelex/builder/operations/runner_code_ops.py
+  73448560fb81c199 28-30
+pipelex/core/bundles/exceptions.py
+  73448560fb81c199 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "705003158f2d98acf1b7d120a69f8f8c0e82923a",
+  "prompts": {
+    "73448560fb81c199": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1fde1ccc-828f-4341-97eb-ecff737cc648",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 28,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

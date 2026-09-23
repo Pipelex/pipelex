@@ -1,0 +1,23 @@
+pipelex/cli/agent_cli/commands/concept_cmd.py
+  2858bf969071118a 13,152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "44d6394c27bec38c99f212ba8a483ee73783e45d",
+  "prompts": {
+    "2858bf969071118a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe6c5ff0-cecb-42bb-a9e2-ea6a32b82d28",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 44,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

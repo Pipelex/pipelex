@@ -1,0 +1,31 @@
+tests/integration/pipelex/temporal/async/library_crate/conftest.py
+  165e45defbe250c0 1-52,54-65,67-72
+.claude/skills/temporal-test-crate/SKILL.md
+  165e45defbe250c0 1-52
+tests/integration/pipelex/temporal/async/library_crate/native_text_sequence.mthds
+  165e45defbe250c0 1-31
+tests/integration/pipelex/temporal/async/library_crate/test_wf_library_crate.py
+  165e45defbe250c0 1-62
+tests/integration/pipelex/temporal/test_data.py
+  165e45defbe250c0 93-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "3e89b77665630d8a17dd81d8b9ee8f94932b9f03",
+  "prompts": {
+    "165e45defbe250c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7586e315-5bf7-4a57-8f4c-4cade56b655d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 452,
+      "total_deletions": 171,
+      "accepted_lines": 317,
+      "overriden_lines": 0
+    }
+  }
+}

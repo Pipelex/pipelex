@@ -1,0 +1,36 @@
+pipelex/cli/commands/build/pipe_cmd.py
+  59f4b781bfdd0211 344,346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "5c6e0a8581fe27d258d5d8f5351aabbb6d70c653",
+  "prompts": {
+    "59f4b781bfdd0211": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d075299-9599-4a9d-a2e8-1576445179ef",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "ba1a9f25f059ec47": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "064c7758-8b95-400c-9ed8-f9c2807a7837",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

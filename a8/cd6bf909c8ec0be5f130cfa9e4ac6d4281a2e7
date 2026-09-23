@@ -1,0 +1,25 @@
+wip/F-handoff-phase-1.md
+  59df85eb7de1e739 1-380
+wip/D-master-plan-distributed-execution-v2.md
+  59df85eb7de1e739 43-44,75-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "a8cd6bf909c8ec0be5f130cfa9e4ac6d4281a2e7",
+  "prompts": {
+    "59df85eb7de1e739": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5e07090-f334-44dd-919c-afc8ad0e3f21",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 390,
+      "total_deletions": 8,
+      "accepted_lines": 390,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,52 @@
+pipelex/runtime_bridge/exceptions.py
+  s_ac72aa72a92ff3::t_c83befc1771758 1-13
+tests/integration/pipelex/runtime_bridge/test_bridge_direct.py
+  s_ac72aa72a92ff3::t_a29f1cac111476 1-119
+tests/unit/pipelex/runtime_bridge/test_validation.py
+  s_ac72aa72a92ff3::t_2fe4a48d4f59a7 1-75
+tests/integration/pipelex/runtime_bridge/conftest.py
+  s_ac72aa72a92ff3::t_9392b985c1368f 1-35
+pipelex/runtime_bridge/bootstrap.py
+  s_ac72aa72a92ff3::t_31e8485368d23e 1-25
+tests/unit/pipelex/runtime_bridge/test_input_models.py
+  s_ac72aa72a92ff3::t_a744c880bd7429 1-69
+tests/integration/pipelex/runtime_bridge/test_data/bridge_test.mthds
+  s_ac72aa72a92ff3::t_537edda851bdb1 1-56
+pipelex/runtime_bridge/execution_mode.py
+  s_ac72aa72a92ff3::t_b5d44533f7e0e7 1-37
+tests/unit/pipelex/runtime_bridge/test_execution_mode.py
+  s_ac72aa72a92ff3::t_880fa4a8748359 1-18
+tests/unit/pipelex/runtime_bridge/test_dispatch.py
+  s_ac72aa72a92ff3::t_d256f5bab89df3 1-121
+tests/integration/pipelex/runtime_bridge/test_data/bridge_funcs.py
+  s_ac72aa72a92ff3::t_bd327765bb7f06 1-14
+TODOS.md
+  s_6eb1cedfd99d1b::t_9c1b530cf5f683 3-7,11-22,27-47,51-67,71-73,299
+  s_ac72aa72a92ff3::t_da463fd01215c4 8-10,23-26,48-50,68-70,74-78
+pipelex/runtime_bridge/bridge.py
+  s_ac72aa72a92ff3::t_ffd172808f4b7f 1-339
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "ac765c2f8fc21fc44335bd9fcd8b97f476e6e389",
+  "prompts": {},
+  "sessions": {
+    "s_6eb1cedfd99d1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aa32ead0-a830-45de-86b5-e533db27635d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_ac72aa72a92ff3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be885409-b4aa-4872-b315-21ae94973fc9",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

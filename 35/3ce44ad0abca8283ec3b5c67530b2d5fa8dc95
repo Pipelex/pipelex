@@ -1,0 +1,33 @@
+tests/unit/pipelex/core/stuffs/document_content/test_data.py
+  f62ce6e83922f04e 35
+.claude/skills/release/SKILL.md
+  f62ce6e83922f04e 73-76
+Makefile
+  f62ce6e83922f04e 888
+pipelex/plugins/gateway/gateway_extract_worker.py
+  f62ce6e83922f04e 126
+pipelex/core/stuffs/document_content.py
+  f62ce6e83922f04e 80
+docs/building-methods/concepts/native-concepts.md
+  f62ce6e83922f04e 199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "353ce44ad0abca8283ec3b5c67530b2d5fa8dc95",
+  "prompts": {
+    "f62ce6e83922f04e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "119c5dfe-4de9-42e5-85f2-5ccf788d46ab",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 10,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}

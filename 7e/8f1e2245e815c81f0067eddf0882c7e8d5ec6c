@@ -1,0 +1,59 @@
+docs/get-started/index.md
+  e4a469a636b17bbe 3,8,10,12
+docs/get-started/build-with-claude-code.md
+  e4a469a636b17bbe 1-42
+docs/get-started/mthds-language-tutorial.md
+  e4a469a636b17bbe 1-228
+mkdocs.yml
+  e4a469a636b17bbe 84-85,206-207
+docs/stylesheets/general.css
+  e4a469a636b17bbe 15-18
+docs/CLAUDE.md
+  e4a469a636b17bbe 57-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "7e8f1e2245e815c81f0067eddf0882c7e8d5ec6c",
+  "prompts": {
+    "75cda66cf6cb4fa2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9a25e7c-bd37-4ba0-b894-873696140c1f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 2,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "d67412741729fe23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69dd97ac-1233-4f5b-9a20-8500eeab96ad",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 40,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "e4a469a636b17bbe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9247a39d-6f3d-4fef-8d0c-e8c2fc568605",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 316,
+      "total_deletions": 289,
+      "accepted_lines": 292,
+      "overriden_lines": 0
+    }
+  }
+}

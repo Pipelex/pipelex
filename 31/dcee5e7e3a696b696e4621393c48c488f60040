@@ -1,0 +1,27 @@
+tests/unit/pipelex/cli/test_agent_graph_cmd.py
+  5d94ee1930e0394c 49-50,74,80,84,88,140-141,167-168,257-258
+tests/unit/pipelex/cli/conftest.py
+  5d94ee1930e0394c 5,11-12,16,18
+tests/unit/pipelex/cli/test_agent_validate_cmd.py
+  5d94ee1930e0394c 46,53-58,67-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "31dcee5e7e3a696b696e4621393c48c488f60040",
+  "prompts": {
+    "5d94ee1930e0394c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2e60750-5e49-4b46-bb25-f85308f24d37",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 30,
+      "total_deletions": 19,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}

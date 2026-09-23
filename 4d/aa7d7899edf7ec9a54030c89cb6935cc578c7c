@@ -1,0 +1,23 @@
+tests/unit/pipelex/cli/test_output_helpers.py
+  020ea82ea86c3ab4 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "4daa7d7899edf7ec9a54030c89cb6935cc578c7c",
+  "prompts": {
+    "020ea82ea86c3ab4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1df9e0a4-a7e6-4f4e-b9e5-7e52e1b578f3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

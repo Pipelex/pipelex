@@ -1,0 +1,27 @@
+pipelex/temporal/temporal_connect.py
+  736f41294025053d 10,52-54
+tests/unit/pipelex/temporal/test_storage_payload_codec.py
+  736f41294025053d 129-148
+pipelex/temporal/config_temporal.py
+  736f41294025053d 166-169,176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "46ad9c62f03bf79fb5e10575580b31497249ef3b",
+  "prompts": {
+    "736f41294025053d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d77951e4-9e04-4555-bdce-b26631905270",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 29,
+      "total_deletions": 3,
+      "accepted_lines": 29,
+      "overriden_lines": 0
+    }
+  }
+}

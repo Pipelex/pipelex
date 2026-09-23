@@ -1,0 +1,23 @@
+docs/under-the-hood/distributed-content-generation.md
+  7a988ff0f698e2d5 63,91-98,101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "76c1be1e58e53060d74f27210680e0afb3714106",
+  "prompts": {
+    "7a988ff0f698e2d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1163bdc8-6347-4f87-93cc-f646ec7efb1d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 2,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

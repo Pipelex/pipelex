@@ -1,0 +1,23 @@
+pipelex/cli/agent_cli/CLAUDE.md
+  3dfdfeeca6a77ae0 59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "733ebc253958c000b5390527eafc819f1406442c",
+  "prompts": {
+    "3dfdfeeca6a77ae0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0af4909-a7d6-4f6c-8fd9-8e461b34d1b0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 37,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

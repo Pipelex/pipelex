@@ -1,0 +1,42 @@
+CHANGELOG.md
+  66ba7f17fbb762f2 12
+tests/e2e/pipelex/pipes/pipe_operators/pipe_llm/pipe_llm_object_list.mthds
+  d8797f82a136a77d 17-18
+tests/e2e/pipelex/pipes/pipe_operators/pipe_llm/test_pipe_llm_object_list.py
+  d8797f82a136a77d 14,32
+pipelex/pipelex.toml
+  66ba7f17fbb762f2 120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "8c1370a5014ccccc0b49f9e4e7983703a7e41c79",
+  "prompts": {
+    "66ba7f17fbb762f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1619db5d-d1dd-4bbf-a2f8-1d292c68130a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "d8797f82a136a77d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2fdb259-36a0-414e-acb9-a5301e243354",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 5,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

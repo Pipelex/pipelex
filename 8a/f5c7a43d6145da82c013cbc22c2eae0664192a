@@ -1,0 +1,49 @@
+pipelex/cogt/content_generation/schema_to_model_factory.py
+  a02fa8924d180a3b 37,76-80,225-231,240-247,250-284
+CHANGELOG.md
+  a02fa8924d180a3b 66
+pyproject.toml
+  a02fa8924d180a3b 27,30,47
+pipelex/temporal/temporal_data_converter.py
+  a02fa8924d180a3b 31,45,94-110
+tests/integration/pipelex/temporal/data_converter/test_data_conv_enum_roundtrip.py
+  a02fa8924d180a3b 1-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8af5c7a43d6145da82c013cbc22c2eae0664192a",
+  "prompts": {
+    "01cd484fb300b130": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "590e6ca3-8d3d-486f-8ca5-5306d91476d8",
+        "model": "unknown"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 194,
+      "total_deletions": 129,
+      "accepted_lines": 194,
+      "overriden_lines": 0
+    },
+    "a02fa8924d180a3b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c71490cc-50ee-4cb7-bfa8-28bcc2ad6392",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 153,
+      "total_deletions": 38,
+      "accepted_lines": 139,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

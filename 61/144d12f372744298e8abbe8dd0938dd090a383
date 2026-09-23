@@ -1,0 +1,23 @@
+pipelex/test_extras/shared_pytest_plugins.py
+  598ba49e7d9cf652 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "61144d12f372744298e8abbe8dd0938dd090a383",
+  "prompts": {
+    "598ba49e7d9cf652": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "624feaaa-0e5b-4e73-b746-883864a1a0b8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

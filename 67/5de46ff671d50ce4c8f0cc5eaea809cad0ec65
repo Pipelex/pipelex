@@ -1,0 +1,86 @@
+docs/cookbook/validate-expense-data.md
+  67074700a8b89b99 1-85
+docs/cookbook/extract-dpe.md
+  67074700a8b89b99 2-3,8,12,14,16-19,21,23,25-40,42,45-47,49-56,59,61,63-65
+docs/cookbook/generate-image.md
+  67074700a8b89b99 1-70
+docs/cookbook/index.md
+  67074700a8b89b99 3,10,14,16,18-19,21,23-30,32,34-35,37,39-41,43,45,47-51,53,55
+docs/cookbook/blog-article-generator.md
+  67074700a8b89b99 1-66
+docs/cookbook/extract-generic.md
+  67074700a8b89b99 3,8,12,14-57,60,62-64
+docs/cookbook/extract-gantt.md
+  67074700a8b89b99 2-3,8,12,14,16-20,22,24,36,41,43,45,47-49
+docs/building-methods/pipes/pipe-controllers/PipeSequence.md
+  67074700a8b89b99 81
+docs/cookbook/summarize.md
+  67074700a8b89b99 1-86
+docs/cookbook/discord-newsletter.md
+  67074700a8b89b99 1-71
+docs/cookbook/design-slides.md
+  67074700a8b89b99 1-83
+docs/cookbook/advisory-board.md
+  67074700a8b89b99 1-65
+docs/cookbook/extract-slides.md
+  67074700a8b89b99 1-63
+docs/cookbook/extract-invoice.md
+  67074700a8b89b99 1-78
+docs/building-methods/pipes/pipe-operators/PipeLLM.md
+  67074700a8b89b99 383
+docs/building-methods/pipes/pipe-operators/PipeExtract.md
+  67074700a8b89b99 85-86
+docs/cookbook/hello-world.md
+  67074700a8b89b99 14,16,18-20,22,24,28,42-43,49-53,55
+docs/features/document-extraction.md
+  67074700a8b89b99 42
+docs/cookbook/extract-markdown.md
+  67074700a8b89b99 1-61
+docs/cookbook/gen-expense-data.md
+  67074700a8b89b99 1-79
+docs/cookbook/extract-table.md
+  67074700a8b89b99 2-3,8,12,14,16-19,21,23,51-58
+mkdocs.yml
+  67074700a8b89b99 94-97,210-212,214-215,217-218,220-234
+docs/cookbook/using-inference-plugins.md
+  67074700a8b89b99 1-53
+docs/cookbook/gen-synthetic-data.md
+  67074700a8b89b99 1-70
+docs/cookbook/write-tweet.md
+  67074700a8b89b99 2-3,8-9,11,15,17,19-22,24,26,28-37,39,48,53,55-59
+docs/cookbook/extract-proof-of-purchase.md
+  67074700a8b89b99 2-3,8,12,14,16-19,21,23,25-46,49,52-62,65,67-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "675de46ff671d50ce4c8f0cc5eaea809cad0ec65",
+  "prompts": {
+    "67074700a8b89b99": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd389a53-a6b9-4ecb-9ca0-37b95f8731b7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1246,
+      "total_deletions": 614,
+      "accepted_lines": 1235,
+      "overriden_lines": 0
+    },
+    "a7d8b9b5a777e8fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fa07ed10-1578-4ce6-b40a-8a62915fdfe3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

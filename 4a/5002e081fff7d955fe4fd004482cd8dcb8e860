@@ -1,0 +1,24 @@
+pyproject.toml
+  s_19fb2c55b25981::t_32e65da6efd27c 459
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "4a5002e081fff7d955fe4fd004482cd8dcb8e860",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_19fb2c55b25981": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00e52b6f-b3b8-4d64-931c-ed14d0144f70",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

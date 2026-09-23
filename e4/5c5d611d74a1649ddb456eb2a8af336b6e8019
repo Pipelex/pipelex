@@ -1,0 +1,25 @@
+pipelex/pipe_operators/compose/structured_content_composer.py
+  dd225d8afce44fea 653
+pipelex/pipe_operators/compose/pipe_compose.py
+  dd225d8afce44fea 188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "e45c5d611d74a1649ddb456eb2a8af336b6e8019",
+  "prompts": {
+    "dd225d8afce44fea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "def48ff8-3004-486f-9330-62c833f865f1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

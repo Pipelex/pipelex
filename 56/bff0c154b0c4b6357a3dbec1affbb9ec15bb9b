@@ -1,0 +1,84 @@
+pipelex/pipelex.toml
+  ae6943ec69346b57 528-554,557-560
+.claude/skills/temporal-e2e-validate/scripts/repro_runner_registry_bug.py
+  7fd5ad37f8dbd712 3-68
+pipelex/temporal/config_temporal.py
+  ae6943ec69346b57 59-70,74-91,210
+Makefile
+  ae6943ec69346b57 1027-1028,1030-1032,1036-1044
+tests/integration/pipelex/temporal/test_tasks.py
+  ae6943ec69346b57 10-14,17-18,21,25-30
+pipelex/temporal/worker_cli.py
+  ae6943ec69346b57 5,29,35-40,49,82
+pipelex/temporal/exceptions.py
+  ae6943ec69346b57 26-29
+pipelex/temporal/temporal_tasks.py
+  ae6943ec69346b57 2-3,50-63,66,71-84,96-151
+.claude/skills/temporal-e2e-validate/SKILL.md
+  7fd5ad37f8dbd712 194-199,201-218,269,272-280,291-329,655
+  ae6943ec69346b57 189-192,200,220-236,246-248
+TODOS.md
+  8b48a819e0e15e32 1,3,7,9,11,13,15,17-19,21,23,25,27,29,31,33,35-43,45,47,49-53,57,59,61-63,65,67-69,71,73,75,77-82,84,86,88-89,91,93,112,115-117,121,123-126,128,130-133,135,137,139-140,142-143
+  7fd5ad37f8dbd712 95,97-99,101,103-108,110,114,141
+tests/integration/pipelex/temporal/library_crate/test_distributed_scopes.py
+  ae6943ec69346b57 1-87
+pipelex/temporal/temporal_task_manager.py
+  ae6943ec69346b57 17-18,86,92,146,167-168,173,186-194,202,208
+pipelex/temporal/task_manager.py
+  ae6943ec69346b57 9,27,33-39,45
+tests/unit/pipelex/temporal/test_worker_scope_resolution.py
+  ae6943ec69346b57 1-151
+pipelex/cli/commands/worker_cmd.py
+  ae6943ec69346b57 27-30,41,54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "56bff0c154b0c4b6357a3dbec1affbb9ec15bb9b",
+  "prompts": {
+    "7fd5ad37f8dbd712": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9c0d8d0-1bee-4310-8b0e-2f935e7604b0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 182,
+      "total_deletions": 39,
+      "accepted_lines": 125,
+      "overriden_lines": 0
+    },
+    "8b48a819e0e15e32": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "556b8d13-4e39-4b70-a838-04847ec5185c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 126,
+      "total_deletions": 0,
+      "accepted_lines": 124,
+      "overriden_lines": 0
+    },
+    "ae6943ec69346b57": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "febe673d-018e-4e6d-a296-325bcd23009c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 564,
+      "total_deletions": 106,
+      "accepted_lines": 492,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+pipelex/cli/error_handlers.py
+  215dcbc874c4ad93 225,228,231-232
+pipelex/core/exceptions.py
+  215dcbc874c4ad93 9
+pipelex/core/pipes/exceptions.py
+  215dcbc874c4ad93 18,27,103-107
+pipelex/core/bundles/exceptions.py
+  215dcbc874c4ad93 8
+tests/unit/pipelex/pipe_controllers/condition/test_pipe_condition_needed_inputs.py
+  215dcbc874c4ad93 358
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "30d0f3e33c79b3f7c0dc6625e339e707557a0b9d",
+  "prompts": {
+    "215dcbc874c4ad93": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18230f57-83c3-419a-b357-04b0d58d15b3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 26,
+      "accepted_lines": 14,
+      "overriden_lines": 1
+    }
+  }
+}

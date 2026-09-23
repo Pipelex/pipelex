@@ -1,0 +1,29 @@
+TODOS.md
+  4db45a1f5fd3ecbf 551-552,555-559,608-701
+tests/unit/pipelex/reporting/test_reporting_event_emission.py
+  4db45a1f5fd3ecbf 110-155
+pipelex/reporting/reporting_manager.py
+  4db45a1f5fd3ecbf 1,176-189
+pipelex/pipeline/runner.py
+  4db45a1f5fd3ecbf 18,206,225-233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "13a586bc87c19860b8aa932b653666fd38975cc2",
+  "prompts": {
+    "4db45a1f5fd3ecbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b601b24-7b6e-4674-92b5-2cdd6919503b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 189,
+      "total_deletions": 21,
+      "accepted_lines": 174,
+      "overriden_lines": 0
+    }
+  }
+}
