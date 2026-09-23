@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:38318fc12f2f5c8bc54359c7b41dddf7c81e3cbddc177a9c8c9f3bf087b525c5"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-22T11:22:02Z"
-rationale = "PipelexKernel.make gained an optional analytics_groups parameter, the opaque host-supplied group mapping, carried onto RunMetadata beside user_id and storage_scope. The kernel doc's run-scoped-state bullet already listed analytics_groups among what run_metadata holds and now also says the host supplies it at make time, which is the seam a multi-tenant embedder needs. The parameter is optional and defaults to an empty mapping, so the doc's two make examples stay correct unchanged."
+digest = "sha256:760c406f9d02a439754968a937eb1ed3a2048f6ff4724bbbcbcc08305fced2ff"
+reviewed_by = "thomashebrard"
+reviewed_at = "2026-09-23T10:51:33Z"
+rationale = "The trigger is one sentence of the boot-contract test's own docstring: the offline boot skips the first-run gate, which used to be the Gateway terms gate. docs/under-the-hood/pipelex-kernel.md describes the kernel surface and names no gateway, no terms and no telemetry, so nothing in it went stale with the Pipelex Gateway's removal. Re-taken after merging dev, whose own ack covered PipelexKernel.make gaining the optional analytics_groups parameter; that doc bullet is unaffected by this branch."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -25,4 +25,4 @@ rationale = "PipelexKernel.make gained an optional analytics_groups parameter, t
 "pipelex/kernel/search_ops.py" = "blob:ed0a8c7953aca1e38de852d0ddef11731b819539"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
 "pipelex/kernel/templating_style_ops.py" = "blob:395473806d600dfc4f124c07f2afebb951fc086b"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:4f440b21ad51f27c098efff4d3a04433b53914bc"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:44dbcb806a14813167c78b5d5e76ebb3cfb9ea0b"
