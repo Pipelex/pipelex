@@ -1,0 +1,21 @@
+pipelex/cli/_cli.py
+  s_177b6af8a168a6::t_b612e19f6493d7 154
+CHANGELOG.md
+  s_177b6af8a168a6::t_12df8b07967c9d 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f7eef7319539beefc26d5c13d5ce2ad82d4e589c",
+  "prompts": {},
+  "sessions": {
+    "s_177b6af8a168a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d0cb6e4-df5b-45ba-ab3c-25e38f06b2ed",
+        "model": "claude-opus-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
