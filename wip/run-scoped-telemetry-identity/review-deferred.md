@@ -49,7 +49,7 @@ Deferred because no deployment shape was found that reaches it: the default is s
 
 ## pipelex-api's `single-tenant` is a placeholder the set does not know
 
-Raised by cubic in round 4, and **not verified** — it sorted to deferral before the verifier ran.
+Raised by cubic in round 4, and **not verified** — it sorted to deferral before the verifier ran. **The stopgap was taken after round 4**, once `pipelex-api/api/routes/pipelex/pipeline.py` confirmed the default: `SINGLE_TENANT_USER_ID` now lives in `pipelex/system/storage_scope.py` beside `LOCAL_USER_ID` and is in the set, so pipelex-api can import the one string rather than spell its own. The model change below remains the cure.
 
 `_NON_DISTINGUISHING_RUN_USER_IDS` in `pipelex/system/telemetry/telemetry_identity.py` holds `local` and `dry-run-no-user`. cubic reports that pipelex-api returns `SINGLE_TENANT_USER_ID = "single-tenant"` for every run on a single-tenant deployment, which is the same kind of shared placeholder: once pipelex-api pins this version, every such deployment's runs would land on one PostHog person named `single-tenant`, and Langfuse would receive it as `langfuse.user.id`. It is one more instance of the section above — identity absence inferred from string contents — and the cure is the same: a nullable principal carried from the host, rather than a longer list of reserved strings. Adding the string to the set is the cheap stopgap if pipelex-api pins this version before that model change lands.
 

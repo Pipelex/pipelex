@@ -23,7 +23,7 @@ which is what every span produced before this release does.
 import pytest
 
 from pipelex.system.job_metadata import RunMetadata
-from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID
+from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID, SINGLE_TENANT_USER_ID
 from pipelex.system.telemetry.otel_constants import LangfuseSpanAttr, PipelexSpanAttr
 from pipelex.system.telemetry.telemetry_config import PostHogMode
 from pipelex.system.telemetry.telemetry_identity import (
@@ -312,7 +312,7 @@ class TestTelemetryIdentity:
 
     # ------------------------------------------ user ids that distinguish nobody
 
-    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID])
+    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID, SINGLE_TENANT_USER_ID])
     def test_a_placeholder_user_id_falls_back_to_the_stream(self, placeholder: str) -> None:
         """`RunMetadata.user_id` is required, so a caller with no real identity says so with a constant.
 
@@ -329,7 +329,7 @@ class TestTelemetryIdentity:
 
         assert identity.distinct_id == "configured-id"
 
-    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID])
+    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID, SINGLE_TENANT_USER_ID])
     def test_a_placeholder_user_id_keeps_the_runs_groups(self, placeholder: str) -> None:
         """A host may know which entities a run belongs to without naming its caller.
 
@@ -347,7 +347,7 @@ class TestTelemetryIdentity:
         assert identity.distinct_id == "configured-id"
         assert identity.groups == {"organization": "org_acme"}
 
-    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID])
+    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID, SINGLE_TENANT_USER_ID])
     def test_a_span_carrying_a_placeholder_falls_back_too(self, placeholder: str) -> None:
         identity = TelemetryIdentity.make_from_span_attributes(
             attributes={PipelexSpanAttr.RUN_USER_ID: placeholder},
@@ -357,7 +357,7 @@ class TestTelemetryIdentity:
 
         assert identity.distinct_id == "gateway-hash"
 
-    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID])
+    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID, SINGLE_TENANT_USER_ID])
     def test_a_placeholder_with_no_fallback_is_anonymous_not_the_placeholder(self, placeholder: str) -> None:
         identity = TelemetryIdentity.make_from_run_metadata(
             run_metadata=_run_metadata(user_id=placeholder),
@@ -391,7 +391,7 @@ class TestTelemetryIdentity:
 
         assert attributes[LangfuseSpanAttr.USER_ID] == "user-42"
 
-    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID])
+    @pytest.mark.parametrize("placeholder", [LOCAL_USER_ID, DRY_RUN_USER_ID, SINGLE_TENANT_USER_ID])
     def test_langfuse_is_never_handed_a_placeholder_as_a_person(self, placeholder: str) -> None:
         """`langfuse.user.id` IS the attribution decision, with no `_resolve` behind it to take it later.
 

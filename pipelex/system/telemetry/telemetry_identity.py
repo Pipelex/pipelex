@@ -29,7 +29,7 @@ are three — the enum below says which stream carries which, and why:
 
 **A run that names nobody** reports under the stream's configured fallback, and
 so does an event that belongs to no run at all — a CLI command, a dry-run sweep.
-`RunMetadata.user_id` is required, but two of its values name a caller without
+`RunMetadata.user_id` is required, but some of its values name a caller without
 distinguishing one; see `_NON_DISTINGUISHING_RUN_USER_IDS` below. This is why a
 local run keeps reporting exactly as it did before per-run attribution existed.
 Under `DIRECT` the run's groups still ride such a capture: a host may know which
@@ -48,7 +48,7 @@ from typing import TYPE_CHECKING, Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID
+from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID, SINGLE_TENANT_USER_ID
 from pipelex.system.telemetry.otel_constants import LangfuseSpanAttr, PipelexSpanAttr
 from pipelex.system.telemetry.telemetry_config import PostHogMode
 from pipelex.tools.log.log import log
@@ -64,18 +64,21 @@ if TYPE_CHECKING:
 #
 # `RunMetadata.user_id` is required precisely so that a host must state who is
 # running — but the two constructor defaults in
-# :mod:`pipelex.system.storage_scope` are true statements rather than identities
-# a backend can tell apart. `LOCAL_USER_ID` is the literal "local", the same
+# :mod:`pipelex.system.storage_scope`, and the single-tenant id a host without a
+# user model states, are true statements rather than identities a backend can
+# tell apart. `LOCAL_USER_ID` is the literal "local", the same
 # string on every machine on earth: honoured as a `distinct_id` it would collapse
 # every Pipelex user's local runs onto one person, and on the Pipelex stream it
 # would replace a per-deployment identity with a single global one. `DRY_RUN_USER_ID`
-# says outright that there is no caller.
+# says outright that there is no caller. `SINGLE_TENANT_USER_ID` is what
+# pipelex-api states for every run on a deployment configured with no users, and
+# is as global as `"local"`.
 #
 # So for telemetry these mean "this run names nobody", and the stream's own
 # fallback answers instead: the operator's configured `user_id` on their stream,
 # the gateway-key hash on Pipelex's — which is exactly what a CLI run reported
 # under before per-run attribution existed, and still does.
-_NON_DISTINGUISHING_RUN_USER_IDS = frozenset({LOCAL_USER_ID, DRY_RUN_USER_ID})
+_NON_DISTINGUISHING_RUN_USER_IDS = frozenset({LOCAL_USER_ID, DRY_RUN_USER_ID, SINGLE_TENANT_USER_ID})
 
 
 # The group type Pipelex's own stream carries its deployment under.
