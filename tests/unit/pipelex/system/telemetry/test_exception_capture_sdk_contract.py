@@ -268,3 +268,75 @@ class TestExceptionCaptureSdkContract:
 
         assert custom_capture.call_count == 1
         assert pipelex_capture.call_count == 0
+
+    def test_an_argument_less_capture_of_a_redacted_error_is_not_sent_again(self, mocker: MockerFixture) -> None:
+        """`capture_exception()` inside `except`, which passes `None`, is the SDK's documented form, and the mark must reach the error it resolved.
+
+        Given nothing, the wrapper reads the error being handled out of
+        `sys.exc_info()` and sends a redacted copy, which is what PostHog marks.
+        Carrying that mark back onto the argument it was handed, `None`, left the
+        live error unmarked, so a second capture and then the excepthook each
+        sent it again.
+        """
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        pipelex_client, pipelex_capture = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
+        capture = _make_dual_capture(custom_client=custom_client, pipelex_client=pipelex_client)
+        error = ToolError(_CONFIDENTIAL_MESSAGE)
+
+        try:
+            raise error
+        except ToolError:
+            custom_client.capture_exception(None)
+            custom_client.capture_exception(None)
+        _crash(capture=capture, error=error)
+
+        assert custom_capture.call_count == 1
+        assert pipelex_capture.call_count == 0
+
+    def test_a_chain_longer_than_the_recursion_limit_is_still_sent(self, mocker: MockerFixture) -> None:
+        """PostHog walks a chain with a loop, so the check deciding whether it needs redacting must not recurse either.
+
+        Nothing in this chain is a `PipelexError`, so nothing in it is copied,
+        and the SDK sends it as it would have without the wrapper.
+        """
+        client, capture_mock = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        error: BaseException = ValueError("root")
+        for link_index in range(sys.getrecursionlimit()):
+            wrapper = ValueError(f"link {link_index}")
+            wrapper.__context__ = error
+            error = wrapper
+
+        client.capture_exception(error)
+
+        assert capture_mock.call_count == 1
+
+    def test_a_capture_the_redaction_cannot_complete_is_dropped_rather_than_raised_or_sent_raw(self, mocker: MockerFixture) -> None:
+        """PostHog's `capture_exception` never raises into its caller, and the redaction in front of it must not either.
+
+        A `PipelexError` at the bottom of a chain longer than the recursion
+        limit cannot be copied. Sending the original instead is the one fallback
+        that is not open, so nothing goes out.
+        """
+        client, capture_mock = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        error: BaseException = ToolError(_CONFIDENTIAL_MESSAGE)
+        for link_index in range(sys.getrecursionlimit()):
+            wrapper = ValueError(f"link {link_index}")
+            wrapper.__context__ = error
+            error = wrapper
+
+        assert client.capture_exception(error) is None
+        assert capture_mock.call_count == 0
+
+    @pytest.mark.parametrize("malformed", ["not an exception", (ValueError, ValueError("two")), 42])
+    def test_an_argument_the_sdk_would_decline_does_not_raise_into_the_caller(self, mocker: MockerFixture, malformed: Any) -> None:
+        """The SDK answers `None` to an argument it cannot use, and the wrapper answers the same instead of raising."""
+        client, capture_mock = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+
+        assert client.capture_exception(malformed) is None
+        assert capture_mock.call_count == 0

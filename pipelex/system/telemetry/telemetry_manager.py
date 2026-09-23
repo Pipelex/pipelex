@@ -199,39 +199,62 @@ class TelemetryManager(TelemetryManagerAbstract):
             dropped, and what it sent may be a redacted copy rather than the
             error the caller holds. The mark is carried back onto the original,
             so the guard still works for a caller that captures an error and
-            then lets it escape.
+            then lets it escape. Given nothing, PostHog would read the error
+            being handled for itself, so that error is resolved first: both the
+            check and the mark need it, and `None` can carry neither.
+
+            PostHog's own `capture_exception` never raises into its caller, and
+            the redaction in front of it must not either. An argument the SDK
+            would decline, or a chain too deep to copy, drops the capture with a
+            debug line: sending the original in its place is the one fallback
+            that is not open, since it is what the redaction exists to stop.
             """
-            if exception is not None and DualClientExceptionCapture.is_marked_as_captured(exception=exception):
+            try:
+                resolved = self._resolved_exception_arg(exception=exception)
+                if resolved is None or DualClientExceptionCapture.is_marked_as_captured(exception=resolved):
+                    return None
+                sanitized = self._sanitized_exception_arg(exception=resolved)
+            except Exception as sanitize_exc:  # ruff: ignore[blind-except]
+                log.debug(f"Dropped an exception capture the privacy redaction could not complete: {sanitize_exc!r}")
                 return None
-            sanitized = self._sanitized_exception_arg(exception=exception)
             result = original_capture_exception(sanitized, **kwargs)
-            DualClientExceptionCapture.carry_capture_marks(source=sanitized, target=exception)
+            DualClientExceptionCapture.carry_capture_marks(source=sanitized, target=resolved)
             return result
 
         client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @classmethod
-    def _sanitized_exception_arg(cls, *, exception: ExceptionArg | None) -> ExceptionArg | None:
+    def _resolved_exception_arg(cls, *, exception: ExceptionArg | None) -> ExceptionArg | None:
+        """Return `exception`, or when it is `None` the error being handled, which is what PostHog would read for itself.
+
+        Resolved here rather than left to the SDK so the error can still be
+        redacted, and so the capture mark lands on the error the caller holds.
+        """
+        if exception is not None:
+            return exception
+        current_type, current_value, current_traceback = sys.exc_info()
+        if current_type is None or current_value is None:
+            return None
+        return (current_type, current_value, current_traceback)
+
+    @classmethod
+    def _sanitized_exception_arg(cls, *, exception: ExceptionArg) -> ExceptionArg:
         """Return what may go out in place of `exception`, in whichever form PostHog was handed.
 
         PostHog takes an error either bare or as the `(type, value, traceback)`
-        triple an interpreter excepthook receives, or nothing at all, in which
-        case it reads `sys.exc_info()` itself — so that case is resolved here,
-        where it can still be redacted. And it does not send one exception: it
-        walks `__cause__`, `__context__` and the members of an exception group,
-        and sends the message of every error it reaches. A `PipelexError`
-        message may repeat whatever the caller passed in — the path it was
-        reading, a slice of the document that would not parse — so every one of
-        them in that graph is replaced by the privacy notice, wherever it sits.
-        Redacting only the error at the top would leave `raise RuntimeError(...)
-        from pipelex_error`, or any error raised while handling one, sending the
-        message as it was written.
+        triple an interpreter excepthook receives. And it does not send one
+        exception: it walks `__cause__`, `__context__` and the members of an
+        exception group, and sends the message of every error it reaches. A
+        `PipelexError` message may repeat whatever the caller passed in — the
+        path it was reading, a slice of the document that would not parse — so
+        the message of every `PipelexError` in that graph is replaced by the
+        privacy notice, wherever it sits, and not only the one at the top.
+
+        The redaction goes by class. An error of another class keeps its own
+        message, so one that copied a `PipelexError`'s text into it —
+        `raise RuntimeError(f"failed: {error}") from error` — still sends that
+        text; only the linked `PipelexError` itself is replaced.
         """
-        if exception is None:
-            current_type, current_value, current_traceback = sys.exc_info()
-            if current_type is None or current_value is None:
-                return None
-            exception = (current_type, current_value, current_traceback)
         if isinstance(exception, BaseException):
             return cls._redacted_exception_graph(exception=exception)
         _, exception_value, exception_traceback = exception
@@ -250,7 +273,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         interpreter goes on to print and a host may still be holding, so only a
         copy of the graph has its links pointed at the stand-ins.
         """
-        if not cls._reaches_pipelex_error(exception=exception, visited=set()):
+        if not cls._reaches_pipelex_error(exception=exception):
             return exception
         redacted = cls._redacted_link(exception=exception, copies={})
         # The root is never cut: only a link back to an exception still being copied is.
@@ -258,15 +281,24 @@ class TelemetryManager(TelemetryManagerAbstract):
         return redacted
 
     @classmethod
-    def _reaches_pipelex_error(cls, *, exception: BaseException | None, visited: set[int]) -> bool:
-        """Whether a `PipelexError` sits anywhere PostHog would walk from `exception`."""
-        if exception is None or id(exception) in visited:
-            return False
-        visited.add(id(exception))
-        if isinstance(exception, PipelexError):
-            return True
-        linked: list[BaseException | None] = [exception.__cause__, exception.__context__, *cls._group_members(exception=exception)]
-        return any(cls._reaches_pipelex_error(exception=each, visited=visited) for each in linked)
+    def _reaches_pipelex_error(cls, *, exception: BaseException) -> bool:
+        """Whether a `PipelexError` sits anywhere PostHog would walk from `exception`.
+
+        A loop and not a recursion, as PostHog's own walk is: the SDK sends a
+        chain as long as the recursion limit, and the check deciding whether it
+        needs redacting must not be what fails on it.
+        """
+        pending: list[BaseException | None] = [exception]
+        visited: set[int] = set()
+        while pending:
+            current = pending.pop()
+            if current is None or id(current) in visited:
+                continue
+            visited.add(id(current))
+            if isinstance(current, PipelexError):
+                return True
+            pending.extend((current.__cause__, current.__context__, *cls._group_members(exception=current)))
+        return False
 
     @classmethod
     def _group_members(cls, *, exception: BaseException) -> tuple[BaseException, ...]:
@@ -327,9 +359,10 @@ class TelemetryManager(TelemetryManagerAbstract):
     def _plain_copy(cls, *, exception: BaseException) -> BaseException:
         """Copy an error that is not a `PipelexError`, message and attributes included, without running its `__init__`.
 
-        Its own message is not confidential, and its attributes stay because a
-        subclass's `__str__` may read them. Only the links are the caller's
-        business, and `_redacted_link` rewrites those.
+        Its own message is sent as it is, because the redaction goes by class:
+        a message that copied a `PipelexError`'s text travels with that text.
+        Its attributes stay because a subclass's `__str__` may read them. Only
+        the links are rewritten, by `_redacted_link`.
         """
         exception_type = type(exception)
         try:
