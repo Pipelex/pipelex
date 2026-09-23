@@ -16,6 +16,7 @@ from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.exceptions import LangfuseCredentialsError
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_config import LangfuseConfig, OtlpExporterConfig, TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.hash_utils import hash_md5_to_int
 from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
@@ -214,7 +215,8 @@ class OtelFactory:
     def make_ai_tracer(
         cls,
         *,
-        user_id: str | None,
+        custom_fallback_distinct_id: str | None,
+        custom_run_identity_policy: RunIdentityPolicy,
         custom_posthog_client: "Posthog | None",
         custom_redaction_config: TelemetryRedactionConfig,
         pipelex_posthog_client: "Posthog | None",
@@ -235,7 +237,13 @@ class OtelFactory:
         4. Langfuse Exporter: Sends OTLP traces to Langfuse for LLM observability
 
         Args:
-            user_id: Optional User ID for event attribution (custom telemetry)
+            custom_fallback_distinct_id: The operator's configured ``user_id``, used
+                on their stream for a span that names no run (a run's own user is
+                read from the span itself — see
+                :mod:`pipelex.system.telemetry.telemetry_identity`)
+            custom_run_identity_policy: What the operator's stream may do with a
+                span's own user, which is what their ``posthog.mode`` amounts to —
+                ``DIRECT`` under ``identified``, ``NONE`` otherwise
             custom_posthog_client: Optional user's PostHog client for sending events
             custom_redaction_config: Redaction config for custom PostHog exporter
             pipelex_posthog_client: Optional Pipelex internal PostHog client (for gateway)
@@ -276,7 +284,8 @@ class OtelFactory:
         if custom_posthog_client:
             custom_posthog_exporter = PostHogSpanExporter(
                 posthog_client=custom_posthog_client,
-                distinct_id=user_id,
+                fallback_distinct_id=custom_fallback_distinct_id,
+                run_identity_policy=custom_run_identity_policy,
                 redaction_config=custom_redaction_config,
             )
             provider.add_span_processor(OTelBatchSpanProcessor(custom_posthog_exporter))
@@ -284,9 +293,13 @@ class OtelFactory:
 
         # Add Pipelex PostHog Exporter if client is provided (mandatory for gateway)
         if pipelex_posthog_client:
+            # The Pipelex stream is one shared project for every deployment, so a
+            # span's own user reaches it only as a digest taken inside the
+            # gateway-key hash, and the run's groups do not reach it at all.
             pipelex_posthog_exporter = PostHogSpanExporter(
                 posthog_client=pipelex_posthog_client,
-                distinct_id=pipelex_distinct_id,
+                fallback_distinct_id=pipelex_distinct_id,
+                run_identity_policy=RunIdentityPolicy.NAMESPACED,
                 redaction_config=pipelex_gateway_redaction_config,
             )
             provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))

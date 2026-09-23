@@ -176,11 +176,11 @@ async def pipeline_run_setup(
     # Validate the groups HERE, before this function causes anything observable.
     #
     # `RunMetadata` validates them too, and `prepare_pipe_job` validates them at
-    # its own top — but BOTH run below `add_new_pipeline`, the open tracer and
-    # `handle_trace_start`, which emits a telemetry event that cannot be unsent.
-    # So a malformed mapping used to abort a run that had already registered
-    # itself and announced its own trace to the backend. The teardown below
-    # releases the local state; the emitted event it cannot take back.
+    # its own top — but BOTH run below `add_new_pipeline` and the open tracer, so
+    # a malformed mapping used to abort a run that had already registered itself
+    # and opened a library and a tracer. The teardown below releases that state.
+    # What it could not take back was the trace-start event, which this seam
+    # emitted from up there too until the emission moved below the job build.
     #
     # This is the same lesson `storage_scope` learned one seam lower, and the
     # same cure: ordering, not absence, was the defect.
@@ -191,8 +191,8 @@ async def pipeline_run_setup(
     # `prepare_pipe_job` gates it too, and that gate stays — but it runs below
     # everything listed above, so until now the OPAQUE mapping was refused
     # earlier than the field that decides where a tenant's bytes land. A scope
-    # carrying `..` registered a pipeline, opened a library and a tracer and
-    # announced its trace before anything looked at it.
+    # carrying `..` registered a pipeline and opened a library and a tracer
+    # before anything looked at it.
     #
     # ADDITIVE, never a move: the value validated here is the caller's raw one,
     # and the sentinel below rebinds it to something else that only the lower
@@ -352,9 +352,6 @@ async def pipeline_run_setup(
                 trace_name_redacted=trace_name_redacted,
                 span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
             )
-            # Emit trace start event immediately to establish trace name in PostHog
-            # This must happen before any pipe spans are created/exported
-            get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
         # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
         pipe_job = await prepare_pipe_job(
@@ -378,11 +375,34 @@ async def pipeline_run_setup(
             inputs_base_dir=inputs_base_dir,
         )
 
+        # Emit the trace start event to establish the trace name in the backend. It
+        # must arrive before any pipe span, which is comfortably satisfied here: the
+        # pipe has not run yet, and no span is created until it does.
+        #
+        # It sits BELOW `prepare_pipe_job` deliberately, although nothing between the
+        # two emits anything. That seam is where the run's `RunMetadata` is built, and
+        # the trace-start has to be attributed to the same person its spans will be —
+        # so the event waits for the one object that says who that is, rather than a
+        # second one assembled here from the same parameters. Waiting also means a
+        # failure inside that seam no longer announces a trace for a run that never
+        # started, which is the event that cannot be unsent.
+        if otel_context is not None:
+            get_telemetry_manager().handle_trace_start(
+                trace_name=otel_context.trace_name,
+                trace_name_redacted=otel_context.trace_name_redacted,
+                trace_id=otel_context.trace_id,
+                run_metadata=pipe_job.job_metadata.run_metadata,
+            )
+
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe.pipe_type,
         }
-        get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
+        get_telemetry_manager().track_event(
+            event_name=EventName.PIPELINE_EXECUTE,
+            properties=properties,
+            run_metadata=pipe_job.job_metadata.run_metadata,
+        )
 
         success = True
         return pipe_job, pipeline_run_id, library_id
