@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Pipelex's own telemetry stream receives the run's `user_id` as it is**: the Gateway stream sent a one-way digest of the caller taken inside the Gateway-key hash, and carried a `deployment` group instead of the run's own `analytics_groups`. It now resolves identity like the operator's identified stream — the run's `user_id` is the PostHog `distinct_id` and its `analytics_groups` ride the groups facet — so a host's events and the runtime's land on the same person and the same organization. The `NAMESPACED` identity policy and the `deployment` group type are removed. Anything that names no caller still reports under the Gateway-key hash.
+
 ## [v0.63.0] - 2026-09-23
 
 ### Added
