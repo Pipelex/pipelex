@@ -1,0 +1,87 @@
+pipelex/pipeline/execution_seams.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 48,168,210-217,291-300
+pipelex/system/job_metadata.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 7,55,57,99-111,127-148
+  s_177b6af8a168a6::t_c7bf1538aa1214 149
+pipelex/system/analytics_groups.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 1-126
+pipelex/kit/configs/inference/deck/1_llm_deck.toml
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 25-29,31,38-44,47,50-59,65-70,76,78,81-83,88-90,94,100,107-110
+tests/unit/pipelex/system/test_analytics_groups.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 1-155
+wip/run-artifacts-beside-graphspec/design.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 2
+docs/under-the-hood/pipelex-kernel.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 130
+docs/get-started/configure-ai-providers.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 174
+wip/azure-only-deck/design.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 2,81-82,96
+wip/run-artifacts-beside-graphspec/plan.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 2,61-62,87-89
+.pipelex/inference/deck/1_llm_deck.toml
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 25-29,31,38-44,47,50-59,65-70,76,78,81-83,88-90,94,100,107-110
+pyproject.toml
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 3
+.pipelex/inference/deck/.kit_manifest.json
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 3
+pipelex/runtime_bridge/payloads.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 18-21,55-73
+  s_177b6af8a168a6::t_39d1e3983d864e 74
+docs/building-methods/configure-ai-llm-to-optimize-methods.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 30-32,58,72
+tests/integration/pipelex/pipeline/test_pipeline_run_setup_storage_scope_gate.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 1-109
+tests/unit/pipelex/kernel/test_llm_ops_model_resolution.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 13
+pipelex/pipeline/runner.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 122-125,137,238
+docs/setup/telemetry.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 105-126
+.drift/acks/pipelex-kernel-docs.toml
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 2-5,23
+  s_177b6af8a168a6::t_825b678a82a999 28
+pipelex/pipeline/pipeline_run_setup.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 28,33,61,128-135,176-202,229-235,369
+tests/integration/pipelex/pipeline/test_pipeline_run_setup_analytics_groups.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 1-117
+tests/unit/pipelex/kernel/test_pipelex_kernel_analytics_groups.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 1-51
+docs/configuration/config-technical/inference-backend-config.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 472,475-478,494-495,500,508
+wip/azure-only-deck/deferred.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 20,22,30,36,46,52,58
+wip/azure-only-deck/plan.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 2
+.test_durations
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 6452-6461
+pipelex/kit/configs/inference/deck/.kit_manifest.json
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 3
+CHANGELOG.md
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 22-27,30-34,39
+  s_177b6af8a168a6::t_66b4220e98fca3 5-12
+pipelex/kernel/pipelex_kernel.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 89,112-118,133
+tests/unit/pipelex/runtime_bridge/test_input_analytics_groups.py
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 1-73
+.badges/tests.json
+  s_177b6af8a168a6::t_ca7b9bf6af50dd 4
+uv.lock
+  s_177b6af8a168a6::t_265daf5dfaa1c6 3306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9d25f20d6ea8fc1e254d3b4288b33d70cb0e3e8b",
+  "prompts": {},
+  "sessions": {
+    "s_177b6af8a168a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d0cb6e4-df5b-45ba-ab3c-25e38f06b2ed",
+        "model": "claude-opus-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
