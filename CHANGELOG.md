@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A caller can be known without a run**: `CallerIdentity` (`pipelex.system.caller_identity`) holds the `user_id` and `analytics_groups` a host would state on a run, and `scoped_caller_identity` makes one the ambient caller for a block. An event emitted with no `RunMetadata` in hand reads the caller in scope before it falls back to the configured `user_id`, and `PipelexMTHDSProtocol.caller_identity` exposes the caller a protocol was built for.
+
+### Changed
+
+- **`BundleValidatorProtocol.validate_bundles` requires `caller_identity` (Breaking)**: a validator is handed who asked for the validation, `None` meaning nobody, so a hosted `/validate` attributes its telemetry to its caller. Every validator implementation must accept the argument, and a host must pass it — `caller_identity=self.caller_identity` from a `PipelexMTHDSProtocol` runner. `validate_bundles_in_process`, `validate_bundle`, `dry_run_pipe_in_process` and the `BundleValidator` sweep methods gain an optional `caller_identity` of their own.
+
+### Fixed
+
+- **A validation is attributed to the caller who asked for it**: the sweep's `pipe_dry_run` event carried no run, so on a hosted plane it went out under the deployment's configured `user_id` whoever validated. It is now emitted with the caller in scope, and the sweep's dry runs and the graph arm's dry run state that caller in their job metadata instead of `dry-run-no-user`. A local validation names nobody and reports under the configured id as before.
+- **A crash inside a run is attributed to that run's caller**: the exception autocapture resolved one runless identity when it was built, so every `$exception` on a hosted plane landed on the configured constant. Every pipe now runs with its run's caller in scope, an exception leaving a pipe carries that caller — read back through the `__cause__` and `__context__` chain, so a host's own error raised `from` it still resolves — and the capture resolves each error's identity when it arrives. An error raised outside every run still reports under the fallback, and `mode = "anonymous"` still identifies nobody.
+
 ## [v0.63.0] - 2026-09-23
 
 ### Added

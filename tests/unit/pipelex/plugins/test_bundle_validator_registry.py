@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from pipelex.base_exceptions import ErrorReport
     from pipelex.pipeline.validation_report import PipelexValidationReport
+    from pipelex.system.caller_identity import CallerIdentity
     from pipelex.system.configuration.configs import PipelexConfig
 
 
@@ -37,6 +38,7 @@ class _FakeBundleValidator:
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
+        caller_identity: CallerIdentity | None,
     ) -> PipelexValidationReport | ErrorReport:
         raise NotImplementedError
 

@@ -10,6 +10,7 @@ from typing_extensions import Unpack, override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
@@ -20,7 +21,7 @@ from pipelex.system.telemetry.exception_capture import DualClientExceptionCaptur
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
-from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, StreamIdentityRule, TelemetryIdentity
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
@@ -129,29 +130,27 @@ class TelemetryManager(TelemetryManagerAbstract):
             self._exception_capture = self._make_exception_capture()
 
     def _make_exception_capture(self) -> DualClientExceptionCapture:
-        """Build the exception autocapture, with each stream's runless identity resolved.
+        """Build the exception autocapture, with each stream's identity rule.
 
-        An unhandled exception belongs to no run that the interpreter hooks can
-        see — they are handed `(type, value, traceback)` and there is no
-        ContextVar layer to read a run out of — so what each stream sends is the
-        identity it uses for a capture that names nobody, resolved through the
-        same `TelemetryIdentity` as every other path. That is what carries
+        An unhandled exception is attributed when it arrives, not here: the
+        capture reads back the caller of the pipe run the error escaped from, and
+        falls back to the stream's own id only for an error that belongs to no
+        caller. What is fixed here is each stream's rule, taken from the same
+        settings as every other capture on that stream — which is what carries
         `anonymous` mode onto this path: a stream that identifies nobody must not
         identify somebody when the process crashes.
 
-        Stated as its own method so the resolution can be exercised without the
+        Stated as its own method so the wiring can be exercised without the
         constructor, which builds live clients and registers a singleton.
         """
         return DualClientExceptionCapture(
             custom_posthog_client=self.custom_posthog_client,
-            custom_identity=TelemetryIdentity.make_from_run_metadata(
-                run_metadata=None,
+            custom_identity_rule=StreamIdentityRule(
                 fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
                 run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=self.telemetry_config.custom_posthog.mode),
             ),
             pipelex_posthog_client=self.pipelex_posthog_client,
-            pipelex_identity=TelemetryIdentity.make_from_run_metadata(
-                run_metadata=None,
+            pipelex_identity_rule=StreamIdentityRule(
                 fallback_distinct_id=self._pipelex_distinct_id,
                 run_identity_policy=RunIdentityPolicy.NAMESPACED,
             ),
@@ -437,6 +436,8 @@ class TelemetryManager(TelemetryManagerAbstract):
         else:
             tracked_properties = {}
 
+        caller_identity = self.resolve_event_caller_identity(run_metadata=run_metadata)
+
         # Track to custom PostHog based on user's posthog.mode
         match self.telemetry_config.custom_posthog.mode:
             case PostHogMode.ANONYMOUS:
@@ -451,8 +452,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                     self._capture_custom_event(
                         event_name,
                         properties=tracked_properties,
-                        identity=TelemetryIdentity.make_from_run_metadata(
-                            run_metadata=run_metadata,
+                        identity=TelemetryIdentity.make_from_caller_identity(
+                            caller_identity=caller_identity,
                             fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
                             run_identity_policy=RunIdentityPolicy.DIRECT,
                         ),
@@ -462,7 +463,22 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         # Always track to Pipelex PostHog if enabled (independent of posthog.mode)
         if self._pipelex_telemetry_enabled:
-            self._track_to_pipelex(event_name, properties=tracked_properties, run_metadata=run_metadata)
+            self._track_to_pipelex(event_name, properties=tracked_properties, caller_identity=caller_identity)
+
+    @classmethod
+    def resolve_event_caller_identity(cls, *, run_metadata: "RunMetadata | None") -> CallerIdentity | None:
+        """The caller an event is attributed to: its run's, else the one in scope, else nobody.
+
+        The run an emitter hands over is the most specific fact there is, so it
+        wins. An emitter with no run in hand — the validation sweep, which is not
+        a run — is still working for somebody when a host or a pipe run opened a
+        caller scope around it, and reads that caller rather than falling back to
+        the stream's constant. Only an event emitted outside every scope, such as
+        a CLI command, belongs to nobody.
+        """
+        if run_metadata is not None:
+            return CallerIdentity.make_from_run_metadata(run_metadata=run_metadata)
+        return get_current_caller_identity()
 
     def _capture_custom_event(self, event_name: str, *, properties: dict[str, Any], identity: TelemetryIdentity):
         """Capture one event on the operator's stream, under the identity resolved for it.
@@ -490,7 +506,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             self.custom_posthog_client.capture(event_name, properties=capture_properties)
             log.verbose(f"Tracked anonymous event '{event_name}' with properties: {capture_properties}")
 
-    def _track_to_pipelex(self, event_name: str, *, properties: dict[str, Any], run_metadata: "RunMetadata | None" = None):
+    def _track_to_pipelex(self, event_name: str, *, properties: dict[str, Any], caller_identity: CallerIdentity | None = None):
         """Track event to Pipelex's PostHog (always identified, always namespaced).
 
         The stream has no mode to turn identification off, but it is a shared
@@ -501,8 +517,8 @@ class TelemetryManager(TelemetryManagerAbstract):
         if not self.pipelex_posthog_client or not self._pipelex_distinct_id:
             log.error("Could not track event to Pipelex telemetry because pipelex_posthog_client or _pipelex_distinct_id is not set")
             return
-        identity = TelemetryIdentity.make_from_run_metadata(
-            run_metadata=run_metadata,
+        identity = TelemetryIdentity.make_from_caller_identity(
+            caller_identity=caller_identity,
             fallback_distinct_id=self._pipelex_distinct_id,
             run_identity_policy=RunIdentityPolicy.NAMESPACED,
         )
@@ -630,8 +646,10 @@ class TelemetryManager(TelemetryManagerAbstract):
             run_metadata: The run this trace belongs to. Carries the identity the
                 event is attributed to, resolved exactly as every pipe span under
                 the same trace will be, so the trace's first event and its spans
-                land on the same person. None leaves the stream's fallback.
+                land on the same person. None reads the caller in scope, and
+                only with none in scope leaves the stream's fallback.
         """
+        caller_identity = self.resolve_event_caller_identity(run_metadata=run_metadata)
         log.verbose(
             f"[Telemetry] Emitting trace start event:\n"
             f"  trace_name='{trace_name}'\n"
@@ -648,8 +666,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 PostHogAttr.SPAN_NAME: custom_trace_name,
                 PostHogAttr.TRACE_NAME: custom_trace_name,
             }
-            custom_identity = TelemetryIdentity.make_from_run_metadata(
-                run_metadata=run_metadata,
+            custom_identity = TelemetryIdentity.make_from_caller_identity(
+                caller_identity=caller_identity,
                 fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
                 run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=self.telemetry_config.custom_posthog.mode),
             )
@@ -674,8 +692,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 PostHogAttr.SPAN_NAME: trace_name_redacted,
                 PostHogAttr.TRACE_NAME: trace_name_redacted,
             }
-            pipelex_identity = TelemetryIdentity.make_from_run_metadata(
-                run_metadata=run_metadata,
+            pipelex_identity = TelemetryIdentity.make_from_caller_identity(
+                caller_identity=caller_identity,
                 fallback_distinct_id=self._pipelex_distinct_id,
                 run_identity_policy=RunIdentityPolicy.NAMESPACED,
             )

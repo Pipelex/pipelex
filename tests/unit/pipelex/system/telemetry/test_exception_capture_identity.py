@@ -1,12 +1,14 @@
 """Unit tests for the identity an unhandled exception is captured under.
 
 An `$exception` is the one capture no run can hand its metadata to: the two
-interpreter hooks receive `(type, value, traceback)` and nothing else, and there
-is no ContextVar layer for them to read a run out of. So what each stream sends
-is its runless identity, resolved once when the capture is built — and these
-tests are about that resolution reaching this path, because for a while it did
-not: the operator's configured `user_id` went out on every crash, `anonymous`
-mode included.
+interpreter hooks receive `(type, value, traceback)` and nothing else. So the
+caller is read back from the error — the caller of the pipe run it escaped,
+stamped on it as it left the run's scope — or from the caller still in scope,
+and only an error that belongs to no caller goes out under the stream's
+fallback. These tests are about that resolution reaching this path, because for
+a while it did not: the operator's configured `user_id` went out on every crash,
+`anonymous` mode included, and later the constant went out even for a crash
+inside a known caller's run.
 
 The manager is built WITHOUT its constructor, as in the tracker tests beside
 these, because `TelemetryManager.__init__` creates live PostHog clients, writes
@@ -24,11 +26,13 @@ import pytest
 from posthog import Posthog
 from pytest_mock import MockerFixture
 
+from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity, stamp_caller_identity
 from pipelex.system.telemetry.exception_capture import DualClientExceptionCapture
 from pipelex.system.telemetry.otel_constants import PostHogAttr
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, TelemetryConfig
 from pipelex.system.telemetry.telemetry_identity import PIPELEX_DEPLOYMENT_GROUP_TYPE
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
+from pipelex.tools.misc.hash_utils import hash_sha256
 
 
 @pytest.fixture
@@ -65,6 +69,23 @@ def _make_capture(
 
 def _crash(*, capture: DualClientExceptionCapture) -> None:
     capture._capture_exception((ValueError, ValueError("boom"), None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+
+
+_CALLER = CallerIdentity(user_id="caller-7", analytics_groups={"organization": "org_caller"})
+
+
+def _crash_with(*, capture: DualClientExceptionCapture, error: BaseException) -> None:
+    capture._capture_exception((type(error), error, None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+
+
+def _escaped_from_a_run() -> ValueError:
+    """An error as it reaches the interpreter hook after leaving a pipe run's caller scope."""
+    msg = "boom inside the run"
+    try:
+        with scoped_caller_identity(caller_identity=_CALLER):
+            raise ValueError(msg)
+    except ValueError as exc:
+        return exc
 
 
 @pytest.mark.usefixtures("restore_excepthooks")
@@ -150,3 +171,72 @@ class TestExceptionCaptureIdentity:
         custom_client.capture_exception.side_effect = RuntimeError("posthog is down")
 
         _crash(capture=capture)
+
+    def test_a_crash_inside_a_run_is_attributed_to_the_runs_caller(self, mocker: MockerFixture) -> None:
+        """The hosted plane's constant must not stand in for a caller the run knew."""
+        capture, custom_client, _ = _make_capture(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-worker")
+
+        _crash_with(capture=capture, error=_escaped_from_a_run())
+
+        capture_kwargs = custom_client.capture_exception.call_args.kwargs
+        assert capture_kwargs["distinct_id"] == "caller-7"
+        assert capture_kwargs["groups"] == {"organization": "org_caller"}
+
+    def test_a_host_error_raised_from_the_runs_error_keeps_the_caller(self, mocker: MockerFixture) -> None:
+        """A host wraps the run's failure in its own error, and that outer error is what reaches the hook."""
+        capture, custom_client, _ = _make_capture(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-worker")
+        host_error = RuntimeError("the pipeline failed")
+        host_error.__cause__ = _escaped_from_a_run()
+
+        _crash_with(capture=capture, error=host_error)
+
+        assert custom_client.capture_exception.call_args.kwargs["distinct_id"] == "caller-7"
+
+    def test_an_error_raised_while_a_caller_is_in_scope_is_attributed_to_it(self, mocker: MockerFixture) -> None:
+        """A thread that inherited a caller's context crashes with the scope still open."""
+        capture, custom_client, _ = _make_capture(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-worker")
+
+        with scoped_caller_identity(caller_identity=_CALLER):
+            _crash_with(capture=capture, error=ValueError("boom"))
+
+        assert custom_client.capture_exception.call_args.kwargs["distinct_id"] == "caller-7"
+
+    def test_the_stamp_wins_over_the_caller_in_scope(self, mocker: MockerFixture) -> None:
+        capture, custom_client, _ = _make_capture(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-worker")
+        error = ValueError("boom")
+        stamp_caller_identity(exception=error, caller_identity=_CALLER)
+
+        with scoped_caller_identity(caller_identity=CallerIdentity(user_id="someone-else")):
+            _crash_with(capture=capture, error=error)
+
+        assert custom_client.capture_exception.call_args.kwargs["distinct_id"] == "caller-7"
+
+    def test_an_error_that_belongs_to_no_caller_reports_under_the_fallback(self, mocker: MockerFixture) -> None:
+        capture, custom_client, _ = _make_capture(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-worker")
+
+        _crash_with(capture=capture, error=ValueError("boom outside any run"))
+
+        capture_kwargs = custom_client.capture_exception.call_args.kwargs
+        assert capture_kwargs["distinct_id"] == "pipelex-worker"
+        assert capture_kwargs["groups"] is None
+
+    def test_an_anonymous_stream_identifies_nobody_even_for_a_known_caller(self, mocker: MockerFixture) -> None:
+        capture, custom_client, _ = _make_capture(mocker=mocker, mode=PostHogMode.ANONYMOUS, configured_user_id="configured-id")
+
+        _crash_with(capture=capture, error=_escaped_from_a_run())
+
+        capture_kwargs = custom_client.capture_exception.call_args.kwargs
+        assert "distinct_id" not in capture_kwargs
+        assert capture_kwargs["properties"][PostHogAttr.PROCESS_PERSON_PROFILE] is False
+
+    def test_the_pipelex_stream_resolves_the_caller_under_its_own_policy(self, mocker: MockerFixture) -> None:
+        capture, _, pipelex_client = _make_capture(
+            mocker=mocker,
+            mode=PostHogMode.IDENTIFIED,
+            configured_user_id="pipelex-worker",
+            pipelex_distinct_id="gateway-hash",
+        )
+
+        _crash_with(capture=capture, error=_escaped_from_a_run())
+
+        assert pipelex_client.capture_exception.call_args.kwargs["distinct_id"] == hash_sha256(data="gateway-hash:caller-7", length=16)

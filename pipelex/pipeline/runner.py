@@ -32,6 +32,7 @@ from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexR
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
+from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -141,6 +142,17 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # D3). Set by a CLI to the inputs file's parent; None for API/SDK callers (absolute urls).
         self.inputs_base_dir = inputs_base_dir
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
+
+    @property
+    def caller_identity(self) -> CallerIdentity:
+        """The caller this protocol works for: the user and the groups every run it starts states.
+
+        What a validation is attributed to, since a validation is not a run and has no
+        `RunMetadata` of its own to carry them. A local runtime states `LOCAL_USER_ID`,
+        which telemetry never attributes to a person, so a local validation still reports
+        under the stream's fallback.
+        """
+        return CallerIdentity.make_from_host(user_id=self.user_id, analytics_groups=self.analytics_groups)
 
     @override
     async def execute(
@@ -442,6 +454,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             allow_signatures=allow_signatures,
             graph_pipe_code=graph_pipe_code,
             log_context="Protocol validate",
+            caller_identity=self.caller_identity,
         )
 
     @override

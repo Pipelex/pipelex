@@ -121,6 +121,16 @@ Anything that names no caller of its own keeps reporting under the `user_id` you
 
 The groups do not depend on that. A run that leaves `user_id` at its default still carries its `analytics_groups` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
 
+### Work that is not a run, and crashes
+
+A run is not the only thing a host does on a caller's behalf. Validating a bundle dry-runs its pipes without being a run, and an unhandled exception reaches PostHog through the interpreter's exception hook, which is handed nothing but the error. Both are still attributed to the caller when one is known, so your configured `user_id` stands only for work that truly belongs to nobody:
+
+- **Validation.** The validate entry points take a `caller_identity` — the `user_id` and `analytics_groups` you would state on a run, as a `CallerIdentity`. `PipelexMTHDSProtocol.validate` passes the caller the protocol was built for, `validate_bundles_in_process`, `validate_bundle` and `BundleValidator` accept one directly, and the `BundleValidatorProtocol` seam requires one (`None` meaning "nobody"). The `pipe_dry_run` event and every dry run the validation performs are then attributed to that caller. A CLI validation on your own machine names nobody and keeps reporting under your configured id.
+- **Crashes inside a run.** Every pipe runs with its run's caller in scope, and an exception that escapes the pipe carries that caller with it — through any error a host raises `from` it — so an `$exception` captured once the error reaches the interpreter lands on the person whose run failed, with their groups. An exception raised outside every run reports under your configured id.
+- **Anything else with no run in hand.** An event emitted without a run but while a caller is in scope reads that caller. A host can open such a scope around its own work with `scoped_caller_identity(caller_identity=...)` from `pipelex.system.caller_identity`.
+
+The same rules apply to all of these as to a run: a placeholder such as `local` names nobody, `mode = "anonymous"` identifies nobody, and the caller never becomes an event property.
+
 !!! note "Anonymous mode covers your users too"
     With `mode = "anonymous"`, the runtime identifies nobody on your stream: no run's `user_id` is applied, no groups are sent, and the `user_id` you configured is not sent either — a mode that identifies nobody would not be one that still named you. Leaving a `user_id` in `telemetry.toml` while switching to `anonymous` therefore changes nothing. Per-run attribution needs `mode = "identified"`.
 

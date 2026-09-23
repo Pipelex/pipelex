@@ -28,7 +28,11 @@ are three — the enum below says which stream carries which, and why:
    produced it.
 
 **A run that names nobody** reports under the stream's configured fallback, and
-so does an event that belongs to no run at all — a CLI command, a dry-run sweep.
+so does an event that belongs to no caller at all — a CLI command, a local
+dry-run sweep. An event emitted outside a run but on a known caller's behalf —
+a hosted validation sweep, an exception raised while a pipe ran — is not such an
+event: it resolves from the ambient :class:`~pipelex.system.caller_identity.CallerIdentity`
+the host or the pipe run put in scope, exactly as a run's own event would.
 `RunMetadata.user_id` is required, but some of its values name a caller without
 distinguishing one; see `_NON_DISTINGUISHING_RUN_USER_IDS` below. This is why a
 local run keeps reporting exactly as it did before per-run attribution existed.
@@ -48,6 +52,7 @@ from typing import TYPE_CHECKING, Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID, SINGLE_TENANT_USER_ID
 from pipelex.system.telemetry.otel_constants import LangfuseSpanAttr, PipelexSpanAttr
 from pipelex.system.telemetry.telemetry_config import PostHogMode
@@ -288,6 +293,33 @@ class TelemetryIdentity(BaseModel):
         )
 
     @classmethod
+    def make_from_caller_identity(
+        cls,
+        *,
+        caller_identity: CallerIdentity | None,
+        fallback_distinct_id: str | None,
+        run_identity_policy: RunIdentityPolicy,
+    ) -> "TelemetryIdentity":
+        """Resolve the attribution of a capture, from the caller it was made for.
+
+        The same resolution as `make_from_run_metadata`, for a capture whose
+        caller is known without a run in hand: a validation sweep, or an
+        exception raised while a pipe ran.
+
+        Args:
+            caller_identity: The caller, or None when the capture belongs to no
+                caller at all, which resolves to the stream's fallback.
+            fallback_distinct_id: The identity this stream falls back to.
+            run_identity_policy: What this stream may do with the caller's identity.
+        """
+        return cls._resolve(
+            run_user_id=caller_identity.user_id if caller_identity is not None else None,
+            run_groups=caller_identity.analytics_groups if caller_identity is not None else None,
+            fallback_distinct_id=fallback_distinct_id,
+            run_identity_policy=run_identity_policy,
+        )
+
+    @classmethod
     def make_from_span_attributes(
         cls,
         *,
@@ -340,3 +372,26 @@ class TelemetryIdentity(BaseModel):
             else:
                 log.debug(f"Ignoring a non-string entry in span attribute '{PipelexSpanAttr.RUN_ANALYTICS_GROUPS}'")
         return groups
+
+
+class StreamIdentityRule(BaseModel):
+    """How one stream attributes a capture: the id it falls back to, and what it may do with a caller.
+
+    The two settings every resolution takes, held together for the one path
+    that cannot resolve when it is built: the exception autocapture learns the
+    caller only when an error arrives, so it keeps each stream's rule and
+    resolves per capture instead of holding an identity decided up front.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    fallback_distinct_id: str | None = None
+    run_identity_policy: RunIdentityPolicy
+
+    def resolve(self, *, caller_identity: CallerIdentity | None) -> TelemetryIdentity:
+        """The identity a capture made for `caller_identity` goes out under on this stream."""
+        return TelemetryIdentity.make_from_caller_identity(
+            caller_identity=caller_identity,
+            fallback_distinct_id=self.fallback_distinct_id,
+            run_identity_policy=self.run_identity_policy,
+        )

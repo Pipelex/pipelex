@@ -22,6 +22,7 @@ which is what every span produced before this release does.
 
 import pytest
 
+from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID, SINGLE_TENANT_USER_ID
 from pipelex.system.telemetry.otel_constants import LangfuseSpanAttr, PipelexSpanAttr
@@ -29,6 +30,7 @@ from pipelex.system.telemetry.telemetry_config import PostHogMode
 from pipelex.system.telemetry.telemetry_identity import (
     PIPELEX_DEPLOYMENT_GROUP_TYPE,
     RunIdentityPolicy,
+    StreamIdentityRule,
     TelemetryIdentity,
     make_run_identity_span_attributes,
 )
@@ -477,3 +479,45 @@ class TestTelemetryIdentity:
         )
 
         assert identity.distinct_id == "configured-id"
+
+
+class TestResolutionFromACaller:
+    """A caller known without a run resolves exactly as a run naming the same caller would."""
+
+    @pytest.mark.parametrize("policy", list(RunIdentityPolicy))
+    @pytest.mark.parametrize("user_id", ["user-42", LOCAL_USER_ID, DRY_RUN_USER_ID])
+    def test_a_caller_resolves_like_the_run_it_would_state(self, policy: RunIdentityPolicy, user_id: str) -> None:
+        groups = {"organization": "org_acme"}
+
+        from_caller = TelemetryIdentity.make_from_caller_identity(
+            caller_identity=CallerIdentity(user_id=user_id, analytics_groups=groups),
+            fallback_distinct_id="fallback-id",
+            run_identity_policy=policy,
+        )
+        from_run = TelemetryIdentity.make_from_run_metadata(
+            run_metadata=_run_metadata(user_id=user_id, analytics_groups=groups),
+            fallback_distinct_id="fallback-id",
+            run_identity_policy=policy,
+        )
+
+        assert from_caller == from_run
+
+    def test_no_caller_resolves_to_the_fallback(self) -> None:
+        identity = TelemetryIdentity.make_from_caller_identity(
+            caller_identity=None,
+            fallback_distinct_id="fallback-id",
+            run_identity_policy=RunIdentityPolicy.DIRECT,
+        )
+
+        assert identity == TelemetryIdentity(distinct_id="fallback-id", groups={})
+
+    def test_a_stream_rule_resolves_per_caller(self) -> None:
+        rule = StreamIdentityRule(fallback_distinct_id="fallback-id", run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        assert rule.resolve(caller_identity=CallerIdentity(user_id="user-42")).distinct_id == "user-42"
+        assert rule.resolve(caller_identity=None).distinct_id == "fallback-id"
+
+    def test_an_anonymous_stream_rule_identifies_nobody(self) -> None:
+        rule = StreamIdentityRule(fallback_distinct_id="fallback-id", run_identity_policy=RunIdentityPolicy.NONE)
+
+        assert rule.resolve(caller_identity=CallerIdentity(user_id="user-42")).is_anonymous
