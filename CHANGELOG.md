@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.63.0] - 2026-09-23
+
+### Added
+
+- **A run carries opaque analytics groups**: `RunMetadata` and the runtime-bridge payload gain `analytics_groups`, a host-supplied mapping of group type to group key (`{"organization": "org_acme"}` on a multi-tenant host, nothing on a single-user one), threaded through `pipeline_run_setup`, `prepare_pipe_job` and `PipelexKernel.make` beside `user_id` and `storage_scope`; like `storage_scope`, the runtime never reads a key by name. It is validated where it enters — a lowercase snake_case group type, a group key from `A-Za-z0-9_-`, and a small fixed number of group types per run — so a malformed mapping is a construction error naming the field rather than a failure inside a telemetry capture.
+- **Telemetry is attributed to each run's caller**: spans and events resolve their identity per capture through one `TelemetryIdentity`, so a run's `user_id` becomes the PostHog `distinct_id`, its `analytics_groups` ride PostHog's groups facet, and both are written onto the span as `pipelex.run.user_id` and `pipelex.run.analytics_groups` for every OpenTelemetry exporter, Langfuse's `langfuse.user.id` included. Everything that names no caller of its own — an event outside any run, or a run whose `user_id` is a shared placeholder (`local`, `dry-run-no-user`, `single-tenant`) — falls back to the configured `user_id` and the Gateway-key hash, `mode = "anonymous"` identifies nobody, and neither value ever becomes an event property or a span name. Pipelex's own Gateway stream receives neither the caller nor the groups, only a one-way digest of the caller taken inside the Gateway-key hash, so a host serving many callers from one process sees each caller on their own timeline without that identity leaving its own project.
+
+### Changed
+
+- **`RunMetadata` is frozen (Breaking)**: a field can no longer be reassigned once the run exists, and an attempt raises a pydantic `ValidationError` at runtime rather than merely failing a type check. Telemetry reads a run's identity off it while the run is in flight, so construct a new `RunMetadata` wherever one used to be mutated.
+
+### Fixed
+
+- **A crash no longer sends a `PipelexError`'s message as written**: the exception autocapture sent the message verbatim — which may repeat a file path or a slice of the document that would not parse — even on the shipped default, because redaction applied only to an error handed over bare. Every `PipelexError` PostHog would reach, across the whole `__cause__` and `__context__` chain and every member of an exception group, is now replaced by a same-class stand-in carrying the privacy notice, the class name and the traceback, on a copy so the exception the interpreter prints is untouched. An error of another class that copied a `PipelexError`'s text into its own message still sends that text.
+- **Both telemetry streams record a crash**: PostHog's once-per-error stamp made the second stream — always Pipelex's own — drop every unhandled exception on a machine that also reports to an operator's project. The stamp is cleared between the streams now, and an error the host had already captured itself is still not recorded twice.
+- **An unhandled exception is captured under the same identity as everything else on its stream**: the autocapture sent the configured `user_id` and the Gateway-key hash raw, so `mode = "anonymous"` still named you on every crash and a run's `$exception` landed on a different PostHog person from its spans. Both streams now use the identity they resolve for any capture that belongs to no run.
+- **An anonymous capture no longer marks the Gateway capture of the same event**: both streams shared one properties dictionary, so the anonymous branch's `$process_person_profile = false` reached the Gateway capture sent with a `distinct_id`. Each capture now takes its own copy.
+- **A malformed `storage_scope` is refused before the run registers itself**: it was validated only in `prepare_pipe_job`, after the trace-start emission, so a scope carrying `..` announced a trace that cannot be unsent. `pipeline_run_setup` now gates the caller's scope at its top and again after the local sentinel rebinds it, and `prepare_pipe_job` keeps its gate for callers reaching that seam directly.
+
 ## [v0.62.0] - 2026-09-21
 
 ### Added
