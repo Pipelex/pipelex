@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from mthds.runners.api.client import MthdsAPIClient
 from mthds.runners.api.models import MAIN_STUFF_NAME
 
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
+from pipelex.cli.cli_api_client import make_pipelex_cli_api_client
 from pipelex.pipeline.exceptions import PipeExecutionError
 
 
@@ -38,7 +38,7 @@ async def run_pipeline_core_api(
         ClientAuthenticationError: If API credentials are invalid or missing.
         PipelineRequestError: If the pipeline request is malformed.
     """
-    async with MthdsAPIClient() as runner:
+    async with make_pipelex_cli_api_client() as runner:
         response = await runner.execute(
             pipe_code=pipe_code,
             mthds_contents=mthds_contents,

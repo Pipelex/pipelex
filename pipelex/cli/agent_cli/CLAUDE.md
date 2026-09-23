@@ -47,7 +47,7 @@ commands/
     bundle_cmd.py              # run bundle — execute from bundle file/directory
     method_cmd.py              # run method — execute method (installed name, address/URL, or path)
     _run_core.py               # Shared async run logic (local runner)
-    _run_core_api.py           # Shared async run logic (API runner)
+    _run_core_api.py           # Shared async run logic (API runner; client from pipelex/cli/cli_api_client.py, User-Agent `pipelex-cli/<v> mthds-python/<v> …`)
     _output_helpers.py         # Output formatting helpers
     stdin_resolver.py          # Stdin input resolution
   validate/                    # validate — verify pipes/bundles/methods
