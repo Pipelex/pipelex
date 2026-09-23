@@ -3,10 +3,12 @@
 The scope decides where a tenant's bytes land, so a traversal in it is the
 highest-stakes value this function takes. It was validated only inside
 `prepare_pipe_job`, which runs below the pipeline registration, the library
-acquire, the tracer open and `handle_trace_start` — so a scope carrying `..`
-registered a run and emitted a trace event that cannot be unsent before
-anything looked at it. These pin the two gates that close that window, and both
-fail if either gate is removed.
+acquire and the tracer open — so a scope carrying `..` registered a run before
+anything looked at it. It ran below `handle_trace_start` as well, and emitted a
+trace event that cannot be unsent; the trace-start has since moved beneath
+`prepare_pipe_job`, so that half of the window is now closed by the ordering
+itself. These pin the two gates that close the rest of it, and both fail if
+either gate is removed.
 
 The lower gate in `prepare_pipe_job` is NOT replaced by these and must stay: the
 sentinel path rebinds the scope to the caller's `pipeline_run_id`, and only the
@@ -71,7 +73,9 @@ class TestPipelineRunSetupStorageScopeGate:
 
         The first gate sees only `LOCAL_STORAGE_SCOPE`, which is a valid scope, so
         this is the first look at what the scope actually became — and it still
-        has to happen before the library, the tracer and the trace-start.
+        has to happen before the library and the tracer. Before the trace-start
+        too, though that now follows `prepare_pipe_job` and so asks nothing of
+        this gate.
         """
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
         telemetry_manager = mocker.spy(pipeline_run_setup_module, "get_telemetry_manager")

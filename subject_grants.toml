@@ -5700,13 +5700,9 @@ rationale = "Predicate on the integration mode; single operand."
 param = "posthog_config"
 rationale = "Factory from source: builds from the posthog config; single operand."
 
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._track_anonymous_event"]
+["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._capture_custom_event"]
 param = "event_name"
-rationale = "Verb-object: tracks the event named; properties stay keyword."
-
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._track_identified_event"]
-param = "event_name"
-rationale = "Verb-object: tracks the event named; properties stay keyword."
+rationale = "Verb-object: captures the event named; properties and identity stay keyword."
 
 ["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._wrap_capture_exception"]
 param = "client"

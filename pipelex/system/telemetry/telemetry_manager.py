@@ -1,5 +1,6 @@
+import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any, Generator, cast
 
 import posthog
 from opentelemetry.trace import Tracer as OTelTracer
@@ -17,10 +18,13 @@ from pipelex.system.telemetry.exception_capture import ExceptionCapture
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
+
+    from pipelex.system.job_metadata import RunMetadata
 
 
 class TelemetryManager(TelemetryManagerAbstract):
@@ -56,7 +60,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             # Create redaction config from user settings
             custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
-                user_id=telemetry_config.custom_posthog.user_id,
+                custom_fallback_distinct_id=telemetry_config.custom_posthog.user_id,
+                custom_run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=telemetry_config.custom_posthog.mode),
                 custom_posthog_client=self.custom_posthog_client,
                 custom_redaction_config=custom_redaction_config,
                 otlp_exporters=telemetry_config.otlp,
@@ -78,10 +83,30 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         # Set up exception autocapture if the client is enabled
         if self.custom_posthog_client:
-            self._exception_capture = ExceptionCapture(
-                posthog_client=self.custom_posthog_client,
-                distinct_id=self.telemetry_config.custom_posthog.user_id,
-            )
+            self._exception_capture = self._make_exception_capture()
+
+    def _make_exception_capture(self) -> ExceptionCapture:
+        """Build the exception autocapture, with the stream's runless identity resolved.
+
+        An unhandled exception belongs to no run that the interpreter hooks can
+        see — they are handed `(type, value, traceback)` and there is no
+        ContextVar layer to read a run out of — so what the stream sends is the
+        identity it uses for a capture that names nobody, resolved through the
+        same `TelemetryIdentity` as every other path. That is what carries
+        `anonymous` mode onto this path: a stream that identifies nobody must not
+        identify somebody when the process crashes.
+
+        Stated as its own method so the resolution can be exercised without the
+        constructor, which builds a live client and registers a singleton.
+        """
+        return ExceptionCapture(
+            posthog_client=self.custom_posthog_client,
+            identity=TelemetryIdentity.make_from_run_metadata(
+                run_metadata=None,
+                fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
+                run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=self.telemetry_config.custom_posthog.mode),
+            ),
+        )
 
     def _handle_transmission_error(  # kw-only: ignore — PostHog on_error callback, invoked positionally as (error, items)
         self, error: Exception | None, _items: list[dict[str, Any]]
@@ -107,31 +132,186 @@ class TelemetryManager(TelemetryManagerAbstract):
             exception: ExceptionArg | None = None,
             **kwargs: Unpack[OptionalCaptureArgs],
         ) -> Any:
-            """Capture exception with message sanitization for PipelexError subclasses."""
-            if exception and isinstance(exception, PipelexError):
-                # Create a new exception with sanitized message while preserving the class type
-                # Use __new__ to create an instance without calling __init__, which may require extra args
-                # This creates a "shell" instance with NO custom attributes
-                exception_type = type(exception)
-                sanitized_exception = exception_type.__new__(exception_type)
+            """Capture exception with message sanitization for PipelexError subclasses.
 
-                # Set the exception args to our privacy notice
-                # This is what str(exception) will return
-                sanitized_exception.args = (self.PRIVACY_NOTICE,)
+            PostHog marks what it sent so a second capture of the same error is
+            dropped, and what it sent may be a redacted copy rather than the
+            error the caller holds. The mark is carried back onto the original,
+            so the guard still works for a caller that captures an error and
+            then lets it escape. Given nothing, PostHog would read the error
+            being handled for itself, so that error is resolved first: both the
+            check and the mark need it, and `None` can carry neither.
 
-                # Preserve the traceback so we still get stack trace information
-                if hasattr(exception, "__traceback__"):
-                    sanitized_exception.__traceback__ = exception.__traceback__
-
-                # Note: No custom attributes (tested_concept, wanted_concept, etc.) are present
-                # because we used __new__() without calling __init__(). The __dict__ is already empty.
-
-                return original_capture_exception(sanitized_exception, **kwargs)
-            else:
-                # For non-PipelexError, capture as-is (or auto-detect current exception)
-                return original_capture_exception(exception, **kwargs)
+            PostHog's own `capture_exception` never raises into its caller, and
+            the redaction in front of it must not either. An argument the SDK
+            would decline, or a chain too deep to copy, drops the capture with a
+            debug line: sending the original in its place is the one fallback
+            that is not open, since it is what the redaction exists to stop.
+            """
+            try:
+                resolved = self._resolved_exception_arg(exception=exception)
+                if resolved is None or ExceptionCapture.is_marked_as_captured(exception=resolved):
+                    return None
+                sanitized = self._sanitized_exception_arg(exception=resolved)
+            except Exception as sanitize_exc:  # ruff: ignore[blind-except]
+                log.debug(f"Dropped an exception capture the privacy redaction could not complete: {sanitize_exc!r}")
+                return None
+            result = original_capture_exception(sanitized, **kwargs)
+            ExceptionCapture.carry_capture_marks(source=sanitized, target=resolved)
+            return result
 
         client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
+
+    @classmethod
+    def _resolved_exception_arg(cls, *, exception: ExceptionArg | None) -> ExceptionArg | None:
+        """Return `exception`, or when it is `None` the error being handled, which is what PostHog would read for itself.
+
+        Resolved here rather than left to the SDK so the error can still be
+        redacted, and so the capture mark lands on the error the caller holds.
+        """
+        if exception is not None:
+            return exception
+        current_type, current_value, current_traceback = sys.exc_info()
+        if current_type is None or current_value is None:
+            return None
+        return (current_type, current_value, current_traceback)
+
+    @classmethod
+    def _sanitized_exception_arg(cls, *, exception: ExceptionArg) -> ExceptionArg:
+        """Return what may go out in place of `exception`, in whichever form PostHog was handed.
+
+        PostHog takes an error either bare or as the `(type, value, traceback)`
+        triple an interpreter excepthook receives. And it does not send one
+        exception: it walks `__cause__`, `__context__` and the members of an
+        exception group, and sends the message of every error it reaches. A
+        `PipelexError` message may repeat whatever the caller passed in — the
+        path it was reading, a slice of the document that would not parse — so
+        the message of every `PipelexError` in that graph is replaced by the
+        privacy notice, wherever it sits, and not only the one at the top.
+
+        The redaction goes by class. An error of another class keeps its own
+        message, so one that copied a `PipelexError`'s text into it —
+        `raise RuntimeError(f"failed: {error}") from error` — still sends that
+        text; only the linked `PipelexError` itself is replaced.
+        """
+        if isinstance(exception, BaseException):
+            return cls._redacted_exception_graph(exception=exception)
+        _, exception_value, exception_traceback = exception
+        if exception_value is None:
+            return exception
+        redacted_value = cls._redacted_exception_graph(exception=exception_value)
+        if redacted_value is exception_value:
+            return exception
+        return (type(redacted_value), redacted_value, exception_traceback)
+
+    @classmethod
+    def _redacted_exception_graph(cls, *, exception: BaseException) -> BaseException:
+        """Return `exception` itself when nothing it reaches is a `PipelexError`, else a redacted copy of all of it.
+
+        The copy is never written back: the live exception is the one the
+        interpreter goes on to print and a host may still be holding, so only a
+        copy of the graph has its links pointed at the stand-ins.
+        """
+        if not cls._reaches_pipelex_error(exception=exception):
+            return exception
+        redacted = cls._redacted_link(exception=exception, copies={})
+        # The root is never cut: only a link back to an exception still being copied is.
+        assert redacted is not None
+        return redacted
+
+    @classmethod
+    def _reaches_pipelex_error(cls, *, exception: BaseException) -> bool:
+        """Whether a `PipelexError` sits anywhere PostHog would walk from `exception`.
+
+        A loop and not a recursion, as PostHog's own walk is: the SDK sends a
+        chain as long as the recursion limit, and the check deciding whether it
+        needs redacting must not be what fails on it.
+        """
+        pending: list[BaseException | None] = [exception]
+        visited: set[int] = set()
+        while pending:
+            current = pending.pop()
+            if current is None or id(current) in visited:
+                continue
+            visited.add(id(current))
+            if isinstance(current, PipelexError):
+                return True
+            pending.extend((current.__cause__, current.__context__, *cls._group_members(exception=current)))
+        return False
+
+    @classmethod
+    def _group_members(cls, *, exception: BaseException) -> tuple[BaseException, ...]:
+        """The members PostHog expands out of an exception group, or nothing for any other error."""
+        if isinstance(exception, BaseExceptionGroup):
+            return cast("BaseExceptionGroup[BaseException]", exception).exceptions
+        return ()
+
+    @classmethod
+    def _redacted_link(cls, *, exception: BaseException | None, copies: dict[int, BaseException | None]) -> BaseException | None:
+        """Copy one exception of the graph, with its own links redacted in turn.
+
+        `copies` maps an original to its copy so a shared or cyclic link is
+        copied once. An entry of `None` means that exception is still being
+        copied, and a link back to it is cut rather than followed forever.
+        """
+        if exception is None:
+            return None
+        exception_id = id(exception)
+        if exception_id in copies:
+            return copies[exception_id]
+        copies[exception_id] = None
+        copied: BaseException
+        if isinstance(exception, PipelexError):
+            copied = cls._redacted_stand_in(exception=exception)
+        elif isinstance(exception, BaseExceptionGroup):
+            group = cast("BaseExceptionGroup[BaseException]", exception)
+            members = [cls._redacted_link(exception=member, copies=copies) for member in cls._group_members(exception=group)]
+            kept_members = [member for member in members if member is not None]
+            copied = cast("BaseException", group.derive(kept_members)) if kept_members else Exception(type(group).__name__)
+            if hasattr(group, "__notes__"):
+                copied.__notes__ = list(group.__notes__)
+        else:
+            copied = cls._plain_copy(exception=exception)
+        copied.__traceback__ = exception.__traceback__
+        copies[exception_id] = copied
+        copied.__cause__ = cls._redacted_link(exception=exception.__cause__, copies=copies)
+        copied.__context__ = cls._redacted_link(exception=exception.__context__, copies=copies)
+        copied.__suppress_context__ = exception.__suppress_context__
+        return copied
+
+    @classmethod
+    def _redacted_stand_in(cls, *, exception: PipelexError) -> PipelexError:
+        """Build a same-class stand-in for `exception` whose message is the privacy notice.
+
+        `__new__` without `__init__` is the point: the instance comes out with an
+        empty `__dict__`, so none of the subclass's own attributes — the
+        concepts it was comparing, the file it was reading — travel with it. What
+        goes out is the class name, the notice and the traceback.
+        """
+        exception_type = type(exception)
+        stand_in = exception_type.__new__(exception_type)
+        stand_in.args = (cls.PRIVACY_NOTICE,)
+        stand_in.__traceback__ = exception.__traceback__
+        return stand_in
+
+    @classmethod
+    def _plain_copy(cls, *, exception: BaseException) -> BaseException:
+        """Copy an error that is not a `PipelexError`, message and attributes included, without running its `__init__`.
+
+        Its own message is sent as it is, because the redaction goes by class:
+        a message that copied a `PipelexError`'s text travels with that text.
+        Its attributes stay because a subclass's `__str__` may read them. Only
+        the links are rewritten, by `_redacted_link`.
+        """
+        exception_type = type(exception)
+        try:
+            copied = exception_type.__new__(exception_type, *exception.args)
+            copied.args = exception.args
+            copied.__dict__.update({name: value for name, value in exception.__dict__.items() if name not in ExceptionCapture.POSTHOG_CAPTURE_MARKS})
+        except Exception:  # ruff: ignore[blind-except]
+            # A class whose construction cannot be reproduced keeps its name and message, and nothing else.
+            return Exception(f"{exception_type.__name__}: {exception}")
+        return copied
 
     @override
     def setup(self, *, integration_mode: IntegrationMode):
@@ -170,7 +350,13 @@ class TelemetryManager(TelemetryManagerAbstract):
         TelemetryManagerAbstract.clear_instance()
 
     @override
-    def track_event(self, event_name: EventName, *, properties: dict[EventProperty, Any] | None = None):
+    def track_event(
+        self,
+        event_name: EventName,
+        *,
+        properties: dict[EventProperty, Any] | None = None,
+        run_metadata: "RunMetadata | None" = None,
+    ):
         # We copy the incoming properties to avoid modifying the original dictionary
         # and to convert the keys to str
         # and to remove the properties that are in the redact list
@@ -183,34 +369,49 @@ class TelemetryManager(TelemetryManagerAbstract):
         # Track to PostHog based on the user's posthog.mode
         match self.telemetry_config.custom_posthog.mode:
             case PostHogMode.ANONYMOUS:
-                self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
+                # The operator chose not to identify people, and that choice covers
+                # their users too: no run identity is applied and no groups are sent.
+                self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
             case PostHogMode.IDENTIFIED:
                 if not self.telemetry_config.custom_posthog.user_id:
                     log.error(f"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous")
-                    self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
+                    self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
                 else:
-                    self._track_identified_event(
-                        event_name=event_name,
+                    self._capture_custom_event(
+                        event_name,
                         properties=tracked_properties,
-                        user_id=self.telemetry_config.custom_posthog.user_id,
+                        identity=TelemetryIdentity.make_from_run_metadata(
+                            run_metadata=run_metadata,
+                            fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
+                            run_identity_policy=RunIdentityPolicy.DIRECT,
+                        ),
                     )
             case PostHogMode.OFF:
                 log.verbose(f"Custom telemetry is off, skipping event '{event_name}' for custom client")
 
-    def _track_anonymous_event(self, event_name: str, *, properties: dict[str, Any]):
-        if not self.custom_posthog_client:
-            log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
-            return
-        properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
-        self.custom_posthog_client.capture(event_name, properties=properties)
-        log.verbose(f"Tracked anonymous event '{event_name}' with properties: {properties}")
+    def _capture_custom_event(self, event_name: str, *, properties: dict[str, Any], identity: TelemetryIdentity):
+        """Capture one event on the operator's stream, under the identity resolved for it.
 
-    def _track_identified_event(self, event_name: str, *, properties: dict[str, Any], user_id: str):
+        Captures a COPY of the properties, because the anonymous branch below
+        stamps `$process_person_profile` onto the one it sends, and the caller's
+        dict must not carry that mark away with it.
+        """
         if not self.custom_posthog_client:
             log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
             return
-        self.custom_posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
-        log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
+        capture_properties = dict(properties)
+        if identity.distinct_id:
+            self.custom_posthog_client.capture(
+                event_name,
+                distinct_id=identity.distinct_id,
+                properties=capture_properties,
+                groups=identity.groups or None,
+            )
+            log.verbose(f"Tracked identified event '{event_name}' with properties: {capture_properties}")
+        else:
+            capture_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
+            self.custom_posthog_client.capture(event_name, properties=capture_properties)
+            log.verbose(f"Tracked anonymous event '{event_name}' with properties: {capture_properties}")
 
     @override
     @contextmanager
@@ -271,7 +472,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         return self.telemetry_config.langfuse.enabled
 
     @override
-    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
         """Hook to do something when a trace starts.
 
         Emits a trace start event to establish the trace name in PostHog.
@@ -283,6 +484,10 @@ class TelemetryManager(TelemetryManagerAbstract):
             trace_name: Full trace name with pipe code.
             trace_name_redacted: Redacted trace name without pipe code, used when pipe codes are not captured.
             trace_id: The trace ID.
+            run_metadata: The run this trace belongs to. Carries the identity the
+                event is attributed to, resolved exactly as every pipe span under
+                the same trace will be, so the trace's first event and its spans
+                land on the same person. None leaves the stream's fallback.
         """
         log.verbose(
             f"[Telemetry] Emitting trace start event:\n"
@@ -300,11 +505,17 @@ class TelemetryManager(TelemetryManagerAbstract):
                 PostHogAttr.SPAN_NAME: custom_trace_name,
                 PostHogAttr.TRACE_NAME: custom_trace_name,
             }
-            if self.telemetry_config.custom_posthog.user_id:
+            custom_identity = TelemetryIdentity.make_from_run_metadata(
+                run_metadata=run_metadata,
+                fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
+                run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=self.telemetry_config.custom_posthog.mode),
+            )
+            if custom_identity.distinct_id:
                 self.custom_posthog_client.capture(
-                    distinct_id=self.telemetry_config.custom_posthog.user_id,
+                    distinct_id=custom_identity.distinct_id,
                     event=PostHogEvent.SPAN,
                     properties=custom_properties,
+                    groups=custom_identity.groups or None,
                 )
             else:
                 custom_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False

@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
     from opentelemetry.trace import Tracer as OTelTracer
 
+    from pipelex.system.job_metadata import RunMetadata
+
 
 class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     @classmethod
@@ -94,8 +96,24 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         pass
 
     @abstractmethod
-    def track_event(self, event_name: EventName, *, properties: dict[EventProperty, Any] | None = None):
-        pass
+    def track_event(
+        self,
+        event_name: EventName,
+        *,
+        properties: dict[EventProperty, Any] | None = None,
+        run_metadata: "RunMetadata | None" = None,
+    ):
+        """Track one product event.
+
+        Args:
+            event_name: The event.
+            properties: Free scalars on the event, minus whatever the operator redacts.
+            run_metadata: The run that produced the event, when there is one. It carries
+                the identity the event is attributed to — see
+                :mod:`pipelex.system.telemetry.telemetry_identity`. An emitter that holds
+                a ``PipeJob`` passes ``pipe_job.job_metadata.run_metadata``; a CLI command
+                or a dry-run sweep passes nothing and reports under the configured id.
+        """
 
     @abstractmethod
     @contextmanager
@@ -140,13 +158,15 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         """Whether Langfuse OTLP exporter is enabled."""
 
     @abstractmethod
-    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
         """Hook to do something when a trace starts.
 
         Args:
             trace_name: Full trace name with pipe code (for custom telemetry).
             trace_name_redacted: Redacted trace name without pipe code (for Pipelex telemetry).
             trace_id: The trace ID.
+            run_metadata: The run this trace belongs to, carrying the identity the
+                event is attributed to. None leaves the stream's fallback.
         """
 
 
@@ -161,7 +181,13 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         TelemetryManagerAbstract.clear_instance()
 
     @override
-    def track_event(self, event_name: EventName, *, properties: dict[EventProperty, Any] | None = None):
+    def track_event(
+        self,
+        event_name: EventName,
+        *,
+        properties: dict[EventProperty, Any] | None = None,
+        run_metadata: "RunMetadata | None" = None,
+    ):
         pass
 
     @override
@@ -208,5 +234,5 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
         pass

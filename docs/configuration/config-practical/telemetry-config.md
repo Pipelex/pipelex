@@ -98,7 +98,7 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `mode` | string | `"off"` | Telemetry mode: `"off"`, `"anonymous"`, or `"identified"` |
-| `user_id` | string | (none) | Required when `mode = "identified"` |
+| `user_id` | string | (none) | Required when `mode = "identified"`. The identity for events that have no run — a run reports under its own caller |
 | `endpoint` | string | `"https://us.i.posthog.com"` | PostHog endpoint URL |
 | `api_key` | string | (required) | Your PostHog project API key |
 | `geoip` | boolean | `true` | Enable GeoIP lookup for location data |
@@ -108,8 +108,10 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 #### Mode Options
 
 - **`"off"`**: No events sent to your PostHog
-- **`"anonymous"`**: Events sent without user identification
-- **`"identified"`**: Events sent with your `user_id` for cross-session tracking
+- **`"anonymous"`**: Events sent without user identification. This covers your users too, and yourself: a run's own caller is never identified, its analytics groups are never sent, and a `user_id` left in the file is not sent either
+- **`"identified"`**: Events and spans produced during a run are attributed to that run's caller, with its analytics groups attached. Your `user_id` is what everything else reports under — an event outside any run, and a run that names no distinguishable caller, which is every run on your own machine. The groups ride either way: a run may carry them without naming a caller
+
+See [Telemetry Setup](../../setup/telemetry.md) for how a run supplies its caller and its groups.
 
 ### `[custom_posthog.tracing]` Settings
 
