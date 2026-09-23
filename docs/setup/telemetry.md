@@ -27,7 +27,6 @@ A run that names a caller of its own is attributed to that caller on this stream
 - Your prompts or completions
 - Your pipe codes or output class names
 - File contents or business data
-- A run's `user_id` as you spell it, or its `analytics_groups` in any form
 
 This telemetry allows us to:
 
