@@ -45,6 +45,7 @@ from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
+from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -164,6 +165,7 @@ async def prepare_pipe_job(
     pipeline_run_id: str,
     user_id: str,
     storage_scope: str,
+    analytics_groups: dict[str, str] | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     search_scope: str | None = None,
     trace_context: "TraceContext | None" = None,
@@ -204,6 +206,14 @@ async def prepare_pipe_job(
     #
     # This is deliberately not a "second gate": it is the FIRST one on this path.
     storage_scope = validate_storage_scope(value=storage_scope)
+
+    # And the groups beside it, for the same reason: `RunMetadata` is built at
+    # the bottom of this function, below the data-url normalization that writes
+    # to real storage, so validating only there refuses a malformed mapping
+    # after the run has already put bytes in a bucket. `pipeline_run_setup`
+    # validates earlier still — this is the first gate for the callers that
+    # reach this seam directly (`bundle_validator`, `dry_run_in_process`).
+    analytics_groups = validate_analytics_groups(value=analytics_groups or {})
 
     working_memory: WorkingMemory | None = None
 
@@ -278,7 +288,16 @@ async def prepare_pipe_job(
         working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope)
 
     job_metadata = JobMetadata(
-        run_metadata=RunMetadata(user_id=user_id, storage_scope=storage_scope, pipeline_run_id=pipeline_run_id, request_id=request_id),
+        run_metadata=RunMetadata(
+            user_id=user_id,
+            storage_scope=storage_scope,
+            pipeline_run_id=pipeline_run_id,
+            request_id=request_id,
+            # Already normalized to a mapping and validated at the top of this
+            # function; the parameter stays nullable only so every existing call
+            # site can keep omitting it.
+            analytics_groups=analytics_groups,
+        ),
         otel_context=otel_context,
         trace_context=trace_context,
     )

@@ -102,6 +102,28 @@ When set, this disables:
 !!! warning "Gateway Requires Telemetry"
     If you set `DO_NOT_TRACK=1` while using Pipelex Gateway, the Gateway will not function. Use direct provider backends instead if you need to disable all telemetry.
 
+## Attaching your own groups to a run
+
+A host that runs Pipelex for more than one customer usually wants a run's telemetry to belong to the entities *it* cares about — an organization, a workspace, a tenant. Pipelex carries those labels for you without ever learning what they mean.
+
+The run-level metadata every run carries (`RunMetadata`) has an `analytics_groups` field: an opaque mapping of **group type** to **group key** that you supply when you start the run, beside `user_id` and `storage_scope`.
+
+```python
+analytics_groups = {"organization": "org_acme"}
+```
+
+!!! note "What this field does today"
+    The runtime validates the mapping, carries it through every nested pipe, and keeps it on the run's metadata across a process boundary. It does **not** yet attach it to the events and spans the built-in PostHog and OpenTelemetry integrations emit — so setting it today will not group anything in your backend. Supply it if you want your runs to carry the labels from now on; wait if you want to see them in PostHog.
+
+The rules it follows:
+
+- **Nothing is privileged.** `organization` is a word a host chose, not one Pipelex knows. A deployment that sends `{"tenant": "t-1", "plan_tier": "enterprise"}` is served identically, because the runtime never reads a key by name — the same boundary that keeps `storage_scope` opaque.
+- **It is validated where it enters.** A group type is lowercase snake_case starting with a letter (up to 32 characters); a group key is 1 to 128 characters from `A-Za-z0-9_-`; a run carries at most five group types. A mapping outside those bounds is refused before the run registers itself or emits anything, and again when a bridge payload is decoded — not later, inside a telemetry capture. The group key is quoted into log lines and capture payloads, so whitespace and control characters are refused outright.
+- **It is optional.** Omitting it leaves the group facet empty, which misattributes nothing. Unlike `user_id` and `storage_scope`, which have no default because a missing one used to be invented, a missing group invents nothing.
+- **It travels with the run.** The mapping rides the job through every nested pipe, and the bridge payload that crosses a process boundary carries it, so a distributed worker is handed the same groups the entry point was given.
+
+These are labels for grouping, not content: they belong in the reserved identity fields of whichever backend understands groups, never in an event property or a span name.
+
 ## Privacy
 
 We take your privacy seriously:

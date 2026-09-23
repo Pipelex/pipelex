@@ -27,9 +27,9 @@ An LLM handle can be either:
 
 ```toml
 [llm.aliases]
-best-gpt = "gpt-6-astra"
-default-general = "gpt-5.4"
-default-small = "gpt-5.4-nano"
+best-gpt = "gpt-5.6-sol"
+default-general = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
@@ -55,7 +55,7 @@ engineering-structured = {
 
 retrieval = {
     model = "@default-large-context-text",
-    temperature = 0.1
+    temperature = 1
 }
 ```
 
@@ -69,7 +69,7 @@ deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort 
 quick-reasoning = { model = "@default-premium", temperature = 1, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 ```
 
-Both declare `temperature = 1` because the premium tier resolves to a model that fixes its temperature at that value. The deck states the temperature the model will actually use, rather than one the runtime would override on every call.
+Both declare `temperature = 1` because every model the shipped deck resolves to fixes its temperature at that value. The deck states the temperature the model will actually use, rather than one the runtime would override on every call. A method that needs a temperature of its own writes an inline LLM settings table, shown below: a bare model name is paired with `[llm.choice_defaults].default_temperature`, which this deck sets to 1, so naming a handle on its own does not give the author control of the temperature.
 
 `reasoning_effort` accepts values from `"none"` to `"max"`. For an explicit token budget, use `reasoning_budget` instead (mutually exclusive with `reasoning_effort`). For provider-specific behavior and model examples, see [Reasoning Controls](../under-the-hood/reasoning-controls.md).
 

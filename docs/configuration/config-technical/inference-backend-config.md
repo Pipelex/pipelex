@@ -336,13 +336,13 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 ```toml
 [llm.aliases]
 # Simple aliases map to a single model
-best-gpt = "gpt-6-astra"
+best-gpt = "gpt-5.6-sol"
 
 # Default aliases (used in presets)
-default-general = "gpt-5.4"
-default-premium = "gpt-6-astra"
-default-large-context-text = "gpt-5.4"
-default-small = "gpt-5.4-nano"
+default-general = "gpt-5.6-terra"
+default-premium = "gpt-5.6-sol"
+default-large-context-text = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 When using aliases in `.mthds` files or other configurations, prefix them with `@`:
@@ -358,13 +358,13 @@ Presets combine model selection with optimized parameters for specific tasks. De
 
 ```toml
 [llm.presets]
-# Writing presets. The premium tier's model fixes its temperature at 1, so these
-# declare that value rather than one the worker would override.
+# Every model this deck resolves to fixes its temperature at 1, so every preset
+# declares that value rather than one the worker would override.
 writing-factual = { model = "@default-premium", temperature = 1 }
 writing-creative = { model = "@default-premium", temperature = 1 }
 
 # Retrieval
-retrieval = { model = "@default-large-context-text", temperature = 0.1 }
+retrieval = { model = "@default-large-context-text", temperature = 1 }
 
 # Engineering
 engineering-structured = { model = "@default-premium-structured", temperature = 1 }
@@ -372,7 +372,7 @@ engineering-code = { model = "@default-premium", temperature = 1 }
 
 # Vision
 vision = { model = "@default-premium-vision", temperature = 1 }
-vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
+vision-cheap = { model = "@default-small-vision", temperature = 1 }
 vision-diagram = { model = "@default-premium-vision", temperature = 1 }
 ```
 

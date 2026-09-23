@@ -25,11 +25,12 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
+from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE
+from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, validate_storage_scope
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -57,6 +58,7 @@ async def pipeline_run_setup(
     is_mock_usage: bool = False,
     user_id: str,
     storage_scope: str,
+    analytics_groups: dict[str, str] | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
@@ -123,6 +125,14 @@ async def pipeline_run_setup(
         Opaque prefix under which every byte this run writes must land. REQUIRED,
         validated at ``JobMetadata`` construction. See
         :mod:`pipelex.system.storage_scope`.
+    analytics_groups:
+        Opaque, host-supplied mapping of group type to group key that this run's
+        telemetry belongs to — the hosted platform sends its organization, a
+        single-user deployment sends nothing. Never read by name here. Validated
+        at the TOP of this function, above the pipeline registration and above
+        the trace-start event, so a malformed mapping registers nothing and
+        emits nothing. Optional, and omitting it leaves the group facet empty.
+        See :mod:`pipelex.system.analytics_groups`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -163,6 +173,33 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
 
+    # Validate the groups HERE, before this function causes anything observable.
+    #
+    # `RunMetadata` validates them too, and `prepare_pipe_job` validates them at
+    # its own top — but BOTH run below `add_new_pipeline`, the open tracer and
+    # `handle_trace_start`, which emits a telemetry event that cannot be unsent.
+    # So a malformed mapping used to abort a run that had already registered
+    # itself and announced its own trace to the backend. The teardown below
+    # releases the local state; the emitted event it cannot take back.
+    #
+    # This is the same lesson `storage_scope` learned one seam lower, and the
+    # same cure: ordering, not absence, was the defect.
+    analytics_groups = validate_analytics_groups(value=analytics_groups or {})
+
+    # And the scope, for the same reason and with more at stake.
+    #
+    # `prepare_pipe_job` gates it too, and that gate stays — but it runs below
+    # everything listed above, so until now the OPAQUE mapping was refused
+    # earlier than the field that decides where a tenant's bytes land. A scope
+    # carrying `..` registered a pipeline, opened a library and a tracer and
+    # announced its trace before anything looked at it.
+    #
+    # ADDITIVE, never a move: the value validated here is the caller's raw one,
+    # and the sentinel below rebinds it to something else that only the lower
+    # gate sees. `LOCAL_STORAGE_SCOPE` passes this gate unharmed — it is itself
+    # a valid one-segment scope — so the sentinel is not disturbed.
+    storage_scope = validate_storage_scope(value=storage_scope)
+
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
         if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
@@ -189,7 +226,13 @@ async def pipeline_run_setup(
     # Keyed on the sentinel EXACTLY, never a prefix test: a host that serves more
     # than one tenant passes its own scope and is untouched here.
     if storage_scope == LOCAL_STORAGE_SCOPE:
-        storage_scope = pipeline_run_id
+        # The rebound value is caller data too: `pipeline_run_id` is a parameter
+        # of this function, so a caller passing the sentinel alongside its own id
+        # chooses the storage scope through the back door. The gate above saw
+        # only the sentinel, so this is the first look at what the scope has
+        # actually become — and it still sits above the library, the tracer and
+        # the trace-start.
+        storage_scope = validate_storage_scope(value=pipeline_run_id)
 
     if not library_id:
         library_id = pipeline_run_id
@@ -323,6 +366,7 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             storage_scope=storage_scope,
+            analytics_groups=analytics_groups,
             inputs=inputs,
             search_scope=search_scope,
             trace_context=trace_context,
