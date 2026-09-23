@@ -24,6 +24,7 @@ from pipelex.system.telemetry.otel_constants import (
     make_otel_gen_ai_output_type,
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE
 from pipelex.tools.misc.package_utils import get_package_version
@@ -118,7 +119,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if not pipe_code:
             msg = "pipe_code is required for LLM span"
             raise JobMetadataError(msg)
-        pipeline_run_id = job_metadata.run_metadata.pipeline_run_id
+        run_metadata = job_metadata.run_metadata
+        pipeline_run_id = run_metadata.pipeline_run_id
 
         # Build output description for span name (full values - exporter handles redaction)
         output_desc: str
@@ -158,7 +160,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if output_class_name:
             span_attributes[PipelexSpanAttr.OUTPUT_CLASS_NAME] = output_class_name
 
-        if TelemetryManagerAbstract.get_langfuse_enabled():
+        # The run's own identity, so a generation lands on the caller who asked for it
+        # rather than on the process that served it.
+        is_langfuse_enabled = TelemetryManagerAbstract.get_langfuse_enabled()
+        span_attributes.update(make_run_identity_span_attributes(run_metadata=run_metadata, is_langfuse_enabled=is_langfuse_enabled))
+
+        if is_langfuse_enabled:
             span_attributes[LangfuseSpanAttr.TRACE_NAME] = otel_context.trace_name
             span_attributes[LangfuseSpanAttr.RELEASE] = get_package_version()
         if job_params.max_tokens:
@@ -196,7 +203,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         messages_json = OtelFactory.stringify_json(json_conent=messages)
         span_attributes[GenAISpanAttr.PROMPT_CONTENT] = messages_json
-        if TelemetryManagerAbstract.get_langfuse_enabled():
+        if is_langfuse_enabled:
             span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = messages_json
 
         # Use trace_id and span_id from otel_context (precomputed)
