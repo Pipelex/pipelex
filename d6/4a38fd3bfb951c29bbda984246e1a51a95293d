@@ -1,0 +1,27 @@
+.drift/acks/cli-docs.toml
+  s_249569b913e311::t_ffadf4b28b9356 2,4-5
+CHANGELOG.md
+  s_249569b913e311::t_e9fc24e74132b2 7
+pipelex/cli/agent_cli/CLAUDE.md
+  s_249569b913e311::t_e9fc24e74132b2 50
+tests/unit/pipelex/cli/test_run_core_api_user_agent.py
+  s_249569b913e311::t_e9fc24e74132b2 1-66
+pipelex/cli/agent_cli/commands/run/_run_core_api.py
+  s_249569b913e311::t_e9fc24e74132b2 11,13,17,43-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d64a38fd3bfb951c29bbda984246e1a51a95293d",
+  "prompts": {},
+  "sessions": {
+    "s_249569b913e311": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c96db657-dce9-4864-8d99-e33151cd32db",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
