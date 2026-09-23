@@ -1,0 +1,27 @@
+tests/unit/pipelex/system/telemetry/test_telemetry_identity.py
+  s_44ae092d2fd100::t_9b33c1f31c70dd 3-4,193-194,197
+pipelex/system/telemetry/telemetry_identity.py
+  s_44ae092d2fd100::t_3b32554fc9078e 4-5,14-15,63,69-70,75-81,147,169
+pipelex/system/telemetry/posthog_span_exporter.py
+  s_44ae092d2fd100::t_5d3801f9b0c51a 33-34,53
+tests/unit/pipelex/system/telemetry/test_posthog_span_exporter.py
+  s_44ae092d2fd100::t_9b33c1f31c70dd 22
+CHANGELOG.md
+  s_44ae092d2fd100::t_6bf2ac3955f596 26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eff1e1bcccee7c6c570552cd4319a39e397f57fd",
+  "prompts": {},
+  "sessions": {
+    "s_44ae092d2fd100": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49ea81ca-2865-445c-beae-48d893dda44a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
