@@ -315,20 +315,23 @@ class TestExceptionCaptureSdkContract:
     def test_a_capture_the_redaction_cannot_complete_is_dropped_rather_than_raised_or_sent_raw(self, mocker: MockerFixture) -> None:
         """PostHog's `capture_exception` never raises into its caller, and the redaction in front of it must not either.
 
-        A `PipelexError` at the bottom of a chain longer than the recursion
-        limit cannot be copied. Sending the original instead is the one fallback
-        that is not open, so nothing goes out.
+        A chain too deep to copy is the realistic way the redaction fails, but
+        the depth at which it fails is the interpreter's to decide: up to
+        Python 3.13 the recursion limit bounds the copy, while Python 3.14 lets
+        this recursion run past it until the stack itself runs out. So the
+        failure is forced here rather than reached by depth. Sending the
+        original instead is the one fallback that is not open, so nothing goes
+        out.
         """
         client, capture_mock = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
         manager = TelemetryManager.__new__(TelemetryManager)
         manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
-        error: BaseException = ToolError(_CONFIDENTIAL_MESSAGE)
-        for link_index in range(sys.getrecursionlimit()):
-            wrapper = ValueError(f"link {link_index}")
-            wrapper.__context__ = error
-            error = wrapper
+        redacted_link = mocker.patch.object(TelemetryManager, "_redacted_link", side_effect=RecursionError("maximum recursion depth exceeded"))
+        error = ValueError("wrapper")
+        error.__context__ = ToolError(_CONFIDENTIAL_MESSAGE)
 
         assert client.capture_exception(error) is None
+        assert redacted_link.call_count == 1
         assert capture_mock.call_count == 0
 
     @pytest.mark.parametrize("malformed", ["not an exception", (ValueError, ValueError("two")), 42])
