@@ -5,13 +5,12 @@ description: "Pipelex lets you build AI methods with your coding agent and run t
 
 <!--
 Adapted from the onboarding source's front-door assembly, last re-read against the rendered file at
-Pipelex/.github@81a3728 (onboarding/rendered/front-door.md). Every paragraph and every command is a
+Pipelex/.github@50bb5ba (onboarding/rendered/front-door.md). Every paragraph and every command is a
 block's own words, so a change lands in the blocks first and is then carried here. Step 3 takes the
 longer first-run/agent.md rather than the assembly's agent-short.md, and the webapp and API sections
 take first-run/webapp.md, key.md, first-run/api-http.md, first-run/api-typescript.md and
 first-run/api-python.md, where the assembly only links to them. This page's own are the headings, the
-content tabs standing in for the assembly's <details> wrappers, the Node.js sentence in step 2 (the
-blocks do not say it yet, and it goes once they do), the sentences pointing at other pages (the SDK references are the links-tail blocks), and the closing section, since the assembly's
+content tabs standing in for the assembly's <details> wrappers, the sentences pointing at other pages (the SDK references are the links-tail blocks), and the closing section, since the assembly's
 last block describes the runtime repository that carries it. The Python sample's inputs dict is
 wrapped by this repository's ruff format, which formats Python fences in Markdown; the code is the
 block's.
@@ -27,7 +26,7 @@ Sign up at [app.pipelex.com](https://app.pipelex.com).
 
 ## 2. Install the Pipelex plugin in your coding agent
 
-The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
+The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
 
 === "Claude Code"
 
@@ -36,7 +35,7 @@ The plugin is how you build methods: it gives your agent the skills that write a
     claude plugin install pipelex@pipelex-plugins
     ```
 
-    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it; nothing else to install.
+    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
     Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
 
@@ -47,7 +46,7 @@ The plugin is how you build methods: it gives your agent the skills that write a
     export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
     ```
 
-    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
+    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
 What the plugin holds, skill by skill, is on the [Pipelex Plugin](../features/pipelex-plugin.md) page.
 

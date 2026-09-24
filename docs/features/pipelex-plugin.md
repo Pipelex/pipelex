@@ -5,16 +5,15 @@ description: "The Pipelex plugin for Claude Code and Codex: skills that build an
 
 <!--
 The install commands and the sentences around them are adapted from the onboarding source's
-front-door assembly, last re-read against the rendered file at Pipelex/.github@81a3728
+front-door assembly, last re-read against the rendered file at Pipelex/.github@50bb5ba
 (onboarding/rendered/front-door.md): the blocks install/claude-code.md and install/codex.md, copied
-verbatim. The Node.js sentence is this page's own: the blocks do not say it yet, and it goes once they
-do. The skills, the hook and the tools summarize the plugin's own README, which stays their
+verbatim, the Node.js requirement included. The skills, the hook and the tools summarize the plugin's own README, which stays their
 reference.
 -->
 
 # Pipelex Plugin
 
-The Pipelex plugin is how you build methods with your coding agent, Claude Code or Codex: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. It works against the hosted Pipelex API, so you need an account at [app.pipelex.com](https://app.pipelex.com) and an API key from your console there. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
+The Pipelex plugin is how you build methods with your coding agent, Claude Code or Codex: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. It works against the hosted Pipelex API, so you need an account at [app.pipelex.com](https://app.pipelex.com) and an API key from your console there.
 
 Its source, its full documentation and its release notes are at [github.com/Pipelex/pipelex-plugins](https://github.com/Pipelex/pipelex-plugins).
 
@@ -27,7 +26,7 @@ Its source, its full documentation and its release notes are at [github.com/Pipe
     claude plugin install pipelex@pipelex-plugins
     ```
 
-    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it; nothing else to install.
+    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
     Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
 
@@ -38,7 +37,7 @@ Its source, its full documentation and its release notes are at [github.com/Pipe
     export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
     ```
 
-    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
+    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
 Then ask your agent for the method you want, as in step 3 of the [Quick Start](../get-started/quick-start.md#3-ask-your-agent-for-the-method-you-want).
 
