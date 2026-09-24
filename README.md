@@ -167,10 +167,6 @@ pipelex run bundle summarize.mthds --inputs inputs.json
 
 The result is written under `results/`. For a method with several steps, typed concepts and a batch, run from the CLI and from Python, read [CV batch screening, step by step](https://docs.pipelex.com/latest/cookbook/cv-batch-screening/).
 
-### Build methods with your coding agent
-
-The Pipelex plugin gives Claude Code and Codex the skills that write, check and run methods; install it as the [Quick start](#quick-start) shows.
-
 ### Editor extension
 
 `.mthds` syntax highlighting and flowchart visualization: the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pipelex.pipelex), or the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex) for Cursor, Windsurf and other VS Code forks. `pipelex init` offers to install it when it detects your IDE.
