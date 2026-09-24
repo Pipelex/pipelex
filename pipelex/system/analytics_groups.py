@@ -10,11 +10,9 @@ mapping of group *type* to group *key* that the runtime carries on
 `RunMetadata`, unread, for a telemetry consumer that understands groups to
 forward. Carrying it unread is all this module does, but it is read downstream:
 a run's mapping rides its spans as `pipelex.run.analytics_groups` and becomes
-PostHog's own groups facet on the operator's stream, so whatever is put here is
-a live group key in that project and a span attribute on every OpenTelemetry
-export. Pipelex's own stream is the exception — one shared project across every
-deployment, where a host's group vocabulary would collide with another's, so
-the mapping never reaches it.
+PostHog's own groups facet on the operator's stream and on Pipelex's own, so
+whatever is put here is a live group key in those projects and a span attribute
+on every OpenTelemetry export.
 
 The hosted Pipelex platform fills it with `{"organization": "<org_id>"}`, but
 nothing here knows or checks that: no key is privileged, and a deployment that

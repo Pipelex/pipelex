@@ -293,13 +293,12 @@ class OtelFactory:
 
         # Add Pipelex PostHog Exporter if client is provided (mandatory for gateway)
         if pipelex_posthog_client:
-            # The Pipelex stream is one shared project for every deployment, so a
-            # span's own user reaches it only as a digest taken inside the
-            # gateway-key hash, and the run's groups do not reach it at all.
+            # A span's own user is its `distinct_id` and the run's groups ride
+            # the capture, as on the operator's stream.
             pipelex_posthog_exporter = PostHogSpanExporter(
                 posthog_client=pipelex_posthog_client,
                 fallback_distinct_id=pipelex_distinct_id,
-                run_identity_policy=RunIdentityPolicy.NAMESPACED,
+                run_identity_policy=RunIdentityPolicy.DIRECT,
                 redaction_config=pipelex_gateway_redaction_config,
             )
             provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))

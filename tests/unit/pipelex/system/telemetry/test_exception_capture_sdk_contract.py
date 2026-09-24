@@ -108,8 +108,7 @@ class TestExceptionCaptureSdkContract:
         PostHog stamps, and the stamp is still on it when the second stream
         asks. Left in place, the stream that goes second — always Pipelex's, on
         a machine that also reports to an operator's own project — returns
-        before building an event, and the deployment group it resolved is
-        recorded nowhere.
+        before building an event, and the crash is recorded nowhere on it.
         """
         custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
         pipelex_client, pipelex_capture = _make_stubbed_client(mocker=mocker, api_key="phc_pipelex")
