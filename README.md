@@ -42,7 +42,7 @@ Claude Code also loads what you have added to your Claude account, so if the Pip
 
 </details>
 
-<details><summary><b>Codex</b></summary>
+<details open><summary><b>Codex</b></summary>
 
 ```bash
 codex plugin marketplace add Pipelex/pipelex-plugins

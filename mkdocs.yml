@@ -21,6 +21,7 @@ theme:
     - navigation.sections
     - navigation.top
     - content.code.copy
+    - content.tabs.link
   palette:
   - scheme: default          # light
     primary: custom
