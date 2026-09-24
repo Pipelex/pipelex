@@ -15,27 +15,32 @@ class TestRuntimeBootPipelexTelemetry:
     def test_a_deployment_mode_with_every_condition_met_enables_the_stream(self, integration_mode: IntegrationMode) -> None:
         assert RuntimeBoot.should_enable_pipelex_telemetry(
             integration_mode=integration_mode,
+            is_unit_testing=False,
             is_gateway_enabled=True,
             needs_inference=True,
             is_gateway_config_cached=False,
         )
 
     @pytest.mark.parametrize(
-        ("is_gateway_enabled", "needs_inference", "is_gateway_config_cached"),
+        ("is_unit_testing", "is_gateway_enabled", "needs_inference", "is_gateway_config_cached"),
         [
-            pytest.param(False, True, False, id="gateway-disabled"),
-            pytest.param(True, False, False, id="no-inference"),
-            pytest.param(True, True, True, id="cached-config"),
+            pytest.param(True, True, True, False, id="unit-testing-run-mode"),
+            pytest.param(False, False, True, False, id="gateway-disabled"),
+            pytest.param(False, True, False, False, id="no-inference"),
+            pytest.param(False, True, True, True, id="cached-config"),
         ],
     )
-    def test_each_existing_condition_alone_disables_the_stream(
+    def test_each_condition_alone_disables_the_stream(
         self,
+        is_unit_testing: bool,
         is_gateway_enabled: bool,
         needs_inference: bool,
         is_gateway_config_cached: bool,
     ) -> None:
+        """The `unit-testing-run-mode` row is the suite that boots in the default `PYTHON` mode, as the shared plugin's recipe does."""
         assert not RuntimeBoot.should_enable_pipelex_telemetry(
             integration_mode=IntegrationMode.PYTHON,
+            is_unit_testing=is_unit_testing,
             is_gateway_enabled=is_gateway_enabled,
             needs_inference=needs_inference,
             is_gateway_config_cached=is_gateway_config_cached,
@@ -47,10 +52,12 @@ class TestRuntimeBootPipelexTelemetry:
 
         Before this condition, every pytest run with `pipelex_gateway` enabled and a fresh remote config
         sent its pipe runs to the Gateway's production analytics project, because the stream's enabling
-        condition never read the integration mode.
+        condition never read the integration mode. The run mode is left false here: a harness that boots
+        without the shared pytest plugin, such as the pipelex-js conformance scripts, has only its mode.
         """
         assert not RuntimeBoot.should_enable_pipelex_telemetry(
             integration_mode=integration_mode,
+            is_unit_testing=False,
             is_gateway_enabled=True,
             needs_inference=True,
             is_gateway_config_cached=False,
@@ -61,8 +68,9 @@ class TestRuntimeBootPipelexTelemetry:
 
         This passes trivially on a machine where `pipelex_gateway` is disabled, or where the remote
         config came from the cache, because the stream is off there for those reasons already; the
-        table tests above are the precise guard. It asserts on the Gateway stream alone, not on the
-        manager being a no-op, because a developer may deliberately allow the custom stream under
-        `pytest` in their own `telemetry_allowed_modes`.
+        table tests above and the setup-level tests in `test_setup_gateway_telemetry.py` are the precise
+        guards. It asserts on the Gateway stream alone, not on the manager being a no-op, because a
+        developer may deliberately allow the custom stream under `pytest` in their own
+        `telemetry_allowed_modes`.
         """
         assert not get_telemetry_manager().is_pipelex_telemetry_enabled
