@@ -23,7 +23,7 @@
 <!-- Generated from the Pipelex onboarding source; this region is replaced from https://raw.githubusercontent.com/Pipelex/.github/main/onboarding/rendered/front-door.md — do not edit it here. -->
 ## Quick start
 
-Pipelex runs your AI methods — write a method once, then run it from your agent via MCP, turn it into a webapp, or use it via API in any software.
+Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
 
 **1. Sign up at [app.pipelex.com](https://app.pipelex.com).**
 
