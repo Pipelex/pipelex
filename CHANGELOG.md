@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **An unknown model name keeps its message on a hosted surface**: `ModelChoiceNotFoundError` is now caller-facing, so under STRICT disclosure its message — the model reference the method named and the "Did you mean" suggestions — reaches the caller instead of "An internal error occurred.". A hosted dry run or run of a method naming a model the deck does not know now says which one and what to use instead.
+
 ## [v0.64.1] - 2026-09-24
 
 ### Changed
