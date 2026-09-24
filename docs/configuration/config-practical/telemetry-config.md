@@ -108,8 +108,8 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 #### Mode Options
 
 - **`"off"`**: No events sent to your PostHog
-- **`"anonymous"`**: Events sent without user identification. This covers your users too, and yourself: a run's own caller is never identified, its analytics groups are never sent, and a `user_id` left in the file is not sent either
-- **`"identified"`**: Events and spans produced during a run are attributed to that run's caller, with its analytics groups attached. Your `user_id` is what everything else reports under — an event outside any run, and a run that names no distinguishable caller, which is every run on your own machine. The groups ride either way: a run may carry them without naming a caller
+- **`"anonymous"`**: Events sent without user identification. This covers your users too, and yourself: a run's own caller is never identified, its `extras` are never sent as groups, and a `user_id` left in the file is not sent either
+- **`"identified"`**: Events and spans produced during a run are attributed to that run's caller, with its `extras` attached as groups. Your `user_id` is what everything else reports under — an event outside any run, and a run that names no distinguishable caller, which is every run on your own machine. The extras ride either way: a run may carry them without naming a caller
 
 See [Telemetry Setup](../../setup/telemetry.md) for how a run supplies its caller and its groups.
 

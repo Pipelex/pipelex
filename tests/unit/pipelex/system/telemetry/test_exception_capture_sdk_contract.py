@@ -5,8 +5,8 @@ so against `MagicMock(spec=Posthog)` — which is the right stub for that questi
 and a blind one for this. A defect lived underneath those mocks: the privacy
 wrapper redacted a `PipelexError` handed over bare but not the
 `(type, value, traceback)` triple an excepthook is given, which is the only form
-this path has. A mock answers that question not at all, because nothing of it
-happens until the SDK runs.
+this path has. A mock answers that not at all, because none of it happens until
+the SDK runs.
 
 So these tests use real `Posthog` clients with only `capture` stubbed — the one
 call that would put an event on the wire. Everything above it is the production
@@ -50,13 +50,13 @@ def _make_stubbed_client(*, mocker: MockerFixture, api_key: str) -> tuple[Postho
 
 
 def _make_capture(*, custom_client: Posthog) -> ExceptionCapture:
-    """Assemble the capture the constructor would have built, over the given client.
+    """Assemble the capture the constructor would have built, over the two given clients.
 
     The manager is built without its constructor, as in the module beside this
     one, because `TelemetryManager.__init__` creates live clients, writes
     `posthog.default_client` and registers a process-wide singleton. The two
     steps under test are its own: wrapping the client for privacy, then
-    resolving the stream's runless identity.
+    fixing the stream's identity rule.
     """
     manager = TelemetryManager.__new__(TelemetryManager)
     manager.telemetry_config = TelemetryConfig(
@@ -70,7 +70,7 @@ def _make_capture(*, custom_client: Posthog) -> ExceptionCapture:
 
 def _crash(*, capture: ExceptionCapture, error: BaseException) -> None:
     """Hand the capture the triple an excepthook would, which is all it ever receives."""
-    capture._capture_exception(exc_info=(type(error), error, None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+    capture._capture_exception((type(error), error, None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
 
 def _sent_exception_values(*, capture_mock: Any) -> str:
@@ -81,10 +81,12 @@ def _sent_exception_values(*, capture_mock: Any) -> str:
 @pytest.mark.usefixtures("restore_excepthooks")
 class TestExceptionCaptureSdkContract:
     def test_the_stream_records_one_crash(self, mocker: MockerFixture) -> None:
-        """A crash reaches the operator's stream exactly once.
+        """The crash reaches the operator's stream exactly once.
 
-        A `PipelexError` is handed to the client as a redacted stand-in rather
-        than as itself, so what the SDK sees is never the live error.
+        A `PipelexError` is handed to each client as its own redacted stand-in,
+        so the SDK never sees one object twice on this path and its
+        deduplication has nothing to bite on. The crash with no stand-in is the
+        test below, and that is the one the clearing is there for.
         """
         custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
         capture = _make_capture(custom_client=custom_client)
@@ -98,7 +100,7 @@ class TestExceptionCaptureSdkContract:
 
         A `ValueError` is never redacted and so never copied: the client is
         handed the live error, stamps it, and the stamp is what stops anything
-        downstream from sending it a second time.
+        downstream from sending the same object a second time.
         """
         custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
         capture = _make_capture(custom_client=custom_client)
@@ -120,7 +122,8 @@ class TestExceptionCaptureSdkContract:
 
         _crash(capture=capture, error=ToolError(_CONFIDENTIAL_MESSAGE))
 
-        sent = _sent_exception_values(capture_mock=custom_capture)
+        capture_mock = custom_capture
+        sent = _sent_exception_values(capture_mock=capture_mock)
         assert _CONFIDENTIAL_MESSAGE not in sent
         assert TelemetryManager.PRIVACY_NOTICE in sent
 
@@ -156,7 +159,8 @@ class TestExceptionCaptureSdkContract:
         except RuntimeError as crash:
             _crash(capture=capture, error=crash)
 
-        sent = _sent_exception_values(capture_mock=custom_capture)
+        capture_mock = custom_capture
+        sent = _sent_exception_values(capture_mock=capture_mock)
         assert _CONFIDENTIAL_MESSAGE not in sent
         assert TelemetryManager.PRIVACY_NOTICE in sent
         assert "wrapper" in sent
@@ -175,7 +179,8 @@ class TestExceptionCaptureSdkContract:
         except RuntimeError as crash:
             _crash(capture=capture, error=crash)
 
-        assert _CONFIDENTIAL_MESSAGE not in _sent_exception_values(capture_mock=custom_capture)
+        capture_mock = custom_capture
+        assert _CONFIDENTIAL_MESSAGE not in _sent_exception_values(capture_mock=capture_mock)
 
     def test_a_pipelex_error_inside_an_exception_group_is_redacted(self, mocker: MockerFixture) -> None:
         """PostHog expands an exception group's members, and a `TaskGroup` wraps whatever its tasks raised."""
@@ -184,7 +189,8 @@ class TestExceptionCaptureSdkContract:
 
         _crash(capture=capture, error=ExceptionGroup("tasks failed", [ToolError(_CONFIDENTIAL_MESSAGE), ValueError("other")]))
 
-        sent = _sent_exception_values(capture_mock=custom_capture)
+        capture_mock = custom_capture
+        sent = _sent_exception_values(capture_mock=capture_mock)
         assert _CONFIDENTIAL_MESSAGE not in sent
         assert TelemetryManager.PRIVACY_NOTICE in sent
 

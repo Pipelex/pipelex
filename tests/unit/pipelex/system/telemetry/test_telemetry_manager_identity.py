@@ -18,19 +18,21 @@ from typing import Any
 from posthog import Posthog
 from pytest_mock import MockerFixture
 
+from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.job_metadata import RunMetadata
+from pipelex.system.storage_scope import LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName
 from pipelex.system.telemetry.otel_constants import PostHogAttr
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, PostHogTracingConfig, TelemetryConfig
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 
 
-def _run_metadata(*, user_id: str = "user-42", analytics_groups: dict[str, str] | None = None) -> RunMetadata:
+def _run_metadata(*, user_id: str = "user-42", extras: dict[str, str] | None = None) -> RunMetadata:
     return RunMetadata(
         user_id=user_id,
         pipeline_run_id="run-1",
         storage_scope="tenant/run-1",
-        analytics_groups=analytics_groups or {},
+        extras=extras or {},
     )
 
 
@@ -57,13 +59,16 @@ def _make_manager(
     return manager, custom_client
 
 
+_CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
+
+
 class TestTelemetryManagerIdentity:
     def test_an_event_from_a_run_is_attributed_to_the_runs_user(self, mocker: MockerFixture) -> None:
         manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
 
         manager.track_event(
             EventName.PIPE_RUN,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -85,7 +90,7 @@ class TestTelemetryManagerIdentity:
 
         manager.track_event(
             EventName.PIPE_RUN,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -108,7 +113,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -129,7 +134,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -149,7 +154,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -163,9 +168,67 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         rendered = repr(custom_client.capture.call_args.kwargs["properties"])
         assert "user-42" not in rendered
         assert "org_acme" not in rendered
+
+    def test_an_event_with_no_run_is_attributed_to_the_caller_in_scope(self, mocker: MockerFixture) -> None:
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-runner")
+
+        with scoped_caller_identity(caller_identity=_CALLER):
+            manager.track_event(EventName.PIPE_DRY_RUN)
+
+        capture_kwargs = custom_client.capture.call_args.kwargs
+        assert capture_kwargs["distinct_id"] == "caller-7"
+        assert capture_kwargs["groups"] == {"organization": "org_caller"}
+
+    def test_the_run_in_hand_wins_over_the_caller_in_scope(self, mocker: MockerFixture) -> None:
+        """The run the emitter holds is the most specific fact there is."""
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-runner")
+
+        with scoped_caller_identity(caller_identity=_CALLER):
+            manager.track_event(EventName.PIPE_RUN, run_metadata=_run_metadata())
+
+        assert custom_client.capture.call_args.kwargs["distinct_id"] == "user-42"
+
+    def test_a_placeholder_caller_in_scope_still_reports_under_the_configured_id(self, mocker: MockerFixture) -> None:
+        """A local runtime states `local`, which names nobody — the CLI keeps reporting as it did."""
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
+
+        with scoped_caller_identity(caller_identity=CallerIdentity(user_id=LOCAL_USER_ID)):
+            manager.track_event(EventName.PIPE_DRY_RUN)
+
+        assert custom_client.capture.call_args.kwargs["distinct_id"] == "configured-id"
+
+    def test_an_anonymous_stream_identifies_nobody_whatever_the_scope_says(self, mocker: MockerFixture) -> None:
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.ANONYMOUS, configured_user_id="configured-id")
+
+        with scoped_caller_identity(caller_identity=_CALLER):
+            manager.track_event(EventName.PIPE_DRY_RUN)
+
+        capture_kwargs = custom_client.capture.call_args.kwargs
+        assert "distinct_id" not in capture_kwargs
+        assert capture_kwargs["properties"][PostHogAttr.PROCESS_PERSON_PROFILE] is False
+
+    def test_the_caller_in_scope_never_becomes_a_property(self, mocker: MockerFixture) -> None:
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
+
+        with scoped_caller_identity(caller_identity=_CALLER):
+            manager.track_event(EventName.PIPE_DRY_RUN)
+
+        properties = custom_client.capture.call_args.kwargs["properties"]
+        assert "caller-7" not in repr(properties)
+        assert "org_caller" not in repr(properties)
+
+    def test_a_trace_start_with_no_run_is_attributed_to_the_caller_in_scope(self, mocker: MockerFixture) -> None:
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-runner")
+
+        with scoped_caller_identity(caller_identity=_CALLER):
+            manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
+
+        capture_kwargs = custom_client.capture.call_args.kwargs
+        assert capture_kwargs["distinct_id"] == "caller-7"
+        assert capture_kwargs["groups"] == {"organization": "org_caller"}

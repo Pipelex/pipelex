@@ -58,13 +58,13 @@ def _make_worker() -> _StubLLMWorker:
     return _StubLLMWorker(inference_model=inference_model)
 
 
-def _make_llm_job(*, analytics_groups: dict[str, str] | None = None) -> LLMJob:
+def _make_llm_job(*, extras: dict[str, str] | None = None) -> LLMJob:
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(
             user_id="user-42",
             pipeline_run_id="run-1",
             storage_scope="tenant/run-1",
-            analytics_groups=analytics_groups or {},
+            extras=extras or {},
         ),
         pipe_code="some_pipe",
         unit_job_id=UnitJobId.LLM_GEN_TEXT,
@@ -101,14 +101,14 @@ class TestLLMSpanIdentity:
         assert _attributes(span)[PipelexSpanAttr.RUN_USER_ID] == "user-42"
 
     def test_the_span_carries_the_runs_groups_serialized(self, mocker: MockerFixture) -> None:
-        span = _start_span(mocker=mocker, llm_job=_make_llm_job(analytics_groups={"organization": "org_acme"}))
+        span = _start_span(mocker=mocker, llm_job=_make_llm_job(extras={"organization": "org_acme"}))
 
-        assert _attributes(span)[PipelexSpanAttr.RUN_ANALYTICS_GROUPS] == '{"organization": "org_acme"}'
+        assert _attributes(span)[PipelexSpanAttr.RUN_EXTRAS] == '{"organization": "org_acme"}'
 
     def test_a_run_with_no_groups_writes_no_groups_attribute(self, mocker: MockerFixture) -> None:
         span = _start_span(mocker=mocker, llm_job=_make_llm_job())
 
-        assert PipelexSpanAttr.RUN_ANALYTICS_GROUPS not in _attributes(span)
+        assert PipelexSpanAttr.RUN_EXTRAS not in _attributes(span)
 
     def test_langfuse_gets_the_user_id_only_when_it_is_enabled(self, mocker: MockerFixture) -> None:
         mocker.patch.object(TelemetryManagerAbstract, "get_langfuse_enabled", return_value=True)

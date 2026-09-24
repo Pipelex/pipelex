@@ -4,8 +4,9 @@ from types import TracebackType
 from typing import TYPE_CHECKING
 
 from pipelex import log
+from pipelex.system.caller_identity import CallerIdentity, find_stamped_caller_identity, get_current_caller_identity
 from pipelex.system.telemetry.otel_constants import PostHogAttr
-from pipelex.system.telemetry.telemetry_identity import TelemetryIdentity
+from pipelex.system.telemetry.telemetry_identity import StreamIdentityRule, TelemetryIdentity
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -14,16 +15,20 @@ if TYPE_CHECKING:
 
 
 class ExceptionCapture:
-    """Captures unhandled exceptions and sends them to the user's PostHog client.
+    """Captures unhandled exceptions and sends them to the operator's PostHog client.
 
-    Installed in place of PostHog's built-in exception_autocapture so the capture goes through the
-    client the telemetry manager built, with its sanitized ``capture_exception``.
+    Installed in place of PostHog's built-in exception_autocapture, which only
+    uses `default_client`, so the capture goes through the client the telemetry
+    manager built with its sanitized `capture_exception`.
 
     **An `$exception` is attributed like every other capture.** It is resolved
-    through `TelemetryIdentity` rather than from a raw id, because the two
-    interpreter hooks below are handed nothing but `(type, value, traceback)`:
-    they cannot see the run that was in flight, so what they send is the runless
-    identity of the stream, resolved once here. That resolution is what makes
+    through `TelemetryIdentity` rather than from a raw id, and per capture rather
+    than once: the two interpreter hooks below are handed nothing but
+    `(type, value, traceback)`, so the caller is read back from the error itself
+    — the caller of the pipe run it escaped, stamped on it by
+    :func:`~pipelex.system.caller_identity.scoped_caller_identity` — and failing
+    that from the caller still in scope. Only an error that belongs to no caller
+    goes out under the stream's fallback. That resolution is also what makes
     `anonymous` mode mean the same thing on this path as on every other — a mode
     that identifies nobody must not identify somebody when the process crashes.
     """
@@ -34,11 +39,11 @@ class ExceptionCapture:
 
     def __init__(
         self,
-        posthog_client: "Posthog | None",
-        identity: TelemetryIdentity,
+        custom_posthog_client: "Posthog | None",
+        custom_identity_rule: StreamIdentityRule,
     ):
-        self._client = posthog_client
-        self._identity = identity
+        self._custom_client = custom_posthog_client
+        self._custom_identity_rule = custom_identity_rule
 
         # Save original hooks
         self._original_excepthook = sys.excepthook
@@ -60,27 +65,25 @@ class ExceptionCapture:
         exc_traceback: TracebackType | None,
     ) -> None:
         """Handle uncaught exceptions from main thread."""
-        self._capture_exception(exc_info=(exc_type, exc_value, exc_traceback))
+        self._capture_exception((exc_type, exc_value, exc_traceback))
         # Always call original handler to preserve default behavior
         self._original_excepthook(exc_type, exc_value, exc_traceback)
 
-    def _thread_exception_handler(  # kw-only: ignore — installed as threading.excepthook; the interpreter calls it positionally
-        self, args: threading.ExceptHookArgs
-    ) -> None:
+    def _thread_exception_handler(self, args: threading.ExceptHookArgs) -> None:
         """Handle uncaught exceptions from threads."""
-        self._capture_exception(exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+        self._capture_exception((args.exc_type, args.exc_value, args.exc_traceback))
         # Always call original handler to preserve default behavior (prints to stderr)
         self._original_threading_excepthook(args)
 
     def _capture_exception(
         self,
-        *,
         exc_info: tuple[type[BaseException], BaseException | None, TracebackType | None],
     ) -> None:
-        """Capture exception to the PostHog client.
+        """Capture exception to both PostHog clients.
 
         An error already marked when the hook runs was captured by the host
-        before it escaped, and is not sent again.
+        before it escaped, and is not sent again. Otherwise the mark the first
+        stream leaves is cleared before the second, and only then.
         """
         exc_type, exc_value, exc_traceback = exc_info
 
@@ -90,6 +93,8 @@ class ExceptionCapture:
         if self.is_marked_as_captured(exception=exc_value):
             return
 
+        caller_identity = self.resolve_caller_identity(exception=exc_value)
+
         # Create the properly typed tuple for PostHog
         posthog_exc_info: tuple[type[BaseException], BaseException, TracebackType | None] = (
             exc_type,
@@ -97,13 +102,29 @@ class ExceptionCapture:
             exc_traceback,
         )
 
-        if self._client:
-            self._capture_to_client(client=self._client, posthog_exc_info=posthog_exc_info)
+        if self._custom_client:
+            self._capture_to_client(
+                client=self._custom_client,
+                identity=self._custom_identity_rule.resolve(caller_identity=caller_identity),
+                posthog_exc_info=posthog_exc_info,
+            )
+
+    @classmethod
+    def resolve_caller_identity(cls, *, exception: BaseException) -> CallerIdentity | None:
+        """The caller an error is attributed to: the one it escaped from, else the one in scope, else nobody.
+
+        The stamp comes first because it is the only one that survives the
+        unwinding: by the time an error reaches an interpreter hook every scope
+        it crossed has closed. The ambient caller answers for an error raised
+        where a scope is still open — a thread that inherited a caller's context.
+        """
+        return find_stamped_caller_identity(exception=exception) or get_current_caller_identity()
 
     def _capture_to_client(
         self,
         *,
         client: "Posthog",
+        identity: TelemetryIdentity,
         posthog_exc_info: tuple[type[BaseException], BaseException, TracebackType | None],
     ) -> None:
         """Send the `$exception` under the identity the stream resolved.
@@ -114,8 +135,8 @@ class ExceptionCapture:
         rejects a null one and would otherwise mint a person for it.
         """
         try:
-            if self._identity.distinct_id:
-                client.capture_exception(posthog_exc_info, distinct_id=self._identity.distinct_id, groups=self._identity.groups or None)
+            if identity.distinct_id:
+                client.capture_exception(posthog_exc_info, distinct_id=identity.distinct_id, groups=identity.groups or None)
             else:
                 client.capture_exception(posthog_exc_info, properties={PostHogAttr.PROCESS_PERSON_PROFILE: False})
         except Exception as capture_exc:  # ruff: ignore[blind-except]

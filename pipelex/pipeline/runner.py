@@ -32,6 +32,7 @@ from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexR
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
+from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -119,10 +120,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # by omission, because `pipeline_run_setup` requires both explicitly.
         user_id: str = LOCAL_USER_ID,
         storage_scope: str = LOCAL_STORAGE_SCOPE,
-        # Opaque groups the host attaches to every run this protocol starts.
+        # Opaque labels the host attaches to every run this protocol starts.
         # No local default: a laptop belongs to no organization, and inventing
-        # a group here would put every such run into one shared entity.
-        analytics_groups: dict[str, str] | None = None,
+        # a label here would put every such run into one shared entity.
+        extras: dict[str, str] | None = None,
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
         inputs_base_dir: Path | None = None,
@@ -134,13 +135,24 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.is_mock_usage = is_mock_usage
         self.user_id = user_id
         self.storage_scope = storage_scope
-        self.analytics_groups = analytics_groups
+        self.extras = extras
         self.execution_config = execution_config
         self._pipe_run = pipe_run
         # Directory that bare relative local file paths in `inputs` resolve against (Smart Inputs
         # D3). Set by a CLI to the inputs file's parent; None for API/SDK callers (absolute urls).
         self.inputs_base_dir = inputs_base_dir
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
+
+    @property
+    def caller_identity(self) -> CallerIdentity:
+        """The caller this protocol works for: the user and the groups every run it starts states.
+
+        What a validation is attributed to, since a validation is not a run and has no
+        `RunMetadata` of its own to carry them. A local runtime states `LOCAL_USER_ID`,
+        which telemetry never attributes to a person, so a local validation still reports
+        under the stream's fallback.
+        """
+        return CallerIdentity.make_from_host(user_id=self.user_id, extras=self.extras)
 
     @override
     async def execute(
@@ -235,7 +247,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 is_mock_usage=self.is_mock_usage,
                 user_id=self.user_id,
                 storage_scope=self.storage_scope,
-                analytics_groups=self.analytics_groups,
+                extras=self.extras,
                 inputs_base_dir=self.inputs_base_dir,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
@@ -442,6 +454,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             allow_signatures=allow_signatures,
             graph_pipe_code=graph_pipe_code,
             log_context="Protocol validate",
+            caller_identity=self.caller_identity,
         )
 
     @override
