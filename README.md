@@ -1,8 +1,8 @@
 <div align="center">
   <h1 align="center"><a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex" width="400" style="max-width: 100%; height: auto;"></a></h1>
 
-  <h2 align="center">Turn your expertise into an AI-powered App/MCP/API</h2>
-  <p align="center">Pipelex runs your AI methods. Write a method once: a webapp runs it for your team or as SaaS for your customers, your agent runs it over MCP, your software runs it over the API.</p>
+  <h2 align="center">Turn your expertise into an AI-powered App, MCP or API</h2>
+  <p align="center">Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin: a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, from your agent or your chatbot via MCP, or via API in any software.</p>
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
@@ -84,29 +84,6 @@ Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it t
 Prefer to run it yourself? This repository is the Pipelex runtime — its own install and configuration are below.
 <!-- /onboarding -->
 
-## What a method looks like
-
-A method is a reusable, typed AI procedure, written in [MTHDS](https://mthds.ai/latest/), an open standard, and saved as a `.mthds` file. Each step is explicit, each output is structured, and every run is repeatable.
-
-```toml
-domain    = "articles"
-main_pipe = "summarize_article"
-
-[pipe.summarize_article]
-type        = "PipeLLM"
-description = "Summarize an article for a given audience"
-inputs      = { article = "Text", audience = "Text" }
-output      = "Text"
-prompt      = "Summarize $article in three bullet points for $audience."
-```
-
-From here, Pipelex handles model routing across providers, structured output parsing, and pipeline orchestration.
-
-| | |
-|---|---|
-| **Declarative** — Human-readable `.mthds` files that work across models | **Typed** — Semantic types: AI understands what you mean, every input/output connects with purpose |
-| **Repeatable** — Deterministic orchestration with controlled room for AI creativity | **Composable** — Chain pipes into sequences, nest methods inside methods, share with the community |
-
 ## Run it yourself
 
 This repository is the Pipelex runtime: the Python package that reads a `.mthds` file and runs it. Install it and everything happens on your own machine, against the model providers you choose.
@@ -148,7 +125,7 @@ uv tool install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,lin
 
 ### Run a method
 
-Save the method above as `summarize.mthds` and its inputs as `inputs.json`:
+Save the method shown under [What a method looks like](#what-a-method-looks-like), further down, as `summarize.mthds`, and its inputs as `inputs.json`:
 
 ```json
 {
@@ -176,6 +153,31 @@ The result is written under `results/`. For a method with several steps, typed c
 <a href="https://go.pipelex.com/demo">
   <img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="500" style="max-width: 100%; height: auto;">
 </a>
+
+## What a method looks like
+
+A method is a reusable, typed AI procedure, written in [MTHDS](https://mthds.ai/latest/), an open standard, and saved as a `.mthds` file. Each step is explicit, each output is structured, and every run is repeatable.
+
+```toml
+domain    = "articles"
+main_pipe = "summarize_article"
+
+[pipe.summarize_article]
+type        = "PipeLLM"
+description = "Summarize an article for a given audience"
+inputs      = { article = "Text", audience = "Text" }
+output      = "Text"
+prompt      = "Summarize $article in three bullet points for $audience."
+```
+
+From here, Pipelex handles model routing across providers, structured output parsing, and pipeline orchestration.
+
+## Why methods?
+
+| | |
+|---|---|
+| **Declarative** — Human-readable `.mthds` files that work across models | **Typed** — Semantic types: AI understands what you mean, every input/output connects with purpose |
+| **Repeatable** — Deterministic orchestration with controlled room for AI creativity | **Composable** — Chain pipes into sequences, nest methods inside methods, share with the community |
 
 ## Run anywhere
 
