@@ -46,7 +46,7 @@ _PARENT_OTEL_CONTEXT = OtelContext(
 )
 
 
-async def _make_pipe_job(*, analytics_groups: dict[str, str] | None = None) -> PipeJob:
+async def _make_pipe_job(*, extras: dict[str, str] | None = None) -> PipeJob:
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
     pipe_job, _, _ = await pipeline_run_setup(
         storage_scope="test/scope",
@@ -54,7 +54,7 @@ async def _make_pipe_job(*, analytics_groups: dict[str, str] | None = None) -> P
         execution_config=execution_config,
         mthds_contents=[_MINIMAL_MTHDS],
         pipe_code="echo_topic",
-        analytics_groups=analytics_groups,
+        extras=extras,
         inputs={"subject": "a subject"},
     )
     return pipe_job
@@ -83,15 +83,15 @@ class TestPipeSpanIdentity:
         assert _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))[PipelexSpanAttr.RUN_USER_ID] == "user-42"
 
     async def test_the_groups_the_caller_supplied_reach_the_span(self, mocker: MockerFixture) -> None:
-        pipe_job = await _make_pipe_job(analytics_groups={"organization": "org_acme"})
+        pipe_job = await _make_pipe_job(extras={"organization": "org_acme"})
 
         attributes = _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))
-        assert attributes[PipelexSpanAttr.RUN_ANALYTICS_GROUPS] == '{"organization": "org_acme"}'
+        assert attributes[PipelexSpanAttr.RUN_EXTRAS] == '{"organization": "org_acme"}'
 
     async def test_a_run_with_no_groups_writes_no_groups_attribute(self, mocker: MockerFixture) -> None:
         pipe_job = await _make_pipe_job()
 
-        assert PipelexSpanAttr.RUN_ANALYTICS_GROUPS not in _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))
+        assert PipelexSpanAttr.RUN_EXTRAS not in _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))
 
     async def test_langfuse_gets_the_user_id_when_it_is_enabled(self, mocker: MockerFixture) -> None:
         pipe_job = await _make_pipe_job()

@@ -331,7 +331,7 @@ class BundleValidator:
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id=dry_run_pipeline_id,
                 user_id=caller_identity.user_id if caller_identity is not None else DRY_RUN_USER_ID,
-                analytics_groups=caller_identity.analytics_groups if caller_identity is not None else None,
+                extras=caller_identity.extras if caller_identity is not None else None,
                 # A dry run provably stores nothing, but `storage_scope` is
                 # required — so it says so, loudly and greppably, instead of
                 # inheriting a default. A silent default on this field is

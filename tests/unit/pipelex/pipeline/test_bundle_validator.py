@@ -24,7 +24,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty
 
-_CALLER = CallerIdentity(user_id="caller-7", analytics_groups={"organization": "org_caller"})
+_CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
 
 
 class TestBundleValidator:
@@ -278,7 +278,7 @@ class TestBundleValidator:
 
         prepare_kwargs = prepare_mock.call_args.kwargs
         assert prepare_kwargs["user_id"] == "caller-7"
-        assert prepare_kwargs["analytics_groups"] == {"organization": "org_caller"}
+        assert prepare_kwargs["extras"] == {"organization": "org_caller"}
         # A dry run still stores nothing, whoever it is done for.
         assert prepare_kwargs["storage_scope"] == DRY_RUN_STORAGE_SCOPE
 
@@ -302,4 +302,4 @@ class TestBundleValidator:
         assert callers_seen_by_the_event == [None]
         prepare_kwargs = prepare_mock.call_args.kwargs
         assert prepare_kwargs["user_id"] == DRY_RUN_USER_ID
-        assert prepare_kwargs["analytics_groups"] is None
+        assert prepare_kwargs["extras"] is None

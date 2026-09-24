@@ -22,7 +22,7 @@ from pipelex.system.caller_identity import (
 )
 from pipelex.system.job_metadata import RunMetadata
 
-_ALICE = CallerIdentity(user_id="user-alice", analytics_groups={"organization": "org_acme"})
+_ALICE = CallerIdentity(user_id="user-alice", extras={"organization": "org_acme"})
 _BOB = CallerIdentity(user_id="user-bob")
 
 
@@ -43,20 +43,20 @@ class TestCallerIdentity:
             user_id="user-42",
             pipeline_run_id="run-1",
             storage_scope="tenant/run-1",
-            analytics_groups={"organization": "org_acme"},
+            extras={"organization": "org_acme"},
         )
 
         caller_identity = CallerIdentity.make_from_run_metadata(run_metadata=run_metadata)
 
-        assert caller_identity == CallerIdentity(user_id="user-42", analytics_groups={"organization": "org_acme"})
+        assert caller_identity == CallerIdentity(user_id="user-42", extras={"organization": "org_acme"})
 
     def test_a_host_with_no_groups_states_an_empty_mapping(self) -> None:
-        assert CallerIdentity.make_from_host(user_id="user-42", analytics_groups=None).analytics_groups == {}
+        assert CallerIdentity.make_from_host(user_id="user-42", extras=None).extras == {}
 
     def test_its_groups_are_validated_like_a_runs(self) -> None:
         """The groups reach a telemetry backend, so a malformed key is refused at construction."""
-        with pytest.raises(ValidationError, match="analytics_groups"):
-            CallerIdentity(user_id="user-42", analytics_groups={"organization": "has a space"})
+        with pytest.raises(ValidationError, match="extras"):
+            CallerIdentity(user_id="user-42", extras={"organization": "has a space"})
 
     def test_there_is_no_caller_outside_every_scope(self) -> None:
         assert get_current_caller_identity() is None

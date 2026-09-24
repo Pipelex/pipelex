@@ -43,7 +43,7 @@ output = "Topic"
 prompt = "Echo the $subject as a topic"
 """
 
-_CALLER = CallerIdentity(user_id="caller-7", analytics_groups={"organization": "org_caller"})
+_CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
 
 
 def _record_callers(*, mocker: MockerFixture) -> tuple[list[CallerIdentity | None], Any, Any]:
@@ -73,12 +73,12 @@ class TestValidateCallerIdentity:
         assert len(dry_run_calls) >= 2
         for dry_run_call in dry_run_calls:
             assert dry_run_call.kwargs["user_id"] == "caller-7"
-            assert dry_run_call.kwargs["analytics_groups"] == {"organization": "org_caller"}
+            assert dry_run_call.kwargs["extras"] == {"organization": "org_caller"}
         assert get_current_caller_identity() is None
 
     async def test_the_protocol_validates_for_the_caller_it_was_built_for(self, mocker: MockerFixture) -> None:
         callers_at_dry_run_event, sweep_prepare_spy, _graph_prepare_spy = _record_callers(mocker=mocker)
-        protocol = PipelexMTHDSProtocol(user_id="caller-7", analytics_groups={"organization": "org_caller"})
+        protocol = PipelexMTHDSProtocol(user_id="caller-7", extras={"organization": "org_caller"})
 
         await protocol.validate(mthds_contents=[_MTHDS])
 

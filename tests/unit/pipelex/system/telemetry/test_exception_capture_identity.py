@@ -69,7 +69,7 @@ def _crash(*, capture: DualClientExceptionCapture) -> None:
     capture._capture_exception((ValueError, ValueError("boom"), None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
 
-_CALLER = CallerIdentity(user_id="caller-7", analytics_groups={"organization": "org_caller"})
+_CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
 
 
 def _crash_with(*, capture: DualClientExceptionCapture, error: BaseException) -> None:

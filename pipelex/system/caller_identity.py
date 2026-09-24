@@ -10,7 +10,7 @@ validation and every crash landed on one constant id per deployment while the
 caller who caused it was known all along.
 
 **Two facts, one object.** A caller is the `user_id` the host states and the
-opaque `analytics_groups` it attaches — the same two facts `RunMetadata` holds,
+opaque `extras` it attaches — the same two facts `RunMetadata` holds,
 without the per-run fields (`pipeline_run_id`, `storage_scope`) that work which
 is not a run does not have. Whether a given `user_id` may be attributed to a
 person is not decided here: telemetry decides it, once, in
@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from pipelex.system.analytics_groups import validate_analytics_groups
+from pipelex.system.run_extras import validate_run_extras
 
 if TYPE_CHECKING:
     from pipelex.system.job_metadata import RunMetadata
@@ -49,10 +49,10 @@ _CALLER_IDENTITY_STAMP = "__pipelex_caller_identity__"
 
 
 class CallerIdentity(BaseModel):
-    """The caller a piece of work is done for: a user and the groups they belong to.
+    """The caller a piece of work is done for: a user and the extras the host attaches.
 
-    Frozen, and the groups are validated at construction exactly as
-    `RunMetadata.analytics_groups` is, because they reach a telemetry backend.
+    Frozen, and the extras are validated at construction exactly as
+    `RunMetadata.extras` is, because they reach a telemetry backend.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -62,23 +62,23 @@ class CallerIdentity(BaseModel):
     # person is decided by telemetry, not here.
     user_id: str
 
-    # The opaque groups the caller belongs to — see `pipelex.system.analytics_groups`.
-    analytics_groups: dict[str, str] = Field(default_factory=dict)
+    # The opaque labels the host attaches to the caller — see `pipelex.system.run_extras`.
+    extras: dict[str, str] = Field(default_factory=dict)
 
-    @field_validator("analytics_groups")
+    @field_validator("extras")
     @classmethod
-    def _validate_analytics_groups(cls, value: dict[str, str]) -> dict[str, str]:
-        return validate_analytics_groups(value=value)
+    def _validate_extras(cls, value: dict[str, str]) -> dict[str, str]:
+        return validate_run_extras(value=value)
 
     @classmethod
     def make_from_run_metadata(cls, *, run_metadata: "RunMetadata") -> "CallerIdentity":
         """The caller of a run, read from the run half of its job metadata."""
-        return cls(user_id=run_metadata.user_id, analytics_groups=dict(run_metadata.analytics_groups))
+        return cls(user_id=run_metadata.user_id, extras=dict(run_metadata.extras))
 
     @classmethod
-    def make_from_host(cls, *, user_id: str, analytics_groups: dict[str, str] | None) -> "CallerIdentity":
-        """The caller a host states, with no groups meaning an empty mapping."""
-        return cls(user_id=user_id, analytics_groups=dict(analytics_groups or {}))
+    def make_from_host(cls, *, user_id: str, extras: dict[str, str] | None) -> "CallerIdentity":
+        """The caller a host states, with no extras meaning an empty mapping."""
+        return cls(user_id=user_id, extras=dict(extras or {}))
 
 
 _current_caller_identity: ContextVar[CallerIdentity | None] = ContextVar("current_caller_identity", default=None)

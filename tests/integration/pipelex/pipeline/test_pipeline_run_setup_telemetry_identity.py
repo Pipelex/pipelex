@@ -57,7 +57,7 @@ async def _run_setup(*, mocker: MockerFixture) -> Any:
         mthds_contents=[_MINIMAL_MTHDS],
         pipe_code="echo_topic",
         inputs={"subject": "a subject"},
-        analytics_groups={"organization": "org_acme"},
+        extras={"organization": "org_acme"},
     )
     return telemetry_manager
 
@@ -70,7 +70,7 @@ class TestPipelineRunSetupTelemetryIdentity:
         telemetry_manager.handle_trace_start.assert_called_once()
         run_metadata = telemetry_manager.handle_trace_start.call_args.kwargs["run_metadata"]
         assert run_metadata.user_id == "user-42"
-        assert run_metadata.analytics_groups == {"organization": "org_acme"}
+        assert run_metadata.extras == {"organization": "org_acme"}
 
     async def test_the_pipeline_execute_event_is_handed_the_runs_metadata(self, mocker: MockerFixture) -> None:
         telemetry_manager = await _run_setup(mocker=mocker)
@@ -79,4 +79,4 @@ class TestPipelineRunSetupTelemetryIdentity:
         assert len(execute_calls) == 1
         run_metadata = execute_calls[0].kwargs["run_metadata"]
         assert run_metadata.user_id == "user-42"
-        assert run_metadata.analytics_groups == {"organization": "org_acme"}
+        assert run_metadata.extras == {"organization": "org_acme"}

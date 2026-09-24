@@ -38,7 +38,7 @@ class TestDirectBundleValidator:
             mthds_sources=["domain.mthds"],
             allow_signatures=True,
             library_dirs=[Path("lib_dir")],
-            caller_identity=CallerIdentity(user_id="user-42", analytics_groups={"organization": "org_acme"}),
+            caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
         )
 
         assert verdict is report
@@ -48,7 +48,7 @@ class TestDirectBundleValidator:
             library_dirs=[Path("lib_dir")],
             allow_signatures=True,
             log_context="API validate",
-            caller_identity=CallerIdentity(user_id="user-42", analytics_groups={"organization": "org_acme"}),
+            caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
         )
 
     async def test_validate_bundle_error_becomes_the_invalid_arm(self, mocker: MockerFixture) -> None:

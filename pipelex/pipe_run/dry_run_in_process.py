@@ -156,7 +156,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str, caller
                 # The caller the dry run is done for, so its pipe runs are attributed to
                 # them; `DRY_RUN_USER_ID` says there is none.
                 user_id=effective_caller_identity.user_id if effective_caller_identity is not None else DRY_RUN_USER_ID,
-                analytics_groups=effective_caller_identity.analytics_groups if effective_caller_identity is not None else None,
+                extras=effective_caller_identity.extras if effective_caller_identity is not None else None,
                 # A dry run provably stores nothing, but `storage_scope` is
                 # required — so it says so, loudly and greppably, instead of
                 # inheriting a default. A silent default on this field is

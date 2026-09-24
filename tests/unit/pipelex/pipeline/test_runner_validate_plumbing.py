@@ -116,15 +116,15 @@ class TestRunnerValidatePlumbing:
             return mocker.MagicMock(name="validate_bundle_result")
 
         env.validate_bundle_mock.side_effect = record_caller
-        runner = PipelexMTHDSProtocol(user_id="caller-7", analytics_groups={"organization": "org_caller"})
+        runner = PipelexMTHDSProtocol(user_id="caller-7", extras={"organization": "org_caller"})
 
         await runner.validate(mthds_contents=["bundle-content"])
 
-        assert callers_seen == [CallerIdentity(user_id="caller-7", analytics_groups={"organization": "org_caller"})]
+        assert callers_seen == [CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})]
         assert get_current_caller_identity() is None
 
     async def test_a_local_protocol_states_the_local_caller(self) -> None:
-        assert PipelexMTHDSProtocol().caller_identity == CallerIdentity(user_id=LOCAL_USER_ID, analytics_groups={})
+        assert PipelexMTHDSProtocol().caller_identity == CallerIdentity(user_id=LOCAL_USER_ID, extras={})
 
     @pytest.mark.parametrize(
         ("prev_library_id", "validation_library_id", "expect_set_prev", "expect_clear", "expect_teardown"),

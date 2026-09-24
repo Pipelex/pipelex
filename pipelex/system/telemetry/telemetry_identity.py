@@ -6,9 +6,11 @@ own stream, the gateway-key hash on Pipelex's — and before this module every s
 and every event carried that one id. On a host that serves many callers from one
 process that is exactly wrong: every tenant's generations land under one identity
 per deployment. The runtime already knows who each run belongs to, on
-`RunMetadata.user_id`, and what it belongs to, on `RunMetadata.analytics_groups`;
-this module is the single place that turns those two facts into what a capture
-needs.
+`RunMetadata.user_id`, and the host's opaque labels about it, on
+`RunMetadata.extras`; this module is the single place that turns those two
+facts into what a capture needs. The extras are forwarded whole as the capture's
+groups — the runtime reads no key by name — because PostHog, the backend these
+captures go to, is the one that supports grouping.
 
 **One resolution, applied everywhere.** The exporter resolves per span, the
 tracker per event, and both go through `TelemetryIdentity` so they cannot drift.
@@ -18,8 +20,8 @@ are two — the enum below says which stream carries which, and why:
 1. `NONE` — the capture is anonymous whatever the run says, and the caller marks
    it so. No user, no fallback, no groups.
 2. `DIRECT` — the run's own `user_id` is the `distinct_id`, spelled as the
-   operator's own backend already knows it, and the run's groups ride the
-   capture.
+   operator's own backend already knows it, and the run's extras ride the
+   capture as its groups.
 
 **A run that names nobody** reports under the stream's configured fallback, and
 so does an event that belongs to no caller at all — a CLI command, a local
@@ -30,12 +32,12 @@ the host or the pipe run put in scope, exactly as a run's own event would.
 `RunMetadata.user_id` is required, but some of its values name a caller without
 distinguishing one; see `_NON_DISTINGUISHING_RUN_USER_IDS` below. This is why a
 local run keeps reporting exactly as it did before per-run attribution existed.
-Under `DIRECT` the run's groups still ride such a capture: a host may know which
+Under `DIRECT` the run's extras still ride such a capture: a host may know which
 entities a run belongs to without naming its caller, and the two facts are
 independent.
 
 **Where the identity is NOT.** The user id goes on the capture as `distinct_id`
-and the groups go through the capture's `groups` argument. Neither is ever copied
+and the run's extras go through the capture's `groups` argument. Neither is ever copied
 into an event property or a span name: one field, one meaning, and a second copy
 is a second thing to keep in step.
 """
@@ -110,7 +112,7 @@ def make_run_identity_span_attributes(*, run_metadata: "RunMetadata", is_langfus
     Called at each span site from the `JobMetadata` already in hand, so the
     identity travels on the span object through the batch processor: no exporter
     has to correlate a span back to a run through shared state, and every
-    exporter sees the same fact. PostHog is the one that reads the groups as
+    exporter sees the same fact. PostHog is the one that reads the extras as
     group identity; Langfuse gets the user id in the field it reserves for it,
     which it has defined and never received until now.
 
@@ -121,8 +123,8 @@ def make_run_identity_span_attributes(*, run_metadata: "RunMetadata", is_langfus
             the same value.
 
     Returns:
-        The attributes to merge into the span's attribute dict. The groups entry
-        is absent — not empty — when the run carries no groups. `pipelex.run.user_id`
+        The attributes to merge into the span's attribute dict. The extras entry
+        is absent — not empty — when the run carries no extras. `pipelex.run.user_id`
         is written as the run states it, placeholders included: a span attribute
         records what the run IS, and whether that value may be attributed to a
         person is a separate decision, taken once in `_resolve` below. Langfuse's
@@ -131,8 +133,8 @@ def make_run_identity_span_attributes(*, run_metadata: "RunMetadata", is_langfus
         than becoming a person named `local` in the operator's project.
     """
     attributes: dict[str, str] = {PipelexSpanAttr.RUN_USER_ID: run_metadata.user_id}
-    if run_metadata.analytics_groups:
-        attributes[PipelexSpanAttr.RUN_ANALYTICS_GROUPS] = pure_json_str(data=run_metadata.analytics_groups)
+    if run_metadata.extras:
+        attributes[PipelexSpanAttr.RUN_EXTRAS] = pure_json_str(data=run_metadata.extras)
     if is_langfuse_enabled and run_metadata.user_id not in _NON_DISTINGUISHING_RUN_USER_IDS:
         attributes[LangfuseSpanAttr.USER_ID] = run_metadata.user_id
     return attributes
@@ -151,7 +153,7 @@ class TelemetryIdentity(BaseModel):
     distinct_id: str | None = None
 
     # The entities the capture belongs to, forwarded through the backend's own
-    # groups facet. Empty on an anonymous capture, which has no person for a
+    # groups facet: the run's `extras`, whole and unread. Empty on an anonymous capture, which has no person for a
     # group to qualify.
     groups: dict[str, str] = Field(default_factory=dict)
 
@@ -170,7 +172,7 @@ class TelemetryIdentity(BaseModel):
         cls,
         *,
         run_user_id: str | None,
-        run_groups: dict[str, str] | None,
+        run_extras: dict[str, str] | None,
         fallback_distinct_id: str | None,
         run_identity_policy: RunIdentityPolicy,
     ) -> "TelemetryIdentity":
@@ -183,7 +185,7 @@ class TelemetryIdentity(BaseModel):
         resolved_distinct_id = distinguishing_user_id or fallback_distinct_id
         if not resolved_distinct_id:
             return cls.make_anonymous()
-        return cls(distinct_id=resolved_distinct_id, groups=dict(run_groups or {}))
+        return cls(distinct_id=resolved_distinct_id, groups=dict(run_extras or {}))
 
     @classmethod
     def make_from_run_metadata(
@@ -204,7 +206,7 @@ class TelemetryIdentity(BaseModel):
         """
         return cls._resolve(
             run_user_id=run_metadata.user_id if run_metadata is not None else None,
-            run_groups=run_metadata.analytics_groups if run_metadata is not None else None,
+            run_extras=run_metadata.extras if run_metadata is not None else None,
             fallback_distinct_id=fallback_distinct_id,
             run_identity_policy=run_identity_policy,
         )
@@ -231,7 +233,7 @@ class TelemetryIdentity(BaseModel):
         """
         return cls._resolve(
             run_user_id=caller_identity.user_id if caller_identity is not None else None,
-            run_groups=caller_identity.analytics_groups if caller_identity is not None else None,
+            run_extras=caller_identity.extras if caller_identity is not None else None,
             fallback_distinct_id=fallback_distinct_id,
             run_identity_policy=run_identity_policy,
         )
@@ -253,14 +255,14 @@ class TelemetryIdentity(BaseModel):
         run_user_id = attributes.get(PipelexSpanAttr.RUN_USER_ID)
         return cls._resolve(
             run_user_id=run_user_id if isinstance(run_user_id, str) else None,
-            run_groups=cls._read_groups_attribute(attributes=attributes),
+            run_extras=cls._read_extras_attribute(attributes=attributes),
             fallback_distinct_id=fallback_distinct_id,
             run_identity_policy=run_identity_policy,
         )
 
     @classmethod
-    def _read_groups_attribute(cls, *, attributes: Mapping[str, Any]) -> dict[str, str]:
-        """Read back the groups a span site serialized, refusing anything else.
+    def _read_extras_attribute(cls, *, attributes: Mapping[str, Any]) -> dict[str, str]:
+        """Read back the extras a span site serialized, refusing anything else.
 
         The value was written by `make_run_identity_span_attributes` from an
         already-validated mapping, so a shape other than a JSON object of strings
@@ -268,27 +270,27 @@ class TelemetryIdentity(BaseModel):
         app, so that is a debug line and an empty mapping — the span still
         exports, attributed to the run's user without its groups.
         """
-        raw = attributes.get(PipelexSpanAttr.RUN_ANALYTICS_GROUPS)
+        raw = attributes.get(PipelexSpanAttr.RUN_EXTRAS)
         if raw is None:
             return {}
         if not isinstance(raw, str):
-            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_ANALYTICS_GROUPS}': expected a JSON string, got {type(raw).__name__}")
+            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_EXTRAS}': expected a JSON string, got {type(raw).__name__}")
             return {}
         try:
             decoded = json.loads(raw)
         except ValueError as exc:
-            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_ANALYTICS_GROUPS}': not decodable JSON ({exc})")
+            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_EXTRAS}': not decodable JSON ({exc})")
             return {}
         if not isinstance(decoded, dict):
-            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_ANALYTICS_GROUPS}': expected a JSON object, got {type(decoded).__name__}")
+            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_EXTRAS}': expected a JSON object, got {type(decoded).__name__}")
             return {}
-        groups: dict[str, str] = {}
-        for group_type, group_key in decoded.items():  # type: ignore[union-attr]
-            if isinstance(group_type, str) and isinstance(group_key, str):
-                groups[group_type] = group_key
+        extras: dict[str, str] = {}
+        for extras_key, extras_value in decoded.items():  # type: ignore[union-attr]
+            if isinstance(extras_key, str) and isinstance(extras_value, str):
+                extras[extras_key] = extras_value
             else:
-                log.debug(f"Ignoring a non-string entry in span attribute '{PipelexSpanAttr.RUN_ANALYTICS_GROUPS}'")
-        return groups
+                log.debug(f"Ignoring a non-string entry in span attribute '{PipelexSpanAttr.RUN_EXTRAS}'")
+        return extras
 
 
 class StreamIdentityRule(BaseModel):

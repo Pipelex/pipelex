@@ -44,12 +44,12 @@ def _job_metadata() -> JobMetadata:
             storage_scope="tenant/run-1",
             user_id="caller-7",
             pipeline_run_id="run-1",
-            analytics_groups={"organization": "org_caller"},
+            extras={"organization": "org_caller"},
         ),
     )
 
 
-_EXPECTED_CALLER = CallerIdentity(user_id="caller-7", analytics_groups={"organization": "org_caller"})
+_EXPECTED_CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
 
 
 @pytest.mark.asyncio(loop_scope="class")

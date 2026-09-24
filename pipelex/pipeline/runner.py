@@ -120,10 +120,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # by omission, because `pipeline_run_setup` requires both explicitly.
         user_id: str = LOCAL_USER_ID,
         storage_scope: str = LOCAL_STORAGE_SCOPE,
-        # Opaque groups the host attaches to every run this protocol starts.
+        # Opaque labels the host attaches to every run this protocol starts.
         # No local default: a laptop belongs to no organization, and inventing
-        # a group here would put every such run into one shared entity.
-        analytics_groups: dict[str, str] | None = None,
+        # a label here would put every such run into one shared entity.
+        extras: dict[str, str] | None = None,
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
         inputs_base_dir: Path | None = None,
@@ -135,7 +135,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.is_mock_usage = is_mock_usage
         self.user_id = user_id
         self.storage_scope = storage_scope
-        self.analytics_groups = analytics_groups
+        self.extras = extras
         self.execution_config = execution_config
         self._pipe_run = pipe_run
         # Directory that bare relative local file paths in `inputs` resolve against (Smart Inputs
@@ -152,7 +152,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         which telemetry never attributes to a person, so a local validation still reports
         under the stream's fallback.
         """
-        return CallerIdentity.make_from_host(user_id=self.user_id, analytics_groups=self.analytics_groups)
+        return CallerIdentity.make_from_host(user_id=self.user_id, extras=self.extras)
 
     @override
     async def execute(
@@ -247,7 +247,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 is_mock_usage=self.is_mock_usage,
                 user_id=self.user_id,
                 storage_scope=self.storage_scope,
-                analytics_groups=self.analytics_groups,
+                extras=self.extras,
                 inputs_base_dir=self.inputs_base_dir,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
