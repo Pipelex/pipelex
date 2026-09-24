@@ -25,12 +25,12 @@ from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 
 
-def _run_metadata(*, user_id: str = "user-42", analytics_groups: dict[str, str] | None = None) -> RunMetadata:
+def _run_metadata(*, user_id: str = "user-42", extras: dict[str, str] | None = None) -> RunMetadata:
     return RunMetadata(
         user_id=user_id,
         pipeline_run_id="run-1",
         storage_scope="tenant/run-1",
-        analytics_groups=analytics_groups or {},
+        extras=extras or {},
     )
 
 
@@ -68,7 +68,7 @@ class TestTelemetryManagerIdentity:
 
         manager.track_event(
             EventName.PIPE_RUN,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -90,7 +90,7 @@ class TestTelemetryManagerIdentity:
 
         manager.track_event(
             EventName.PIPE_RUN,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -117,7 +117,7 @@ class TestTelemetryManagerIdentity:
 
         manager.track_event(
             EventName.PIPE_RUN,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = pipelex_client.capture.call_args.kwargs
@@ -160,7 +160,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -181,7 +181,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -201,7 +201,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = custom_client.capture.call_args.kwargs
@@ -222,7 +222,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         capture_kwargs = pipelex_client.capture.call_args.kwargs
@@ -236,7 +236,7 @@ class TestTelemetryManagerIdentity:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             trace_id=1234,
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
         )
 
         rendered = repr(custom_client.capture.call_args.kwargs["properties"])

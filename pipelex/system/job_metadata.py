@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from pipelex.system.analytics_groups import validate_analytics_groups
+from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
@@ -71,13 +71,13 @@ class RunMetadata(BaseModel):
     here rather than a check at construction that a later assignment undoes.
     Nothing ever needed to reassign one — these are the facts that are constant
     for a whole run, which is the definition this class exists to draw — and
-    since telemetry began forwarding ``analytics_groups`` to a backend and
+    since telemetry began forwarding ``extras`` to a backend and
     composing ``storage_scope`` into storage keys, "validated at construction"
     has to mean "validated, full stop".
 
     **What the freeze does not close**, named here so nobody mistakes any of it
     for closed. Freezing refuses a REASSIGNMENT and nothing else, so an in-place
-    edit of the mapping (``run_metadata.analytics_groups[k] = v``) still reaches
+    edit of the mapping (``run_metadata.extras[k] = v``) still reaches
     a backend unvalidated, and pydantic's two deliberate bypasses —
     ``model_copy(update=...)`` and ``model_construct`` — still build an instance
     without running a validator. The runtime does none of the three, and a
@@ -118,18 +118,18 @@ class RunMetadata(BaseModel):
     # characters into the log lines or ``ErrorReport`` envelopes that quote it.
     request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
 
-    # The opaque groups this run's telemetry belongs to, supplied by the host.
-    # Forwarded to whichever consumer understands groups and never read by name
-    # — see `pipelex.system.analytics_groups` for why the host's own concepts
+    # The opaque labels the host attaches to this run. Never read by name;
+    # telemetry forwards the whole mapping as the groups of each capture
+    # — see `pipelex.system.run_extras` for why the host's own concepts
     # (organization, tenant, plan tier) deliberately do not cross this boundary,
     # and for the charset and the size bound.
     #
     # It DEFAULTS, unlike `user_id` and `storage_scope` above, and the asymmetry
     # is the point: those two refuse to default because a missing identity once
-    # became a present-looking one and a shared storage prefix. An absent group
+    # became a present-looking one and a shared storage prefix. An absent label
     # creates no namespace and misattributes nothing — it only leaves the group
-    # facet empty — so a caller with no groups to send says nothing.
-    analytics_groups: dict[str, str] = Field(default_factory=dict)
+    # facet empty — so a caller with no labels to send says nothing.
+    extras: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("storage_scope")
     @classmethod
@@ -146,9 +146,9 @@ class RunMetadata(BaseModel):
         """
         return validate_storage_scope(value=value)
 
-    @field_validator("analytics_groups")
+    @field_validator("extras")
     @classmethod
-    def _validate_analytics_groups(cls, value: dict[str, str]) -> dict[str, str]:
+    def _validate_run_extras(cls, value: dict[str, str]) -> dict[str, str]:
         """Refuse a mapping the runtime could not safely forward, at construction.
 
         On the TYPE for the same reason as `storage_scope`: the value is caller
@@ -161,12 +161,12 @@ class RunMetadata(BaseModel):
         The guarantee stops at construction, and deliberately so. The model is
         frozen, so reassigning the field raises — but freezing does not reach
         inside the mapping, and mutating it in place
-        (`run_metadata.analytics_groups[k] = v`) still bypasses this validator.
+        (`run_metadata.extras[k] = v`) still bypasses this validator.
         See the class docstring for that hole and for pydantic's two others.
         Nothing in the runtime mutates the mapping after construction; a future
         consumer that forwards it must not start.
         """
-        return validate_analytics_groups(value=value)
+        return validate_run_extras(value=value)
 
 
 class JobMetadata(BaseModel):

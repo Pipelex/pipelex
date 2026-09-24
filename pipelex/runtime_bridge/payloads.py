@@ -16,9 +16,9 @@ from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
 # Import-light by design (see module docstring): `storage_scope` and
-# `analytics_groups` each pull in `re` and nothing else, so validating here
+# `extras` each pull in `re` and nothing else, so validating here
 # costs the boundary nothing.
-from pipelex.system.analytics_groups import validate_analytics_groups
+from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_storage_scope
 
 
@@ -52,15 +52,15 @@ class PipelexPipeRunInput(BaseModel):
         """
         return validate_storage_scope(value=value)
 
-    # The opaque groups this run's telemetry belongs to. Unlike the two fields
-    # above it DEFAULTS: a host with no groups to send invents nothing by
+    # The opaque labels the host attaches to this run. Unlike the two fields
+    # above it DEFAULTS: a host with no labels to send invents nothing by
     # staying silent, whereas a missing identity or scope used to be invented
-    # for it. See `pipelex.system.analytics_groups`.
-    analytics_groups: dict[str, str] = Field(default_factory=dict)
+    # for it. See `pipelex.system.run_extras`.
+    extras: dict[str, str] = Field(default_factory=dict)
 
-    @field_validator("analytics_groups")
+    @field_validator("extras")
     @classmethod
-    def _validate_analytics_groups(cls, value: dict[str, str]) -> dict[str, str]:
+    def _validate_run_extras(cls, value: dict[str, str]) -> dict[str, str]:
         """Refuse a malformed mapping at the WIRE, not inside a telemetry capture.
 
         Declaring the field `dict[str, str]` says nothing about its contents,
@@ -70,7 +70,7 @@ class PipelexPipeRunInput(BaseModel):
         carried it. Validating at construction makes it a decoding error naming
         the field.
         """
-        return validate_analytics_groups(value=value)
+        return validate_run_extras(value=value)
 
     library_crate_dump: dict[str, Any] | None = None
     # Two orthogonal axes: which orchestrator runs the pipe (open token, defaults to the
