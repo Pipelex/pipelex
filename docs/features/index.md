@@ -39,10 +39,6 @@ This section covers all Pipelex capabilities, organized by area.
 
 <div class="grid cards" markdown>
 
--   **[Pipelex Gateway & Model Access](gateway.md)**
-
-    Unified access to 60+ AI models through a single API key, or bring your own keys for direct provider access. Open-source model support via Hugging Face, Scaleway, and Groq.
-
 -   **[LLM Integration](llm-integration.md)**
 
     Text generation, structured outputs, vision language models, templating styles, system prompt inheritance, and model presets.
@@ -67,9 +63,9 @@ This section covers all Pipelex capabilities, organized by area.
 
 <div class="grid cards" markdown>
 
--   **[Claude Code Skills Plugin](claude-code-skills-plugin.md)**
+-   **[Pipelex Plugin](pipelex-plugin.md)**
 
-    Build, run, validate, and edit AI methods directly from Claude Code with the MTHDS skills plugin. Slash commands cover the full method lifecycle.
+    The Pipelex plugin for Claude Code and Codex: skills that build and run methods, a hook that checks every edit, and the Pipelex tools.
 
 -   **[CLI](cli.md)**
 
