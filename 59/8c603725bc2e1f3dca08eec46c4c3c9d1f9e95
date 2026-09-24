@@ -1,0 +1,78 @@
+CHANGELOG.md
+  s_44ae092d2fd100::t_adc64052dcaa5a 7-8
+docs/features/telemetry.md
+  s_44ae092d2fd100::t_adc64052dcaa5a 28
+.test_durations
+  s_44ae092d2fd100::t_adc64052dcaa5a 679-682,6806-6809,9836-9848,10118-10151
+pipelex/system/telemetry/telemetry_identity.py
+  s_44ae092d2fd100::t_be265eea839cf1 151
+  s_a14e3cb5d855cb::t_a87312743597ab 9-13,23-24,31,36,110,121-122,131-132,170,183,204,226,232-233,241,245,250,253,255-258,260-261
+docs/configuration/config-practical/telemetry-config.md
+  s_44ae092d2fd100::t_adc64052dcaa5a 114-115
+docs/setup/telemetry.md
+  s_44ae092d2fd100::t_adc64052dcaa5a 15,107,111,114,117,121
+docs/under-the-hood/pipelex-kernel.md
+  s_44ae092d2fd100::t_adc64052dcaa5a 130
+pipelex/kernel/pipelex_kernel.py
+  s_44ae092d2fd100::t_760a8f9f549f85 89,112-113,115-117,133
+pipelex/pipeline/execution_seams.py
+  s_44ae092d2fd100::t_12ff039b8fb513 51,168,210,216,299
+pipelex/pipeline/pipeline_run_setup.py
+  s_44ae092d2fd100::t_17005da34d4d4e 32,61,128-132,135-136,177,188,367
+pipelex/pipeline/runner.py
+  s_44ae092d2fd100::t_1109259127fd5a 122,124-125,137,238
+pipelex/runtime_bridge/payloads.py
+  s_44ae092d2fd100::t_36befbb27d2865 19,21,55-56,58-59,61,63,73
+pipelex/system/job_metadata.py
+  s_44ae092d2fd100::t_c7769b90b901bb 7,74,80,121-123,129,131-132,149,151,164,169
+pipelex/system/run_extras.py
+  s_44ae092d2fd100::t_1f957a6fa2cc68 1,5-20,24,37-38,47,49-56,63,65,69-74,77-78,81-82,90,95,97-99,107-108,110-112,115,117-119
+pipelex/system/telemetry/otel_constants.py
+  s_44ae092d2fd100::t_49f02306bd94fe 126,128,131
+tests/integration/pipelex/pipeline/test_pipeline_run_setup_run_extras.py
+  s_44ae092d2fd100::t_a16962e4709d9d 1,4-5,29-30,48-50,60,62,76,78,83,90,112,119
+tests/integration/pipelex/pipeline/test_pipeline_run_setup_telemetry_identity.py
+  s_44ae092d2fd100::t_5f4ae05d9fd519 60,73,82
+tests/integration/pipelex/system/telemetry/test_pipe_span_carries_run_identity.py
+  s_44ae092d2fd100::t_e6b25bf072d604 49,57,86,89,94
+tests/unit/pipelex/kernel/test_pipelex_kernel_run_extras.py
+  s_44ae092d2fd100::t_61537fe9fb12bb 1,6,17-18,23,26,32,35,39,41,45,50
+tests/unit/pipelex/runtime_bridge/test_input_run_extras.py
+  s_44ae092d2fd100::t_9461a242683691 1,3,18,21,26,30,32,35,38,41,45,48-49,52,61,64,66,68,73
+tests/unit/pipelex/system/telemetry/test_llm_span_carries_run_identity.py
+  s_44ae092d2fd100::t_8f5338e2d6ca07 61,67,104,106,111
+tests/unit/pipelex/system/telemetry/test_observer_telemetry_identity.py
+  s_44ae092d2fd100::t_f9c15b3adb40eb 24
+tests/unit/pipelex/system/telemetry/test_posthog_span_exporter.py
+  s_44ae092d2fd100::t_3ae1c9f9f44d1f 125,158,179
+tests/unit/pipelex/system/telemetry/test_telemetry_identity.py
+  s_44ae092d2fd100::t_3cfef1e96f8dcc 31,36,45,88,97,111,124,179,182,214,219,227,251,279,292,304
+tests/unit/pipelex/system/telemetry/test_telemetry_manager_identity.py
+  s_44ae092d2fd100::t_ba748f812e10b3 28,33,71,93,120,163,184,204,225,239
+tests/unit/pipelex/system/test_run_extras.py
+  s_44ae092d2fd100::t_ecefbf345f8dad 1,18-23,26,32,37,39,43,47,50-51,56,61,64,67-68,71,94,97,101,105,112,116,119-120,122,126,131,135,138-139,142-143,147-148,152-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "598c603725bc2e1f3dca08eec46c4c3c9d1f9e95",
+  "prompts": {},
+  "sessions": {
+    "s_44ae092d2fd100": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49ea81ca-2865-445c-beae-48d893dda44a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    },
+    "s_a14e3cb5d855cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a87a9e7fa849f9e79",
+        "model": "unknown"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
