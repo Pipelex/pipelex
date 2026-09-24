@@ -12,6 +12,8 @@ Pipelex supports two independent telemetry streams that serve different purposes
 
 When you use **Pipelex Gateway** as your inference backend, identified telemetry is **automatically enabled**. This telemetry is tied to your Gateway API key (hashed for security) and operates independently from your `telemetry.toml` settings.
 
+Test harnesses are the exception. When the runtime boots in the `pytest` or `ci` integration mode, the Gateway stream stays off, so a project's test suite sends nothing to Pipelex even with the Gateway enabled. In those modes the boot does not look for `PIPELEX_GATEWAY_API_KEY` on the stream's behalf, and `DO_NOT_TRACK` does not conflict with the Gateway.
+
 A run that names a caller of its own is attributed to that caller on this stream too: the run's `user_id` is sent as the `distinct_id` exactly as you supplied it, and its `extras` ride the capture as groups. Anything that names no caller reports under your key's hash.
 
 **What we collect:**

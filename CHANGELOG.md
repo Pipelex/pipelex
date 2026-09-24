@@ -5,6 +5,10 @@
 - **The README leads with the hosted route**: its quick start is the onboarding region included from `Pipelex/.github` — sign up at app.pipelex.com, then the Pipelex plugin in Claude Code or Codex or the Pipelex MCP in ChatGPT or Claude — and the runtime's own install, configuration and first run follow under their own heading, **Run it yourself**. The CV batch screening walkthrough moved from the README to the cookbook in the documentation. Its hero is the website's line, "Turn your expertise into an AI-powered App, MCP or API", with a paragraph on building a method with your coding agent and where it runs, and **What a method looks like** and **Why methods?** follow the install instead of preceding it.
 - **`mthds` version**: The pin moves to `mthds==0.16.0`, the release adding a `User-Agent` on every `MthdsAPIClient` request and the `mthds.version` module. Nothing in pipelex uses either, and the MTHDS standard version stays at `2.0.0`, but the pin is exact, so everyone downstream inherits `mthds` 0.16.0 and a consumer depending on `mthds` directly must move in step.
 
+### Fixed
+
+- **Test runs no longer send the Pipelex Gateway telemetry stream**: a runtime booted in the `pytest` or `ci` integration mode keeps the Gateway stream off even with `pipelex_gateway` enabled, so a project's test suite no longer reports its runs and its fixture user ids to Pipelex. In those modes a boot no longer needs `PIPELEX_GATEWAY_API_KEY` for telemetry, `DO_NOT_TRACK` no longer conflicts with the Gateway, and `IntegrationMode.is_test_harness` names the two modes.
+
 ## [v0.64.0] - 2026-09-24
 
 ### Added
