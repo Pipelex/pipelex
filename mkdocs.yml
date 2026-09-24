@@ -195,7 +195,7 @@ plugins:
   - llmstxt-md:
       sections:
         Get Started:
-        - index.md: "Build & Run AI Methods (landing page)"
+        - index.md: "Turn your expertise into an AI-powered App, MCP or API (landing page)"
         - get-started/quick-start.md: "Quick Start"
         - get-started/run-it-yourself.md: "Run It Yourself"
         - get-started/mthds-language-tutorial.md: "The MTHDS Language Tutorial"
@@ -410,7 +410,7 @@ not_in_nav: |
 
 nav:
   - Get Started:
-    - Build & Run AI Methods: index.md
+    - Overview: index.md
     - Quick Start: get-started/quick-start.md
     - Run It Yourself: get-started/run-it-yourself.md
     - The MTHDS Language Tutorial: get-started/mthds-language-tutorial.md
