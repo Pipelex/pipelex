@@ -209,6 +209,7 @@ plugins:
         - cookbook/extract-gantt.md: "Extract Gantt Chart"
         - cookbook/extract-markdown.md: "Extract Markdown from Document"
         - cookbook/extract-slides.md: "Extract Slides from Presentation"
+        - cookbook/cv-batch-screening.md: "CV Batch Screening"
         - cookbook/design-slides.md: "Design Slides"
         - cookbook/generate-image.md: "Generate Image"
         - cookbook/gen-synthetic-data.md: "Generate Synthetic Data"
@@ -422,6 +423,7 @@ nav:
         - Gantt Chart: cookbook/extract-gantt.md
         - Markdown from Document: cookbook/extract-markdown.md
         - Slides from Presentation: cookbook/extract-slides.md
+        - CV Batch Screening: cookbook/cv-batch-screening.md
       - Visual Generation:
         - Design Slides: cookbook/design-slides.md
         - Generate Image: cookbook/generate-image.md
