@@ -1,0 +1,25 @@
+.badges/tests.json
+  s_44ae092d2fd100::t_94805076c148c4 4
+CHANGELOG.md
+  s_44ae092d2fd100::t_bed4908c7294b0 3,11,13
+pyproject.toml
+  s_44ae092d2fd100::t_5d73dc8560b21c 3
+uv.lock
+  s_44ae092d2fd100::t_bce099b4a78a4d 3306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b36b0c4b3b7ac813e64cc538014df6f991110c94",
+  "prompts": {},
+  "sessions": {
+    "s_44ae092d2fd100": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49ea81ca-2865-445c-beae-48d893dda44a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
