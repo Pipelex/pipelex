@@ -2,7 +2,7 @@
   <h1 align="center"><a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex" width="400" style="max-width: 100%; height: auto;"></a></h1>
 
   <h2 align="center">Turn your expertise into an AI-powered App, MCP or API</h2>
-  <p align="center">Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin: a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, from your agent or your chatbot via MCP, or via API in any software.</p>
+  <p align="center">Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, from your agent or your chatbot via MCP, or via API in any software.</p>
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
