@@ -136,13 +136,12 @@ MTHDS is the open standard behind Pipelex methods. It defines the language, the 
 
 <!--
 Adapted from the onboarding source's front-door assembly, last re-read against the rendered file at
-Pipelex/.github@81a3728 (onboarding/rendered/front-door.md). Every paragraph and every command is a
+Pipelex/.github@50bb5ba (onboarding/rendered/front-door.md). Every paragraph and every command is a
 block's own words, so a change lands in the blocks first and is then carried here. Step 3 takes the
 longer first-run/agent.md rather than the assembly's agent-short.md, and the webapp and API sections
 take first-run/webapp.md, key.md, first-run/api-http.md, first-run/api-typescript.md and
 first-run/api-python.md, where the assembly only links to them. This page's own are the headings, the
-content tabs standing in for the assembly's <details> wrappers, the Node.js sentence in step 2 (the
-blocks do not say it yet, and it goes once they do), the sentences pointing at other pages (the SDK references are the links-tail blocks), and the closing section, since the assembly's
+content tabs standing in for the assembly's <details> wrappers, the sentences pointing at other pages (the SDK references are the links-tail blocks), and the closing section, since the assembly's
 last block describes the runtime repository that carries it. The Python sample's inputs dict is
 wrapped by this repository's ruff format, which formats Python fences in Markdown; the code is the
 block's.
@@ -158,7 +157,7 @@ Sign up at [app.pipelex.com](https://app.pipelex.com).
 
 ## 2. Install the Pipelex plugin in your coding agent
 
-The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
+The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
 
 === "Claude Code"
 
@@ -167,7 +166,7 @@ The plugin is how you build methods: it gives your agent the skills that write a
     claude plugin install pipelex@pipelex-plugins
     ```
 
-    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it; nothing else to install.
+    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
     Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
 
@@ -178,7 +177,7 @@ The plugin is how you build methods: it gives your agent the skills that write a
     export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
     ```
 
-    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
+    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
 What the plugin holds, skill by skill, is on the [Pipelex Plugin](../features/pipelex-plugin.md) page.
 
@@ -2957,16 +2956,15 @@ Use PipeSearch in a PipeSequence to retrieve information from the web and then p
 
 <!--
 The install commands and the sentences around them are adapted from the onboarding source's
-front-door assembly, last re-read against the rendered file at Pipelex/.github@81a3728
+front-door assembly, last re-read against the rendered file at Pipelex/.github@50bb5ba
 (onboarding/rendered/front-door.md): the blocks install/claude-code.md and install/codex.md, copied
-verbatim. The Node.js sentence is this page's own: the blocks do not say it yet, and it goes once they
-do. The skills, the hook and the tools summarize the plugin's own README, which stays their
+verbatim, the Node.js requirement included. The skills, the hook and the tools summarize the plugin's own README, which stays their
 reference.
 -->
 
 # Pipelex Plugin
 
-The Pipelex plugin is how you build methods with your coding agent, Claude Code or Codex: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. It works against the hosted Pipelex API, so you need an account at [app.pipelex.com](https://app.pipelex.com) and an API key from your console there. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
+The Pipelex plugin is how you build methods with your coding agent, Claude Code or Codex: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. It works against the hosted Pipelex API, so you need an account at [app.pipelex.com](https://app.pipelex.com) and an API key from your console there.
 
 Its source, its full documentation and its release notes are at [github.com/Pipelex/pipelex-plugins](https://github.com/Pipelex/pipelex-plugins).
 
@@ -2979,7 +2977,7 @@ Its source, its full documentation and its release notes are at [github.com/Pipe
     claude plugin install pipelex@pipelex-plugins
     ```
 
-    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it; nothing else to install.
+    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
     Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
 
@@ -2990,7 +2988,7 @@ Its source, its full documentation and its release notes are at [github.com/Pipe
     export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
     ```
 
-    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
+    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
 Then ask your agent for the method you want, as in step 3 of the [Quick Start](../get-started/quick-start.md#3-ask-your-agent-for-the-method-you-want).
 
@@ -21405,6 +21403,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)`; `error_domain = RUNTIME` → HTTP 500 |
 | Bad API key | `CONFIGURATION` → non-retryable; `error_domain = CONFIG` → HTTP 500 |
 | Model or deployment not found (provider HTTP 404) | Raises a dedicated `*ModelNotFoundError` sibling (`LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ExtractModelNotFoundError`, `SearchModelNotFoundError`); operator re-raises `PipeOperatorModelAvailabilityError` |
+| Model reference unknown to the deck (a method naming `gpt-5.1`, a mistyped `@alias` or `$preset`) | `ModelChoiceNotFoundError` → `CONFIGURATION` category, but `error_domain = INPUT` → **HTTP 422**, and caller-facing under STRICT: the message names the reference and its "Did you mean" suggestions, which are all a caller needs to fix the method |
 | Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422** |
 | Malformed prompt image / bad prompt parameter | `CONTENT` class-level (`PromptImageFormatError`, `LLMPromptParameterError`, …) → `error_domain = INPUT` → **HTTP 422** |
 | Any other provider **HTTP 400** | `CONTENT` → `error_domain = INPUT` → **HTTP 422**. This is the widest reach of the derivation: a 400 covers a context-length overflow and a parameter the model rejects alike, and an engine-side request-construction fault lands here too — reported as the caller's to fix, and absent from the 5xx rate |
