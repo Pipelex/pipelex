@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+### Changed
+
 - **The README leads with the hosted route**: its quick start is the onboarding region included from `Pipelex/.github` — sign up at app.pipelex.com, then the Pipelex plugin in Claude Code or Codex or the Pipelex MCP in ChatGPT or Claude — and the runtime's own install, configuration and first run follow under their own heading, **Run it yourself**. The CV batch screening walkthrough moved from the README to the cookbook in the documentation. Its hero is the website's line, "Turn your expertise into an AI-powered App, MCP or API", with a paragraph on building a method with your coding agent and where it runs, and **What a method looks like** and **Why methods?** follow the install instead of preceding it.
 - **`mthds` version**: The pin moves to `mthds==0.16.0`, the release adding a `User-Agent` on every `MthdsAPIClient` request and the `mthds.version` module. Nothing in pipelex uses either, and the MTHDS standard version stays at `2.0.0`, but the pin is exact, so everyone downstream inherits `mthds` 0.16.0 and a consumer depending on `mthds` directly must move in step.
 
