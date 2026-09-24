@@ -8,6 +8,10 @@
 - **The documentation site leads with the hosted route**: its getting-started opens on a new **Quick Start** page — sign up at app.pipelex.com, the Pipelex plugin in Claude Code or Codex, the Pipelex MCP in ChatGPT or Claude, then a webapp from the method-app template or the hosted API over HTTP, TypeScript or Python — and the runtime's own install moves to **Run It Yourself**. **Build with Claude Code** and its `npm install -g mthds` route are retired, and **Claude Code Skills Plugin** becomes **Pipelex Plugin**, which documents the Pipelex plugin instead of the MTHDS plugin; the old addresses redirect. The front page's buttons and the site's description lead with what Pipelex lets you do.
 - **`mthds` version**: The pin moves to `mthds==0.16.0`, the release adding a `User-Agent` on every `MthdsAPIClient` request and the `mthds.version` module. Nothing in pipelex uses either, and the MTHDS standard version stays at `2.0.0`, but the pin is exact, so everyone downstream inherits `mthds` 0.16.0 and a consumer depending on `mthds` directly must move in step.
 
+### Fixed
+
+- **Test runs no longer send the Pipelex Gateway telemetry stream**: a runtime booted in the `pytest` or `ci` integration mode, or in a session that loads the shared pytest plugin, which sets a test run mode when pytest configures, keeps the Gateway stream off even with `pipelex_gateway` enabled, so a project's test suite no longer reports its runs and its fixture user ids to Pipelex. In a test run a boot no longer needs `PIPELEX_GATEWAY_API_KEY` for telemetry, `DO_NOT_TRACK` no longer conflicts with the Gateway, and the Gateway's Portkey debug and tracing flags have no effect, even where the custom stream is allowed; `IntegrationMode.is_test_harness` names the two modes. The plugin's session fixture `set_run_mode` is gone: the run mode is set in its `pytest_configure`, so a boot at test-module import or during collection is covered too.
+
 ## [v0.64.0] - 2026-09-24
 
 ### Added
