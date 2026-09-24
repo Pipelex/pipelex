@@ -1,8 +1,8 @@
-"""Integration tests for :func:`pipeline_run_setup` threading ``analytics_groups``
+"""Integration tests for :func:`pipeline_run_setup` threading ``extras``
 onto :class:`JobMetadata`.
 
-The groups ride the ``PipeJob``
-(``arg.pipe_job.job_metadata.run_metadata.analytics_groups``) — the same payload-first
+The extras ride the ``PipeJob``
+(``arg.pipe_job.job_metadata.run_metadata.extras``) — the same payload-first
 route ``request_id`` takes, and for the same reason: there is no ContextVar layer
 and the worker on the far side of a Temporal hop rehydrates the whole job. The
 PostHog exporters read them back off the span attributes; this test pins the
@@ -26,8 +26,8 @@ from pipelex.pipeline import pipeline_run_setup as pipeline_run_setup_module
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 
 _MINIMAL_MTHDS = """
-domain = "analytics_groups_test"
-description = "Minimal bundle for analytics_groups propagation test"
+domain = "extras_test"
+description = "Minimal bundle for extras propagation test"
 
 [concept.Topic]
 description = "A topic"
@@ -45,9 +45,9 @@ prompt = "Echo the $subject as a topic"
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipelineRunSetupAnalyticsGroups:
-    async def test_analytics_groups_thread_onto_job_metadata(self) -> None:
-        """``pipeline_run_setup(..., analytics_groups=...)`` puts them on ``job_metadata.run_metadata``."""
+class TestPipelineRunSetupRunExtras:
+    async def test_run_extras_thread_onto_job_metadata(self) -> None:
+        """``pipeline_run_setup(..., extras=...)`` puts them on ``job_metadata.run_metadata``."""
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
         )
@@ -57,9 +57,9 @@ class TestPipelineRunSetupAnalyticsGroups:
             execution_config=execution_config,
             mthds_contents=[_MINIMAL_MTHDS],
             pipe_code="echo_topic",
-            analytics_groups={"organization": "org_acme"},
+            extras={"organization": "org_acme"},
         )
-        assert pipe_job.job_metadata.run_metadata.analytics_groups == {"organization": "org_acme"}
+        assert pipe_job.job_metadata.run_metadata.extras == {"organization": "org_acme"}
 
     async def test_omitting_them_leaves_an_empty_mapping(self) -> None:
         """Every existing caller omits the field, and an omission is an empty group facet, not an error."""
@@ -73,21 +73,21 @@ class TestPipelineRunSetupAnalyticsGroups:
             mthds_contents=[_MINIMAL_MTHDS],
             pipe_code="echo_topic",
         )
-        assert pipe_job.job_metadata.run_metadata.analytics_groups == {}
+        assert pipe_job.job_metadata.run_metadata.extras == {}
 
-    async def test_malformed_groups_are_refused_before_the_run_starts(self) -> None:
+    async def test_malformed_extras_are_refused_before_the_run_starts(self) -> None:
         """The validator on the field is what makes a bad mapping fail at setup rather than at capture."""
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
         )
-        with pytest.raises(ValueError, match="analytics_groups"):
+        with pytest.raises(ValueError, match="extras"):
             await pipeline_run_setup(
                 storage_scope="test/scope",
                 user_id="test-user",
                 execution_config=execution_config,
                 mthds_contents=[_MINIMAL_MTHDS],
                 pipe_code="echo_topic",
-                analytics_groups={"Organization": "org_acme"},
+                extras={"Organization": "org_acme"},
             )
 
     async def test_the_refusal_registers_no_run_and_emits_no_trace_start(self, mocker: MockerFixture) -> None:
@@ -109,14 +109,14 @@ class TestPipelineRunSetupAnalyticsGroups:
         pipeline_manager = mocker.spy(pipeline_run_setup_module, "get_pipeline_manager")
         telemetry_manager = mocker.spy(pipeline_run_setup_module, "get_telemetry_manager")
 
-        with pytest.raises(ValueError, match="analytics_groups"):
+        with pytest.raises(ValueError, match="extras"):
             await pipeline_run_setup(
                 storage_scope="test/scope",
                 user_id="test-user",
                 execution_config=execution_config,
                 mthds_contents=[_MINIMAL_MTHDS],
                 pipe_code="echo_topic",
-                analytics_groups={"Organization": "org_acme"},
+                extras={"Organization": "org_acme"},
             )
 
         pipeline_manager.assert_not_called()

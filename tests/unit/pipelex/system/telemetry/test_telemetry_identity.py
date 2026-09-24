@@ -17,23 +17,25 @@ which is what every span produced before this release does.
 
 import pytest
 
+from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID, SINGLE_TENANT_USER_ID
 from pipelex.system.telemetry.otel_constants import LangfuseSpanAttr, PipelexSpanAttr
 from pipelex.system.telemetry.telemetry_config import PostHogMode
 from pipelex.system.telemetry.telemetry_identity import (
     RunIdentityPolicy,
+    StreamIdentityRule,
     TelemetryIdentity,
     make_run_identity_span_attributes,
 )
 
 
-def _run_metadata(*, user_id: str = "user-42", analytics_groups: dict[str, str] | None = None) -> RunMetadata:
+def _run_metadata(*, user_id: str = "user-42", extras: dict[str, str] | None = None) -> RunMetadata:
     return RunMetadata(
         user_id=user_id,
         pipeline_run_id="run-1",
         storage_scope="tenant/run-1",
-        analytics_groups=analytics_groups or {},
+        extras=extras or {},
     )
 
 
@@ -42,7 +44,7 @@ class TestTelemetryIdentity:
 
     def test_a_direct_stream_takes_the_runs_user_and_groups(self) -> None:
         identity = TelemetryIdentity.make_from_run_metadata(
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
             fallback_distinct_id="configured-id",
             run_identity_policy=RunIdentityPolicy.DIRECT,
         )
@@ -85,7 +87,7 @@ class TestTelemetryIdentity:
 
     def test_the_groups_are_copied_not_shared_with_the_run(self) -> None:
         """The identity is a decision already taken; editing it must not reach back into the run."""
-        run_metadata = _run_metadata(analytics_groups={"organization": "org_acme"})
+        run_metadata = _run_metadata(extras={"organization": "org_acme"})
         identity = TelemetryIdentity.make_from_run_metadata(
             run_metadata=run_metadata,
             fallback_distinct_id=None,
@@ -94,7 +96,7 @@ class TestTelemetryIdentity:
 
         identity.groups["tenant"] = "t-1"
 
-        assert run_metadata.analytics_groups == {"organization": "org_acme"}
+        assert run_metadata.extras == {"organization": "org_acme"}
 
     # ------------------------------------------------------------------- NONE
 
@@ -108,7 +110,7 @@ class TestTelemetryIdentity:
         span and on the trace-start event.
         """
         identity = TelemetryIdentity.make_from_run_metadata(
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
             fallback_distinct_id="configured-id",
             run_identity_policy=RunIdentityPolicy.NONE,
         )
@@ -121,7 +123,7 @@ class TestTelemetryIdentity:
         identity = TelemetryIdentity.make_from_span_attributes(
             attributes={
                 PipelexSpanAttr.RUN_USER_ID: "user-42",
-                PipelexSpanAttr.RUN_ANALYTICS_GROUPS: '{"organization": "org_acme"}',
+                PipelexSpanAttr.RUN_EXTRAS: '{"organization": "org_acme"}',
             },
             fallback_distinct_id="configured-id",
             run_identity_policy=RunIdentityPolicy.NONE,
@@ -176,10 +178,10 @@ class TestTelemetryIdentity:
         The two facts are independent: groups carry no person identity, so tying
         them to the distinguishing-user test discarded them from every capture of
         a run that simply left `user_id` at its default — which is what
-        `PipelexRunner(analytics_groups=...)` does by default.
+        `PipelexRunner(extras=...)` does by default.
         """
         identity = TelemetryIdentity.make_from_run_metadata(
-            run_metadata=_run_metadata(user_id=placeholder, analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(user_id=placeholder, extras={"organization": "org_acme"}),
             fallback_distinct_id="configured-id",
             run_identity_policy=RunIdentityPolicy.DIRECT,
         )
@@ -211,12 +213,12 @@ class TestTelemetryIdentity:
 
     def test_a_run_with_groups_writes_both_attributes(self) -> None:
         attributes = make_run_identity_span_attributes(
-            run_metadata=_run_metadata(analytics_groups={"organization": "org_acme"}),
+            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
             is_langfuse_enabled=False,
         )
 
         assert attributes[PipelexSpanAttr.RUN_USER_ID] == "user-42"
-        assert attributes[PipelexSpanAttr.RUN_ANALYTICS_GROUPS] == '{"organization": "org_acme"}'
+        assert attributes[PipelexSpanAttr.RUN_EXTRAS] == '{"organization": "org_acme"}'
         assert LangfuseSpanAttr.USER_ID not in attributes
 
     def test_a_run_without_groups_omits_the_groups_attribute(self) -> None:
@@ -224,7 +226,7 @@ class TestTelemetryIdentity:
         attributes = make_run_identity_span_attributes(run_metadata=_run_metadata(), is_langfuse_enabled=False)
 
         assert attributes[PipelexSpanAttr.RUN_USER_ID] == "user-42"
-        assert PipelexSpanAttr.RUN_ANALYTICS_GROUPS not in attributes
+        assert PipelexSpanAttr.RUN_EXTRAS not in attributes
 
     def test_langfuse_gets_the_user_id_in_the_field_it_reserves_for_it(self) -> None:
         attributes = make_run_identity_span_attributes(run_metadata=_run_metadata(), is_langfuse_enabled=True)
@@ -248,7 +250,7 @@ class TestTelemetryIdentity:
         assert LangfuseSpanAttr.USER_ID not in attributes
 
     def test_what_a_span_site_writes_is_what_the_exporter_reads_back(self) -> None:
-        run_metadata = _run_metadata(analytics_groups={"organization": "org_acme", "tenant": "t-1"})
+        run_metadata = _run_metadata(extras={"organization": "org_acme", "tenant": "t-1"})
         attributes = make_run_identity_span_attributes(run_metadata=run_metadata, is_langfuse_enabled=False)
 
         identity = TelemetryIdentity.make_from_span_attributes(
@@ -276,7 +278,7 @@ class TestTelemetryIdentity:
         identity = TelemetryIdentity.make_from_span_attributes(
             attributes={
                 PipelexSpanAttr.RUN_USER_ID: "user-42",
-                PipelexSpanAttr.RUN_ANALYTICS_GROUPS: "not json at all",
+                PipelexSpanAttr.RUN_EXTRAS: "not json at all",
             },
             fallback_distinct_id="configured-id",
             run_identity_policy=RunIdentityPolicy.DIRECT,
@@ -289,7 +291,7 @@ class TestTelemetryIdentity:
         identity = TelemetryIdentity.make_from_span_attributes(
             attributes={
                 PipelexSpanAttr.RUN_USER_ID: "user-42",
-                PipelexSpanAttr.RUN_ANALYTICS_GROUPS: '["organization"]',
+                PipelexSpanAttr.RUN_EXTRAS: '["organization"]',
             },
             fallback_distinct_id=None,
             run_identity_policy=RunIdentityPolicy.DIRECT,
@@ -301,7 +303,7 @@ class TestTelemetryIdentity:
         identity = TelemetryIdentity.make_from_span_attributes(
             attributes={
                 PipelexSpanAttr.RUN_USER_ID: "user-42",
-                PipelexSpanAttr.RUN_ANALYTICS_GROUPS: '{"organization": "org_acme", "count": 3}',
+                PipelexSpanAttr.RUN_EXTRAS: '{"organization": "org_acme", "count": 3}',
             },
             fallback_distinct_id=None,
             run_identity_policy=RunIdentityPolicy.DIRECT,
@@ -317,3 +319,45 @@ class TestTelemetryIdentity:
         )
 
         assert identity.distinct_id == "configured-id"
+
+
+class TestResolutionFromACaller:
+    """A caller known without a run resolves exactly as a run naming the same caller would."""
+
+    @pytest.mark.parametrize("policy", list(RunIdentityPolicy))
+    @pytest.mark.parametrize("user_id", ["user-42", LOCAL_USER_ID, DRY_RUN_USER_ID])
+    def test_a_caller_resolves_like_the_run_it_would_state(self, policy: RunIdentityPolicy, user_id: str) -> None:
+        groups = {"organization": "org_acme"}
+
+        from_caller = TelemetryIdentity.make_from_caller_identity(
+            caller_identity=CallerIdentity(user_id=user_id, extras=groups),
+            fallback_distinct_id="fallback-id",
+            run_identity_policy=policy,
+        )
+        from_run = TelemetryIdentity.make_from_run_metadata(
+            run_metadata=_run_metadata(user_id=user_id, extras=groups),
+            fallback_distinct_id="fallback-id",
+            run_identity_policy=policy,
+        )
+
+        assert from_caller == from_run
+
+    def test_no_caller_resolves_to_the_fallback(self) -> None:
+        identity = TelemetryIdentity.make_from_caller_identity(
+            caller_identity=None,
+            fallback_distinct_id="fallback-id",
+            run_identity_policy=RunIdentityPolicy.DIRECT,
+        )
+
+        assert identity == TelemetryIdentity(distinct_id="fallback-id", groups={})
+
+    def test_a_stream_rule_resolves_per_caller(self) -> None:
+        rule = StreamIdentityRule(fallback_distinct_id="fallback-id", run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        assert rule.resolve(caller_identity=CallerIdentity(user_id="user-42")).distinct_id == "user-42"
+        assert rule.resolve(caller_identity=None).distinct_id == "fallback-id"
+
+    def test_an_anonymous_stream_rule_identifies_nobody(self) -> None:
+        rule = StreamIdentityRule(fallback_distinct_id="fallback-id", run_identity_policy=RunIdentityPolicy.NONE)
+
+        assert rule.resolve(caller_identity=CallerIdentity(user_id="user-42")).is_anonymous

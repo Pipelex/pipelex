@@ -29,6 +29,7 @@ from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
+from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry
@@ -612,15 +613,22 @@ class PipeAbstract(ABC, BaseModel):
         # so a failed pipe never leaves a stale frame behind on the shared pipe_stack, where it
         # could accumulate entries and trip PipeStackOverflowError. Required cleanup belongs in a
         # `finally` block.
+        #
+        # The run's caller is made the ambient one for as long as the pipe runs, so a
+        # capture with no run in hand — an exception raised in here, captured once it
+        # escapes the interpreter — is still attributed to the person the run is for.
+        # Every pipe, at every depth, opens the scope from its own job metadata: a
+        # Temporal activity runs a sub-pipe with no outer scope to inherit.
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         try:
-            return await self._run_pipe_traced(
-                job_metadata=job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-                output_name=output_name,
-                library_crate=library_crate,
-            )
+            with scoped_caller_identity(caller_identity=CallerIdentity.make_from_run_metadata(run_metadata=job_metadata.run_metadata)):
+                return await self._run_pipe_traced(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                    library_crate=library_crate,
+                )
         finally:
             pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 
