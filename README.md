@@ -165,7 +165,7 @@ Then run it:
 pipelex run bundle summarize.mthds --inputs inputs.json
 ```
 
-The result is written under `results/`. For a method with several steps, typed concepts and a batch, run from the CLI and from Python, read [CV batch screening, step by step](https://github.com/Pipelex/pipelex/blob/main/docs/cookbook/cv-batch-screening.md).
+The result is written under `results/`. For a method with several steps, typed concepts and a batch, run from the CLI and from Python, read [CV batch screening, step by step](https://docs.pipelex.com/latest/cookbook/cv-batch-screening/).
 
 ### Build methods with your coding agent
 
@@ -196,7 +196,7 @@ The same `.mthds` file runs from multiple execution targets:
 | Target | How |
 |--------|-----|
 | **CLI** | `pipelex run bundle method.mthds --inputs inputs.json` |
-| **Python** | `PipelexRunner().execute_pipeline(...)` |
+| **Python** | `PipelexMTHDSProtocol().execute(...)` |
 | **TypeScript / Node** | [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) against the hosted API, or [`mthds`](https://www.npmjs.com/package/mthds) against any MTHDS API |
 | **REST API** | Self-host [`pipelex-api`](https://github.com/Pipelex/pipelex-api); the hosted API is the one in the Quick start above |
 | **MCP** | The [Pipelex MCP](https://github.com/Pipelex/pipelex-mcp): your chatbot runs the methods saved in your account |
@@ -217,7 +217,7 @@ The same `.mthds` file runs from multiple execution targets:
 ## Documentation
 
 - [docs.pipelex.com](https://docs.pipelex.com/): the Pipelex documentation, from the MTHDS language tutorial to the CLI reference.
-- [CV batch screening, step by step](https://github.com/Pipelex/pipelex/blob/main/docs/cookbook/cv-batch-screening.md): a production method with its concepts, its pipes and its flowchart, and how to run it from the CLI and from Python.
+- [CV batch screening, step by step](https://docs.pipelex.com/latest/cookbook/cv-batch-screening/): a production method with its concepts, its pipes and its flowchart, and how to run it from the CLI and from Python.
 - [The cookbook](https://github.com/Pipelex/pipelex-cookbook): methods to clone, run and adapt.
 - [The MTHDS standard](https://mthds.ai/latest/): the language a method is written in.
 - [The changelog](https://docs.pipelex.com/latest/changelog/).
