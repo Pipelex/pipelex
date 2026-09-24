@@ -249,7 +249,7 @@ set DO_NOT_TRACK=1
 When set, this disables:
 
 - All custom telemetry (PostHog, Langfuse, OTLP)
-- Gateway telemetry (note: Gateway won't work without telemetry)
+- Gateway telemetry (note: outside a test run, Gateway won't work without telemetry — see [Telemetry Setup](../../setup/telemetry.md#1-gateway-telemetry-pipelex-controlled))
 
 ---
 

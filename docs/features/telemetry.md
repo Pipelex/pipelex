@@ -29,7 +29,7 @@ A span or an event produced during a run is attributed to that run's own caller,
 
 ## Gateway Telemetry
 
-When using Pipelex Gateway as your inference backend, privacy-respecting metrics are automatically collected: models used, token counts, latency, and error rates. This data is tied to your Gateway API key (hashed for security) and requires no additional configuration. Test runs are not collected: when the runtime boots in the `pytest` or `ci` integration mode, the Gateway stream stays off.
+When using Pipelex Gateway as your inference backend, privacy-respecting metrics are automatically collected: models used, token counts, latency, and error rates. This data is tied to your Gateway API key (hashed for security) and requires no additional configuration. Test runs are not collected: when the runtime boots in the `pytest` or `ci` integration mode, or in a session that loads Pipelex's shared pytest plugin, the Gateway stream stays off.
 
 ## Privacy Controls
 
