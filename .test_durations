@@ -4937,6 +4937,8 @@
     "tests/unit/pipelex/cogt/test_inference_error_domain.py::TestInferenceErrorDomain::test_uncategorized_cogt_error_still_has_no_domain": 0.0017,
     "tests/unit/pipelex/cogt/test_inference_error_domain.py::TestInferenceErrorDomain::test_uncategorized_cogt_error_still_inherits_the_cause_domain": 0.0004,
     "tests/unit/pipelex/cogt/test_inference_error_domain.py::TestInferenceErrorDomain::test_unknown_asserts_no_domain": 0.0004,
+    "tests/unit/pipelex/cogt/test_model_choice_not_found_disclosure.py::TestModelChoiceNotFoundDisclosure::test_message_survives_strict_disclosure": 0.771,
+    "tests/unit/pipelex/cogt/test_model_choice_not_found_disclosure.py::TestModelChoiceNotFoundDisclosure::test_message_survives_the_worker_to_runner_hop": 0.7684,
     "tests/unit/pipelex/cogt/test_worker_error_enrichment.py::TestWorkerErrorEnrichment::test_extract_worker_enriches_error": 0.0396,
     "tests/unit/pipelex/cogt/test_worker_error_enrichment.py::TestWorkerErrorEnrichment::test_img_gen_worker_enriches_error[False]": 0.0515,
     "tests/unit/pipelex/cogt/test_worker_error_enrichment.py::TestWorkerErrorEnrichment::test_img_gen_worker_enriches_error[True]": 0.0662,
