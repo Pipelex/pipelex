@@ -86,7 +86,7 @@ class PipelexKernel:
         run_mode: PipeRunMode = PipeRunMode.LIVE,
         user_id: str,
         storage_scope: str,
-        analytics_groups: dict[str, str] | None = None,
+        extras: dict[str, str] | None = None,
         is_mock_usage: bool = False,
         trace_context: TraceContext | None = None,
         step_id_source: Callable[[], str] | None = None,
@@ -109,12 +109,12 @@ class PipelexKernel:
         across two ids (the registered-context emit path stamps the event log's id, the runner
         fallback stamps the metadata's), so the read-back would silently miss half of them.
 
-        ``analytics_groups`` is the opaque, host-supplied mapping this run's telemetry belongs to,
-        carried beside ``user_id`` and ``storage_scope``. This tier is the direct programmatic entry
+        ``extras`` is the opaque, host-supplied mapping of labels about this run, carried beside
+        ``user_id`` and ``storage_scope``. This tier is the direct programmatic entry
         point, so a multi-tenant host embedding the kernel needs the same seam the pipeline entry
-        points have — without it a kernel-minted run is permanently group-less and its host has no
-        supported way to say otherwise. Omitting it leaves the group facet empty, which misattributes
-        nothing. See :mod:`pipelex.system.analytics_groups`.
+        points have — without it a kernel-minted run is permanently unlabelled and its host has no
+        supported way to say otherwise. Omitting it leaves the telemetry group facet empty, which
+        misattributes nothing. See :mod:`pipelex.system.run_extras`.
 
         ``step_id_source`` overrides where each step's ``pipe_run_id`` comes from; it defaults to a
         fresh ``uuid4``, which is what every in-process run wants. It exists for a kernel hosted
@@ -130,7 +130,7 @@ class PipelexKernel:
                     user_id=user_id,
                     storage_scope=storage_scope,
                     pipeline_run_id=trace_context.graph_id if trace_context is not None else str(uuid4()),
-                    analytics_groups=analytics_groups or {},
+                    extras=extras or {},
                 ),
                 trace_context=trace_context,
             ),

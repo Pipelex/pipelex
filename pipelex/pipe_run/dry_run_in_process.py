@@ -26,6 +26,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.runtime_hub import scoped_content_generator, scoped_event_log
+from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -70,7 +71,7 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
         return None
 
 
-async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> GraphSpec:
+async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str, caller_identity: CallerIdentity | None = None) -> GraphSpec:
     """Dry-run ``pipe`` against an already-open library fully in-process, tracing the graph in memory.
 
     The in-process twin of :func:`pipelex.pipeline.dry_run_pipeline.dry_run_pipeline` for hosts
@@ -98,6 +99,9 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
     Args:
         pipe: The pipe to dry-run (resolved against the open library).
         library_id: The id of the already-open library to run against.
+        caller_identity: Who the dry run is done for, when a host knows it. ``None`` inherits
+            the caller already in scope — the validate surfaces open one around their whole
+            pass — and with none the job states ``DRY_RUN_USER_ID``.
 
     Returns:
         The assembled GraphSpec.
@@ -137,14 +141,22 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
         mode=GraphSpecMode.DRY,
     )
     try:
-        with scoped_event_log(event_log), scoped_pipe_router(pipe_router), scoped_content_generator(content_generator):
+        with (
+            scoped_caller_identity(caller_identity=caller_identity) as effective_caller_identity,
+            scoped_event_log(event_log),
+            scoped_pipe_router(pipe_router),
+            scoped_content_generator(content_generator),
+        ):
             pipe_job = await prepare_pipe_job(
                 pipe=pipe,
                 library_id=library_id,
                 execution_config=execution_config,
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id=pipeline_run_id,
-                user_id=DRY_RUN_USER_ID,
+                # The caller the dry run is done for, so its pipe runs are attributed to
+                # them; `DRY_RUN_USER_ID` says there is none.
+                user_id=effective_caller_identity.user_id if effective_caller_identity is not None else DRY_RUN_USER_ID,
+                extras=effective_caller_identity.extras if effective_caller_identity is not None else None,
                 # A dry run provably stores nothing, but `storage_scope` is
                 # required — so it says so, loudly and greppably, instead of
                 # inheriting a default. A silent default on this field is

@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.64.0] - 2026-09-24
+
+### Added
+
+- **A caller can be known without a run**: `CallerIdentity` (`pipelex.system.caller_identity`) holds the `user_id` and `extras` a host would state on a run, and `scoped_caller_identity` makes one the ambient caller for a block. An event emitted with no `RunMetadata` in hand reads the caller in scope before it falls back to the configured `user_id`, and `PipelexMTHDSProtocol.caller_identity` exposes the caller a protocol was built for.
+
+### Changed
+
+- **A run's `analytics_groups` is renamed `extras` (Breaking)**: the base library no longer names an analytics concept in its run model or its job-preparation signatures. `RunMetadata.analytics_groups`, `PipelexPipeRunInput.analytics_groups` on the runtime-bridge payload, and the `analytics_groups` parameter of `pipeline_run_setup`, `prepare_pipe_job`, `PipelexKernel.make` and the `PipelexMTHDSProtocol` constructor are now `extras`: an opaque `dict[str, str]` of labels the host attaches to a run, which the library never reads by name. Behaviour is unchanged: the mapping is validated where it enters under the same bounds, and telemetry still forwards it whole as the PostHog groups of each capture. **Migration:** rename every `analytics_groups=` argument and field to `extras`; there is no alias, and while the functions and `PipelexPipeRunInput` refuse the old name, `RunMetadata` silently ignores it, so a missed rename there drops the groups without an error. Import from `pipelex.system.run_extras` instead of `pipelex.system.analytics_groups`, calling `validate_run_extras` instead of `validate_analytics_groups`, with the bounds now named `RUN_EXTRAS_KEY_PATTERN`, `RUN_EXTRAS_VALUE_PATTERN` and `RUN_EXTRAS_MAX_ENTRIES`. A dashboard, query or exporter reading the span attribute `pipelex.run.analytics_groups` must read `pipelex.run.extras` (`PipelexSpanAttr.RUN_EXTRAS`) instead.
+- **Pipelex's own telemetry stream receives the run's `user_id` as it is**: the Gateway stream sent a one-way digest of the caller taken inside the Gateway-key hash, and carried a `deployment` group instead of the run's own groups. It now resolves identity like the operator's identified stream — the run's `user_id` is the PostHog `distinct_id` and its `extras` ride the groups facet — so a host's events and the runtime's land on the same person and the same organization. The `NAMESPACED` identity policy and the `deployment` group type are removed. Anything that names no caller still reports under the Gateway-key hash.
+- **`BundleValidatorProtocol.validate_bundles` requires `caller_identity` (Breaking)**: a validator is handed who asked for the validation, `None` meaning nobody, so a hosted `/validate` attributes its telemetry to its caller. `validate_bundles_in_process`, `validate_bundle`, `dry_run_pipe_in_process` and the `BundleValidator` sweep methods gain an optional `caller_identity` of their own. **Migration:** every plugin implementing `BundleValidatorProtocol` must add a keyword-only `caller_identity: CallerIdentity | None` parameter to `validate_bundles` and pass it on to the sweep it runs, carrying it to the worker when the validation is dispatched. Every host calling `validate_bundles` must now pass it explicitly: `caller_identity=self.caller_identity` from a `PipelexMTHDSProtocol` runner, or `None` for a validation nobody in particular asked for.
+
+### Fixed
+
+- **A trace's first span carries its run**: the trace-start `$ai_span` captured on both PostHog streams now includes `pipeline_run_id`, so the root of a trace joins its run's other events without going through a child span.
+- **A validation is attributed to the caller who asked for it**: the sweep's `pipe_dry_run` event carried no run, so on a hosted plane it went out under the deployment's configured `user_id` whoever validated. It is now emitted with the caller in scope, and the sweep's dry runs and the graph arm's dry run state that caller in their job metadata instead of `dry-run-no-user`. A local validation names nobody and reports under the configured id as before.
+- **A crash inside a run is attributed to that run's caller**: the exception autocapture resolved one runless identity when it was built, so every `$exception` on a hosted plane landed on the configured constant. Every pipe now runs with its run's caller in scope, an exception leaving a pipe carries that caller — read back through the `__cause__` and `__context__` chain, so a host's own error raised `from` it still resolves — and the capture resolves each error's identity when it arrives. An error raised outside every run still reports under the fallback, and `mode = "anonymous"` still identifies nobody.
+
 ## [v0.63.0] - 2026-09-23
 
 ### Added

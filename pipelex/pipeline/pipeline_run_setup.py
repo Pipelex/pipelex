@@ -25,11 +25,11 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
-from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, validate_storage_scope
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -58,7 +58,7 @@ async def pipeline_run_setup(
     is_mock_usage: bool = False,
     user_id: str,
     storage_scope: str,
-    analytics_groups: dict[str, str] | None = None,
+    extras: dict[str, str] | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
@@ -125,14 +125,15 @@ async def pipeline_run_setup(
         Opaque prefix under which every byte this run writes must land. REQUIRED,
         validated at ``JobMetadata`` construction. See
         :mod:`pipelex.system.storage_scope`.
-    analytics_groups:
-        Opaque, host-supplied mapping of group type to group key that this run's
-        telemetry belongs to — the hosted platform sends its organization, a
-        single-user deployment sends nothing. Never read by name here. Validated
+    extras:
+        Opaque, host-supplied mapping of labels about this run — the hosted
+        platform sends its organization, a single-user deployment sends nothing.
+        Never read by name here; telemetry forwards it whole as the groups of
+        each capture. Validated
         at the TOP of this function, above the pipeline registration and above
         the trace-start event, so a malformed mapping registers nothing and
-        emits nothing. Optional, and omitting it leaves the group facet empty.
-        See :mod:`pipelex.system.analytics_groups`.
+        emits nothing. Optional, and omitting it leaves the telemetry group facet empty.
+        See :mod:`pipelex.system.run_extras`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -173,7 +174,7 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
 
-    # Validate the groups HERE, before this function causes anything observable.
+    # Validate the extras HERE, before this function causes anything observable.
     #
     # `RunMetadata` validates them too, and `prepare_pipe_job` validates them at
     # its own top — but BOTH run below `add_new_pipeline` and the open tracer, so
@@ -184,7 +185,7 @@ async def pipeline_run_setup(
     #
     # This is the same lesson `storage_scope` learned one seam lower, and the
     # same cure: ordering, not absence, was the defect.
-    analytics_groups = validate_analytics_groups(value=analytics_groups or {})
+    extras = validate_run_extras(value=extras or {})
 
     # And the scope, for the same reason and with more at stake.
     #
@@ -363,7 +364,7 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             storage_scope=storage_scope,
-            analytics_groups=analytics_groups,
+            extras=extras,
             inputs=inputs,
             search_scope=search_scope,
             trace_context=trace_context,

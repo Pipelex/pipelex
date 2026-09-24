@@ -35,6 +35,7 @@ from pipelex.pipeline.input_form import qualify_current_library_crate
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
+from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 
 if TYPE_CHECKING:
     from pipelex.graph.graphspec import GraphSpec
@@ -48,6 +49,7 @@ async def validate_bundles_in_process(
     allow_signatures: bool = False,
     graph_pipe_code: str | None = None,
     log_context: str = "validate",
+    caller_identity: CallerIdentity | None = None,
 ) -> PipelexValidationReport:
     """Parse, validate, and dry-run MTHDS bundles in-process; assemble the canonical report.
 
@@ -72,6 +74,10 @@ async def validate_bundles_in_process(
             selected bundle `main_pipe`. Bare and qualified refs are accepted according
             to the loaded pipe library's normal resolution rules.
         log_context: Label used in graph-arm degradation and teardown-failure logs.
+        caller_identity: Who asked for the validation, when the host knows it. It is the
+            ambient caller for the whole pass — the sweep's telemetry event and every dry run,
+            the graph arm's included — so none of it falls back to the telemetry stream's
+            configured id. ``None`` inherits the caller already in scope, if any.
 
     Returns:
         PipelexValidationReport with the structural artifacts of a valid bundle.
@@ -79,6 +85,27 @@ async def validate_bundles_in_process(
     Raises:
         PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
     """
+    with scoped_caller_identity(caller_identity=caller_identity):
+        return await _validate_bundles_in_scope(
+            mthds_contents=mthds_contents,
+            mthds_sources=mthds_sources,
+            library_dirs=library_dirs,
+            allow_signatures=allow_signatures,
+            graph_pipe_code=graph_pipe_code,
+            log_context=log_context,
+        )
+
+
+async def _validate_bundles_in_scope(
+    *,
+    mthds_contents: list[str],
+    mthds_sources: list[str] | None,
+    library_dirs: Sequence[Path] | None,
+    allow_signatures: bool,
+    graph_pipe_code: str | None,
+    log_context: str,
+) -> PipelexValidationReport:
+    """The body of :func:`validate_bundles_in_process`, run inside the caller's scope."""
     # `validate_bundle` deliberately leaves its validation library OPEN and current on
     # success (the CLI surfaces consume it before process exit). This entry point is
     # long-lived, so restore the caller's current-library and tear the validation library
