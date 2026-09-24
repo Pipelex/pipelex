@@ -7,13 +7,14 @@ description: "The Pipelex plugin for Claude Code and Codex: skills that build an
 The install commands and the sentences around them are adapted from the onboarding source's
 front-door assembly, last re-read against the rendered file at Pipelex/.github@81a3728
 (onboarding/rendered/front-door.md): the blocks install/claude-code.md and install/codex.md, copied
-verbatim. The skills, the hook and the tools summarize the plugin's own README, which stays their
+verbatim. The Node.js sentence is this page's own: the blocks do not say it yet, and it goes once they
+do. The skills, the hook and the tools summarize the plugin's own README, which stays their
 reference.
 -->
 
 # Pipelex Plugin
 
-The Pipelex plugin is how you build methods with your coding agent, Claude Code or Codex: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. It works against the hosted Pipelex API, so you need an account at [app.pipelex.com](https://app.pipelex.com) and an API key from your console there.
+The Pipelex plugin is how you build methods with your coding agent, Claude Code or Codex: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. It works against the hosted Pipelex API, so you need an account at [app.pipelex.com](https://app.pipelex.com) and an API key from your console there. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
 Its source, its full documentation and its release notes are at [github.com/Pipelex/pipelex-plugins](https://github.com/Pipelex/pipelex-plugins).
 
@@ -67,7 +68,7 @@ After every edit to a `.mthds` file, the hook lints it and formats it in place o
 
 ## The Pipelex tools
 
-The tools the skills call to validate a method, prepare its inputs, run it, generate typed code and reach your saved methods start with your agent, with nothing else to install. [The tools, one by one](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md#the-pipelex-tools).
+The tools the skills call to validate a method, prepare its inputs, run it, generate typed code and reach your saved methods start with your agent, on Node.js. [The tools, one by one](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md#the-pipelex-tools).
 
 ## Related Documentation
 

@@ -10,8 +10,8 @@ block's own words, so a change lands in the blocks first and is then carried her
 longer first-run/agent.md rather than the assembly's agent-short.md, and the webapp and API sections
 take first-run/webapp.md, key.md, first-run/api-http.md, first-run/api-typescript.md and
 first-run/api-python.md, where the assembly only links to them. This page's own are the headings, the
-content tabs standing in for the assembly's <details> wrappers, the sentences pointing at other
-pages (the SDK references are the links-tail blocks), and the closing section, since the assembly's
+content tabs standing in for the assembly's <details> wrappers, the Node.js sentence in step 2 (the
+blocks do not say it yet, and it goes once they do), the sentences pointing at other pages (the SDK references are the links-tail blocks), and the closing section, since the assembly's
 last block describes the runtime repository that carries it. The Python sample's inputs dict is
 wrapped by this repository's ruff format, which formats Python fences in Markdown; the code is the
 block's.
@@ -27,7 +27,7 @@ Sign up at [app.pipelex.com](https://app.pipelex.com).
 
 ## 2. Install the Pipelex plugin in your coding agent
 
-The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
+The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
 === "Claude Code"
 
