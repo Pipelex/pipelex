@@ -59,7 +59,7 @@ Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on
 
 `/pipelex-design` writes the method, the hook checks it on every edit, `/pipelex-run` starts it and prints a run id you can come back to, and `/pipelex-catalog` saves it to your account, where your chatbot can run it too.
 
-**Run your methods from your chatbot.** The Pipelex MCP is a connector to the Pipelex service: it lets your chatbot (ChatGPT, Claude) run the methods saved in your account. It does not build methods; your agent does.
+**Run your methods from your chatbot.** The Pipelex MCP connects your chatbot (ChatGPT, Claude) to the Pipelex service, so it can run the methods saved in your account. It does not build methods; your agent does.
 
 Add the Pipelex MCP in your chatbot's settings by the address below — in Claude, that is **Add custom connector** — then sign in with your Pipelex account when asked. Nothing to install and no key: the Pipelex MCP runs on your signed-in session.
 
