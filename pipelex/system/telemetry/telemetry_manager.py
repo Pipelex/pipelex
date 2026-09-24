@@ -560,6 +560,10 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
+        # The Gateway's Portkey logging follows the Gateway stream: where the stream is off, a test run
+        # above all, neither the backend's `debug` nor the force flag may turn it on.
+        if not self._pipelex_telemetry_enabled:
+            return False
         is_debug: bool = is_debug_configured
         if (
             not is_debug
@@ -581,6 +585,9 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
+        # Trace correlation follows the Gateway stream for the same reason as the logging above.
+        if not self._pipelex_telemetry_enabled:
+            return False
         if (
             self.telemetry_config.pipelex_gateway
             and self.telemetry_config.pipelex_gateway.portkey
