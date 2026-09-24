@@ -210,6 +210,11 @@ class ModelChoiceNotFoundError(CogtError):
     # local ``.mthds`` file. An operator-side deck fault surfaces as
     # ``ModelDeckPresetValidatonError`` instead, which keeps the derived ``CONFIG``.
     error_domain = ErrorDomain.INPUT
+    # The message is caller-facing copy for the same reason: it names only the caller's own model
+    # reference and the deck's public handles (suggestions, sigil hints, available options). Without
+    # the flag, STRICT disclosure on the hosted API replaced it with the generic placeholder, so a
+    # method naming an unknown model failed its dry run with no hint of which model or what to use.
+    _authors_caller_facing_message = True
 
     def __init__(
         self,
