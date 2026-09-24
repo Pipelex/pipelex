@@ -1,4 +1,4 @@
-"""The remote gateway config may carry per-model keys this client's model-spec blueprint does not know.
+"""A managed gateway's served config may carry per-model keys this client's model-spec blueprint does not know.
 
 It is served by a component that deploys on its own schedule, so a client can read a config written
 by a different release than itself. The loader's per-model rule tolerates that skew: an unknown
@@ -15,34 +15,36 @@ from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
-from pipelex.providers.gateway.gateway_factory import GatewayFactory
+from pipelex.providers.manifold.manifold_factory import ManifoldFactory
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
-GATEWAY_BACKENDS_TOML = """
-[pipelex_gateway]
+MANIFOLD_BACKENDS_TOML = f"""
+[pipelex_manifold]
 enabled = true
+model_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"
+endpoint = "https://manifold.example.com"
 api_key = "pk-not-a-real-key"
 """
 
 
-class TestGatewayUnknownPerModelKeys:
+class TestManagedGatewayUnknownPerModelKeys:
     """The loader's per-model rule on a remote payload: header-shaped keys are headers, the rest is pruned."""
 
     def _load(self, tmp_path: Path, *, model_specs: BackendModelSpecs) -> InferenceBackendLibrary:
         backends_dir = tmp_path / "backends"
         backends_dir.mkdir()
         backends_library_path = tmp_path / "backends.toml"
-        backends_library_path.write_text(GATEWAY_BACKENDS_TOML)
+        backends_library_path.write_text(MANIFOLD_BACKENDS_TOML)
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
             backends_library_paths=[backends_library_path],
             backends_dir_path=str(backends_dir),
-            managed_gateway_configs={PipelexBackend.GATEWAY: GatewayConfig(model_specs=model_specs, aws_region="eu-west-3")},
+            managed_gateway_configs={PipelexBackend.MANIFOLD: GatewayConfig(model_specs=model_specs)},
         )
         return library
 
@@ -50,7 +52,7 @@ class TestGatewayUnknownPerModelKeys:
         return cast(
             "BackendModelSpecs",
             {
-                "defaults": {"model_type": "llm", "sdk": "gateway_completions"},
+                "defaults": {"model_type": "llm", "sdk": "manifold_completions"},
                 "gpt-4o-mini": {"model_id": "gpt-4o-mini", **per_model_extras},
             },
         )
@@ -59,7 +61,7 @@ class TestGatewayUnknownPerModelKeys:
         """`x-portkey-config` is on every served model; without it the gateway cannot route."""
         library = self._load(tmp_path, model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576"}))
 
-        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        backend = library.get_inference_backend(backend_name="pipelex_manifold")
         assert backend is not None
         assert backend.model_specs["gpt-4o-mini"].extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
 
@@ -70,7 +72,7 @@ class TestGatewayUnknownPerModelKeys:
             model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576", "a_field_we_removed": "openai"}),
         )
 
-        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        backend = library.get_inference_backend(backend_name="pipelex_manifold")
         assert backend is not None
         model_spec = backend.model_specs["gpt-4o-mini"]
         assert model_spec.extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
@@ -85,7 +87,7 @@ class TestGatewayUnknownPerModelKeys:
             model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576", "x-weird": 3}),
         )
 
-        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        backend = library.get_inference_backend(backend_name="pipelex_manifold")
         assert backend is not None
         assert backend.model_specs["gpt-4o-mini"].extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
 
@@ -98,7 +100,7 @@ class TestGatewayUnknownPerModelKeys:
             model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576", "x-weird key": "value"}),
         )
 
-        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        backend = library.get_inference_backend(backend_name="pipelex_manifold")
         assert backend is not None
         assert backend.model_specs["gpt-4o-mini"].extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
 
@@ -111,7 +113,7 @@ class TestGatewayUnknownPerModelKeys:
             model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576", "x-weird": "two\r\nlines"}),
         )
 
-        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        backend = library.get_inference_backend(backend_name="pipelex_manifold")
         assert backend is not None
         assert backend.model_specs["gpt-4o-mini"].extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
 
@@ -121,29 +123,26 @@ class TestGatewayUnknownPerModelKeys:
         """
         library = self._load(tmp_path, model_specs=self._remote_specs(per_model_extras={"endpoint_path": "openai/deployments/x/images/generations"}))
 
-        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        backend = library.get_inference_backend(backend_name="pipelex_manifold")
         assert backend is not None
         model_spec = backend.model_specs["gpt-4o-mini"]
         assert model_spec.endpoint_path == "openai/deployments/x/images/generations"
         assert not model_spec.extra_headers
 
     def test_the_accepted_header_reaches_the_wire(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        telemetry_manager = mocker.MagicMock()
-        telemetry_manager.is_pipelex_gateway_portkey_tracing_enabled.return_value = False
-        mocker.patch("pipelex.providers.gateway.gateway_factory.get_telemetry_manager", return_value=telemetry_manager)
         library = self._load(tmp_path, model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576"}))
-        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        backend = library.get_inference_backend(backend_name="pipelex_manifold")
         assert backend is not None
         model_spec = backend.model_specs["gpt-4o-mini"]
 
-        extra_headers, _ = GatewayFactory.make_extras(model_spec, inference_job=mocker.MagicMock(spec=LLMJob), output_desc="text")
+        extra_headers, _ = ManifoldFactory.make_extras(model_spec, inference_job=mocker.MagicMock(spec=LLMJob), output_desc="text")
 
         assert extra_headers["x-portkey-config"] == "pc-openai-6e7576"
 
     def test_pruning_a_per_model_key_does_not_need_the_log_hub(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Same constraint as the `defaults` prune: this runs on gateway loads that precede runtime_hub.set_config()."""
+        """Same constraint as the `defaults` prune: this runs on managed-gateway loads that precede runtime_hub.set_config()."""
         mocker.patch.object(log.log_dispatch, "_log_config_instance", None)
 
         library = self._load(tmp_path, model_specs=self._remote_specs(per_model_extras={"a_field_we_removed": "openai"}))
 
-        assert library.get_inference_backend(backend_name="pipelex_gateway") is not None
+        assert library.get_inference_backend(backend_name="pipelex_manifold") is not None

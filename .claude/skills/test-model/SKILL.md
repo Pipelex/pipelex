@@ -5,7 +5,7 @@ description: >
   infrastructure. Handles test profile creation, fixture regeneration, and
   running the right test class for the model type (LLM, image gen, extract,
   search). Use when the user says "test model X", "test gpt-5.4 on openai",
-  "test model on gateway", "run inference test for model", "try model X on
+  "test model on manifold", "run inference test for model", "try model X on
   backend Y", "verify model X works", or any variation of running inference
   tests against a specific model on a specific backend. Also use when the user
   mentions testing a model after adding it, or wants to verify a model works
@@ -25,7 +25,7 @@ Gather from the user (or infer from context):
 | Field | Description | Example |
 |-------|-------------|---------|
 | **Model name** | The model handle as it appears in backend TOMLs | `gpt-5.6-sol` |
-| **Backend** | Which backend to test on | `pipelex_gateway` |
+| **Backend** | Which backend to test on | `pipelex_manifold` |
 | **Model type** | `llm`, `img_gen`, `extract`, or `search` | `llm` |
 
 ### How to determine the model type
@@ -44,7 +44,7 @@ If the user says a backend name, use it directly. Common shorthand mappings:
 
 | User says | Backend name |
 |-----------|-------------|
-| "gateway" | `pipelex_gateway` |
+| "manifold" | `pipelex_manifold` |
 | "openai" | `openai` |
 | "azure" | `azure_openai` |
 | "anthropic" | `anthropic` |
@@ -63,7 +63,7 @@ target backend. For most backends, check the TOML file:
 .pipelex/inference/backends/<backend_name>.toml
 ```
 
-For **gateway** (`pipelex_gateway`), the model list is fetched remotely — you
+For **manifold** (`pipelex_manifold`), the model list is fetched remotely — you
 cannot verify locally. Proceed and let the test tell you if the model isn't
 available.
 

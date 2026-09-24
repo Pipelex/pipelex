@@ -7,8 +7,8 @@ the ``.pipelex/`` config directory AND the ``~/.pipelex/cache/`` directory the o
 fallback reads.
 
 The kit configs are copied wholesale so the subprocess sees a realistic Pipelex install,
-not a hand-rolled minimal one. Per-test tweaks (gateway enabled/disabled, terms accepted,
-primed cache content) layer on top.
+not a hand-rolled minimal one. Per-test tweaks (manifold enabled/disabled, primed cache
+content) layer on top.
 """
 
 from __future__ import annotations
@@ -47,18 +47,18 @@ OFFLINE_BUNDLES_DIR = REPO_ROOT / "tests" / "e2e" / "data" / "offline_mode"
 # Reserved/unroutable address — httpx will raise ConnectError immediately without hanging.
 UNREACHABLE_REMOTE_CONFIG_URL = "http://127.0.0.1:1/pipelex_remote_config.json"
 
-# Minimal-but-valid gateway spec bodies per model type (valid against InferenceModelSpecBlueprint).
-# Each ``sdk`` names the dedicated gateway worker for its type — gateway_completions (LLM),
-# gateway_img_gen (image), gateway_extract, gateway_search — i.e. a value the matching worker factory's
-# gateway branch accepts (an unrecognized sdk like "gateway_image" hits ``case _: raise NotImplementedError``).
+# Minimal-but-valid manifold spec bodies per model type (valid against InferenceModelSpecBlueprint).
+# Each ``sdk`` names the dedicated manifold worker for its type — manifold_completions (LLM),
+# manifold_img_gen (image), manifold_extract, manifold_search — i.e. a value the manifold plugin
+# registers for that family (an unrecognized sdk would be refused at worker creation).
 # The sdk is consumed only at worker creation, which the offline dry-run tests never reach
 # (the cogt leaf mocks generation under DRY), so the membership check is indifferent to it — but it must still
 # be real so the fake cache stays faithful and any non-dry consumer of this helper can build a worker.
-_GATEWAY_SPEC_TEMPLATE_BY_TYPE: dict[ModelType, dict[str, Any]] = {
-    ModelType.LLM: {"sdk": "gateway_completions", "model_type": "llm", "inputs": ["text"], "outputs": ["text", "structured"]},
-    ModelType.IMG_GEN: {"sdk": "gateway_img_gen", "model_type": "img_gen"},
-    ModelType.TEXT_EXTRACTOR: {"sdk": "gateway_extract", "model_type": "text_extractor"},
-    ModelType.SEARCH: {"sdk": "gateway_search", "model_type": "search"},
+_MANIFOLD_SPEC_TEMPLATE_BY_TYPE: dict[ModelType, dict[str, Any]] = {
+    ModelType.LLM: {"sdk": "manifold_completions", "model_type": "llm", "inputs": ["text"], "outputs": ["text", "structured"]},
+    ModelType.IMG_GEN: {"sdk": "manifold_img_gen", "model_type": "img_gen"},
+    ModelType.TEXT_EXTRACTOR: {"sdk": "manifold_extract", "model_type": "text_extractor"},
+    ModelType.SEARCH: {"sdk": "manifold_search", "model_type": "search"},
 }
 
 
@@ -87,39 +87,39 @@ def load_kit_model_deck_blueprint() -> ModelDeckBlueprint:
 
 
 def software_only_internal_handles() -> set[str]:
-    """Handles served by the local ``internal`` backend — the ones the Pipelex Gateway never provides.
+    """Handles served by the local ``internal`` backend — the ones Pipelex Manifold never provides.
 
     ``PipelexBackend.INTERNAL`` is the software-only backend ("runs internally, without AI" — e.g. the
-    pypdfium2 / docling text extractors). Those handles have no gateway equivalent, so they must be
-    excluded from the derived gateway specs: otherwise the primed cache would claim the gateway serves a
+    pypdfium2 / docling text extractors). Those handles have no manifold equivalent, so they must be
+    excluded from the derived manifold specs: otherwise the primed cache would claim the manifold serves a
     software-only extractor, and a deck alias like ``@default-no-inference`` / ``@default-text-from-pdf``
-    could resolve through the fake ``gateway_extract`` worker instead of the real internal backend.
+    could resolve through the fake ``manifold_extract`` worker instead of the real internal backend.
 
     Read straight from the shipped backend spec file (no booted Pipelex needed) and keyed off the enum
     value, so adding a new software-only extractor to the internal backend auto-excludes it here too.
     Provider-backed models (claude, gpt, linkup, nano-banana, ...) are intentionally NOT excluded: the
-    gateway genuinely proxies those, so they belong in the faithful gateway cache.
+    manifold genuinely proxies those, so they belong in the faithful manifold cache.
     """
     internal_spec_path = Path(str(get_kit_configs_dir())) / "inference" / "backends" / f"{PipelexBackend.INTERNAL}.toml"
     raw_specs = load_toml_from_path(path=str(internal_spec_path))
     return {name for name, spec in raw_specs.items() if name != "defaults" and isinstance(spec, dict)}
 
 
-def gateway_backend_model_specs_for_kit_deck() -> dict[str, Any]:
-    """Build a gateway ``backend_model_specs`` payload covering every concrete model handle the kit deck names.
+def manifold_model_specs_for_kit_deck() -> dict[str, Any]:
+    """Build a manifold ``manifold_model_specs`` payload covering every concrete model handle the kit deck names.
 
     Derived from the shipped kit deck rather than a hand-maintained list, so the primed
     offline cache auto-tracks deck changes — e.g. promoting a premium alias to a new model
     no longer silently breaks these tests. Every bare handle named in the deck's aliases,
     waterfalls, and presets (across all model types) gets a minimal spec declaring the
-    gateway sdk for its type — all ``ModelManager._enforce_gateway_model_membership`` needs
-    is name membership. Deck/gateway consistency itself is covered by ``TestModelDeckReferences``.
+    manifold sdk for its type — all ``ModelManager._enforce_gateway_model_membership`` needs
+    is name membership. Deck/manifold consistency itself is covered by ``TestModelDeckReferences``.
 
     Handles served by the software-only ``internal`` backend (see ``software_only_internal_handles``)
-    are excluded: the gateway never provides them, so claiming it does would make the fake cache
-    unfaithful and let a software-only extractor alias resolve through the gateway worker. Those
+    are excluded: the manifold never provides them, so claiming it does would make the fake cache
+    unfaithful and let a software-only extractor alias resolve through the manifold worker. Those
     handles are still reachable in the offline subprocess via the local internal backend, so the
-    membership check passes for them without a gateway spec.
+    membership check passes for them without a manifold spec.
     """
     blueprint = load_kit_model_deck_blueprint()
     excluded_handles = software_only_internal_handles()
@@ -144,9 +144,9 @@ def gateway_backend_model_specs_for_kit_deck() -> dict[str, Any]:
                 case ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL | ModelReferenceKind.PRESET:
                     continue
 
-    specs: dict[str, Any] = {"defaults": {"sdk": "gateway_completions"}}
+    specs: dict[str, Any] = {"defaults": {"sdk": "manifold_completions"}}
     for handle, model_type in handle_model_types.items():
-        specs[handle] = dict(_GATEWAY_SPEC_TEMPLATE_BY_TYPE[model_type])
+        specs[handle] = dict(_MANIFOLD_SPEC_TEMPLATE_BY_TYPE[model_type])
     return specs
 
 
@@ -176,43 +176,37 @@ def _copy_kit_configs_into(pipelex_dir: Path) -> None:
             shutil.copy2(source_file, dst / source_file.name)
 
 
-def set_gateway_enabled(backends_path: Path, *, enabled: bool) -> None:
-    """Toggle ``[pipelex_gateway].enabled`` in a backends.toml file in place.
+def set_manifold_enabled(backends_path: Path, *, enabled: bool) -> None:
+    """Toggle ``[pipelex_manifold].enabled`` in a backends.toml file in place.
 
     Avoids loading the file through ``tomlkit`` (which the kit configs are encoded with)
-    by doing a targeted text rewrite — the kit file's ``enabled = true`` line directly
-    follows the ``[pipelex_gateway]`` section header.
+    by doing a targeted text rewrite of the ``enabled`` line inside the ``[pipelex_manifold]``
+    section.
     """
     original_text = backends_path.read_text(encoding="utf-8")
     lines = original_text.splitlines(keepends=True)
     target_value = "true" if enabled else "false"
-    in_gateway_section = False
+    in_manifold_section = False
     rewrote = False
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
-            in_gateway_section = stripped == "[pipelex_gateway]"
+            in_manifold_section = stripped == "[pipelex_manifold]"
             continue
-        if in_gateway_section and stripped.startswith("enabled"):
+        if in_manifold_section and stripped.startswith("enabled"):
             indent = line[: len(line) - len(line.lstrip())]
             lines[index] = f"{indent}enabled = {target_value}                         # set by offline-mode E2E fixture\n"
             rewrote = True
             break
     if not rewrote:
-        msg = f"Could not find [pipelex_gateway].enabled in {backends_path}"
+        msg = f"Could not find [pipelex_manifold].enabled in {backends_path}"
         raise AssertionError(msg)
     backends_path.write_text("".join(lines), encoding="utf-8")
 
 
-def write_pipelex_service_config(pipelex_dir: Path, *, terms_accepted: bool, inference_setup_completed: bool) -> None:
+def write_pipelex_service_config(pipelex_dir: Path, *, inference_setup_completed: bool) -> None:
     """Overwrite ``pipelex_service.toml`` so the subprocess skips the first-run gate."""
-    content = (
-        "[agreement]\n"
-        f"terms_accepted = {str(terms_accepted).lower()}\n"
-        "\n"
-        "[onboarding]\n"
-        f"inference_setup_completed = {str(inference_setup_completed).lower()}\n"
-    )
+    content = f"[onboarding]\ninference_setup_completed = {str(inference_setup_completed).lower()}\n"
     (pipelex_dir / "pipelex_service.toml").write_text(content, encoding="utf-8")
 
 
@@ -250,12 +244,12 @@ def write_remote_config_cache(pipelex_dir: Path, raw_config: dict[str, Any]) -> 
 def hermetic_home(tmp_path: Path) -> Path:
     """Return a tmp ``HOME`` that already has a populated ``.pipelex/`` config tree.
 
-    Tests further tweak the resulting directory (toggle gateway, prime cache, ...) before
+    Tests further tweak the resulting directory (toggle the manifold, prime cache, ...) before
     invoking the subprocess.
     """
     pipelex_dir = tmp_path / ".pipelex"
     _copy_kit_configs_into(pipelex_dir)
-    write_pipelex_service_config(pipelex_dir, terms_accepted=True, inference_setup_completed=True)
+    write_pipelex_service_config(pipelex_dir, inference_setup_completed=True)
     return tmp_path
 
 
@@ -275,14 +269,15 @@ def offline_subprocess_env(hermetic_home: Path) -> dict[str, str]:
         "HOME": str(hermetic_home),
         "PATH": "/usr/bin:/bin:/usr/local/bin",
         "PIPELEX_REMOTE_CONFIG_URL": UNREACHABLE_REMOTE_CONFIG_URL,
-        # Force CI test mode so vertexai is skipped and terms-acceptance gate doesn't fire
+        # Force CI test mode so vertexai is skipped and the first-run gate doesn't fire
         # for code paths that still consult the integration mode.
         "RUN_MODE": "ci_test",
         # Dummy credentials — the test never makes a real provider call (dry-run only) and
         # ``lenient=True`` (set by ``--dry-run``) skips backends whose env vars are missing
         # rather than raising. We populate every key so backend loading is deterministic
         # regardless of the developer's shell environment.
-        "PIPELEX_GATEWAY_API_KEY": "dummy-gateway-key",
+        "PIPELEX_MANIFOLD_ENDPOINT": "https://manifold.example.invalid",
+        "PIPELEX_MANIFOLD_API_KEY": "dummy-manifold-key",
         "ANTHROPIC_API_KEY": "dummy-anthropic-key",
         "AWS_REGION": "us-east-1",
         "AZURE_API_BASE": "https://example.invalid",
@@ -314,9 +309,9 @@ __all__ = [
     "OFFLINE_BUNDLES_DIR",
     "PIPELEX_AGENT_BIN",
     "UNREACHABLE_REMOTE_CONFIG_URL",
-    "gateway_backend_model_specs_for_kit_deck",
+    "manifold_model_specs_for_kit_deck",
     "load_kit_model_deck_blueprint",
-    "set_gateway_enabled",
+    "set_manifold_enabled",
     "software_only_internal_handles",
     "write_active_routing_profile",
     "write_remote_config_cache",

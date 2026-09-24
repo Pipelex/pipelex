@@ -17,9 +17,6 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes
 from pipelex.runtime_hub import get_console
 from pipelex.system.pipelex_service.exceptions import (
-    GatewayApiKeyMissingError,
-    GatewayDoNotTrackConflictError,
-    GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
@@ -445,96 +442,10 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
     raise typer.Exit(1) from exc
 
 
-def handle_gateway_terms_not_accepted_error(exc: GatewayTermsNotAcceptedError) -> NoReturn:
-    """Handle and display GatewayTermsNotAcceptedError with user-friendly guidance.
-
-    This error occurs when Pipelex Gateway is enabled but the user hasn't
-    accepted the terms of service yet.
-
-    Args:
-        exc: The gateway terms not accepted error exception
-    """
-    console = get_console()
-    print_traceback_if_requested(console=console)
-    console.print("\n[bold red]❌ Pipelex Gateway terms not accepted[/bold red]\n")
-
-    console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but you haven't accepted\nthe terms of service yet.\n")
-
-    console.print("[bold green]💡 To fix:[/bold green] Run [cyan]pipelex init config[/cyan] to configure your backends and accept the terms\n")
-
-    console.print("[dim]Alternatively, you can:[/dim]")
-    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
-    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
-    console.print()
-
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
-def handle_gateway_api_key_missing_error(exc: GatewayApiKeyMissingError) -> NoReturn:
-    """Handle and display GatewayApiKeyMissingError with user-friendly guidance.
-
-    This error occurs when Pipelex Gateway is enabled but the PIPELEX_GATEWAY_API_KEY
-    environment variable is not set.
-
-    Args:
-        exc: The gateway API key missing error exception
-    """
-    console = get_console()
-    print_traceback_if_requested(console=console)
-    console.print("\n[bold red]❌ Pipelex Gateway API key not set[/bold red]\n")
-
-    console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but the API key\nenvironment variable is not set.\n")
-
-    console.print("[bold green]💡 To fix:[/bold green]")
-    console.print(f"  • Get your API key at: [cyan]{URLs.app_cli_auth}[/cyan]")
-    console.print("  • Set the [cyan]PIPELEX_GATEWAY_API_KEY[/cyan] environment variable")
-    console.print()
-
-    console.print("[dim]Alternatively, you can:[/dim]")
-    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
-    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
-    console.print()
-
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
-def handle_gateway_do_not_track_conflict_error(exc: GatewayDoNotTrackConflictError) -> NoReturn:
-    """Handle and display GatewayDoNotTrackConflictError with user-friendly guidance.
-
-    This error occurs when Pipelex Gateway is enabled but the user has set
-    a DO_NOT_TRACK environment variable, which conflicts with gateway's telemetry requirement.
-
-    Args:
-        exc: The gateway do not track conflict error exception
-    """
-    console = get_console()
-    print_traceback_if_requested(console=console)
-    console.print("\n[bold red]❌ Pipelex Gateway requires telemetry[/bold red]\n")
-
-    console.print(
-        "[bold yellow]⚠ Conflict:[/bold yellow] Pipelex Gateway requires telemetry for service monitoring,\n"
-        "but you have set DO_NOT_TRACK. We respect your privacy preference.\n"
-    )
-
-    console.print("[bold green]💡 To fix, choose one option:[/bold green]")
-    console.print("  • [cyan]Unset[/cyan] the DO_NOT_TRACK environment variable to use Gateway")
-    console.print("  • [cyan]Or[/cyan] disable pipelex_gateway in .pipelex/inference/backends.toml")
-    console.print("    and use your own API keys with direct provider backends")
-    console.print()
-
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
 def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> NoReturn:
     """Handle and display RemoteConfigValidationError with user-friendly guidance.
 
-    This error occurs when Pipelex Gateway remote configuration was fetched but
+    This error occurs when the Pipelex remote configuration was fetched but
     the data is malformed or doesn't match the expected schema.
 
     Args:
@@ -542,10 +453,10 @@ def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> N
     """
     console = get_console()
     print_traceback_if_requested(console=console)
-    console.print("\n[bold red]❌ Pipelex Gateway configuration is invalid[/bold red]\n")
+    console.print("\n[bold red]❌ The Pipelex remote configuration is invalid[/bold red]\n")
 
     console.print(
-        "[bold yellow]⚠ Server Issue:[/bold yellow] The Pipelex Gateway configuration was received but\n"
+        "[bold yellow]⚠ Server Issue:[/bold yellow] The Pipelex remote configuration was received but\n"
         "couldn't be validated. This is a server-side issue that we need to fix.\n"
     )
 
@@ -560,29 +471,29 @@ def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> N
     console.print()
 
     console.print("[dim]In the meantime, you can:[/dim]")
-    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
+    console.print("[dim]  • Disable the Pipelex-managed gateway backends in .pipelex/inference/backends.toml[/dim]")
     console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
     console.print()
 
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]\n")
+    console.print(f"[dim]For more information: {URLs.backend_provider_docs}[/dim]\n")
     raise typer.Exit(1) from exc
 
 
 def handle_remote_config_unavailable_error(exc: RemoteConfigUnavailableError) -> NoReturn:
     """Handle and display RemoteConfigUnavailableError with user-friendly guidance.
 
-    Raised when a fresh fetch failed AND no usable cached fallback exists. The gateway
-    is enabled but we have neither network nor a primed local cache.
+    Raised when a fresh fetch failed AND no usable cached fallback exists. A Pipelex-managed
+    gateway backend is enabled but we have neither network nor a primed local cache.
 
     Args:
         exc: The remote config unavailable error exception
     """
     console = get_console()
     print_traceback_if_requested(console=console)
-    console.print("\n[bold red]❌ Pipelex Gateway is unreachable and no cached config is available[/bold red]\n")
+    console.print("\n[bold red]❌ The Pipelex remote configuration is unreachable and no cached config is available[/bold red]\n")
 
     console.print(
-        "[bold yellow]⚠ Offline + Cold Cache:[/bold yellow] Pipelex Gateway requires a config\n"
+        "[bold yellow]⚠ Offline + Cold Cache:[/bold yellow] A Pipelex-managed gateway backend requires a config\n"
         "either fetched fresh or restored from a local cache, but neither is available.\n"
     )
 
@@ -592,11 +503,11 @@ def handle_remote_config_unavailable_error(exc: RemoteConfigUnavailableError) ->
     console.print("[bold green]💡 To fix:[/bold green]")
     console.print("  • Reconnect to the network and run [cyan]pipelex init[/cyan] to prime the cache")
     console.print(
-        "  • Or disable [cyan]pipelex_gateway[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] for permanent offline (BYOK) operation"
+        "  • Or disable the Pipelex-managed gateway backends in [cyan].pipelex/inference/backends.toml[/cyan] for permanent offline (BYOK) operation"
     )
     console.print()
 
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
+    console.print(f"[dim]For more information: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc
 
@@ -609,8 +520,8 @@ def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoRetur
     remediation on the provenance of the gateway config.
 
     **The backend is named rather than assumed.** More than one managed gateway can be live at
-    once, so telling the user to disable `pipelex_gateway` when it was the other service that could
-    not serve the handle would send them to fix the wrong line of their configuration.
+    once, so telling the user to disable one when it was another service that could not serve the
+    handle would send them to fix the wrong line of their configuration.
 
     Args:
         exc: The gateway unknown model error exception
@@ -636,6 +547,6 @@ def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoRetur
             console.print(f"  • Or disable [cyan]{backend_name}[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] to operate offline (BYOK)")
     console.print()
 
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
+    console.print(f"[dim]For more information: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

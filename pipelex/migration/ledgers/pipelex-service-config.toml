@@ -1,4 +1,4 @@
-# The migration ledger for the Pipelex service agreement and onboarding state.
+# The migration ledger for the Pipelex service onboarding state.
 #
 # This surface has no tier files: there is one `pipelex_service.toml` per configuration directory
 # and nothing layers over it.
@@ -7,7 +7,28 @@
 
 [surface]
 id = "pipelex-service-config"
-title = "Pipelex service agreement and onboarding state"
+title = "Pipelex service onboarding state"
 base_file = "pipelex_service.toml"
-current_schema_version = 1
+current_schema_version = 2
 min_supported_schema_version = 0
+
+[[migration]]
+id = "pipelex-service-config@2"
+to_schema_version = 2
+introduced_in = "0.62.0"
+breaking = true
+safety = "safe"
+title = "Drop the [agreement] section with the Pipelex Gateway"
+description = """
+The Pipelex Gateway backend left the runtime, and with it the terms of service a user accepted to \
+use it. `[agreement]` recorded that acceptance and nothing reads it any more, so a file written \
+by an earlier release loses the section; `[onboarding]` is untouched.
+"""
+guidance = """
+Nothing to decide: the terms of service belonged to the Pipelex Gateway backend, which no longer
+exists in the runtime. Your inference setup state under `[onboarding]` is kept as it was.
+"""
+
+[[migration.ops]]
+kind = "delete_table"
+table_path = ["agreement"]

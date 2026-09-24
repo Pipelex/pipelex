@@ -7,7 +7,7 @@ id = "telemetry-config"
 title = "Telemetry destinations and capture settings"
 base_file = "telemetry.toml"
 tier_glob = "telemetry_*.toml"
-current_schema_version = 2
+current_schema_version = 3
 min_supported_schema_version = 0
 
 [[migration]]
@@ -121,3 +121,25 @@ key = "dry_mode_enabled"
 kind = "delete_key"
 table_path = []
 key = "verbose_enabled"
+
+[[migration]]
+id = "telemetry-config@3"
+to_schema_version = 3
+introduced_in = "0.62.0"
+breaking = true
+safety = "safe"
+title = "Drop the maintainer-only [pipelex_gateway] telemetry section"
+description = """
+The Pipelex Gateway backend left the runtime, and with it the telemetry stream that reported to \
+Pipelex on its behalf. `[pipelex_gateway]` was the maintainer-only override of that stream's PostHog \
+and Portkey settings, and nothing reads it any more, so a file carrying it loses the section; every \
+user-facing destination (`[custom_posthog]`, `[langfuse]`, `[[otlp]]`) is untouched.
+"""
+guidance = """
+Nothing to decide: the section only ever existed in a maintainer's personal `telemetry_override.toml`,
+and the stream it configured no longer exists. Your own telemetry destinations are kept as they were.
+"""
+
+[[migration.ops]]
+kind = "delete_table"
+table_path = ["pipelex_gateway"]

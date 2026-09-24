@@ -1,6 +1,6 @@
 """Unit tests for the CLI error handlers not covered by test_error_handlers.py.
 
-Covers the shared panel renderer, the gateway/telemetry/signature handlers, and the
+Covers the shared panel renderer, the remote-config/telemetry/signature handlers, and the
 detailed sections of bundle-validation error display. Assertions are on the recorded
 plain-text console output plus the exit code.
 """
@@ -18,9 +18,6 @@ from pipelex.base_exceptions import MigrationErrorBlock
 from pipelex.cli.error_handlers import (
     ErrorContext,
     display_error_panel,
-    handle_gateway_api_key_missing_error,
-    handle_gateway_do_not_track_conflict_error,
-    handle_gateway_terms_not_accepted_error,
     handle_gateway_unknown_model_error,
     handle_model_deck_preset_error,
     handle_remote_config_unavailable_error,
@@ -35,9 +32,6 @@ from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, P
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
-    GatewayApiKeyMissingError,
-    GatewayDoNotTrackConflictError,
-    GatewayTermsNotAcceptedError,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
@@ -269,46 +263,14 @@ class TestErrorHandlersExtended:
         assert f"{MIGRATE_COMMAND} --dry-run" in output
         assert "init telemetry" not in output, "a file the migration cannot repair is still never answered with a reset"
 
-    def test_handle_gateway_terms_not_accepted_error(self, console: Console) -> None:
-        """The terms handler points at init config and the BYOK alternative."""
-        with pytest.raises(typer.Exit) as exc_info:
-            handle_gateway_terms_not_accepted_error(GatewayTermsNotAcceptedError())
-
-        assert exc_info.value.exit_code == 1
-        output = console.export_text()
-        assert "Pipelex Gateway terms not accepted" in output
-        assert "pipelex init config" in output
-        assert "Disable pipelex_gateway" in output
-
-    def test_handle_gateway_api_key_missing_error(self, console: Console) -> None:
-        """The API-key handler names the env var to set."""
-        with pytest.raises(typer.Exit) as exc_info:
-            handle_gateway_api_key_missing_error(GatewayApiKeyMissingError())
-
-        assert exc_info.value.exit_code == 1
-        output = console.export_text()
-        assert "Pipelex Gateway API key not set" in output
-        assert "PIPELEX_GATEWAY_API_KEY" in output
-
-    def test_handle_gateway_do_not_track_conflict_error(self, console: Console) -> None:
-        """The DNT handler offers both resolution options."""
-        with pytest.raises(typer.Exit) as exc_info:
-            handle_gateway_do_not_track_conflict_error(GatewayDoNotTrackConflictError(dnt_env_var="DO_NOT_TRACK"))
-
-        assert exc_info.value.exit_code == 1
-        output = console.export_text()
-        assert "Pipelex Gateway requires telemetry" in output
-        assert "Unset" in output
-        assert "disable pipelex_gateway" in output
-
     def test_handle_remote_config_validation_error(self, console: Console) -> None:
-        """A malformed gateway config is flagged as a server-side bug to report."""
+        """A malformed remote config is flagged as a server-side bug to report."""
         with pytest.raises(typer.Exit) as exc_info:
             handle_remote_config_validation_error(RemoteConfigValidationError("missing key 'models'"))
 
         assert exc_info.value.exit_code == 1
         output = console.export_text()
-        assert "Pipelex Gateway configuration is invalid" in output
+        assert "remote configuration is invalid" in output
         assert "missing key 'models'" in output
         assert "Please report this!" in output
 

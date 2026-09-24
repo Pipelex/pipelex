@@ -1,6 +1,6 @@
 """GatewayUnknownModelError contract.
 
-When a model deck references a handle that the gateway should provide but the gateway's
+When a model deck references a handle that a managed gateway should provide but that gateway's
 model specs (fresh or cached) don't contain it, setup must raise ``GatewayUnknownModelError``
 with provenance so the message can hint stale-cache remediation. This complements the
 existing ``LLMHandleNotFoundError`` path: the gateway-specific check fires even when
@@ -16,9 +16,9 @@ import pytest
 
 from pipelex import log
 from pipelex.cogt.exceptions import GatewayUnknownModelError
-from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, PipelexBackend
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.pipelex import Pipelex
-from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import (
     RemoteConfigFetcher,
     RemoteConfigResult,
@@ -34,22 +34,13 @@ if TYPE_CHECKING:
 RUNTIME_BOOT_MODULE = "pipelex.runtime_boot"
 
 
-def _empty_gateway_remote_config_result(source: RemoteConfigSource) -> RemoteConfigResult:
-    """Build a ``RemoteConfigResult`` whose gateway has no model specs.
+def _empty_manifold_remote_config_result(source: RemoteConfigSource) -> RemoteConfigResult:
+    """Build a ``RemoteConfigResult`` whose manifold section has no model specs.
 
-    Forces every deck-referenced handle that should come from the gateway to be missing,
-    so the new membership check trips on the first one.
+    Forces every deck-referenced handle that should come from the manifold to be missing,
+    so the membership check trips on the first one.
     """
-    config = RemoteConfig(
-        posthog=PipelexPosthogConfig(
-            project_api_key="",
-            endpoint="https://dummy.example.com",
-            is_geoip_enabled=False,
-            is_debug_enabled=False,
-        ),
-        backend_model_specs={},
-        aws_region="us-east-1",
-    )
+    config = RemoteConfig(**{MANIFOLD_MODEL_SPECS_SECTION: {}})
     return RemoteConfigResult(config=config, source=source, cached_at=None)
 
 
@@ -62,8 +53,8 @@ def reset_pipelex_config_fixture() -> Generator[None, None, None]:
 
 class TestGatewayUnknownModel:
     def test_known_model_loads(self) -> None:
-        """Happy path: the session-cached gateway config contains every model referenced by
-        the default deck, so the new gateway-membership check should be silent.
+        """Happy path: with no managed gateway enabled by default, the membership check has
+        nothing to validate and setup is silent.
         """
         Pipelex.teardown_if_needed()
         try:
@@ -77,13 +68,13 @@ class TestGatewayUnknownModel:
             log.reset()
 
     def test_unknown_model_fresh_raises(self, mocker: MockerFixture) -> None:
-        """Gateway returns no model specs → first deck-referenced gateway handle trips
+        """The manifold section carries no model specs → the first deck-referenced handle trips
         ``GatewayUnknownModelError(source=FRESH)`` with the missing model name surfaced.
         """
         Pipelex.teardown_if_needed()
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
@@ -93,7 +84,7 @@ class TestGatewayUnknownModel:
         mocker.patch.object(
             RemoteConfigFetcher,
             "fetch_remote_config",
-            return_value=_empty_gateway_remote_config_result(RemoteConfigSource.FRESH),
+            return_value=_empty_manifold_remote_config_result(RemoteConfigSource.FRESH),
         )
 
         try:
@@ -106,23 +97,23 @@ class TestGatewayUnknownModel:
             assert exc_info.value.source == RemoteConfigSource.FRESH
             assert exc_info.value.model_name, "the error must carry the missing model name"
             assert exc_info.value.model_name in str(exc_info.value), "the error message must surface the missing model name"
-            assert exc_info.value.backend_name == PipelexBackend.GATEWAY, "with more than one managed gateway, the error has to say which"
+            assert exc_info.value.backend_name == PipelexBackend.MANIFOLD, "with more than one managed gateway, the error has to say which"
         finally:
             Pipelex.teardown_if_needed()
             log.reset()
 
     def test_dummy_specs_path_skips_membership_check(self, mocker: MockerFixture) -> None:
-        """When gateway is enabled but ``needs_model_specs=False``, ``Pipelex.setup`` builds a
-        dummy ``RemoteConfig`` with empty ``backend_model_specs``. The membership check must NOT
-        run on this path — its provenance is "no live gateway data," so validating the deck's
-        gateway handles against an empty spec set would always fail. This covers read-only
+        """When a managed gateway is enabled but ``needs_model_specs=False``, ``Pipelex.setup`` builds
+        a dummy ``RemoteConfig`` with empty sections. The membership check must NOT run on this
+        path — its provenance is "no live gateway data," so validating the deck's handles against
+        an empty spec set would always fail. This covers read-only
         flows like ``pipelex-agent models`` (no ``--backend``) where the user did not opt in to
         fetching specs.
         """
         Pipelex.teardown_if_needed()
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
@@ -145,13 +136,13 @@ class TestGatewayUnknownModel:
             log.reset()
 
     def test_unknown_model_cached_raises_with_stale_hint(self, mocker: MockerFixture) -> None:
-        """Same scenario as fresh, but the gateway config came from the cache → the error
+        """Same scenario as fresh, but the remote config came from the cache → the error
         message must point at ``pipelex init`` (while online) to refresh the cache.
         """
         Pipelex.teardown_if_needed()
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
@@ -161,7 +152,7 @@ class TestGatewayUnknownModel:
         mocker.patch.object(
             RemoteConfigFetcher,
             "fetch_remote_config",
-            return_value=_empty_gateway_remote_config_result(RemoteConfigSource.CACHED),
+            return_value=_empty_manifold_remote_config_result(RemoteConfigSource.CACHED),
         )
 
         try:

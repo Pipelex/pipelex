@@ -7,7 +7,7 @@ description: "Reference for the `RemoteConfigFetchError` Pipelex error class."
 
 # Remote config fetch
 
-Raised when fetching remote configuration from PostHog fails.
+Raised when fetching the Pipelex remote configuration fails.
 
 | Field | Value |
 |---|---|

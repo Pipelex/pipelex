@@ -23,8 +23,6 @@ from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
-from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory
-from pipelex.providers.gateway.gateway_responses_factory import GatewayResponsesFactory
 from pipelex.providers.mistral.mistral_factory import MistralFactory
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory
@@ -55,10 +53,6 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
 
 FACTORY_MODULE = "pipelex.cogt.llm.llm_worker_factory"
 
-GATEWAY_COMPLETIONS_CLIENT = (
-    "pipelex.providers.gateway.gateway_completions_factory.GatewayCompletionsFactory.make_portkey_openai_client_for_completions"
-)
-GATEWAY_RESPONSES_CLIENT = "pipelex.providers.gateway.gateway_responses_factory.GatewayResponsesFactory.make_portkey_openai_client_for_responses"
 PORTKEY_COMPLETIONS_CLIENT = (
     "pipelex.providers.portkey.portkey_completions_factory.PortkeyCompletionsFactory.make_portkey_openai_client_for_completions"
 )
@@ -121,28 +115,6 @@ class TestLLMWorkerFactory:
     @pytest.mark.parametrize(
         ("sdk", "client_target", "worker_target", "factory_field", "factory_cls", "http_flag", "passes_model_handle", "expects_extra_config"),
         [
-            pytest.param(
-                "gateway_completions",
-                GATEWAY_COMPLETIONS_CLIENT,
-                COMPLETIONS_WORKER,
-                "openai_completions_factory",
-                GatewayCompletionsFactory,
-                False,
-                True,
-                False,
-                id="gateway_completions",
-            ),
-            pytest.param(
-                "gateway_responses",
-                GATEWAY_RESPONSES_CLIENT,
-                RESPONSES_WORKER,
-                "openai_responses_factory",
-                GatewayResponsesFactory,
-                False,
-                True,
-                False,
-                id="gateway_responses",
-            ),
             pytest.param(
                 "portkey_completions",
                 PORTKEY_COMPLETIONS_CLIENT,

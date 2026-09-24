@@ -98,7 +98,7 @@ class ManifoldFactory:
         """Read from the backend's own configuration and from nothing else.
 
         The Portkey-path sibling routes this through the telemetry manager's
-        `pipelex_gateway.portkey` knobs. Reusing those here would put one configuration block in
+        Portkey-path telemetry knobs. Reusing those here would put one configuration block in
         charge of two services, which is the seam the two-gateways design exists to avoid.
         """
         return bool(backend.extra_config.get("debug", False))

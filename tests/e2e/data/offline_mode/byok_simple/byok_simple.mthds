@@ -5,7 +5,7 @@ main_pipe   = "byok_simple_pipe"
 [pipe]
 [pipe.byok_simple_pipe]
 type        = "PipeLLM"
-description = "Single LLM step using a non-gateway backend model handle"
+description = "Single LLM step using a BYOK backend model handle"
 inputs      = { topic = "Text" }
 output      = "Text"
 model       = "claude-4.5-haiku"

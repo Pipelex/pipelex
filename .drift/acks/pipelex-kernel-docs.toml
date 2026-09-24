@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:c9de05f94227aa7679111cf720166b97249792b096a54bdcdc2ecac99168b860"
+digest = "sha256:9427ac67df5c68d519200da6b5bd3afa463f935e6112e3a337a32be87005084b"
 reviewed_by = "thomashebrard"
-reviewed_at = "2026-09-24T09:00:51Z"
-rationale = "PipelexKernel.make renamed its analytics_groups parameter to extras (opaque host-supplied labels). The kernel doc's run-scoped-state bullet already names extras on run_metadata and says the host supplies it at make time; the two make examples pass neither and stay correct."
+reviewed_at = "2026-09-24T12:48:29Z"
+rationale = "This branch's trigger is one sentence of the boot-contract test's own docstring: the offline boot skips the first-run gate, which used to be the Gateway terms gate. docs/under-the-hood/pipelex-kernel.md describes the kernel surface and names no gateway, no terms and no telemetry, so nothing in it went stale with the Pipelex Gateway's removal. Re-taken after merging dev, whose own ack covers PipelexKernel.make renaming analytics_groups to extras; that bullet is unaffected by this branch."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -25,4 +25,4 @@ rationale = "PipelexKernel.make renamed its analytics_groups parameter to extras
 "pipelex/kernel/search_ops.py" = "blob:ed0a8c7953aca1e38de852d0ddef11731b819539"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
 "pipelex/kernel/templating_style_ops.py" = "blob:395473806d600dfc4f124c07f2afebb951fc086b"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:4f440b21ad51f27c098efff4d3a04433b53914bc"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:44dbcb806a14813167c78b5d5e76ebb3cfb9ea0b"

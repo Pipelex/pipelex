@@ -31,7 +31,6 @@ These two categories are managed by separate steps. `init_config()` copies only 
 | `pipelex init inference` | `inference` | Interactive backend selection + routing |
 | `pipelex init routing` | `routing` | Routing profile customization only |
 | `pipelex init telemetry` | `telemetry` | Telemetry config template copy |
-| `pipelex init agreement` | `agreement` | Gateway terms acceptance (no reset) |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
 
 All commands except `agreement` and `credentials` perform a **full reset** (overwrite existing files) — every setting in the file is replaced by the template's. That is why init is not the answer to a configuration file that has fallen behind the current schema: [`pipelex migrate`](../tools/cli/migrate.md) rewrites such a file in place and keeps what is in it.
@@ -54,10 +53,10 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 | `routing_profiles.toml` | Inference step | Project or global | `.pipelex/inference/routing_profiles.toml` |
 | `telemetry.toml` | Telemetry step | Project or global | `.pipelex/telemetry.toml` |
 | `.env` | Credentials step | **Always global** | `~/.pipelex/.env` (mode 0600) |
-| `pipelex_service.toml` | Gateway terms acceptance | **Always global** | `~/.pipelex/pipelex_service.toml` |
+| `pipelex_service.toml` | Onboarding state | **Always global** | `~/.pipelex/pipelex_service.toml` |
 
 !!! info "Project vs global"
-    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exceptions are `.env` (credentials) and `pipelex_service.toml`, which are **always** written to and read from `~/.pipelex/` — see [Gateway Terms: Always Global](#gateway-terms-always-global).
+    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exceptions are `.env` (credentials) and `pipelex_service.toml`, which are **always** written to and read from `~/.pipelex/`.
 
 ---
 
@@ -86,12 +85,11 @@ flowchart TD
     DETECT -- "No (first time)" --> FORCE_INF[Force needs_inference = True]
     DETECT -- Yes --> CHK_INF{check_inference<br/>in focus?}
     CHK_INF -- Yes --> FORCE_INF
-    CHK_INF -- No --> GW_CHK[Check gateway terms]
+    CHK_INF -- No --> S2
 
     S1 -- No --> S2
 
     FORCE_INF --> S2
-    GW_CHK --> S2
 
     S2{needs_inference?}
     S2 -- Yes --> COPY_INF["Copy inference templates<br/>(backends, deck, routing)"]
@@ -190,13 +188,6 @@ This handles two scenarios:
 | `not backends_existed_before` | First-time setup (no inference yet) | Force inference step regardless of focus |
 | `check_inference and backends_exists_now` | Inference in focus + existing config | Re-run inference (reset) |
 
-When inference is **not** forced and backends already exist, service terms are still checked. The question is the broad one — is *any* Pipelex-managed gateway backend enabled — because the terms are the Pipelex service's rather than one dialect's, and it is read off the merged backends document pinned to the target directory (`enabled_managed_gateway_sections(config_dir=…)`), so a managed backend switched on only by that directory's `backends_override.toml` is prompted for terms too. Declining writes `enabled = false` into the base for every managed backend, and `warn_if_managed_gateway_pinned_by_override` names the ones an override still keeps on:
-
-```python
-if not needs_inference and backends_existed_before:
-    _check_gateway_terms_if_needed(console, backends_toml_path)
-```
-
 ### Step 2: Inference Step
 
 When `needs_inference` is `True` and `reset` is `True`, the inference step copies its own template files independently:
@@ -208,7 +199,7 @@ When `needs_inference` is `True` and `reset` is `True`, the inference step copie
 
 Then runs interactive customization:
 
-1. `customize_backends_config()` — prompts user to select backends, handles gateway terms, and suggests IDE extension installation via `suggest_extension_install_if_needed()`
+1. `customize_backends_config()` — prompts user to select backends and suggests IDE extension installation via `suggest_extension_install_if_needed()`
 2. `customize_routing_profile()` — auto-configures routing based on selected backends (**only when `check_routing` is `False`**, i.e. when routing is not the specific focus)
 
 When `focus=routing`, the inference step skips routing entirely because Step 3 handles it as a standalone operation.
@@ -234,19 +225,18 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 ## Scenario Matrix
 
-| Scenario | Focus | Config Step | Inference Step | Credentials | Routing Step | Gateway Terms | Telemetry Step |
-|----------|-------|:-----------:|:--------------:|:-----------:|:------------:|:-------------:|:--------------:|
-| Fresh project, full init | `all` | Copies config files | Copies templates + interactive selection | Prompted | Auto (part of inference) | Via `customize_backends_config` | Copies template |
-| Fresh project, config only | `config` | Copies config files | Forced (first-time detected) | Prompted | Auto (part of inference) | Via `customize_backends_config` | Skipped |
-| Existing project, full re-init | `all` | Overwrites config files | Resets templates + interactive selection | Prompted | Auto (part of inference) | Via `customize_backends_config` | Overwrites template |
-| Existing project, config only | `config` | Overwrites config files | Skipped (backends already exist) | Prompted | Skipped | `_check_gateway_terms_if_needed` | Skipped |
-| Existing project, inference only | `inference` | Skipped | Resets templates + interactive selection | Prompted | Auto (part of inference) | Via `customize_backends_config` | Skipped |
-| Existing project, routing only | `routing` | Skipped | Skipped | Skipped | Resets template + interactive selection | Skipped | Skipped |
-| Existing project, credentials only | `credentials` | Skipped | Skipped | Prompted | Skipped | Skipped | Skipped |
-| Gateway terms only | `agreement` | Skipped | Skipped | Skipped | Skipped | Direct acceptance | Skipped |
+| Scenario | Focus | Config Step | Inference Step | Credentials | Routing Step | Telemetry Step |
+|----------|-------|:-----------:|:--------------:|:-----------:|:------------:|:--------------:|
+| Fresh project, full init | `all` | Copies config files | Copies templates + interactive selection | Prompted | Auto (part of inference) | Copies template |
+| Fresh project, config only | `config` | Copies config files | Forced (first-time detected) | Prompted | Auto (part of inference) | Skipped |
+| Existing project, full re-init | `all` | Overwrites config files | Resets templates + interactive selection | Prompted | Auto (part of inference) | Overwrites template |
+| Existing project, config only | `config` | Overwrites config files | Skipped (backends already exist) | Prompted | Skipped | Skipped |
+| Existing project, inference only | `inference` | Skipped | Resets templates + interactive selection | Prompted | Auto (part of inference) | Skipped |
+| Existing project, routing only | `routing` | Skipped | Skipped | Skipped | Resets template + interactive selection | Skipped |
+| Existing project, credentials only | `credentials` | Skipped | Skipped | Prompted | Skipped | Skipped |
 
 !!! warning "Config-Only on Existing Project"
-    Running `pipelex init config` on a project that already has `inference/backends.toml` will overwrite config files (`pipelex.toml`, etc.) but will **not** touch the inference setup. Gateway terms are still checked via `_check_gateway_terms_if_needed`. The user's backend selection and routing are preserved.
+    Running `pipelex init config` on a project that already has `inference/backends.toml` will overwrite config files (`pipelex.toml`, etc.) but will **not** touch the inference setup. The user's backend selection and routing are preserved.
 
 ---
 
@@ -264,7 +254,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 | `inference/deck/*.toml` | Inference step | Model deck definitions |
 | `inference/routing_profiles.toml` | Inference step | Routing profile definitions |
 | `telemetry.toml` | Telemetry step | Telemetry export configuration |
-| `pipelex_service.toml` | Agreement step | Gateway service terms tracking |
+| `pipelex_service.toml` | Onboarding step | Inference setup state |
 
 ### Skip Lists
 
@@ -344,39 +334,6 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ---
 
-## Gateway Terms: Always Global
-
-`pipelex_service.toml` is **always** written to and read from `~/.pipelex/`, never from a project directory. This is an intentional invariant.
-
-**Why:** Gateway terms are a user-level agreement, not a per-project setting. Accepting terms once should apply everywhere.
-
-### Write Locations
-
-All writers explicitly target `config_manager.global_config_dir`:
-
-| Context | Module | `mkdir` before write? |
-|---------|--------|-----------------------|
-| Interactive init (config step) | `init/command.py` → `_check_gateway_terms_if_needed()` | Yes |
-| Interactive backends | `init/backends.py` → `customize_backends_config()` | Yes |
-| Agreement step | `init/command.py` → `_init_agreement()` | Yes (in `update_service_terms_acceptance`) |
-| Agent CLI | `agent_cli/commands/init_cmd.py` → `_configure_backends()` | Yes |
-
-### Read Locations
-
-| Context | Module | How |
-|---------|--------|-----|
-| Doctor | `doctor_cmd.py` → `check_models()` | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
-| Runtime | `runtime_boot.py` setup | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
-
-### Rules
-
-- **`mkdir` before writing**: All write paths ensure the config directory exists before writing. Some callers call `global_config_dir.mkdir(parents=True, exist_ok=True)` explicitly, and `update_service_terms_acceptance()` itself ensures the directory exists, so every path is protected.
-- **Git-ignored**: `pipelex_service.toml` is in `GIT_IGNORED_CONFIG_FILES`, so it is never copied by `init_config()` and never synced to a project directory.
-
-**Source:** `pipelex/system/pipelex_service/pipelex_service_agreement.py`, `pipelex/system/pipelex_service/pipelex_service_config.py`
-
----
-
 ## Agent CLI Init
 
 `pipelex-agent init` is the non-interactive counterpart to `pipelex init`. It runs the same steps but takes all inputs from a JSON config argument instead of interactive prompts.
@@ -400,9 +357,8 @@ If no project root is found and `--global` is not set, the command fails with an
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `"openai"`, `"anthropic"`, `"pipelex_gateway"`) |
-| `primary_backend` | `str` | Required when 2+ backends selected and `pipelex_gateway` is not among them |
-| `accept_gateway_terms` | `bool` | Sets gateway terms acceptance; when omitted, nothing is written and any existing acceptance state is left untouched |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `"openai"`, `"anthropic"`, `"openrouter"`) |
+| `primary_backend` | `str` | Required when 2+ backends selected |
 
 ### Flow
 
@@ -414,12 +370,9 @@ flowchart TD
     STEP1 --> STEP15["Step 1.5: Copy inference templates<br/>(backends.toml, backends/*, deck/*, routing_profiles.toml)"]
     STEP15 --> STEP16["Step 1.6: Copy telemetry template<br/>(global: active defaults; project: commented-out)"]
     STEP16 --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
-    STEP2 --> GW{pipelex_gateway<br/>in backends?}
-    GW -- Yes --> TERMS["Write gateway terms to ~/.pipelex/<br/>(always global; skipped if accept_gateway_terms omitted)"]
-    GW -- No --> STEP3
-    TERMS --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile"]
+    STEP2 --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile"]
     STEP3 --> STEP4["Step 4: Mark inference setup completed<br/>(written to ~/.pipelex/)"]
-    STEP4 --> STEP5["Step 5: Prime remote-config cache<br/>(no-op if gateway disabled or terms not accepted)"]
+    STEP4 --> STEP5["Step 5: Prime remote-config cache<br/>(no-op when no managed gateway is enabled)"]
     STEP5 --> OUTPUT["Output result<br/>(Markdown, or JSON via --format json)"]
 ```
 
@@ -431,7 +384,6 @@ flowchart TD
 | Aspect | `pipelex init` | `pipelex-agent init` |
 |--------|---------------|---------------------|
 | Prompts | Interactive (Rich prompts) | None — all input from `--config` JSON |
-| Gateway terms | Prompted interactively | From `accept_gateway_terms` field in config |
 | Output | Rich console output | Markdown by default (`agent_success_formatted()` / `agent_error()`), structured JSON via `--format json` |
 | Credentials | Prompted interactively | Not configured — use `pipelex-agent doctor` or `pipelex init credentials` |
 | Focus dispatch | Supports individual focus (`config`, `inference`, etc.) | Runs config, inference, routing, telemetry (no credentials) |
@@ -453,12 +405,11 @@ flowchart TD
 | `check_telemetry_config()` | `resolve_config_file()` | Layered resolution (project > global) |
 | `check_backend_credentials()` | `backends_file_paths()` | Reads the merged backends document: the base `backends.toml` wherever it lives, plus the personal `backends_override.toml` at each tier |
 | `check_backend_files()` | `resolve_config_file()` for `inference/backends/`, `backends_file_paths()` for the enabled-backend list | Finds `inference/backends/` wherever it lives, and reads the merged backends document to decide which backends to probe |
-| `check_models()` gateway terms | `global_config_dir` | **Always global** — reads from `~/.pipelex/` |
 | `check_pending_migrations()` | none | **Both directories, always** — see below |
 
 `check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
 
-`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose gateway model specs were not handed to the loader (the probe fetches nothing) or whose credentials do not resolve is skipped rather than reported: those are the Models row's and the Credentials row's findings. Without leniency the shipped defaults, which enable `pipelex_gateway` and ship its override file, would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after the gateway in `backends.toml` would go unreported. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
+`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose gateway model specs were not handed to the loader (the probe fetches nothing) or whose credentials do not resolve is skipped rather than reported: those are the Models row's and the Credentials row's findings. Without leniency the shipped defaults, which ship the manifold backend's override file, would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after the manifold in `backends.toml` would go unreported. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
 ### Fix Targeting
 

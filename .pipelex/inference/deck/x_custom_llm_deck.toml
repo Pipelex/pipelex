@@ -5,10 +5,10 @@
 # This file allows you to override or complete the base model decks.
 #
 # ADVANCED USERS ONLY: This file is for users who bring their own API keys and connect directly
-# to AI providers (OpenAI, Anthropic, Google, etc.) without using the Pipelex Gateway.
+# to AI providers (OpenAI, Anthropic, Google, etc.) and want to tune their own catalog.
 #
-# If you're using the standard Pipelex Gateway setup, you don't need to modify this file.
-# The Gateway handles model routing automatically and supports all available models.
+# If the shipped backend catalogs cover your needs, you don't need to modify this file.
+# The routing profile picks a backend for every model the enabled backends serve.
 #
 # Waterfalls are useful when using multiple backends directly - they define ordered lists
 # of models that are resolved at configuration time based on which backends are available.

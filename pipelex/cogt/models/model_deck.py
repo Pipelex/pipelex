@@ -23,7 +23,6 @@ from pipelex.cogt.llm.llm_setting import (
     LLMSettingChoices,
     LLMSettingChoicesDefaults,
 )
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
@@ -32,8 +31,6 @@ from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
-from pipelex.tools.misc.exceptions import TomlError
-from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"
@@ -655,32 +652,6 @@ class ModelDeck(ConfigModel):
         """Return the set of backend names that have at least one model enabled."""
         return {model.backend_name for model in self.inference_models.values()}
 
-    def _is_model_available_in_backend(self, model_handle: str, *, backend_name: str) -> bool | None:
-        """Check if a model is available from a specific backend.
-
-        This is a low-level check that reads the backend TOML file directly,
-        so it works even if the backend is disabled. Best-effort: returns False
-        if the file can't be read or parsed.
-
-        Args:
-            model_handle: The model handle/name to check for
-            backend_name: The backend name (e.g., 'bedrock')
-
-        Returns:
-            True if the model is defined in the backend's TOML file, False otherwise
-        """
-        backend_file_path = f".pipelex/inference/backends/{backend_name}.toml"
-        try:
-            backend_toml = load_toml_from_path_if_exists(backend_file_path)
-            if backend_toml is None:
-                return None
-            # Check if model_handle exists as a top-level key (section) in the TOML
-            # Exclude special sections like 'defaults'
-            return model_handle in backend_toml and model_handle != "defaults"
-        except (TomlError, OSError):
-            # Best-effort: an unreadable or malformed backend TOML is treated as "model not found"
-            return None
-
     def _resolve_waterfall(
         self,
         waterfall_name: str,
@@ -715,21 +686,7 @@ class ModelDeck(ConfigModel):
                             f"and the method might fail due to feature limitations such as context window size, etc. "
                             f"Consider getting access to '{ideal_model_handle}'."
                         )
-                        enabled_backends = self._get_enabled_backends()
-                        if PipelexBackend.GATEWAY not in enabled_backends and self._is_model_available_in_backend(
-                            model_handle=ideal_model_handle, backend_name=PipelexBackend.GATEWAY
-                        ):
-                            msg += (
-                                f" Note that many high quality models such as '{ideal_model_handle}' are available "
-                                f"from the {PipelexBackend.GATEWAY.display_name} "
-                                f"and you can get free credits to try them out."
-                            )
-                            msg += (
-                                f"\nPlease see our docs for more details about setting up "
-                                f"{PipelexBackend.GATEWAY.display_name} or other inference backends:\n{URLs.backend_provider_docs}"
-                            )
-                        else:
-                            msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
+                        msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
                         log.info(msg)
                         # Mark this warning as logged for this waterfall_name
                         self._logged_fallback_warnings.add(waterfall_name)

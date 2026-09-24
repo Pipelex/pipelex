@@ -14,11 +14,12 @@ if TYPE_CHECKING:
     from posthog.args import ExceptionArg
 
 
-class DualClientExceptionCapture:
-    """Captures unhandled exceptions and sends them to multiple PostHog clients.
+class ExceptionCapture:
+    """Captures unhandled exceptions and sends them to the operator's PostHog client.
 
-    Unlike PostHog's built-in exception_autocapture which only uses default_client,
-    this implementation sends to both custom and Pipelex PostHog clients.
+    Installed in place of PostHog's built-in exception_autocapture, which only
+    uses `default_client`, so the capture goes through the client the telemetry
+    manager built with its sanitized `capture_exception`.
 
     **An `$exception` is attributed like every other capture.** It is resolved
     through `TelemetryIdentity` rather than from a raw id, and per capture rather
@@ -40,13 +41,9 @@ class DualClientExceptionCapture:
         self,
         custom_posthog_client: "Posthog | None",
         custom_identity_rule: StreamIdentityRule,
-        pipelex_posthog_client: "Posthog | None",
-        pipelex_identity_rule: StreamIdentityRule,
     ):
         self._custom_client = custom_posthog_client
         self._custom_identity_rule = custom_identity_rule
-        self._pipelex_client = pipelex_posthog_client
-        self._pipelex_identity_rule = pipelex_identity_rule
 
         # Save original hooks
         self._original_excepthook = sys.excepthook
@@ -105,23 +102,11 @@ class DualClientExceptionCapture:
             exc_traceback,
         )
 
-        # Send to custom PostHog client
         if self._custom_client:
             self._capture_to_client(
                 client=self._custom_client,
                 identity=self._custom_identity_rule.resolve(caller_identity=caller_identity),
                 posthog_exc_info=posthog_exc_info,
-                stream_name="custom",
-            )
-
-        # Send to Pipelex PostHog client
-        if self._pipelex_client:
-            self._forget_posthog_capture_marks(exc_value=exc_value)
-            self._capture_to_client(
-                client=self._pipelex_client,
-                identity=self._pipelex_identity_rule.resolve(caller_identity=caller_identity),
-                posthog_exc_info=posthog_exc_info,
-                stream_name="Pipelex",
             )
 
     @classmethod
@@ -141,9 +126,8 @@ class DualClientExceptionCapture:
         client: "Posthog",
         identity: TelemetryIdentity,
         posthog_exc_info: tuple[type[BaseException], BaseException, TracebackType | None],
-        stream_name: str,
     ) -> None:
-        """Send one `$exception` to one stream, under the identity that stream resolved.
+        """Send the `$exception` under the identity the stream resolved.
 
         The identified and anonymous shapes are PostHog's own: an identified
         capture passes `distinct_id` and the groups it belongs to, an anonymous
@@ -157,28 +141,7 @@ class DualClientExceptionCapture:
                 client.capture_exception(posthog_exc_info, properties={PostHogAttr.PROCESS_PERSON_PROFILE: False})
         except Exception as capture_exc:  # ruff: ignore[blind-except]
             # Telemetry must never break the app: a failed exception capture is logged at debug and swallowed.
-            log.debug(f"Failed to capture exception to {stream_name} PostHog: {capture_exc}")
-
-    @classmethod
-    def _forget_posthog_capture_marks(cls, *, exc_value: BaseException) -> None:
-        """Let this stream judge the error for itself, whatever the other one did with it.
-
-        Both streams are handed the same exception object, and PostHog drops a
-        capture of an error it has already sent — a guard meant for one stream
-        seeing one error twice. Two clients are two destinations rather than a
-        repeat, so without this whichever stream goes second receives nothing at
-        all, and the Gateway stream, which is always second, would never record
-        a crash on a machine that also reports to an operator's own project.
-
-        It runs only between the two streams, never before the first: a mark
-        already present when the hook ran is the host's own capture, and
-        `_capture_exception` has skipped that error. The marks left by the last
-        stream to capture stay in place, so the guard still holds for anything
-        downstream of this class.
-        """
-        for mark in cls.POSTHOG_CAPTURE_MARKS:
-            if hasattr(exc_value, mark):
-                delattr(exc_value, mark)
+            log.debug(f"Failed to capture exception to PostHog: {capture_exc}")
 
     @classmethod
     def is_marked_as_captured(cls, *, exception: "ExceptionArg") -> bool:

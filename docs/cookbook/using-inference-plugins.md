@@ -81,7 +81,7 @@ Write a haiku about Hello World.
 """
 ```
 
-The only difference from the standard [Hello World](./hello-world.md) example is the `model` field: `hello-1` is served by the plugin instead of a gateway backend.
+The only difference from the standard [Hello World](./hello-world.md) example is the `model` field: `hello-1` is served by the plugin instead of a provider backend.
 
 ## How to run
 
@@ -121,4 +121,4 @@ Pipelex fails loud at worker-creation time: `No inference backend registered for
 
 - [Inference Backend Plugins](../under-the-hood/inference-backend-plugins.md) - The plugin seam and the Inference SPI, including how to wrap a real SDK (dependency guards, client memoization)
 - [Configuration System](../features/configuration.md) - How `.pipelex/` project configuration works
-- [Pipelex Gateway & Model Access](../features/gateway.md) - Default model access through the gateway
+- [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) - Backends, routing profiles and the model deck

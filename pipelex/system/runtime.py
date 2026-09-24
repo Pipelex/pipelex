@@ -20,7 +20,7 @@ class IntegrationMode(StrEnum):
     PYTHON = "python"
 
     @property
-    def requires_terms_acceptance(self) -> bool:
+    def requires_inference_setup(self) -> bool:
         match self:
             case IntegrationMode.CI:
                 return False

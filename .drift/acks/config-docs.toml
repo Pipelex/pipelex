@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:253467d8e548ab963307b4efa6209306a83860076cc8b6116b20e7f74cd5db4e"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-15T23:02:03Z"
-rationale = "The two rendering keys are deleted from DataInclusionConfig and from every shipped pipelex.toml, and the deletion is accounted for by ledger entry pipelex-config@4 with its regenerated goldens. Reviewed docs/configuration: no page there names the data_inclusion keys, and the logging page's pretty-print section is unaffected. The tracing page under docs/under-the-hood, which did name them, is updated in this same change."
+digest = "sha256:b9217ff20ae7a65d59dfe4ba6b4d955ba5e39929421c9b48d425e47e4e2fe6e6"
+reviewed_by = "thomashebrard"
+reviewed_at = "2026-09-21T08:58:22Z"
+rationale = "Reviewed the targets against the trigger. telemetry_config.py loses the maintainer-only Portkey-cloud telemetry section, accounted for by telemetry-config@3 with regenerated goldens, and pipelex_service.toml loses [agreement], accounted for by pipelex-service-config@2. telemetry-config.md is updated to the single user-owned stream. The gateway sections of inference-backend-config.md belong to the docs rewrite item that follows this one and are left for it."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -16,6 +16,6 @@ rationale = "The two rendering keys are deleted from DataInclusionConfig and fro
 "pipelex/system/configuration/config_surface.py" = "blob:96f685656a3f4355e8a073e8bf6184e020fea8f5"
 "pipelex/system/configuration/configs.py" = "blob:cd7dee01503888351d71e58fd1b1cc88420a1def"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
-"pipelex/system/telemetry/telemetry_config.py" = "blob:7070951a6d3e4c10cb7d59822ce168c6590c53be"
+"pipelex/system/telemetry/telemetry_config.py" = "blob:068a785d97a2d52ee43e82e723cd944b8b6601bc"
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
 "pipelex/tools/log/log_config.py" = "blob:288f992a399a106c0aa1129c85aae048e402cb6d"

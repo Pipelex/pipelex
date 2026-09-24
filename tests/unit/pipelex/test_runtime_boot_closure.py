@@ -31,7 +31,7 @@ from tests.unit.pipelex.test_kernel_layer_import_closure import INTERPRETER_PACK
 SUBPROCESS_TIMEOUT_SECONDS = 300
 
 #: Boot the kernel layer in a fresh interpreter, then answer the three questions this module exists
-#: to ask. `needs_inference=False` keeps it offline: no gateway terms gate, no model-deck validation.
+#: to ask. `needs_inference=False` keeps it offline: no first-run gate, no model-deck validation.
 #: The `sys.modules` sweep runs *before* `pipelex.interpreter_hub` is imported for the hub assertion,
 #: so importing it to ask the question cannot be what makes the answer wrong.
 _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(

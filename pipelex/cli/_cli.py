@@ -12,7 +12,6 @@ from pipelex.cli.commands.fix.app import fix_app
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cli.commands.login.command import login_cmd
 from pipelex.cli.commands.migrate_cmd import migrate_cmd
 from pipelex.cli.commands.plugins_cmd import plugins_app
 from pipelex.cli.commands.resolve_cmd import resolve_cmd
@@ -30,7 +29,6 @@ from pipelex.tools.misc.package_utils import get_package_version
 
 # Core commands in display order (natural ordering doesn't work between Typer groups and commands).
 _CORE_COMMAND_ORDER: list[str] = [
-    "login",
     "init",
     "doctor",
     "update",
@@ -153,7 +151,7 @@ def app_callback(
 """
         )
     # Skip checks if no command is being run (e.g., just --help) or if running setup/diagnostic commands
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor", "update", "migrate", "which"}:
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "doctor", "update", "migrate", "which"}:
         return
 
     # Check system readiness (dependencies and venv for dev installs)
@@ -163,18 +161,12 @@ def app_callback(
     warn_if_deck_stale()
 
 
-@app.command(name="login", help="Log in to Pipelex Gateway via the browser and save your API key")
-def login_command() -> None:
-    """Open the browser to authenticate and save your Pipelex Gateway API key."""
-    login_cmd()
-
-
 @app.command(name="init", help="Initialize Pipelex configuration, backends, credentials, routing, and telemetry")
 def init_command(
     focus: Annotated[
         InitFocus,
         typer.Argument(
-            help="What to initialize: 'all' (default), 'config', 'credentials', 'inference', 'routing', 'telemetry', or 'agreement'",
+            help="What to initialize: 'all' (default), 'config', 'credentials', 'inference', 'routing', or 'telemetry'",
         ),
     ] = InitFocus.ALL,
     local: Annotated[
@@ -196,8 +188,6 @@ def init_command(
       routing      Reset routing profile
 
       telemetry    Reset telemetry preferences
-
-      agreement    Review/accept Pipelex Gateway terms of service
     """
     init_cmd(focus=focus, local=local)
 

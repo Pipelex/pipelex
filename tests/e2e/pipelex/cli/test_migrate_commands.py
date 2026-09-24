@@ -1151,7 +1151,7 @@ class TestAStaleBackendDirectory:
     Everything else in this module is planted on a file that sits *directly* in a configuration
     directory. These files do not: they are the reason the walk learned to enter a subdirectory at
     all, and the reason a file is claimed by `(directory, name)` rather than by name — the kit ships
-    a `pipelex_gateway.toml` in there, which the main configuration's `pipelex_*.toml` glob would
+    a `pipelex_manifold.toml` in there, which the main configuration's `pipelex_*.toml` glob would
     otherwise have claimed. It is present here for that reason, untouched, and the assertions say so.
 
     What a boot *says* is not asserted here and cannot be: the probe is `pipelex-agent`, which cuts
@@ -1163,7 +1163,7 @@ class TestAStaleBackendDirectory:
         """Everything in and beside the directory that no migration may rewrite.
 
         Excluded by name rather than by extension, and the difference is the whole point of this
-        class: the kit ships `pipelex_gateway.toml` in this directory, which the main configuration's
+        class: the kit ships `pipelex_manifold.toml` in this directory, which the main configuration's
         `pipelex_*.toml` glob would claim by name alone, so it is the one file a walk that forgot
         about directories would rewrite. An extension filter dropped it — and every other `.toml` in
         here — out of the snapshot, leaving the class's own claim unasserted. Only the files the

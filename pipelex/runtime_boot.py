@@ -64,7 +64,6 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
@@ -97,7 +96,6 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.config_surface import INFERENCE_BACKEND_CONFIG_SURFACE_ID, PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.pipelex_service.exceptions import (
-    GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
     RemoteConfigStaleWarning,
 )
@@ -463,32 +461,19 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # ``pipelex-agent models`` without ``--backend``.
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
-                # Terms acceptance is only required for actual inference usage, not for
-                # read-only operations like fetching model specs for validation.
-                # Also skip for CI mode — automated pipelines don't require human consent.
-                #
-                # **One gate, for any managed gateway backend.** The terms are the Pipelex service's
-                # terms, not one dialect's: a boot that reaches the service at all passes through
-                # here, whichever managed backend asked for it.
-                if needs_inference and integration_mode.requires_terms_acceptance:
+                # The first-run check only matters for actual inference usage, not for read-only
+                # operations like fetching model specs for validation, and it is skipped for CI mode —
+                # automated pipelines have no onboarding to complete. It fires when inference has
+                # never been set up on this machine, so the agent skill can guide the user through it.
+                if needs_inference and integration_mode.requires_inference_setup:
                     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-                    # First-run check: fires if inference has never been configured
-                    # AND terms were never accepted (terms_accepted=true means existing
-                    # user who already completed gateway setup before this flag existed).
-                    if pipelex_service_config is None or (
-                        not pipelex_service_config.onboarding.inference_setup_completed and not pipelex_service_config.agreement.terms_accepted
-                    ):
+                    if pipelex_service_config is None or not pipelex_service_config.onboarding.inference_setup_completed:
                         raise InferenceSetupRequiredError
-                    # Gateway terms check: this block only runs when gateway is
-                    # enabled (is_pipelex_service_enabled guard above). BYOK users
-                    # who disabled gateway via init skip this entire block.
-                    if not pipelex_service_config.agreement.terms_accepted:
-                        raise GatewayTermsNotAcceptedError
                 # Fetch remote configuration (may fall back to on-disk cache when offline).
                 remote_config_result = RemoteConfigFetcher.fetch_remote_config()
                 remote_config = remote_config_result.config
                 gateway_config_source = remote_config_result.source
-                log.verbose(f"Successfully fetched Pipelex Gateway remote configuration (source={gateway_config_source})")
+                log.verbose(f"Successfully fetched the Pipelex remote configuration (source={gateway_config_source})")
                 managed_gateway_configs = build_managed_gateway_configs(
                     remote_config=remote_config,
                     managed_gateway_sections=managed_gateway_sections,
@@ -500,7 +485,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 if gateway_config_source.is_cached:
                     cached_at_iso = remote_config_result.cached_at.isoformat() if remote_config_result.cached_at else "unknown"
                     warnings.warn(
-                        f"Pipelex Gateway is running off a cached remote config (snapshot: {cached_at_iso}). "
+                        f"The Pipelex-managed gateway backends are running off a cached remote config (snapshot: {cached_at_iso}). "
                         "Run `pipelex init` while online to refresh.",
                         RemoteConfigStaleWarning,
                         stacklevel=2,
@@ -509,7 +494,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Plugin discovery -----------------------------------------------------------------
         # Build the plugin registrar from the fully-resolved config (pure and import-light:
         # registering the built-ins imports no backend SDK, constructs no client, touches no hub).
-        # Built here — after the gateway service/terms precondition gate above (so an unaccepted-terms or
+        # Built here — after the managed-gateway precondition gate above (so a
         # first-run boot fails fast before any discovery work) and before the telemetry factory below,
         # which is the first consumer of the secrets provider. Secrets is now a config-selected plugin
         # seam: the built-in SecretsPlugin's factory (and any external pipelex-secrets-<backend>) is
@@ -556,27 +541,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             secrets_config = get_config().runtime.secrets
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
-        # Whether the Pipelex Gateway telemetry stream is sent: the conditions, and why each one is
-        # there, are in `should_enable_pipelex_telemetry`.
-        #
-        # The gateway's enablement is read off the mapping computed above rather than by asking the
-        # document a second time. The two answers are the same one — the gateway resolves to a section
-        # whenever it is enabled — and a second read would be a second chance for an unparseable file
-        # to escape the clause that frames it as a backend-library refusal.
-        gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
-        is_gateway_enabled = PipelexBackend.GATEWAY in managed_gateway_sections
-        is_pipelex_telemetry_enabled = self.should_enable_pipelex_telemetry(
-            integration_mode=integration_mode,
-            is_unit_testing=runtime_manager.is_unit_testing,
-            is_gateway_enabled=is_gateway_enabled,
-            needs_inference=needs_inference,
-            is_gateway_config_cached=gateway_source_is_cached,
-        )
+        # The only telemetry stream is the user's own opt-in one (`telemetry.toml`); nothing in the
+        # runtime reports to Pipelex.
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
-            remote_config=remote_config,
-            is_pipelex_telemetry_enabled=is_pipelex_telemetry_enabled,
             telemetry_config=telemetry_config,
             injected_telemetry_manager=telemetry_manager,
         )

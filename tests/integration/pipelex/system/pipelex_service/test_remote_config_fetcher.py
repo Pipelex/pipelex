@@ -21,6 +21,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
@@ -44,13 +45,7 @@ _ORIGINAL_FETCH_REMOTE_CONFIG = RemoteConfigFetcher.fetch_remote_config
 
 def _valid_remote_config_payload() -> dict[str, Any]:
     return {
-        "posthog": {
-            "project_api_key": "test-key",
-            "endpoint": "https://posthog.example.com",
-            "is_geoip_enabled": False,
-            "is_debug_enabled": False,
-        },
-        "backend_model_specs": {"defaults": {"sdk": "gateway_completions"}},
+        MANIFOLD_MODEL_SPECS_SECTION: {"defaults": {"sdk": "manifold_completions"}},
         "aws_region": "eu-west-3",
     }
 
@@ -111,7 +106,7 @@ class TestRemoteConfigFetcher:
         assert isinstance(result, RemoteConfigResult)
         assert result.source == RemoteConfigSource.FRESH
         assert result.cached_at is None
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
 
         cached = RemoteConfigCache.load()
         assert cached is not None, "successful fetch must persist the raw payload to the cache"
@@ -137,7 +132,7 @@ class TestRemoteConfigFetcher:
 
         assert result.source == RemoteConfigSource.CACHED
         assert result.cached_at == stored_snapshot.cached_at, "result must forward the cache's snapshot timestamp, not a freshly-computed one"
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_network_failure_without_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
@@ -199,7 +194,7 @@ class TestRemoteConfigFetcher:
 
         assert result.source == RemoteConfigSource.CACHED
         assert result.cached_at == stored_snapshot.cached_at
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_http_error_without_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
@@ -328,7 +323,7 @@ class TestRemoteConfigFetcher:
         result = RemoteConfigFetcher.fetch_remote_config()
 
         assert result.source == RemoteConfigSource.FRESH
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
         captured = capsys.readouterr()
         assert "failed to persist remote config cache" in captured.err, (
             f"cache-write failure must surface as a warning on stderr; got stderr={captured.err!r}"

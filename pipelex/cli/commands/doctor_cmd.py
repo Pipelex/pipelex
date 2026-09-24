@@ -57,7 +57,6 @@ from pipelex.system.pipelex_service.exceptions import (
 from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
 from pipelex.system.pipelex_service.pipelex_service_config import (
     enabled_managed_gateway_sections,
-    load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
@@ -1094,12 +1093,11 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
             return False, msg, backend_file_reports
 
     # Fetch the managed gateways' model specs if any managed gateway backend is enabled.
-    # Probe the same backends document / pipelex_service.toml the doctor is reporting on
-    # (project-vs-global) instead of always defaulting to the global path — otherwise
-    # --global on a machine with a project-local backends.toml would mis-report gateway
-    # state because the layered `config_manager.backends_file_paths()` would still resolve
-    # its base to the project file.
-    service_config_dir = config_dir if config_dir is not None else config_manager.global_config_dir
+    # Probe the same backends document the doctor is reporting on (project-vs-global) instead
+    # of always defaulting to the global path — otherwise --global on a machine with a
+    # project-local backends.toml would mis-report the managed-gateway state because the
+    # layered `config_manager.backends_file_paths()` would still resolve its base to the
+    # project file.
     managed_gateway_configs: dict[str, GatewayConfig] | None = None
     gateway_config_source: RemoteConfigSource | None = None
     try:
@@ -1107,11 +1105,6 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
     except InferenceBackendLibraryValidationError as exc:
         return False, f"Error checking models: {exc}", backend_file_reports
     if managed_gateway_sections:
-        pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=service_config_dir)
-        if pipelex_service_config is None:
-            return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
-        if not pipelex_service_config.agreement.terms_accepted:
-            return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
         try:
             result = RemoteConfigFetcher.fetch_remote_config()
             gateway_config_source = result.source
@@ -1120,7 +1113,7 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
                 managed_gateway_sections=managed_gateway_sections,
             )
         except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
-            return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
+            return False, f"Failed to fetch the Pipelex remote configuration: {exc}", backend_file_reports
 
     # When --global (config_dir set), pin every path so layered config_manager.X
     # resolution doesn't silently fall back to the project-local files. The two documents

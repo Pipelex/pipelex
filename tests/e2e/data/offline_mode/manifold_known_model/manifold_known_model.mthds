@@ -1,0 +1,12 @@
+domain      = "offline_manifold_known"
+description = "Pipeline referencing a manifold model that exists in the cached manifold specs"
+main_pipe   = "manifold_known_pipe"
+
+[pipe]
+[pipe.manifold_known_pipe]
+type        = "PipeLLM"
+description = "Single LLM step using a manifold-listed model handle"
+inputs      = { topic = "Text" }
+output      = "Text"
+model       = "gpt-5.4-nano"
+prompt      = "Write a single sentence about $topic.text."

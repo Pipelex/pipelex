@@ -265,7 +265,7 @@ class Pipelex(RuntimeBoot):
             needs_inference: When False, forces every run THIS process initiates to DRY mode
                 (applied at runtime_hub.resolve_run_mode_for_boot, which every run-params factory
                 calls: operators dispatch normally and the cogt leaf mocks) and loads backends leniently
-                (skipping those with missing credentials). This skips gateway terms check and model
+                (skipping those with missing credentials). This skips the first-run check and model
                 deck validation. Useful for commands like validate/show that don't call inference
                 APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
                 not constrain work this process executes as a Temporal worker.
@@ -275,7 +275,7 @@ class Pipelex(RuntimeBoot):
                 the matching plugin gates on its own name.
             needs_model_specs: When True, load real model specs even if needs_inference
                 is False. When None (default), follows needs_inference. Useful for validate
-                commands that need gateway-provided model specs without enabling full inference.
+                commands that need the managed gateways' model specs without enabling full inference.
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -297,7 +297,7 @@ class Pipelex(RuntimeBoot):
                 to this directory (package defaults + this directory) instead of following
                 project/global layering. Note the limit: it scopes *that load* and nothing else. The
                 inference files — backends, routing profiles and the model deck — still resolve through
-                the layered paths, and the gateway consent/onboarding state is read from the global
+                the layered paths, and the onboarding state is read from the global
                 config dir outright. So this does not fully isolate a boot from the surrounding
                 project.
             config_overrides: Optional dict deep-merged on top of all TOML config layers

@@ -11,6 +11,7 @@ import pytest
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import (
     ModelDeckBlueprint,
@@ -41,11 +42,11 @@ class TestModelDeckReferences:
 
     @pytest.fixture(scope="class")
     def all_known_model_handles(self) -> dict[str, ModelType]:
-        """Collect all valid model handles with their types from local backends + Pipelex Gateway.
+        """Collect all valid model handles with their types from local backends + Pipelex Manifold.
 
         Sources:
         1. Local backend TOML files (.pipelex/inference/backends/*.toml)
-        2. Pipelex Gateway remote config (uses session-level cache from conftest.py)
+        2. The manifold section of the Pipelex remote config (uses session-level cache from conftest.py)
 
         Returns:
             Mapping of model_handle -> ModelType
@@ -55,8 +56,8 @@ class TestModelDeckReferences:
         # 1. Parse local backend TOML files
         known_handles.update(self._get_local_backend_models())
 
-        # 2. Get gateway models from cached remote config
-        gateway_specs = RemoteConfigFetcher.fetch_remote_config().config.backend_model_specs  # Uses cached version
+        # 2. Get the manifold models from the cached remote config
+        gateway_specs = RemoteConfigFetcher.fetch_remote_config().config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) or {}
 
         # Get default model_type from gateway defaults section (same pattern as local backends)
         gateway_defaults = gateway_specs.get("defaults", {})

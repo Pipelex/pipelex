@@ -7,7 +7,7 @@ description: "Reference for the `GatewayConfigMergeError` Pipelex error class."
 
 # Gateway config merge
 
-Raised when gateway configuration merge encounters invalid data.
+Raised when merging a managed gateway's served model specs with local overrides meets invalid data.
 
 | Field | Value |
 |---|---|

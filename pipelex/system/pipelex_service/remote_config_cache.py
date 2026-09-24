@@ -1,4 +1,4 @@
-"""On-disk fallback cache for the Pipelex Gateway remote config.
+"""On-disk fallback cache for the Pipelex remote config.
 
 The cache is a **last-resort** safety net for offline operation. It is never read for freshness
 optimisation. Layout::
@@ -34,7 +34,7 @@ CACHE_FILE_NAME = "remote_config.json"
 
 
 class CachedRemoteConfig(BaseModel):
-    """A snapshot of the remote gateway config plus the metadata needed to validate it."""
+    """A snapshot of the remote config plus the metadata needed to validate it."""
 
     model_config = ConfigDict(extra="forbid")
 

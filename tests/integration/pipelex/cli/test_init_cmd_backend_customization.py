@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 from pipelex.cli.commands.init.backends import customize_backends_config
 from pipelex.cli.commands.init.config_files import init_config
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cli.commands.init.ui.backends_ui import RECOMMENDED_INIT_BACKEND
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 from tests.helpers.init_cmd_helpers import get_backend_indices_helper
@@ -17,7 +17,7 @@ from tests.helpers.init_cmd_helpers import get_backend_indices_helper
 
 class TestBackendCustomization:
     def test_customize_backends_config_with_default_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test backend customization with default selection (pipelex_gateway)."""
+        """Test backend customization with the recommended default selection."""
         # Setup directories with actual backends.toml
         inference_dir = tmp_path / ".pipelex" / "inference"
         inference_dir.mkdir(parents=True)
@@ -37,8 +37,8 @@ class TestBackendCustomization:
         mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
 
         # Setup input queues - global patching like MockedInitEnvironment
-        prompt_inputs = ["1"]  # Select pipelex_gateway
-        confirm_inputs = [True]  # Accept gateway terms
+        prompt_inputs = [""]  # Empty = the recommended default
+        confirm_inputs: list[bool] = []
 
         def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
             if not prompt_inputs:
@@ -63,9 +63,9 @@ class TestBackendCustomization:
         # Verify backends.toml was customized
         toml_doc = load_toml_with_tomlkit(str(test_backends))
 
-        # pipelex_gateway should be enabled
-        assert "enabled" in toml_doc[PipelexBackend.GATEWAY]  # type: ignore[operator]
-        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is True  # type: ignore[index]
+        # the recommended backend should be enabled
+        assert "enabled" in toml_doc[RECOMMENDED_INIT_BACKEND]  # type: ignore[operator]
+        assert toml_doc[RECOMMENDED_INIT_BACKEND]["enabled"] is True  # type: ignore[index]
 
         # Other backends should be disabled
         for backend in ["openai", "anthropic", "mistral", "fal"]:
@@ -98,7 +98,7 @@ class TestBackendCustomization:
         # Mock console provider
         mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
 
-        # Setup input queues - no gateway selected, so no confirm needed
+        # Setup input queues - no confirm needed
         prompt_inputs = [indices_str]
 
         def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
@@ -121,8 +121,8 @@ class TestBackendCustomization:
         assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
 
-        # pipelex_gateway should be disabled
-        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is False  # type: ignore[index]
+        # the recommended backend should be disabled
+        assert toml_doc[RECOMMENDED_INIT_BACKEND]["enabled"] is False  # type: ignore[index]
 
         # fal should be disabled
         assert toml_doc["fal"]["enabled"] is False  # type: ignore[index]
@@ -140,7 +140,7 @@ class TestBackendCustomization:
         shutil.copy2(actual_backends, test_backends)
 
         # Dynamically get indices for the backends we want to test
-        backend_names = [PipelexBackend.GATEWAY, "openai", "fal"]
+        backend_names = [RECOMMENDED_INIT_BACKEND, "openai", "fal"]
         indices = get_backend_indices_helper(str(actual_backends), backend_names)
         indices_str = " ".join(str(idx) for idx in indices)
 
@@ -153,9 +153,9 @@ class TestBackendCustomization:
         # Mock console provider
         mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
 
-        # Setup input queues - gateway selected, so confirm needed
+        # Setup input queues - no confirm needed
         prompt_inputs = [indices_str]
-        confirm_inputs = [True]  # Accept gateway terms
+        confirm_inputs: list[bool] = []
 
         def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
             if not prompt_inputs:
@@ -181,7 +181,7 @@ class TestBackendCustomization:
         toml_doc = load_toml_with_tomlkit(str(test_backends))
 
         # Selected backends should be enabled
-        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is True  # type: ignore[index]
+        assert toml_doc[RECOMMENDED_INIT_BACKEND]["enabled"] is True  # type: ignore[index]
         assert toml_doc["openai"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["fal"]["enabled"] is True  # type: ignore[index]
 
@@ -241,123 +241,3 @@ class TestBackendCustomization:
 
         # Verify warning was printed
         mock_console.print.assert_called()
-
-    def test_customize_backends_disables_gateway_when_terms_save_raises_type_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """A TypeError from terms persistence (malformed [agreement] TOML) still triggers the gateway-disable safety fallback."""
-        inference_dir = tmp_path / ".pipelex" / "inference"
-        inference_dir.mkdir(parents=True)
-
-        actual_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
-        test_backends = inference_dir / "backends.toml"
-        shutil.copy2(actual_backends, test_backends)
-
-        mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = tmp_path / ".pipelex"
-        mock_config_manager.global_config_dir = tmp_path / ".pipelex"
-        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
-        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
-
-        # Terms persistence fails with a TypeError, as a malformed [agreement] section would produce.
-        mocker.patch(
-            "pipelex.cli.commands.init.backends.update_service_terms_acceptance",
-            side_effect=TypeError("'str' object does not support item assignment"),
-        )
-
-        prompt_inputs = ["1"]  # Select pipelex_gateway
-        confirm_inputs = [True]  # Accept gateway terms
-
-        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
-            if not prompt_inputs:
-                question = str(args[0]) if args else "<unknown prompt>"
-                msg = f"Unexpected prompt without predefined input: {question}"
-                raise AssertionError(msg)
-            return prompt_inputs.pop(0)
-
-        def confirm_side_effect(*args: Any, **_kwargs: Any) -> bool:
-            if not confirm_inputs:
-                question = str(args[0]) if args else "<unknown confirmation>"
-                msg = f"Unexpected confirm without predefined input: {question}"
-                raise AssertionError(msg)
-            return confirm_inputs.pop(0)
-
-        mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
-        mocker.patch("rich.prompt.Confirm.ask", side_effect=confirm_side_effect)
-
-        # Execute - the TypeError must be caught so the safety fallback runs.
-        customize_backends_config()
-
-        # The gateway must be disabled since its terms could not be recorded.
-        toml_doc = load_toml_with_tomlkit(str(test_backends))
-        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is False  # type: ignore[index]
-
-
-class TestTermsAreAskedForAnyManagedGateway:
-    """The terms are the Pipelex service's terms, not one dialect's.
-
-    The boot gate asks the broad question — any enabled managed gateway backend puts the install
-    behind service-terms acceptance (`runtime_boot`). These prompts have to ask the same question,
-    or selecting the manifold service alone produces a configuration that init calls complete and
-    the next inference boot refuses, with no init step that records acceptance.
-    """
-
-    @staticmethod
-    def _prepare(tmp_path: Path, mocker: MockerFixture) -> Path:
-        inference_dir = tmp_path / ".pipelex" / "inference"
-        inference_dir.mkdir(parents=True)
-        test_backends = inference_dir / "backends.toml"
-        shutil.copy2(Path(str(get_kit_configs_dir())) / "inference" / "backends.toml", test_backends)
-
-        mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = tmp_path / ".pipelex"
-        mock_config_manager.global_config_dir = tmp_path / ".pipelex"
-        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
-        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
-        return test_backends
-
-    @staticmethod
-    def _answer(mocker: MockerFixture, *, selection: str, accepts_terms: bool) -> None:
-        prompt_inputs = [selection]
-        confirm_inputs = [accepts_terms]
-
-        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
-            if not prompt_inputs:
-                question = str(args[0]) if args else "<unknown prompt>"
-                msg = f"Unexpected prompt without predefined input: {question}"
-                raise AssertionError(msg)
-            return prompt_inputs.pop(0)
-
-        def confirm_side_effect(*args: Any, **_kwargs: Any) -> bool:
-            if not confirm_inputs:
-                question = str(args[0]) if args else "<unknown confirmation>"
-                msg = f"Unexpected confirm without predefined input: {question}"
-                raise AssertionError(msg)
-            return confirm_inputs.pop(0)
-
-        mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
-        mocker.patch("rich.prompt.Confirm.ask", side_effect=confirm_side_effect)
-
-    def test_selecting_only_the_manifold_service_records_terms_acceptance(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Accepting must persist, exactly as it does for the Portkey-cloud service."""
-        test_backends = self._prepare(tmp_path, mocker)
-        recorded = mocker.patch("pipelex.cli.commands.init.backends.update_service_terms_acceptance")
-        manifold_index = get_backend_indices_helper(str(test_backends), [PipelexBackend.MANIFOLD])[0]
-        self._answer(mocker, selection=str(manifold_index), accepts_terms=True)
-
-        customize_backends_config()
-
-        recorded.assert_called_once()
-        assert recorded.call_args.kwargs["accepted"] is True
-        toml_doc = load_toml_with_tomlkit(str(test_backends))
-        assert toml_doc[PipelexBackend.MANIFOLD]["enabled"] is True  # type: ignore[index]
-
-    def test_declining_removes_the_manifold_service_from_the_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """The same guarantee the gateway decline path gives: refused terms leave nothing enabled."""
-        test_backends = self._prepare(tmp_path, mocker)
-        mocker.patch("pipelex.cli.commands.init.backends.update_service_terms_acceptance")
-        manifold_index = get_backend_indices_helper(str(test_backends), [PipelexBackend.MANIFOLD])[0]
-        self._answer(mocker, selection=str(manifold_index), accepts_terms=False)
-
-        customize_backends_config()
-
-        toml_doc = load_toml_with_tomlkit(str(test_backends))
-        assert toml_doc[PipelexBackend.MANIFOLD]["enabled"] is False  # type: ignore[index]

@@ -6,7 +6,6 @@ from pipelex.providers.bedrock.bedrock_plugin import BedrockPlugin
 from pipelex.providers.blackboxai.blackboxai_plugin import BlackboxaiPlugin
 from pipelex.providers.docling.docling_plugin import DoclingPlugin
 from pipelex.providers.fal.fal_plugin import FalPlugin
-from pipelex.providers.gateway.gateway_plugin import GatewayPlugin
 from pipelex.providers.google.google_plugin import GooglePlugin
 from pipelex.providers.huggingface.huggingface_plugin import HuggingFacePlugin
 from pipelex.providers.linkup.linkup_plugin import LinkupPlugin
@@ -37,7 +36,6 @@ KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
     StoragePlugin(),
     SecretsPlugin(),
     OpenAIPlugin(),
-    GatewayPlugin(),
     ManifoldPlugin(),
     PortkeyPlugin(),
     AnthropicPlugin(),

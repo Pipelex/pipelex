@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend import PipelexBackend
-from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
@@ -24,8 +23,7 @@ class TestFocusedInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_confirm_input(True)  # Accept gateway terms of service
-        env.add_prompt_input("1")  # Backend selection (pipelex_gateway)
+        env.add_prompt_input("")  # Backend selection: the recommended default
 
         env.setup_mocks()
 
@@ -72,10 +70,10 @@ class TestFocusedInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Set pipelex_gateway as initially enabled
+        # Set openrouter as initially enabled
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
-        toml_doc[PipelexBackend.GATEWAY]["enabled"] = True  # type: ignore[index]
+        toml_doc["openrouter"]["enabled"] = True  # type: ignore[index]
         save_toml_to_path(toml_doc, path=str(backends_path))
 
         # Get index for mistral
@@ -198,19 +196,19 @@ class TestFocusedInitialization:
         # After reconfigure, telemetry should be reset to default (off)
         env.verify_telemetry("off")
 
-    def test_reset_routing_with_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case: Reset routing when only pipelex_gateway is enabled (bug fix test)."""
-        # Setup environment with existing config and pipelex_gateway enabled
+    def test_reset_routing_with_pipelex_manifold(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test Case: Reset routing when only pipelex_manifold is enabled (bug fix test)."""
+        # Setup environment with existing config and pipelex_manifold enabled
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Enable only pipelex_gateway (disable everything else)
+        # Enable only pipelex_manifold (disable everything else)
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
         for backend_key in toml_doc:
             if backend_key == "internal":
                 continue
-            toml_doc[backend_key]["enabled"] = backend_key == PipelexBackend.GATEWAY  # type: ignore[index]
+            toml_doc[backend_key]["enabled"] = backend_key == PipelexBackend.MANIFOLD  # type: ignore[index]
         save_toml_to_path(toml_doc, path=str(backends_path))
 
         # Modify routing to have wrong config (simulating the bug scenario)
@@ -227,8 +225,8 @@ class TestFocusedInitialization:
         # Execute with ROUTING focus and reset flag
         init_cmd(focus=InitFocus.ROUTING)
 
-        # Verify routing was reset to all_pipelex_gateway (correct for pipelex_gateway)
-        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
+        # Verify routing was reset to all_pipelex_manifold (correct for a single enabled backend)
+        env.verify_routing(f"all_{PipelexBackend.MANIFOLD}")
 
     def test_everything_already_configured(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 7.1: Everything configured - decline reconfigure."""
