@@ -30,9 +30,7 @@ from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identit
 from pipelex.system.telemetry.exception_capture import DualClientExceptionCapture
 from pipelex.system.telemetry.otel_constants import PostHogAttr
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, TelemetryConfig
-from pipelex.system.telemetry.telemetry_identity import PIPELEX_DEPLOYMENT_GROUP_TYPE
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
-from pipelex.tools.misc.hash_utils import hash_sha256
 
 
 @pytest.fixture
@@ -121,8 +119,8 @@ class TestExceptionCaptureIdentity:
 
         assert custom_client.capture_exception.call_args.kwargs["distinct_id"] == "configured-id"
 
-    def test_the_pipelex_stream_captures_an_exception_under_its_deployment(self, mocker: MockerFixture) -> None:
-        """No run means no fold, so the gateway hash is both the person and the group."""
+    def test_the_pipelex_stream_captures_an_exception_under_its_fallback(self, mocker: MockerFixture) -> None:
+        """No run means no caller and no groups, so the stream's fallback is the person."""
         capture, _, pipelex_client = _make_capture(
             mocker=mocker,
             mode=PostHogMode.IDENTIFIED,
@@ -134,7 +132,7 @@ class TestExceptionCaptureIdentity:
 
         capture_kwargs = pipelex_client.capture_exception.call_args.kwargs
         assert capture_kwargs["distinct_id"] == "gateway-hash"
-        assert capture_kwargs["groups"] == {PIPELEX_DEPLOYMENT_GROUP_TYPE: "gateway-hash"}
+        assert capture_kwargs["groups"] is None
 
     def test_the_pipelex_stream_is_unaffected_by_the_operators_anonymous_mode(self, mocker: MockerFixture) -> None:
         """The two streams answer to different settings, and anonymity on one is not anonymity on the other."""
@@ -239,4 +237,4 @@ class TestExceptionCaptureIdentity:
 
         _crash_with(capture=capture, error=_escaped_from_a_run())
 
-        assert pipelex_client.capture_exception.call_args.kwargs["distinct_id"] == hash_sha256(data="gateway-hash:caller-7", length=16)
+        assert pipelex_client.capture_exception.call_args.kwargs["distinct_id"] == "caller-7"

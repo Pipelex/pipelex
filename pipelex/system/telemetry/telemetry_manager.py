@@ -152,7 +152,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             pipelex_posthog_client=self.pipelex_posthog_client,
             pipelex_identity_rule=StreamIdentityRule(
                 fallback_distinct_id=self._pipelex_distinct_id,
-                run_identity_policy=RunIdentityPolicy.NAMESPACED,
+                run_identity_policy=RunIdentityPolicy.DIRECT,
             ),
         )
 
@@ -507,12 +507,11 @@ class TelemetryManager(TelemetryManagerAbstract):
             log.verbose(f"Tracked anonymous event '{event_name}' with properties: {capture_properties}")
 
     def _track_to_pipelex(self, event_name: str, *, properties: dict[str, Any], caller_identity: CallerIdentity | None = None):
-        """Track event to Pipelex's PostHog (always identified, always namespaced).
+        """Track event to Pipelex's PostHog (always identified, always direct).
 
-        The stream has no mode to turn identification off, but it is a shared
-        project: a run's own user reaches it only as a digest taken inside the
-        gateway-key hash, and the hash itself is what an event with no run
-        reports under. The run's groups do not travel here at all.
+        The stream has no mode to turn identification off. A run's own
+        `user_id` is the `distinct_id` and its groups ride the capture; an event
+        that names nobody reports under the stream's fallback.
         """
         if not self.pipelex_posthog_client or not self._pipelex_distinct_id:
             log.error("Could not track event to Pipelex telemetry because pipelex_posthog_client or _pipelex_distinct_id is not set")
@@ -520,7 +519,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         identity = TelemetryIdentity.make_from_caller_identity(
             caller_identity=caller_identity,
             fallback_distinct_id=self._pipelex_distinct_id,
-            run_identity_policy=RunIdentityPolicy.NAMESPACED,
+            run_identity_policy=RunIdentityPolicy.DIRECT,
         )
         self.pipelex_posthog_client.capture(
             event_name,
@@ -695,7 +694,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             pipelex_identity = TelemetryIdentity.make_from_caller_identity(
                 caller_identity=caller_identity,
                 fallback_distinct_id=self._pipelex_distinct_id,
-                run_identity_policy=RunIdentityPolicy.NAMESPACED,
+                run_identity_policy=RunIdentityPolicy.DIRECT,
             )
             if pipelex_identity.distinct_id:
                 self.pipelex_posthog_client.capture(

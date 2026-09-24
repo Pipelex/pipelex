@@ -32,8 +32,8 @@ class PostHogSpanExporter(SpanExporter):
     and attributes each span to the run that produced it — see
     :mod:`pipelex.system.telemetry.telemetry_identity`. One class serves both
     streams: the operator's exporter is built with their configured id and the
-    policy their mode implies, Pipelex's with the gateway-key hash and the
-    namespacing policy a shared project requires.
+    policy their mode implies, Pipelex's with the gateway-key hash as its
+    fallback and the direct policy.
     """
 
     def __init__(
@@ -52,8 +52,8 @@ class PostHogSpanExporter(SpanExporter):
                 this used to be the identity for every span on the stream.
             run_identity_policy: What this stream may do with a span's own user.
                 `NONE` on an operator's stream in `anonymous` mode, where the
-                operator chose not to identify people at all; `NAMESPACED` on
-                Pipelex's shared project.
+                operator chose not to identify people at all; `DIRECT`
+                otherwise, Pipelex's stream included.
             redaction_config: What this stream is allowed to see.
         """
         self.posthog_client = posthog_client

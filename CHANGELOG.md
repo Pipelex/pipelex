@@ -8,6 +8,7 @@
 
 ### Changed
 
+- **Pipelex's own telemetry stream receives the run's `user_id` as it is**: the Gateway stream sent a one-way digest of the caller taken inside the Gateway-key hash, and carried a `deployment` group instead of the run's own `analytics_groups`. It now resolves identity like the operator's identified stream — the run's `user_id` is the PostHog `distinct_id` and its `analytics_groups` ride the groups facet — so a host's events and the runtime's land on the same person and the same organization. The `NAMESPACED` identity policy and the `deployment` group type are removed. Anything that names no caller still reports under the Gateway-key hash.
 - **`BundleValidatorProtocol.validate_bundles` requires `caller_identity` (Breaking)**: a validator is handed who asked for the validation, `None` meaning nobody, so a hosted `/validate` attributes its telemetry to its caller. Every validator implementation must accept the argument, and a host must pass it — `caller_identity=self.caller_identity` from a `PipelexMTHDSProtocol` runner. `validate_bundles_in_process`, `validate_bundle`, `dry_run_pipe_in_process` and the `BundleValidator` sweep methods gain an optional `caller_identity` of their own.
 
 ### Fixed

@@ -24,9 +24,7 @@ from pipelex.system.storage_scope import LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName
 from pipelex.system.telemetry.otel_constants import PostHogAttr
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, PostHogTracingConfig, TelemetryConfig
-from pipelex.system.telemetry.telemetry_identity import PIPELEX_DEPLOYMENT_GROUP_TYPE
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
-from pipelex.tools.misc.hash_utils import hash_sha256
 
 
 def _run_metadata(*, user_id: str = "user-42", analytics_groups: dict[str, str] | None = None) -> RunMetadata:
@@ -112,13 +110,8 @@ class TestTelemetryManagerIdentity:
 
         custom_client.capture.assert_not_called()
 
-    def test_the_pipelex_stream_digests_the_run_inside_the_gateway_hash(self, mocker: MockerFixture) -> None:
-        """One shared project serves every deployment, so a raw caller value must never reach it.
-
-        Two customers whose callers are both `user-42` would otherwise merge into
-        a single person there, and a caller id that is an e-mail address would
-        leave the deployment holding it.
-        """
+    def test_the_pipelex_stream_sends_the_runs_user_and_groups_as_they_are(self, mocker: MockerFixture) -> None:
+        """The run's `user_id` is the `distinct_id` and its groups ride the capture, unchanged."""
         manager, _, pipelex_client = _make_manager(
             mocker=mocker,
             mode=PostHogMode.OFF,
@@ -133,24 +126,8 @@ class TestTelemetryManagerIdentity:
         )
 
         capture_kwargs = pipelex_client.capture.call_args.kwargs
-        assert capture_kwargs["distinct_id"] == hash_sha256(data="gateway-hash:user-42", length=16)
-        assert capture_kwargs["groups"] == {PIPELEX_DEPLOYMENT_GROUP_TYPE: "gateway-hash"}
-        assert "org_acme" not in repr(capture_kwargs)
-
-    def test_two_deployments_never_merge_on_the_same_caller_name(self, mocker: MockerFixture) -> None:
-        captured_ids: list[str] = []
-        for gateway_hash in ("gateway-hash-one", "gateway-hash-other"):
-            manager, _, pipelex_client = _make_manager(
-                mocker=mocker,
-                mode=PostHogMode.OFF,
-                configured_user_id=None,
-                pipelex_distinct_id=gateway_hash,
-            )
-            assert pipelex_client is not None
-            manager.track_event(EventName.PIPE_RUN, run_metadata=_run_metadata())
-            captured_ids.append(pipelex_client.capture.call_args.kwargs["distinct_id"])
-
-        assert captured_ids[0] != captured_ids[1]
+        assert capture_kwargs["distinct_id"] == "user-42"
+        assert capture_kwargs["groups"] == {"organization": "org_acme"}
 
     def test_an_event_with_no_run_falls_back_to_the_gateway_hash(self, mocker: MockerFixture) -> None:
         manager, _, pipelex_client = _make_manager(
@@ -236,7 +213,7 @@ class TestTelemetryManagerIdentity:
         assert "distinct_id" not in capture_kwargs
         assert capture_kwargs["properties"][PostHogAttr.PROCESS_PERSON_PROFILE] is False
 
-    def test_the_pipelex_stream_trace_start_is_namespaced_like_its_spans(self, mocker: MockerFixture) -> None:
+    def test_the_pipelex_stream_trace_start_is_attributed_like_its_spans(self, mocker: MockerFixture) -> None:
         """The trace's first event has to land on the same person its spans will."""
         manager, _, pipelex_client = _make_manager(
             mocker=mocker,
@@ -254,8 +231,8 @@ class TestTelemetryManagerIdentity:
         )
 
         capture_kwargs = pipelex_client.capture.call_args.kwargs
-        assert capture_kwargs["distinct_id"] == hash_sha256(data="gateway-hash:user-42", length=16)
-        assert capture_kwargs["groups"] == {PIPELEX_DEPLOYMENT_GROUP_TYPE: "gateway-hash"}
+        assert capture_kwargs["distinct_id"] == "user-42"
+        assert capture_kwargs["groups"] == {"organization": "org_acme"}
 
     def test_the_identity_never_becomes_a_property(self, mocker: MockerFixture) -> None:
         manager, custom_client, _ = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
@@ -331,7 +308,7 @@ class TestTelemetryManagerIdentity:
         with scoped_caller_identity(caller_identity=_CALLER):
             manager.track_event(EventName.PIPE_DRY_RUN)
 
-        assert pipelex_client.capture.call_args.kwargs["distinct_id"] == hash_sha256(data="gateway-hash:caller-7", length=16)
+        assert pipelex_client.capture.call_args.kwargs["distinct_id"] == "caller-7"
 
     def test_a_trace_start_with_no_run_is_attributed_to_the_caller_in_scope(self, mocker: MockerFixture) -> None:
         manager, custom_client, _ = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-runner")
