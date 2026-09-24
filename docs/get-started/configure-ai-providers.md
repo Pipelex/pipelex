@@ -88,15 +88,7 @@ Rather than holding provider keys, sign up at [app.pipelex.com](https://app.pipe
 - Want one bill and one credential
 - Are calling Pipelex from an application or an agent rather than from your own machine
 
-**Setup:**
-
-1. Create your Pipelex API key at [app.pipelex.com](https://app.pipelex.com/), or run `pipelex login`, which opens the browser and saves the key for you.
-
-2. Point your client at the hosted API with that key:
-
-    ```env
-    PIPELEX_API_KEY=plx_sk_...
-    ```
+**Setup:** sign up at [app.pipelex.com](https://app.pipelex.com/) and create your Pipelex API key there. The [Quick Start](./quick-start.md) shows the ways to use it: the Pipelex plugin in your coding agent, the Pipelex MCP in your chatbot, a webapp, or the API from your own software.
 
 Your methods then run on Pipelex's infrastructure, and the inference credentials are ours rather than yours.
 

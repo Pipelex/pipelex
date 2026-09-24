@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The documentation no longer offers the Pipelex Gateway**: **Configure AI Providers** and **Inference Backend Configuration** name your own provider keys, with OpenRouter as the single-key option, the hosted Pipelex API, or a local model, and their routing examples use OpenRouter where they used the Gateway. The landing page and the MTHDS language tutorial no longer mention a gateway key or `pipelex login`.
+
 ### Fixed
 
 - **The quick start says the Pipelex plugin needs Node.js**: the README's quick start and the documentation's **Quick Start** and **Pipelex Plugin** pages said, in the Claude Code install step, that the plugin needed nothing else to install. Both agents' install steps now say that the plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`; without it the hook passes silently and the tools never start.

@@ -75,7 +75,7 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 
 -   :material-cloud-check: **[60+ AI Models](./features/llm-integration.md)**
 
-    One gateway key or bring-your-own: OpenAI, Anthropic, Mistral, Google, Deepseek, Hugging Face, and more.
+    Your own provider keys for OpenAI, Anthropic, Mistral, Google, Deepseek, Hugging Face and more, or local models.
 
 -   :material-check-decagram: **[Validation and Dry Run](./features/validation-dry-run.md)**
 

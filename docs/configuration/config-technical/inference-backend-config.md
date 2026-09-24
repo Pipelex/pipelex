@@ -23,7 +23,7 @@ See [Inference Backends](#inference-backends) below for configuration.
 
 ### Option B: The hosted Pipelex API
 
-Rather than holding a key per provider, sign up at [app.pipelex.com](https://app.pipelex.com/), create a Pipelex API key, and run your methods on the hosted API — one credential, one bill, and the inference credentials are Pipelex's rather than yours. `pipelex login` opens the browser and saves that key for you.
+Rather than holding a key per provider, sign up at [app.pipelex.com](https://app.pipelex.com/), create a Pipelex API key, and run your methods on the hosted API — one credential, one bill, and the inference credentials are Pipelex's rather than yours. The [Quick Start](../../get-started/quick-start.md) shows the ways to use it.
 
 This is a different thing from the configuration on this page: the hosted API runs the method for you, so none of the backends, routing profiles or decks described here apply to it.
 
