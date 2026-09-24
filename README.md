@@ -169,13 +169,7 @@ The result is written under `results/`. For a method with several steps, typed c
 
 ### Build methods with your coding agent
 
-The MTHDS plugin gives Claude Code and Codex the `/mthds-*` skills and a `.mthds` validation hook, against this runtime rather than the hosted API. Paste this into Claude Code:
-
-```
-Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins'. Then tell me to /reload-plugins.
-```
-
-For Codex, and for the manual install on either, see the [`mthds-plugins` README](https://github.com/mthds-ai/mthds-plugins).
+The Pipelex plugin gives Claude Code and Codex the skills that write, check and run methods; install it as the [Quick start](#quick-start) shows.
 
 ### Editor extension
 
@@ -208,7 +202,6 @@ The same `.mthds` file runs from multiple execution targets:
 |---|---|---|
 | **MTHDS standard** | The open standard specification — language, package system, and typed concepts | [mthds.ai](https://mthds.ai/latest/) |
 | **MTHDS Hub** | Discover and share methods — browse packages, search by signature | [mthds.sh](https://mthds.sh) |
-| **MTHDS plugin** | Skills for Claude Code and Codex that build, run, check and edit methods on your machine | [github.com/mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins) |
 | **Pipelex plugin** | The Pipelex plugin for Claude Code and Codex: skills that build and run methods, a hook that checks every edit, and the Pipelex tools | [github.com/Pipelex/pipelex-plugins](https://github.com/Pipelex/pipelex-plugins) |
 | **Pipelex MCP** | The Pipelex MCP, which ChatGPT or Claude adds to run the methods saved in your account | [github.com/Pipelex/pipelex-mcp](https://github.com/Pipelex/pipelex-mcp) |
 | **Method library** | Public methods to run by their address or to fork — `github.com/Pipelex/methods/<method_name>` | [github.com/Pipelex/methods](https://github.com/Pipelex/methods) |
