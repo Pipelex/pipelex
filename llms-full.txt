@@ -1,6 +1,6 @@
 # Pipelex Documentation
 
-> Official documentation for Pipelex, a source-available library/CLI for building and running executable AI methods.
+> The Pipelex documentation. Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
 
 # Get Started
 
@@ -10,10 +10,12 @@
 
 # Build & Run AI Methods
 
+Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
+
 A method is a reusable, typed AI procedure — declared in a `.mthds` file and executed by Pipelex. Each step is explicit, each output is structured, and every run is repeatable.
 
-[:material-robot-outline: Claude Code](./get-started/build-with-claude-code.md){ .md-button .md-button--primary }
-[:material-school: MTHDS Tutorial](./get-started/mthds-language-tutorial.md){ .md-button }
+[:material-rocket-launch: Quick Start](./get-started/quick-start.md){ .md-button .md-button--primary }
+[:material-account-plus: Sign up at app.pipelex.com](https://app.pipelex.com){ .md-button }
 [:material-book-open-variant: Cookbook](./cookbook/index.md){ .md-button }
 
 ---
@@ -90,15 +92,19 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 
 ---
 
-## The MTHDS Ecosystem
+## The Ecosystem
 
 MTHDS is the open standard behind Pipelex methods. It defines the language, the file format, and the ecosystem for sharing methods.
 
-!!! info "Explore the ecosystem"
+!!! info "Explore the MTHDS ecosystem"
 
     - **[mthds.ai](https://mthds.ai/latest/)** — The MTHDS language specification
     - **[mthds.sh](https://mthds.sh)** — The Methods Hub for discovering and sharing methods
-    - **[MTHDS Plugins](https://github.com/mthds-ai/mthds-plugins)** — Claude Code plugin for building, running, and validating methods
+
+!!! info "Build and run methods with Pipelex"
+
+    - **[Pipelex plugin](./features/pipelex-plugin.md)** — The Pipelex plugin for Claude Code and Codex: skills that build and run methods, a hook that checks every edit, and the Pipelex tools
+    - **[Pipelex MCP](https://github.com/Pipelex/pipelex-mcp)** — The Pipelex MCP, which ChatGPT or Claude adds to run the methods saved in your account
 
 ---
 
@@ -106,9 +112,13 @@ MTHDS is the open standard behind Pipelex methods. It defines the language, the 
 
 <div class="grid cards" markdown>
 
--   :material-robot-outline: **[Build with Claude Code](./get-started/build-with-claude-code.md)**
+-   :material-rocket-launch: **[Quick Start](./get-started/quick-start.md)**
 
-    Describe what you want in natural language — Claude writes, runs, and iterates on your method for you.
+    Sign up, install the Pipelex plugin in Claude Code or Codex, and ask your agent for the method you want — then run it from your chatbot, as a webapp, or via API.
+
+-   :material-laptop: **[Run It Yourself](./get-started/run-it-yourself.md)**
+
+    Install the Pipelex runtime and run methods on your own machine, against the model providers you choose.
 
 -   :material-school: **[MTHDS Language Tutorial](./get-started/mthds-language-tutorial.md)**
 
@@ -122,55 +132,272 @@ MTHDS is the open standard behind Pipelex methods. It defines the language, the 
 
 
 
-## Build with Claude Code
+## Quick Start
 
-# Build with Claude Code
+<!--
+Adapted from the onboarding source's front-door assembly, last re-read against the rendered file at
+Pipelex/.github@81a3728 (onboarding/rendered/front-door.md). Every paragraph and every command is a
+block's own words, so a change lands in the blocks first and is then carried here. Step 3 takes the
+longer first-run/agent.md rather than the assembly's agent-short.md, and the webapp and API sections
+take first-run/webapp.md, key.md, first-run/api-http.md, first-run/api-typescript.md and
+first-run/api-python.md, where the assembly only links to them. This page's own are the headings, the
+content tabs standing in for the assembly's <details> wrappers, the Node.js sentence in step 2 (the
+blocks do not say it yet, and it goes once they do), the sentences pointing at other pages (the SDK references are the links-tail blocks), and the closing section, since the assembly's
+last block describes the runtime repository that carries it. The Python sample's inputs dict is
+wrapped by this repository's ruff format, which formats Python fences in Markdown; the code is the
+block's.
+-->
 
-Install the `mthds` CLI:
+# Quick Start
+
+Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
+
+## 1. Sign up
+
+Sign up at [app.pipelex.com](https://app.pipelex.com).
+
+## 2. Install the Pipelex plugin in your coding agent
+
+The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
+
+=== "Claude Code"
+
+    ```bash
+    claude plugin marketplace add Pipelex/pipelex-plugins
+    claude plugin install pipelex@pipelex-plugins
+    ```
+
+    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it; nothing else to install.
+
+    Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
+
+=== "Codex"
+
+    ```bash
+    codex plugin marketplace add Pipelex/pipelex-plugins
+    export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
+    ```
+
+    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
+
+What the plugin holds, skill by skill, is on the [Pipelex Plugin](../features/pipelex-plugin.md) page.
+
+## 3. Ask your agent for the method you want
+
+> Design a method that reads an invoice PDF and returns the supplier, the total and the line items. Then run it on `~/Downloads/invoice.pdf` and save it to my Pipelex account.
+
+`/pipelex-design` writes the method, the hook checks it on every edit, `/pipelex-inputs` gets your file ready, and `/pipelex-run` starts it and prints a run id. Come back to that id for the status, the results or the files it produced, days later if you want. `/pipelex-catalog` saves the method to your account, where your chatbot can run it too.
+
+## Run your methods from your chatbot
+
+The Pipelex MCP is a connector for your chatbot (ChatGPT, Claude): it gives it access to the Pipelex service, so it can list the methods saved in your account and run them right in the conversation. Your methods become your chatbot's tools. To build a method, use the Pipelex plugin in a coding agent such as Claude Code or Codex, as in steps 2 and 3 above.
+
+Add the Pipelex MCP in your chatbot's settings by the address below — in Claude, that is **Add custom connector** — then sign in with your Pipelex account when asked. Nothing to install and no key: the Pipelex MCP runs on your signed-in session.
+
+```
+https://mcp.pipelex.com/mcp
+```
+
+Then ask your chatbot:
+
+> What methods do I have?
+>
+> Run the invoice method on https://example.com/invoice.pdf
+
+You get a run id straight away, and you can ask for its status, its results or the files it produced at any time.
+
+Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it to the conversation instead and ask for a run on it; Claude has no way yet to hand the Pipelex MCP a file you attached.
+
+## The other two ways
+
+### As a webapp
+
+Turn the method into a webapp with the [method-app template](https://github.com/Pipelex/pipelex-method-apps):
 
 ```bash
-npm install -g mthds
+src=$(mktemp -d)
+git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$src"
+mkdir -p my-app && cp -R "$src/webapp-js/." my-app/
+cd my-app && git init
+
+export PIPELEX_API_KEY=plx_sk_...
+make create METHOD=path/to/my_method.mthds
+make dev
 ```
 
-Launch Claude Code and tell it to install the MTHDS plugin:
+The app calls Pipelex from its own server code, so it needs a key of its own — create one in your console at [app.pipelex.com](https://app.pipelex.com). `METHOD` is a `.mthds` file, a directory of them, a method id from your catalog (`mt_…`), or a published address. The form and the result view are rendered from the method's own contract, so adding a method writes no form fields.
 
-```
-/plugin marketplace add mthds-ai/mthds-plugins
-```
+### Via API
 
-```
-/plugin install mthds@mthds-plugins
-```
+Use the method via API in any software through `POST /v1/start` — in TypeScript with [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk), in Python with [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/), or with any HTTP client.
 
-then reload plugins:
+Create an API key in your console at [app.pipelex.com](https://app.pipelex.com) and give it to your program as `PIPELEX_API_KEY` — the only thing to configure, since `PIPELEX_BASE_URL` already points at the hosted API.
 
-```
-/reload-plugins
+```bash
+export PIPELEX_API_KEY=plx_sk_...
 ```
 
-If that doesn't work, exit Claude Code and reopen it:
+=== "HTTP"
 
+    ```bash
+    curl -s https://api.pipelex.com/v1/start \
+      -H "Authorization: Bearer $PIPELEX_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "method_ref": "github.com/Pipelex/methods/invoice_extraction@v0.1.1",
+        "inputs": {"document": {"url": "https://raw.githubusercontent.com/Pipelex/pipelex-cookbook/main/assets/extract_proof_of_purchase/restaurant_invoice.pdf", "mime_type": "application/pdf"}}
+      }'
+    # 202 → {"pipeline_run_id": "..."}
+
+    RUN_ID=...     # the pipeline_run_id the start returned
+    curl -s https://api.pipelex.com/v1/runs/$RUN_ID/results \
+      -H "Authorization: Bearer $PIPELEX_API_KEY"
+    ```
+
+    The start returns immediately and the run is durable — poll the results route, or fetch them hours later by the same id.
+
+=== "TypeScript"
+
+    ```bash
+    npm install @pipelex/sdk
+    ```
+
+    ```ts
+    import { PipelexApiClient } from "@pipelex/sdk";
+
+    const client = new PipelexApiClient({ apiKey: process.env.PIPELEX_API_KEY });
+
+    const result = await client.startAndWaitForResult({
+      method_ref: "github.com/Pipelex/methods/invoice_extraction@v0.1.1",
+      inputs: {
+        document: { url: "https://raw.githubusercontent.com/Pipelex/pipelex-cookbook/main/assets/extract_proof_of_purchase/restaurant_invoice.pdf", mime_type: "application/pdf" },
+      },
+    });
+
+    console.log(result.main_stuff);
+    ```
+
+    More in the [`@pipelex/sdk` reference](https://github.com/Pipelex/pipelex-sdk-js/tree/main/docs).
+
+=== "Python"
+
+    ```bash
+    pip install pipelex-sdk
+    ```
+
+    ```python
+    import asyncio
+
+    from pipelex_sdk.client import PipelexAPIClient
+
+
+    async def main() -> None:
+        async with PipelexAPIClient() as client:
+            result = await client.start_and_wait(
+                method_ref="github.com/Pipelex/methods/invoice_extraction@v0.1.1",
+                inputs={
+                    "document": {
+                        "url": "https://raw.githubusercontent.com/Pipelex/pipelex-cookbook/main/assets/extract_proof_of_purchase/restaurant_invoice.pdf",
+                        "mime_type": "application/pdf",
+                    }
+                },
+            )
+            print(result.main_stuff)
+
+
+    asyncio.run(main())
+    ```
+
+    More in the [`pipelex-sdk` reference](https://github.com/Pipelex/pipelex-sdk-python/tree/main/docs).
+
+**Next:** [what Pipelex is](https://go.pipelex.com/product) · [documentation](https://go.pipelex.com/docs) · [your console](https://app.pipelex.com) · [Discord](https://go.pipelex.com/discord)
+
+## Prefer to run it yourself?
+
+The Pipelex runtime runs your methods on your own machine, against the model providers you choose. [Run It Yourself](./run-it-yourself.md) installs it, and [The MTHDS Language Tutorial](./mthds-language-tutorial.md) walks through writing a method by hand.
+
+
+## Run It Yourself
+
+# Run It Yourself
+
+The Pipelex runtime is the Python package that reads a `.mthds` file and runs it. Install it and everything happens on your own machine, against the model providers you choose. If you would rather not run anything yourself, the [Quick Start](./quick-start.md) builds methods with your coding agent and runs them on the hosted API.
+
+## Install
+
+```bash
+uv tool install pipelex
+pipelex init
+pipelex doctor
 ```
-/exit
+
+`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing.
+
+Some providers and features need an extra:
+
+- `anthropic`: Anthropic/Claude support for text generation
+- `google`: Google models (Vertex) support for text generation
+- `google-genai`: Google Gemini API support for text and image generation
+- `mistralai`: Mistral AI support for text generation and OCR
+- `bedrock`: Amazon Bedrock support for text generation
+- `fal`: Image generation through fal
+- `linkup`: Web search with Linkup
+- `docling`: OCR with Docling
+
+Name the ones you need when you install, or take them all:
+
+```bash
+uv tool install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
-Build your first method:
+## Configure AI access
 
+- **Bring Your Own Keys** — Use existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](./configure-ai-providers.md).
+- **Local AI** — Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](./configure-ai-providers.md).
+
+## Run a method
+
+Save this method as `summarize.mthds`:
+
+```toml
+domain    = "articles"
+main_pipe = "summarize_article"
+
+[pipe.summarize_article]
+type        = "PipeLLM"
+description = "Summarize an article for a given audience"
+inputs      = { article = "Text", audience = "Text" }
+output      = "Text"
+prompt      = "Summarize $article in three bullet points for $audience."
 ```
-/mthds-build A method to analyze a Job offer to build a scorecard, then batch process CVs to score them
+
+Save its inputs as `inputs.json`:
+
+```json
+{
+  "article": "Paste the text of an article here.",
+  "audience": "busy executives"
+}
 ```
 
-Run it:
+The method names no model, so it runs on the deck's `default-general` alias, which `pipelex init` points at an OpenAI model. With a provider other than OpenAI or Azure OpenAI, point that alias at one of your provider's models first, by adding it to `~/.pipelex/inference/deck/x_custom_llm_deck.toml` — the models each provider serves are listed under `~/.pipelex/inference/backends/`:
 
+```toml
+[llm.aliases]
+default-general = "claude-5-sonnet"     # an Anthropic model, for example
 ```
-/mthds-run
+
+Then run it:
+
+```bash
+pipelex run bundle summarize.mthds --inputs inputs.json
 ```
 
-That's it — Claude writes the `.mthds` file, creates inputs, and runs the method for you. See the [Claude Code Skills Plugin](../features/claude-code-skills-plugin.md) documentation for the full list of commands (`/mthds-edit`, `/mthds-check`, `/mthds-fix`, `/mthds-explain`, and more).
+The result is written under `results/`. From here, [The MTHDS Language Tutorial](./mthds-language-tutorial.md) builds a method step by step, and [CV batch screening](../cookbook/cv-batch-screening.md) runs a method with several steps, typed concepts and a batch, from the CLI and from Python.
 
-See [Configure AI Providers](./configure-ai-providers.md) for other options: bring your own keys, local AI, etc.
+## Editor extension
 
-![Claude Code + Pipelex + MTHDS](https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/Claude-Code-Pipelex-MTHDS-Cursor.png)
+`.mthds` syntax highlighting and flowchart visualization: the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pipelex.pipelex), or the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex) for Cursor, Windsurf and other VS Code forks. `pipelex init` offers to install it when it detects your IDE.
 
 
 ## The MTHDS Language Tutorial
@@ -623,6 +850,7 @@ We strongly encourage you to clone the [Pipelex Cookbook repository](https://git
 - [**Gantt Chart**](./extract-gantt.md) — Extract tasks and dates from Gantt chart images using divide-and-conquer.
 - [**Markdown from Document**](./extract-markdown.md) — Simple document-to-markdown using shared method packages.
 - [**Slides from Presentation**](./extract-slides.md) — Extract slide content and descriptions with vision analysis.
+- [**CV Batch Screening**](./cv-batch-screening.md) — Extract a stack of CVs and a job offer, then score each candidate against the role.
 
 ## Visual Generation
 
@@ -1325,6 +1553,330 @@ pipelex run bundle examples/b_basics/document_extract/extract_slides/bundle.mthd
 - [PipeCompose Operator](../building-methods/pipes/pipe-operators/PipeCompose.md) - Template-based data composition
 
 
+## CV Batch Screening
+
+# Example: CV Batch Screening
+
+A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role.
+
+## What it demonstrates
+
+- Typed concepts with inline structures (`CandidateProfile`, `JobRequirements`, `CandidateMatch`)
+- Nested `PipeSequence` controllers, one preparing the job offer and one processing each CV
+- Batching over a list of documents (`batch_over` / `batch_as`)
+- Document extraction with `PipeExtract`, followed by structured analysis with `PipeLLM`
+
+## The method: `cv_batch_screening.mthds`
+
+### The main pipe
+
+```toml
+domain    = "cv_batch_screening"
+main_pipe = "batch_analyze_cvs_for_job_offer"
+
+[pipe.batch_analyze_cvs_for_job_offer]
+type = "PipeSequence"
+description = """
+Main orchestrator pipe that takes a bunch of CVs and a job offer in PDF format, and analyzes how they match.
+"""
+inputs = { cvs = "Document[]", job_offer_pdf = "Document" }
+output = "CandidateMatch[]"
+steps = [
+  { pipe = "prepare_job_offer", result = "job_requirements" },
+  { pipe = "process_cv", batch_over = "cvs", batch_as = "cv_pdf", result = "match_analyses" },
+]
+```
+
+### Concepts
+
+```toml
+[concept.CandidateProfile]
+description = "A structured summary of a job candidate's professional background extracted from their CV."
+
+[concept.CandidateProfile.structure]
+skills       = { type = "text", description = "Technical and soft skills possessed by the candidate", required = true }
+experience   = { type = "text", description = "Work history and professional experience", required = true }
+education    = { type = "text", description = "Educational background and qualifications", required = true }
+achievements = { type = "text", description = "Notable accomplishments and certifications" }
+
+[concept.JobRequirements]
+description = "A structured summary of what a job position requires from candidates."
+
+[concept.JobRequirements.structure]
+required_skills  = { type = "text", description = "Skills that are mandatory for the position", required = true }
+responsibilities = { type = "text", description = "Main duties and tasks of the role", required = true }
+qualifications   = { type = "text", description = "Required education, certifications, or experience levels", required = true }
+nice_to_haves    = { type = "text", description = "Preferred but not mandatory qualifications" }
+
+[concept.CandidateMatch]
+description = "An evaluation of how well a candidate fits a job position."
+
+[concept.CandidateMatch.structure]
+match_score        = { type = "number", description = "Numerical score representing overall fit percentage between 0 and 100", required = true }
+strengths          = { type = "text", description = "Areas where the candidate meets or exceeds requirements", required = true }
+gaps               = { type = "text", description = "Areas where the candidate falls short of requirements", required = true }
+overall_assessment = { type = "text", description = "Summary evaluation of the candidate's suitability", required = true }
+```
+
+### Supporting pipes
+
+```toml
+[pipe.prepare_job_offer]
+type = "PipeSequence"
+description = """
+Extracts and analyzes the job offer PDF to produce structured job requirements.
+"""
+inputs = { job_offer_pdf = "Document" }
+output = "JobRequirements"
+steps = [
+  { pipe = "extract_one_job_offer", result = "job_offer_pages" },
+  { pipe = "analyze_job_requirements", result = "job_requirements" },
+]
+
+[pipe.extract_one_job_offer]
+type        = "PipeExtract"
+description = "Extracts text content from the job offer PDF document"
+inputs      = { job_offer_pdf = "Document" }
+output      = "Page[]"
+model       = "@default-text-from-pdf"
+
+[pipe.analyze_job_requirements]
+type = "PipeLLM"
+description = """
+Parses and summarizes the job requirements from the extracted job offer content, identifying required skills, responsibilities, qualifications, and nice-to-haves
+"""
+inputs = { job_offer_pages = "Page" }
+output = "JobRequirements"
+model = "$writing-factual"
+system_prompt = """
+You are an expert HR analyst specializing in parsing job descriptions. Your task is to extract and summarize job requirements into a structured format.
+"""
+prompt = """
+Analyze the following job offer content and extract the key requirements for the position.
+
+@job_offer_pages
+"""
+
+[pipe.process_cv]
+type = "PipeSequence"
+description = "Processes one application"
+inputs = { cv_pdf = "Document", job_requirements = "JobRequirements" }
+output = "CandidateMatch"
+steps = [
+  { pipe = "extract_one_cv", result = "cv_pages" },
+  { pipe = "analyze_one_cv", result = "candidate_profile" },
+  { pipe = "analyze_match", result = "match_analysis" },
+]
+
+[pipe.extract_one_cv]
+type        = "PipeExtract"
+description = "Extracts text content from the CV PDF document"
+inputs      = { cv_pdf = "Document" }
+output      = "Page[]"
+model       = "@default-text-from-pdf"
+
+[pipe.analyze_one_cv]
+type = "PipeLLM"
+description = """
+Parses and summarizes the candidate's professional profile from the extracted CV content, identifying skills, experience, education, and achievements
+"""
+inputs = { cv_pages = "Page" }
+output = "CandidateProfile"
+model = "$writing-factual"
+system_prompt = """
+You are an expert HR analyst specializing in parsing and summarizing candidate CVs. Your task is to extract and structure the candidate's professional profile into a structured format.
+"""
+prompt = """
+Analyze the following CV content and extract the candidate's professional profile.
+
+@cv_pages
+"""
+
+[pipe.analyze_match]
+type = "PipeLLM"
+description = """
+Evaluates how well the candidate matches the job requirements, calculating a match score and identifying strengths and gaps
+"""
+inputs = { candidate_profile = "CandidateProfile", job_requirements = "JobRequirements" }
+output = "CandidateMatch"
+model = "$writing-factual"
+system_prompt = """
+You are an expert HR analyst specializing in candidate-job fit evaluation. Your task is to produce a structured match analysis comparing a candidate's profile against job requirements.
+"""
+prompt = """
+Analyze how well the candidate matches the job requirements. Evaluate their fit by comparing their skills, experience, and qualifications against what the position demands.
+
+@candidate_profile
+
+@job_requirements
+
+Provide a comprehensive match analysis including a numerical score, identified strengths, gaps, and an overall assessment.
+"""
+```
+
+### Flowchart
+
+```mermaid
+flowchart LR
+    %% Pipe and stuff nodes within controller subgraphs
+    subgraph sg_n_8b2136e3fe["batch_analyze_cvs_for_job_offer"]
+        subgraph sg_n_91d5d6dc7c["prepare_job_offer"]
+            n_fde22777cb["analyze_job_requirements"]
+            s_f9f703fbb4(["job_requirements<br/>JobRequirements"]):::stuff
+            n_b8469c838f["extract_one_job_offer"]
+            s_d998350046(["job_offer_pages<br/>Page"]):::stuff
+        end
+        subgraph sg_n_f8d5afb7cd["process_cv_batch"]
+            subgraph sg_n_6e53e16369["process_cv"]
+                n_c18aded200["analyze_match"]
+                s_5c911f7e54(["match_analysis<br/>CandidateMatch"]):::stuff
+                n_a7ed00ac24["analyze_one_cv"]
+                s_c5ae714e89(["candidate_profile<br/>CandidateProfile"]):::stuff
+                n_d24f39aa60["extract_one_cv"]
+                s_427beb5195(["cv_pdf<br/>Document"]):::stuff
+                s_f1f80289df(["cv_pages<br/>Page"]):::stuff
+            end
+            subgraph sg_n_2cfb7a32c8["process_cv"]
+                n_f6a25d1769["analyze_match"]
+                s_ea99eee6ed(["match_analysis<br/>CandidateMatch"]):::stuff
+                n_f48b73fbee["analyze_one_cv"]
+                s_e1ffee913e(["candidate_profile<br/>CandidateProfile"]):::stuff
+                n_d16f2fe381["extract_one_cv"]
+                s_041bb18fb4(["cv_pdf<br/>Document"]):::stuff
+                s_5fbba7194a(["cv_pages<br/>Page"]):::stuff
+            end
+            subgraph sg_n_08a7186be9["process_cv"]
+                n_937e750ea4["analyze_match"]
+                s_bb41a103f0(["match_analysis<br/>CandidateMatch"]):::stuff
+                n_786a2969d5["analyze_one_cv"]
+                s_c47fe821d7(["candidate_profile<br/>CandidateProfile"]):::stuff
+                n_38f0cfd11c["extract_one_cv"]
+                s_2634ece93d(["cv_pdf<br/>Document"]):::stuff
+                s_44e253b325(["cv_pages<br/>Page"]):::stuff
+            end
+        end
+    end
+
+    %% Pipeline input stuff nodes (no producer)
+    s_9b7e74ac51(["job_offer_pdf<br/>Document"]):::stuff
+
+    %% Data flow edges: producer -> stuff -> consumer
+    n_a7ed00ac24 --> s_c5ae714e89
+    n_b8469c838f --> s_d998350046
+    n_f48b73fbee --> s_e1ffee913e
+    n_d16f2fe381 --> s_5fbba7194a
+    n_fde22777cb --> s_f9f703fbb4
+    n_d24f39aa60 --> s_f1f80289df
+    n_38f0cfd11c --> s_44e253b325
+    n_786a2969d5 --> s_c47fe821d7
+    n_c18aded200 --> s_5c911f7e54
+    n_f6a25d1769 --> s_ea99eee6ed
+    n_937e750ea4 --> s_bb41a103f0
+    s_c5ae714e89 --> n_c18aded200
+    s_9b7e74ac51 --> n_b8469c838f
+    s_d998350046 --> n_fde22777cb
+    s_e1ffee913e --> n_f6a25d1769
+    s_427beb5195 --> n_d24f39aa60
+    s_041bb18fb4 --> n_d16f2fe381
+    s_2634ece93d --> n_38f0cfd11c
+    s_5fbba7194a --> n_f48b73fbee
+    s_f9f703fbb4 --> n_c18aded200
+    s_f9f703fbb4 --> n_f6a25d1769
+    s_f9f703fbb4 --> n_937e750ea4
+    s_f1f80289df --> n_a7ed00ac24
+    s_44e253b325 --> n_786a2969d5
+    s_c47fe821d7 --> n_937e750ea4
+
+    %% Batch edges: list-item relationships
+    s_52d84618d0(["match_analyses<br/>CandidateMatch"]):::stuff
+    s_5c911f7e54 -."[0]".-> s_52d84618d0
+    s_ea99eee6ed -."[1]".-> s_52d84618d0
+    s_bb41a103f0 -."[2]".-> s_52d84618d0
+
+    %% Style definitions
+    classDef failed fill:#ffcccc,stroke:#cc0000
+    classDef stuff fill:#fff3e6,stroke:#cc6600,stroke-width:2px
+    classDef controller fill:#e6f3ff,stroke:#0066cc
+
+    %% Subgraph depth-based coloring
+    style sg_n_08a7186be9 fill:#fffde6
+    style sg_n_2cfb7a32c8 fill:#fffde6
+    style sg_n_6e53e16369 fill:#fffde6
+    style sg_n_8b2136e3fe fill:#e6f3ff
+    style sg_n_91d5d6dc7c fill:#e6ffe6
+    style sg_n_f8d5afb7cd fill:#e6ffe6
+```
+
+## Run the method
+
+### From the CLI
+
+```bash
+pipelex run bundle cv_batch_screening.mthds --inputs inputs.json
+```
+
+Create an `inputs.json` file with your PDF URLs:
+
+```json
+{
+  "cvs": {
+    "concept": "native.Document",
+    "content": [
+      { "url": "https://pipelex-web.s3.amazonaws.com/demo/John-Doe-CV.pdf" },
+      { "url": "inputs/Jane-Smith-CV.pdf" }
+    ]
+  },
+  "job_offer_pdf": {
+    "concept": "native.Document",
+    "content": {
+      "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
+    }
+  }
+}
+```
+
+### From Python
+
+```python
+import asyncio
+from pathlib import Path
+
+from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
+
+# Generated by: `pipelex build structures cv_batch_screening.mthds`
+from structures.structures import CandidateMatch
+
+
+async def run_pipeline() -> list[CandidateMatch]:
+    runner = PipelexMTHDSProtocol()
+    response = await runner.execute(
+        mthds_contents=[Path("cv_batch_screening.mthds").read_text(encoding="utf-8")],
+        inputs={
+            "cvs": {
+                "concept": "Document",
+                "content": [
+                    DocumentContent(url="https://pipelex-web.s3.amazonaws.com/demo/John-Doe-CV.pdf"),
+                    DocumentContent(url="inputs/Jane-Smith-CV.pdf"),
+                ],
+            },
+            "job_offer_pdf": {
+                "concept": "native.Document",
+                "content": DocumentContent(url="https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"),
+            },
+        },
+    )
+    pipe_output = response.pipe_output
+    print(pipe_output)
+    return pipe_output.main_stuff_as_items(item_type=CandidateMatch)
+
+
+Pipelex.make()
+asyncio.run(run_pipeline())
+```
+
+
 ## Design Slides
 
 # Example: Design Slides
@@ -1939,9 +2491,9 @@ This section covers all Pipelex capabilities, organized by area.
 
 <div class="grid cards" markdown>
 
--   **[Claude Code Skills Plugin](claude-code-skills-plugin.md)**
+-   **[Pipelex Plugin](pipelex-plugin.md)**
 
-    Build, run, validate, and edit AI methods directly from Claude Code with the MTHDS skills plugin. Slash commands cover the full method lifecycle.
+    The Pipelex plugin for Claude Code and Codex: skills that build and run methods, a hook that checks every edit, and the Pipelex tools.
 
 -   **[CLI](cli.md)**
 
@@ -2401,54 +2953,80 @@ Use PipeSearch in a PipeSequence to retrieve information from the web and then p
 - [Working Memory](../building-methods/pipes/working-memory.md) - How search outputs flow through a method
 
 
-## Claude Code Skills Plugin
+## Pipelex Plugin
 
-# Claude Code Skills Plugin
+<!--
+The install commands and the sentences around them are adapted from the onboarding source's
+front-door assembly, last re-read against the rendered file at Pipelex/.github@81a3728
+(onboarding/rendered/front-door.md): the blocks install/claude-code.md and install/codex.md, copied
+verbatim. The Node.js sentence is this page's own: the blocks do not say it yet, and it goes once they
+do. The skills, the hook and the tools summarize the plugin's own README, which stays their
+reference.
+-->
 
-Build, run, validate, and edit AI methods directly from Claude Code.
+# Pipelex Plugin
 
-## Overview
+The Pipelex plugin is how you build methods with your coding agent, Claude Code or Codex: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools. It works against the hosted Pipelex API, so you need an account at [app.pipelex.com](https://app.pipelex.com) and an API key from your console there. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
-The **MTHDS skills plugin** for Claude Code brings the full Pipelex workflow into your AI coding assistant. Build methods from natural language, validate them, run them, and iterate through conversational slash commands. The plugin leverages the `pipelex-agent` CLI under the hood.
+Its source, its full documentation and its release notes are at [github.com/Pipelex/pipelex-plugins](https://github.com/Pipelex/pipelex-plugins).
 
-Install from [mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins).
+## Install
 
-## Available Commands
+=== "Claude Code"
 
-| Command | Description |
-|---------|-------------|
-| `/mthds-build` | Build new AI method bundles from scratch |
-| `/mthds-check` | Validate workflow bundles for issues (read-only) |
-| `/mthds-edit` | Modify existing bundles — change pipes, update prompts, add or remove steps |
-| `/mthds-explain` | Explain and document existing workflows in plain language |
-| `/mthds-fix` | Automatically fix validation errors in a loop |
-| `/mthds-run` | Execute methods and interpret the results (supports dry runs and graph generation) |
-| `/mthds-inputs` | Prepare inputs: placeholder templates, synthetic test data, or user-provided files |
-| `/mthds-install` | Install method packages from GitHub or local directories |
-| `/mthds-pkg` | Manage package manifests and related package workflows |
-| `/mthds-publish` | Publish methods to mthds.sh |
+    ```bash
+    claude plugin marketplace add Pipelex/pipelex-plugins
+    claude plugin install pipelex@pipelex-plugins
+    ```
 
-## Getting Started
+    Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it; nothing else to install.
 
-```
-/plugin marketplace add mthds-ai/mthds-plugins
-```
+    Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
 
-then:
+=== "Codex"
 
-```
-/plugin install mthds@mthds-plugins
-```
+    ```bash
+    codex plugin marketplace add Pipelex/pipelex-plugins
+    export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
+    ```
 
-Then reload plugins with `/reload-plugins` (or exit and reopen Claude Code if that doesn't work).
+    Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
 
-Once installed, type `/mthds-build` in Claude Code to create your first method from a natural language description.
+Then ask your agent for the method you want, as in step 3 of the [Quick Start](../get-started/quick-start.md#3-ask-your-agent-for-the-method-you-want).
+
+## Skills
+
+Your agent picks the skill your request calls for, and you can also name one yourself.
+
+| Skill | What it does |
+|-------|--------------|
+| `/pipelex-design` | Designs a method contract-first and writes it as `.mthds` files |
+| `/pipelex-edit` | Makes an edit that keeps a method's contract, and proves it with a validation before and after |
+| `/pipelex-organize` | Regroups a method's files into a layout you can browse, without changing what the method does |
+| `/pipelex-explain` | Explains a method in plain language — its contract, its flow and every pipe — and writes nothing |
+| `/pipelex-inputs` | Prepares a method's inputs from your files, from synthetic data or from a template |
+| `/pipelex-synthetic-inputs` | Makes the test files a method needs when you have none |
+| `/pipelex-run` | Runs a method on the hosted Pipelex API and follows the run to its status, its results and its files |
+| `/pipelex-catalog` | Saves a method to your Pipelex account, lists what is saved there, and pulls a saved method back to disk |
+| `/pipelex-lab` | Frames a use case into candidate methods, then runs, scores and fixes them round after round within a budget you agree |
+| `/pipelex-integrate` | Wires a method into your TypeScript or Python code, with generated types and one typed call through an SDK |
+| `/pipelex-scaffold` | Starts a new project around a method, such as a web app from the method-app template |
+
+[Each skill in detail, and what it needs](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md).
+
+## The hook
+
+After every edit to a `.mthds` file, the hook lints it and formats it in place on your machine, offline, then validates the whole method on the hosted Pipelex API when a key is set. A failed check returns to your agent with the line to fix. Without a key, the hook still lints and formats every edit and skips only the validation. [How the hook works](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/hooks.md).
+
+## The Pipelex tools
+
+The tools the skills call to validate a method, prepare its inputs, run it, generate typed code and reach your saved methods start with your agent, on Node.js. [The tools, one by one](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md#the-pipelex-tools).
 
 ## Related Documentation
 
-- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented interface used under the hood
-- [Packages](../building-methods/packages.md) - `METHODS.toml` manifest workflow
-- [Package Commands](../tools/cli/pkg.md) - Current `mthds package` commands
+- [Quick Start](../get-started/quick-start.md) — sign up, install the plugin and run your first method, then run it from your chatbot, as a webapp or via API
+- [MTHDS Language](mthds-language.md) — the language the plugin's skills write
+- [Run It Yourself](../get-started/run-it-yourself.md) — the Pipelex runtime on your own machine
 
 
 ## CLI
@@ -2658,7 +3236,7 @@ A span or an event produced during a run is attributed to that run's own caller,
 
 ## Gateway Telemetry
 
-When using Pipelex Gateway as your inference backend, privacy-respecting metrics are automatically collected: models used, token counts, latency, and error rates. This data is tied to your Gateway API key (hashed for security) and requires no additional configuration.
+When using Pipelex Gateway as your inference backend, privacy-respecting metrics are automatically collected: models used, token counts, latency, and error rates. This data is tied to your Gateway API key (hashed for security) and requires no additional configuration. Test runs are not collected: when the runtime boots in the `pytest` or `ci` integration mode, or in a session that loads Pipelex's shared pytest plugin, the Gateway stream stays off.
 
 ## Privacy Controls
 
@@ -12579,7 +13157,7 @@ set DO_NOT_TRACK=1
 When set, this disables:
 
 - All custom telemetry (PostHog, Langfuse, OTLP)
-- Gateway telemetry (note: Gateway won't work without telemetry)
+- Gateway telemetry (note: outside a test run, Gateway won't work without telemetry — see [Telemetry Setup](../../setup/telemetry.md#1-gateway-telemetry-pipelex-controlled))
 
 ---
 
@@ -14559,6 +15137,8 @@ Pipelex supports two independent telemetry streams that serve different purposes
 
 When you use **Pipelex Gateway** as your inference backend, identified telemetry is **automatically enabled**. This telemetry is tied to your Gateway API key (hashed for security) and operates independently from your `telemetry.toml` settings.
 
+Test runs are the exception, and either of two signals marks one. The first is the `pytest` or `ci` integration mode. The second is a test run mode, which Pipelex's shared pytest plugin (`pipelex.test_extras.shared_pytest_plugins`) sets for every session that loads it, when pytest configures and before it collects anything, so a suite booting with `Pipelex.make()` in the default mode is covered too, whether it boots in a fixture, at test-module import or in a pytest hook that runs after `pytest_configure`. What it cannot reach is anything pytest runs before it configures: the body of every `conftest.py` loaded at startup, which means the ones along the paths given on the command line or in `testpaths` and not only the one that loads the plugin, and the hooks that run before `pytest_configure`, such as `pytest_addoption` or `pytest_cmdline_main`. Boot in a fixture there. In a test run the Gateway stream stays off, so a project's test suite sends nothing to Pipelex even with the Gateway enabled: the boot does not look for `PIPELEX_GATEWAY_API_KEY` on the stream's behalf, and `DO_NOT_TRACK` does not conflict with the Gateway. The Gateway's Portkey request logging and trace correlation follow the stream, so the `debug` setting on the `pipelex_gateway` backend and the `[pipelex_gateway.portkey]` force flags in `telemetry.toml` have no effect in a test run either, even where your own custom stream is allowed in that mode.
+
 A run that names a caller of its own is attributed to that caller on this stream too: the run's `user_id` is sent as the `distinct_id` exactly as you supplied it, and its `extras` ride the capture as groups. Anything that names no caller reports under your key's hash.
 
 **What we collect:**
@@ -14645,11 +15225,11 @@ export DO_NOT_TRACK=1
 
 When set, this disables:
 
-- Gateway telemetry (but note: Gateway won't work without telemetry)
+- Gateway telemetry (but note: outside a test run, Gateway won't work without telemetry)
 - All custom telemetry destinations
 
 !!! warning "Gateway Requires Telemetry"
-    If you set `DO_NOT_TRACK=1` while using Pipelex Gateway, the Gateway will not function. Use direct provider backends instead if you need to disable all telemetry.
+    If you set `DO_NOT_TRACK=1` while using Pipelex Gateway, the Gateway will not function, except in a test run, where the Gateway stream is off anyway. Use direct provider backends instead if you need to disable all telemetry.
 
 ## Attaching your own labels to a run
 

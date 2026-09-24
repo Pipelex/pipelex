@@ -305,6 +305,10 @@
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/cookbook/cv-batch-screening/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/cookbook/design-slides/</loc>
          <lastmod>2026-09-24</lastmod>
     </url>
@@ -1733,10 +1737,6 @@
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>
-         <loc>https://docs.pipelex.com/latest/features/claude-code-skills-plugin/</loc>
-         <lastmod>2026-09-24</lastmod>
-    </url>
-    <url>
          <loc>https://docs.pipelex.com/latest/features/cli/</loc>
          <lastmod>2026-09-24</lastmod>
     </url>
@@ -1789,6 +1789,10 @@
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/features/pipelex-plugin/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/features/pipeline-orchestration/</loc>
          <lastmod>2026-09-24</lastmod>
     </url>
@@ -1809,15 +1813,19 @@
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>
-         <loc>https://docs.pipelex.com/latest/get-started/build-with-claude-code/</loc>
-         <lastmod>2026-09-24</lastmod>
-    </url>
-    <url>
          <loc>https://docs.pipelex.com/latest/get-started/configure-ai-providers/</loc>
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/get-started/mthds-language-tutorial/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/get-started/quick-start/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/get-started/run-it-yourself/</loc>
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>
