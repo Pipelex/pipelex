@@ -131,6 +131,13 @@ Save the method shown under [What a method looks like](#what-a-method-looks-like
 }
 ```
 
+The method names no model, so it runs on the deck's `default-general` alias, which `pipelex init` points at an OpenAI model. With a provider other than OpenAI or Azure OpenAI, point that alias at one of your provider's models first, by adding it to `~/.pipelex/inference/deck/x_custom_llm_deck.toml` — the models each provider serves are listed under `~/.pipelex/inference/backends/`:
+
+```toml
+[llm.aliases]
+default-general = "claude-5-sonnet"     # an Anthropic model, for example
+```
+
 Then run it:
 
 ```bash
