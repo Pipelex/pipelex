@@ -27,7 +27,7 @@ Pipelex runs your AI methods — write a method once, then run it from your agen
 
 **1. Sign up at [app.pipelex.com](https://app.pipelex.com).**
 
-**2. Install the Pipelex plugin in your agent, or add the Pipelex MCP to your chatbot.**
+**2. Install the Pipelex plugin in your coding agent.** The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
 
 <details open><summary><b>Claude Code</b></summary>
 
@@ -53,7 +53,13 @@ Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on
 
 </details>
 
-<details><summary><b>Chatbots — ChatGPT, Claude</b></summary>
+**3. Ask your agent for the method you want.**
+
+> Design a method that reads an invoice PDF and returns the supplier, the total and the line items. Then run it on `~/Downloads/invoice.pdf` and save it to my Pipelex account.
+
+`/pipelex-design` writes the method, the hook checks it on every edit, `/pipelex-run` starts it and prints a run id you can come back to, and `/pipelex-catalog` saves it to your account, where your chatbot can run it too.
+
+**Run your methods from your chatbot.** The Pipelex MCP is a connector to the Pipelex service: it lets your chatbot (ChatGPT, Claude) run the methods saved in your account. It does not build methods; your agent does.
 
 Add the Pipelex MCP in your chatbot's settings by the address below — in Claude, that is **Add custom connector** — then sign in with your Pipelex account when asked. Nothing to install and no key: the Pipelex MCP runs on your signed-in session.
 
@@ -61,15 +67,7 @@ Add the Pipelex MCP in your chatbot's settings by the address below — in Claud
 https://mcp.pipelex.com/mcp
 ```
 
-</details>
-
-**3. Ask for the method you want.**
-
-> Design a method that reads an invoice PDF and returns the supplier, the total and the line items. Then run it on `~/Downloads/invoice.pdf` and save it to my Pipelex account.
-
-`/pipelex-design` writes the method, the hook checks it on every edit, `/pipelex-run` starts it and prints a run id you can come back to, and `/pipelex-catalog` saves it to your account, where your chatbot can run it too.
-
-**In your chatbot**, where methods are run rather than built:
+Then ask your chatbot:
 
 > What methods do I have?
 >
