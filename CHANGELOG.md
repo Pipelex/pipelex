@@ -7,7 +7,7 @@
 
 ### Fixed
 
-- **Test runs no longer send the Pipelex Gateway telemetry stream**: a runtime booted in the `pytest` or `ci` integration mode, or in a session that loads the shared pytest plugin, which sets a test run mode, keeps the Gateway stream off even with `pipelex_gateway` enabled, so a project's test suite no longer reports its runs and its fixture user ids to Pipelex. In a test run a boot no longer needs `PIPELEX_GATEWAY_API_KEY` for telemetry, `DO_NOT_TRACK` no longer conflicts with the Gateway, and the Gateway's Portkey debug and tracing flags have no effect, even where the custom stream is allowed; `IntegrationMode.is_test_harness` names the two modes.
+- **Test runs no longer send the Pipelex Gateway telemetry stream**: a runtime booted in the `pytest` or `ci` integration mode, or in a session that loads the shared pytest plugin, which sets a test run mode when pytest configures, keeps the Gateway stream off even with `pipelex_gateway` enabled, so a project's test suite no longer reports its runs and its fixture user ids to Pipelex. In a test run a boot no longer needs `PIPELEX_GATEWAY_API_KEY` for telemetry, `DO_NOT_TRACK` no longer conflicts with the Gateway, and the Gateway's Portkey debug and tracing flags have no effect, even where the custom stream is allowed; `IntegrationMode.is_test_harness` names the two modes. The plugin's session fixture `set_run_mode` is gone: the run mode is set in its `pytest_configure`, so a boot at test-module import or during collection is covered too.
 
 ## [v0.64.0] - 2026-09-24
 
