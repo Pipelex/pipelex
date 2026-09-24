@@ -28,6 +28,7 @@ We strongly encourage you to clone the [Pipelex Cookbook repository](https://git
 - [**Gantt Chart**](./extract-gantt.md) — Extract tasks and dates from Gantt chart images using divide-and-conquer.
 - [**Markdown from Document**](./extract-markdown.md) — Simple document-to-markdown using shared method packages.
 - [**Slides from Presentation**](./extract-slides.md) — Extract slide content and descriptions with vision analysis.
+- [**CV Batch Screening**](./cv-batch-screening.md) — Extract a stack of CVs and a job offer, then score each candidate against the role.
 
 ## Visual Generation
 
