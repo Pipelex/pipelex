@@ -665,6 +665,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 PostHogAttr.SPAN_NAME: custom_trace_name,
                 PostHogAttr.TRACE_NAME: custom_trace_name,
             }
+            if run_metadata is not None:
+                custom_properties[EventProperty.PIPELINE_RUN_ID] = run_metadata.pipeline_run_id
             custom_identity = TelemetryIdentity.make_from_caller_identity(
                 caller_identity=caller_identity,
                 fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
@@ -691,6 +693,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 PostHogAttr.SPAN_NAME: trace_name_redacted,
                 PostHogAttr.TRACE_NAME: trace_name_redacted,
             }
+            if run_metadata is not None:
+                pipelex_properties[EventProperty.PIPELINE_RUN_ID] = run_metadata.pipeline_run_id
             pipelex_identity = TelemetryIdentity.make_from_caller_identity(
                 caller_identity=caller_identity,
                 fallback_distinct_id=self._pipelex_distinct_id,

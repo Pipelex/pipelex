@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- **A trace's first span carries its run**: the trace-start `$ai_span` captured on both PostHog streams now includes `pipeline_run_id`, so the root of a trace joins its run's other events without going through a child span.
 - **A validation is attributed to the caller who asked for it**: the sweep's `pipe_dry_run` event carried no run, so on a hosted plane it went out under the deployment's configured `user_id` whoever validated. It is now emitted with the caller in scope, and the sweep's dry runs and the graph arm's dry run state that caller in their job metadata instead of `dry-run-no-user`. A local validation names nobody and reports under the configured id as before.
 - **A crash inside a run is attributed to that run's caller**: the exception autocapture resolved one runless identity when it was built, so every `$exception` on a hosted plane landed on the configured constant. Every pipe now runs with its run's caller in scope, an exception leaving a pipe carries that caller — read back through the `__cause__` and `__context__` chain, so a host's own error raised `from` it still resolves — and the capture resolves each error's identity when it arrives. An error raised outside every run still reports under the fallback, and `mode = "anonymous"` still identifies nobody.
 
