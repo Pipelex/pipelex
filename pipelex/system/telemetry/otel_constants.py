@@ -123,12 +123,12 @@ class PipelexSpanAttr(StrEnum):
 
     # The run's identity, set at every span site from `RunMetadata` so the identity
     # rides the span object to every exporter instead of being correlated back to a
-    # run through shared state. RUN_USER_ID is who started the run; the groups are
+    # run through shared state. RUN_USER_ID is who started the run; RUN_EXTRAS is
     # the host's opaque labels, serialized as a JSON string because an OTel attribute
-    # is a scalar or a homogeneous list, never a mapping. The groups attribute is
+    # is a scalar or a homogeneous list, never a mapping. The extras attribute is
     # omitted entirely when a run carries none.
     RUN_USER_ID = "pipelex.run.user_id"
-    RUN_ANALYTICS_GROUPS = "pipelex.run.analytics_groups"
+    RUN_EXTRAS = "pipelex.run.extras"
 
 
 class LangfuseSpanAttr(StrEnum):

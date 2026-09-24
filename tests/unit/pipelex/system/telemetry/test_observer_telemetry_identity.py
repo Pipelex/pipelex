@@ -21,7 +21,7 @@ _RUN_METADATA = RunMetadata(
     user_id="user-42",
     pipeline_run_id="run-1",
     storage_scope="tenant/run-1",
-    analytics_groups={"organization": "org_acme"},
+    extras={"organization": "org_acme"},
 )
 
 

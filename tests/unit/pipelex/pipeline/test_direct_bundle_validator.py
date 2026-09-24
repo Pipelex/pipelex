@@ -17,6 +17,7 @@ import pytest
 from pipelex.base_exceptions import ErrorReport
 from pipelex.pipeline.direct_bundle_validator import DirectBundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.system.caller_identity import CallerIdentity
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -37,6 +38,7 @@ class TestDirectBundleValidator:
             mthds_sources=["domain.mthds"],
             allow_signatures=True,
             library_dirs=[Path("lib_dir")],
+            caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
         )
 
         assert verdict is report
@@ -46,6 +48,7 @@ class TestDirectBundleValidator:
             library_dirs=[Path("lib_dir")],
             allow_signatures=True,
             log_context="API validate",
+            caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
         )
 
     async def test_validate_bundle_error_becomes_the_invalid_arm(self, mocker: MockerFixture) -> None:
@@ -61,6 +64,7 @@ class TestDirectBundleValidator:
             mthds_sources=None,
             allow_signatures=False,
             library_dirs=None,
+            caller_identity=None,
         )
 
         assert isinstance(verdict, ErrorReport)
@@ -80,4 +84,5 @@ class TestDirectBundleValidator:
                 mthds_sources=None,
                 allow_signatures=False,
                 library_dirs=None,
+                caller_identity=None,
             )

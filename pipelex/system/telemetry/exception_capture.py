@@ -4,8 +4,9 @@ from types import TracebackType
 from typing import TYPE_CHECKING
 
 from pipelex import log
+from pipelex.system.caller_identity import CallerIdentity, find_stamped_caller_identity, get_current_caller_identity
 from pipelex.system.telemetry.otel_constants import PostHogAttr
-from pipelex.system.telemetry.telemetry_identity import TelemetryIdentity
+from pipelex.system.telemetry.telemetry_identity import StreamIdentityRule, TelemetryIdentity
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -20,10 +21,13 @@ class DualClientExceptionCapture:
     this implementation sends to both custom and Pipelex PostHog clients.
 
     **An `$exception` is attributed like every other capture.** It is resolved
-    through `TelemetryIdentity` rather than from a raw id, because the two
-    interpreter hooks below are handed nothing but `(type, value, traceback)`:
-    they cannot see the run that was in flight, so what they send is the runless
-    identity of the stream, resolved once here. That resolution is what makes
+    through `TelemetryIdentity` rather than from a raw id, and per capture rather
+    than once: the two interpreter hooks below are handed nothing but
+    `(type, value, traceback)`, so the caller is read back from the error itself
+    — the caller of the pipe run it escaped, stamped on it by
+    :func:`~pipelex.system.caller_identity.scoped_caller_identity` — and failing
+    that from the caller still in scope. Only an error that belongs to no caller
+    goes out under the stream's fallback. That resolution is also what makes
     `anonymous` mode mean the same thing on this path as on every other — a mode
     that identifies nobody must not identify somebody when the process crashes.
     """
@@ -35,14 +39,14 @@ class DualClientExceptionCapture:
     def __init__(
         self,
         custom_posthog_client: "Posthog | None",
-        custom_identity: TelemetryIdentity,
+        custom_identity_rule: StreamIdentityRule,
         pipelex_posthog_client: "Posthog | None",
-        pipelex_identity: TelemetryIdentity,
+        pipelex_identity_rule: StreamIdentityRule,
     ):
         self._custom_client = custom_posthog_client
-        self._custom_identity = custom_identity
+        self._custom_identity_rule = custom_identity_rule
         self._pipelex_client = pipelex_posthog_client
-        self._pipelex_identity = pipelex_identity
+        self._pipelex_identity_rule = pipelex_identity_rule
 
         # Save original hooks
         self._original_excepthook = sys.excepthook
@@ -92,6 +96,8 @@ class DualClientExceptionCapture:
         if self.is_marked_as_captured(exception=exc_value):
             return
 
+        caller_identity = self.resolve_caller_identity(exception=exc_value)
+
         # Create the properly typed tuple for PostHog
         posthog_exc_info: tuple[type[BaseException], BaseException, TracebackType | None] = (
             exc_type,
@@ -103,7 +109,7 @@ class DualClientExceptionCapture:
         if self._custom_client:
             self._capture_to_client(
                 client=self._custom_client,
-                identity=self._custom_identity,
+                identity=self._custom_identity_rule.resolve(caller_identity=caller_identity),
                 posthog_exc_info=posthog_exc_info,
                 stream_name="custom",
             )
@@ -113,10 +119,21 @@ class DualClientExceptionCapture:
             self._forget_posthog_capture_marks(exc_value=exc_value)
             self._capture_to_client(
                 client=self._pipelex_client,
-                identity=self._pipelex_identity,
+                identity=self._pipelex_identity_rule.resolve(caller_identity=caller_identity),
                 posthog_exc_info=posthog_exc_info,
                 stream_name="Pipelex",
             )
+
+    @classmethod
+    def resolve_caller_identity(cls, *, exception: BaseException) -> CallerIdentity | None:
+        """The caller an error is attributed to: the one it escaped from, else the one in scope, else nobody.
+
+        The stamp comes first because it is the only one that survives the
+        unwinding: by the time an error reaches an interpreter hook every scope
+        it crossed has closed. The ambient caller answers for an error raised
+        where a scope is still open — a thread that inherited a caller's context.
+        """
+        return find_stamped_caller_identity(exception=exception) or get_current_caller_identity()
 
     def _capture_to_client(
         self,
