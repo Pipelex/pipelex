@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.64.2] - 2026-09-24
+
+### Fixed
+
+- **The quick start says the Pipelex plugin needs Node.js**: the README's quick start and the documentation's **Quick Start** and **Pipelex Plugin** pages said, in the Claude Code install step, that the plugin needed nothing else to install. Both agents' install steps now say that the plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`; without it the hook passes silently and the tools never start.
+- **An unknown model name keeps its message on a hosted surface**: `ModelChoiceNotFoundError` is now caller-facing, so under STRICT disclosure its message — the model reference the method named and the "Did you mean" suggestions — reaches the caller instead of "An internal error occurred.". A hosted dry run or run of a method naming a model the deck does not know now says which one and what to use instead.
+
 ## [v0.64.1] - 2026-09-24
 
 ### Changed
