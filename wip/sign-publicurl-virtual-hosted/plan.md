@@ -50,7 +50,7 @@ Code, in `pipelex/pipeline/input_normalizer.py`:
 
 Knock-on checks:
 
-- [x] Run the tests that pretty-print `TextAndImagesContent` and structured inputs: an `http(s)` image now has a `public_url`, which adds the "Display" column to the rich table (`pipelex/core/stuffs/text_and_images_content.py:115`). Update expectations that pinned the old rendering, and read each diff rather than accepting it wholesale.
+- [x] Run the tests that pretty-print `TextAndImagesContent` and structured inputs. The premise turned out wrong for `TextAndImagesContent`: the normalizer never reaches its images (see the deferral below), so its rendering does not change; the structured-input and rendering tests passed unchanged.
 - [x] Run the tests that snapshot a run's inputs or graph, since normalized inputs now carry one more field.
 
 Documentation:
@@ -60,10 +60,26 @@ Documentation:
 
 ## Checkpoint — ready for review
 
-- [ ] `make agent-check` clean.
-- [ ] `make agent-test` green.
-- [ ] `/rev`, at the depth `ledger review-profile` derives.
-- [ ] Record here what was decided during the build, any open question, and the SHA of the last reviewed commit, so the pull request can be opened from a fresh session.
+- [x] `make agent-check` clean.
+- [x] `make agent-test` green.
+- [x] `/rev`, at the depth `ledger review-profile` derives: round 1 at profile 3 (cubic, Codex review, the official code-review at `low`), recorded on the item.
+- [x] Record here what was decided during the build, any open question, and the last reviewed commit.
+
+### Decisions taken during the build
+
+- **Each new test class has its own module**, `test_s3_storage_provider_url_form.py` and `test_input_normalizer_public_url.py`, because the repo's test standard allows one test class per module.
+- **A provider that cannot link a stored reference leaves the link the input carried.** In-memory storage returns no link at all; erasing a carried link the runtime cannot replace would lose information for nothing.
+- **A reference the storage provider refuses as a key is an input error at normalization.** Signing now happens before the run, so the local provider's refusal of a path escaping its root surfaces there; it is raised as `PipelineInputContentError`, INPUT domain and not caller-facing, rather than as a bare storage error.
+- **The unsigned S3 link uses botocore's own `check_dns_name`** instead of a hand-written dot test, so a legacy bucket name with uppercase letters or an underscore falls back to path-style exactly as the signed link does. Both unsigned builders, S3 and GCS, percent-encode the key as their signed forms do. Both came out of review round 1.
+- **The public design describes the hosted plane's network and tenancy checks by role.** `pipelex` is a public repository, so the specifics sit on the ledger item instead, and the commit that added this design was rewritten before any pull request so that no commit carries them.
+
+### Deferred
+
+- **The normalizer does not reach the images inside a `TextAndImagesContent`**, nor those in a `PageContent`'s `text_and_images`: `_normalize_value` recurses only into `StructuredContent`, `ListContent` and lists, and `TextAndImagesContent` is a plain `StuffContent`. Their `data:` URLs are left unstored and their `public_url` unfilled. The gap predates this branch; review round 1 confirmed it, and the changelog and docs now say which placements are reached. Reaching them is a recursion branch in `_normalize_value` and its tests.
+
+### Last reviewed commit
+
+Round 1 reviewed the branch at the commit titled "Mark the campaign active and tick the built phases", before the round's fixes.
 
 ## After the merge
 

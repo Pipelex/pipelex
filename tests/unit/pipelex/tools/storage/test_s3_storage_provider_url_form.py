@@ -23,6 +23,11 @@ _AWS_ENV_VARS_TO_CLEAR = (
 URL_FORM_TEST_REGION = "us-west-2"
 URL_FORM_PLAIN_BUCKET = "pipelex-app-dev"
 URL_FORM_DOTTED_BUCKET = "my.dotted.bucket"
+# Only a legacy us-east-1 bucket can carry uppercase letters or an underscore; botocore signs it path-style
+URL_FORM_LEGACY_BUCKET = "Legacy_Bucket"
+URL_FORM_PLAIN_KEY = "runs/abc/moodboard.png"
+# A caller's own upload can name its key freely: botocore percent-encodes what a URL would misread
+URL_FORM_SPECIAL_KEY = "org/uploads/My Photo+#1?.png"
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -83,11 +88,12 @@ class TestS3StorageProviderUrlForm:
         assert parsed.netloc == f"s3.{URL_FORM_TEST_REGION}.amazonaws.com"
         assert parsed.path == f"/{URL_FORM_DOTTED_BUCKET}/{key}"
 
-    @pytest.mark.parametrize("bucket_name", [URL_FORM_PLAIN_BUCKET, URL_FORM_DOTTED_BUCKET])
+    @pytest.mark.parametrize("bucket_name", [URL_FORM_PLAIN_BUCKET, URL_FORM_DOTTED_BUCKET, URL_FORM_LEGACY_BUCKET])
+    @pytest.mark.parametrize("key", [URL_FORM_PLAIN_KEY, URL_FORM_SPECIAL_KEY])
     @pytest.mark.usefixtures("isolated_aws_environment")
-    async def test_signed_and_unsigned_urls_name_the_same_host_and_path(self, bucket_name: str) -> None:
-        """An unsigned link never names a host the signed link would not."""
-        uri = f"{PIPELEX_STORAGE_SCHEME}runs/abc/moodboard.png"
+    async def test_signed_and_unsigned_urls_name_the_same_host_and_path(self, bucket_name: str, key: str) -> None:
+        """An unsigned link never names a host or a path the signed link would not."""
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
         signing_provider = self._make_provider(bucket_name=bucket_name, signed_urls_lifespan=3600)
         unsigned_provider = self._make_provider(bucket_name=bucket_name, signed_urls_lifespan=None)
 
@@ -104,3 +110,4 @@ class TestS3StorageProviderUrlForm:
             parsed_signed.path,
         )
         assert parsed_unsigned.query == ""
+        assert parsed_unsigned.fragment == ""

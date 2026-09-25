@@ -46,7 +46,7 @@ The risk this accepts is a self-hosted deployment whose egress proxy allows only
 
 ### Signed and unsigned links follow one rule
 
-Both forms are virtual-hosted on the bucket's regional host, except for a bucket name containing a dot, which falls back to path-style on the regional host. botocore applies that rule to the signed form by itself; `_make_public_url` applies it by hand, so an unsigned link never names a host the signed link would not. A test pins the two forms to the same host for both kinds of bucket name.
+Both forms are virtual-hosted on the bucket's regional host, except for a bucket name that cannot be a hostname, which falls back to path-style on the regional host: a dotted name, and a legacy one with uppercase letters or an underscore. botocore applies that rule to the signed form by itself; `_make_public_url` applies it through botocore's own `check_dns_name`, so an unsigned link never names a host the signed link would not. The unsigned form percent-encodes the key as botocore does, since a caller's own upload can name a key holding a space, a `#` or a `?`, and the GCS provider's unsigned form gets the same encoding. A test pins the two forms to the same host and path for a plain, a dotted and a legacy bucket name, with a plain key and one holding those characters.
 
 ### Every normalized input carries a `public_url`
 

@@ -33,16 +33,21 @@ NormalizableContent = ImageContent | DocumentContent
 
 
 async def normalize_data_urls_to_storage(working_memory: WorkingMemory, *, storage_scope: str) -> WorkingMemory:
-    """Convert all data URLs in ImageContent and DocumentContent to pipelex-storage:// URIs.
+    """Convert data URLs and local files in ImageContent and DocumentContent to pipelex-storage:// URIs, and fill their public_url.
 
     Scans all stuffs in working memory and for any ImageContent or DocumentContent with
-    a data:...;base64,... URL, stores the data and replaces the URL with a pipelex-storage:// URI.
+    a data:...;base64,... URL, or a local path when local uploads are enabled, stores the
+    data and replaces the URL with a pipelex-storage:// URI. Every such content also comes
+    out with a public_url: a link signed through the storage provider for a stored file,
+    the URL itself for an http(s) one. See `_normalize_url_content` for each form.
 
     This handles:
 
     - Direct ImageContent and DocumentContent
     - ListContent containing ImageContent or DocumentContent items
     - StructuredContent with nested ImageContent or DocumentContent fields (recursive)
+
+    The images inside a TextAndImagesContent are not reached, and keep their url and public_url as given.
 
     Args:
         working_memory: The working memory to normalize.

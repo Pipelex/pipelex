@@ -76,7 +76,7 @@ class ImageContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the image (a storage URI, an HTTP(S) URL, or a base64 data URL)
-- `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
+- `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes, passed alone, in a list or in a structured field: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
 - `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
 - `mime_type`: Optional MIME type of the image
