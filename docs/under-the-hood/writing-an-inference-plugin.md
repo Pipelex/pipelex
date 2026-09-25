@@ -66,7 +66,6 @@ The group is not cosmetic. It declares the plugin's layer, and an inference back
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
@@ -109,7 +108,9 @@ class HelloInferencePlugin:
     """
 
     name = "hello_inference"
-    targets_api = PLUGIN_API_VERSION
+    # The plugin API version this plugin was written against, as a literal: never import the
+    # runtime's PLUGIN_API_VERSION here, or the check that catches a breaking runtime upgrade always passes.
+    targets_api = 4
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)
@@ -117,7 +118,7 @@ class HelloInferencePlugin:
         registrar.add_model_lister(sdk="hello", lister=_list_hello_models)
 ```
 
-A plugin is any object with a `name`, a `targets_api` equal to the runtime's `PLUGIN_API_VERSION`, and a `register` method. Pipelex calls `register` at startup and again whenever `pipelex plugins list` rediscovers the plugins, so it must do nothing but call the registrar's menu methods: no hub access, no I/O and no client construction.
+A plugin is any object with a `name`, a `targets_api` and a `register` method. `targets_api` is the plugin API version the plugin was written against, written as a number: discovery compares it with the runtime's `PLUGIN_API_VERSION` and refuses the plugin with `PluginApiVersionMismatchError` when they differ, which is how a runtime whose plugin contract changed tells you the plugin needs updating. The runtime's own plugins import the constant because they ship with it; a plugin installed separately must not, or the comparison always passes. Pipelex calls `register` at startup and again whenever `pipelex plugins list` rediscovers the plugins, so it must do nothing but call the registrar's menu methods: no hub access, no I/O and no client construction.
 
 `add_inference_backend` registers a worker factory for one pair of family and `sdk` token, here the LLM family and `hello`. When a pipe first calls a model whose `sdk` is `hello`, Pipelex calls the factory with four keyword arguments: the resolved model spec, the backend's configuration, the process-wide cache of SDK clients, and the reporting delegate. The hello worker needs only the first and the last. The factory imports the worker module inside its body, so discovering the plugin imports nothing heavy.
 
