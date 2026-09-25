@@ -63,6 +63,16 @@ class BundleValidatorProtocol(Protocol):
     must attribute its telemetry to that caller, never to the deployment's configured
     fallback. A worker-dispatched arm carries it to the worker and hands it to the sweep
     there.
+
+    ``graph_pipe_code`` names the pipe the best-effort graph arm dry-runs, resolved the way a
+    run resolves its entry pipe, so a bare code or a qualified ref both work. ``None`` keeps
+    the default target, the primary blueprint's ``main_pipe``. A host that knows the pipe a
+    run of the same request would execute (the ``main_pipe`` of a fetched package's manifest,
+    which the bundles themselves may not declare) passes it here so the graph shows that pipe.
+    It is required for the same reason as ``caller_identity``: a validator that silently
+    dropped it would graph a different pipe than the one the host asked for. A target that
+    does not resolve degrades the graph to ``None``, like any other graph-arm failure, and
+    never changes the verdict.
     """
 
     async def validate_bundles(
@@ -73,6 +83,7 @@ class BundleValidatorProtocol(Protocol):
         allow_signatures: bool,
         library_dirs: "Sequence[Path] | None",
         caller_identity: CallerIdentity | None,
+        graph_pipe_code: str | None,
     ) -> BundleValidationVerdict: ...
 
 
