@@ -57,8 +57,14 @@ class TestPipeRun:
         # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
         # onto the output, and `assemble_tracing_on_output` then feeds its
         # `run_metadata` into `TracingAssembly`, which is a typed field.
-        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-req", storage_scope="test/scope"))
-        mock_job.job_metadata.run_metadata.request_id = "req-direct-mode"
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(
+                user_id="pytest",
+                pipeline_run_id="plr-req",
+                storage_scope="test/scope",
+                request_id="req-direct-mode",
+            )
+        )
 
         pipe_run = PipeRun(pipe_router=mock_router)
         assignment = DeliveryAssignment(storage=StorageTarget())

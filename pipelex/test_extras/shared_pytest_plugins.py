@@ -55,12 +55,11 @@ ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
 ]
 
 
-@pytest.fixture(scope="session", autouse=True)
-def set_run_mode():
+def _set_test_run_mode() -> None:
     if is_env_var_set(key="GITHUB_ACTIONS") or is_env_var_set(key="CI"):
         runtime_manager.set_run_mode(run_mode=RunMode.CI_TEST)
     elif is_env_var_truthy(key=CODEX_CLOUD_ENV_VAR_KEY):
-        # we're in codex cloud and this fixture is called by pytest, so we are testing in codex cloud
+        # we're in codex cloud and pytest is running, so we are testing in codex cloud
         runtime_manager.set_run_mode(run_mode=RunMode.CODEX_CLOUD_TEST)
     else:
         runtime_manager.set_run_mode(run_mode=RunMode.UNIT_TEST)
@@ -124,12 +123,20 @@ def _print_terms_required() -> None:
     console.print(Panel(_TERMS_REQUIRED_MARKUP, title=_TERMS_REQUIRED_TITLE, border_style="yellow"))
 
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: Config) -> None:
-    """Check prerequisites before test collection starts.
+    """Set the test run mode, then check prerequisites before test collection starts.
 
-    Validates that Pipelex Gateway terms are accepted when gateway is enabled.
+    The run mode is set here, first among the configure hooks, rather than in a fixture, because
+    it is what keeps the Pipelex Gateway telemetry stream off in a test run: a boot at test-module
+    import, during collection or in a later pytest hook happens before any fixture runs, and would
+    otherwise see the normal run mode and send the stream.
+
+    Then validates that Pipelex Gateway terms are accepted when gateway is enabled.
     This runs early to provide clear feedback before wasting time on test collection.
     """
+    _set_test_run_mode()
+
     # Skip check when inference is disabled via CLI option
     if config.getoption("--disable-inference", default=False):
         return

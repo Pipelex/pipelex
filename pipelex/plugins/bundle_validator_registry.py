@@ -30,6 +30,7 @@ from mthds.protocol.models import ValidationReport
 
 from pipelex.base_exceptions import ErrorReport
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
+from pipelex.system.caller_identity import CallerIdentity
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -55,6 +56,23 @@ class BundleValidatorProtocol(Protocol):
 
     ``library_dirs`` is host context the in-process arm needs to load the method library;
     a worker-dispatched arm ignores it — its worker loads its own library.
+
+    ``caller_identity`` is who asked for the validation, as the host knows them: the user id
+    and the analytics groups it would state on a run. It is required, with ``None`` meaning
+    "nobody", so a host cannot forget it — a validation the host serves on a caller's behalf
+    must attribute its telemetry to that caller, never to the deployment's configured
+    fallback. A worker-dispatched arm carries it to the worker and hands it to the sweep
+    there.
+
+    ``graph_pipe_code`` names the pipe the best-effort graph arm dry-runs, resolved the way a
+    run resolves its entry pipe, so a bare code or a qualified ref both work. ``None`` keeps
+    the default target, the primary blueprint's ``main_pipe``. A host that knows the pipe a
+    run of the same request would execute (the ``main_pipe`` of a fetched package's manifest,
+    which the bundles themselves may not declare) passes it here so the graph shows that pipe.
+    It is required for the same reason as ``caller_identity``: a validator that silently
+    dropped it would graph a different pipe than the one the host asked for. A target that
+    does not resolve degrades the graph to ``None``, like any other graph-arm failure, and
+    never changes the verdict.
     """
 
     async def validate_bundles(
@@ -64,6 +82,8 @@ class BundleValidatorProtocol(Protocol):
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: "Sequence[Path] | None",
+        caller_identity: CallerIdentity | None,
+        graph_pipe_code: str | None,
     ) -> BundleValidationVerdict: ...
 
 

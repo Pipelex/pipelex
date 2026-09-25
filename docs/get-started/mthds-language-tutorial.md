@@ -224,8 +224,8 @@ Learn more about concepts in [Define Your Concepts](../building-methods/concepts
 
 You now understand the building blocks: pipes, sequences, inputs, and structured outputs.
 
-- **Tutorial** — more lessons in the [Cookbook](../cookbook/index.md) (document extraction, batch processing, and more)
+- **Tutorial** — more lessons in the [cookbook's tutorial](https://github.com/Pipelex/pipelex-cookbook/tree/main/tutorial), from structured outputs to model settings, batches and parallel steps
 - **Build Reliable AI Methods** — deep dive into [method project design](../building-methods/kick-off-a-methods-project.md)
 - **Pipe Operators & Controllers** — reference for [pipe operators](../building-methods/pipes/pipe-operators/index.md) (PipeLLM, PipeExtract, PipeCompose, ...) and [pipe controllers](../building-methods/pipes/pipe-controllers/index.md) (PipeSequence, PipeParallel, PipeBatch, PipeCondition)
-- **Cookbook Examples** — real-world [examples and patterns](../cookbook/index.md)
+- **The Cookbook** — [example methods](../cookbook/index.md) you run by their address, with every way to use each one
 - **CLI Reference** — full [command-line reference](../tools/cli/index.md)

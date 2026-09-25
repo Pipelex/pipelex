@@ -342,6 +342,56 @@ Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 """
 
+    @classmethod
+    def should_enable_pipelex_telemetry(
+        cls,
+        *,
+        integration_mode: IntegrationMode,
+        is_unit_testing: bool,
+        is_gateway_enabled: bool,
+        needs_inference: bool,
+        is_gateway_config_cached: bool,
+    ) -> bool:
+        """Decide whether this boot sends the Pipelex Gateway telemetry stream.
+
+        The stream is disabled when:
+
+        - the legacy gateway backend is not enabled, OR
+        - inference is not needed (no live runs to track), OR
+        - the gateway config came from the cache (stale specs imply potentially stale model
+          identities; phoning home about pipe runs in that state would pollute metrics), OR
+        - the runtime is booted by a test harness: its runs are not usage, and its fixture user ids must
+          not become persons in the production analytics project. Two signals say so, and either one is
+          enough. The integration mode (`CI` or `PYTEST`) is what a harness booting without our pytest
+          plugin states, such as the pipelex-js conformance scripts. The run mode is what the shared
+          pytest plugin sets for every session that loads it, which covers the suites that boot in the
+          default `PYTHON` mode, as the plugin's own recipe does.
+
+        **The first condition asks about `pipelex_gateway` specifically, not about managed backends
+        in general**, and the distinct id is why: it is derived from `PIPELEX_GATEWAY_API_KEY`, which
+        a manifold backend neither has nor can stand in for — its own key is, for the private beta,
+        one token shared by every participant, so keying on it would produce a single indistinguishable
+        user rather than an identity. Asked the general way, a manifold-only installation would be
+        required to hold a gateway key it has no other use for and would fail to boot without one.
+        The common beta case is unaffected: a participant who keeps `pipelex_gateway` enabled has a
+        real gateway key, and their manifold runs are tracked under it like everything else.
+
+        The per-mode `telemetry_allowed_modes` table does not take part: it governs only the
+        operator's custom stream, which the telemetry factory gates by itself.
+
+        Args:
+            integration_mode: The mode the runtime is booted in.
+            is_unit_testing: Whether the run mode is a test mode, as `RuntimeManager.is_unit_testing` says.
+            is_gateway_enabled: Whether the `pipelex_gateway` backend is enabled.
+            needs_inference: Whether this boot runs live inference.
+            is_gateway_config_cached: Whether the gateway config came from the cache rather than a fresh fetch.
+
+        Returns:
+            True when the Gateway telemetry stream should be sent.
+        """
+        is_test_harness = integration_mode.is_test_harness or is_unit_testing
+        return is_gateway_enabled and needs_inference and not is_gateway_config_cached and not is_test_harness
+
     def setup(
         self,
         *,
@@ -522,28 +572,22 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             secrets_config = get_config().runtime.secrets
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
-        # Disable Pipelex telemetry when:
-        # - the legacy gateway backend is not enabled, OR
-        # - inference is not needed (no live runs to track), OR
-        # - the gateway config came from the cache (stale specs imply potentially stale model
-        #   identities; phoning home about pipe runs in that state would pollute metrics).
+        # Whether the Pipelex Gateway telemetry stream is sent: the conditions, and why each one is
+        # there, are in `should_enable_pipelex_telemetry`.
         #
-        # **The first condition asks about `pipelex_gateway` specifically, not about managed backends
-        # in general**, and the distinct id is why: it is derived from `PIPELEX_GATEWAY_API_KEY`, which
-        # a manifold backend neither has nor can stand in for — its own key is, for the private beta,
-        # one token shared by every participant, so keying on it would produce a single indistinguishable
-        # user rather than an identity. Asked the general way, a manifold-only installation would be
-        # required to hold a gateway key it has no other use for and would fail to boot without one.
-        # The common beta case is unaffected: a participant who keeps `pipelex_gateway` enabled has a
-        # real gateway key, and their manifold runs are tracked under it like everything else.
-        #
-        # Read off the mapping computed above rather than by asking the document a second time. The
-        # two answers are the same one — the gateway resolves to a section whenever it is enabled —
-        # and a second read would be a second chance for an unparseable file to escape the clause
-        # that frames it as a backend-library refusal.
+        # The gateway's enablement is read off the mapping computed above rather than by asking the
+        # document a second time. The two answers are the same one — the gateway resolves to a section
+        # whenever it is enabled — and a second read would be a second chance for an unparseable file
+        # to escape the clause that frames it as a backend-library refusal.
         gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
         is_gateway_enabled = PipelexBackend.GATEWAY in managed_gateway_sections
-        is_pipelex_telemetry_enabled = is_gateway_enabled and needs_inference and not gateway_source_is_cached
+        is_pipelex_telemetry_enabled = self.should_enable_pipelex_telemetry(
+            integration_mode=integration_mode,
+            is_unit_testing=runtime_manager.is_unit_testing,
+            is_gateway_enabled=is_gateway_enabled,
+            needs_inference=needs_inference,
+            is_gateway_config_cached=gateway_source_is_cached,
+        )
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
