@@ -46,9 +46,20 @@ FORWARDED_MARK = "_pipelex_forwarded"
 # wire, and reserving it is what stops a caller steering the console through a field of that name.
 VERBATIM_MARK = "markup"
 
+# The attribute the redaction stamps on a record it could not strip, and takes back off the moment it
+# has. It is the fail-closed half of the scrub: a record still carrying it reaches no sink, because what
+# it carries is whatever the call put there and the scrub never read. It is set before the stripping
+# rather than after the failure, so a stripping that dies partway leaves it behind rather than needing a
+# second thing to go right at the moment the first one went wrong.
+UNSCRUBBED_MARK = "_pipelex_unscrubbed"
+
 # The names this package stamps on a record itself. Never a field: a caller's entry of the same name is
 # prefixed on the way on, and a record carrying one does not hand it to a sink as something it carries.
-PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, VERBATIM_MARK})
+# Reserving them is what makes each one safe, because each is stamped later than the entries are attached
+# and so a fresh record owns none of them: a caller's field spelling ``FORWARDED_MARK`` would be read as
+# the forwarding marker and cost the whole record its delivery, and one spelling ``UNSCRUBBED_MARK`` would
+# have a perfectly ordinary record read as one the scrub could not strip, and dropped.
+PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, VERBATIM_MARK, UNSCRUBBED_MARK})
 
 # Reserved whether or not the record carries the name yet, which is exactly what the stdlib's own refusal
 # cannot cover: both sets are stamped after the entries are attached.
@@ -74,22 +85,27 @@ def build_log_record_extra(
     """The ``extra`` for one record, in precedence order: the bound context, then the call's fields, then the content.
 
     A field overrides the context for its record, so a call site that names a request it is not running
-    under can say so. Structured content owns the ``data`` name, and a field of that name is moved aside
+    under can say so. The ``data`` name is the dispatch's own, and a field spelled that way is moved aside
     under the ``field_`` prefix rather than destroyed — the same discipline the record's own attributes
     and every wire sink's reserved keys follow, applied until the name lands where nothing sits, so a call
     passing both ``data`` and ``field_data`` beside structured content loses neither.
+
+    The move happens whether or not this call has structured content to put there. Owning the name only
+    when the content happens to be structured would leave a caller's ``data`` on the record's own ``data``
+    beside a string content — where the runtime treats it as its own rendering and hands it to a sink
+    with its control characters intact, which is exactly the forged line the escaping exists to stop.
     """
     extra: dict[str, Any] = {}
     if context is not None:
         extra.update(context.fields)
     if fields:
         extra.update(fields)
+    if DATA_FIELD in extra:
+        displaced = f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}"
+        while displaced in extra:
+            displaced = f"{COLLIDING_FIELD_PREFIX}{displaced}"
+        extra[displaced] = extra.pop(DATA_FIELD)
     if data is not None:
-        if DATA_FIELD in extra:
-            displaced = f"{COLLIDING_FIELD_PREFIX}{DATA_FIELD}"
-            while displaced in extra:
-                displaced = f"{COLLIDING_FIELD_PREFIX}{displaced}"
-            extra[displaced] = extra[DATA_FIELD]
         extra[DATA_FIELD] = data
     return extra
 

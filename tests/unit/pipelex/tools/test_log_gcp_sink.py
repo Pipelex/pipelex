@@ -32,6 +32,7 @@ from pipelex.tools.log.gcp_log_sink import (
 )
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_redaction import CYCLE_TEXT
 from pipelex.tools.misc.hash_utils import hash_md5_to_int
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -222,6 +223,7 @@ class TestGcpLogSink:
         assert entry.payload["data"] == {"key": "value", "nested": {"flag": True}}
 
     def test_a_value_json_cannot_carry_is_written_as_text_rather_than_costing_the_line(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """A non-finite float is spelled as text, and a cycle is cut by the redaction walk and keeps the payload a struct."""
         fresh, transport = gcp_log
         circular: dict[str, Any] = {}
         circular["self"] = circular
@@ -231,7 +233,23 @@ class TestGcpLogSink:
         assert entry.payload[MESSAGE_KEY] == "odd values"
         assert entry.payload["nan"] == "NaN"
         assert entry.payload["inf"] == "Infinity"
-        assert isinstance(entry.payload["circular"], str)
+        assert entry.payload["circular"] == {"self": CYCLE_TEXT}
+
+    def test_a_raw_cycle_reaching_the_handler_is_written_as_text_rather_than_costing_the_line(self) -> None:
+        """The sink's own guard, for a process with redaction off: a value ``json`` refuses is written as its ``repr``, the payload stays a struct."""
+        transport = FakeTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+        cyclic: dict[str, Any] = {}
+        cyclic["me"] = cyclic
+        record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="cyclic value", args=(), exc_info=None)
+        record.loop = cyclic
+
+        handler.handle(record)
+
+        (entry,) = transport.entries
+        assert entry.payload[MESSAGE_KEY] == "cyclic value"
+        assert isinstance(entry.payload["loop"], str)
+        assert "{...}" in entry.payload["loop"]
 
     def test_a_field_named_like_a_fixed_key_keeps_its_value_under_the_prefix(self, gcp_log: tuple[Log, FakeTransport]) -> None:
         fresh, transport = gcp_log
