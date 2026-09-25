@@ -2,12 +2,19 @@
 
 The keys are the ones a log agent ingests without a parser, the CloudWatch agent, the Google Cloud
 Logging agent and any OTLP collector among them: ``time``, ``severity``, ``logger``, ``message``, then
-``exception`` when the record carries one, then the fields, the context identifiers and the ``data``
-attribute under their own names. The sink's own keys are reserved whether or not the line carries
-them: a field named like one is carried under the same ``field_`` prefix the record uses for a name
-the stdlib owns, on every line and not only the ones with an exception, so no value is lost and a
-field keeps one wire name. A non-finite float is written as the string ``"NaN"``, ``"Infinity"`` or
-``"-Infinity"``, since JSON has no token for it that a strict parser accepts.
+``exception`` when the record carries one, then ``trace_id``, ``span_id`` and ``trace_flags`` when the
+record was logged inside a valid span, then the fields, the context identifiers and the ``data``
+attribute under their own names. The trace keys are the ones OpenTelemetry specifies for trace context
+in a JSON log that is not OTLP, hex-encoded, so a collector or an error tracker joins the line to its
+trace without a parser. They name the Pipelex span active when the record is formatted, a pipe's or an
+LLM call's, or, outside one, OpenTelemetry's current span, which is only read; the stream handler formats
+inside the log call, in the calling task, and a boot line held until the sink arrives is replayed in the
+context it was logged in, so it keeps its span. The sink's own keys, the trace keys among them, are
+reserved whether or not the line carries them: a field named like one is carried under the same
+``field_`` prefix the record uses for a name the stdlib owns, on every line and not only the ones with
+an exception or a span, so no value is lost and a field keeps one wire name. A non-finite float is
+written as the string ``"NaN"``, ``"Infinity"`` or ``"-Infinity"``, since JSON has no token for it that
+a strict parser accepts.
 """
 
 from __future__ import annotations
@@ -18,8 +25,10 @@ import sys
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from opentelemetry import trace
 from typing_extensions import override
 
+from pipelex.system.telemetry.current_span import span_context_for_logs
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
 from pipelex.tools.log.log_sink import LogSink, json_fallback, spell_non_finite
 
@@ -31,8 +40,11 @@ SEVERITY_KEY = "severity"
 LOGGER_KEY = "logger"
 MESSAGE_KEY = "message"
 EXCEPTION_KEY = "exception"
+TRACE_ID_KEY = "trace_id"
+SPAN_ID_KEY = "span_id"
+TRACE_FLAGS_KEY = "trace_flags"
 # The keys the sink writes itself, reserved on every line; a carried attribute of the same name is prefixed.
-FIXED_KEYS = frozenset({TIME_KEY, SEVERITY_KEY, LOGGER_KEY, MESSAGE_KEY, EXCEPTION_KEY})
+FIXED_KEYS = frozenset({TIME_KEY, SEVERITY_KEY, LOGGER_KEY, MESSAGE_KEY, EXCEPTION_KEY, TRACE_ID_KEY, SPAN_ID_KEY, TRACE_FLAGS_KEY})
 
 
 def _json_line(*, payload: dict[str, Any]) -> str:
@@ -49,6 +61,18 @@ def _json_line(*, payload: dict[str, Any]) -> str:
     except (TypeError, ValueError):
         safe_payload = {key: value if key in FIXED_KEYS else repr(value) for key, value in payload.items()}
         return json.dumps(safe_payload, ensure_ascii=False, default=str)
+
+
+def _trace_context() -> dict[str, str]:
+    """The trace context of the span a line logged here is joined to, under the OpenTelemetry JSON keys, or nothing outside one."""
+    span_context = span_context_for_logs()
+    if span_context is None:
+        return {}
+    return {
+        TRACE_ID_KEY: trace.format_trace_id(span_context.trace_id),
+        SPAN_ID_KEY: trace.format_span_id(span_context.span_id),
+        TRACE_FLAGS_KEY: f"{span_context.trace_flags:02x}",
+    }
 
 
 def _iso_utc(*, created: float) -> str:
@@ -71,6 +95,7 @@ class JsonLogFormatter(logging.Formatter):
             payload[EXCEPTION_KEY] = record.exc_text or self.formatException(record.exc_info)
         elif record.exc_text:
             payload[EXCEPTION_KEY] = record.exc_text
+        payload.update(_trace_context())
         for name, value in carried_attributes(record=record).items():
             key = name
             while key in payload or key in FIXED_KEYS:

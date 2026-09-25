@@ -50,8 +50,9 @@ GCP_LOGGING_EXTRA_NAME = "gcp-logging"
 # The sink writes three of the ``json`` sink's keys into the payload — its ``message``, ``logger`` and
 # ``exception``, imported rather than respelled — and reserves that sink's whole set against a carried
 # attribute, so one field keeps one wire name whichever of the two a process selects. ``time`` and
-# ``severity`` are not payload keys here, the client library carrying both out of band, but a field
-# named like one is ``field_time`` and ``field_severity`` under either sink rather than under one only.
+# ``severity`` are not payload keys here, the client library carrying both out of band, and neither are
+# ``trace_id``, ``span_id`` and ``trace_flags``, the entry's own ``trace`` field carrying the trace, but a
+# field named like one is ``field_time`` or ``field_trace_id`` under either sink rather than under one only.
 FIXED_PAYLOAD_KEYS = FIXED_KEYS
 
 # The stdlib formatter the ``json`` sink renders a traceback through, so both sinks spell one exception

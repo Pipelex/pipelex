@@ -49,6 +49,14 @@ Custom telemetry is configured in `.pipelex/telemetry.toml` and allows you to se
 
 Custom telemetry is completely independent from Gateway telemetry—you can use both, either, or neither.
 
+### Pipelex's spans in your process
+
+Either stream makes Pipelex trace a run: the Gateway stream whenever it is on, and yours when AI span tracing is enabled on your PostHog. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **Pipelex never makes its spans current in your process's OpenTelemetry context**:
+
+- Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
+- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
+- The `json` and `otlp` log sinks still join each line to the Pipelex span it was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, and outside a Pipelex run to your current span, as [Logging](../tools/logging.md#the-trace-context) describes.
+
 ## Quick Setup
 
 When you run `pipelex init`, a default `telemetry.toml` configuration file is created:

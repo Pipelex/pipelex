@@ -13,6 +13,7 @@ over each of those records runs over it on that path too.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 
 from typing_extensions import override
@@ -22,6 +23,9 @@ from pipelex.tools.log.log_fields import FORWARDED_MARK
 # The most records held at once; beyond it the oldest are dropped, so a process that configures
 # logging and never installs a sink cannot grow without bound. A boot holds a few dozen lines.
 HOLDING_CAPACITY = 1000
+
+# A held record and a copy of the context it was emitted in, which its replay runs under.
+HeldRecord = tuple[logging.LogRecord, contextvars.Context]
 
 
 class ForwardedRecordFilter(logging.Filter):
@@ -72,7 +76,7 @@ class HoldingLogHandler(logging.Handler):
 
     def __init__(self, *, last_resort_filter: logging.Filter | None = None) -> None:
         super().__init__(level=logging.NOTSET)
-        self._held: list[logging.LogRecord] = []
+        self._held: list[HeldRecord] = []
         self._released_to: logging.Handler | None = None
         self._last_resort_filter = last_resort_filter
 
@@ -93,7 +97,7 @@ class HoldingLogHandler(logging.Handler):
             return
         if len(self._held) >= HOLDING_CAPACITY:
             del self._held[0]
-        self._held.append(record)
+        self._held.append((record, contextvars.copy_context()))
 
     def release_to(self, *, handler: logging.Handler) -> None:
         """Hand every held record to the handler, in the order they were emitted, and forward to it whatever arrives after.
@@ -105,13 +109,18 @@ class HoldingLogHandler(logging.Handler):
         reason: a thread that read the root logger's handler list before the handoff can still reach the
         sink's handler carrying a record this drain has already delivered, and the mark is the only thing
         that tells the handler's guard so.
+
+        Each record is delivered in the context it was emitted in, copied when it was held, so a sink that
+        reads the context at emit, the span a trace-joining sink writes, Pipelex's own or OpenTelemetry's
+        current one, reads the one the record was logged under rather than the one the boot holds at the
+        handoff, and a record another thread logged inside a span of its own keeps that span too.
         """
         self.acquire()
         try:
             held, self._held = self._held, []
             self._released_to = handler
-            for record in held:
-                _deliver(handler=handler, record=record)
+            for record, emitted_in in held:
+                emitted_in.run(_deliver, handler=handler, record=record)
                 setattr(record, FORWARDED_MARK, True)
         finally:
             self.release()
@@ -136,7 +145,7 @@ class HoldingLogHandler(logging.Handler):
             self.release()
         last_resort = logging.lastResort
         if last_resort is not None:
-            for record in held:
+            for record, _emitted_in in held:
                 if self._last_resort_filter is not None and not self._last_resort_filter.filter(record):
                     continue
                 last_resort.handle(record)
