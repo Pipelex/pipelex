@@ -10,6 +10,7 @@ from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_holding import ForwardedRecordFilter, HoldingLogHandler
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
 from pipelex.tools.log.log_redaction import make_redaction_processor
+from pipelex.tools.log.log_sink import ProcessorFilter
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -84,7 +85,8 @@ class Log:
         object installed again carries the next configuration's processor and not two, and builds itself
         a live handler rather than being handed back the one this close just finished with. A holding
         handler still in place, because the boot died before its sink arrived, is closed too, and what
-        it holds gets the stdlib's last-resort handling.
+        it holds gets the stdlib's last-resort handling once the redaction ``configure`` gave it has run
+        over each record.
         """
         root_logger = logging.getLogger()
         try:
@@ -149,7 +151,13 @@ class Log:
         # every record is held, so nothing a boot says is lost or written in a shape nothing chose.
         root_logger = logging.getLogger()
         root_logger.setLevel(log_config.default_log_level.int_logging_level)
-        self._holding_handler = HoldingLogHandler()
+        # A boot that dies before its sink arrives hands what was held to the stdlib's last resort, and
+        # those records meet the redaction there as they would have met it on the sink's handler, behind
+        # the same guard: a failed boot is the one moment the trail on stderr is read line by line.
+        last_resort_filter = None
+        if log_config.redaction.is_enabled:
+            last_resort_filter = ProcessorFilter(processors=[make_redaction_processor(config=log_config.redaction)])
+        self._holding_handler = HoldingLogHandler(last_resort_filter=last_resort_filter)
         root_logger.addHandler(self._holding_handler)
 
         self.set_levels_for_packages(package_log_levels=log_config.package_log_levels)

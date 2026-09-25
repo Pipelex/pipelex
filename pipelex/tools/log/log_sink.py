@@ -54,7 +54,7 @@ class LogSinkMethod(StrEnum):
     OTLP = "otlp"
 
 
-class _ProcessorFilter(logging.Filter):
+class ProcessorFilter(logging.Filter):
     """Runs the sink's processors over each record before the handler formats it, and drops only what one asks it to.
 
     The stdlib runs a handler's filters outside any ``try``, so a processor that raised would raise out
@@ -121,7 +121,7 @@ class LogSink(ABC):
         """The sink's handler, built on first read with the processors wired in front of it."""
         if self._handler is None:
             handler = self.make_handler()
-            handler.addFilter(_ProcessorFilter(processors=self.processors))
+            handler.addFilter(ProcessorFilter(processors=self.processors))
             self._handler = handler
         return self._handler
 

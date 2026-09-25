@@ -605,3 +605,41 @@ class TestLogRedaction:
         # The forwarded-record filter is inserted at every install and taken off by none, so the filters
         # stacked up on the cached handler for as long as the same one came back.
         assert len(sink.handler.filters) == len(first.filters)
+
+    @pytest.fixture
+    def root_without_other_handlers(self, mocker: MockerFixture) -> None:
+        """The root logger with none of the session's handlers on it, whose own sink would scrub the shared record first."""
+        mocker.patch.object(logging.getLogger(), "handlers", [])
+
+    @pytest.mark.usefixtures("root_without_other_handlers")
+    def test_a_boot_that_dies_before_its_sink_arrives_writes_its_held_records_scrubbed(
+        self, fresh_log: Log, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The held records reach stderr through the stdlib's last resort, and the redaction runs over each of them first."""
+        fresh_log.configure(log_config=_package_log_config())
+        fresh_log.warning("upstream refused: Authorization: Bearer sk_live_0123456789abcdef")
+        try:
+            msg = "token=sk_live_EXC0123456789abcdef"
+            raise RuntimeError(msg)
+        except RuntimeError:
+            logging.getLogger(__name__).exception("the remote config could not be read")
+
+        fresh_log.reset()
+
+        captured = capsys.readouterr()
+        assert "upstream refused: Authorization: Bearer" in captured.err
+        assert "the remote config could not be read" in captured.err
+        assert "sk_live_0123456789abcdef" not in captured.err
+        assert "sk_live_EXC0123456789abcdef" not in captured.err
+        assert REDACTED_TEXT in captured.err
+
+    @pytest.mark.usefixtures("root_without_other_handlers")
+    def test_a_boot_that_dies_with_redaction_turned_off_writes_its_held_records_as_they_were(
+        self, fresh_log: Log, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        fresh_log.configure(log_config=_package_log_config(is_redaction_enabled=False))
+        fresh_log.warning("upstream refused: Authorization: Bearer sk_live_0123456789abcdef")
+
+        fresh_log.reset()
+
+        assert "sk_live_0123456789abcdef" in capsys.readouterr().err
