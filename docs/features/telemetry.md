@@ -23,9 +23,13 @@ Send execution spans to any OTLP-compatible backend for integration with your ex
 
 Event tracking and AI span tracing with fine-grained privacy controls. Choose between anonymous and identified modes. Configure what data to capture: content, pipe codes, output class names, and content length limits.
 
+## Per-run attribution
+
+A span or an event produced during a run is attributed to that run's own caller, not to the process that served it — which is what lets one deployment run many people's methods and still see each person's generations on their own timeline. The identity comes from the run: `user_id` is who started it, and the optional `extras` mapping carries your own opaque labels for it, such as which of your entities it belongs to, forwarded to PostHog as groups. Both are supplied where the run is, they ride the job through every nested pipe and across a process boundary, and they reach PostHog in the fields it reserves for identity — never as an event property or a span name. Work a host does for a known caller without it being a run is attributed the same way: validating a bundle, whose `pipe_dry_run` event and dry runs carry the caller the host passed, and an unhandled exception raised inside a run, which carries that run's caller out to the exception hook. Anything that names no caller of its own reports under the `user_id` you configured: an event outside any run and any caller's work, and a run on your own machine, whose caller is the literal `local` rather than a person a backend could tell apart — though its extras still ride as groups, because which entities a run belongs to is a separate question from who started it. Pipelex's own Gateway stream is attributed the same way: the run's `user_id` as it is, and its extras as groups. See [Telemetry Setup](../setup/telemetry.md) for how to supply the extras.
+
 ## Gateway Telemetry
 
-When using Pipelex Gateway as your inference backend, privacy-respecting metrics are automatically collected: models used, token counts, latency, and error rates. This data is tied to your Gateway API key (hashed for security) and requires no additional configuration.
+When using Pipelex Gateway as your inference backend, privacy-respecting metrics are automatically collected: models used, token counts, latency, and error rates. This data is tied to your Gateway API key (hashed for security) and requires no additional configuration. Test runs are not collected: when the runtime boots in the `pytest` or `ci` integration mode, or in a session that loads Pipelex's shared pytest plugin, the Gateway stream stays off.
 
 ## Privacy Controls
 

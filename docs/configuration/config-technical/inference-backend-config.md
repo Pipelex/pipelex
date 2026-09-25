@@ -305,11 +305,11 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
-[gpt-4-turbo]
-model_id = "gpt-4-turbo"
-inputs = ["text"]
+["gpt-5.4"]
+model_id = "gpt-5.4"
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
-costs = { input = 10.0, output = 30.0 }
+costs = { input = 2.5, output = 15.0 }
 
 [gpt-image-1]
 model_id = "gpt-image-1"
@@ -469,21 +469,19 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 ```toml
 [llm.aliases]
 # Simple aliases map to a single model
-best-claude = "claude-4.8-opus"
-best-gpt = "gpt-5.5"
-best-gemini = "gemini-pro-latest"
+best-gpt = "gpt-5.6-sol"
 
 # Default aliases (used in presets)
-default-general = "claude-4.6-sonnet"
-default-premium = "claude-4.8-opus"
-default-large-context-text = "gemini-flash-latest"
-default-small = "gpt-4o-mini"
+default-general = "gpt-5.6-terra"
+default-premium = "gpt-5.6-sol"
+default-large-context-text = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 When using aliases in `.mthds` files or other configurations, prefix them with `@`:
 
 ```toml
-model = "@best-claude"           # References the best-claude alias
+model = "@best-gpt"              # References the best-gpt alias
 model = "@default-general"       # References the default-general alias
 ```
 
@@ -493,21 +491,22 @@ Presets combine model selection with optimized parameters for specific tasks. De
 
 ```toml
 [llm.presets]
-# Writing presets
-writing-factual = { model = "@default-premium", temperature = 0.1 }
-writing-creative = { model = "@default-premium", temperature = 0.9 }
+# Every model this deck resolves to fixes its temperature at 1, so every preset
+# declares that value rather than one the worker would override.
+writing-factual = { model = "@default-premium", temperature = 1 }
+writing-creative = { model = "@default-premium", temperature = 1 }
 
 # Retrieval
-retrieval = { model = "@default-large-context-text", temperature = 0.1 }
+retrieval = { model = "@default-large-context-text", temperature = 1 }
 
 # Engineering
-engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
-engineering-code = { model = "@default-premium", temperature = 0.1 }
+engineering-structured = { model = "@default-premium-structured", temperature = 1 }
+engineering-code = { model = "@default-premium", temperature = 1 }
 
 # Vision
-vision = { model = "@default-premium-vision", temperature = 0.5 }
-vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
-vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
+vision = { model = "@default-premium-vision", temperature = 1 }
+vision-cheap = { model = "@default-small-vision", temperature = 1 }
+vision-diagram = { model = "@default-premium-vision", temperature = 1 }
 ```
 
 When using presets in `.mthds` files, prefix them with `$`:
@@ -651,7 +650,7 @@ for_object = "@my-custom-alias"
 
 # Add custom waterfalls - lists of models tried in order
 [llm.waterfalls]
-premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.2"]
+premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.4"]
 small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 ```
 
@@ -665,7 +664,7 @@ document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 When using waterfalls in `.mthds` files, prefix them with `~`:
 
 ```toml
-model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.2
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.4
 model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 

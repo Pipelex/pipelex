@@ -111,6 +111,8 @@ class TestRunnerExecuteErrorPaths:
         assert wrapped.run_mode == PipeRunMode.DRY
         assert wrapped.pipe_stack == ["root_pipe", "echo_pipe"]
         assert wrapped.__cause__ is original
+        # The failure event is attributed to the run, not to the process: `run_metadata`
+        # is the job's own, which is what carries the caller's user id and groups.
         env.telemetry_manager.track_event.assert_called_once_with(
             event_name=EventName.PIPELINE_COMPLETE,
             properties={
@@ -118,6 +120,7 @@ class TestRunnerExecuteErrorPaths:
                 EventProperty.PIPE_TYPE: "PipeLLM",
                 EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
             },
+            run_metadata=env.pipe_job.job_metadata.run_metadata,
         )
 
     async def test_pipelex_error_during_setup_propagates_unwrapped(self, mocker: MockerFixture) -> None:

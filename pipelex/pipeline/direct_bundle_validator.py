@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from pipelex.base_exceptions import ErrorReport
     from pipelex.pipeline.validation_report import PipelexValidationReport
+    from pipelex.system.caller_identity import CallerIdentity
 
 
 class DirectBundleValidator:
@@ -41,6 +42,8 @@ class DirectBundleValidator:
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
+        caller_identity: CallerIdentity | None,
+        graph_pipe_code: str | None,
     ) -> PipelexValidationReport | ErrorReport:
         try:
             return await validate_bundles_in_process(
@@ -48,7 +51,9 @@ class DirectBundleValidator:
                 mthds_sources=mthds_sources,
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
+                graph_pipe_code=graph_pipe_code,
                 log_context="API validate",
+                caller_identity=caller_identity,
             )
         except ValidateBundleError as exc:
             # An invalid bundle is a produced verdict, not a fault: surface its structured

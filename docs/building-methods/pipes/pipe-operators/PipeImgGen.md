@@ -58,11 +58,10 @@ PipeImgGen uses the unified inference backend system to manage image generation 
 
 Common image generation model handles:
 
-- `default-general`: General-purpose image generation model (alias for nano-banana)
-- `default-premium`: Premium image generation model (alias for nano-banana-2)
+- `default-general`: General-purpose image generation model (alias for gpt-image-2)
+- `default-premium`: Premium image generation model (alias for gpt-image-2)
 - `default-small`: Small, fast image generation model (alias for gpt-image-1-mini)
 - `best-gpt`: Best OpenAI image generation model (alias for gpt-image-2)
-- `best-gemini`: Best Gemini image generation model (alias for nano-banana-2)
 
 Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 

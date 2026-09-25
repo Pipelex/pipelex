@@ -4,7 +4,7 @@ site_name: Pipelex Documentation
 # already contains /latest/, mike produces broken double paths like /latest/0.20.9/page/.
 # Canonical URLs are forced to /latest/ via a template override in docs/overrides/main.html.
 site_url: https://docs.pipelex.com/
-site_description: "Official documentation for Pipelex, a source-available library/CLI for building and running executable AI methods."
+site_description: "The Pipelex documentation. Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software."
 docs_dir: docs
 repo_url: "https://github.com/Pipelex/pipelex"
 repo_name: "Pipelex on GitHub"
@@ -21,6 +21,7 @@ theme:
     - navigation.sections
     - navigation.top
     - content.code.copy
+    - content.tabs.link
   palette:
   - scheme: default          # light
     primary: custom
@@ -69,7 +70,8 @@ plugins:
         'distributed-execution/observability.md': 'distributed-execution/index.md'
         'under-the-hood/temporal-integration.md': 'under-the-hood/runtime-bridge-and-transport.md'
         'home/1-features/advanced-customizations.md': 'features/advanced-customizations.md'
-        'home/1-features/claude-code-skills-plugin.md': 'features/claude-code-skills-plugin.md'
+        'home/1-features/claude-code-skills-plugin.md': 'features/pipelex-plugin.md'
+        'features/claude-code-skills-plugin.md': 'features/pipelex-plugin.md'
         'home/1-features/cli.md': 'features/cli.md'
         'home/1-features/cloud-storage.md': 'features/cloud-storage.md'
         'home/1-features/concepts.md': 'features/concepts.md'
@@ -98,25 +100,51 @@ plugins:
         'get-started/write-methods-manually.md': 'get-started/mthds-language-tutorial.md'
         'home/2-get-started/write-methods-manually.md': 'get-started/mthds-language-tutorial.md'
         'home/3-understand-pipelex/viewpoint.md': 'viewpoint/viewpoint.md'
-        'home/4-cookbook-examples/extract-dpe.md': 'cookbook/extract-dpe.md'
-        'home/4-cookbook-examples/extract-gantt.md': 'cookbook/extract-gantt.md'
-        'home/4-cookbook-examples/extract-generic.md': 'cookbook/extract-generic.md'
-        'home/4-cookbook-examples/extract-proof-of-purchase.md': 'cookbook/extract-proof-of-purchase.md'
-        'home/4-cookbook-examples/extract-table.md': 'cookbook/extract-table.md'
-        'home/4-cookbook-examples/hello-world.md': 'cookbook/hello-world.md'
+        # The cookbook section became one page that links the cookbook, whose own pages now show each method.
+        # Every former example page redirects to it, and the two runtime pages it held moved into the runtime's docs.
+        'home/4-cookbook-examples/extract-dpe.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/extract-gantt.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/extract-generic.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/extract-proof-of-purchase.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/extract-table.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/hello-world.md': 'cookbook/index.md'
         'home/4-cookbook-examples/index.md': 'cookbook/index.md'
-        'home/4-cookbook-examples/invoice-extractor.md': 'cookbook/extract-invoice.md'
+        'home/4-cookbook-examples/invoice-extractor.md': 'cookbook/index.md'
         'home/4-cookbook-examples/simple-ocr.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/write-screenplay.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/write-tweet.md': 'cookbook/index.md'
         'cookbook/simple-ocr.md': 'cookbook/index.md'
-        'cookbook/invoice-extractor.md': 'cookbook/extract-invoice.md'
-        'home/4-cookbook-examples/write-tweet.md': 'cookbook/write-tweet.md'
+        'cookbook/invoice-extractor.md': 'cookbook/index.md'
+        'cookbook/advisory-board.md': 'cookbook/index.md'
+        'cookbook/blog-article-generator.md': 'cookbook/index.md'
+        'cookbook/design-slides.md': 'cookbook/index.md'
+        'cookbook/discord-newsletter.md': 'cookbook/index.md'
+        'cookbook/extract-dpe.md': 'cookbook/index.md'
+        'cookbook/extract-gantt.md': 'cookbook/index.md'
+        'cookbook/extract-generic.md': 'cookbook/index.md'
+        'cookbook/extract-invoice.md': 'cookbook/index.md'
+        'cookbook/extract-markdown.md': 'cookbook/index.md'
+        'cookbook/extract-proof-of-purchase.md': 'cookbook/index.md'
+        'cookbook/extract-slides.md': 'cookbook/index.md'
+        'cookbook/extract-table.md': 'cookbook/index.md'
+        'cookbook/gen-expense-data.md': 'cookbook/index.md'
+        'cookbook/gen-synthetic-data.md': 'cookbook/index.md'
+        'cookbook/generate-image.md': 'cookbook/index.md'
+        'cookbook/hello-world.md': 'cookbook/index.md'
+        'cookbook/summarize.md': 'cookbook/index.md'
+        'cookbook/validate-expense-data.md': 'cookbook/index.md'
+        'cookbook/write-screenplay.md': 'cookbook/index.md'
+        'cookbook/write-tweet.md': 'cookbook/index.md'
+        'cookbook/cv-batch-screening.md': 'get-started/cv-batch-screening.md'
+        'cookbook/using-inference-plugins.md': 'under-the-hood/writing-an-inference-plugin.md'
         'home/5-setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
-        'home/5-setup/index.md': 'get-started/build-with-claude-code.md'
-        'home/5-setup/project-organization.md': 'get-started/build-with-claude-code.md'
+        'home/5-setup/index.md': 'get-started/quick-start.md'
+        'home/5-setup/project-organization.md': 'get-started/quick-start.md'
         'home/5-setup/telemetry.md': 'setup/telemetry.md'
-        'setup/index.md': 'get-started/build-with-claude-code.md'
-        'setup/project-organization.md': 'get-started/build-with-claude-code.md'
+        'setup/index.md': 'get-started/quick-start.md'
+        'setup/project-organization.md': 'get-started/quick-start.md'
+        'get-started/build-with-claude-code.md': 'get-started/quick-start.md'
         'setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/templating-style.md'
         'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/templating-style.md'
@@ -193,27 +221,13 @@ plugins:
   - llmstxt-md:
       sections:
         Get Started:
-        - index.md: "Build & Run AI Methods (landing page)"
-        - get-started/build-with-claude-code.md: "Build with Claude Code"
+        - index.md: "Turn your expertise into an AI-powered App, MCP or API (landing page)"
+        - get-started/quick-start.md: "Quick Start"
+        - get-started/run-it-yourself.md: "Run It Yourself"
         - get-started/mthds-language-tutorial.md: "The MTHDS Language Tutorial"
         - get-started/configure-ai-providers.md: "Configure AI Providers"
-        Cookbook Examples:
-        - cookbook/index.md: "Cookbook Overview"
-        - cookbook/hello-world.md: "Hello World"
-        - cookbook/summarize.md: "Summarize"
-        - cookbook/extract-generic.md: "Extract Generic Document"
-        - cookbook/extract-invoice.md: "Extract Invoice"
-        - cookbook/extract-proof-of-purchase.md: "Extract Proof of Purchase"
-        - cookbook/extract-dpe.md: "Extract DPE (Energy Diagnostic)"
-        - cookbook/extract-table.md: "Extract Table from Image"
-        - cookbook/extract-gantt.md: "Extract Gantt Chart"
-        - cookbook/extract-markdown.md: "Extract Markdown from Document"
-        - cookbook/extract-slides.md: "Extract Slides from Presentation"
-        - cookbook/design-slides.md: "Design Slides"
-        - cookbook/generate-image.md: "Generate Image"
-        - cookbook/gen-synthetic-data.md: "Generate Synthetic Data"
-        - cookbook/gen-expense-data.md: "Generate Expense Data with Receipts"
-        - cookbook/using-inference-plugins.md: "Using Inference Plugins"
+        - get-started/cv-batch-screening.md: "CV Batch Screening, Step by Step"
+        - cookbook/index.md: "The Pipelex Cookbook"
         Viewpoint:
         - viewpoint/viewpoint.md: "The Know-How Graph"
         Features:
@@ -227,7 +241,7 @@ plugins:
         - features/document-extraction.md: "Document Extraction"
         - features/image-generation.md: "Image Generation"
         - features/web-search.md: "Web Search"
-        - features/claude-code-skills-plugin.md: "Claude Code Skills Plugin"
+        - features/pipelex-plugin.md: "Pipelex Plugin"
         - features/cli.md: "CLI"
         - features/plxt.md: "plxt Formatter & Linter"
         - features/execution-graph.md: "Execution Graph Visualization"
@@ -333,6 +347,7 @@ plugins:
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
+        - under-the-hood/writing-an-inference-plugin.md: "Writing an Inference Plugin"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
         - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
@@ -368,6 +383,8 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.snippets:
       base_path: .
       check_paths: true
@@ -404,37 +421,13 @@ not_in_nav: |
 
 nav:
   - Get Started:
-    - Build & Run AI Methods: index.md
-    - Build with Claude Code: get-started/build-with-claude-code.md
+    - Overview: index.md
+    - Quick Start: get-started/quick-start.md
+    - Run It Yourself: get-started/run-it-yourself.md
     - The MTHDS Language Tutorial: get-started/mthds-language-tutorial.md
     - Configure AI Providers: get-started/configure-ai-providers.md
-    - Cookbook Examples:
-      - Overview: cookbook/index.md
-      - Quick Start:
-        - Hello World: cookbook/hello-world.md
-        - Summarize: cookbook/summarize.md
-      - Document Extraction:
-        - Generic Document: cookbook/extract-generic.md
-        - Invoice: cookbook/extract-invoice.md
-        - Proof of Purchase: cookbook/extract-proof-of-purchase.md
-        - DPE (Energy Diagnostic): cookbook/extract-dpe.md
-        - Table from Image: cookbook/extract-table.md
-        - Gantt Chart: cookbook/extract-gantt.md
-        - Markdown from Document: cookbook/extract-markdown.md
-        - Slides from Presentation: cookbook/extract-slides.md
-      - Visual Generation:
-        - Design Slides: cookbook/design-slides.md
-        - Generate Image: cookbook/generate-image.md
-      - Advanced:
-        - Synthetic Data: cookbook/gen-synthetic-data.md
-        - Expense Data with Receipts: cookbook/gen-expense-data.md
-        - Using Inference Plugins: cookbook/using-inference-plugins.md
-      - Work in Progress:
-        - Tweet Optimizer: cookbook/write-tweet.md
-        - Blog Article Generator: cookbook/blog-article-generator.md
-        - Advisory Board: cookbook/advisory-board.md
-        - Discord Newsletter: cookbook/discord-newsletter.md
-        - Expense Validation: cookbook/validate-expense-data.md
+    - CV Batch Screening, Step by Step: get-started/cv-batch-screening.md
+    - The Pipelex Cookbook: cookbook/index.md
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
@@ -452,7 +445,7 @@ nav:
         - Image Generation: features/image-generation.md
         - Web Search: features/web-search.md
       - Developer Tools:
-        - Claude Code Skills Plugin: features/claude-code-skills-plugin.md
+        - Pipelex Plugin: features/pipelex-plugin.md
         - CLI: features/cli.md
         - plxt Formatter & Linter: features/plxt.md
         - Execution Graph Visualization: features/execution-graph.md
@@ -587,6 +580,7 @@ nav:
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
+      - Writing an Inference Plugin: under-the-hood/writing-an-inference-plugin.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
       - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md

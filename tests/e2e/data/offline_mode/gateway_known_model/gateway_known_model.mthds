@@ -8,5 +8,5 @@ type        = "PipeLLM"
 description = "Single LLM step using a gateway-listed model handle"
 inputs      = { topic = "Text" }
 output      = "Text"
-model       = "gpt-4o-mini"
+model       = "gpt-5.6-luna"
 prompt      = "Write a single sentence about $topic.text."
