@@ -77,6 +77,26 @@ class OtlpLogSinkConfig(ConfigModel):
     headers: dict[str, str]
 
 
+class GcpLogSinkConfig(ConfigModel):
+    """The settings of the ``gcp`` sink.
+
+    ``log_name`` is the Cloud Logging log the entries land under. An absent ``project_id`` leaves the
+    project to the client library, which reads it from the credentials or from the metadata server of
+    the machine the process runs on. An absent ``credentials_file_path`` leaves authentication to
+    Application Default Credentials, which is what a process already running on Google Cloud has; a
+    path names a service-account JSON file to build the client from instead.
+
+    The path is a plain config value rather than a secret id resolved through the secrets provider,
+    because the log sink is the first capability boot resolves — ahead of the secrets provider, so
+    that every later line of the boot goes through the sink the configuration chose — and there is no
+    provider on the hub to ask at the moment this section is read.
+    """
+
+    log_name: str
+    project_id: str | None = None
+    credentials_file_path: str | None = None
+
+
 class LogRedactionConfig(ConfigModel):
     """What the redaction processor removes from a record before any sink renders it.
 
@@ -133,6 +153,7 @@ class LogConfig(ConfigModel):
     redaction: LogRedactionConfig
     rich_log: RichLogConfig
     otlp: OtlpLogSinkConfig
+    gcp: GcpLogSinkConfig
 
     @field_validator("package_log_levels", mode="before")
     @classmethod

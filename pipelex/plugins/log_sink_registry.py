@@ -15,7 +15,7 @@ class LogSinkRegistry:
     """Read view over the log-sink factories contributed by discovered plugins.
 
     Keyed by the open sink ``method`` token (a ``str``; the built-in ``LogSinkPlugin`` registers the
-    ``LogSinkMethod`` values, an external plugin registers e.g. ``"gcp"``). Built once at boot from the
+    ``LogSinkMethod`` values, an external plugin registers e.g. ``"syslog"``). Built once at boot from the
     registrar's accumulated ``log_sinks``; boot reads ``runtime.log.sink`` and calls the looked-up
     factory to produce the one sink installed on the root logger. Mirrors ``StorageProviderRegistry``.
     """

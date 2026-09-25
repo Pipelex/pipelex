@@ -103,7 +103,7 @@ def gcp_mock(tmp_path: Path, mocker: MockerFixture) -> dict[str, Any]:
     Creates a mock that simulates GCS behavior using an in-memory dict.
     """
     # Import the module first so it can be patched
-    from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+    from google.cloud import storage  # type: ignore[import-untyped, attr-defined]  # ruff: ignore[import-outside-top-level]
 
     # Create mock credentials file
     credentials_path = tmp_path / "gcp_credentials.json"
