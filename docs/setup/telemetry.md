@@ -49,7 +49,13 @@ Custom telemetry is configured in `.pipelex/telemetry.toml` and allows you to se
 
 Custom telemetry is completely independent from Gateway telemetry—you can use both, either, or neither.
 
-When AI tracing is on, a pipe's span and an LLM call's span are OpenTelemetry's current span while they run, in the process running them. Pipelex's tracer stays its own and never becomes the global one, but anything in your code that reads the current span sees Pipelex's: your own instrumentation opens its spans as children of the pipe or the LLM call, in the run's trace, and the `json` and `otlp` log sinks write each line's trace context so a line joins its span. See [Logging](../tools/logging.md#the-trace-context).
+### Pipelex's spans in your process
+
+Either stream makes Pipelex trace a run: the Gateway stream whenever it is on, and yours when AI span tracing is enabled on your PostHog. While a traced run goes, a pipe's span and an LLM call's span are OpenTelemetry's current span in the process running them. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, but anything in your code that reads the current span sees Pipelex's:
+
+- Your own instrumentation, an HTTP client's or a provider SDK's, opens its spans as children of the pipe or the LLM call, in the run's trace. Those spans reach your backend with a parent your backend receives only if one of your own exporters receives Pipelex's spans, and a sampler that follows its parent keeps them whatever ratio it samples at, since the run's spans are sampled.
+- An error tracker that reads the current span files its events under the run's trace.
+- The `json` and `otlp` log sinks write each line's trace context, so a line joins the span it was logged in, as [Logging](../tools/logging.md#the-trace-context) describes.
 
 ## Quick Setup
 
