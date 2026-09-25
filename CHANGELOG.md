@@ -3,7 +3,9 @@
 ## [Unreleased]
 
 ### Changed
+
 - **`BundleValidatorProtocol.validate_bundles` requires `graph_pipe_code` (Breaking)**: a host names the pipe the best-effort graph arm dry-runs, resolved the way a run resolves its entry pipe, with `None` keeping the primary blueprint's `main_pipe`. A host validating a fetched method package by address can now graph the pipe its manifest names, which a bundle declaring no `main_pipe` of its own left without a graph. Every validator implementation must accept the argument and hand it to its graph arm, and a host must pass it; `DirectBundleValidator` forwards it to `validate_bundles_in_process`.
+- **The pitch names who each way of running a method is for**: the README, the documentation's front page and **Quick Start**, and the site description now say a method runs "as an MCP for chatbots, as a webapp for people, or via API for your software", instead of "from your agent or your chatbot via MCP, as a webapp, or via API in any software".
 - **The quick start shows both agents' installs**: the README's Codex install now starts open beside the Claude Code one instead of folded, and the documentation site links its content tabs, so choosing Codex on one page selects it on every page.
 - **The documentation's front page takes the README's hero**: it opens on "Turn your expertise into an AI-powered App, MCP or API" and the paragraph on building a method with your coding agent and where it runs. **Get Started** now follows the buttons, and **What a Method Looks Like**, which now introduces the MTHDS language, and **Why Methods?** come after it. The front page's entry in the navigation is now **Overview**.
 

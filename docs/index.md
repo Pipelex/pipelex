@@ -1,13 +1,13 @@
 ---
 title: "Turn your expertise into an AI-powered App, MCP or API"
-description: "Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software."
+description: "Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software."
 ---
 
 ![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png)
 
 # Turn your expertise into an AI-powered App, MCP or API
 
-Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, from your agent or your chatbot via MCP, or via API in any software.
+Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, as an MCP for chatbots, or via API for your software.
 
 [:material-rocket-launch: Quick Start](./get-started/quick-start.md){ .md-button .md-button--primary }
 [:material-account-plus: Sign up at app.pipelex.com](https://app.pipelex.com){ .md-button }
