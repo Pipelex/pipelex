@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260925-94110e
 ---
 
@@ -86,4 +86,4 @@ Round 1 reviewed the branch at the commit titled "Mark the campaign active and t
 
 ## After the merge
 
-`/ledger-land` closes this item on the merge. The hosted acceptance, a fresh "Fashion designer" run on the dev console painting every picture from the bucket's regional host, waits for the release train to carry the change into `pipelex-api` and `pipelex-server`, and is recorded on the pipelex-mcp follow-up along with the comments there that still call the runtime's link path-style.
+The branch merged into `dev` as #1260, squash commit `4f535ec56`, and `/ledger-land` closed the item on that merge; the change reaches `main` with the next pipelex release. The hosted acceptance, a fresh "Fashion designer" run on the dev console painting every picture from the bucket's regional host, waits for the release train to carry the change into `pipelex-api` and `pipelex-server`, and is recorded on the pipelex-mcp follow-up along with the comments there that still call the runtime's link path-style.
