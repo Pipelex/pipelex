@@ -96,6 +96,10 @@ console_log_target = "stderr"
 # targets to stderr internally to keep its stdout strictly reserved for the success
 # envelope.
 console_print_target = "stdout"
+# sink names where the records go: "console" (the Rich handler, for a terminal), "json" (one JSON
+# object per line, for a server behind a log agent), "otlp" (the OpenTelemetry logs signal, for a
+# collector), or a token an installed plugin registers.
+sink = "console"
 
 [runtime.log.package_log_levels]
 # Log levels for specific packages (use "-" instead of "." in package names)

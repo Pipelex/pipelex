@@ -10,6 +10,7 @@ from pipelex.providers.gateway.gateway_plugin import GatewayPlugin
 from pipelex.providers.google.google_plugin import GooglePlugin
 from pipelex.providers.huggingface.huggingface_plugin import HuggingFacePlugin
 from pipelex.providers.linkup.linkup_plugin import LinkupPlugin
+from pipelex.providers.log_sinks.log_sink_plugin import LogSinkPlugin
 from pipelex.providers.manifold.manifold_plugin import ManifoldPlugin
 from pipelex.providers.mistral.mistral_plugin import MistralPlugin
 from pipelex.providers.openai.openai_plugin import OpenAIPlugin
@@ -34,6 +35,7 @@ from pipelex.providers.storage.storage_plugin import StoragePlugin
 # Each is import-light: importing this module imports no backend SDK (the SDKs load lazily inside the
 # make_worker closures).
 KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
+    LogSinkPlugin(),
     StoragePlugin(),
     SecretsPlugin(),
     OpenAIPlugin(),
@@ -55,13 +57,14 @@ KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
 ]
 
 # Kernel-layer built-ins that core requires unconditionally — naming one in ``runtime.plugins.disabled`` is a
-# configuration error, not a no-op. ``storage`` supplies every built-in storage backend
-# (``runtime.storage.method`` must resolve to a registered factory or boot fails loud); ``secrets``
-# supplies the built-in ``env`` secrets backend (``runtime.secrets.method`` must likewise resolve or boot
-# fails loud); ``openai`` is the always-on default inference driver (no optional SDK to avoid), so
-# disabling it would only break the out-of-the-box experience. The interpreter-layer half of this set
-# lives beside its plugins, in ``pipelex.interpreter_plugins.builtins``.
-KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = frozenset({"storage", "secrets", "openai"})
+# configuration error, not a no-op. ``log_sinks`` supplies every built-in log sink
+# (``runtime.log.sink`` must resolve to a registered factory or boot fails loud); ``storage`` supplies
+# every built-in storage backend (``runtime.storage.method`` must likewise resolve or boot fails loud);
+# ``secrets`` supplies the built-in ``env`` secrets backend (``runtime.secrets.method`` must likewise
+# resolve or boot fails loud); ``openai`` is the always-on default inference driver (no optional SDK to
+# avoid), so disabling it would only break the out-of-the-box experience. The interpreter-layer half of
+# this set lives beside its plugins, in ``pipelex.interpreter_plugins.builtins``.
+KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = frozenset({"log_sinks", "storage", "secrets", "openai"})
 
 # The entry-point groups a kernel-only boot reads: its own, and only its own. Sits beside the
 # built-in manifest because it answers the same question for the other half of discovery — what an

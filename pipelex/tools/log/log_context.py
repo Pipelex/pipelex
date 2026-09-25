@@ -18,8 +18,8 @@ from pydantic import BaseModel, ConfigDict
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-# The reserved identifier names. They are spelled exactly as the payload fields they come from, so a
-# record and the ``ErrorReport`` or the run result it relates to agree on the key.
+# The reserved identifier names. They are spelled exactly as the payload fields they come from, the
+# job metadata's and the run result's, so a record and the run it relates to agree on the key.
 REQUEST_ID_FIELD = "request_id"
 PIPELINE_RUN_ID_FIELD = "pipeline_run_id"
 PIPE_RUN_ID_FIELD = "pipe_run_id"

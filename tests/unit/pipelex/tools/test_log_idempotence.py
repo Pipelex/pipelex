@@ -5,13 +5,14 @@ with library embedders or interleaved tests that may already have called
 ``log.configure`` earlier in the same process — instead of raising the once-per-process
 RuntimeError, ``configure_if_unset`` returns False and no-ops.
 
-Each test uses the ``fresh_log`` fixture so the RichHandler installed by ``configure``
-is removed from the global root logger on teardown; otherwise handlers accumulate
-across the suite and pollute later test output.
+Each test uses the ``fresh_log`` fixture so the handler ``configure`` installs on the
+global root logger is removed on teardown; otherwise handlers accumulate across the
+suite and pollute later test output.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -38,10 +39,10 @@ def log_config() -> LogConfig:
 def fresh_log() -> Iterator[Log]:
     """Yield a fresh Log() instance and reset it on teardown.
 
-    ``Log.configure`` attaches a RichHandler to the global root logger
-    (``logging.getLogger()``) and StreamHandlers to every named poor_logger. Without
-    explicit cleanup these handlers leak across tests in the same process — later tests
-    inherit duplicated handlers and stray output. ``reset()`` removes them.
+    ``Log.configure`` attaches a holding handler to the global root logger
+    (``logging.getLogger()``), which a sink's handler later replaces. Without explicit
+    cleanup these handlers leak across tests in the same process — later tests inherit
+    duplicated handlers and stray output. ``reset()`` removes them.
     """
     log_instance = Log()
     try:
@@ -53,12 +54,14 @@ def fresh_log() -> Iterator[Log]:
 class TestLogConfigureIfUnset:
     def test_returns_true_and_applies_on_fresh_instance(self, fresh_log: Log, log_config: LogConfig) -> None:
         """A fresh Log() instance has no config; configure_if_unset must apply it."""
+        root_handlers_before = list(logging.getLogger().handlers)
+
         applied = fresh_log.configure_if_unset(log_config=log_config)
 
         assert applied is True
-        # rich_handler is only built inside configure(); seeing it set proves we
-        # didn't take the no-op branch.
-        assert fresh_log.rich_handler is not None
+        # The holding handler is only installed inside configure(); seeing one more root handler
+        # proves we didn't take the no-op branch.
+        assert len(logging.getLogger().handlers) == len(root_handlers_before) + 1
 
     def test_returns_false_after_prior_configure_without_raising(self, fresh_log: Log, log_config: LogConfig) -> None:
         """A second call must no-op and return False instead of raising RuntimeError.
@@ -80,3 +83,16 @@ class TestLogConfigureIfUnset:
         applied = fresh_log.configure_if_unset(log_config=log_config)
 
         assert applied is True
+
+    def test_reset_leaves_every_other_root_handler_in_place(self, fresh_log: Log, log_config: LogConfig) -> None:
+        """Teardown removes what configure installed and nothing else: a host's handler survives a Pipelex reset."""
+        root_logger = logging.getLogger()
+        foreign = logging.NullHandler()
+        root_logger.addHandler(foreign)
+        try:
+            fresh_log.configure(log_config=log_config)
+            fresh_log.reset()
+
+            assert foreign in root_logger.handlers
+        finally:
+            root_logger.removeHandler(foreign)

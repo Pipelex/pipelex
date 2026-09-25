@@ -10,6 +10,7 @@ from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
     DuplicateHttpErrorMapperError,
     DuplicateInferenceBackendError,
+    DuplicateLogSinkError,
     DuplicateModelListerError,
     DuplicateOrchestratorError,
     DuplicatePipeFuncExecutorError,
@@ -19,6 +20,7 @@ from pipelex.plugins.exceptions import (
     PluginLayerViolationError,
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
+from pipelex.plugins.log_sink_registry import LogSinkFactoryFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorFactoryFn
@@ -158,6 +160,7 @@ class PluginRegistrar:
         self.bundle_validators: dict[OrchestrationMode, BundleValidatorProtocol] = {}
         self.storage_providers: dict[str, StorageProviderFactoryFn] = {}
         self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
+        self.log_sinks: dict[str, LogSinkFactoryFn] = {}
         self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
@@ -172,6 +175,7 @@ class PluginRegistrar:
         self._bundle_validator_sources: dict[OrchestrationMode, str] = {}
         self._storage_provider_sources: dict[str, str] = {}
         self._secrets_provider_sources: dict[str, str] = {}
+        self._log_sink_sources: dict[str, str] = {}
         self._pipe_func_executor_sources: dict[str, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
@@ -280,6 +284,27 @@ class PluginRegistrar:
             value=factory,
             contribution=f"secrets provider {method}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicateSecretsProviderError(
+                method=method, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_log_sink(self, *, method: str, factory: LogSinkFactoryFn) -> None:
+        """Contribute a factory for one log sink, keyed by an open ``method`` token.
+
+        The built-in ``LogSinkPlugin`` registers the ``json`` / ``console`` / ``otlp`` methods; an
+        external plugin registers its own token (e.g. ``"gcp"``). Boot reads ``runtime.log.sink`` and
+        calls the looked-up factory to produce the one sink whose handler goes on the root logger.
+        ``factory`` is invoked at that boot apply-point, never here, and the sink builds its handler
+        later still, at install — so a factory or a sink may import a heavy SDK (Rich, the OpenTelemetry
+        logs SDK) while ``register`` stays import-light. Fail-loud on a duplicate method, naming both plugins.
+        """
+        self._add(
+            store=self.log_sinks,
+            sources=self._log_sink_sources,
+            key=method,
+            value=factory,
+            contribution=f"log sink {method}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateLogSinkError(
                 method=method, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )

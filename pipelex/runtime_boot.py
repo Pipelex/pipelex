@@ -82,6 +82,7 @@ from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.exceptions import UnknownBootOrchestratorError
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+from pipelex.plugins.log_sink_registry import LogSinkRegistry
 from pipelex.plugins.model_lister_registry import ModelListerRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
@@ -546,6 +547,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # declaration.
         if boot_orchestrator is not None and boot_orchestrator not in plugin_registrar.registered_plugin_names:
             raise UnknownBootOrchestratorError(requested=boot_orchestrator)
+
+        # The log sink: the first capability resolved out of the registrar, because every line the rest
+        # of this boot emits should be rendered by the sink the configuration chose. ``log.configure``
+        # ran in ``__init__``, before discovery could, and has held every record since; installing the
+        # sink replays them through it. The built-in LogSinkPlugin supplies every shipped sink, so there
+        # is no separate core default, and an unknown token fails loud here listing the registered ones.
+        log_config = get_config().runtime.log
+        log_sink_registry = LogSinkRegistry(plugin_registrar.log_sinks)
+        log.install_sink(log_sink_registry.get_required(method=log_config.sink)(log_config))
 
         # Secrets provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.

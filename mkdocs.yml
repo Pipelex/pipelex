@@ -351,6 +351,7 @@ plugins:
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
         - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
+        - under-the-hood/log-sink-plugins.md: "Log Sink Plugins"
         - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
         - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
@@ -584,6 +585,7 @@ nav:
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
       - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md
+      - Log Sink Plugins: under-the-hood/log-sink-plugins.md
       - Error Model: under-the-hood/error-model.md
       - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
       - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md

@@ -3,6 +3,7 @@ from enum import StrEnum
 from typing import ClassVar
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError, PipelexUnexpectedError
+from pipelex.tools.log.log_fields import VERBATIM_MARK
 
 
 class ToolError(PipelexError):
@@ -52,14 +53,17 @@ class TracebackMessageError(PipelexError):
     def __init__(self, message: str):
         super().__init__(message)
         logger_name = __name__
+        # The message is assembled from whatever raised, so it carries text nobody chose: `[Errno 2]`, a
+        # `list[int]` in a type complaint, a fragment of a traceback. On a console that interprets markup
+        # that is a tag, and Rich either swallows the bracketed span or raises on an unbalanced one — an
+        # error message is the last line that may be silently altered. The mark asks for it verbatim.
+        verbatim = {VERBATIM_MARK: False}
         match self.__class__.error_mode:
             case TracebackMessageErrorMode.ERROR:
-                generic_poor_logger = "#poor-log"
-                logger = logging.getLogger(generic_poor_logger)
-                logger.error(message)
+                logging.getLogger(logger_name).error(message, extra=verbatim)
             case TracebackMessageErrorMode.EXCEPTION:
                 self.logger = logging.getLogger(logger_name)
-                self.logger.exception(message)
+                self.logger.exception(message, extra=verbatim)
 
 
 class FatalError(TracebackMessageError):
