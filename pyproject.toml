@@ -50,7 +50,6 @@ dependencies = [
   "PyYAML>=6.0.2",
   "reportlab>=4.0,<5",                              # for generating synthetic PDFs
   "requests>=2.33.0",
-  "rich>=13.8.1",
   "semantic-version>=2.10.0",
   "shortuuid>=1.0.13",
   # Not stdlib tomllib: our error path reads TOMLDecodeError.{msg,doc,pos,lineno,colno},
@@ -75,6 +74,12 @@ Changelog = "https://docs.pipelex.com/changelog/"
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.78.0"]
 bedrock = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
+# Rich renders the terminal: the `pipelex` and `pipelex-agent` CLIs, the console log sink and the
+# pretty-print mode "rich". Nothing the runtime does on the way to running a method needs it, so a
+# server selects the json sink and a Rich-free pretty-print mode and never reaches for it. Leaving this
+# extra out does not make the environment Rich-free, though: `typer` and `instructor` are core
+# dependencies and both require Rich unconditionally, so a stock install still contains it.
+cli = ["rich>=13.8.1"]
 docling = [
   "docling>=2.94.0",
   "lxml>=6.1.0",
@@ -483,13 +488,24 @@ runtime-evaluated-base-classes = [
   "pipelex.system.configuration.config_root.ConfigRoot",
 ]
 
+[tool.ruff.lint.flake8-tidy-imports]
+# Rich is the `cli` extra, so outside the CLI it is imported inside the function that renders, never at
+# module level. Listing it here is also what lets such a deferred import stand without an
+# `import-outside-top-level` suppression. The authoritative gate is `make check-rich-imports`, which applies
+# the same allowlist and also sees an import in a module-level `try` block or class body; the per-file
+# ignore for `pipelex/cli/` below mirrors its allowlist.
+banned-module-level-imports = ["rich"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
-  "implicit-namespace-package", # Allow test files to not have __init__.py in their directories (avoids namespace collisions)
-  "blind-except",               # Broad `except Exception` is acceptable in tests (asserting failure modes, defensive fixtures)
-  "float-equality-comparison",  # Tests assert exact float literals that round-trip exactly; `pytest.approx` would only add noise
-  "import-private-name",        # Tests reach into private `_core` modules on purpose, to exercise the logic behind a CLI command without going through the CLI
+  "implicit-namespace-package",  # Allow test files to not have __init__.py in their directories (avoids namespace collisions)
+  "blind-except",                # Broad `except Exception` is acceptable in tests (asserting failure modes, defensive fixtures)
+  "float-equality-comparison",   # Tests assert exact float literals that round-trip exactly; `pytest.approx` would only add noise
+  "import-private-name",         # Tests reach into private `_core` modules on purpose, to exercise the logic behind a CLI command without going through the CLI
+  "banned-module-level-imports", # The test suite installs every extra, the `cli` extra's Rich included
 ]
+# The CLI installs the `cli` extra: the check-rich-imports guard's allowlist.
+"pipelex/cli/**/*.py" = ["banned-module-level-imports"]
 
 # The usage example in `needs_inference_in_pipelex` is a pytest fixture, so it contains a bare `yield`
 # line. Ruff's Google-style parser reads any line starting with `yield` as a section header, wherever it

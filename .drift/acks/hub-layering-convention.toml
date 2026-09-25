@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:ba531715aa9e9f29262c7ea2fd18c4a63e31b9878c5b5f1507b135f511aa7b38"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-09-16T08:54:20Z"
-rationale = "Round-2 review fix in runtime_hub is docstring-only: reset_boot_state no longer claims the agent CLI pins silent before booting (it pins after), and now says a mode assigned after boot is released too. No import, accessor or layer placement changed. Read docs/contribute/hub-layering.md: it specifies the boundary, the forbidden import list and the accessor table, and describes neither reset_boot_state nor the pretty-print mode. Nothing stale."
+digest = "sha256:75768fa677bc8550119a8b20ce80c22e5edfa1040eee6b32fe574f7ae2019435"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-09-17T17:57:19Z"
+rationale = "The runtime hub no longer imports Rich at module level. Its console accessor builds the Rich console lazily after checking that the cli extra is installed, and the console print target now stores the stream instead of building a console. No accessor was added, moved or removed and no layer placement changed, so the partition table in the hub-layering doc, which lists get_console as the console accessor, is still accurate. The new Rich import guard reuses the import graph of the hub-layering guard without changing it, and the rich-imports contribute doc says so."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:4682e96a187338d7c0c6728319f0b81e270b0c21"
+"pipelex/runtime_hub.py" = "blob:48caf3ba024b97e112aca1a8c3db5e5d2f17b4cd"

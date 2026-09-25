@@ -3476,7 +3476,6 @@ dependencies = [
     { name = "pyyaml" },
     { name = "reportlab" },
     { name = "requests" },
-    { name = "rich" },
     { name = "semantic-version" },
     { name = "shortuuid" },
     { name = "tomli" },
@@ -3493,6 +3492,9 @@ anthropic = [
 bedrock = [
     { name = "aioboto3" },
     { name = "boto3" },
+]
+cli = [
+    { name = "rich" },
 ]
 dev = [
     { name = "boto3-stubs" },
@@ -3649,7 +3651,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "reportlab", specifier = ">=4.0,<5" },
     { name = "requests", specifier = ">=2.33.0" },
-    { name = "rich", specifier = ">=13.8.1" },
+    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.8.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.16.4" },
     { name = "semantic-version", specifier = ">=2.10.0" },
     { name = "shortuuid", specifier = ">=1.0.13" },
@@ -3665,7 +3667,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.13.2" },
     { name = "urllib3", specifier = ">=2.7.0" },
 ]
-provides-extras = ["anthropic", "bedrock", "docling", "fal", "gcp-logging", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "dynamodb", "s3", "docs", "dev"]
+provides-extras = ["anthropic", "bedrock", "cli", "docling", "fal", "gcp-logging", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "dynamodb", "s3", "docs", "dev"]
 
 [[package]]
 name = "pipelex-tools"

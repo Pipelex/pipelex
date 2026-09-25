@@ -91,15 +91,16 @@ This repository is the Pipelex runtime: the Python package that reads a `.mthds`
 ### Install
 
 ```bash
-uv tool install pipelex
+uv tool install "pipelex[cli]"
 pipelex init
 pipelex doctor
 ```
 
-`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing.
+`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
 
 Some providers and features need an extra:
 
+- `cli`: Rich, for the `pipelex` and `pipelex-agent` commands, the `console` log sink and the `rich` pretty-print mode. Install it wherever Pipelex runs in a terminal; a server leaves it out and selects the `json` log sink with the `poor` or `silent` pretty-print mode, and then nothing the runtime does on the way to running a method asks for Rich. Leaving the extra out does not make the environment Rich-free: `typer` and `instructor` are core dependencies and both require Rich, so a stock install still contains it
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `google-genai`: Google Gemini API support for text and image generation
@@ -112,7 +113,7 @@ Some providers and features need an extra:
 Name the ones you need when you install, or take them all:
 
 ```bash
-uv tool install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
+uv tool install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
 ### Configure AI Access
