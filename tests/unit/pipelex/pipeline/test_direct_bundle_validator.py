@@ -4,7 +4,8 @@ Pins the wrapper's two branches with the in-process sweep mocked out (its own re
 covered by test_validation_report.py / the integration test_protocol_validate.py): a successful
 sweep is returned verbatim as the valid arm; a ``ValidateBundleError`` is converted to its
 structured ``ErrorReport`` (the invalid arm) rather than propagated. Also pins argument
-passthrough, including the ``library_dirs`` host context and the ``log_context`` label.
+passthrough, including the ``library_dirs`` host context, the explicit ``graph_pipe_code`` target
+and the ``log_context`` label.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import pytest
 from pipelex.base_exceptions import ErrorReport
 from pipelex.pipeline.direct_bundle_validator import DirectBundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.system.caller_identity import CallerIdentity
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -37,6 +39,8 @@ class TestDirectBundleValidator:
             mthds_sources=["domain.mthds"],
             allow_signatures=True,
             library_dirs=[Path("lib_dir")],
+            caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
+            graph_pipe_code="extract_document_markdown",
         )
 
         assert verdict is report
@@ -45,7 +49,9 @@ class TestDirectBundleValidator:
             mthds_sources=["domain.mthds"],
             library_dirs=[Path("lib_dir")],
             allow_signatures=True,
+            graph_pipe_code="extract_document_markdown",
             log_context="API validate",
+            caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
         )
 
     async def test_validate_bundle_error_becomes_the_invalid_arm(self, mocker: MockerFixture) -> None:
@@ -61,6 +67,8 @@ class TestDirectBundleValidator:
             mthds_sources=None,
             allow_signatures=False,
             library_dirs=None,
+            caller_identity=None,
+            graph_pipe_code=None,
         )
 
         assert isinstance(verdict, ErrorReport)
@@ -80,4 +88,6 @@ class TestDirectBundleValidator:
                 mthds_sources=None,
                 allow_signatures=False,
                 library_dirs=None,
+                caller_identity=None,
+                graph_pipe_code=None,
             )

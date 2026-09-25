@@ -37,6 +37,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.registries.exceptions import FuncRegistryError
 
 
@@ -247,7 +248,14 @@ async def validate_bundle(
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
+    caller_identity: CallerIdentity | None = None,
 ) -> ValidateBundleResult:
+    """Load one bundle into a fresh library and dry-run its pipes.
+
+    ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
+    sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
+    inherits the caller already in scope, and with none the sweep belongs to nobody.
+    """
     provided_params = sum(
         [
             mthds_contents is not None,
@@ -314,6 +322,7 @@ async def validate_bundle(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
                     library_id=library_id,
                     allow_signatures=allow_signatures,
+                    caller_identity=caller_identity,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -341,6 +350,7 @@ async def validate_bundle(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
                     library_id=library_id,
                     allow_signatures=allow_signatures,
+                    caller_identity=caller_identity,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,

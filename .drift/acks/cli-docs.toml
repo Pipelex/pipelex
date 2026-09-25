@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:4c010af1c0aef26bb6429a597c7d1d533f9f7d5bb20e838987f6ebac63855d35"
-reviewed_by = "Claude (Fable 5.1)"
-reviewed_at = "2026-09-19T20:51:33Z"
-rationale = "Merge of origin/feature/Log-fields-context (carrying dev's v0.60.0 release) into feature/Log-sink-seam: the merged trigger set is the union of two changes each acked on its own side. This branch's side (agent_cli_factory.py and both doctor_cmd.py) is covered by the checks.log_sink row in pipelex/cli/agent_cli/CLAUDE.md, which says where the report's own lines went when a sink was already recorded; the parent's side (agent_output.py, stdin_resolver.py) is covered by the stdin paragraph in docs/tools/cli/agent-cli.md naming StdinEnvelopeShapeError and its --with-memory line requiring the same domain-qualified ref. Both updates are present in the merged tree, the trigger files auto-merged without conflict, and docs/tools/cli/ describes no per-row shape for doctor, so nothing further is stale."
+digest = "sha256:28dfaac2f38ffb7bebd4e7aaf1e872dcf8a1ff0401e91b846006b6a001a28d89"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-09-25T12:38:13Z"
+rationale = "Merge of origin/feature/Log-fields-context (carrying dev's releases v0.61.0 through v0.65.0) into feature/Log-sink-seam: the merged trigger set is the union of two changes each acked on its own side, with no trigger file changed on both. This branch's side (agent_cli_factory.py and both doctor_cmd.py) is covered by the checks.log_sink row in pipelex/cli/agent_cli/CLAUDE.md, present in the merged tree. The parent's side is check_model_cmd.py's argument-help example moving from the retired @best-claude alias to @best-gpt; neither docs/tools/cli/ nor the agent-CLI contract doc quotes that example or any deck alias (grep for best-claude, best-gemini and best-mistral finds nothing in either target). The ack file's line-wise auto-merge kept each side's trigger snapshot, so this re-ack records the merged tree as reviewed as a whole. No doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -14,7 +14,7 @@ rationale = "Merge of origin/feature/Log-fields-context (carrying dev's v0.60.0 
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:49b8bab889d8673e7d4f1d683efe0928e43914b9"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:3dc0283ef1daee4e17183b01f8a5c9d92f2688af"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:ff33446143044332983a0cb7b204b8eca349795a"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:91589e517509248a4639a37e82f46a69538f8071"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"

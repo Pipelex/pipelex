@@ -2140,10 +2140,6 @@ rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
 param = "waterfall_name"
 rationale = "Operates on the waterfall_name; single operand (qualifiers keyword-only)."
 
-["pipelex/cogt/models/model_deck.py::ModelDeck._validate_llm_setting"]
-param = "llm_setting"
-rationale = "Verb–object: validates/checks the llm_setting; single operand."
-
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_extract"]
 param = "name"
 rationale = "Verb–object: validates/checks the name; single operand."
@@ -2163,10 +2159,6 @@ rationale = "Verb–object: validates/checks the name; single operand."
 ["pipelex/cogt/models/model_deck.py::ModelDeck.check_llm_choice"]
 param = "llm_choice"
 rationale = "Verb–object: validates/checks the llm_choice; single operand."
-
-["pipelex/cogt/models/model_deck.py::ModelDeck.final_validate"]
-param = "deck"
-rationale = "Verb–object: validates/checks the deck; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_aliases_and_waterfalls_for_type"]
 param = "model_type"
@@ -5900,13 +5892,9 @@ rationale = "Predicate on the integration mode; single operand."
 param = "posthog_config"
 rationale = "Factory from source: builds from the posthog config; single operand."
 
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._track_anonymous_event"]
+["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._capture_custom_event"]
 param = "event_name"
-rationale = "Verb-object: tracks the event named; properties stay keyword."
-
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._track_identified_event"]
-param = "event_name"
-rationale = "Verb-object: tracks the event named; properties stay keyword."
+rationale = "Verb-object: captures the event named; properties and identity stay keyword."
 
 ["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._track_to_pipelex"]
 param = "event_name"

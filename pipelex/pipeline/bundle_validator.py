@@ -55,6 +55,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.runtime_hub import get_telemetry_manager, scoped_content_generator
+from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
@@ -118,6 +119,7 @@ class BundleValidator:
         bundle_uris: list[str] | None = None,
         library_id: str = "",
         allow_signatures: bool = False,
+        caller_identity: CallerIdentity | None = None,
     ) -> dict[str, DryRunOutput]:
         """Acquire a fresh library, load dirs + contents, sweep **all** loaded pipes, tear down.
 
@@ -138,7 +140,7 @@ class BundleValidator:
         try:
             # acquire_library left the freshly-acquired library current, so the inner sweep over the
             # current library targets exactly acquired_id (it filters signatures in strict mode itself).
-            return await self.validate_current_library(allow_signatures=allow_signatures)
+            return await self.validate_current_library(allow_signatures=allow_signatures, caller_identity=caller_identity)
         finally:
             # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown
             # raise), then tear the acquired library down — mirroring validate_bundle / acquire_library.
@@ -150,7 +152,9 @@ class BundleValidator:
                 clear_current_library()
             get_library_manager().teardown(library_id=acquired_id)
 
-    async def validate_current_library(self, *, allow_signatures: bool = False) -> dict[str, DryRunOutput]:
+    async def validate_current_library(
+        self, *, allow_signatures: bool = False, caller_identity: CallerIdentity | None = None
+    ) -> dict[str, DryRunOutput]:
         """Sweep every pipe in the already-open **current** library, **without** tearing it down.
 
         The public inner sweep over the active library (D6): the caller owns the library lifecycle —
@@ -161,7 +165,12 @@ class BundleValidator:
         acquires + tears down) and the shared core both the ``validate --all`` CLI and downstream
         consumers (e.g. cocode) build on instead of re-deriving ``get_pipes`` + ``validate_pipes`` by hand.
         """
-        return await self.validate_pipes(get_pipe_library().get_pipes(), library_id=get_current_library(), allow_signatures=allow_signatures)
+        return await self.validate_pipes(
+            get_pipe_library().get_pipes(),
+            library_id=get_current_library(),
+            allow_signatures=allow_signatures,
+            caller_identity=caller_identity,
+        )
 
     async def validate_pipes(
         self,
@@ -169,6 +178,7 @@ class BundleValidator:
         *,
         library_id: str,
         allow_signatures: bool = False,
+        caller_identity: CallerIdentity | None = None,
     ) -> dict[str, DryRunOutput]:
         """Classify each pipe ``SUCCESS / FAILURE / SKIPPED`` against an already-open library.
 
@@ -191,9 +201,33 @@ class BundleValidator:
         the HTTP caller reading ``is_runnable``). A non-signature pipe that *reaches* a signature
         dry-runs trivially in both modes (the signature mints a mock), so it is never a failure here.
 
+        ``caller_identity`` is who asked for the sweep, when a host knows it (the hosted
+        ``/validate`` route does). It is made the ambient caller for the sweep, so the
+        ``PIPE_DRY_RUN`` event and every dry run's job metadata are attributed to that caller
+        rather than to the telemetry stream's configured fallback. ``None`` inherits whatever
+        caller is already in scope, and with none — a local CLI sweep — the dry runs state
+        ``DRY_RUN_USER_ID`` and the event goes out under the fallback, as before.
+
         Returns the per-pipe status map (carrying allowed failures + skips). Raises ``DryRunError``
         on ≥1 unexpected failure.
         """
+        with scoped_caller_identity(caller_identity=caller_identity) as effective_caller_identity:
+            return await self._validate_pipes_for_caller(
+                pipes=pipes,
+                library_id=library_id,
+                allow_signatures=allow_signatures,
+                caller_identity=effective_caller_identity,
+            )
+
+    async def _validate_pipes_for_caller(
+        self,
+        *,
+        pipes: list[PipeAbstract],
+        library_id: str,
+        allow_signatures: bool,
+        caller_identity: CallerIdentity | None,
+    ) -> dict[str, DryRunOutput]:
+        """The body of :meth:`validate_pipes`, run inside the caller's scope."""
         start_time = time.time()
 
         # allow_signatures is the sweep-mechanics flag (D-B): in strict mode signature pipes are
@@ -225,6 +259,8 @@ class BundleValidator:
             sweepable_pipes.append(pipe)
 
         # 2. One validation telemetry event per sweep (relocated from the CLI's _validate_core).
+        #    It has no run to hand over — the sweep is not a run — so it is attributed to the
+        #    caller `validate_pipes` put in scope, and to the stream's fallback only when none is.
         get_telemetry_manager().track_event(event_name=EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(sweepable_pipes)})
 
         # 3. The dry-run sweep. Each pipe is dry-run under a UNIQUE per-sweep pipeline run id (a
@@ -255,14 +291,24 @@ class BundleValidator:
         with scoped_pipe_router(self._pipe_router), scoped_content_generator(ContentGenerator.make_inline()):
             for pipe in sweepable_pipes:
                 results[pipe.pipe_ref] = await self._classify_pipe(
-                    pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id
+                    pipe=pipe,
+                    library_id=library_id,
+                    execution_config=execution_config,
+                    dry_run_pipeline_id=dry_run_pipeline_id,
+                    caller_identity=caller_identity,
                 )
 
         # 4. Aggregate + report.
         return self._aggregate(results=results, start_time=start_time)
 
     async def _classify_pipe(
-        self, *, pipe: PipeAbstract, library_id: str, execution_config: PipelineExecutionConfig, dry_run_pipeline_id: str
+        self,
+        *,
+        pipe: PipeAbstract,
+        library_id: str,
+        execution_config: PipelineExecutionConfig,
+        dry_run_pipeline_id: str,
+        caller_identity: CallerIdentity | None,
     ) -> DryRunOutput:
         """Build the mock job and run the pipe DRY through the direct primitive; classify the outcome.
 
@@ -271,6 +317,11 @@ class BundleValidator:
         plus pydantic ``ValidationError`` and polyfactory ``FactoryException`` (the third-party shapes a
         ``PipeSignature`` mint can raise). The per-pipe step classifies **only** — no ``allowed_to_fail``
         check and no early raise; those live at the aggregate step.
+
+        The dry run is done for ``caller_identity`` when one is known, so its job metadata states
+        that caller — the pipe run opens its caller scope from it — and ``DRY_RUN_USER_ID`` only
+        when the sweep belongs to nobody. It stores nothing either way: ``storage_scope`` stays
+        ``DRY_RUN_STORAGE_SCOPE``.
         """
         try:
             pipe_job = await prepare_pipe_job(
@@ -279,7 +330,8 @@ class BundleValidator:
                 execution_config=execution_config,
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id=dry_run_pipeline_id,
-                user_id=DRY_RUN_USER_ID,
+                user_id=caller_identity.user_id if caller_identity is not None else DRY_RUN_USER_ID,
+                extras=caller_identity.extras if caller_identity is not None else None,
                 # A dry run provably stores nothing, but `storage_scope` is
                 # required — so it says so, loudly and greppably, instead of
                 # inheriting a default. A silent default on this field is

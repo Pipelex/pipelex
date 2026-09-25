@@ -10,6 +10,8 @@ on:
   # expired token) is otherwise unrecoverable: re-running a run replays the
   # workflow file it started with, and the only other trigger is merging a PR
   # into main — which the branch guard restricts to release/vX.Y.Z branches.
+  # A dispatch is a new run and so holds no artifact of its own; the build job
+  # below recovers the bytes this version published rather than rebuilding them.
   workflow_dispatch:
 
 jobs:
@@ -17,6 +19,21 @@ jobs:
     name: Build distribution 📦
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      actions: read # reading artifact lists — this run's, and the repository's
+
+    env:
+      # The commit whose build this job is looking for, resolved into HEAD_SHA
+      # below. The two triggers name it differently: on the `pull_request` path
+      # `github.sha` is the event's own merge ref, while the run — and so the
+      # artifact it stores — records the release branch's last commit as its
+      # `head_sha`. Deliberately NOT a `${{ cond && a || b }}` expression, for the
+      # reason spelled out in `github-release`: that idiom falls through to `b`
+      # whenever `a` is empty. Two plain inputs and a shell branch fail loudly.
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      DISPATCH_SHA: ${{ github.sha }}
 
     steps:
       # A manual run can target any ref that contains this workflow, and every
@@ -40,23 +57,289 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read the package, the version and the commit being shipped
+        id: project
+        run: |
+          set -euo pipefail
+          NAME=$(grep -m 1 '^name = ' pyproject.toml | cut -d '"' -f 2)
+          VERSION=$(grep -m 1 '^version = ' pyproject.toml | cut -d '"' -f 2)
+          if [ -z "$NAME" ] || [ -z "$VERSION" ]; then
+            echo "::error::Could not read the package name and version out of pyproject.toml."
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            HEAD_SHA="$PR_HEAD_SHA"
+          else
+            HEAD_SHA="$DISPATCH_SHA"
+          fi
+          if [ -z "$HEAD_SHA" ]; then
+            echo "::error::Could not determine which commit this run is shipping ($GITHUB_EVENT_NAME). Refusing to look for, or make, a build without it."
+            exit 1
+          fi
+          {
+            echo "name=$NAME"
+            echo "version=$VERSION"
+            echo "head_sha=$HEAD_SHA"
+          } >> "$GITHUB_OUTPUT"
+          echo "Shipping $NAME $VERSION from $HEAD_SHA"
+      # A recovery re-run — the one the signing fallback in `github-release`
+      # prescribes — must attach and sign the exact bytes this version published,
+      # because PyPI's copies of them are immutable. Rebuilding cannot promise
+      # that: `[build-system] requires = ["hatchling"]` names no version and
+      # `actions/setup-python` asks for `3.x`, so a backend or interpreter release
+      # landing between two attempts changes the output of the same commit, and
+      # GitHub would then serve — and Sigstore would attest — dists that differ
+      # from the ones on PyPI. So this job recovers those bytes from the first of
+      # three places that holds them, builds only when nothing was ever published,
+      # and checks whatever it ends up with against PyPI before anything is
+      # published, attached or signed.
+      #
+      # PyPI is asked first, once, because its answer decides both halves of that:
+      # whether there are published bytes to recover at all, and what every dist
+      # below is measured against. A layer cannot skip a check it does not carry.
+      - name: Ask PyPI what this version has published
+        id: published
+        env:
+          NAME: ${{ steps.project.outputs.name }}
+          VERSION: ${{ steps.project.outputs.version }}
+        run: |
+          set -euo pipefail
+          # `--retry` covers a transient 5xx or a rate limit; a 404 is not an error
+          # to curl without `-f`, so the "never published" answer below is reached
+          # on the first call rather than after three.
+          CODE=$(curl -sS --retry 3 --retry-delay 2 --retry-all-errors \
+            -o "$RUNNER_TEMP/pypi-release.json" -w '%{http_code}' \
+            "https://pypi.org/pypi/$NAME/$VERSION/json" || echo " transport-failure")
+          case "$CODE" in
+            200)
+              FILES=$(jq '.urls | length' "$RUNNER_TEMP/pypi-release.json")
+              if [ "$FILES" -eq 0 ]; then
+                echo "::error::PyPI knows $NAME $VERSION but serves no files for it. Refusing to guess at what this release published."
+                exit 1
+            fi
+              echo "PyPI serves $NAME $VERSION, so that release's files are what this run must carry."
+              echo "published=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "PyPI serves no $NAME $VERSION, so nothing has been published under this version yet."
+              echo "published=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              # A guard that reads an outage as "never published" would rebuild —
+              # and attest — exactly when it is least able to tell what it is
+              # replacing.
+              echo "::error::Could not ask PyPI whether $NAME $VERSION is published (got '$CODE'). Refusing to publish bytes that cannot be checked against what PyPI already serves — re-run this job once PyPI answers."
+              exit 1
+              ;;
+          esac
+      # Layer 1: an attempt of THIS run. Artifacts are scoped to the run rather
+      # than to the attempt, so "Re-run all jobs" finds the build the first
+      # attempt stored, which is the ordinary Sigstore recovery.
+      - name: Look for a build an earlier attempt of this run stored
+        id: this_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # `all` rather than `any`: one live record is enough to reuse, and only a
+          # set where every record has expired is a dead end. v4 artifact names are
+          # unique per run, so in practice there is one record or none.
+          STATE=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name == "python-package-distributions")]
+                  | if length == 0 then "absent"
+                    elif all(.expired) then "expired"
+                    else "present" end')
+          case "$STATE" in
+            present)
+              echo "An earlier attempt of this run stored a build — reusing it."
+              echo "found=true" >> "$GITHUB_OUTPUT"
+              echo "The dists come from the build an earlier attempt of this run stored." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            expired)
+              # No longer a dead end: the layers below can still recover the bytes
+              # this version published. The artifact record does hold this run's
+              # name, though, so the upload at the end has to replace it.
+              echo "::notice::The build stored by an earlier attempt of this run has expired; recovering the published bytes instead."
+              echo "expired=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "This run holds no build yet."
+              ;;
+          esac
+      # Downloaded rather than left in place, because the verification below reads
+      # the files. This run's own artifact is precisely the one that can be stale:
+      # it was built before whatever ended up on PyPI.
+      - name: Download the build this run already holds
+        if: steps.this_run.outputs.found == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      # Layer 2: an earlier RUN of the same commit. A `workflow_dispatch` retry is
+      # a new run, so layer 1 finds nothing there. Artifacts are listed
+      # repository-wide and each carries the head commit of the run that stored
+      # it, so a build an earlier attempt at this same commit made is still
+      # reachable — which is what saves a retry of a publish that never reached
+      # PyPI. The dispatch a released version is actually recovered by is one from
+      # the base branch, whose tip is the commit the release was tagged at and the
+      # only ref the tag guard in `github-release` admits; that names a different
+      # commit than the release run's head, so it falls through to layer 3.
+      - name: Reuse a build an earlier run stored for this commit
+        id: earlier_run
+        if: steps.this_run.outputs.found != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.project.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          # Piped through the runner's own `jq` rather than `gh --jq`, so the
+          # commit can be passed in with `--arg` instead of read out of the
+          # environment. `pipefail` is what makes a failed `gh` call fail the
+          # pipeline rather than quietly yielding an empty list.
+          if ! CANDIDATES=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts?name=python-package-distributions&per_page=100" \
+            | jq -r --arg head "$HEAD_SHA" \
+              '.artifacts[]
+               | select(.expired == false and .workflow_run.head_sha == $head)
+               | "\(.created_at) \(.id)"'); then
+            # Reading an outage as "no earlier build" only sends this job down to
+            # layer 3, which reuses what PyPI itself serves — a strictly better
+            # source than either an artifact or a rebuild. A warning is enough.
+            echo "::warning::Could not list this repository's artifacts, so the earlier-run layer is being skipped."
+            CANDIDATES=""
+          fi
+          ARTIFACT_ID=$(printf '%s\n' "$CANDIDATES" | sort | tail -1 | cut -d ' ' -f 2)
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "No earlier run holds a build for $HEAD_SHA."
+            exit 0
+          fi
+          echo "Reusing artifact $ARTIFACT_ID, stored by an earlier run of $HEAD_SHA."
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            > "$RUNNER_TEMP/earlier-build.zip"
+          mkdir -p dist
+          unzip -q -o "$RUNNER_TEMP/earlier-build.zip" -d dist
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "The dists come from artifact $ARTIFACT_ID, stored by an earlier run of $HEAD_SHA." >> "$GITHUB_STEP_SUMMARY"
+      # Layer 3: PyPI itself, when it serves this version. Its files are the
+      # release, so downloading them is what makes the GitHub Release assets
+      # provably the bytes PyPI serves rather than a build that probably matches
+      # them — and it needs no artifact to have survived.
+      - name: Take the files PyPI publishes for this version
+        if: steps.published.outputs.published == 'true'
+          && steps.this_run.outputs.found != 'true'
+          && steps.earlier_run.outputs.found != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          while read -r SHA256 FILENAME URL; do
+            echo "Downloading $FILENAME"
+            curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "dist/$FILENAME" "$URL"
+            # Checked here as well as in the verification below, so that a
+            # truncated transfer is reported as the download failure it is.
+            printf '%s  %s\n' "$SHA256" "dist/$FILENAME" | sha256sum -c -
+          done < <(jq -r '.urls[] | "\(.digests.sha256) \(.filename) \(.url)"' "$RUNNER_TEMP/pypi-release.json")
+          echo "The dists are the files PyPI publishes for this version." >> "$GITHUB_STEP_SUMMARY"
+      # Whether a build is still needed is a question about `dist/`, and asking the
+      # directory keeps it honest: no bookkeeping flag can disagree with what the
+      # layers above actually left there. It stays empty only when nothing was
+      # published and no artifact survived, which is the ordinary first pass.
+      - name: Decide whether a build still has to be made
+        id: acquire
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          RECOVERED=(dist/*)
+          if [ "${#RECOVERED[@]}" -eq 0 ]; then
+            echo "Nothing holds this version's bytes yet, so this run builds them."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Set up Python
+        if: steps.acquire.outputs.build == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - name: Install pypa/build
+        if: steps.acquire.outputs.build == 'true'
         run: >-
           python3 -m
           pip install
           build
           --user
       - name: Build a binary wheel and a source tarball
-        run: python3 -m build
+        if: steps.acquire.outputs.build == 'true'
+        env:
+          HEAD_SHA: ${{ steps.project.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          python3 -m build
+          echo "The dists are a fresh build of $HEAD_SHA — this version had not been published." >> "$GITHUB_STEP_SUMMARY"
+      # The one check every path passes through, because what is in `dist/` now is
+      # what the jobs below publish, attach and sign. It runs on the reused
+      # artifact as well as on the recovered or freshly built files: an artifact is
+      # not evidence of anything on its own — it was stored by a run this one did
+      # not watch, and a run whose own publish failed can hold a build that a later
+      # run then published differently.
+      - name: Verify the dists are this version's, and are what PyPI serves
+        env:
+          VERSION: ${{ steps.project.outputs.version }}
+          PUBLISHED: ${{ steps.published.outputs.published }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          WHEELS=(dist/*.whl)
+          SDISTS=(dist/*.tar.gz)
+          DIST_FILES=(dist/*)
+          if [ "${#WHEELS[@]}" -ne 1 ] || [ "${#SDISTS[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one wheel and one source tarball in dist/, found: ${DIST_FILES[*]:-nothing}"
+            exit 1
+          fi
+          for DIST in "${WHEELS[@]}" "${SDISTS[@]}"; do
+            case "${DIST##*/}" in
+              *-"$VERSION"-*.whl|*-"$VERSION".tar.gz) ;;
+              *)
+                echo "::error::$DIST is not a $VERSION distribution. Refusing to publish it as v$VERSION."
+                exit 1
+                ;;
+            esac
+          done
+          if [ "$PUBLISHED" = "true" ]; then
+            # PyPI's copies are immutable, so its digests are the only statement of
+            # what this version IS. Every published file has to be here and intact:
+            # `sha256sum -c` fails on a digest that differs and on a file that is
+            # missing altogether.
+            jq -r '.urls[] | "\(.digests.sha256)  dist/\(.filename)"' \
+              "$RUNNER_TEMP/pypi-release.json" > "$RUNNER_TEMP/published.sha256"
+            if ! sha256sum -c "$RUNNER_TEMP/published.sha256"; then
+              echo "::error::The dists this job holds are not the bytes PyPI serves for v$VERSION, so attaching and signing them would contradict the release PyPI is already publishing. A build stored by this run is stale — dispatch a fresh run from the ref this release is tagged at, which recovers the published files instead of reusing that build."
+              exit 1
+            fi
+            # The digests say nothing about a file PyPI never published, and an
+            # extra one would be attached and signed alongside the others.
+            PUBLISHED_NAMES=$(jq -r '.urls[].filename' "$RUNNER_TEMP/pypi-release.json" | sort)
+            LOCAL_NAMES=$(printf '%s\n' "${DIST_FILES[@]##*/}" | sort)
+            if [ "$PUBLISHED_NAMES" != "$LOCAL_NAMES" ]; then
+              echo "::error::dist/ does not hold the same set of files PyPI publishes for v$VERSION. PyPI serves: $(echo "$PUBLISHED_NAMES" | tr '\n' ' '). This job holds: $(echo "$LOCAL_NAMES" | tr '\n' ' ')."
+              exit 1
+            fi
+            echo "The dists are byte-for-byte the files PyPI publishes for v$VERSION."
+          fi
+          ls -l dist
+      # Artifacts are immutable in v4, and layer 1 above means this step is
+      # reached only when this run holds no usable build — so an ordinary second
+      # attempt reuses the first one's bytes rather than replacing them.
+      # `overwrite` opens for exactly one case: the record is still here but its
+      # contents have expired, and the name it holds has to be freed before the
+      # recovered bytes can take it.
       - name: Store the distribution packages
+        if: steps.this_run.outputs.found != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+          overwrite: ${{ steps.this_run.outputs.expired == 'true' }}
 
   publish-to-pypi:
     name: >-
@@ -82,6 +365,25 @@ jobs:
         # previous pin did not, so the first v0.43.0 upload was rejected on a
         # wheel hatchling had built correctly.
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          # Only a retry may skip an already-published version, which is what the
+          # signing fallback below tells the operator to do: PyPI files are
+          # immutable, so on a second pass this step would otherwise die on the
+          # already-published version and `github-release` — which needs this job —
+          # would never get to attach the missing signatures.
+          #
+          # Both of this repo's retry paths are named, and neither implies the
+          # other. "Re-run all jobs" reuses the run, so it raises `run_attempt`.
+          # The `workflow_dispatch` above is the retry this workflow documents for
+          # itself, and it is a NEW run whose `run_attempt` is 1.
+          #
+          # It stays off for an ordinary merge deliberately. Letting a merge that
+          # kept the current version publish "successfully" would carry it into
+          # `github-release`, where `--clobber` would replace the tagged release's
+          # dists with a build of the newer commit while PyPI kept serving the
+          # originals. Failing here is what keeps that release intact — and the tag
+          # guard there is what keeps it intact on the two paths this flag opens.
+          skip-existing: ${{ github.run_attempt > 1 || github.event_name == 'workflow_dispatch' }}
 
   github-release:
     name: >-
@@ -95,6 +397,15 @@ jobs:
     permissions:
       contents: write # IMPORTANT: mandatory for making GitHub Releases
       id-token: write # IMPORTANT: mandatory for sigstore
+
+    env:
+      # Resolved into RELEASE_SHA below. Deliberately NOT a
+      # `${{ cond && a || b }}` expression: that idiom falls through to `b`
+      # whenever `a` is empty, so a missing merge commit would silently become
+      # `github.sha` — the exact wrong value, and indistinguishable from the
+      # right one afterwards. Two plain inputs and a shell branch fail loudly.
+      MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+      DISPATCH_SHA: ${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -113,6 +424,73 @@ jobs:
           else
             echo "IS_PRERELEASE=false" >> $GITHUB_ENV
             echo "Detected stable version: $VERSION"
+          fi
+      # `skip-existing` above opens on a re-run and on a manual dispatch, which
+      # separates a retry from a first pass but not a legitimate recovery (this
+      # commit published, Sigstore then failed) from a retry of a pass that failed
+      # *because* an earlier commit had already published this version. In that
+      # second case skipping turns PyPI's duplicate rejection into success and
+      # carries the run down here, where `--clobber` would replace the tagged
+      # release's dists with this commit's build while PyPI kept serving the
+      # originals. The tag settles which case this is: it exists only once a
+      # release has shipped this version, and it names the commit that shipped it.
+      # Absent — the first pass died between the PyPI upload and `gh release
+      # create` — is allowed through, because blocking it would break the very
+      # recovery the fallback exists to enable. Pointing elsewhere is not.
+      #
+      # Uses the commits endpoint so an annotated tag resolves to its commit
+      # rather than to the tag object, and distinguishes "no such tag" from "the
+      # API could not answer": a guard that reads an outage, a rate limit or a bad
+      # token as "untagged" disarms itself exactly when it is least able to tell
+      # what it is letting through.
+      - name: Refuse to touch a release that shipped a different commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # The commit this run ships, and the one the tag must name. `github.sha`
+          # is NOT it on the path this repo actually releases by: the trigger is a
+          # merged pull request, where `github.sha` is the event's own merge ref
+          # rather than the commit that landed on the base. v0.60.0 is the worked
+          # example — the tag names 97694a9b, the merge commit of #1212 on `main`,
+          # while that run's head was 2a72bd7f, the `release/v0.60.0` branch. A tag
+          # compared against `github.sha` would refuse every recovery re-run of a
+          # release, which is the one thing the signing fallback exists to allow.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            RELEASE_SHA="$MERGE_COMMIT_SHA"
+          else
+            RELEASE_SHA="$DISPATCH_SHA"
+          fi
+          if [ -z "$RELEASE_SHA" ]; then
+            echo "::error::Could not determine which commit this run is shipping ($GITHUB_EVENT_NAME). Refusing to create or touch a release without it."
+            exit 1
+          fi
+          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
+          echo "This run ships $RELEASE_SHA"
+          # `gh` writes its error body to stdout rather than stderr, so a failed
+          # call still fills $BODY — with the failure, not with a commit.
+          if BODY=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$VERSION" 2>/dev/null); then
+            TAGGED_SHA=$(jq -r '.sha' <<<"$BODY")
+          else
+            case "$(jq -r '.status // empty' <<<"$BODY" 2>/dev/null || true)" in
+              404|422)
+                # No such tag: the first pass died between the PyPI upload and
+                # `gh release create`. This is the recovery path, and it proceeds.
+                TAGGED_SHA=""
+                ;;
+              *)
+                # Anything else — 5xx, a rate limit, a bad token, or a transport
+                # failure that left no body at all — leaves the question open.
+                # `//` cannot supply the fallback here: on an empty body `jq`
+                # emits nothing rather than null, so the shell applies it instead.
+                REASON=$(jq -r '.message // empty' <<<"$BODY" 2>/dev/null || true)
+                echo "::error::Could not determine whether v$VERSION is already tagged: ${REASON:-the GitHub API call returned no response body}. Refusing to touch the release without knowing which commit it shipped."
+                exit 1
+                ;;
+            esac
+          fi
+          if [ -n "$TAGGED_SHA" ] && [ "$TAGGED_SHA" != "$RELEASE_SHA" ]; then
+            echo "::error::v$VERSION is already tagged at $TAGGED_SHA, but this run is shipping $RELEASE_SHA. Refusing to replace that release's artifacts with a different commit's build. Bump the version instead of re-running this workflow."
+            exit 1
           fi
       - name: Extract changelog notes for current version
         id: get_changelog
@@ -193,8 +571,17 @@ jobs:
               --notes "$NOTES" \
               $PRERELEASE_FLAG
           else
+            # `--target` is not optional here. Without it `gh` creates the tag on
+            # the repository's DEFAULT branch head, which is neither necessarily
+            # the commit that produced these dists — a publish from a
+            # `pre-release/v*` merge or a `release/vX.Y.Z` dispatch is not on
+            # `main` at all — nor stable, since any unrelated merge landing
+            # between this release's merge and this step would move it. Naming
+            # the commit makes the tag the record of what actually shipped, and
+            # makes the guard above a comparison of like with like.
             gh release create "v$VERSION" \
               --repo "$GITHUB_REPOSITORY" \
+              --target "$RELEASE_SHA" \
               --title "v$VERSION$TITLE_SUFFIX" \
               --generate-notes \
               --notes "$NOTES" \
@@ -225,17 +612,28 @@ jobs:
         if: steps.sign.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        # Upload to GitHub Release using the `gh` CLI.
-        # `dist/` contains the built packages, and the
-        # sigstore-produced signatures and certificates.
+        # Only the bundles signing just produced (`{input}.sigstore.json`). The
+        # `dist/**` glob this used to carry expands as `dist/*` in the runner's
+        # bash, which has no `globstar` — so it also matched the wheel and sdist
+        # attached above, and `--clobber` deletes an asset before uploading its
+        # replacement. A transient failure here therefore stripped the release of
+        # the very dists the previous step exists to secure, undoing that step's
+        # own guarantee.
         run: >-
           gh release upload
-          "v$VERSION" dist/**
+          "v$VERSION" dist/*.sigstore.json
           --repo "$GITHUB_REPOSITORY"
           --clobber
       - name: Report an unsigned release
         if: steps.sign.outcome != 'success'
         run: >-
           echo "::warning::Sigstore signing failed. v$VERSION is released and its
-          dists are attached, but it carries no signature bundles. Re-run this
-          workflow once Sigstore is healthy to attach them."
+          dists are attached, but it carries no signature bundles. Once Sigstore is
+          healthy, use 'Re-run all jobs' on this run to attach them: the build job
+          recovers the bytes this version published rather than building new ones.
+          A manual dispatch does the same, but only from a ref whose head is the
+          commit this release is tagged at — the release pull request's base branch,
+          while nothing further has landed on it — because the guard above refuses a
+          run that is shipping any other commit, and the release branch's own tip is
+          never that commit. Signing is non-fatal, so this job succeeded and 'Re-run
+          failed jobs' is not offered."

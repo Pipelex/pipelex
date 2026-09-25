@@ -77,6 +77,8 @@ class BundleValidatorProtocol(Protocol):
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: "Sequence[Path] | None",
+        caller_identity: CallerIdentity | None,
+        graph_pipe_code: str | None,
     ) -> BundleValidationVerdict: ...
 ```
 
@@ -88,6 +90,10 @@ Two contract points distinguish it from `OrchestratorProtocol.execute`:
 - **Verdict-as-value, not raise.** `validate_bundles` *returns* the verdict — `BundleValidationVerdict` is the union of the valid arm (a `ValidationReport`) and the invalid arm (an `ErrorReport` carrying `validation_errors`) — and raises only for a no-verdict infra fault, which a host runtime maps to a 5xx. This is the same valid/invalid pair the API maps onto its 200-always `/validate` wire, so the verdict contract is backend-independent.
 
 The seam is deliberately typed at the MTHDS-protocol level (`ValidationReport` from `mthds.protocol`), not the concrete `PipelexValidationReport` envelope: the concrete report's module reaches the hub, so naming it from this hub-reachable seam would close an import cycle, and the seam is generic across orchestrators (language-standard altitude), so it speaks the protocol report — the Pipelex-runtime envelope is the concrete `ValidationReport` subtype the validators actually produce, and the API recovers that precise type at its edge. `library_dirs` is host context the in-process arm needs to load the method library; a worker-dispatched arm ignores it — its worker loads its own library.
+
+`caller_identity` is who asked for the validation: the `user_id` and `extras` the host would state on a run, as a `CallerIdentity` (`pipelex/system/caller_identity.py`). It is required, with `None` meaning "nobody", so a host cannot leave it out by accident: a validation is not a run and has no `RunMetadata` to carry its caller, and without this argument its telemetry — the sweep's `pipe_dry_run` event and its dry runs — reported under the deployment's configured id. The in-process arm hands it to `validate_bundles_in_process`, which makes it the ambient caller for the whole pass; a worker-dispatched arm must carry it to the worker and do the same there. A `PipelexMTHDSProtocol` exposes the caller it was built for as `caller_identity`, so a host runner passes `caller_identity=self.caller_identity`.
+
+`graph_pipe_code` names the pipe the verdict's best-effort `graph_spec` is drawn from. It is resolved the way a run resolves its entry pipe, so a bare pipe code or a qualified `domain.pipe_code` both work, and `None` keeps the default target: the `main_pipe` of the primary blueprint, the first one declaring one. A host passes a target when it knows the pipe a selector-less run of the same request would execute and the bundles do not say so themselves — a method package fetched by address, whose manifest's `main_pipe` outranks the bundles' own declaration and may be the only entry pipe there is. It is required for the same reason as `caller_identity`: a validator that dropped it would silently graph another pipe. A target that does not resolve degrades the graph to `None` like any other graph-arm failure and never changes the verdict. The in-process arm hands it to `validate_bundles_in_process`; a worker-dispatched arm must carry it to the worker's graph arm.
 
 A plugin contributes one per token, right next to its orchestrator:
 
