@@ -2,7 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
 - **The pitch names who each way of running a method is for**: the README, the documentation's front page and **Quick Start**, and the site description now say a method runs "as an MCP for chatbots, as a webapp for people, or via API for your software", instead of "from your agent or your chatbot via MCP, as a webapp, or via API in any software".
+- **The quick start says the plugin also puts a method in your software**: the README and the documentation's **Quick Start** now say the plugin's skills build methods, run them and put them in your software, name `/pipelex-scaffold` for a webapp and `/pipelex-integrate` for a typed call from TypeScript or Python code, and say that `@pipelex/sdk` is the TypeScript SDK and `pipelex-sdk` the Python one.
 
 ## [v0.65.0] - 2026-09-25
 

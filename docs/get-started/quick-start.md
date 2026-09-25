@@ -26,7 +26,7 @@ Sign up at [app.pipelex.com](https://app.pipelex.com).
 
 ## 2. Install the Pipelex plugin in your coding agent
 
-The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
+The plugin gives your agent the skills that build methods, run them and put them in your software, a hook that checks every edit, and the Pipelex tools.
 
 === "Claude Code"
 
@@ -78,9 +78,11 @@ Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it t
 
 ## The other two ways
 
+Your agent builds these too, and each can also be done by hand.
+
 ### As a webapp
 
-Turn the method into a webapp with the [method-app template](https://github.com/Pipelex/pipelex-method-apps):
+Ask your agent for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. By hand, the same app takes these commands:
 
 ```bash
 src=$(mktemp -d)
@@ -97,7 +99,7 @@ The app calls Pipelex from its own server code, so it needs a key of its own —
 
 ### Via API
 
-Use the method via API in any software through `POST /v1/start` — in TypeScript with [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk), in Python with [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/), or with any HTTP client.
+Ask your agent to call the method from your TypeScript or Python code, and `/pipelex-integrate` generates the method's types and one typed call that runs it, through the TypeScript SDK [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) or the Python SDK [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/). By hand, any software runs a method via API through `POST /v1/start`, with either SDK or with any HTTP client.
 
 Create an API key in your console at [app.pipelex.com](https://app.pipelex.com) and give it to your program as `PIPELEX_API_KEY` — the only thing to configure, since `PIPELEX_BASE_URL` already points at the hosted API.
 
