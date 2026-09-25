@@ -102,7 +102,8 @@ class TestUserProvidedImageStorage:
         """Test that HTTP URLs are passed through when fetch is disabled.
 
         When is_fetch_remote_content_enabled=False, HTTP URLs should not be
-        fetched and stored. They should be passed through unchanged.
+        fetched and stored. They should be passed through unchanged, the URL
+        becoming the image's own public_url.
         """
         # Create ImageContent with HTTP URL
         http_url = URLs.png_example_1
@@ -121,6 +122,7 @@ class TestUserProvidedImageStorage:
         normalized_stuff = normalized_memory.get_stuff("remote_image")
         assert isinstance(normalized_stuff.content, ImageContent)
         assert normalized_stuff.content.url == http_url
+        assert normalized_stuff.content.public_url == http_url
 
     @pytest.mark.usefixtures("mock_upload_local_content_enabled")
     async def test_user_image_local_file_to_storage_when_upload_enabled(self) -> None:

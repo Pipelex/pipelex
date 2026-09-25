@@ -2,7 +2,8 @@
 
 This module provides functions to scan WorkingMemory and convert any ImageContent
 or DocumentContent with data URLs (data:...;base64,...) or local file paths to
-pipelex-storage:// URIs for more efficient pipeline processing.
+pipelex-storage:// URIs for more efficient pipeline processing, and to give every
+such input a public_url a template can render, whichever form its url took.
 """
 
 import base64
@@ -22,8 +23,9 @@ from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.http_utils import validate_http_url_syntax
+from pipelex.tools.storage.exceptions import StorageInvalidUriError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath
+from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedPipelexStorage
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 # Type alias for content types that can have their URLs normalized
@@ -207,7 +209,15 @@ async def _normalize_url_content(
     storage: StorageProviderAbstract,
     storage_scope: str,
 ) -> NormalizableContent:
-    """Normalize ImageContent or DocumentContent by converting data URLs to storage URIs.
+    """Normalize ImageContent or DocumentContent to a storage reference and give it a public_url.
+
+    Each form of url comes out with a `public_url` a template can render:
+
+    - A `data:` URL is stored, and its url becomes the storage reference, signed as its `public_url`.
+    - A local path is stored the same way when local uploads are enabled, and kept unchanged otherwise.
+    - A `pipelex-storage://` reference is signed as its `public_url`, replacing any link it carried,
+      which may have expired; a provider that cannot link one leaves the carried link.
+    - An `http(s)` URL is already public: it becomes its own `public_url` unless the input names one.
 
     Args:
         content: The image or document content to normalize.
@@ -217,7 +227,13 @@ async def _normalize_url_content(
 
     Returns:
         The original content if no normalization needed, or a new instance
-        with the normalized URL.
+        with the normalized url and its public_url.
+
+    Raises:
+        PipelineInputUrlMissingError: If the url is blank.
+        PipelineInputUrlInvalidError: If an http(s) url does not parse as one.
+        PipelineInputContentError: If a local path cannot be read, or the storage
+            provider refuses a pipelex-storage:// reference as a key.
     """
     if not content.url.strip():
         msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
@@ -233,7 +249,21 @@ async def _normalize_url_content(
         except ValueError as exc:
             msg = f"{type(content).__name__} input: {exc}"
             raise PipelineInputUrlInvalidError(msg) from exc
-        return content
+        if content.public_url is not None:
+            return content
+        return content.model_copy(update={"public_url": content.url})
+
+    if isinstance(resolved_uri, ResolvedPipelexStorage):
+        # The reference is the durable fact and the link a derivative with an expiry, so the link is
+        # always signed afresh: an input carrying both is usually a previous run's output passed back in.
+        try:
+            public_url = await storage.public_url(uri=resolved_uri.storage_uri)
+        except StorageInvalidUriError as exc:
+            msg = f"{type(content).__name__} input: the storage reference '{content.url}' cannot be linked ({exc})"
+            raise PipelineInputContentError(msg) from exc
+        if public_url is None:
+            return content
+        return content.model_copy(update={"public_url": public_url})
 
     if isinstance(resolved_uri, ResolvedBase64DataUrl):
         # Decode base64 data and store
@@ -257,31 +287,29 @@ async def _normalize_url_content(
                 "mime_type": mime_type,
             }
         )
-    elif isinstance(resolved_uri, ResolvedLocalPath):
-        if not get_config().runtime.storage.is_upload_local_content_enabled:
-            return content
 
-        # Read local file, detect type, upload to storage. OSError covers
-        # the whole caller-controllable failure surface (FileNotFoundError,
-        # IsADirectoryError, PermissionError, name-too-long, ...) — all of
-        # them mean the supplied path is unusable, an INPUT fault.
-        try:
-            raw_bytes = await load_binary_async(Path(resolved_uri.path))
-        except OSError as exc:
-            msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
-            raise PipelineInputContentError(msg) from exc
-        file_type = detect_file_type_from_bytes(raw_bytes)
-        key = f"{storage_scope}/assets/{shortuuid.uuid()}.{file_type.extension}"
-        storage_uri = await storage.store(data=raw_bytes, key=key, content_type=file_type.mime)
-        public_url = await storage.public_url(uri=storage_uri)
-
-        return content.model_copy(
-            update={
-                "url": storage_uri,
-                "public_url": public_url,
-                "mime_type": file_type.mime,
-            }
-        )
-    else:
-        # Other URI types (HTTP URLs, pipelex-storage://) are kept unchanged
+    # The one form left is a local path
+    if not get_config().runtime.storage.is_upload_local_content_enabled:
         return content
+
+    # Read local file, detect type, upload to storage. OSError covers
+    # the whole caller-controllable failure surface (FileNotFoundError,
+    # IsADirectoryError, PermissionError, name-too-long, ...) — all of
+    # them mean the supplied path is unusable, an INPUT fault.
+    try:
+        raw_bytes = await load_binary_async(Path(resolved_uri.path))
+    except OSError as exc:
+        msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
+        raise PipelineInputContentError(msg) from exc
+    file_type = detect_file_type_from_bytes(raw_bytes)
+    key = f"{storage_scope}/assets/{shortuuid.uuid()}.{file_type.extension}"
+    storage_uri = await storage.store(data=raw_bytes, key=key, content_type=file_type.mime)
+    public_url = await storage.public_url(uri=storage_uri)
+
+    return content.model_copy(
+        update={
+            "url": storage_uri,
+            "public_url": public_url,
+            "mime_type": file_type.mime,
+        }
+    )

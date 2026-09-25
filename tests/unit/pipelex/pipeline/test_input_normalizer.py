@@ -70,7 +70,7 @@ class TestInputNormalizerUrlGuards:
         assert "not a valid http(s) URL" in strict["message"]
 
     async def test_well_formed_http_url_passes_through_unchanged(self, mocker: MockerFixture) -> None:
-        """A well-formed http(s) url is not fetched or probed at shaping time."""
+        """A well-formed http(s) url is not fetched or probed at shaping time, and it becomes its own public_url."""
         _patch_storage_and_config(mocker)
         mock_get = mocker.patch("httpx.AsyncClient.get")
 
@@ -79,6 +79,7 @@ class TestInputNormalizerUrlGuards:
         content = memory.get_stuff("document").content
         assert isinstance(content, DocumentContent)
         assert content.url == "https://example.com/file.pdf"
+        assert content.public_url == "https://example.com/file.pdf"
         mock_get.assert_not_called()
 
     async def test_blank_url_message_survives_strict_disclosure(self, mocker: MockerFixture) -> None:
