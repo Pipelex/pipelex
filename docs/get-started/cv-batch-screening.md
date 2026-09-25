@@ -1,11 +1,11 @@
 ---
-title: "CV Batch Screening Example"
-description: "Screen a stack of CVs against a job offer with a multi-step Pipelex method that extracts each document, analyzes it and scores the match."
+title: "CV Batch Screening, Step by Step"
+description: "Screen a stack of CVs against a job offer with a multi-step Pipelex method that extracts each document, analyzes it and scores the match, run on your own machine from the CLI and from Python."
 ---
 
-# Example: CV Batch Screening
+# CV Batch Screening, Step by Step
 
-A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role.
+A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role. This page reads it part by part and runs it on your own machine with the Pipelex runtime, from the CLI and from Python, once you have followed [Run It Yourself](./run-it-yourself.md).
 
 ## What it demonstrates
 

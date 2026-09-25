@@ -31,9 +31,9 @@ Describe how the work gets done in plain English, and your coding agent builds i
 
     Learn the declarative language step by step: concepts, pipes, sequences, inputs, and structured outputs.
 
--   :material-book-open-variant: **[Cookbook Examples](./cookbook/index.md)**
+-   :material-book-open-variant: **[Cookbook](./cookbook/index.md)**
 
-    Production-ready recipes — from Hello World to document extraction, synthetic data, and image generation.
+    Example methods you run by their address, each with a page showing every way to use it: in your chatbot, in your code, as an app, or as a method of your own.
 
 </div>
 

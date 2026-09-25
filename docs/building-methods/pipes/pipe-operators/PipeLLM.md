@@ -430,8 +430,8 @@ Analyze the following topic in depth, considering multiple perspectives:
 
 ## Related Documentation
 
-- [Hello World Example](../../../cookbook/hello-world.md) - Simple introductory example using PipeLLM
-- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline
-- [Write Tweet Example](../../../cookbook/write-tweet.md) - Multi-step tweet generation workflow
-- [Table Extraction Example](../../../cookbook/extract-table.md) - Extract and correct tables from images
-- [Gantt Extraction Example](../../../cookbook/extract-gantt.md) - Extract Gantt chart data from documents
+- [The MTHDS Language Tutorial](../../../get-started/mthds-language-tutorial.md#step-1-hello-world) - Starts from a single PipeLLM and builds a method step by step
+- [Invoice extraction](https://github.com/Pipelex/methods/tree/main/methods/invoice_extraction) - A method in the method library that extracts structured invoice data using both the OCR text and the page view
+- [Tweet optimizer](https://github.com/Pipelex/methods/tree/main/methods/tweet_optimizer) - A method in the method library that scores a draft tweet and rewrites it in your style
+- [Table extraction](https://github.com/Pipelex/methods/tree/main/methods/table_extraction) - A method in the method library that extracts a table from a screenshot into HTML, then reviews it against the image
+- [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) - A cookbook method that returns every task and milestone of a Gantt chart image with their dates

@@ -124,6 +124,8 @@ The same import-light / fail-at-use rules apply: a missing optional extra must r
 
 ## Authoring a backend plugin (minimal example)
 
+[Writing an Inference Plugin](writing-an-inference-plugin.md) walks through a complete plugin you can install and run with no API key, from its entry point to a method served by its model. The example below shows what a plugin wrapping a real SDK adds to that.
+
 A complete LLM backend plugin for a hypothetical `acme` SDK:
 
 ```python
@@ -248,6 +250,7 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 
 ## Related
 
+- [Writing an Inference Plugin](writing-an-inference-plugin.md) — a complete plugin, installed and run end to end with no API key
 - [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, riding the same discovery/denylist machinery
 - [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `runtime.storage.method`)
 - [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `runtime.secrets.method`)

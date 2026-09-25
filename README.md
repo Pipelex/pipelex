@@ -144,7 +144,7 @@ Then run it:
 pipelex run bundle summarize.mthds --inputs inputs.json
 ```
 
-The result is written under `results/`. For a method with several steps, typed concepts and a batch, run from the CLI and from Python, read [CV batch screening, step by step](https://docs.pipelex.com/latest/cookbook/cv-batch-screening/).
+The result is written under `results/`. For a method with several steps, typed concepts and a batch, run from the CLI and from Python, read [CV batch screening, step by step](https://docs.pipelex.com/latest/get-started/cv-batch-screening/).
 
 ### Editor extension
 
@@ -210,8 +210,8 @@ The same `.mthds` file runs from multiple execution targets:
 ## Documentation
 
 - [docs.pipelex.com](https://docs.pipelex.com/): the Pipelex documentation, from the MTHDS language tutorial to the CLI reference.
-- [CV batch screening, step by step](https://docs.pipelex.com/latest/cookbook/cv-batch-screening/): a production method with its concepts, its pipes and its flowchart, and how to run it from the CLI and from Python.
-- [The cookbook](https://github.com/Pipelex/pipelex-cookbook): methods to clone, run and adapt.
+- [CV batch screening, step by step](https://docs.pipelex.com/latest/get-started/cv-batch-screening/): a production method with its concepts, its pipes and its flowchart, and how to run it from the CLI and from Python.
+- [The cookbook](https://github.com/Pipelex/pipelex-cookbook): Pipelex's example methods, which run by their address on the hosted API with nothing to install, each with a page showing every way to use it: in your chatbot, in your coding agent, in your code, as an app, or as a method of your own.
 - [The MTHDS standard](https://mthds.ai/latest/): the language a method is written in.
 - [The changelog](https://docs.pipelex.com/latest/changelog/).
 
