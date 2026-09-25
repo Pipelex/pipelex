@@ -22,36 +22,71 @@ from pipelex.system.telemetry.otel_constants import (
     SpanCategory,
 )
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
 
 
 class PostHogSpanExporter(SpanExporter):
     """Exports OTel spans to PostHog as $ai_generation or $ai_span events.
 
-    Applies redaction rules from TelemetryRedactionConfig before sending events.
+    Applies redaction rules from TelemetryRedactionConfig before sending events,
+    and attributes each span to the run that produced it — see
+    :mod:`pipelex.system.telemetry.telemetry_identity`. One class serves both
+    streams: the operator's exporter is built with their configured id and the
+    policy their mode implies, Pipelex's with the gateway-key hash as its
+    fallback and the direct policy.
     """
 
     def __init__(
         self,
+        *,
         posthog_client: Posthog,
-        distinct_id: str | None,
+        fallback_distinct_id: str | None,
+        run_identity_policy: RunIdentityPolicy,
         redaction_config: TelemetryRedactionConfig,
     ):
+        """Build an exporter for one PostHog stream.
+
+        Args:
+            posthog_client: The client this exporter captures through.
+            fallback_distinct_id: The identity for a span that names no run —
+                this used to be the identity for every span on the stream.
+            run_identity_policy: What this stream may do with a span's own user.
+                `NONE` on an operator's stream in `anonymous` mode, where the
+                operator chose not to identify people at all; `DIRECT`
+                otherwise, Pipelex's stream included.
+            redaction_config: What this stream is allowed to see.
+        """
         self.posthog_client = posthog_client
-        self.distinct_id = distinct_id
+        self.fallback_distinct_id = fallback_distinct_id
+        self.run_identity_policy = run_identity_policy
         self.redaction_config = redaction_config
 
-    def _capture_event(self, event: PostHogEvent, *, properties: dict[str, Any]) -> None:
+    def _resolve_identity(self, *, attributes: Mapping[str, AttributeValue]) -> TelemetryIdentity:
+        """Resolve who this span belongs to on this stream."""
+        return TelemetryIdentity.make_from_span_attributes(
+            attributes=attributes,
+            fallback_distinct_id=self.fallback_distinct_id,
+            run_identity_policy=self.run_identity_policy,
+        )
+
+    def _capture_event(self, event: PostHogEvent, *, properties: dict[str, Any], identity: TelemetryIdentity) -> None:
         """Capture an event to PostHog, handling anonymous vs identified users.
 
         PostHog requires a valid distinct_id - passing None will cause the event to be rejected.
         For anonymous tracking, we omit distinct_id and set $process_person_profile=False.
+
+        The identity lands in the fields PostHog reserves for it — `distinct_id`
+        and `groups` — and in no property: a property cannot produce a group-level
+        count after the fact, and a second copy of the user id is a second thing
+        to keep in step.
         """
-        if self.distinct_id:
-            # Identified user: pass distinct_id
+        if identity.distinct_id:
+            # Identified user: pass distinct_id, and the entities the run belongs to
             self.posthog_client.capture(
-                distinct_id=self.distinct_id,
+                distinct_id=identity.distinct_id,
                 event=event,
                 properties=properties,
+                groups=identity.groups or None,
             )
         else:
             # Anonymous user: don't pass distinct_id, mark as anonymous
@@ -283,7 +318,11 @@ class PostHogSpanExporter(SpanExporter):
             f"  model={properties.get(PostHogAttr.MODEL)}"
         )
 
-        self._capture_event(event=PostHogEvent.GENERATION, properties=properties)
+        self._capture_event(
+            event=PostHogEvent.GENERATION,
+            properties=properties,
+            identity=self._resolve_identity(attributes=attributes),
+        )
 
     def _export_pipe_span(self, span: ReadableSpan, *, attributes: Mapping[str, AttributeValue]) -> None:
         """Export a pipe execution span."""
@@ -323,7 +362,11 @@ class PostHogSpanExporter(SpanExporter):
             f"  parent_id={properties.get(PostHogAttr.PARENT_ID)}"
         )
 
-        self._capture_event(event=PostHogEvent.SPAN, properties=properties)
+        self._capture_event(
+            event=PostHogEvent.SPAN,
+            properties=properties,
+            identity=self._resolve_identity(attributes=attributes),
+        )
 
     @override
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:

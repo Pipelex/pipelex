@@ -8,10 +8,8 @@ from pipelex.cogt.exceptions import (
     ExtractHandleNotFoundError,
     ImgGenHandleNotFoundError,
     LLMHandleNotFoundError,
-    LLMSettingsValidationError,
     ModelChoiceNotFoundError,
     ModelDeckPresetValidatonError,
-    ModelDeckValidatonError,
     ModelNotFoundError,
     ModelWaterfallError,
     SearchHandleNotFoundError,
@@ -26,7 +24,6 @@ from pipelex.cogt.llm.llm_setting import (
     LLMSettingChoicesDefaults,
 )
 from pipelex.cogt.model_backends.backend import PipelexBackend
-from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
@@ -505,36 +502,9 @@ class ModelDeck(ConfigModel):
                     presets=self.img_gen_presets,
                 )
 
-    @classmethod
-    def final_validate(cls, deck: Self):
-        for llm_preset_id, llm_setting in deck.llm_presets.items():
-            inference_model = deck.get_required_inference_model(model_handle=llm_setting.model, model_type=ModelType.LLM)
-            try:
-                cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
-            except ConfigValidationError as exc:
-                msg = f"LLM preset '{llm_preset_id}' is invalid: {exc}"
-                raise ModelDeckValidatonError(msg) from exc
-
     ############################################################
     # ModelDeck validations
     ############################################################
-
-    @classmethod
-    def _validate_llm_setting(cls, llm_setting: LLMSetting, *, inference_model: InferenceModelSpec):
-        if inference_model.max_tokens is not None and (llm_setting_max_tokens := llm_setting.max_tokens):
-            if llm_setting_max_tokens > inference_model.max_tokens:
-                msg = (
-                    f"LLM setting '{llm_setting.model}' has a max_tokens of {llm_setting_max_tokens}, "
-                    f"which is greater than the model's max_tokens of {inference_model.max_tokens}"
-                )
-                raise LLMSettingsValidationError(msg)
-        fixed_temperature = inference_model.valued_constraints.get(ValuedConstraint.FIXED_TEMPERATURE)
-        if fixed_temperature is not None and llm_setting.temperature != fixed_temperature:
-            msg = (
-                f"LLM setting '{llm_setting.model}' has a temperature of {llm_setting.temperature}, "
-                f"which is not allowed by the model's constraints: it must be {fixed_temperature}"
-            )
-            raise LLMSettingsValidationError(msg)
 
     @field_validator("llm_choice_defaults", mode="after")
     @classmethod

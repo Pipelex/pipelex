@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:f2bd94079d70e4dbfd93fb4cca9020c9b9f28628ca6a8d0bfab0a2298e89660d"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-19T21:18:19Z"
-rationale = "Merge of origin/feature/Log-sink-seam (carrying dev v0.60.0) into feature/Log-redaction. The one trigger change since the last ack is pipelex/cli/commands/doctor_cmd.py, whose two sides were combined rather than chosen between: the fallback installer still decides for itself whether it can stand in and hands back the note the row carries, and the except arm keeps this branch's earlier return for the case where log.sink is already set, so a sink that was installed and then failed during the replay of the held records is reported with the sink kept instead of a fallback that would refuse. Reviewed both targets on the merged tree. In pipelex/cli/agent_cli/CLAUDE.md the checks.log_sink row now carries both accounts in one row: the three shapes where the report runs on the console sink on stderr or on a sink already recorded and left alone, and the fourth where it runs on the configured sink that failed during the replay. In docs/tools/cli/ the doctor row describes flags and formats only and no per-check shape, so nothing there is stale; the parent-side updates that earlier acks covered are still present, the stdin paragraph in agent-cli.md naming StdinEnvelopeShapeError and the --with-memory line requiring the domain-qualified concept ref."
+digest = "sha256:2ac30bcfcf3e7d174db15b59fa2df4e9cb64c5c6a2c64f1d9e8bef415a4efd8f"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-09-25T12:48:43Z"
+rationale = "Merge of origin/feature/Log-sink-seam (carrying dev's releases v0.61.0 through v0.65.0) into feature/Log-redaction. Against the parent the only trigger change is this branch's doctor_cmd.py arm that keeps an installed sink which failed during the replay of the held records, and the checks.log_sink row in pipelex/cli/agent_cli/CLAUDE.md carries that fourth case in the merged tree. Against this branch's previous head the only trigger change is the parent's check_model_cmd.py argument-help example moving from the retired @best-claude alias to @best-gpt, and neither docs/tools/cli/ nor the agent-CLI contract doc quotes that example or any retired deck alias (a grep for best-claude, best-gemini and best-mistral over both targets finds nothing). docs/tools/cli/agent-cli.md describes the doctor command by its flags and formats only, so nothing there is stale. The ack file's merge spliced the parent's header onto this branch's trigger snapshot, so this re-ack records the merged tree as reviewed as a whole. No doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -14,7 +14,7 @@ rationale = "Merge of origin/feature/Log-sink-seam (carrying dev v0.60.0) into f
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:49b8bab889d8673e7d4f1d683efe0928e43914b9"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:3dc0283ef1daee4e17183b01f8a5c9d92f2688af"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:ff33446143044332983a0cb7b204b8eca349795a"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:91589e517509248a4639a37e82f46a69538f8071"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"

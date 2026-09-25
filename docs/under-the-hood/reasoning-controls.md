@@ -30,7 +30,7 @@ Define a reusable preset in your LLM deck, then reference it with the `$` prefix
 ```toml
 # In .pipelex/inference/deck/1_llm_deck.toml
 [llm.presets]
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high" }
 ```
 
 ```toml
@@ -87,13 +87,13 @@ Effort maps to a `ThinkingLevel` enum sent to the Google SDK:
 model = { model = "gemini-3.1-pro", temperature = 0.3, reasoning_effort = "high" }
 ```
 
-**GPT-5.2 — manual mode**
+**GPT-5.4 — manual mode**
 
 Effort maps directly to OpenAI's `reasoning_effort` parameter:
 
 ```toml
 # Manual: effort "max" -> reasoning_effort = "xhigh" in the SDK call
-model = { model = "gpt-5.2", temperature = 0.1, reasoning_effort = "max" }
+model = { model = "gpt-5.4", temperature = 0.1, reasoning_effort = "max" }
 ```
 
 !!! note "Structured Generation"

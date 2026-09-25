@@ -167,6 +167,18 @@ To keep the configuration inside a project instead, run `pipelex init --local`: 
 
 Learn more in our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) guide.
 
+### What the deck resolves to out of the box
+
+The deck files `pipelex init` installs resolve the language, image-generation and document-extraction defaults to models the Pipelex Gateway serves from Azure, so a fresh install runs inside one provider's scope without you choosing anything:
+
+- **Language models** — the whole ladder is the GPT-5.6 range: the premium tier and `best-gpt` are GPT-5.6 Sol, the general and large-context tiers are GPT-5.6 Terra, and the small tiers are GPT-5.6 Luna.
+- **Image generation** — the general and premium tiers are GPT Image 2, the small tier is GPT Image 1 mini.
+- **Document extraction** — Azure Document Intelligence. `default-text-from-pdf` and `default-no-inference` are the exception within that family: they read the PDF locally with pypdfium2 and call no model, so they need no key of any kind.
+
+**Where the deck leaves Azure, it goes to Linkup**, and it does so in two families rather than one. Azure serves no search model, so everything in `4_search_deck.toml` resolves to Linkup; and `default-extract-web-page` in `3_extract_deck.toml` resolves to `linkup-fetch`, which pulls a web page through Linkup rather than through Azure Document Intelligence. A method that searches the web, or that extracts from a web page, needs a Linkup key or the Gateway.
+
+Nothing about this locks you in. The deck is a vocabulary of aliases and presets, not a provider commitment: point any of them at a model from any backend you have enabled, by editing `x_custom_llm_deck.toml`, which `pipelex update` never touches. That is also how you bring back an alias the shipped deck does not define.
+
 ---
 
 ## Next Steps
