@@ -56,3 +56,10 @@ class TestSpanMadeCurrent:
 
         with trace.use_span(caller), span_made_current(span=None):
             assert trace.get_current_span() is caller
+
+    def test_a_span_naming_no_trace_leaves_the_callers_span_current(self) -> None:
+        """What a no-op tracer starts, under ``OTEL_SDK_DISABLED`` for one, must not hide the caller's span."""
+        caller = _started_span(name="caller")
+
+        with trace.use_span(caller), span_made_current(span=trace.INVALID_SPAN):
+            assert trace.get_current_span() is caller

@@ -10,6 +10,7 @@ Each test runs once per sink.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -22,7 +23,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from typing_extensions import override
 
 from pipelex import log
@@ -85,7 +86,14 @@ class CurrentSpanPipe(PipeAbstract):
     type: Any = "PipeFunc"
     nested: CurrentSpanPipe | None = None
     fails: bool = False
+    hangs: bool = False
     seen_span_ids: list[int] = Field(default_factory=empty_list_factory_of(int))
+    _hanging: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
+
+    @property
+    def hanging(self) -> asyncio.Event:
+        """Set once a hanging pipe has logged its line and started to wait."""
+        return self._hanging
 
     @override
     def validate_inputs_with_library(self) -> None: ...
@@ -131,6 +139,9 @@ class CurrentSpanPipe(PipeAbstract):
         if self.fails:
             msg = f"{self.code} failed"
             raise RuntimeError(msg)
+        if self.hangs:
+            self._hanging.set()
+            await asyncio.Event().wait()
         return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
     @override
@@ -146,7 +157,7 @@ class CurrentSpanPipe(PipeAbstract):
         raise NotImplementedError
 
 
-def _make_pipe(*, code: str, nested: CurrentSpanPipe | None = None, fails: bool = False) -> CurrentSpanPipe:
+def _make_pipe(*, code: str, nested: CurrentSpanPipe | None = None, fails: bool = False, hangs: bool = False) -> CurrentSpanPipe:
     return CurrentSpanPipe(
         code=code,
         domain_code="test_current_span",
@@ -154,6 +165,7 @@ def _make_pipe(*, code: str, nested: CurrentSpanPipe | None = None, fails: bool 
         output=StuffSpec(concept=ConceptFactory.make_native_concept(NativeConceptCode.TEXT)),
         nested=nested,
         fails=fails,
+        hangs=hangs,
     )
 
 
@@ -305,3 +317,30 @@ class TestLiveRunPipeCurrentSpan:
         caller_context = caller_span.get_span_context()
 
         assert sunk.read_lines()["inside untraced"] == LineTrace(trace_id=f"{caller_context.trace_id:032x}", span_id=f"{caller_context.span_id:016x}")
+
+    async def test_a_cancelled_pipe_ends_its_span_and_restores_the_context(self, sunk: Sunk, span_exporter: InMemorySpanExporter) -> None:
+        """A cancellation is not an ``Exception``; the span still ends, so the lines of the run name a span the backend receives."""
+        pipe = _make_pipe(code="cancelled", hangs=True)
+        task = asyncio.create_task(_run(pipe))
+        await pipe.hanging.wait()
+
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        pipe_span = _span_named(span_exporter.get_finished_spans(), code="cancelled")
+        assert pipe_span.status.status_code is StatusCode.ERROR
+        assert sunk.read_lines()["inside cancelled"].span_id == _hex_span_id(pipe_span)
+        assert trace.get_current_span() is trace.INVALID_SPAN
+
+    async def test_a_no_op_tracer_leaves_the_callers_span_current(self, sunk: Sunk, mocker: MockerFixture) -> None:
+        """A no-op tracer, what the SDK hands out under ``OTEL_SDK_DISABLED``, starts spans naming no trace, which must not hide the caller's."""
+        mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=trace.NoOpTracer())
+        caller_tracer = TracerProvider().get_tracer(__name__)
+        pipe = _make_pipe(code="no_op")
+
+        with caller_tracer.start_as_current_span("caller") as caller_span:
+            await _run(pipe)
+        caller_context = caller_span.get_span_context()
+
+        assert sunk.read_lines()["inside no_op"] == LineTrace(trace_id=f"{caller_context.trace_id:032x}", span_id=f"{caller_context.span_id:016x}")

@@ -27,8 +27,13 @@ if TYPE_CHECKING:
 
 @contextmanager
 def span_made_current(*, span: Span | None) -> Generator[None]:
-    """Make ``span`` current while the block runs; a ``None`` span, no tracer or a dry run, leaves the context alone."""
-    if span is None:
+    """Make ``span`` current while the block runs; no span, or one naming no trace, leaves the context alone.
+
+    ``None`` is what the runtime holds with no tracer or in a dry run. A span naming no trace is what a
+    no-op tracer starts, under ``OTEL_SDK_DISABLED`` for one, and making it current would hide the
+    caller's own span for the whole block.
+    """
+    if span is None or not span.get_span_context().is_valid:
         yield
         return
     with trace.use_span(span, end_on_exit=False, record_exception=False, set_status_on_exception=False):

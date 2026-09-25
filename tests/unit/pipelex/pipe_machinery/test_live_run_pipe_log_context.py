@@ -124,7 +124,7 @@ class RecordingPipe(PipeAbstract):
         self._see(moment="succeeded")
 
     @override
-    def _end_pipe_span_error(self, span: Any, *, error: Exception, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Any, *, error: BaseException, is_root_span: bool = False) -> None:
         self._see(moment="failed")
         log.info(f"{self.code} span ends in error")
 

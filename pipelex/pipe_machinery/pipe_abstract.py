@@ -985,9 +985,10 @@ class PipeAbstract(ABC, BaseModel):
                         output_name=output_name,
                         library_crate=library_crate,
                     )
-                except Exception as exc:
+                except BaseException as exc:
                     # Broad catch is intentional: the OTel span must be closed with ERROR status
-                    # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
+                    # on any failure, a cancellation included, which is not an Exception.
+                    # Observes-and-re-raises — see note on the catch in _run_pipe_traced.
                     self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
                     raise
 
@@ -1208,7 +1209,7 @@ class PipeAbstract(ABC, BaseModel):
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
-    def _end_pipe_span_error(self, span: Span | None, *, error: Exception, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Span | None, *, error: BaseException, is_root_span: bool = False) -> None:
         """End the pipe's OTel span with error status. Safe to call if span is None.
 
         Args:
