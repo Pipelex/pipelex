@@ -191,6 +191,18 @@ class TestGcpStorageProvider:
         expected_url = f"https://storage.googleapis.com/{gcp_bucket_name}/{key}"
         assert display == expected_url
 
+    async def test_public_url_percent_encodes_the_key_when_signed_urls_disabled(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        gcp_bucket_name: str,
+    ) -> None:
+        """A key holding a space, '+', '#' or '?' is percent-encoded as GCS signs it, so the link names the object and not a fragment or query."""
+        uri = f"{PIPELEX_STORAGE_SCHEME}org/uploads/My Photo+#1?.png"
+
+        display = await gcp_provider_no_signed_urls.public_url(uri=uri)
+
+        assert display == f"https://storage.googleapis.com/{gcp_bucket_name}/org/uploads/My%20Photo%2B%231%3F.png"
+
     async def test_public_url_returns_signed_url_when_signed_urls_enabled(
         self,
         gcp_provider_with_signed_urls: GcpStorageProvider,

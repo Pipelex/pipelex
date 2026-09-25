@@ -233,13 +233,14 @@ class PipelineInputContentError(PipelexError):
     """A pipeline input's content reference (url) is unusable.
 
     Raised by the input normalizer when an Image/Document input carries a local
-    path that cannot be read. The caller supplied the value — INPUT domain, so
-    API servers answer 422, never a sanitized 500 (a blank url used to surface
-    as IsADirectoryError('.') → 500).
+    path that cannot be read, or a pipelex-storage:// reference the storage
+    provider refuses as a key (a path escaping local storage, for one). The
+    caller supplied the value — INPUT domain, so API servers answer 422, never
+    a sanitized 500 (a blank url used to surface as IsADirectoryError('.') → 500).
 
     Deliberately NOT caller-facing: the message names the resolved path and the
-    ``OSError`` subclass that rejected it, which are server-side filesystem
-    facts. Surviving STRICT disclosure would turn the report into an
+    ``OSError`` subclass that rejected it, or the storage provider's reason for
+    refusing a key, which are server-side storage facts. Surviving STRICT disclosure would turn the report into an
     existence/permission oracle over the runner's filesystem for any
     authenticated caller — ``PermissionError`` on a path that exists reads
     differently from ``FileNotFoundError`` on one that does not. The

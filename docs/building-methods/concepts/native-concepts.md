@@ -76,7 +76,7 @@ class ImageContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the image (a storage URI, an HTTP(S) URL, or a base64 data URL)
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes, passed alone, in a list or in a structured field: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
 - `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
 - `mime_type`: Optional MIME type of the image
@@ -102,7 +102,7 @@ class DocumentContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the document file, storage URL, or web page URL
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `public_url`: A URL a viewer can open, filled by the runtime for every document input it normalizes, exactly as for `ImageContent`: the storage provider's link for a stored file, which expires when signed URLs are configured, and the URL itself for an `http(s)` one
 - `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 - `filename`: Optional filename of the document
 - `title`: Optional title of the document or source

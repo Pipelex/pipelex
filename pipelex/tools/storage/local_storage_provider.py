@@ -33,12 +33,17 @@ class LocalStorageProvider(StorageProviderAbstract):
             The resolved absolute path.
 
         Raises:
-            StorageInvalidUriError: If the key is invalid (absolute path or path traversal).
+            StorageInvalidUriError: If the key is invalid (a NUL byte, an absolute path or path traversal).
         """
         relative_path = Path(key)
 
         if relative_path.is_absolute():
             msg = f"Invalid key '{key}': absolute paths are not allowed"
+            raise StorageInvalidUriError(msg)
+
+        # A NUL byte cannot name a file, and resolve() rejects it with a bare ValueError
+        if "\x00" in key:
+            msg = f"Invalid key {key!r}: a null byte is not allowed"
             raise StorageInvalidUriError(msg)
 
         resolved_path = (self._root_path / relative_path).resolve()
