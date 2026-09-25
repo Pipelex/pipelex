@@ -127,6 +127,13 @@ class TestInputNormalizerUrlGuards:
         with pytest.raises(PipelineInputContentError, match="cannot be read"):
             await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path)), storage_scope="test/scope")
 
+    async def test_path_with_null_byte_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A NUL byte makes the path unusable: the read raises ValueError, not OSError, and it must still be an input error."""
+        _patch_storage_and_config(mocker)
+
+        with pytest.raises(PipelineInputContentError, match="cannot be read"):
+            await normalize_data_urls_to_storage(_memory_with_document(f"{tmp_path}/a\x00b.pdf"), storage_scope="test/scope")
+
     async def test_missing_file_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         _patch_storage_and_config(mocker)
 

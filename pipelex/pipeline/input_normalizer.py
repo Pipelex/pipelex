@@ -298,12 +298,13 @@ async def _normalize_url_content(
         return content
 
     # Read local file, detect type, upload to storage. OSError covers
-    # the whole caller-controllable failure surface (FileNotFoundError,
-    # IsADirectoryError, PermissionError, name-too-long, ...) — all of
-    # them mean the supplied path is unusable, an INPUT fault.
+    # the caller-controllable failure surface (FileNotFoundError,
+    # IsADirectoryError, PermissionError, name-too-long, ...) and ValueError
+    # the one left, a NUL byte in the path — all of them mean the supplied
+    # path is unusable, an INPUT fault.
     try:
         raw_bytes = await load_binary_async(Path(resolved_uri.path))
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
         raise PipelineInputContentError(msg) from exc
     file_type = detect_file_type_from_bytes(raw_bytes)

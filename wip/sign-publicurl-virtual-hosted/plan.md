@@ -62,7 +62,7 @@ Documentation:
 
 - [x] `make agent-check` clean.
 - [x] `make agent-test` green.
-- [x] `/rev`, at the depth `ledger review-profile` derives: round 1 at profile 3 (cubic, Codex review, the official code-review at `low`), recorded on the item.
+- [x] `/rev`, at the depth `ledger review-profile` derives: round 1 at profile 3 (cubic, Codex review, the official code-review at `low`), then round 2 at the `defects` bar over round 1's fixes, both recorded on the item.
 - [x] Record here what was decided during the build, any open question, and the last reviewed commit.
 
 ### Decisions taken during the build
@@ -71,15 +71,18 @@ Documentation:
 - **A provider that cannot link a stored reference leaves the link the input carried.** In-memory storage returns no link at all; erasing a carried link the runtime cannot replace would lose information for nothing.
 - **A reference the storage provider refuses as a key is an input error at normalization.** Signing now happens before the run, so the local provider's refusal of a path escaping its root surfaces there; it is raised as `PipelineInputContentError`, INPUT domain and not caller-facing, rather than as a bare storage error.
 - **The unsigned S3 link uses botocore's own `check_dns_name`** instead of a hand-written dot test, so a legacy bucket name with uppercase letters or an underscore falls back to path-style exactly as the signed link does. Both unsigned builders, S3 and GCS, percent-encode the key as their signed forms do. Both came out of review round 1.
+- **A NUL byte in a local input path or a local storage key is an input error.** `Path` rejects it with a bare `ValueError` rather than an `OSError`, so the local provider refuses such a key as `StorageInvalidUriError` and the normalizer's local-path branch catches `ValueError` beside `OSError`. The storage-reference branch made the first reachable before the run; the second predates this branch. Both came out of review round 2.
 - **The public design describes the hosted plane's network and tenancy checks by role.** `pipelex` is a public repository, so the specifics sit on the ledger item instead, and the commit that added this design was rewritten before any pull request so that no commit carries them.
 
 ### Deferred
 
 - **The normalizer does not reach the images inside a `TextAndImagesContent`**, nor those in a `PageContent`'s `text_and_images`: `_normalize_value` recurses only into `StructuredContent`, `ListContent` and lists, and `TextAndImagesContent` is a plain `StuffContent`. Their `data:` URLs are left unstored and their `public_url` unfilled. The gap predates this branch; review round 1 confirmed it, and the changelog and docs now say which placements are reached. Reaching them is a recursion branch in `_normalize_value` and its tests.
+- **The storage configuration refuses a dotted bucket name**, for S3 and GCS alike, so the S3 provider's path-style fallback for one is reachable only by a provider constructed directly. Review round 2 proposed accepting dotted names; that is a feature choice, and one the shared GCS check would need too, so the docs and changelog now say the configuration refuses them, and the fallback stays as a defensive measure.
+- **The design still names a few paths inside internal repositories**: the webapp's CSP source file and the hosted plane's member manifests. Review round 2 raised it; nothing named is secret, and rewording them by role is hygiene rather than a defect at that round's bar.
 
 ### Last reviewed commit
 
-Round 1 reviewed the branch at the commit titled "Mark the campaign active and tick the built phases", before the round's fixes.
+Round 1 reviewed the branch at the commit titled "Mark the campaign active and tick the built phases", and round 2 at the commit titled "Unsigned storage links encode their key and match botocore's host rule", each before its round's fixes.
 
 ## After the merge
 
