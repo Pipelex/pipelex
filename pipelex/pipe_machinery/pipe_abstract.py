@@ -1162,17 +1162,18 @@ class PipeAbstract(ABC, BaseModel):
             attributes=span_attributes,
         )
 
-        # Debug logging
+        # Debug logging, under the span it announces, so the line's trace context names that span
         span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] PIPE SPAN STARTED:\n"
-            f"  pipe_code='{self.code}'\n"
-            f"  pipeline_run_id='{pipeline_run_id}'\n"
-            f"  trace_id={span_ctx.trace_id:032x}\n"
-            f"  span_id={span_ctx.span_id:016x}\n"
-            f"  parent_span_id={parent_span_id:016x}\n"
-            f"  is_root_span={is_root_span}"
-        )
+        with pipelex_span_active(span=span):
+            log.verbose(
+                f"[OTel] PIPE SPAN STARTED:\n"
+                f"  pipe_code='{self.code}'\n"
+                f"  pipeline_run_id='{pipeline_run_id}'\n"
+                f"  trace_id={span_ctx.trace_id:032x}\n"
+                f"  span_id={span_ctx.span_id:016x}\n"
+                f"  parent_span_id={parent_span_id:016x}\n"
+                f"  is_root_span={is_root_span}"
+            )
 
         return span, is_root_span
 

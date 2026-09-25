@@ -44,6 +44,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManager
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, SPAN_ID_KEY, TRACE_ID_KEY, JsonLogSink
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 from pipelex.tools.log.otlp_log_sink import OtlpLogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -56,6 +57,9 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.libraries.library_crate import LibraryCrate
+
+# The logger the pipe's own span lines are written on.
+PIPE_ABSTRACT_LOGGER = PipeAbstract.__module__
 
 # The trace the submission derived for the run, and the virtual root parent every root pipe span takes.
 RUN_TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
@@ -75,10 +79,13 @@ class LineTrace(NamedTuple):
 
 
 class Sunk(NamedTuple):
-    """A fresh ``Log`` with a sink installed, and how to read back the trace context of each of this module's lines."""
+    """A fresh ``Log`` with a sink installed, and how to read back the trace context of each line a logger wrote, this module's by default."""
 
     log: Log
-    read_lines: Callable[[], dict[str, LineTrace]]
+    read_lines_of: Callable[[str], dict[str, LineTrace]]
+
+    def read_lines(self) -> dict[str, LineTrace]:
+        return self.read_lines_of(__name__)
 
 
 class CurrentSpanPipe(PipeAbstract):
@@ -199,17 +206,19 @@ def _package_log_config() -> LogConfig:
     return LogConfig.model_validate(config_dict["runtime"]["log"])
 
 
-def _json_lines(buffer: io.StringIO) -> dict[str, LineTrace]:
+def _json_lines(buffer: io.StringIO, *, logger_name: str) -> dict[str, LineTrace]:
     lines = [json.loads(line) for line in buffer.getvalue().splitlines() if line]
     return {
-        line[MESSAGE_KEY]: LineTrace(trace_id=line.get(TRACE_ID_KEY), span_id=line.get(SPAN_ID_KEY)) for line in lines if line[LOGGER_KEY] == __name__
+        line[MESSAGE_KEY]: LineTrace(trace_id=line.get(TRACE_ID_KEY), span_id=line.get(SPAN_ID_KEY))
+        for line in lines
+        if line[LOGGER_KEY] == logger_name
     }
 
 
-def _otlp_lines(exporter: InMemoryLogExporter) -> dict[str, LineTrace]:
+def _otlp_lines(exporter: InMemoryLogExporter, *, logger_name: str) -> dict[str, LineTrace]:
     lines: dict[str, LineTrace] = {}
     for log_data in exporter.get_finished_logs():
-        if log_data.instrumentation_scope.name != __name__:
+        if log_data.instrumentation_scope.name != logger_name:
             continue
         record = log_data.log_record
         trace_id = f"{record.trace_id:032x}" if record.trace_id else None
@@ -241,22 +250,26 @@ class TestLiveRunPipeCurrentSpan:
         caplog.set_level(logging.INFO, logger=__name__)
         fresh = Log()
         fresh.configure(log_config=_package_log_config())
-        read_lines: Callable[[], dict[str, LineTrace]]
+        read_lines_of: Callable[[str], dict[str, LineTrace]]
         if request.param == "json":
             buffer = io.StringIO()
             fresh.install_sink(JsonLogSink(stream=buffer))
 
-            def read_lines() -> dict[str, LineTrace]:
-                return _json_lines(buffer)
+            def read_json_lines(logger_name: str) -> dict[str, LineTrace]:
+                return _json_lines(buffer, logger_name=logger_name)
+
+            read_lines_of = read_json_lines
         else:
             exporter = InMemoryLogExporter()
             fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
 
-            def read_lines() -> dict[str, LineTrace]:
-                return _otlp_lines(exporter)
+            def read_otlp_lines(logger_name: str) -> dict[str, LineTrace]:
+                return _otlp_lines(exporter, logger_name=logger_name)
+
+            read_lines_of = read_otlp_lines
 
         try:
-            yield Sunk(log=fresh, read_lines=read_lines)
+            yield Sunk(log=fresh, read_lines_of=read_lines_of)
         finally:
             fresh.reset()
 
@@ -296,6 +309,25 @@ class TestLiveRunPipeCurrentSpan:
         # The line still names the pipe's span, not the host's.
         pipe_span = _span_named(span_exporter.get_finished_spans(), code="hosted")
         assert sunk.read_lines()["inside hosted"] == LineTrace(trace_id=f"{RUN_TRACE_ID:032x}", span_id=_hex_span_id(pipe_span))
+
+    async def test_a_span_started_line_names_the_span_it_announces(
+        self, sunk: Sunk, span_exporter: InMemorySpanExporter, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The verbose line a pipe logs once its span has started carries that span's ids, not the enclosing pipe's or none."""
+        caplog.set_level(LOGGING_LEVEL_VERBOSE, logger=PIPE_ABSTRACT_LOGGER)
+        outer = _make_pipe(code="outer", nested=_make_pipe(code="inner"))
+
+        await _run(outer)
+
+        spans = span_exporter.get_finished_spans()
+        started = {
+            message: line for message, line in sunk.read_lines_of(PIPE_ABSTRACT_LOGGER).items() if message.startswith("[OTel] PIPE SPAN STARTED")
+        }
+        assert sorted(line.span_id or "" for line in started.values()) == sorted(
+            _hex_span_id(_span_named(spans, code=code)) for code in ("outer", "inner")
+        )
+        for message, line in started.items():
+            assert f"\n  span_id={line.span_id}\n" in message
 
     async def test_a_nested_pipe_holds_its_own_span_and_the_outer_one_comes_back(self, sunk: Sunk, span_exporter: InMemorySpanExporter) -> None:
         outer = _make_pipe(code="outer", nested=_make_pipe(code="inner"))

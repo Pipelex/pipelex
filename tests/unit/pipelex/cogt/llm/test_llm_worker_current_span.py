@@ -10,6 +10,7 @@ the public ``gen_text`` and ``gen_object`` on a worker whose provider half recor
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -33,12 +34,18 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.telemetry.current_span import span_context_for_logs
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from opentelemetry.sdk.trace import ReadableSpan
     from pytest_mock import MockerFixture
 
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+# The logger the worker's own span lines are written on.
+LLM_WORKER_LOGGER = LLMWorkerAbstract.__module__
 
 RUN_TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
 PIPE_SPAN_ID = 0x00000000000000AB
@@ -74,6 +81,19 @@ class _RecordingLLMWorker(LLMWorkerAbstract):
     async def _gen_object(self, llm_job: LLMJob, *, schema: type[BaseModelTypeVar]) -> BaseModelTypeVar:
         self._record()
         return schema.model_validate({"text": "answer"})
+
+
+class _SpanRecordingHandler(logging.Handler):
+    """Records each message with the span id a sink would write for it, read at emit as a sink reads it."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.NOTSET)
+        self.span_ids_by_message: dict[str, int] = {}
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        span_context = span_context_for_logs()
+        self.span_ids_by_message[record.getMessage()] = INVALID_SPAN_ID if span_context is None else span_context.span_id
 
 
 def _make_worker(*, fails: bool = False) -> _RecordingLLMWorker:
@@ -129,6 +149,19 @@ def span_exporter(mocker: MockerFixture) -> InMemorySpanExporter:
     return exporter
 
 
+@pytest.fixture
+def worker_lines(caplog: pytest.LogCaptureFixture) -> Iterator[_SpanRecordingHandler]:
+    """The worker's own lines at VERBOSE, each with the span a sink would join it to."""
+    caplog.set_level(LOGGING_LEVEL_VERBOSE, logger=LLM_WORKER_LOGGER)
+    handler = _SpanRecordingHandler()
+    logger = logging.getLogger(LLM_WORKER_LOGGER)
+    logger.addHandler(handler)
+    try:
+        yield handler
+    finally:
+        logger.removeHandler(handler)
+
+
 @pytest.mark.asyncio
 class TestLLMWorkerCurrentSpan:
     async def test_gen_text_runs_the_provider_call_under_its_span(self, span_exporter: InMemorySpanExporter) -> None:
@@ -178,3 +211,17 @@ class TestLLMWorkerCurrentSpan:
         # The worker's own error path records the failure; holding the span records nothing more.
         assert llm_span.status.status_code is StatusCode.ERROR
         assert [event.name for event in llm_span.events] == ["exception"]
+
+    async def test_the_span_started_line_names_the_span_it_announces(
+        self, span_exporter: InMemorySpanExporter, worker_lines: _SpanRecordingHandler
+    ) -> None:
+        """The verbose line the worker logs once its span has started carries that span's id, not the one enclosing the call."""
+        worker = _make_worker()
+
+        await worker.gen_text(llm_job=_make_llm_job())
+
+        llm_span_id = _span_id(_only_span(span_exporter))
+        started = {message: span_id for message, span_id in worker_lines.span_ids_by_message.items() if message.startswith("[OTel] LLM SPAN STARTED")}
+        assert list(started.values()) == [llm_span_id]
+        (message,) = started
+        assert f"\n  span_id={llm_span_id:016x}\n" in message
