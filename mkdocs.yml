@@ -4,7 +4,7 @@ site_name: Pipelex Documentation
 # already contains /latest/, mike produces broken double paths like /latest/0.20.9/page/.
 # Canonical URLs are forced to /latest/ via a template override in docs/overrides/main.html.
 site_url: https://docs.pipelex.com/
-site_description: "The Pipelex documentation. Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software."
+site_description: "The Pipelex documentation. Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software."
 docs_dir: docs
 repo_url: "https://github.com/Pipelex/pipelex"
 repo_name: "Pipelex on GitHub"
