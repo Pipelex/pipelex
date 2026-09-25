@@ -395,7 +395,7 @@ key = "stuff_html_content"
 [[migration]]
 id = "pipelex-config@5"
 to_schema_version = 5
-introduced_in = "0.60.0"
+introduced_in = "0.66.0"
 breaking = true
 safety = "safe"
 title = "Log sinks replace the rich-or-poor log mode: by hand, a poor-mode file then selects sink = \"json\" and a silenced one sets pipelex = \"OFF\" under package_log_levels"
