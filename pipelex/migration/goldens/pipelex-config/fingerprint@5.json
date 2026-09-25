@@ -1044,6 +1044,27 @@
       "default": "INFO",
       "open_node": false
     },
+    "runtime.log.gcp": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.log.gcp.credentials_file_path": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.log.gcp.log_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "pipelex",
+      "open_node": false
+    },
+    "runtime.log.gcp.project_id": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
     "runtime.log.is_caller_info_enabled": {
       "value_type": "bool",
       "required": true,
@@ -1126,6 +1147,23 @@
         "silent"
       ],
       "default": "rich",
+      "open_node": false
+    },
+    "runtime.log.redaction": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.log.redaction.extra_patterns": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [],
+      "open_node": false
+    },
+    "runtime.log.redaction.is_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
       "open_node": false
     },
     "runtime.log.rich_log": {

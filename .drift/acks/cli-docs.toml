@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:28dfaac2f38ffb7bebd4e7aaf1e872dcf8a1ff0401e91b846006b6a001a28d89"
+digest = "sha256:2ac30bcfcf3e7d174db15b59fa2df4e9cb64c5c6a2c64f1d9e8bef415a4efd8f"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-09-25T12:38:13Z"
-rationale = "Merge of origin/feature/Log-fields-context (carrying dev's releases v0.61.0 through v0.65.0) into feature/Log-sink-seam: the merged trigger set is the union of two changes each acked on its own side, with no trigger file changed on both. This branch's side (agent_cli_factory.py and both doctor_cmd.py) is covered by the checks.log_sink row in pipelex/cli/agent_cli/CLAUDE.md, present in the merged tree. The parent's side is check_model_cmd.py's argument-help example moving from the retired @best-claude alias to @best-gpt; neither docs/tools/cli/ nor the agent-CLI contract doc quotes that example or any deck alias (grep for best-claude, best-gemini and best-mistral finds nothing in either target). The ack file's line-wise auto-merge kept each side's trigger snapshot, so this re-ack records the merged tree as reviewed as a whole. No doc change needed."
+reviewed_at = "2026-09-25T12:48:43Z"
+rationale = "Merge of origin/feature/Log-sink-seam (carrying dev's releases v0.61.0 through v0.65.0) into feature/Log-redaction. Against the parent the only trigger change is this branch's doctor_cmd.py arm that keeps an installed sink which failed during the replay of the held records, and the checks.log_sink row in pipelex/cli/agent_cli/CLAUDE.md carries that fourth case in the merged tree. Against this branch's previous head the only trigger change is the parent's check_model_cmd.py argument-help example moving from the retired @best-claude alias to @best-gpt, and neither docs/tools/cli/ nor the agent-CLI contract doc quotes that example or any retired deck alias (a grep for best-claude, best-gemini and best-mistral over both targets finds nothing). docs/tools/cli/agent-cli.md describes the doctor command by its flags and formats only, so nothing there is stale. The ack file's merge spliced the parent's header onto this branch's trigger snapshot, so this re-ack records the merged tree as reviewed as a whole. No doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "Merge of origin/feature/Log-fields-context (carrying dev's releases
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:7ea6e1b0f260a0de8cceae4e5c2deede7b0abbd7"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:26db32ff20d1c064bc421093825a05e980c9b770"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"

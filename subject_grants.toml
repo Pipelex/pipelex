@@ -5092,6 +5092,10 @@ rationale = "Plugin protocol: registers into the registrar; single operand, cons
 param = "config"
 rationale = "Factory from source: builds the sink from the config; single operand, the LogSinkFactoryFn shape."
 
+["pipelex/providers/log_sinks/log_sink_plugin.py::_make_gcp_log_sink"]
+param = "config"
+rationale = "Factory from source: builds the sink from the config; single operand, the LogSinkFactoryFn shape."
+
 ["pipelex/providers/log_sinks/log_sink_plugin.py::_make_json_log_sink"]
 param = "config"
 rationale = "Factory from source: builds the sink from the config; single operand, the LogSinkFactoryFn shape."

@@ -63,6 +63,28 @@ class _NullSink(LogSink):
         return logging.NullHandler()
 
 
+class _UnrecoverableHandler(logging.Handler):
+    """Cannot render a record, and cannot say so either: the shape a closed stderr gives a handler at its ``handleError``."""
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        msg = "this handler cannot render a record"
+        raise RuntimeError(msg)
+
+    @override
+    def handleError(self, record: logging.LogRecord) -> None:
+        msg = "stderr is closed"
+        raise ValueError(msg)
+
+
+class _FailsOnReplaySink(LogSink):
+    """Builds its handler, so the sink is recorded as installed, and then fails on the first record replayed through it."""
+
+    @override
+    def make_handler(self) -> logging.Handler:
+        return _UnrecoverableHandler()
+
+
 def _registry() -> LogSinkRegistry:
     return LogSinkRegistry(
         {
@@ -85,11 +107,15 @@ class TestDoctorLogSink:
     @pytest.mark.usefixtures("released_log")
     def test_the_doctor_releases_the_logging_it_configured_once_the_report_is_out(self, mocker: MockerFixture) -> None:
         sink = _NullSink()
+        # The handler the install put on the root logger, captured while it is there: the release discards
+        # it, and ``sink.handler`` read afterwards builds a new one that could never be on the root.
+        installed: list[logging.Handler] = []
 
         def report_through_a_sink(**_options: Any) -> None:
             log.configure(log_config=_log_config(sink=LogSinkMethod.CONSOLE))
             log.install_sink(sink)
             assert log.sink is sink
+            installed.append(sink.handler)
 
         mocker.patch.object(doctor_cmd, "do_doctor_cmd", side_effect=report_through_a_sink)
 
@@ -97,7 +123,8 @@ class TestDoctorLogSink:
 
         assert log.sink is None
         assert not log.is_configured
-        assert sink.handler not in logging.getLogger().handlers
+        (handler,) = installed
+        assert handler not in logging.getLogger().handlers
 
     @pytest.mark.usefixtures("released_log")
     def test_the_doctor_leaves_logging_an_embedder_configured_before_calling_in(self, mocker: MockerFixture) -> None:
@@ -150,6 +177,20 @@ class TestDoctorLogSink:
         assert "could not be installed" in check.message
         assert "choose stdout or stderr" in check.message
         _assert_the_fallback_console_sink_is_installed_on_stderr()
+
+    @pytest.mark.usefixtures("released_log")
+    def test_a_sink_that_failed_after_being_recorded_is_a_row_and_the_installed_sink_is_kept(self) -> None:
+        """The failure comes out of the replay, past the point where the sink was recorded, so there is nothing for a fallback to install."""
+        log_config = _log_config(sink=LogSinkMethod.JSON)
+        log.configure(log_config=log_config)
+        log.warning("a record held until the sink arrives")
+        registry = LogSinkRegistry({LogSinkMethod.JSON: lambda _config: _FailsOnReplaySink()})
+
+        check = install_doctor_log_sink(registry=registry, log_config=log_config)
+
+        assert not check.is_healthy
+        assert "stderr is closed" in check.message
+        assert isinstance(log.sink, _FailsOnReplaySink)
 
     @pytest.mark.usefixtures("released_log")
     def test_a_plugin_registry_that_does_not_build_is_a_row_and_the_report_goes_on_through_stderr(self, mocker: MockerFixture) -> None:

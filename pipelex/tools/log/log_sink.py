@@ -3,13 +3,14 @@
 A sink owns one stdlib handler on the root logger and everything about how a record leaves the
 process: the stream, the wire shape, the exporter. Which sink a process runs is a registrar
 capability selected by ``[runtime.log] sink``, exactly as the storage and secrets providers are: the
-built-in plugin registers ``json``, ``console`` and ``otlp`` under open string tokens, and an external
-plugin registers its own. This module holds what every sink shares, the base class with its processor
-slot and the stream resolution, and names no sink.
+built-in plugin registers ``json``, ``console``, ``otlp`` and ``gcp`` under open string tokens, and an
+external plugin registers its own. This module holds what every sink shares, the base class with its
+processor slot and the stream resolution, and names no sink.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
@@ -23,6 +24,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.tools.log.log_fields import UNSCRUBBED_MARK
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -36,8 +38,11 @@ POSITIVE_INFINITY_TEXT = "Infinity"
 NEGATIVE_INFINITY_TEXT = "-Infinity"
 
 # A processor edits a record in place before the sink renders it; redaction is the intended one. It
-# runs on the sink's own handler, once per record, so a handler another integration attached to the
-# root logger sees the record as the processors left it only if it runs after this one.
+# runs on the sink's own handler, once per record, and on the original record rather than a copy, so a
+# handler another integration attached to the root logger sees the record as the processors left it
+# when it runs after this one, and as the call made it when it runs before. In place is deliberate:
+# what the processors do is remove what must not leave the process, and a copy would hand every other
+# handler the secret the sink was spared.
 LogRecordProcessor = Callable[[logging.LogRecord], None]
 
 
@@ -47,20 +52,53 @@ class LogSinkMethod(StrEnum):
     JSON = "json"
     CONSOLE = "console"
     OTLP = "otlp"
+    GCP = "gcp"
 
 
-class _ProcessorFilter(logging.Filter):
-    """Runs the sink's processors over each record before the handler formats it, and never drops one."""
+class ProcessorFilter(logging.Filter):
+    """Runs the sink's processors over each record before the handler formats it, and drops only what one asks it to.
 
-    def __init__(self, processors: list[LogRecordProcessor]):
+    The stdlib runs a handler's filters outside any ``try``, so a processor that raised would raise out
+    of the ``log.<level>(...)`` call that emitted the record, against the promise that a log call never
+    raises. Each processor is therefore guarded on its own: what it raises is reported on stderr, the
+    processors after it still run, and the record is handed to the handler all the same. The report
+    names the processor and the type of what it raised, and withholds the exception's text and
+    traceback, which the handler's ``handleError`` would have printed: a processor fails on the record's
+    own values, so its exception is where they end up, the secret the redaction was removing among them.
+    The reporter is guarded too, since a closed stderr makes it raise. A processor that fails costs that
+    record its processing, never the call and never the line; a processor that must not hand on what it
+    failed to process, the redaction, strips the record itself before it raises, and where even the
+    stripping failed it leaves the mark that has this filter drop the record instead.
+    """
+
+    def __init__(self, *, processors: list[LogRecordProcessor]):
         super().__init__()
         self._processors = processors
 
     @override
     def filter(self, record: logging.LogRecord) -> bool:
         for processor in self._processors:
-            processor(record)
-        return True
+            try:
+                processor(record)
+            except Exception as exc:  # ruff: ignore[blind-except]
+                with contextlib.suppress(Exception):
+                    _report_processor_failure(processor=processor, exc=exc)
+        # A processor that must not hand on what it failed to process says so by leaving the mark on the
+        # record, and the record is dropped rather than emitted. It is read out of the record's own
+        # dictionary, so finding out costs no call and no frame: this runs where a stack that has run
+        # out is the likeliest reason a processor failed in the first place.
+        return UNSCRUBBED_MARK not in record.__dict__
+
+
+def _report_processor_failure(*, processor: LogRecordProcessor, exc: Exception) -> None:
+    """Write the stdlib's logging-error banner with the processor and the exception type, when the stdlib would have reported at all."""
+    if not logging.raiseExceptions or not sys.stderr:
+        return
+    processor_name = getattr(processor, "__qualname__", type(processor).__qualname__)
+    sys.stderr.write(
+        f"--- Logging error ---\nThe log record processor {processor_name} raised {type(exc).__name__}, and the record was handed on "
+        "without it. The exception's text is withheld, since it may carry what the processor was removing.\n"
+    )
 
 
 class LogSink(ABC):
@@ -84,9 +122,26 @@ class LogSink(ABC):
         """The sink's handler, built on first read with the processors wired in front of it."""
         if self._handler is None:
             handler = self.make_handler()
-            handler.addFilter(_ProcessorFilter(self.processors))
+            handler.addFilter(ProcessorFilter(processors=self.processors))
             self._handler = handler
         return self._handler
+
+    def discard_handler(self) -> None:
+        """Forget the handler built for an install, so a sink object installed again builds a fresh one.
+
+        A teardown closes the handler, and a close is terminal for a sink that really releases what it
+        writes to: a file sink closes its file there. Handing the same handler back at the next install
+        would install a sink that accepts every record, runs every filter and drops the lot on the floor,
+        with nothing raised to say so. The fresh handler also gets a fresh processor filter, reading
+        whatever ``processors`` holds at that install rather than the list the first one closed over.
+
+        A fresh handler is only as live as what ``make_handler`` builds it on. A sink that opens its
+        target there comes back whole; one that was handed its target built, and whose close released
+        it, cannot, and says so from ``make_handler`` rather than build a handler on the dead target:
+        the ``otlp`` sink, whose close shuts down the provider and the processor it was constructed
+        with, is that case.
+        """
+        self._handler = None
 
     def redirect_to_stderr(self) -> None:
         """Point a sink that writes to a process stream at stderr; a sink that does not ignores the call."""

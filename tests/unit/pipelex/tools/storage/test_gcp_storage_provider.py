@@ -43,7 +43,7 @@ class TestGcpStorageProvider:
         for test assertions.
         """
         # Import the module first so it can be patched
-        from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+        from google.cloud import storage  # type: ignore[import-untyped, attr-defined]  # ruff: ignore[import-outside-top-level]
 
         # Create mock objects
         mock_blob = mocker.MagicMock()

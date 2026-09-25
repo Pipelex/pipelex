@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, cast
 from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig
 from pipelex.tools.log.log_context import get_log_context
 from pipelex.tools.log.log_fields import attach_log_record_extra, build_log_record_extra
+from pipelex.tools.log.log_redaction import redact_secret_entries
 from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
 
 if TYPE_CHECKING:
@@ -174,10 +175,25 @@ class LogDispatch:
             # given, and a sink that serializes later would read whatever the caller did to it since. The
             # data is therefore the rendering re-read: a snapshot of the call, JSON-ready whatever it held.
             data = json.loads(rendered)
+            if log_config is not None and log_config.redaction.is_enabled:
+                # Redacted by name before the message is settled, because the message is this rendering and
+                # the redaction processor reads it as text: an entry named like a secret whose value is an
+                # object or a number would keep its value there while ``data`` lost it. Rendered again only
+                # when an entry was replaced, so every other line keeps the helpers' own rendering.
+                redacted = redact_secret_entries(value=data)
+                if redacted != data:
+                    data = redacted
+                    rendered = json.dumps(redacted, indent=indent)
         except (TypeError, ValueError):
             # What ``json`` refuses outright, a circular reference or a mapping with a non-string key,
-            # is rendered as its ``repr`` and carries no ``data``: a log call never raises.
-            rendered = repr(cast("object", content))
+            # is rendered as its ``repr`` and carries no ``data``: a log call never raises. The names
+            # are redacted on this path too, and not only where the serialization worked: the ``repr``
+            # of an entry holding an object is beyond what the string families can read back out of
+            # text, so a fallback that skipped it would be the one rendering in which a secret the
+            # redaction is configured to remove reaches the sink whole.
+            is_redacting = log_config is not None and log_config.redaction.is_enabled
+            fallback = cast("object", redact_secret_entries(value=content) if is_redacting else content)
+            rendered = repr(fallback)
             data = None
         message = f"\n{rendered}"
         if title is not None:

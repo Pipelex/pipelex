@@ -21,6 +21,7 @@ from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX
+from pipelex.tools.log.log_redaction import REDACTED_TEXT
 from pipelex.tools.log.otlp_log_sink import FLUSH_TIMEOUT_MILLIS, ExportPathFilter, OtlpLogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -31,9 +32,10 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _package_log_config() -> LogConfig:
+def _package_log_config(*, is_redaction_enabled: bool = True) -> LogConfig:
     config_dict = load_toml_from_path(ConfigLoader().pipelex_root_dir / "pipelex.toml")
-    return LogConfig.model_validate(config_dict["runtime"]["log"])
+    redaction = {**config_dict["runtime"]["log"]["redaction"], "is_enabled": is_redaction_enabled}
+    return LogConfig.model_validate({**config_dict["runtime"]["log"], "redaction": redaction})
 
 
 def _own_logs(exporter: InMemoryLogExporter) -> list[LogData]:
@@ -105,15 +107,51 @@ class TestOtlpLogSink:
         assert log_data.log_record.severity_number is SeverityNumber.ERROR
         attributes = _attributes(log_data)
         assert attributes[exception_attributes.EXCEPTION_TYPE] == "ValueError"
-        assert attributes[exception_attributes.EXCEPTION_MESSAGE] == "boom"
+        assert exception_attributes.EXCEPTION_MESSAGE not in attributes
         assert "Traceback (most recent call last)" in attributes[exception_attributes.EXCEPTION_STACKTRACE]
+        assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith("ValueError: boom")
+
+    def test_the_stacktrace_is_the_scrubbed_text_and_no_message_attribute_carries_the_secret(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+        """The message attribute would be ``str(exc_value)``, which no sink can scrub; the type and the stacktrace's last line carry what it said."""
+        fresh, exporter = otlp_log
+        try:
+            msg = "refused for sk_live_0123456789abcdef"
+            raise RuntimeError(msg)
+        except RuntimeError:
+            fresh.error("call failed", include_exception=True)
+
+        (log_data,) = _own_logs(exporter)
+        attributes = _attributes(log_data)
+        assert exception_attributes.EXCEPTION_MESSAGE not in attributes
+        assert "sk_live_0123456789abcdef" not in attributes[exception_attributes.EXCEPTION_STACKTRACE]
+        assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith(f"RuntimeError: refused for sk_{REDACTED_TEXT}")
+
+    def test_an_exception_that_carries_no_traceback_still_exports_its_own_text(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``exc_text`` is the processor's rendering; with redaction off there is none and the stacktrace is the only place the text goes."""
+        caplog.set_level(logging.INFO, logger=__name__)
+        exporter = InMemoryLogExporter()
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config(is_redaction_enabled=False))
+        fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
+        try:
+            logging.getLogger(__name__).error("failed", exc_info=ValueError("upstream quota exceeded"))
+
+            (log_data,) = _own_logs(exporter)
+            attributes = _attributes(log_data)
+            assert attributes[exception_attributes.EXCEPTION_TYPE] == "ValueError"
+            assert exception_attributes.EXCEPTION_MESSAGE not in attributes
+            assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip() == "ValueError: upstream quota exceeded"
+        finally:
+            fresh.reset()
 
     def test_the_semantic_convention_keys_are_reserved_with_or_without_an_exception(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
         """The sink writes these keys itself, so a field named like one is prefixed rather than overwritten.
 
         Reserved whether or not the record carries an exception, exactly as the json sink reserves its own
         keys on every line: a field's wire name must not depend on an exception being active, and the same
-        field must not survive one sink and vanish on another.
+        field must not survive one sink and vanish on another. ``exception.message`` is reserved on the same
+        terms though the sink no longer writes it — the rendering it used to carry, ``str(exc_value)``, is
+        the one the redaction processor never sees — so a field named like it is prefixed all the same.
         """
         fresh, exporter = otlp_log
         supplied = {
@@ -140,7 +178,8 @@ class TestOtlpLogSink:
             assert attributes[code_attributes.CODE_LINE_NUMBER] > 0
             assert attributes[code_attributes.CODE_FUNCTION_NAME] == "test_the_semantic_convention_keys_are_reserved_with_or_without_an_exception"
         assert _attributes(with_exception)[exception_attributes.EXCEPTION_TYPE] == "ValueError"
-        assert _attributes(with_exception)[exception_attributes.EXCEPTION_MESSAGE] == "boom"
+        assert _attributes(with_exception)[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith("ValueError: boom")
+        assert exception_attributes.EXCEPTION_MESSAGE not in _attributes(with_exception)
         assert exception_attributes.EXCEPTION_TYPE not in _attributes(without)
 
     @pytest.mark.parametrize(
@@ -251,3 +290,21 @@ class TestOtlpLogSink:
         sink.handler.flush()
 
         force_flush.assert_called_once_with(timeout_millis=FLUSH_TIMEOUT_MILLIS)
+
+    def test_the_same_sink_installed_again_after_a_reset_is_refused_rather_than_exporting_nothing(self) -> None:
+        """The teardown shuts the provider and the processor down, which nothing starts again, so a second install must say so."""
+        exporter = InMemoryLogExporter()
+        sink = OtlpLogSink(processor=SimpleLogRecordProcessor(exporter))
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config())
+        fresh.install_sink(sink)
+        fresh.reset()
+        fresh.configure(log_config=_package_log_config())
+        try:
+            with pytest.raises(RuntimeError, match="installed once already"):
+                fresh.install_sink(sink)
+
+            assert fresh.sink is None
+            assert sink.processors == []
+        finally:
+            fresh.reset()
