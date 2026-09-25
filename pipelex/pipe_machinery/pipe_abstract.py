@@ -33,6 +33,7 @@ from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identit
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry
+from pipelex.system.telemetry.current_span import span_made_current
 from pipelex.system.telemetry.otel_constants import (
     LangfuseSpanAttr,
     OTelConstants,
@@ -972,23 +973,27 @@ class PipeAbstract(ABC, BaseModel):
 
             # Run pipe ------------------------------------------------------------
 
-            try:
-                pipe_output = await self._live_run_pipe(
-                    job_metadata=child_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                    output_name=output_name,
-                    library_crate=library_crate,
-                )
-            except Exception as exc:
-                # Broad catch is intentional: the OTel span must be closed with ERROR status
-                # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
-                self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
-                raise
+            # The span is current from here until it ends, whichever way it ends, so a log line, a
+            # library's own span or an error tracker's event inside the run is joined to it. Its
+            # children still take their parent from `child_metadata`, never from the current context.
+            with span_made_current(span=span):
+                try:
+                    pipe_output = await self._live_run_pipe(
+                        job_metadata=child_metadata,
+                        working_memory=working_memory,
+                        pipe_run_params=pipe_run_params,
+                        output_name=output_name,
+                        library_crate=library_crate,
+                    )
+                except Exception as exc:
+                    # Broad catch is intentional: the OTel span must be closed with ERROR status
+                    # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
+                    self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
+                    raise
 
-            # Handle telemetry ------------------------------------------------------------
+                # Handle telemetry ------------------------------------------------------------
 
-            self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
+                self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
 
         return pipe_output
 

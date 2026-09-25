@@ -112,6 +112,19 @@ The identifiers travel in the payload, and the contextvar is in-process plumbing
 
 The last two are the runner's and the orchestration plugin's to bind, beside the payload they read; the runtime only provides `log.context`.
 
+### The trace context
+
+Beside the identifiers, a record is joined to the OpenTelemetry span current when it is logged, and the structured sinks write that on their own, with nothing for a call site to pass: the `json` sink as `trace_id`, `span_id` and `trace_flags`, lowercase hex, the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP, and the `otlp` sink as the record's own trace context, so a collector files the record under the span. A record logged outside any valid span carries none of it, and the `console` sink writes none.
+
+The runtime makes each span it starts the current one from its start to its end, however it ends:
+
+- **A pipe run's span**: `live_run_pipe` starts the span, then runs the pipe with it current, so a line logged by the pipe's own work, a controller's or an operator's and the lines of the extract, image-generation, search or function call an operator makes, names the pipe's span, and a nested pipe's lines name the nested pipe's span until it returns. The line announcing the run is logged before the span starts, under the enclosing span.
+- **An LLM call's span**: the LLM worker runs the provider call with its generation span current, so the lines of the call and of its failure name that span.
+
+The runtime starts these spans only when it traces: a live run, with AI tracing enabled in [Telemetry](../setup/telemetry.md). Otherwise it leaves the context alone, and a line names whatever span the host's own code runs under, if any.
+
+Making a span current is in-process plumbing, like binding the log context. A span's children still take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs names a span only while the process runs a span of its own, the LLM call's for instance. Anything else that reads OpenTelemetry's current context sees the span too: a library's own instrumentation opens its spans as children of the pipe's or the LLM call's span, in the run's trace, and an error tracker that reads the current span files its events under it.
+
 ## Structured content
 
 When the content is not a string, it is rendered as JSON for the message, indented by `json_logs_indent`, and the rendering is read back as the record's `data` attribute for a structured sink. `data` is therefore a snapshot of the call, JSON-ready whatever the content held, and the caller may mutate the object afterwards without changing what was emitted:

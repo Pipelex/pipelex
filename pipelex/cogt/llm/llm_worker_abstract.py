@@ -16,6 +16,7 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedCons
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.system.exceptions import JobMetadataError
 from pipelex.system.job_metadata import UnitJobId
+from pipelex.system.telemetry.current_span import span_made_current
 from pipelex.system.telemetry.otel_constants import (
     GenAISpanAttr,
     LangfuseSpanAttr,
@@ -462,20 +463,23 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.TEXT)
 
-        try:
-            text_result = await self._gen_text(llm_job=llm_job)
-            await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
-            return text_result
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
-            raise
-        finally:
-            # `_gen_text` / `_after_text_job` raised before the span was ended — close it with the
-            # in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
-            # failure stays in telemetry. On success `_after_text_job` already ended the span.
-            pending_error = sys.exc_info()[1]
-            if pending_error is not None and span is not None and span.is_recording():
-                self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
+        # The span is current from here until it ends, whichever way it ends, so a log line or a
+        # provider SDK's own span during the call is joined to it.
+        with span_made_current(span=span):
+            try:
+                text_result = await self._gen_text(llm_job=llm_job)
+                await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
+                return text_result
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
+                raise
+            finally:
+                # `_gen_text` / `_after_text_job` raised before the span was ended — close it with the
+                # in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
+                # failure stays in telemetry. On success `_after_text_job` already ended the span.
+                pending_error = sys.exc_info()[1]
+                if pending_error is not None and span is not None and span.is_recording():
+                    self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
 
     @abstractmethod
     async def _gen_text(
@@ -501,25 +505,28 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.OBJECT, output_class_name=schema.__name__)
 
-        try:
-            object_result = await self._gen_object(llm_job=llm_job, schema=schema)
+        # The span is current from here until it ends, whichever way it ends, so a log line or a
+        # provider SDK's own span during the call is joined to it.
+        with span_made_current(span=span):
+            try:
+                object_result = await self._gen_object(llm_job=llm_job, schema=schema)
 
-            # Cleanup result
-            if hasattr(object_result, "_raw_response"):
-                delattr(object_result, "_raw_response")  # ruff: ignore[del-attr-with-constant] - not a declared model field, so `del obj._attr` cannot type-check
+                # Cleanup result
+                if hasattr(object_result, "_raw_response"):
+                    delattr(object_result, "_raw_response")  # ruff: ignore[del-attr-with-constant] - not a declared model field, so `del obj._attr` cannot type-check
 
-            await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
-            return object_result
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
-            raise
-        finally:
-            # `_gen_object` / `_after_object_job` raised before the span was ended — close it with
-            # the in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
-            # failure stays in telemetry. On success `_after_object_job` already ended the span.
-            pending_error = sys.exc_info()[1]
-            if pending_error is not None and span is not None and span.is_recording():
-                self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
+                await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
+                return object_result
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
+                raise
+            finally:
+                # `_gen_object` / `_after_object_job` raised before the span was ended — close it with
+                # the in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
+                # failure stays in telemetry. On success `_after_object_job` already ended the span.
+                pending_error = sys.exc_info()[1]
+                if pending_error is not None and span is not None and span.is_recording():
+                    self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
 
     @abstractmethod
     async def _gen_object(
