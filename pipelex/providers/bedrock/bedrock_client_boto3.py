@@ -36,8 +36,9 @@ class BedrockClientBoto3(BedrockClientProtocol):
         if system_text:
             params["system"] = [{"text": system_text}]
 
-        # ``to_thread`` rather than ``run_in_executor``: it carries the context over, so the LLM span stays
-        # current in the thread and the SDK's own log lines and spans are joined to it.
+        # ``to_thread`` rather than ``run_in_executor``: it carries the context over, so the SDK's own log
+        # lines in the thread are joined to the LLM span, and a span its instrumentation opens has the
+        # caller's current span as its parent.
         resp_dict: dict[str, Any] = await asyncio.to_thread(self.boto3_client.converse, **params)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
 
         usage_dict: dict[str, Any] = resp_dict["usage"]

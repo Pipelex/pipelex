@@ -111,9 +111,9 @@ class HoldingLogHandler(logging.Handler):
         that tells the handler's guard so.
 
         Each record is delivered in the context it was emitted in, copied when it was held, so a sink that
-        reads the current context at emit, the OpenTelemetry span a trace-joining sink writes, reads the
-        one the record was logged under rather than the one the boot holds at the handoff, and a record
-        another thread logged inside a span of its own keeps that span too.
+        reads the context at emit, the span a trace-joining sink writes, Pipelex's own or OpenTelemetry's
+        current one, reads the one the record was logged under rather than the one the boot holds at the
+        handoff, and a record another thread logged inside a span of its own keeps that span too.
         """
         self.acquire()
         try:

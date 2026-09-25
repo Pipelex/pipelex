@@ -1,9 +1,10 @@
-"""The ``json`` sink writes the trace context of the span current when a record is logged.
+"""The ``json`` sink writes the trace context of the span a record is logged in.
 
-The keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not OTLP,
-``trace_id``, ``span_id`` and ``trace_flags``, lowercase hex at their full widths, and a record logged
-outside any valid span carries none of them. A boot line held until the sink arrives keeps the span it
-was logged in. The records go the whole way, from the facade through the module-named logger to the
+That span is the Pipelex span active at the log call, and outside one OpenTelemetry's current span, the
+host's own. The keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not
+OTLP, ``trace_id``, ``span_id`` and ``trace_flags``, lowercase hex at their full widths, and a record
+logged outside any valid span carries none of them. A boot line held until the sink arrives keeps the
+span it was logged in. The records go the whole way, from the facade through the module-named logger to the
 sink's handler, on a fresh ``Log`` so the installed sink is the one under test and the teardown leaves
 the root logger as it found it.
 """
@@ -22,6 +23,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 
 from pipelex.system.configuration.config_loader import ConfigLoader
+from pipelex.system.telemetry.current_span import pipelex_span_active
 from pipelex.tools.log.json_log_sink import (
     LOGGER_KEY,
     MESSAGE_KEY,
@@ -88,6 +90,21 @@ class TestJsonSinkTraceContext:
         assert line[TRACE_FLAGS_KEY] == "01"
         assert re.fullmatch(r"[0-9a-f]{32}", line[TRACE_ID_KEY])
         assert re.fullmatch(r"[0-9a-f]{16}", line[SPAN_ID_KEY])
+
+    def test_a_line_logged_in_a_pipelex_span_carries_it_rather_than_the_hosts(self, json_log: tuple[Log, io.StringIO]) -> None:
+        fresh, buffer = json_log
+        tracer = TracerProvider().get_tracer(__name__)
+        pipelex_span = tracer.start_span("pipe")
+        with tracer.start_as_current_span("host"):
+            with pipelex_span_active(span=pipelex_span):
+                fresh.info("in the pipe")
+            fresh.info("back in the host")
+        span_context = pipelex_span.get_span_context()
+
+        in_pipe, in_host = _own_lines(buffer)
+        assert in_pipe[TRACE_ID_KEY] == f"{span_context.trace_id:032x}"
+        assert in_pipe[SPAN_ID_KEY] == f"{span_context.span_id:016x}"
+        assert in_host[TRACE_ID_KEY] != in_pipe[TRACE_ID_KEY]
 
     def test_a_line_logged_outside_any_span_carries_none_of_the_keys(self, json_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = json_log
@@ -160,15 +177,19 @@ class TestJsonSinkTraceContext:
         fresh = Log()
         fresh.configure(log_config=_package_log_config())
         tracer = TracerProvider().get_tracer(__name__)
+        pipelex_span = tracer.start_span("pipe at boot")
         try:
             with tracer.start_as_current_span("boot step") as boot_step:
                 fresh.info("held inside a span")
+            with pipelex_span_active(span=pipelex_span):
+                fresh.info("held inside a pipelex span")
             fresh.info("held outside any span")
-            with tracer.start_as_current_span("install"):
+            with tracer.start_as_current_span("install"), pipelex_span_active(span=tracer.start_span("pipe at install")):
                 fresh.install_sink(JsonLogSink(stream=buffer))
         finally:
             fresh.reset()
 
-        inside, outside = _own_lines(buffer)
+        inside, inside_pipelex, outside = _own_lines(buffer)
         assert inside[SPAN_ID_KEY] == f"{boot_step.get_span_context().span_id:016x}"
+        assert inside_pipelex[SPAN_ID_KEY] == f"{pipelex_span.get_span_context().span_id:016x}"
         assert not set(TRACE_KEYS) & set(outside)

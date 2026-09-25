@@ -33,7 +33,7 @@ from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identit
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry
-from pipelex.system.telemetry.current_span import span_made_current
+from pipelex.system.telemetry.current_span import pipelex_span_active
 from pipelex.system.telemetry.otel_constants import (
     LangfuseSpanAttr,
     OTelConstants,
@@ -973,10 +973,11 @@ class PipeAbstract(ABC, BaseModel):
 
             # Run pipe ------------------------------------------------------------
 
-            # The span is current from here until it ends, whichever way it ends, so a log line, a
-            # library's own span or an error tracker's event inside the run is joined to it. Its
-            # children still take their parent from `child_metadata`, never from the current context.
-            with span_made_current(span=span):
+            # The span is the Pipelex span active here until it ends, whichever way it ends, so a log
+            # line inside the run is joined to it. OpenTelemetry's current context is left alone, so a
+            # host's own instrumentation is never re-parented, and the span's children still take their
+            # parent from `child_metadata`.
+            with pipelex_span_active(span=span):
                 try:
                     pipe_output = await self._live_run_pipe(
                         job_metadata=child_metadata,

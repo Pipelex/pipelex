@@ -8,9 +8,11 @@ rendered exception text so that what the redaction processor scrubbed is what le
 semantic-convention keys the sink writes itself — the source location and the exception — are reserved
 whether or not the record carries an exception, exactly as the ``json`` sink reserves its own keys: a
 field named like one is carried under the same ``field_`` prefix, so the same field survives a change of
-sink. The records the sink's own export path emits, the SDK's and the transport's, are rejected by a
-filter on the handler and never exported. This module imports the OpenTelemetry SDK at load, which is why
-the built-in plugin imports it inside the ``otlp`` factory and nowhere else.
+sink. Each record is filed under the Pipelex span active when it was logged, a pipe's or an LLM
+call's, or, outside one, under OpenTelemetry's current span, which is only read. The records the sink's
+own export path emits, the SDK's and the transport's, are rejected by a filter on the handler and never
+exported. This module imports the OpenTelemetry SDK at load, which is why the built-in plugin imports it
+inside the ``otlp`` factory and nowhere else.
 """
 
 from __future__ import annotations
@@ -23,7 +25,6 @@ from typing import TYPE_CHECKING, Any, cast
 from opentelemetry._logs import SeverityNumber  # ruff: ignore[import-private-name]
 from opentelemetry.context import (
     _SUPPRESS_INSTRUMENTATION_KEY,  # ruff: ignore[import-private-name] # pyright: ignore[reportPrivateUsage]
-    get_current,
     get_value,
 )
 from opentelemetry.sdk._logs import LoggerProvider  # ruff: ignore[import-private-name]
@@ -31,6 +32,7 @@ from opentelemetry.semconv._incubating.attributes import code_attributes  # ruff
 from opentelemetry.semconv.attributes import exception_attributes
 from typing_extensions import override
 
+from pipelex.system.telemetry.current_span import otel_context_for_logs
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
 from pipelex.tools.log.log_sink import LogSink, render_json
@@ -144,7 +146,7 @@ class OtlpLogHandler(logging.Handler):
             logger.emit(
                 timestamp=int(record.created * 1e9),
                 observed_timestamp=time_ns(),
-                context=get_current() or None,
+                context=otel_context_for_logs(),
                 severity_text=_severity_text(levelname=record.levelname),
                 severity_number=_severity_number(levelno=record.levelno),
                 body=record.getMessage(),

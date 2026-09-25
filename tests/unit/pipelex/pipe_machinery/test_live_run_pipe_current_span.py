@@ -1,11 +1,12 @@
-"""``live_run_pipe`` makes the pipe's span current from its start to its end, so the run's log lines carry it.
+"""``live_run_pipe`` holds the pipe's span as the Pipelex span active from its start to its end, so the run's log lines carry it.
 
 The span is started with an explicit parent read off the job metadata, which is how a child running in
-another process reaches it, and that stays as it was: the pipe only makes its already-started span the
-current one for the in-process work, and restores the previous context when the span ends, however it
-ends. Both wire sinks read the current span, so a line logged during the run names the pipe's span: the
-``json`` sink under ``trace_id`` and ``span_id``, the ``otlp`` sink as the record's own trace context.
-Each test runs once per sink.
+another process reaches it, and that stays as it was: the pipe only holds its already-started span for
+the in-process work, and restores the previous one when the span ends, however it ends. Both wire sinks
+read the active Pipelex span, so a line logged during the run names the pipe's span: the ``json`` sink
+under ``trace_id`` and ``span_id``, the ``otlp`` sink as the record's own trace context. OpenTelemetry's
+current span is never touched: inside the run it is whatever it was outside, the host's or none, so the
+host's own instrumentation is never re-parented under the pipe. Each test runs once per sink.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from opentelemetry.sdk._logs.export import InMemoryLogExporter, SimpleLogRecordP
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
+from opentelemetry.trace import INVALID_SPAN_ID, StatusCode
 from pydantic import Field, PrivateAttr
 from typing_extensions import override
 
@@ -37,6 +38,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.telemetry.current_span import span_context_for_logs
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, SPAN_ID_KEY, TRACE_ID_KEY, JsonLogSink
@@ -80,14 +82,19 @@ class Sunk(NamedTuple):
 
 
 class CurrentSpanPipe(PipeAbstract):
-    """A pipe whose live run logs a line and records the span current at that moment; it may nest a pipe, and it may fail."""
+    """A pipe whose live run logs a line and records the spans it runs under; it may nest a pipe, and it may fail.
+
+    It records the span a line logged there is joined to, and OpenTelemetry's current span, which is what the
+    host's own instrumentation would open its spans under.
+    """
 
     pipe_category: Any = "PipeOperator"
     type: Any = "PipeFunc"
     nested: CurrentSpanPipe | None = None
     fails: bool = False
     hangs: bool = False
-    seen_span_ids: list[int] = Field(default_factory=empty_list_factory_of(int))
+    seen_log_span_ids: list[int] = Field(default_factory=empty_list_factory_of(int))
+    seen_current_spans: list[object] = Field(default_factory=empty_list_factory_of(object))
     _hanging: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
 
     @property
@@ -131,7 +138,9 @@ class CurrentSpanPipe(PipeAbstract):
         output_name: str | None = None,
         library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
-        self.seen_span_ids.append(trace.get_current_span().get_span_context().span_id)
+        log_span_context = span_context_for_logs()
+        self.seen_log_span_ids.append(INVALID_SPAN_ID if log_span_context is None else log_span_context.span_id)
+        self.seen_current_spans.append(trace.get_current_span())
         log.info(f"inside {self.code}")
         if self.nested is not None:
             await self.nested.live_run_pipe(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params)
@@ -267,14 +276,28 @@ class TestLiveRunPipeCurrentSpan:
 
         pipe_span = _span_named(span_exporter.get_finished_spans(), code="solo")
         assert sunk.read_lines()["inside solo"] == LineTrace(trace_id=f"{RUN_TRACE_ID:032x}", span_id=_hex_span_id(pipe_span))
-        assert pipe.seen_span_ids == [_span_id(pipe_span)]
-        assert trace.get_current_span() is trace.INVALID_SPAN
+        assert pipe.seen_log_span_ids == [_span_id(pipe_span)]
+        assert span_context_for_logs() is None
         log.info("after the run")
         assert sunk.read_lines()["after the run"] == LineTrace(trace_id=None, span_id=None)
 
-    async def test_a_nested_pipe_makes_its_own_span_current_and_the_outer_one_comes_back(
-        self, sunk: Sunk, span_exporter: InMemorySpanExporter
-    ) -> None:
+    async def test_the_run_never_makes_its_span_opentelemetrys_current_one(self, sunk: Sunk, span_exporter: InMemorySpanExporter) -> None:
+        """Inside the run the current span is whatever it was outside, so the host's instrumentation is never re-parented."""
+        host_tracer = TracerProvider().get_tracer(__name__)
+        without_host = _make_pipe(code="hostless")
+        under_host = _make_pipe(code="hosted")
+
+        await _run(without_host)
+        with host_tracer.start_as_current_span("host") as host_span:
+            await _run(under_host)
+
+        assert without_host.seen_current_spans == [trace.INVALID_SPAN]
+        assert under_host.seen_current_spans == [host_span]
+        # The line still names the pipe's span, not the host's.
+        pipe_span = _span_named(span_exporter.get_finished_spans(), code="hosted")
+        assert sunk.read_lines()["inside hosted"] == LineTrace(trace_id=f"{RUN_TRACE_ID:032x}", span_id=_hex_span_id(pipe_span))
+
+    async def test_a_nested_pipe_holds_its_own_span_and_the_outer_one_comes_back(self, sunk: Sunk, span_exporter: InMemorySpanExporter) -> None:
         outer = _make_pipe(code="outer", nested=_make_pipe(code="inner"))
 
         await _run(outer)
@@ -291,7 +314,7 @@ class TestLiveRunPipeCurrentSpan:
         assert inner_span.parent is not None
         assert inner_span.parent.span_id == _span_id(outer_span)
 
-    async def test_a_failing_pipe_keeps_its_span_current_through_the_failure_and_records_it_once(
+    async def test_a_failing_pipe_keeps_its_span_through_the_failure_and_records_it_once(
         self, sunk: Sunk, span_exporter: InMemorySpanExporter
     ) -> None:
         pipe = _make_pipe(code="failing", fails=True)
@@ -301,13 +324,13 @@ class TestLiveRunPipeCurrentSpan:
 
         pipe_span = _span_named(span_exporter.get_finished_spans(), code="failing")
         assert sunk.read_lines()["inside failing"].span_id == _hex_span_id(pipe_span)
-        assert trace.get_current_span() is trace.INVALID_SPAN
-        # The pipe's own error hook records the failure; making the span current records nothing more.
+        assert span_context_for_logs() is None
+        # The pipe's own error hook records the failure; holding the span records nothing more.
         assert pipe_span.status.status_code is StatusCode.ERROR
         assert [event.name for event in pipe_span.events] == ["exception"]
 
-    async def test_without_a_tracer_the_callers_span_stays_current(self, sunk: Sunk, mocker: MockerFixture) -> None:
-        """No tracer, no pipe span: the context is left alone, so a line names whatever span the caller runs under."""
+    async def test_without_a_tracer_a_line_names_the_callers_span(self, sunk: Sunk, mocker: MockerFixture) -> None:
+        """No tracer, no pipe span: nothing is held, so a line names whatever span the caller runs under."""
         mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=None)
         caller_tracer = TracerProvider().get_tracer(__name__)
         pipe = _make_pipe(code="untraced")
@@ -317,8 +340,9 @@ class TestLiveRunPipeCurrentSpan:
         caller_context = caller_span.get_span_context()
 
         assert sunk.read_lines()["inside untraced"] == LineTrace(trace_id=f"{caller_context.trace_id:032x}", span_id=f"{caller_context.span_id:016x}")
+        assert pipe.seen_current_spans == [caller_span]
 
-    async def test_a_cancelled_pipe_ends_its_span_and_restores_the_context(self, sunk: Sunk, span_exporter: InMemorySpanExporter) -> None:
+    async def test_a_cancelled_pipe_ends_its_span(self, sunk: Sunk, span_exporter: InMemorySpanExporter) -> None:
         """A cancellation is not an ``Exception``; the span still ends, so the lines of the run name a span the backend receives."""
         pipe = _make_pipe(code="cancelled", hangs=True)
         task = asyncio.create_task(_run(pipe))
@@ -331,9 +355,8 @@ class TestLiveRunPipeCurrentSpan:
         pipe_span = _span_named(span_exporter.get_finished_spans(), code="cancelled")
         assert pipe_span.status.status_code is StatusCode.ERROR
         assert sunk.read_lines()["inside cancelled"].span_id == _hex_span_id(pipe_span)
-        assert trace.get_current_span() is trace.INVALID_SPAN
 
-    async def test_a_no_op_tracer_leaves_the_callers_span_current(self, sunk: Sunk, mocker: MockerFixture) -> None:
+    async def test_a_no_op_tracer_leaves_the_callers_span_to_the_line(self, sunk: Sunk, mocker: MockerFixture) -> None:
         """A no-op tracer, what the SDK hands out under ``OTEL_SDK_DISABLED``, starts spans naming no trace, which must not hide the caller's."""
         mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=trace.NoOpTracer())
         caller_tracer = TracerProvider().get_tracer(__name__)

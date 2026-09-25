@@ -16,7 +16,7 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedCons
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.system.exceptions import JobMetadataError
 from pipelex.system.job_metadata import UnitJobId
-from pipelex.system.telemetry.current_span import span_made_current
+from pipelex.system.telemetry.current_span import pipelex_span_active
 from pipelex.system.telemetry.otel_constants import (
     GenAISpanAttr,
     LangfuseSpanAttr,
@@ -463,9 +463,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.TEXT)
 
-        # The span is current from here until it ends, whichever way it ends, so a log line or a
-        # provider SDK's own span during the call is joined to it.
-        with span_made_current(span=span):
+        # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
+        # during the call, a provider SDK's included, is joined to it; OpenTelemetry's current context
+        # is left alone.
+        with pipelex_span_active(span=span):
             try:
                 text_result = await self._gen_text(llm_job=llm_job)
                 await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
@@ -505,9 +506,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.OBJECT, output_class_name=schema.__name__)
 
-        # The span is current from here until it ends, whichever way it ends, so a log line or a
-        # provider SDK's own span during the call is joined to it.
-        with span_made_current(span=span):
+        # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
+        # during the call, a provider SDK's included, is joined to it; OpenTelemetry's current context
+        # is left alone.
+        with pipelex_span_active(span=span):
             try:
                 object_result = await self._gen_object(llm_job=llm_job, schema=schema)
 
