@@ -13,7 +13,6 @@ from typing import Any, cast
 
 from pytest_mock import MockerFixture
 
-from pipelex import log
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
@@ -139,11 +138,3 @@ class TestGatewayUnknownPerModelKeys:
         extra_headers, _ = GatewayFactory.make_extras(model_spec, inference_job=mocker.MagicMock(spec=LLMJob), output_desc="text")
 
         assert extra_headers["x-portkey-config"] == "pc-openai-6e7576"
-
-    def test_pruning_a_per_model_key_does_not_need_the_log_hub(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Same constraint as the `defaults` prune: this runs on gateway loads that precede runtime_hub.set_config()."""
-        mocker.patch.object(log.log_dispatch, "_log_config_instance", None)
-
-        library = self._load(tmp_path, model_specs=self._remote_specs(per_model_extras={"a_field_we_removed": "openai"}))
-
-        assert library.get_inference_backend(backend_name="pipelex_gateway") is not None

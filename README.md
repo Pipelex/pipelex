@@ -2,7 +2,7 @@
   <h1 align="center"><a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex" width="400" style="max-width: 100%; height: auto;"></a></h1>
 
   <h2 align="center">Turn your expertise into an AI-powered App, MCP or API</h2>
-  <p align="center">Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, from your agent or your chatbot via MCP, or via API in any software.</p>
+  <p align="center">Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, as an MCP for chatbots, or via API for your software.</p>
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
@@ -23,11 +23,11 @@
 <!-- Generated from the Pipelex onboarding source; this region is replaced from https://raw.githubusercontent.com/Pipelex/.github/main/onboarding/rendered/front-door.md — do not edit it here. -->
 ## Quick start
 
-Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
+Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software.
 
 **1. Sign up at [app.pipelex.com](https://app.pipelex.com).**
 
-**2. Install the Pipelex plugin in your coding agent.** The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
+**2. Install the Pipelex plugin in your coding agent.** The plugin gives your agent the skills that build methods, run them and put them in your software, a hook that checks every edit, and the Pipelex tools.
 
 <details open><summary><b>Claude Code</b></summary>
 
@@ -38,7 +38,7 @@ claude plugin install pipelex@pipelex-plugins
 
 Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
-Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
+Claude Code also loads what you have added to your Claude account, so if you added the Pipelex MCP to Claude, Claude Code has it too. An agent with the plugin does not need the Pipelex MCP, and there is nothing to turn off: when both are present, the Pipelex MCP defers to the plugin's tools.
 
 </details>
 
@@ -77,7 +77,7 @@ You get a run id straight away, and you can ask for its status, its results or t
 
 Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it to the conversation instead and ask for a run on it; Claude has no way yet to hand the Pipelex MCP a file you attached.
 
-**The other two ways.** Turn the method into a webapp with the [method-app template](https://github.com/Pipelex/pipelex-method-apps), or use it via API in any software through `POST /v1/start` — in TypeScript with [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk), in Python with [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/), or with any HTTP client.
+**The other two ways, built by your agent too.** Ask it for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. Ask it to call the method from your TypeScript or Python code, and `/pipelex-integrate` generates the method's types and one typed call that runs it, through the TypeScript SDK [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) or the Python SDK [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/). Any other software runs a method via API through `POST /v1/start`, with any HTTP client.
 
 **Next:** [what Pipelex is](https://go.pipelex.com/product) · [documentation](https://go.pipelex.com/docs) · [your console](https://app.pipelex.com) · [Discord](https://go.pipelex.com/discord)
 
@@ -91,15 +91,16 @@ This repository is the Pipelex runtime: the Python package that reads a `.mthds`
 ### Install
 
 ```bash
-uv tool install pipelex
+uv tool install "pipelex[cli]"
 pipelex init
 pipelex doctor
 ```
 
-`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing.
+`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
 
 Some providers and features need an extra:
 
+- `cli`: Rich, for the `pipelex` and `pipelex-agent` commands, the `console` log sink and the `rich` pretty-print mode. Install it wherever Pipelex runs in a terminal; a server leaves it out and selects the `json` log sink with the `poor` or `silent` pretty-print mode, and then nothing the runtime does on the way to running a method asks for Rich. Leaving the extra out does not make the environment Rich-free: `typer` and `instructor` are core dependencies and both require Rich, so a stock install still contains it
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `google-genai`: Google Gemini API support for text and image generation
@@ -112,7 +113,7 @@ Some providers and features need an extra:
 Name the ones you need when you install, or take them all:
 
 ```bash
-uv tool install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
+uv tool install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
 ### Configure AI Access
@@ -144,7 +145,7 @@ Then run it:
 pipelex run bundle summarize.mthds --inputs inputs.json
 ```
 
-The result is written under `results/`. For a method with several steps, typed concepts and a batch, run from the CLI and from Python, read [CV batch screening, step by step](https://docs.pipelex.com/latest/cookbook/cv-batch-screening/).
+The result is written under `results/`. For a method with several steps, typed concepts and a batch, run from the CLI and from Python, read [CV batch screening, step by step](https://docs.pipelex.com/latest/get-started/cv-batch-screening/).
 
 ### Editor extension
 
@@ -210,8 +211,8 @@ The same `.mthds` file runs from multiple execution targets:
 ## Documentation
 
 - [docs.pipelex.com](https://docs.pipelex.com/): the Pipelex documentation, from the MTHDS language tutorial to the CLI reference.
-- [CV batch screening, step by step](https://docs.pipelex.com/latest/cookbook/cv-batch-screening/): a production method with its concepts, its pipes and its flowchart, and how to run it from the CLI and from Python.
-- [The cookbook](https://github.com/Pipelex/pipelex-cookbook): methods to clone, run and adapt.
+- [CV batch screening, step by step](https://docs.pipelex.com/latest/get-started/cv-batch-screening/): a production method with its concepts, its pipes and its flowchart, and how to run it from the CLI and from Python.
+- [The cookbook](https://github.com/Pipelex/pipelex-cookbook): Pipelex's example methods, which run by their address on the hosted API with nothing to install, each with a page showing every way to use it: in your chatbot, in your coding agent, in your code, as an app, or as a method of your own.
 - [The MTHDS standard](https://mthds.ai/latest/): the language a method is written in.
 - [The changelog](https://docs.pipelex.com/latest/changelog/).
 

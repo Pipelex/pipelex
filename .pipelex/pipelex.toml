@@ -96,6 +96,18 @@ console_log_target = "stderr"
 # targets to stderr internally to keep its stdout strictly reserved for the success
 # envelope.
 console_print_target = "stdout"
+# sink names where the records go: "console" (the Rich handler, for a terminal), "json" (one JSON
+# object per line, for a server behind a log agent), "otlp" (the OpenTelemetry logs signal, for a
+# collector), or a token an installed plugin registers.
+sink = "console"
+
+# redaction scrubs known secret shapes (bearer tokens, api-key and signature headers, OAuth code
+# parameters, cookies, JSON secret entries, the sk_ / plx_sk_ / pk_ / bl_ key prefixes) out of the
+# message and of every string a field carries, and neutralises control characters in a field value so
+# a caller-supplied string cannot forge a line. Add this project's own secret shapes to extra_patterns.
+[runtime.log.redaction]
+is_enabled = true
+extra_patterns = []
 
 [runtime.log.package_log_levels]
 # Log levels for specific packages (use "-" instead of "." in package names)

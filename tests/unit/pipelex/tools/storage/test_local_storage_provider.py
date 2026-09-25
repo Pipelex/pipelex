@@ -117,6 +117,20 @@ class TestLocalStorageProvider:
 
         assert "path traversal" in str(exc_info.value).lower()
 
+    async def test_key_with_null_byte_raises_invalid_uri(self, tmp_path: Path) -> None:
+        """A key holding a NUL byte cannot name a file, so it is refused like any other invalid key.
+
+        `Path.resolve()` raises a bare ValueError on it, which would otherwise escape a
+        caller-supplied storage reference as an internal error.
+        """
+        provider = LocalStorageProvider(root_path=tmp_path)
+        uri = f"{PIPELEX_STORAGE_SCHEME}a\x00b.png"
+
+        with pytest.raises(StorageInvalidUriError, match="null byte"):
+            await provider.public_url(uri=uri)
+        with pytest.raises(StorageInvalidUriError, match="null byte"):
+            await provider.load(uri=uri)
+
     async def test_store_empty_bytes(self, tmp_path: Path) -> None:
         """Test storing and loading empty bytes."""
         provider = LocalStorageProvider(root_path=tmp_path)

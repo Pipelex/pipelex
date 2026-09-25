@@ -1,6 +1,6 @@
 ---
 title: "Quick Start"
-description: "Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software."
+description: "Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software."
 ---
 
 <!--
@@ -18,7 +18,7 @@ block's.
 
 # Quick Start
 
-Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
+Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software.
 
 ## 1. Sign up
 
@@ -26,7 +26,7 @@ Sign up at [app.pipelex.com](https://app.pipelex.com).
 
 ## 2. Install the Pipelex plugin in your coding agent
 
-The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
+The plugin gives your agent the skills that build methods, run them and put them in your software, a hook that checks every edit, and the Pipelex tools.
 
 === "Claude Code"
 
@@ -37,7 +37,7 @@ The plugin is how you build methods: it gives your agent the skills that write a
 
     Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
-    Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
+    Claude Code also loads what you have added to your Claude account, so if you added the Pipelex MCP to Claude, Claude Code has it too. An agent with the plugin does not need the Pipelex MCP, and there is nothing to turn off: when both are present, the Pipelex MCP defers to the plugin's tools.
 
 === "Codex"
 
@@ -78,9 +78,11 @@ Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it t
 
 ## The other two ways
 
+Your agent builds these too, and each can also be done by hand.
+
 ### As a webapp
 
-Turn the method into a webapp with the [method-app template](https://github.com/Pipelex/pipelex-method-apps):
+Ask your agent for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. By hand, the same app takes these commands:
 
 ```bash
 src=$(mktemp -d)
@@ -97,7 +99,7 @@ The app calls Pipelex from its own server code, so it needs a key of its own —
 
 ### Via API
 
-Use the method via API in any software through `POST /v1/start` — in TypeScript with [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk), in Python with [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/), or with any HTTP client.
+Ask your agent to call the method from your TypeScript or Python code, and `/pipelex-integrate` generates the method's types and one typed call that runs it, through the TypeScript SDK [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) or the Python SDK [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/). By hand, any software runs a method via API through `POST /v1/start`, with either SDK or with any HTTP client.
 
 Create an API key in your console at [app.pipelex.com](https://app.pipelex.com) and give it to your program as `PIPELEX_API_KEY` — the only thing to configure, since `PIPELEX_BASE_URL` already points at the hosted API.
 

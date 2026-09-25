@@ -1,10 +1,7 @@
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict, Field, field_validator
-from rich.console import Group
-from rich.table import Table
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
@@ -22,8 +19,11 @@ from pipelex.core.pipes.variable_multiplicity import (
 )
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType, valid_pipe_type_tags
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeSpec(StructuredContent):
@@ -211,7 +211,12 @@ class PipeSpec(StructuredContent):
         )
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.table import Table
+        from rich.text import Text
+
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))

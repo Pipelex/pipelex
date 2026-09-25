@@ -10,15 +10,16 @@ The Pipelex runtime is the Python package that reads a `.mthds` file and runs it
 ## Install
 
 ```bash
-uv tool install pipelex
+uv tool install "pipelex[cli]"
 pipelex init
 pipelex doctor
 ```
 
-`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing.
+`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
 
 Some providers and features need an extra:
 
+- `cli`: Rich, for the `pipelex` and `pipelex-agent` commands, the `console` log sink and the `rich` pretty-print mode. Install it wherever Pipelex runs in a terminal; a server leaves it out and selects the `json` log sink with the `poor` or `silent` pretty-print mode (see [Rich Imports](../contribute/rich-imports.md))
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `google-genai`: Google Gemini API support for text and image generation
@@ -31,7 +32,7 @@ Some providers and features need an extra:
 Name the ones you need when you install, or take them all:
 
 ```bash
-uv tool install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
+uv tool install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
 ## Configure AI access
@@ -77,7 +78,7 @@ Then run it:
 pipelex run bundle summarize.mthds --inputs inputs.json
 ```
 
-The result is written under `results/`. From here, [The MTHDS Language Tutorial](./mthds-language-tutorial.md) builds a method step by step, and [CV batch screening](../cookbook/cv-batch-screening.md) runs a method with several steps, typed concepts and a batch, from the CLI and from Python.
+The result is written under `results/`. From here, [The MTHDS Language Tutorial](./mthds-language-tutorial.md) builds a method step by step, and [CV batch screening, step by step](./cv-batch-screening.md) runs a method with several steps, typed concepts and a batch, from the CLI and from Python.
 
 ## Editor extension
 

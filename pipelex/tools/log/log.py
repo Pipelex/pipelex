@@ -1,18 +1,54 @@
+from __future__ import annotations
+
+import contextlib
 import logging
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from rich.console import Console
-from rich.logging import RichHandler
-
-from pipelex.tools.log.log_config import LogConfig, LogMode
+from pipelex.tools.log.log_context import bind_log_context
 from pipelex.tools.log.log_dispatch import LogDispatch
-from pipelex.tools.log.log_formatter import EmojiLogFormatter, LevelAndEmojiLogFormatter
+from pipelex.tools.log.log_holding import ForwardedRecordFilter, HoldingLogHandler
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
+from pipelex.tools.log.log_redaction import make_redaction_processor
+from pipelex.tools.log.log_sink import ProcessorFilter
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+    from contextlib import AbstractContextManager
+
+    from pipelex.tools.log.log_config import LogConfig
+    from pipelex.tools.log.log_context import LogContext
+    from pipelex.tools.log.log_sink import LogRecordProcessor, LogSink
+
+
+def _finish_teardown_step(*, sink: LogSink, verb: str, step: Callable[[], None]) -> None:
+    """Run one step of a sink's teardown and let nothing it raises escape.
+
+    A closed stream, a test capture or a redirected process stream torn down first, stays silent: the
+    stdlib's own shutdown tolerates the same two. Anything else, an exporter that cannot reach its
+    collector or a processor whose shutdown raises, is a fact about the sink, said on stderr with the
+    step that failed, and never a reason to leave the teardown half done.
+    """
+    try:
+        step()
+    except (OSError, ValueError):
+        pass
+    except Exception as exc:  # ruff: ignore[blind-except]
+        # A closed or disconnected stderr is the one place the diagnostic can go, and a teardown that
+        # stopped to say it could not be said would be the failure it was written to avoid.
+        with contextlib.suppress(Exception):
+            sys.stderr.write(f"The log sink {type(sink).__name__} failed to {verb} at reset: {exc!r}\n")
 
 
 class Log:
-    """A class for managing logging configurations and operations."""
+    """A class for managing logging configurations and operations.
+
+    Configuration is two steps, because the sink is a plugin capability and plugin discovery runs a
+    little after the configuration is read: ``configure`` sets the levels and holds every record on the
+    root logger, then ``install_sink`` puts the selected sink's handler in its place and replays what was
+    held through it. ``reset`` removes exactly what those two installed and leaves every other handler,
+    a host's or a test's, where it was.
+    """
 
     ########################################################
     # Init and Configure
@@ -21,54 +57,58 @@ class Log:
     def __init__(self):
         """Initialize the Log class with default attributes."""
         self._log_config_instance: LogConfig | None = None
-        self.rich_handler: logging.Handler | None = None
-        self.poor_handler: logging.Handler | None = None
+        self._holding_handler: HoldingLogHandler | None = None
+        self._sink: LogSink | None = None
+        # The redaction processor ``install_sink`` put on the sink, so ``reset`` can take it back.
+        self._redaction_processor: LogRecordProcessor | None = None
         self.log_dispatch: LogDispatch = LogDispatch()
 
-    def set_log_mode(self, mode: LogMode):
-        self.log_dispatch.set_log_mode(mode=mode)
+    @property
+    def sink(self) -> LogSink | None:
+        """The installed sink, or ``None`` before ``install_sink`` and after ``reset``."""
+        return self._sink
 
     @property
-    def _log_config(self) -> LogConfig:
-        """Get the log configuration, raising an error if it's not set.
-
-        Returns:
-            LogConfig: The current log configuration.
-
-        Raises:
-            RuntimeError: If the log configuration is not set.
-
-        """
-        if self._log_config_instance is None:
-            msg = "LogConfig is not set. You must initialize Pipelex first."
-            raise RuntimeError(msg)
-        return self._log_config_instance
+    def is_configured(self) -> bool:
+        """Whether ``configure`` has run and ``reset`` has not, which is what makes a later ``configure`` refuse."""
+        return self._log_config_instance is not None
 
     def reset(self):
-        """Reset the logging system."""
-        # Remove all handlers from the root logger
+        """Remove what ``configure`` and ``install_sink`` put on the root logger, and forget the configuration.
+
+        The sink's handler is flushed and closed, which is where a batching sink ships what it still
+        holds, and nothing that flush or close raises escapes: this runs first in the runtime's release
+        of its process globals, and an error out of it would skip the rest and leave the process
+        unbootable. The close runs whatever the flush did, since the close is what stops an exporter's
+        thread, ships its last batch and unregisters what it put at exit. The redaction processor
+        ``install_sink`` put on the sink is taken back and the closed handler is discarded, so a sink
+        object installed again carries the next configuration's processor and not two, and builds itself
+        a live handler rather than being handed back the one this close just finished with. A holding
+        handler still in place, because the boot died before its sink arrived, is closed too, and what
+        it holds gets the stdlib's last-resort handling once the redaction ``configure`` gave it has run
+        over each record.
+        """
         root_logger = logging.getLogger()
-        for handler in root_logger.handlers[:]:
-            root_logger.removeHandler(handler)
-            handler.close()
-
-        # Remove handlers from poor loggers
-        if self._log_config_instance:
-            poor_loggers = {
-                *self._log_config_instance.poor_loggers,
-                self._log_config_instance.generic_poor_logger,
-            }
-            for logger_name in poor_loggers:
-                logger = logging.getLogger(logger_name)
-                for handler in logger.handlers[:]:
-                    logger.removeHandler(handler)
-                    handler.close()
-
-        logging.shutdown()
-        self._log_config_instance = None
-        self.rich_handler = None
-        self.poor_handler = None
-        self.log_dispatch.reset()
+        try:
+            if self._sink is not None:
+                sink, self._sink = self._sink, None
+                handler = sink.handler
+                root_logger.removeHandler(handler)
+                try:
+                    _finish_teardown_step(sink=sink, verb="flush", step=handler.flush)
+                finally:
+                    _finish_teardown_step(sink=sink, verb="close", step=handler.close)
+                    self._take_back_redaction_processor(sink=sink)
+                    sink.discard_handler()
+            if self._holding_handler is not None:
+                holding, self._holding_handler = self._holding_handler, None
+                root_logger.removeHandler(holding)
+                holding.close()
+        finally:
+            # Whatever the handlers did, the configuration is forgotten: a reset that left it in place
+            # would make the next ``configure`` refuse, which is the unbootable process this guards.
+            self._log_config_instance = None
+            self.log_dispatch.reset()
 
     def configure_if_unset(self, log_config: LogConfig) -> bool:
         """Configure logging unless already configured.
@@ -107,38 +147,94 @@ class Log:
 
         self._log_config_instance = log_config
 
-        self.rich_handler = log_config.rich_log.make_rich_handler(target=log_config.console_log_target)
-        self.rich_handler.setFormatter(EmojiLogFormatter())
-
-        # Configure the root logger
+        # Configure the root logger: the levels now, the sink when discovery hands it over. Until then
+        # every record is held, so nothing a boot says is lost or written in a shape nothing chose.
         root_logger = logging.getLogger()
         root_logger.setLevel(log_config.default_log_level.int_logging_level)
-        root_logger.addHandler(self.rich_handler)
-
-        self.poor_handler = logging.StreamHandler()
-        self.poor_handler.setFormatter(LevelAndEmojiLogFormatter())
-        poor_loggers = {*log_config.poor_loggers, log_config.generic_poor_logger}
-        for logger_name in poor_loggers:
-            logger = logging.getLogger(logger_name)
-            logger.setLevel(log_config.default_log_level.int_logging_level)
-            logger.addHandler(self.poor_handler)
-            logger.propagate = False
+        # A boot that dies before its sink arrives hands what was held to the stdlib's last resort, and
+        # those records meet the redaction there as they would have met it on the sink's handler, behind
+        # the same guard: a failed boot is the one moment the trail on stderr is read line by line.
+        last_resort_filter = None
+        if log_config.redaction.is_enabled:
+            last_resort_filter = ProcessorFilter(processors=[make_redaction_processor(config=log_config.redaction)])
+        self._holding_handler = HoldingLogHandler(last_resort_filter=last_resort_filter)
+        root_logger.addHandler(self._holding_handler)
 
         self.set_levels_for_packages(package_log_levels=log_config.package_log_levels)
 
         self.verbose("Logs configured and config set")
 
-    def set_poor_log_formatter(self, formatter: logging.Formatter):
-        """Set the formatter for the poor log handler.
+    def _take_back_redaction_processor(self, *, sink: LogSink) -> None:
+        """Remove from the sink the processor ``install_sink`` put there, so a sink installed again carries the next configuration's alone.
 
-        Args:
-            formatter (logging.Formatter): The formatter to use for poor logging.
+        Guarded, since a sink is free to have replaced its list; a processor that is no longer there is nothing to take back.
+        """
+        processor, self._redaction_processor = self._redaction_processor, None
+        if processor is None:
+            return
+        with contextlib.suppress(ValueError):
+            sink.processors.remove(processor)
+
+    def install_sink(self, sink: LogSink):
+        """Put the sink's handler on the root logger and replay through it every record held since ``configure``.
+
+        The handler is built here, so a sink whose dependency is missing fails at this call, at boot,
+        with the extra named. Once per configuration: a second sink is refused, as a second ``configure`` is.
+
+        The redaction processor is put in front of the sink's own processors here rather than by each
+        sink, so every sink gets it, the built-in ones, an out-of-tree one and the console sink the
+        doctor falls back to alike, and none of them knows about it.
+
+        Raises:
+            RuntimeError: If logging is not configured, or a sink is already installed.
+            MissingDependencyError: If the sink's handler needs a package that is not installed.
 
         """
-        if self.poor_handler is None:
-            msg = "Poor log handler is not set."
+        if self._log_config_instance is None:
+            msg = "Logging is not configured. Call log.configure() before log.install_sink()."
             raise RuntimeError(msg)
-        self.poor_handler.setFormatter(formatter)
+        if self._sink is not None:
+            msg = "A log sink is already installed. You can only call log.install_sink() once per configuration."
+            raise RuntimeError(msg)
+
+        redaction = self._log_config_instance.redaction
+        if redaction.is_enabled:
+            # Ahead of whatever the sink appended, so a processor that renders or enriches a record
+            # works on one the secrets have already left. A processor that adds a secret of its own
+            # after the scrub is that sink's to answer for. Remembered, so ``reset`` takes it back off a
+            # sink object a caller installs again.
+            self._redaction_processor = make_redaction_processor(config=redaction)
+            sink.processors.insert(0, self._redaction_processor)
+
+        try:
+            handler = sink.handler
+        except BaseException:
+            # The sink is not recorded when its handler fails to build, so ``reset`` would never reach it:
+            # the processor comes back off here, or the same sink installed again carries two.
+            self._take_back_redaction_processor(sink=sink)
+            raise
+        # Ahead of every other filter, so the sink's processors never run on a record it rejects.
+        handler.filters.insert(0, ForwardedRecordFilter())
+        root_logger = logging.getLogger()
+        # Recorded before the replay: a handler that raises on one held record leaves the sink
+        # installed all the same, so ``reset`` finds it and removes it rather than leaking it into
+        # the next boot.
+        self._sink = sink
+        if self._holding_handler is None:
+            root_logger.addHandler(handler)
+            return
+        # The held records drain first, so every one of them precedes whatever is emitted from now
+        # on. A record emitted meanwhile reaches the holding handler, which forwards it once and
+        # marks it; once the sink's handler is on the root logger too, the guard on it rejects the
+        # root's own delivery of that same record, so nothing is delivered twice, and nothing reaches
+        # neither, since one of the two handlers is on the root at every instant.
+        holding, self._holding_handler = self._holding_handler, None
+        try:
+            holding.release_to(handler=handler)
+        finally:
+            root_logger.addHandler(handler)
+            root_logger.removeHandler(holding)
+            holding.close()
 
     def _should_ignore(self, problem_id: str | None = None) -> bool:
         """Check if a log message should be ignored based on the problem ID.
@@ -150,22 +246,22 @@ class Log:
             bool: True if the message should be ignored, False otherwise.
 
         """
-        return bool(problem_id) and problem_id in self._log_config.silenced_problem_ids
+        if self._log_config_instance is None:
+            return False
+        return bool(problem_id) and problem_id in self._log_config_instance.silenced_problem_ids
 
     ########################################################
     # Public methods
     ########################################################
 
     def redirect_to_stderr(self):
-        """Redirect the root logger's rich handler to stderr.
+        """Point the installed sink at stderr when it writes to a process stream.
 
-        Used by the agent CLI to ensure no log output pollutes stdout.
+        Used by the agent CLI to ensure no log output pollutes stdout. A no-op before a sink is
+        installed, and for a sink that writes to no process stream.
         """
-        if self.rich_handler is not None:
-            if not isinstance(self.rich_handler, RichHandler):
-                msg = "Rich handler is not properly set."
-                raise RuntimeError(msg)
-            self.rich_handler.console = Console(file=sys.stderr)
+        if self._sink is not None:
+            self._sink.redirect_to_stderr()
 
     def set_level_by_int(self, *, level_int: int):
         """Set the log level using an integer value.
@@ -221,12 +317,28 @@ class Log:
         for package_name, level in package_log_levels.items():
             self.set_level_for_package(package_name=package_name, level=level)
 
+    def context(
+        self,
+        *,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        pipe_run_id: str | None = None,
+    ) -> AbstractContextManager[LogContext]:
+        """Bind the run-scoped identifiers onto every record emitted inside the block.
+
+        Bound at a process entry from the payload it received — ``PipeRun.run`` binds from the job's
+        metadata — and released when the block exits. Nested blocks merge, the inner overriding the
+        outer for the identifiers it gives; a ``None`` inherits rather than clears.
+        """
+        return bind_log_context(request_id=request_id, pipeline_run_id=pipeline_run_id, pipe_run_id=pipe_run_id)
+
     def verbose(
         self,
         content: str | Any,
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a verbose message.
 
@@ -235,10 +347,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = LOGGING_LEVEL_VERBOSE
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def debug(
         self,
@@ -246,6 +359,7 @@ class Log:
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a debug message.
 
@@ -254,10 +368,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = logging.DEBUG
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def dev(
         self,
@@ -265,6 +380,7 @@ class Log:
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a development message.
 
@@ -273,10 +389,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = LOGGING_LEVEL_DEV
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def info(
         self,
@@ -284,6 +401,7 @@ class Log:
         *,
         title: str | None = None,
         inline: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log an info message.
 
@@ -292,10 +410,11 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
 
         """
         severity = logging.INFO
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def warning(
         self,
@@ -304,6 +423,7 @@ class Log:
         title: str | None = None,
         inline: str | None = None,
         problem_id: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a warning message.
 
@@ -312,13 +432,14 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
             problem_id (str | None, optional): A problem ID to associate with the warning. Defaults to None.
 
         """
         if self._should_ignore(problem_id=problem_id):
             return
         severity = logging.WARNING
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
 
     def error(
         self,
@@ -328,6 +449,7 @@ class Log:
         inline: str | None = None,
         include_exception: bool = False,
         problem_id: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log an error message.
 
@@ -336,6 +458,7 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the error. Defaults to None.
 
@@ -349,6 +472,7 @@ class Log:
             title=title,
             inline=inline,
             include_exception=include_exception,
+            fields=fields,
         )
 
     def critical(
@@ -359,6 +483,7 @@ class Log:
         inline: str | None = None,
         include_exception: bool = False,
         problem_id: str | None = None,
+        fields: Mapping[str, Any] | None = None,
     ):
         """Log a critical message.
 
@@ -367,6 +492,7 @@ class Log:
             title (str | None, optional): The title of the log message. Defaults to None.
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
+            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the critical message. Defaults to None.
 
@@ -380,6 +506,7 @@ class Log:
             title=title,
             inline=inline,
             include_exception=include_exception,
+            fields=fields,
         )
 
 

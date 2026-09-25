@@ -67,6 +67,9 @@ jobs:
       - name: Run hub layering check
         run: make check-hub-layering
 
+      - name: Run Rich import check
+        run: make check-rich-imports
+
       - name: Run drift contracts check
         run: make drift-check
 

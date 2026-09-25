@@ -123,6 +123,20 @@ class DuplicateSecretsProviderError(PluginError):
         super().__init__(message)
 
 
+class DuplicateLogSinkError(PluginError):
+    """Two plugins registered a log sink for the same method."""
+
+    def __init__(self, *, method: str, first_plugin: str, second_plugin: str):
+        self.method = method
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Log sink for method '{method}' is registered by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            "Each method must have a single sink."
+        )
+        super().__init__(message)
+
+
 class DuplicatePipeFuncExecutorError(PluginError):
     """Two plugins registered a PipeFunc executor for the same execution mode."""
 
@@ -369,5 +383,30 @@ class UnknownSecretsMethodError(PluginError):
         message = (
             f"No secrets provider is registered for method '{method}'. Registered methods: {available}. "
             "Check runtime.secrets.method, or install/enable the plugin that provides that method."
+        )
+        super().__init__(message)
+
+
+class UnknownLogSinkError(PluginError):
+    """A configured log sink has no registered factory.
+
+    ``runtime.log.sink`` selects a sink from the registry the built-in ``LogSinkPlugin`` (and any
+    external plugin contributing one) populates. When the token names no registered factory — a typo,
+    or an external plugin that is not installed or was disabled via ``runtime.plugins.disabled`` — boot
+    fails loud here rather than starting with its records going nowhere. The message lists the
+    registered sinks so the fix is obvious.
+    """
+
+    # The message describes the caller's own input (the configured sink) and lists the registered
+    # ones; it is fully actionable, so keep it verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, method: str, registered_methods: list[str]):
+        self.method = method
+        self.registered_methods = registered_methods
+        available = ", ".join(sorted(registered_methods)) or "(none)"
+        message = (
+            f"No log sink is registered for '{method}'. Registered sinks: {available}. "
+            "Check runtime.log.sink, or install/enable the plugin that provides that sink."
         )
         super().__init__(message)

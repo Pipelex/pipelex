@@ -3,15 +3,13 @@ from __future__ import annotations
 import importlib.util
 from typing import TYPE_CHECKING, Any
 
-from rich import box
-from rich.table import Table
-
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.config import get_config
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.runtime_hub import get_console
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.aws.exceptions import AwsCredentialsError
+from pipelex.tools.misc.rich_extra import RICH_TABLE_MISSING_MESSAGE, require_rich
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend
@@ -103,6 +101,10 @@ def _display_bedrock_models_table(
     aws_region: str,
 ) -> None:
     """Display Bedrock models in table format."""
+    require_rich(message=RICH_TABLE_MISSING_MESSAGE)
+    from rich import box
+    from rich.table import Table
+
     table = Table(
         title=f"Available Bedrock Models in {aws_region} (SDK: {sdk})",
         show_header=True,

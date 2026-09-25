@@ -2,8 +2,6 @@ from itertools import groupby
 from typing import Self
 
 from pydantic import RootModel
-from rich import box
-from rich.table import Table
 from typing_extensions import override
 
 from pipelex import pretty_print
@@ -11,6 +9,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.tools.misc.rich_extra import RICH_TABLE_MISSING_MESSAGE, require_rich
 
 PipeLibraryRoot = dict[str, PipeAbstract]
 
@@ -200,6 +199,11 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def pretty_list_pipes(self) -> None:
+        # The table is built whatever the pretty-print mode, so this listing needs Rich in every mode.
+        require_rich(message=RICH_TABLE_MISSING_MESSAGE)
+        from rich import box
+        from rich.table import Table
+
         def _format_concept_code(concept_code: str | None, *, current_domain: str) -> str:
             """Format concept code by removing domain prefix if it matches current domain."""
             if not concept_code:

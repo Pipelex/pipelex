@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from rich.markup import escape
-
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelListingUnsupportedError, ModelManagerError
 from pipelex.runtime_hub import get_console, get_model_lister_registry, get_models_manager
@@ -31,7 +29,10 @@ class ModelLister:
 
         # A backend with no model specs is a valid config state — there is simply nothing to list.
         if not backend.model_specs:
+            # The note renders through Rich; the console hands out the named failure when the extra is missing.
             console = get_console()
+            from rich.markup import escape
+
             if flat:
                 console.print(f"# Note: Backend '{escape(backend_name)}' has no models configured")
             else:
@@ -95,7 +96,10 @@ class ModelLister:
     ) -> None:
         """Display message about unsupported SDKs."""
         if not any_listed and unsupported_sdks:
+            # As above: nothing renders unless there is something to say, so the guard sits with the printing.
             console = get_console()
+            from rich.markup import escape
+
             if not flat:
                 console.print(
                     f"\n[yellow]Note: Backend '{escape(backend_name)}' has models using SDKs that we don't support for remote listing:[/yellow]"

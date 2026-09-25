@@ -1,16 +1,16 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
-from rich.console import Group
-from rich.markup import escape
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeExtractSpec(PipeSpec):
@@ -69,7 +69,12 @@ class PipeExtractSpec(PipeSpec):
         return inputs_value
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.markup import escape
+        from rich.text import Text
+
         # Get base pipe information from parent
         base_group = super().rendered_pretty(title=title, depth=depth)
 

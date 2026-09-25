@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 # v4 split the single ``pipelex.plugins`` entry-point group into the two ``PluginGroup`` groups
 # below: a plugin now declares its layer by the group it publishes under, and a kernel-group plugin
 # may no longer reach the interpreter tier of the menu.
+#
+# ``add_log_sink`` — a third config-selected, process-global registry (``runtime.log.sink`` picks the
+# factory at boot) — joined the menu under v4 without a bump: a menu addition breaks no plugin that
+# targets v4, and a bump would have made every installed plugin re-declare ``targets_api`` for nothing.
 PLUGIN_API_VERSION: int = 4
 
 

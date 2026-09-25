@@ -3,6 +3,7 @@ import importlib.util
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from typing_extensions import override
 
@@ -67,7 +68,7 @@ class GcpStorageProvider(StorageProviderAbstract):
                     msg,
                 )
 
-            from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+            from google.cloud import storage  # type: ignore[import-untyped, attr-defined]  # ruff: ignore[import-outside-top-level]
 
             credentials_path = Path(self._credentials_file_path)
             if not credentials_path.exists():
@@ -172,13 +173,16 @@ class GcpStorageProvider(StorageProviderAbstract):
     def _make_public_url(self, key: str) -> str:
         """Build a public URL for a GCS object.
 
+        The key is percent-encoded as GCS signs it, since a caller's own upload can name a key holding
+        a space, a `#` or a `?`, which a raw URL would misread.
+
         Args:
             key: Storage key (without scheme prefix).
 
         Returns:
             Public URL for the object.
         """
-        return f"https://storage.googleapis.com/{self._bucket_name}/{key}"
+        return f"https://storage.googleapis.com/{self._bucket_name}/{quote(key, safe='/~')}"
 
     def _generate_signed_url_sync(self, key: str) -> str | None:
         """Synchronous implementation of signed URL generation for use with to_thread.
