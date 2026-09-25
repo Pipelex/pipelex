@@ -1,11 +1,11 @@
-"""Both wire sinks carry the trace context of the span current when a record is logged.
+"""The ``json`` sink writes the trace context of the span current when a record is logged.
 
-The ``json`` sink writes it under the keys OpenTelemetry specifies for trace context in a JSON log that
-is not OTLP, ``trace_id``, ``span_id`` and ``trace_flags``, lowercase hex at their full widths; the
-``otlp`` sink hands the current context to the SDK, which files the record under the span. A record
-logged outside any valid span carries none of it. The records go the whole way, from the facade
-through the module-named logger to the sink's handler, on a fresh ``Log`` so the installed sink is the
-one under test and the teardown leaves the root logger as it found it.
+The keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not OTLP,
+``trace_id``, ``span_id`` and ``trace_flags``, lowercase hex at their full widths, and a record logged
+outside any valid span carries none of them. A boot line held until the sink arrives keeps the span it
+was logged in. The records go the whole way, from the facade through the module-named logger to the
+sink's handler, on a fresh ``Log`` so the installed sink is the one under test and the teardown leaves
+the root logger as it found it.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from opentelemetry import trace
-from opentelemetry.sdk._logs.export import InMemoryLogExporter, SimpleLogRecordProcessor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 
@@ -36,13 +35,10 @@ from pipelex.tools.log.json_log_sink import (
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX
-from pipelex.tools.log.otlp_log_sink import OtlpLogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from opentelemetry.sdk._logs import LogData
 
 TRACE_KEYS: tuple[str, ...] = (TRACE_ID_KEY, SPAN_ID_KEY, TRACE_FLAGS_KEY)
 
@@ -60,11 +56,6 @@ def _own_lines(buffer: io.StringIO) -> list[dict[str, Any]]:
     """Every line this module emitted, each parsed as one JSON object, whatever else the process logged meanwhile."""
     lines = [json.loads(line) for line in buffer.getvalue().splitlines() if line]
     return [line for line in lines if line[LOGGER_KEY] == __name__]
-
-
-def _own_logs(exporter: InMemoryLogExporter) -> list[LogData]:
-    """The records this module emitted, whatever else the process logged meanwhile."""
-    return [log_data for log_data in exporter.get_finished_logs() if log_data.instrumentation_scope.name == __name__]
 
 
 class TestJsonSinkTraceContext:
@@ -162,31 +153,22 @@ class TestJsonSinkTraceContext:
             assert with_span[f"{COLLIDING_FIELD_PREFIX}{key}"] == "supplied"
         assert with_span[TRACE_ID_KEY] == "000000000000000000000000000000ab"
 
-
-class TestOtlpSinkTraceContext:
-    @pytest.fixture
-    def otlp_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, InMemoryLogExporter]]:
+    def test_a_boot_line_held_until_the_sink_arrives_keeps_the_span_it_was_logged_in(self, caplog: pytest.LogCaptureFixture) -> None:
+        """The holding handler replays each record in the context it was emitted in, not in the one the install runs under."""
         caplog.set_level(logging.INFO, logger=__name__)
-        exporter = InMemoryLogExporter()
+        buffer = io.StringIO()
         fresh = Log()
         fresh.configure(log_config=_package_log_config())
-        fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
+        tracer = TracerProvider().get_tracer(__name__)
         try:
-            yield fresh, exporter
+            with tracer.start_as_current_span("boot step") as boot_step:
+                fresh.info("held inside a span")
+            fresh.info("held outside any span")
+            with tracer.start_as_current_span("install"):
+                fresh.install_sink(JsonLogSink(stream=buffer))
         finally:
             fresh.reset()
 
-    def test_a_record_logged_inside_a_span_is_filed_under_it(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
-        fresh, exporter = otlp_log
-        tracer = TracerProvider().get_tracer(__name__)
-        with tracer.start_as_current_span("work") as span:
-            fresh.info("inside")
-        fresh.info("outside")
-        span_context = span.get_span_context()
-
-        inside, outside = (log_data.log_record for log_data in _own_logs(exporter))
-        assert inside.trace_id == span_context.trace_id
-        assert inside.span_id == span_context.span_id
-        assert inside.trace_flags == span_context.trace_flags
-        assert outside.trace_id == 0
-        assert outside.span_id == 0
+        inside, outside = _own_lines(buffer)
+        assert inside[SPAN_ID_KEY] == f"{boot_step.get_span_context().span_id:016x}"
+        assert not set(TRACE_KEYS) & set(outside)

@@ -8,11 +8,12 @@ attribute under their own names. The trace keys are the ones OpenTelemetry speci
 in a JSON log that is not OTLP, hex-encoded, so a collector or an error tracker joins the line to its
 trace without a parser. They are read from OpenTelemetry's current span when the record is formatted,
 which the stream handler does inside the log call, in the calling task; a boot line held until the sink
-arrives is formatted when the boot installs the sink. The sink's own keys, the trace keys among them,
-are reserved whether or not the line carries them: a field named like one is carried under the same
-``field_`` prefix the record uses for a name the stdlib owns, on every line and not only the ones with
-an exception or a span, so no value is lost and a field keeps one wire name. A non-finite float is written as the string ``"NaN"``, ``"Infinity"`` or
-``"-Infinity"``, since JSON has no token for it that a strict parser accepts.
+arrives is replayed in the context it was logged in, so it keeps its span. The sink's own keys, the
+trace keys among them, are reserved whether or not the line carries them: a field named like one is
+carried under the same ``field_`` prefix the record uses for a name the stdlib owns, on every line and
+not only the ones with an exception or a span, so no value is lost and a field keeps one wire name. A
+non-finite float is written as the string ``"NaN"``, ``"Infinity"`` or ``"-Infinity"``, since JSON has
+no token for it that a strict parser accepts.
 """
 
 from __future__ import annotations
