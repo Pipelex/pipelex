@@ -100,11 +100,14 @@ class TestLogReset:
     ) -> None:
         sink = _RaisingAtCloseSink(error=RuntimeError("the collector is gone"))
         configured_log.install_sink(sink)
+        # Captured before the reset, which discards it: read afterwards, ``sink.handler`` builds a new one
+        # that was never on the root logger, and the assertion could not fail.
+        installed = sink.handler
 
         configured_log.reset()
 
         assert configured_log.sink is None
-        assert sink.handler not in logging.getLogger().handlers
+        assert installed not in logging.getLogger().handlers
         captured = capsys.readouterr()
         assert "_RaisingAtCloseSink" in captured.err
         assert "the collector is gone" in captured.err
@@ -152,6 +155,7 @@ class TestLogReset:
         """The diagnostic has one place to go; when that place is gone the teardown still finishes and the next configure is not refused."""
         sink = _RaisingAtCloseSink(error=RuntimeError("the collector is gone"))
         configured_log.install_sink(sink)
+        installed = sink.handler
         closed_stderr = io.StringIO()
         closed_stderr.close()
         mocker.patch("sys.stderr", closed_stderr)
@@ -160,4 +164,4 @@ class TestLogReset:
 
         assert configured_log.sink is None
         assert not configured_log.is_configured
-        assert sink.handler not in logging.getLogger().handlers
+        assert installed not in logging.getLogger().handlers

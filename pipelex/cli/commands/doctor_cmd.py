@@ -1133,6 +1133,12 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
     handler before it touches the root logger, so a sink that failed to build left nothing installed —
     but not always, which is why the fallback is the one that decides whether it can stand in and
     hands back the note the row carries.
+
+    Which failure it was is read off ``log.sink`` rather than assumed from the exception. The sink is
+    recorded before the held records are replayed through it, so a failure out of that replay — a
+    handler that cannot render a record and whose ``handleError`` cannot say so either, which is what a
+    closed stderr produces — leaves the sink installed. There is nothing for a fallback to stand in for
+    there, so that row names the replay as what failed and the installed sink is kept.
     """
     if registry is None:
         note = _install_fallback_log_sink(log_config=log_config)
@@ -1151,6 +1157,9 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
     except Exception as exc:  # ruff: ignore[blind-except]
         # A factory or a handler that raises on this configuration, a console target no sink writes
         # to or a dependency the sink needs: the row says so, and the report goes on.
+        if log.sink is not None:
+            failure = f"was installed but then failed while the records held since logging was configured were replayed through it: {exc}"
+            return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' {failure}")
         note = _install_fallback_log_sink(log_config=log_config)
         return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' could not be installed: {exc}; {note}")
     return LogSinkCheck(is_healthy=True, message=f"Log sink '{log_config.sink}' installed")

@@ -7,7 +7,8 @@ rendered by the sink the configuration chose rather than dropped or written in a
 A boot that dies before a sink arrives closes this handler, and what it still holds reaches stderr
 through the stdlib's last resort — every record of it, since the root logger's level already admitted
 them and that level came from the configuration, so each held line is one this process was asked to
-show. A boot that failed is when that trail is worth most.
+show. A boot that failed is when that trail is worth most, and the redaction the sink would have run
+over each of those records runs over it on that path too.
 """
 
 from __future__ import annotations
@@ -64,12 +65,20 @@ def _deliver(*, handler: logging.Handler, record: logging.LogRecord) -> None:
 
 
 class HoldingLogHandler(logging.Handler):
-    """Holds every record it is handed until a sink's handler takes them over, then forwards to that handler."""
+    """Holds every record it is handed until a sink's handler takes them over, then forwards to that handler.
 
-    def __init__(self) -> None:
+    ``last_resort_filter`` is what a held record passes through on its way to the stdlib's last resort,
+    when the handler closes with records still held: the redaction a sink's handler would have run over
+    it, behind the same guard. A record it rejects is not written. It runs there and nowhere else, since
+    a record released to a sink meets the sink's own processors, and a second pass would escape its
+    control characters twice.
+    """
+
+    def __init__(self, *, last_resort_filter: logging.Filter | None = None) -> None:
         super().__init__(level=logging.NOTSET)
         self._held: list[HeldRecord] = []
         self._released_to: logging.Handler | None = None
+        self._last_resort_filter = last_resort_filter
 
     @property
     def held_count(self) -> int:
@@ -125,7 +134,9 @@ class HoldingLogHandler(logging.Handler):
         records passed the root logger's level, which ``configure`` set from the configuration, so each one
         is a line this process was asked to show. The only moment this runs with anything still held is a
         boot that died before its sink arrived, which is exactly when the trail a verbose run was turned on
-        to produce is the thing being looked for.
+        to produce is the thing being looked for. Each one passes the last-resort filter first, so a secret
+        a held line quoted is scrubbed on this path as it would have been by the sink, and a record the
+        filter rejects, one the redaction could neither scrub nor strip, is not written.
         """
         self.acquire()
         try:
@@ -135,5 +146,7 @@ class HoldingLogHandler(logging.Handler):
         last_resort = logging.lastResort
         if last_resort is not None:
             for record, _emitted_in in held:
+                if self._last_resort_filter is not None and not self._last_resort_filter.filter(record):
+                    continue
                 last_resort.handle(record)
         super().close()
