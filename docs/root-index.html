@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta http-equiv="refresh" content="0;url=/latest/">
 <link rel="canonical" href="https://__SITE_DOMAIN__/latest/">
-<title>Pipelex — Build & Run AI Methods</title>
+<title>Pipelex — Turn your expertise into an AI-powered App, MCP or API</title>
 <meta name="description" content="Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.">
-<meta property="og:title" content="Pipelex — Build & Run AI Methods">
+<meta property="og:title" content="Pipelex — Turn your expertise into an AI-powered App, MCP or API">
 <meta property="og:description" content="Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.">
 <meta property="og:url" content="https://__SITE_DOMAIN__/latest/">
 <meta property="og:type" content="website">
@@ -28,10 +28,17 @@
 </style>
 </head>
 <body>
-<h1>Pipelex: Build & Run AI Methods</h1>
-<p>Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.</p>
-<p>A method is a reusable, typed AI procedure declared in a .mthds file and executed by Pipelex. Each step is explicit, each output is structured, and every run is repeatable.</p>
+<h1>Pipelex: Turn your expertise into an AI-powered App, MCP or API</h1>
+<p>Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, from your agent or your chatbot via MCP, or via API in any software.</p>
+<h2>Get Started</h2>
+<ul>
+<li><a href="/latest/get-started/quick-start/">Quick Start</a> — Sign up at <a href="https://app.pipelex.com">app.pipelex.com</a>, install the Pipelex plugin in Claude Code or Codex, and ask your agent for the method you want.</li>
+<li><a href="/latest/get-started/run-it-yourself/">Run It Yourself</a> — Install the Pipelex runtime and run methods on your own machine.</li>
+<li><a href="/latest/get-started/mthds-language-tutorial/">MTHDS Language Tutorial</a> — Learn concepts, pipes, sequences, and structured outputs.</li>
+<li><a href="/latest/cookbook/">Cookbook Examples</a> — From Hello World to document extraction and image generation.</li>
+</ul>
 <h2>What a Method Looks Like</h2>
+<p>A method is a reusable, typed AI procedure, written in <a href="https://mthds.ai/latest/">MTHDS</a>, an open standard, and saved as a .mthds file. Each step is explicit, each output is structured, and every run is repeatable.</p>
 <pre><code>[pipe.summarize_article]
 type    = "PipeLLM"
 inputs  = { article = "Text", audience = "Text" }
@@ -54,13 +61,6 @@ prompt  = "Summarize $article in three bullet points for $audience."
 <li><a href="/latest/features/llm-integration/">60+ AI Models</a> — OpenAI, Anthropic, Mistral, Google, Deepseek, Hugging Face, and more.</li>
 <li><a href="/latest/features/validation-dry-run/">Validation and Dry Run</a> — Catch errors without spending tokens.</li>
 <li><a href="/latest/features/cli/">CLI and Tooling</a> — Init, build, validate, run, and graph visualization.</li>
-</ul>
-<h2>Get Started</h2>
-<ul>
-<li><a href="/latest/get-started/quick-start/">Quick Start</a> — Sign up at <a href="https://app.pipelex.com">app.pipelex.com</a>, install the Pipelex plugin in Claude Code or Codex, and ask your agent for the method you want.</li>
-<li><a href="/latest/get-started/run-it-yourself/">Run It Yourself</a> — Install the Pipelex runtime and run methods on your own machine.</li>
-<li><a href="/latest/get-started/mthds-language-tutorial/">MTHDS Language Tutorial</a> — Learn concepts, pipes, sequences, and structured outputs.</li>
-<li><a href="/latest/cookbook/">Cookbook Examples</a> — From Hello World to document extraction and image generation.</li>
 </ul>
 <h2>The MTHDS Ecosystem</h2>
 <ul>
