@@ -255,23 +255,20 @@ display_name = "Hello (plugin example)"
 enabled = true
 ```
 
-Finally, `routing_profiles.toml` routes the model to that backend. Add an optional route to the profile its `active` key names, here the default `all_pipelex_gateway` profile:
+Finally, `routing_profiles.toml` routes the model to that backend. The file already has a table for the profile its `active` key names, here the default `[profiles.all_pipelex_gateway]`, so add one line inside that table rather than a second copy of it, which TOML refuses:
 
 ```toml
-[profiles.all_pipelex_gateway]
-description = "Use Pipelex Gateway for all its supported models"
-default = "pipelex_gateway"
 optional_routes = { "hello-1" = "hello" }
 ```
 
-An optional route applies only while its backend is enabled, so turning the `hello` backend off leaves the profile valid. If you would rather not edit the tracked `backends.toml` and `routing_profiles.toml`, the same tables can go in the personal override files beside them, as [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides) explains.
+An optional route applies only while its backend is enabled, so turning the `hello` backend off leaves the profile valid. If you would rather not edit the tracked `backends.toml` and `routing_profiles.toml`, the same entries can go in the personal override files beside them, each under its table's header, as [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides) explains.
 
 ## Step 6: Install the plugin and check that Pipelex found it
 
-Install the package into the environment Pipelex runs in:
+Install the package into the environment Pipelex runs in. `uv tool install` rebuilds the tool's environment from the requirements it is given, so name Pipelex exactly as you installed it: if you installed it with provider extras, such as `"pipelex[anthropic,google]"`, repeat them here, or uv removes those providers' packages.
 
 ```bash
-# Pipelex installed as a uv tool, as in Run It Yourself
+# Pipelex installed as a uv tool, as in Run It Yourself (repeat any extras you installed it with)
 uv tool install --with-editable ./hello-inference-plugin pipelex
 
 # Pipelex installed in a project's virtual environment
