@@ -34,6 +34,7 @@ pipelex = "INFO"
 
 - Override log levels for specific packages
 - Use `-` instead of `.` in package names (e.g., `urllib3-connectionpool`)
+- A key works at any depth of the logger hierarchy, because Pipelex names every logger after the emitting module: `pipelex` governs the whole runtime, and `pipelex-pipe_operators-pipe_llm = "DEBUG"` opens one module while the rest of `pipelex` stays at its level
 
 ### Console Output
 

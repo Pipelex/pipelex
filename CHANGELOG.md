@@ -2,11 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Named fields and a run-scoped context on the log calls**: the seven `log.*` methods take a keyword-only `fields={...}`, carried as attributes of the stdlib `LogRecord` and never rendered into the message, and `with log.context(request_id=..., pipeline_run_id=..., pipe_run_id=...)` stamps the run's identifiers onto every record emitted in scope, nested bindings merging and an absent identifier staying absent rather than reading `None`. `PipeRun.run` binds the request and pipeline identifiers from the job's metadata for a direct-mode run, and every pipe binds its own `pipe_run_id` around the whole of its run, its announcement and its failure included. A `dict` or `list` content is carried as the record's `data` attribute beside its console rendering, a JSON-ready snapshot of the call rather than the caller's live object, and an entry named like an attribute the record already owns, a record factory's included, is carried under a `field_` prefix instead of raising, whatever the order the names arrive in. See [Logging](tools/logging.md).
+
 ### Changed
 
+- **Loggers are named by module (Breaking)**: a record from `pipelex/pipe_operators/pipe_llm.py` is emitted on the `pipelex.pipe_operators.pipe_llm` logger instead of `pipelex`, so a handler or filter keyed on the bare package name must key on the prefix, and a `package_log_levels` key now works at module depth too, `pipelex-pipe_operators-pipe_llm = "DEBUG"` for instance. The stack walk that named the logger on every line is gone, replaced by one frame lookup, and the caller-info templates that name the module now render instead of raising.
 - **The pitch names who each way of running a method is for**: the README, the documentation's front page and **Quick Start**, and the site description now say a method runs "as an MCP for chatbots, as a webapp for people, or via API for your software", instead of "from your agent or your chatbot via MCP, as a webapp, or via API in any software".
 - **The quick start says the plugin also puts a method in your software**: the README and the documentation's **Quick Start** now say the plugin's skills build methods, run them and put them in your software, name `/pipelex-scaffold` for a webapp and `/pipelex-integrate` for a typed call from TypeScript or Python code, and say that `@pipelex/sdk` is the TypeScript SDK and `pipelex-sdk` the Python one.
 - **The documentation's cookbook is one page that points to the cookbook**: the cookbook now holds Pipelex's example methods as packages you run by their address on the hosted API, each with its own page showing every way to use it, so the documentation no longer keeps a page per example. **The Pipelex Cookbook** says what the cookbook is and links to it, the pages that linked an example now link its page in the cookbook or in the method library, and every old example address redirects to the new page. The two pages that documented the runtime itself move into the runtime's own sections: **Writing an Inference Plugin**, under **Under the Hood**, now carries the whole sample plugin and the configuration that routes a model to it, and **CV Batch Screening, Step by Step** joins **Get Started**. The README's cookbook line says what the cookbook now is.
+
+### Fixed
+
+- **A log call before `log.configure` no longer raises**: it goes to the stdlib's default handling at the stdlib's default level, so a library that logs before Pipelex boots, or a boot that logs while it configures, cannot crash on the log line itself.
 
 ## [v0.65.0] - 2026-09-25
 

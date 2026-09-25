@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -52,6 +53,17 @@ class TestAgentOutput:
         consume_setup_warnings()
         yield
         consume_setup_warnings()
+
+    @pytest.fixture(autouse=True)
+    def _restore_logging_cutoff(self) -> Iterator[None]:
+        """Restore the process-global ``logging.disable`` threshold after a test that runs the app.
+
+        The app callback arms the agent CLI cutoff through ``silence_logging_for_agent_cli``;
+        left in place it silences every log call of every test that runs after this module.
+        """
+        original_disable = logging.root.manager.disable
+        yield
+        logging.disable(original_disable)
 
     def test_agent_error_outputs_json_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should print valid JSON to stderr and exit with code 1."""

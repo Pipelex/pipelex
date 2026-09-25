@@ -923,66 +923,72 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
         library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
-        log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
-
-        # Handle telemetry ------------------------------------------------------------
-
         # Generate pipe_run_id (business ID, always set)
         this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
-        # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
-        # The trace_id comes from parent's otel_context (already computed at pipeline start)
-        this_otel_context: OtelContext | None = None
-        span: Span | None = None
-        is_root_span: bool = False
+        # The pipe run's id exists from here on, so this is where the log context takes it: every
+        # record emitted during the run, its announcement, its span lines and its failure included,
+        # names the pipe run it belongs to, a nested pipe's until it binds its own. The outer binding
+        # comes back when the pipe returns, however it returns. A pipe lifted for absent optional
+        # inputs never gets here: it has no run and no id, and its skip line carries the enclosing binding.
+        with log.context(pipe_run_id=this_pipe_run_id):
+            log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
 
-        parent_otel_context = job_metadata.otel_context
-        if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
-            # Start OTel span first
-            span, is_root_span = self._start_pipe_span(
-                parent_otel_context=parent_otel_context,
-                run_metadata=job_metadata.run_metadata,
-                working_memory=working_memory,
-            )
-            # Get the actual span_id from OTel (OTel generates its own span_id)
-            if span:
-                span_context = span.get_span_context()
-                this_otel_context = OtelContext(
-                    trace_id=parent_otel_context.trace_id,
-                    trace_name=parent_otel_context.trace_name,
-                    trace_name_redacted=parent_otel_context.trace_name_redacted,
-                    span_id=span_context.span_id,
+            # Handle telemetry ------------------------------------------------------------
+
+            # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
+            # The trace_id comes from parent's otel_context (already computed at pipeline start)
+            this_otel_context: OtelContext | None = None
+            span: Span | None = None
+            is_root_span: bool = False
+
+            parent_otel_context = job_metadata.otel_context
+            if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
+                # Start OTel span first
+                span, is_root_span = self._start_pipe_span(
+                    parent_otel_context=parent_otel_context,
+                    run_metadata=job_metadata.run_metadata,
+                    working_memory=working_memory,
                 )
+                # Get the actual span_id from OTel (OTel generates its own span_id)
+                if span:
+                    span_context = span.get_span_context()
+                    this_otel_context = OtelContext(
+                        trace_id=parent_otel_context.trace_id,
+                        trace_name=parent_otel_context.trace_name,
+                        trace_name_redacted=parent_otel_context.trace_name_redacted,
+                        span_id=span_context.span_id,
+                    )
 
-        # Create child metadata with updated pipe_code and pipe_run_id
-        # This passes down a modified copy rather than mutating the original
-        # otel_context is passed separately because it must always be set explicitly
-        # (even when None in dry mode) to avoid inheriting stale parent context
-        child_metadata = job_metadata.copy_with_update(
-            otel_context=this_otel_context,
-            pipe_code=self.code,
-            pipe_run_id=this_pipe_run_id,
-        )
-
-        # Run pipe ------------------------------------------------------------
-
-        try:
-            pipe_output = await self._live_run_pipe(
-                job_metadata=child_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-                output_name=output_name,
-                library_crate=library_crate,
+            # Create child metadata with updated pipe_code and pipe_run_id
+            # This passes down a modified copy rather than mutating the original
+            # otel_context is passed separately because it must always be set explicitly
+            # (even when None in dry mode) to avoid inheriting stale parent context
+            child_metadata = job_metadata.copy_with_update(
+                otel_context=this_otel_context,
+                pipe_code=self.code,
+                pipe_run_id=this_pipe_run_id,
             )
-        except Exception as exc:
-            # Broad catch is intentional: the OTel span must be closed with ERROR status
-            # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
-            self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
-            raise
 
-        # Handle telemetry ------------------------------------------------------------
+            # Run pipe ------------------------------------------------------------
 
-        self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
+            try:
+                pipe_output = await self._live_run_pipe(
+                    job_metadata=child_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                    library_crate=library_crate,
+                )
+            except Exception as exc:
+                # Broad catch is intentional: the OTel span must be closed with ERROR status
+                # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
+                self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
+                raise
+
+            # Handle telemetry ------------------------------------------------------------
+
+            self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
 
         return pipe_output
 
