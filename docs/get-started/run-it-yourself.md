@@ -77,7 +77,7 @@ Then run it:
 pipelex run bundle summarize.mthds --inputs inputs.json
 ```
 
-The result is written under `results/`. From here, [The MTHDS Language Tutorial](./mthds-language-tutorial.md) builds a method step by step, and [CV batch screening](../cookbook/cv-batch-screening.md) runs a method with several steps, typed concepts and a batch, from the CLI and from Python.
+The result is written under `results/`. From here, [The MTHDS Language Tutorial](./mthds-language-tutorial.md) builds a method step by step, and [CV batch screening, step by step](./cv-batch-screening.md) runs a method with several steps, typed concepts and a batch, from the CLI and from Python.
 
 ## Editor extension
 
