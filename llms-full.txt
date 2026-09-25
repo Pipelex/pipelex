@@ -1,6 +1,6 @@
 # Pipelex Documentation
 
-> The Pipelex documentation. Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
+> The Pipelex documentation. Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software.
 
 # Get Started
 
@@ -10,7 +10,7 @@
 
 # Turn your expertise into an AI-powered App, MCP or API
 
-Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, from your agent or your chatbot via MCP, or via API in any software.
+Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, as an MCP for chatbots, or via API for your software.
 
 [:material-rocket-launch: Quick Start](./get-started/quick-start.md){ .md-button .md-button--primary }
 [:material-account-plus: Sign up at app.pipelex.com](https://app.pipelex.com){ .md-button }
@@ -34,9 +34,9 @@ Describe how the work gets done in plain English, and your coding agent builds i
 
     Learn the declarative language step by step: concepts, pipes, sequences, inputs, and structured outputs.
 
--   :material-book-open-variant: **[Cookbook Examples](./cookbook/index.md)**
+-   :material-book-open-variant: **[Cookbook](./cookbook/index.md)**
 
-    Production-ready recipes — from Hello World to document extraction, synthetic data, and image generation.
+    Example methods you run by their address, each with a page showing every way to use it: in your chatbot, in your code, as an app, or as a method of your own.
 
 </div>
 
@@ -148,7 +148,7 @@ block's.
 
 # Quick Start
 
-Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
+Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software.
 
 ## 1. Sign up
 
@@ -156,7 +156,7 @@ Sign up at [app.pipelex.com](https://app.pipelex.com).
 
 ## 2. Install the Pipelex plugin in your coding agent
 
-The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
+The plugin gives your agent the skills that build methods, run them and put them in your software, a hook that checks every edit, and the Pipelex tools.
 
 === "Claude Code"
 
@@ -167,7 +167,7 @@ The plugin is how you build methods: it gives your agent the skills that write a
 
     Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
-    Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
+    Claude Code also loads what you have added to your Claude account, so if you added the Pipelex MCP to Claude, Claude Code has it too. An agent with the plugin does not need the Pipelex MCP, and there is nothing to turn off: when both are present, the Pipelex MCP defers to the plugin's tools.
 
 === "Codex"
 
@@ -208,9 +208,11 @@ Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it t
 
 ## The other two ways
 
+Your agent builds these too, and each can also be done by hand.
+
 ### As a webapp
 
-Turn the method into a webapp with the [method-app template](https://github.com/Pipelex/pipelex-method-apps):
+Ask your agent for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. By hand, the same app takes these commands:
 
 ```bash
 src=$(mktemp -d)
@@ -227,7 +229,7 @@ The app calls Pipelex from its own server code, so it needs a key of its own —
 
 ### Via API
 
-Use the method via API in any software through `POST /v1/start` — in TypeScript with [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk), in Python with [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/), or with any HTTP client.
+Ask your agent to call the method from your TypeScript or Python code, and `/pipelex-integrate` generates the method's types and one typed call that runs it, through the TypeScript SDK [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) or the Python SDK [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/). By hand, any software runs a method via API through `POST /v1/start`, with either SDK or with any HTTP client.
 
 Create an API key in your console at [app.pipelex.com](https://app.pipelex.com) and give it to your program as `PIPELEX_API_KEY` — the only thing to configure, since `PIPELEX_BASE_URL` already points at the hosted API.
 
@@ -324,15 +326,16 @@ The Pipelex runtime is the Python package that reads a `.mthds` file and runs it
 ## Install
 
 ```bash
-uv tool install pipelex
+uv tool install "pipelex[cli]"
 pipelex init
 pipelex doctor
 ```
 
-`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing.
+`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
 
 Some providers and features need an extra:
 
+- `cli`: Rich, for the `pipelex` and `pipelex-agent` commands, the `console` log sink and the `rich` pretty-print mode. Install it wherever Pipelex runs in a terminal; a server leaves it out and selects the `json` log sink with the `poor` or `silent` pretty-print mode (see [Rich Imports](../contribute/rich-imports.md))
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `google-genai`: Google Gemini API support for text and image generation
@@ -345,7 +348,7 @@ Some providers and features need an extra:
 Name the ones you need when you install, or take them all:
 
 ```bash
-uv tool install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
+uv tool install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
 ## Configure AI access
@@ -391,7 +394,7 @@ Then run it:
 pipelex run bundle summarize.mthds --inputs inputs.json
 ```
 
-The result is written under `results/`. From here, [The MTHDS Language Tutorial](./mthds-language-tutorial.md) builds a method step by step, and [CV batch screening](../cookbook/cv-batch-screening.md) runs a method with several steps, typed concepts and a batch, from the CLI and from Python.
+The result is written under `results/`. From here, [The MTHDS Language Tutorial](./mthds-language-tutorial.md) builds a method step by step, and [CV batch screening, step by step](./cv-batch-screening.md) runs a method with several steps, typed concepts and a batch, from the CLI and from Python.
 
 ## Editor extension
 
@@ -407,10 +410,12 @@ This tutorial walks you through writing `.mthds` files manually, step by step.
 Set up your project and get free AI access:
 
 ```bash
-uv tool install pipelex
+uv tool install "pipelex[cli]"
 pipelex init
 pipelex login
 ```
+
+The `cli` extra installs Rich, which the `pipelex` command renders its output through.
 
 `pipelex init` creates your project configuration. `pipelex login` opens your browser to authenticate with Pipelex Gateway (free). See [Configure AI Providers](./configure-ai-providers.md) for other options: bring your own keys, local AI, etc.
 
@@ -619,10 +624,10 @@ Learn more about concepts in [Define Your Concepts](../building-methods/concepts
 
 You now understand the building blocks: pipes, sequences, inputs, and structured outputs.
 
-- **Tutorial** — more lessons in the [Cookbook](../cookbook/index.md) (document extraction, batch processing, and more)
+- **Tutorial** — more lessons in the [cookbook's tutorial](https://github.com/Pipelex/pipelex-cookbook/tree/main/tutorial), from structured outputs to model settings, batches and parallel steps
 - **Build Reliable AI Methods** — deep dive into [method project design](../building-methods/kick-off-a-methods-project.md)
 - **Pipe Operators & Controllers** — reference for [pipe operators](../building-methods/pipes/pipe-operators/index.md) (PipeLLM, PipeExtract, PipeCompose, ...) and [pipe controllers](../building-methods/pipes/pipe-controllers/index.md) (PipeSequence, PipeParallel, PipeBatch, PipeCondition)
-- **Cookbook Examples** — real-world [examples and patterns](../cookbook/index.md)
+- **The Cookbook** — [example methods](../cookbook/index.md) you run by their address, with every way to use each one
 - **CLI Reference** — full [command-line reference](../tools/cli/index.md)
 
 
@@ -819,743 +824,11 @@ Now that you have your backend configured:
     For detailed backend configuration options, see [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md).
 
 
-# Cookbook Examples
+## CV Batch Screening, Step by Step
 
-## Overview
+# CV Batch Screening, Step by Step
 
-# Pipelex Cookbook Examples
-
-Welcome to the Pipelex Cookbook!
-
-[![GitHub](https://img.shields.io/badge/Cookbook_Repository-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/main)
-
-This is your go-to resource for practical examples and ready-to-use recipes to build powerful and reliable AI methods with Pipelex. Whether you're a beginner looking to get started or an experienced user searching for advanced patterns, you'll find something useful here.
-
-We strongly encourage you to clone the [Pipelex Cookbook repository](https://github.com/Pipelex/pipelex-cookbook/tree/main), play with the examples, and tailor them to your specific needs.
-
-## Quick Start
-
-- [**Hello World**](./hello-world.md) — The simplest Pipelex pipeline: a single LLM call that generates a haiku.
-- [**Summarize**](./summarize.md) — Multi-step text summarization with topic extraction and batching.
-
-## Document Extraction
-
-- [**Generic Document**](./extract-generic.md) — Extract markdown from complex PDFs using vision.
-- [**Invoice**](./extract-invoice.md) — Extract structured invoice data with classification and vision analysis.
-- [**Proof of Purchase**](./extract-proof-of-purchase.md) — Extract receipt data including product lists.
-- [**DPE (Energy Diagnostic)**](./extract-dpe.md) — Specialized extraction for French energy performance certificates.
-- [**Table from Image**](./extract-table.md) — Convert table images to HTML with self-correction review.
-- [**Gantt Chart**](./extract-gantt.md) — Extract tasks and dates from Gantt chart images using divide-and-conquer.
-- [**Markdown from Document**](./extract-markdown.md) — Simple document-to-markdown using shared method packages.
-- [**Slides from Presentation**](./extract-slides.md) — Extract slide content and descriptions with vision analysis.
-- [**CV Batch Screening**](./cv-batch-screening.md) — Extract a stack of CVs and a job offer, then score each candidate against the role.
-
-## Visual Generation
-
-- [**Design Slides**](./design-slides.md) — Generate themed slide design proposals with visual mockups.
-- [**Generate Image**](./generate-image.md) — Creative image generation through a three-step pipeline.
-
-## Advanced
-
-- [**Synthetic Data**](./gen-synthetic-data.md) — Generate diverse synthetic data samples from a description.
-- [**Expense Data with Receipts**](./gen-expense-data.md) — Generate complete expense datasets with receipt images and fraud scenarios.
-- [**Using Inference Plugins**](./using-inference-plugins.md) — Install an inference-backend plugin and run a method against the model it serves, with zero API keys.
-
-## Work in Progress
-
-These examples are under active development and may change:
-
-- [**Tweet Optimizer**](./write-tweet.md) — Analyze and optimize tech tweets with style transfer.
-- [**Blog Article Generator**](./blog-article-generator.md) — Generate SEO-optimized articles from structured requests.
-- [**Advisory Board**](./advisory-board.md) — Multi-board business consultation with consensus analysis.
-- [**Discord Newsletter**](./discord-newsletter.md) — Generate HTML newsletters from Discord channel data.
-- [**Expense Validation**](./validate-expense-data.md) — Validate expense reports against company policies.
-
-## Contribute
-
-Have you built a cool pipeline with Pipelex? Share it with the community! We welcome contributions. Check out our [contribution guidelines](../contributing.md) and help us grow this collection of examples.
-
-
-## Hello World
-
-# Example: Hello World
-
-This is the "Hello World" of Pipelex, a simple pipeline that demonstrates the basic concepts of Pipelex.
-
-It's the perfect starting point to verify your installation and get a first taste of how Pipelex works.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/a_quick_start/hello_world.mthds)
-
-## What it demonstrates
-
-- Minimal Pipelex setup with a single `PipeLLM` pipe
-- The `main_pipe` field to designate the entry point
-- Running a method bundle from the CLI
-
-## The Method: `hello_world.mthds`
-
-The method definition is extremely simple — a single LLM call that generates a haiku:
-
-```toml
-domain    = "quick_start"
-main_pipe = "hello_world"
-
-[pipe]
-[pipe.hello_world]
-type = "PipeLLM"
-description = "Write text about Hello World."
-output = "Text"
-prompt = """
-Write a haiku about Hello World.
-"""
-```
-
-## How to run
-
-1. Clone the cookbook repository and install dependencies:
-
-    ```bash
-    git clone https://github.com/Pipelex/pipelex-cookbook.git
-    cd pipelex-cookbook
-    pip install .
-    ```
-
-2. Set up your environment variables by copying `.env.example` to `.env` and adding your API keys.
-
-3. Run the example:
-
-    ```bash
-    pipelex run bundle examples/a_quick_start/hello_world.mthds
-    ```
-
-Expected output: A haiku about "Hello World" displayed with pretty formatting.
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [Define Your Concepts](../building-methods/concepts/define_your_concepts.md) - How to define custom data types for your methods
-
-
-## Summarize
-
-# Example: Summarize
-
-This example demonstrates two approaches to summarizing text: a direct structured summary and a multi-step topic-based summarization pipeline.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/a_quick_start/summarize.mthds)
-
-## What it demonstrates
-
-- Defining custom concepts with inline structures (`StructuredSummary`)
-- Multi-step `PipeSequence` with intermediate results
-- Batching over a list of topics (`batch_over` / `batch_as`)
-- Two pipes producing different outputs from the same input
-
-## The Method: `summarize.mthds`
-
-### Concepts
-
-The method defines a `StructuredSummary` concept with fields for the summary, an abstract, and a list of main concepts:
-
-```toml
-domain        = "summarize"
-description   = "Example of summarizing text by topics."
-system_prompt = "You are an expert at summarizing text."
-
-[concept]
-Topic   = "A topic a text deals with."
-Summary = "A concise rewriting of a dense text."
-
-[concept.StructuredSummary]
-description = "A summary with a structured output."
-
-[concept.StructuredSummary.structure]
-summary       = { type = "text", description = "Summary of the text, super clear and factual", required = true }
-abstract      = { type = "text", description = "Abstract of the summary 1 short sentences", required = true }
-main_concepts = { type = "list", item_type = "text", description = "Array of main concepts tackled in the text" }
-```
-
-### Multi-step pipeline
-
-The `summarize_by_steps` pipeline breaks summarization into three stages: extract topics, summarize each topic individually (batched), then combine all summaries:
-
-```toml
-[pipe.summarize_by_steps]
-type = "PipeSequence"
-description = "Summarize text by steps: extract topics, summarize for each topic, summarize from summaries."
-inputs = { text = "Text" }
-output = "Summary"
-steps = [
-  { pipe = "extract_topics", result = "topics" },
-  { pipe = "summarize_topic", batch_over = "topics", batch_as = "topic", result = "summarized_topics" },
-  { pipe = "summarize_from_summaries", result = "summary" },
-]
-```
-
-Each topic is summarized independently using `batch_over`, and the final step merges everything into a single cohesive summary.
-
-## How to run
-
-**Direct structured summary:**
-
-```bash
-pipelex run bundle examples/a_quick_start/summarize.mthds \
-  --pipe summarize_with_structure \
-  -i examples/a_quick_start/inputs.json
-```
-
-**Multi-step topic-based summary:**
-
-```bash
-pipelex run bundle examples/a_quick_start/summarize.mthds \
-  --pipe summarize_by_steps \
-  -i examples/a_quick_start/inputs.json
-```
-
-## Related Documentation
-
-- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [Understanding Multiplicity](../building-methods/pipes/understanding-multiplicity.md) - How batching works
-
-
-## Generic Document
-
-# Example: Generic Document Extraction
-
-This example demonstrates a generic pipeline for extracting content from complex PDF documents. It extracts pages with views, then converts each page to markdown using a vision-capable LLM that combines OCR text with the page image.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_generic/bundle.mthds)
-
-## What it demonstrates
-
-- Vision-based page-to-markdown conversion using `PipeLLM` with `$vision` model
-- Using shared method packages for page extraction
-- Batching over pages to process each one independently
-- Combining OCR text with page images for accurate extraction
-
-## The Method: `bundle.mthds`
-
-```toml
-domain    = "extract_generic"
-main_pipe = "power_extractor"
-
-[pipe.power_extractor]
-type = "PipeSequence"
-description = "Update page content with markdown"
-inputs = { document = "Document" }
-output = "Text[]"
-steps = [
-  { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views",
-    result = "page_contents" },
-  { pipe = "write_markdown_from_page_content",
-    batch_over = "page_contents", batch_as = "page_content",
-    result = "markdowns" },
-]
-
-[pipe.write_markdown_from_page_content]
-type = "PipeLLM"
-description = "Write markdown from page content"
-inputs = { "page_content.page_view" = "Image", page_content = "Page" }
-output = "Text"
-model = "$vision"
-system_prompt = "You are a multimodal LLM, expert at converting images into perfect markdown."
-prompt = """
-You are given an image which is a view of a document page: $page_content.page_view
-You are also given the text extracted from the page by an OCR model.
-Your task is to output the perfect markdown of the page.
-
-Here is the text extracted from the page:
-{{ page_content.text_and_images.text.text|tag("ocr_text") }}
-
-- Ensure you do not miss any information from the page.
-- Output only the markdown, nothing else.
-"""
-```
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_generic/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_generic/inputs.json
-```
-
-## Related Documentation
-
-- [PipeExtract Operator](../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities
-
-
-## Invoice
-
-# Example: Invoice Extraction
-
-This example processes PDF invoices through a multi-step pipeline: extract pages with views, classify the invoice type, then extract structured data using vision.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_invoice/bundle.mthds)
-
-## What it demonstrates
-
-- Rich structured concept (`Invoice` with 14+ fields including nested `InvoiceDetails`)
-- Nested `PipeSequence` (main pipeline batches over pages, sub-pipeline does analyze then extract)
-- Vision-based extraction using page views and OCR text
-- Using shared method packages for page extraction
-
-## The Method: `bundle.mthds`
-
-### Invoice concept
-
-```toml
-[concept.Invoice]
-description = "Invoice information extracted from text, supporting both formal bills and receipts"
-
-[concept.Invoice.structure]
-invoice_id        = { type = "text", description = "Unique identifier for the invoice" }
-invoice_number    = { type = "text", description = "Invoice number as shown on the document" }
-date              = { type = "date", description = "Date when the invoice was issued" }
-amount_incl_tax   = { type = "number", description = "Total amount including taxes" }
-amount_excl_tax   = { type = "number", description = "Net amount excluding taxes" }
-vendor            = { type = "text", description = "Name of the vendor/seller" }
-category          = { type = "concept", concept_ref = "invoice_extraction.InvoiceDetails", description = "Category or type of expense" }
-# ... and more fields
-```
-
-### Pipeline
-
-```toml
-[pipe.process_invoice]
-type = "PipeSequence"
-inputs = { document = "Document" }
-output = "Invoice[]"
-steps = [
-  { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views", result = "invoice_pages" },
-  { pipe = "extract_invoice", batch_over = "invoice_pages", batch_as = "invoice_page", result = "invoice" },
-]
-```
-
-Each page goes through a sub-pipeline that first classifies the invoice type (bill vs. receipt), then extracts the full structured data using both the page view and OCR text:
-
-```toml
-[pipe.extract_invoice]
-type = "PipeSequence"
-inputs = { invoice_page = "Page" }
-output = "Invoice"
-steps = [
-  { pipe = "analyze_invoice", result = "invoice_details" },
-  { pipe = "extract_invoice_data", result = "invoice" },
-]
-```
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_invoice/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_invoice/inputs.json
-```
-
-## Related Documentation
-
-- [PipeExtract Operator](../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
-- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities
-
-
-## Proof of Purchase
-
-# Example: Proof of Purchase Extraction
-
-This example extracts structured data from receipts and invoices. It defines nested data concepts (`Product` inside `ProofOfPurchase`) and uses vision-based extraction to capture all details from the document.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_proof_of_purchase/bundle.mthds)
-
-## What it demonstrates
-
-- Nested structured concepts (`Product` referenced inside `ProofOfPurchase`)
-- Vision-based extraction with `$vision` model and `structuring_method = "preliminary_text"`
-- Using shared method packages for page extraction
-- Batching over pages to process each independently
-
-## The Method: `bundle.mthds`
-
-### Concepts
-
-```toml
-[concept.Product]
-description = "A product in a proof of purchase"
-
-[concept.Product.structure]
-name        = { type = "text", description = "Name of the product" }
-quantity    = { type = "integer", description = "Quantity purchased" }
-unit_price  = { type = "number", description = "Unit price of the product" }
-total_price = { type = "number", description = "Total price for this product" }
-
-[concept.ProofOfPurchase]
-description = "Elements from a proof of purchase"
-
-[concept.ProofOfPurchase.structure]
-date_of_purchase = { type = "date", description = "Date of the purchase" }
-amount_paid      = { type = "number", description = "Total amount paid" }
-currency         = { type = "text", description = "Currency used for the purchase" }
-payment_method   = { type = "text", description = "Method of payment used" }
-purchase_number  = { type = "text", description = "Purchase or receipt number" }
-products         = { type = "list", item_type = "concept", item_concept_ref = "extract_proof_of_purchase.Product", description = "List of products purchased" }
-```
-
-### Pipeline
-
-```toml
-[pipe.power_extractor_proof_of_purchase]
-type = "PipeSequence"
-inputs = { document = "Document" }
-output = "ProofOfPurchase[]"
-steps = [
-  { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views",
-    result = "page_contents" },
-  { pipe = "write_markdown_from_page_content_proof_of_purchase",
-    batch_over = "page_contents", batch_as = "page_content",
-    result = "proof_of_purchase" },
-]
-```
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_proof_of_purchase/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_proof_of_purchase/inputs.json
-```
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities
-
-
-## DPE (Energy Diagnostic)
-
-# Example: DPE Extraction
-
-This example extracts information from French "Diagnostic de Performance Energetique" (DPE) documents. It uses a three-step pipeline: extract pages, convert each to markdown using vision, then conclude the DPE details from the combined markdown.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_dpe/bundle.mthds)
-
-## What it demonstrates
-
-- Custom structured concept with constrained choices (energy efficiency classes A-G)
-- Three-step extraction: pages, markdown per page, then conclude
-- Vision-based extraction focused on specific document elements (energy classes, graphs, tables)
-- Using shared method packages for page extraction
-
-## The Method: `bundle.mthds`
-
-### DPE concept
-
-```toml
-[concept.Dpe]
-description = "A diagnostic of the energy performance of a building"
-
-[concept.Dpe.structure]
-address                       = { type = "text", description = "The address of the building" }
-date_of_issue                 = { type = "date", description = "The date the DPE was issued" }
-date_of_expiration            = { type = "date", description = "The expiration date of the DPE" }
-energy_efficiency_class       = { type = "text", description = "The energy efficiency class",
-                                  choices = ["A", "B", "C", "D", "E", "F", "G"] }
-per_year_per_m2_consumption   = { type = "number", description = "Energy consumption per year per m2" }
-co2_emission_class            = { type = "text", description = "The CO2 emission class",
-                                  choices = ["A", "B", "C", "D", "E", "F", "G"] }
-per_year_per_m2_co2_emissions = { type = "number", description = "CO2 emissions per year per m2" }
-yearly_energy_costs           = { type = "number", description = "Yearly energy costs" }
-```
-
-### Pipeline
-
-```toml
-[pipe.power_extractor_dpe]
-type = "PipeSequence"
-inputs = { document = "Document" }
-output = "Dpe"
-steps = [
-  { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views",
-    result = "page_contents" },
-  { pipe = "write_markdown_from_page_content_dpe",
-    batch_over = "page_contents", batch_as = "page_content",
-    result = "dpe_pages" },
-  { pipe = "conclude_dpe", result = "dpe" },
-]
-```
-
-The final `conclude_dpe` step takes all the markdown pages and produces a single structured `Dpe` object.
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_dpe/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_dpe/inputs.json
-```
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities
-
-
-## Table from Image
-
-# Example: Table Extraction from Image
-
-This example extracts a table from an image and converts it into structured HTML. It uses a two-step "extract and review" pattern where the first pipe does the initial extraction and the second pipe reviews the result against the original image to correct errors.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_table/bundle.mthds)
-
-## What it demonstrates
-
-- Self-correction pattern: extract then review against the original image
-- Custom structured concept (`HtmlTable` with title and HTML content)
-- Vision-based extraction using `$vision-table` model
-- Multi-modal inputs (image + structured data) in a single pipe
-
-## The Method: `bundle.mthds`
-
-### Pipeline
-
-```toml
-[pipe.extract_html_table_and_review]
-type = "PipeSequence"
-description = "Get an HTML table and review it"
-inputs = { table_screenshot = "TableScreenshot" }
-output = "HtmlTable"
-steps = [
-    { pipe = "extract_html_table_from_image", result = "html_table" },
-    { pipe = "review_html_table", result = "reviewed_html_table" },
-]
-
-[pipe.review_html_table]
-type = "PipeLLM"
-description = "Review an HTML table"
-inputs = { table_screenshot = "TableScreenshot", html_table = "HtmlTable" }
-output = "HtmlTable"
-prompt = """
-Your role is to correct an html_table to make sure that it matches the one in the provided image: $table_screenshot
-
-@html_table
-
-Pay attention to the text and formatting (color, borders, ...).
-Rewrite the entire html table with your potential corrections.
-Make sure you do not forget any text.
-"""
-```
-
-This self-correction pattern is a key technique for building robust AI methods — the first step provides a draft, and the second step verifies and corrects it against the source.
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_table/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_table/inputs.json
-```
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
-
-
-## Gantt Chart
-
-# Example: Gantt Chart Extraction
-
-This example extracts structured information from Gantt chart images: timescale, task names, task details (dates, dependencies), and milestones. It uses a "divide and conquer" approach where each aspect is extracted separately.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_gantt/bundle.mthds)
-
-## What it demonstrates
-
-- Divide-and-conquer extraction: timescale, task names, task details, then assemble
-- Batching over task names to extract details for each independently
-- Vision-based extraction using `$vision-diagram` model
-- Rich structured output (`GanttChart` with `GanttTaskDetails` and `Milestone` lists)
-- Two alternative approaches: step-by-step vs. direct one-shot extraction
-
-## The Method: `bundle.mthds`
-
-### Pipeline
-
-```toml
-[pipe.extract_gantt_by_steps]
-type = "PipeSequence"
-description = "Extract all details from a gantt chart"
-inputs = { gantt_chart_image = "GanttChartImage" }
-output = "GanttChart"
-steps = [
-    { pipe = "extract_gantt_timescale", result = "gantt_timescale" },
-    { pipe = "extract_gantt_task_names", result = "gantt_task_names" },
-    { pipe = "extract_details_of_task", batch_as = "gantt_task_name",
-      result = "details_of_all_tasks" },
-    { pipe = "gather_in_a_gantt_chart", result = "gantt_chart" },
-]
-```
-
-Each task's details are extracted individually using the chart image, the timescale context, and the specific task name — making each extraction focused and accurate.
-
-The bundle also includes a `transcript_gantt_direct` pipe for one-shot extraction to markdown, useful for simpler charts.
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_gantt/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_gantt/inputs.json
-```
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
-
-
-## Markdown from Document
-
-# Example: Extract Markdown from Document
-
-This example extracts text from a PDF document and composes the pages into a single clean markdown output. It leverages the shared `documents` method package for page extraction.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_markdown/bundle.mthds)
-
-## What it demonstrates
-
-- Using shared method packages (`github.com/Pipelex/methods/documents`)
-- `PipeCompose` with Jinja2 templates to concatenate page text
-- Simple two-step document-to-markdown pipeline
-
-## The Method: `bundle.mthds`
-
-The pipeline uses a shared extraction pipe and then composes all pages into a single text:
-
-```toml
-domain      = "extract_markdown"
-main_pipe   = "extract_markdown_from_document"
-
-[pipe.extract_markdown_from_document]
-type = "PipeSequence"
-description = "Extract markdown from a document"
-inputs = { document = "Document" }
-output = "Text"
-steps = [
-  { pipe = "github.com/Pipelex/methods/documents->documents.extract_markdown_pages", result = "pages" },
-  { pipe = "write_markdown_from_pages", result = "markdown" },
-]
-
-[pipe.write_markdown_from_pages]
-type = "PipeCompose"
-description = "Write markdown from pages"
-inputs = { pages = "Page[]" }
-output = "Text"
-template = """
-{% for page in pages %}
-{{ page.text_and_images.text }}
-{% endfor %}
-"""
-```
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_markdown/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_markdown/inputs.json
-```
-
-## Related Documentation
-
-- [PipeExtract Operator](../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
-- [PipeCompose Operator](../building-methods/pipes/pipe-operators/PipeCompose.md) - Template-based data composition
-- [Packages](../building-methods/packages.md) - Using shared method packages
-
-
-## Slides from Presentation
-
-# Example: Extract Slides from Presentation
-
-This example extracts structured slide information from a presentation document — including titles, content as markdown, and visual descriptions of each slide layout.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_slides/bundle.mthds)
-
-## What it demonstrates
-
-- Custom `Slide` concept with inline structure (title, text, description)
-- Vision-based slide analysis using `PipeLLM` with page views
-- Batching over extracted pages to process each slide individually
-- `PipeCompose` for assembling structured output into formatted text
-
-## The Method: `bundle.mthds`
-
-### Slide concept
-
-```toml
-[concept.Slide]
-description = "A slide from a presentation"
-
-[concept.Slide.structure]
-title         = { type = "text", description = "The title of the slide" }
-text_markdown = { type = "text", description = "The content of the slide as markdown" }
-description   = { type = "text", description = "A description of the slide: layout of the text, description of the graphics" }
-```
-
-### Pipeline
-
-The pipeline extracts pages with views, describes each slide using a vision model, then concatenates the descriptions:
-
-```toml
-[pipe.extract_slides]
-type = "PipeSequence"
-description = "Extract markdown from a document"
-inputs = { document = "Document" }
-output = "Text"
-steps = [
-  { pipe = "extract_markdown_and_views_from_document", result = "pages" },
-  { pipe = "describe_slide", batch_over = "pages", batch_as = "page", result = "slides" },
-  { pipe = "concatenate_slide_descriptions", result = "slides_description" },
-]
-```
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/document_extract/extract_slides/bundle.mthds \
-  -i examples/b_basics/document_extract/extract_slides/inputs.json
-```
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [PipeExtract Operator](../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
-- [PipeCompose Operator](../building-methods/pipes/pipe-operators/PipeCompose.md) - Template-based data composition
-
-
-## CV Batch Screening
-
-# Example: CV Batch Screening
-
-A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role.
+A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role. This page reads it part by part and runs it on your own machine with the Pipelex runtime, from the CLI and from Python, once you have followed [Run It Yourself](./run-it-yourself.md).
 
 ## What it demonstrates
 
@@ -1875,425 +1148,21 @@ asyncio.run(run_pipeline())
 ```
 
 
-## Design Slides
+## The Pipelex Cookbook
 
-# Example: Design Slides
+# The Pipelex Cookbook
 
-This example takes a slide design brief and generates multiple themed design proposals, complete with visual mockups and an HTML report comparing them.
+[![GitHub](https://img.shields.io/badge/Cookbook_Repository-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook)
 
-## Get the code
+The [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) holds Pipelex's example methods. Each one is a package that runs by its address on the hosted Pipelex API, `github.com/Pipelex/pipelex-cookbook/<method>@<release>`, so there is nothing to clone and nothing to install before you try it. Each method's page gives its address at the cookbook's latest release.
 
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/generate_visuals/design_slides/bundle.mthds)
+Every method has its own page in the cookbook, and every page shows the same ways to use it: in your chatbot through the Pipelex MCP, in your coding agent through the Pipelex plugin, in your code through the TypeScript or Python SDK or over HTTP, as a web app made from the method-app template, and how to make it yours by copying it, changing it and saving it to your account. The [list of methods](https://github.com/Pipelex/pipelex-cookbook#methods-you-can-run-by-address) on the cookbook's front page links to each page, and the page for [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) is a good one to start with.
 
-## What it demonstrates
+The cookbook also has [recipes](https://github.com/Pipelex/pipelex-cookbook/tree/main/recipes), each of which takes one way of using a method further on a real case, such as a FastAPI endpoint, a Next.js server action or a web app you deploy. Its [tutorial](https://github.com/Pipelex/pipelex-cookbook/tree/main/tutorial) teaches you to write methods in MTHDS by hand and to run them on your own machine.
 
-- Rich concept hierarchy (nested structures: `Theme` contains `ColorPalette`, `Typography`, `LayoutSettings`, `StyleSettings`)
-- `nb_output` parameter to generate multiple results from a single pipe
-- `PipeImgGen` for generating visual mockup images
-- `PipeCompose` with an HTML template for report rendering
-- Multi-step creative pipeline: polish brief, generate themes, render visuals, compose report
+The methods Pipelex publishes as reusable building blocks, such as invoice extraction and table extraction, live in the [method library](https://github.com/Pipelex/methods) instead, and they run by their address in the same way.
 
-## The Method: `bundle.mthds`
-
-### Key concepts
-
-The method defines a deep hierarchy of design concepts:
-
-```toml
-[concept.SlideDesignBrief]
-description = "Client brief for slide deck design"
-
-[concept.SlideDesignBrief.structure]
-topic = { type = "text", description = "The main topic or subject of the presentation", required = true }
-brand_guidelines = { type = "text", description = "The client's brand guidelines", required = false }
-tone = { type = "text", description = "The tone of the presentation", choices = [
-  "formal", "playful", "innovative", "trustworthy", "artsy",
-], required = false }
-# ... goal, audience fields
-```
-
-```toml
-[concept.Theme]
-description = "Complete presentation theme with colors, typography, layout, and style"
-
-[concept.Theme.structure]
-name       = { type = "text", description = "Theme name identifier", required = true }
-colors     = { type = "concept", concept_ref = "ColorPalette", description = "Color palette for the theme", required = true }
-typography = { type = "concept", concept_ref = "Typography", description = "Typography settings", required = true }
-layout     = { type = "concept", concept_ref = "LayoutSettings", description = "Layout configuration", required = true }
-style      = { type = "concept", concept_ref = "StyleSettings", description = "Visual style settings", required = true }
-```
-
-### Pipeline
-
-```toml
-[pipe.generate_design_proposals_from_rough_brief]
-type = "PipeSequence"
-description = "Transform a design brief into multiple themes with visual mockups and HTML report"
-inputs = { brief = "SlideDesignBrief" }
-output = "Html"
-steps = [
-  { pipe = "polish_brief", result = "polished_brief" },
-  { pipe = "generate_multiple_themes", nb_output = 3, result = "themes" },
-  { pipe = "render_visual_proposal", batch_over = "themes", batch_as = "theme", result = "design_proposals" },
-  { pipe = "compose_proposals_report", result = "proposals_report" },
-]
-```
-
-The `nb_output = 3` parameter tells `generate_multiple_themes` to produce 3 different theme proposals. Each theme is then rendered as a visual mockup using `PipeImgGen`, and everything is assembled into an HTML report.
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/generate_visuals/design_slides/bundle.mthds \
-  -i examples/b_basics/generate_visuals/design_slides/inputs.json
-```
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [PipeImgGen Operator](../building-methods/pipes/pipe-operators/PipeImgGen.md) - Generate images from prompts
-- [PipeCompose Operator](../building-methods/pipes/pipe-operators/PipeCompose.md) - Template-based data composition
-- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
-
-
-## Generate Image
-
-# Example: Generate Image
-
-This example generates creative, absurd images through a three-step pipeline: imagine a surreal scene concept, refine it into an optimized image prompt, then render the image.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/generate_visuals/gen_image/bundle.mthds)
-
-## What it demonstrates
-
-- Concept refinement (`SceneConcept` and `ImagePrompt` both refine `Text`)
-- `PipeImgGen` for image generation
-- Multi-step creative pipeline where each step builds on the previous one
-- No external inputs required — the pipeline generates everything from scratch
-
-## The Method: `bundle.mthds`
-
-```toml
-domain      = "crazy_image_generation"
-main_pipe   = "generate_crazy_image"
-
-[concept.SceneConcept]
-description = "A creative, abstract description of an absurd and surreal scene."
-refines = "Text"
-
-[concept.ImagePrompt]
-description = "A detailed textual description optimized for image generation models."
-refines = "Text"
-
-[pipe.generate_crazy_image]
-type = "PipeSequence"
-description = "Main pipeline that imagines a scene, refines it into a prompt, and renders the image"
-output = "Image"
-steps = [
-  { pipe = "imagine_scene", result = "scene_concept" },
-  { pipe = "generate_img_prompt", result = "image_prompt" },
-  { pipe = "render_image", result = "crazy_image" },
-]
-```
-
-The `render_image` pipe uses `PipeImgGen` to generate the final image:
-
-```toml
-[pipe.render_image]
-type        = "PipeImgGen"
-description = "Generates the absurd image based on the creative scene description"
-inputs      = { image_prompt = "ImagePrompt" }
-output      = "Image"
-prompt      = "$image_prompt"
-model       = "@default-small"
-```
-
-## How to run
-
-```bash
-pipelex run bundle examples/b_basics/generate_visuals/gen_image/bundle.mthds
-```
-
-No inputs needed — the pipeline imagines everything from scratch.
-
-## Related Documentation
-
-- [PipeImgGen Operator](../building-methods/pipes/pipe-operators/PipeImgGen.md) - Generate images from prompts
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [Refining Concepts](../building-methods/concepts/refining-concepts.md) - How concept refinement works
-
-
-## Synthetic Data
-
-# Example: Synthetic Data Generation
-
-This example generates diverse synthetic data samples from a text description. It first identifies a comprehensive set of sample cases, then creates detailed profiles for each one.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/c_advanced/gen_synthetic_data/bundle.mthds)
-
-## What it demonstrates
-
-- Concept refinement (`DataDescription` refines `Text`, `NbOfSamples` refines `Number`)
-- Rich structured concept with constrained choices (`Sample` with `current_performance`, `learns_best_with`, etc.)
-- Two-step generation: identify diverse cases, then create a profile for each
-- Batching over identified cases to generate samples in parallel
-
-## The Method: `bundle.mthds`
-
-### Sample concept
-
-The `Sample` concept represents a student profile with constrained fields:
-
-```toml
-[concept.Sample]
-description = "A complete synthetic data record representing a student profile."
-
-[concept.Sample.structure]
-student_name = { type = "text", description = "The name of the student", required = true }
-current_performance = { type = "text", description = "The student's current performance level", choices = [
-  "Struggling", "Average", "Advanced",
-], required = true }
-learns_best_with = { type = "text", description = "The learning modality that works best", choices = [
-  "Visual examples", "Step-by-step text", "Hands-on practice", "Videos",
-], required = true }
-# ... pace, complexity, strengths, needs_help_with, etc.
-```
-
-### Pipeline
-
-```toml
-[pipe.generate_synthetic_data_samples]
-type = "PipeSequence"
-inputs = { data_description = "DataDescription", nb_samples = "NbOfSamples" }
-output = "Sample[]"
-steps = [
-  { pipe = "identify_sample_cases", result = "cases" },
-  { pipe = "create_profile_for_case", result = "samples",
-    batch_over = "cases", batch_as = "case_characterization" },
-]
-```
-
-The first step identifies diverse real-world scenarios to ensure comprehensive coverage (edge cases, common scenarios, important variations). The second step creates a full profile for each case.
-
-## How to run
-
-```bash
-pipelex run bundle examples/c_advanced/gen_synthetic_data/bundle.mthds \
-  -i examples/c_advanced/gen_synthetic_data/inputs.json
-```
-
-## Related Documentation
-
-- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
-- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
-- [Understanding Multiplicity](../building-methods/pipes/understanding-multiplicity.md) - How batching works
-- [Refining Concepts](../building-methods/concepts/refining-concepts.md) - How concept refinement works
-
-
-## Expense Data with Receipts
-
-# Example: Expense Data with Receipts
-
-This advanced example generates complete synthetic expense datasets for multiple employees, including realistic receipt images and HTML reports. It features fraud scenario generation for testing expense validation systems.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/c_advanced/gen_expense_data/bundle.mthds)
-
-## What it demonstrates
-
-- Deep concept hierarchy (Employee, ExpenseScenario, CompanyProfile, ReceiptContent, Expense, etc.)
-- Nested `PipeSequence` pipelines (main pipeline batches over employees, sub-pipeline batches over categories)
-- `PipeImgGen` for generating realistic receipt images
-- `PipeCompose` with `construct` for assembling structured objects from parts
-- `PipeCompose` with HTML templates for report rendering
-- Fraud scenario modeling (weekend expenses, inflated amounts, receipt mismatches, vague purposes)
-- Custom Python runner for post-processing (PDF generation, file export)
-
-## The Method: `bundle.mthds`
-
-### Concept hierarchy (simplified)
-
-```
-NbOfEmployees (input, refines Number)
-  -> Employee[]
-     -> CompanyCategory[] (with ExpenseScenario)
-        -> CompanyProfile
-        -> ReceiptContent (from ReceiptHeader + ReceiptItemsAndTotals + ExpenseMetadata)
-        -> Receipt (image via PipeImgGen)
-        -> Expense + Receipt = ExpenseWithReceipt
-     -> EmployeeExpenseReport (employee + expenses + HTML report)
-```
-
-### Main pipeline
-
-```toml
-[pipe.generate_expense_dataset]
-type = "PipeSequence"
-inputs = { nb_employees = "NbOfEmployees" }
-output = "EmployeeExpenseReport[]"
-steps = [
-  { pipe = "generate_employees", result = "employees" },
-  { pipe = "generate_employee_report", batch_over = "employees", batch_as = "employee", result = "reports" },
-]
-```
-
-For each employee, the `generate_employee_report` sub-pipeline assigns expense categories (with fraud scenarios), then for each category generates a company profile, receipt content, receipt image, and expense record.
-
-### Receipt generation
-
-Receipt content is built in multiple steps: header (transaction number, date), items and totals (from the company's product catalog), and business purpose metadata. These are composed into formatted thermal-paper-style text, then rendered as a photo using `PipeImgGen`.
-
-## How to run
-
-**Using the CLI:**
-
-```bash
-pipelex run bundle examples/c_advanced/gen_expense_data/bundle.mthds \
-  -i examples/c_advanced/gen_expense_data/inputs.json
-```
-
-**Using the Python runner** (for PDF export and file organization):
-
-```bash
-cd examples/c_advanced/gen_expense_data
-python run_generate_expense_dataset.py
-```
-
-## Related Documentation
-
-- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
-- [PipeImgGen Operator](../building-methods/pipes/pipe-operators/PipeImgGen.md) - Generate images from prompts
-- [PipeCompose Operator](../building-methods/pipes/pipe-operators/PipeCompose.md) - Template-based data composition
-- [Understanding Multiplicity](../building-methods/pipes/understanding-multiplicity.md) - How batching works
-
-
-## Using Inference Plugins
-
-# Example: Using Inference Plugins
-
-This example shows how Pipelex discovers **inference-backend plugins**: installable Python packages that teach Pipelex how to serve models for a given `sdk` token. The cookbook ships a complete, minimal plugin — a deterministic "LLM" that always answers with the same haiku — so the whole flow runs anywhere with no API key and no network.
-
-## Get the code
-
-[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/main/examples/c_advanced/using_inference_plugins)
-
-## What it demonstrates
-
-- What a plugin **is**: a package exposing a `pipelex.plugins.kernel` entry point that resolves to a `PipelexPlugin` — an object with a `name`, a `targets_api` version, and a side-effect-free `register(registrar)` method
-- Registration through the registrar: `register` contributes an inference backend for `(family="llm", sdk="hello")`, plus an optional model lister
-- Discovery by presence: installing the package is the whole integration — no enable-list, no config switch
-- The model-config side: how a model handle in a `.mthds` file resolves to the plugin's worker through `.pipelex/inference/`
-- The failure mode when the plugin is missing — a loud, friendly error, not a silent fallback
-
-## The plugin package
-
-The plugin lives inside the example directory as its own installable package:
-
-```
-examples/c_advanced/using_inference_plugins/
-├── hello_plugin.mthds                  # the method that uses the plugin-served model
-└── hello_inference_plugin/             # the plugin package
-    ├── pyproject.toml                  # declares the `pipelex.plugins.kernel` entry point
-    └── hello_inference_plugin/
-        ├── hello_plugin.py             # HelloInferencePlugin: name, targets_api, register()
-        ├── hello_llm_worker.py         # HelloLLMWorker(LLMWorkerAbstract): the actual "model"
-        └── hello_list.py               # optional lister behind `pipelex show models hello`
-```
-
-The entry point in `pyproject.toml` is the single line that wires everything:
-
-```toml
-[project.entry-points."pipelex.plugins.kernel"]
-hello_inference = "hello_inference_plugin.hello_plugin:HelloInferencePlugin"
-```
-
-The plugin class registers what it serves — and nothing else happens at registration time (no I/O, no client construction; heavy work belongs inside the worker factory):
-
-```python
-class HelloInferencePlugin:
-    name = "hello_inference"
-    targets_api = PLUGIN_API_VERSION
-
-    def register(self, registrar: PluginRegistrar) -> None:
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)
-        registrar.add_model_lister(sdk="hello", lister=_list_hello_models)
-```
-
-The worker subclasses `LLMWorkerAbstract` and only implements the generation itself — the base class owns the job lifecycle, capability checks, usage reporting, and telemetry. Here it deterministically returns a haiku; a real plugin would call a remote model at this exact spot.
-
-## The model-config side
-
-Model configuration lives in the project's `.pipelex/inference/` directory (not in `.pipelex/pipelex.toml`). Three pieces connect a `.mthds` model handle to the plugin:
-
-- `backends.toml` declares the `[hello]` backend (enabled, no API key)
-- `backends/hello.toml` declares model `hello-1` with `sdk = "hello"` — the token that selects the plugin's worker factory
-- `routing_profiles.toml` routes `hello-1` to the `hello` backend via an `optional_routes` entry, which only applies while the target backend is enabled
-
-## The Method: `hello_plugin.mthds`
-
-```toml
-domain      = "hello_plugin"
-description = "Using a model served by an inference-backend plugin"
-main_pipe   = "hello_plugin"
-
-[pipe]
-[pipe.hello_plugin]
-type = "PipeLLM"
-description = "Write text about Hello World."
-output = "Text"
-model = { model = "hello-1", temperature = 0.5 }
-prompt = """
-Write a haiku about Hello World.
-"""
-```
-
-The only difference from the standard [Hello World](./hello-world.md) example is the `model` field: `hello-1` is served by the plugin instead of a gateway backend.
-
-## How to run
-
-1. Install the plugin package (this is the step being demonstrated):
-
-    ```bash
-    uv pip install -e examples/c_advanced/using_inference_plugins/hello_inference_plugin
-    ```
-
-2. Check that Pipelex discovered it:
-
-    ```bash
-    pipelex plugins list        # hello_inference | external | registered
-    pipelex show models hello   # lists hello-1
-    ```
-
-3. Run the method — no credentials needed:
-
-    ```bash
-    pipelex run bundle examples/c_advanced/using_inference_plugins/hello_plugin.mthds
-    ```
-
-    The output is the plugin's deterministic haiku.
-
-## The failure mode
-
-Uninstall the package and run again:
-
-```bash
-uv pip uninstall hello-inference-plugin
-pipelex run bundle examples/c_advanced/using_inference_plugins/hello_plugin.mthds
-```
-
-Pipelex fails loud at worker-creation time: `No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?` — the model config still resolves; only the worker factory is missing. A dry run still passes without the plugin, because worker creation is lazy.
-
-## Related Documentation
-
-- [Inference Backend Plugins](../under-the-hood/inference-backend-plugins.md) - The plugin seam and the Inference SPI, including how to wrap a real SDK (dependency guards, client memoization)
-- [Configuration System](../features/configuration.md) - How `.pipelex/` project configuration works
-- [Pipelex Gateway & Model Access](../features/gateway.md) - Default model access through the gateway
+This documentation explains each part of Pipelex once, as a reference, and the cookbook shows each of them working on a real method. If you have not used Pipelex yet, the [Quick Start](../get-started/quick-start.md) sets up the Pipelex plugin and the Pipelex MCP that the cookbook's pages rely on.
 
 
 # Viewpoint
@@ -2883,7 +1752,7 @@ Include PDFs directly in your prompts using `@variable` syntax. PipeLLM automati
 ## Related Documentation
 
 - [PipeExtract](../building-methods/pipes/pipe-operators/PipeExtract.md) - Operator reference and MTHDS fields
-- [Generic Document Extraction Example](../cookbook/extract-generic.md) - Extract markdown from complex PDFs using vision
+- [Generic document extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_generic) - A cookbook method that returns each page of any document as Markdown, including the text inside its images and diagrams
 
 
 ## Image Generation
@@ -2978,7 +1847,7 @@ Its source, its full documentation and its release notes are at [github.com/Pipe
 
     Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it. The plugin's hook and the Pipelex tools run on Node.js, so you need Node.js on your `PATH`.
 
-    Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
+    Claude Code also loads what you have added to your Claude account, so if you added the Pipelex MCP to Claude, Claude Code has it too. An agent with the plugin does not need the Pipelex MCP, and there is nothing to turn off: when both are present, the Pipelex MCP defers to the plugin's tools.
 
 === "Codex"
 
@@ -3266,6 +2135,14 @@ Pipelex can automatically upload generated artifacts — images, extracted pages
 
 - **Public URLs** — Directly accessible URLs for public content
 - **Signed URLs** — Time-limited secure URLs for private content, with configurable lifespan
+
+### The host an S3 link names
+
+An S3 link, signed or not, is virtual-hosted on the bucket's own regional host: `https://<bucket>.s3.<region>.amazonaws.com/<key>`. The runtime's own reads and writes go to that host too. A page that shows the runtime's links under a content security policy therefore allows that one origin, which covers your bucket and no one else's, where the region's shared endpoint `https://s3.<region>.amazonaws.com` would cover every bucket in the region.
+
+The exception is a legacy bucket name that cannot be a hostname, one with uppercase letters or an underscore. Its links are path-style on the regional endpoint, `https://s3.<region>.amazonaws.com/<bucket>/<key>`, so a policy must allow the shared endpoint for it. Name a bucket with lowercase letters, digits and hyphens only if its links have to be allowed on their own. A bucket name containing a dot is refused by the storage configuration; it could not be virtual-hosted over HTTPS anyway, because it breaks the `*.s3.<region>.amazonaws.com` wildcard certificate.
+
+A deployment whose egress rules allow S3 by hostname must allow `*.s3.<region>.amazonaws.com`, not only `s3.<region>.amazonaws.com`.
 
 ## Configuration
 
@@ -4853,7 +3730,7 @@ class ImageContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the image (a storage URI, an HTTP(S) URL, or a base64 data URL)
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes, passed alone, in a list or in a structured field: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
 - `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
 - `mime_type`: Optional MIME type of the image
@@ -4879,7 +3756,7 @@ class DocumentContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the document file, storage URL, or web page URL
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `public_url`: A URL a viewer can open, filled by the runtime for every document input it normalizes, exactly as for `ImageContent`: the storage provider's link for a stored file, which expires when signed URLs are configured, and the URL itself for an `http(s)` one
 - `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 - `filename`: Optional filename of the document
 - `title`: Optional title of the document or source
@@ -8264,11 +7141,11 @@ Analyze the following topic in depth, considering multiple perspectives:
 
 ## Related Documentation
 
-- [Hello World Example](../../../cookbook/hello-world.md) - Simple introductory example using PipeLLM
-- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline
-- [Write Tweet Example](../../../cookbook/write-tweet.md) - Multi-step tweet generation workflow
-- [Table Extraction Example](../../../cookbook/extract-table.md) - Extract and correct tables from images
-- [Gantt Extraction Example](../../../cookbook/extract-gantt.md) - Extract Gantt chart data from documents
+- [The MTHDS Language Tutorial](../../../get-started/mthds-language-tutorial.md#step-1-hello-world) - Starts from a single PipeLLM and builds a method step by step
+- [Invoice extraction](https://github.com/Pipelex/methods/tree/main/methods/invoice_extraction) - A method in the method library that extracts structured invoice data using both the OCR text and the page view
+- [Tweet optimizer](https://github.com/Pipelex/methods/tree/main/methods/tweet_optimizer) - A method in the method library that scores a draft tweet and rewrites it in your style
+- [Table extraction](https://github.com/Pipelex/methods/tree/main/methods/table_extraction) - A method in the method library that extracts a table from a screenshot into HTML, then reviews it against the image
+- [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) - A cookbook method that returns every task and milestone of a Gantt chart image with their dates
 
 ## PipeStructure
 
@@ -8513,8 +7390,8 @@ Pass a web URL as the `article_url` input when running the pipe. PipeExtract fet
 
 ## Related Documentation
 
-- [Generic Document Extraction Example](../../../cookbook/extract-generic.md) - Extract markdown from complex PDFs using vision
-- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline
+- [Generic document extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_generic) - A cookbook method that returns each page of any document as Markdown, including the text inside its images and diagrams
+- [Invoice extraction](https://github.com/Pipelex/methods/tree/main/methods/invoice_extraction) - A method in the method library that extracts structured invoice data using both the OCR text and the page view
 - [Document Extraction Feature](../../../features/document-extraction.md) - Overview of document extraction capabilities
 
 
@@ -9361,10 +8238,10 @@ steps = [
 
 ## Related Documentation
 
-- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline using PipeSequence
-- [Write Tweet Example](../../../cookbook/write-tweet.md) - Multi-step tweet generation workflow
-- [Table Extraction Example](../../../cookbook/extract-table.md) - Extract and correct tables from images
-- [Gantt Extraction Example](../../../cookbook/extract-gantt.md) - Extract Gantt chart data from documents
+- [Invoice extraction](https://github.com/Pipelex/methods/tree/main/methods/invoice_extraction) - A method in the method library that classifies each page, then extracts structured invoice data
+- [Tweet optimizer](https://github.com/Pipelex/methods/tree/main/methods/tweet_optimizer) - A method in the method library that scores a draft tweet and rewrites it in your style
+- [Table extraction](https://github.com/Pipelex/methods/tree/main/methods/table_extraction) - A method in the method library that extracts a table from a screenshot into HTML, then reviews it against the image
+- [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) - A cookbook method that returns every task and milestone of a Gantt chart image with their dates
 
 ## PipeParallel
 
@@ -10266,6 +9143,16 @@ So a pipe with `templating_style = "no_tag"` and one with `$article` instead of 
 # Pipelex CLI Documentation
 
 The `pipelex` CLI is the runtime and project-configuration CLI for Pipelex. Use it to initialize config, validate methods, run pipes, inspect the runtime state, and generate supporting files.
+
+## Installation
+
+The CLI renders its tables, panels and log lines through Rich, which is the `cli` extra, so install the package with it:
+
+```bash
+uv tool install "pipelex[cli]"
+```
+
+The same extra serves the [`pipelex-agent`](agent-cli.md) CLI. A process that only embeds Pipelex, a server for instance, installs the package without it; see [Rich Imports](../../contribute/rich-imports.md) for what that process gives up and how the runtime keeps Rich out of it.
 
 ## Overview
 
@@ -12098,6 +10985,8 @@ The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CL
 
 It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
+It ships in the same `cli` extra as the main CLI, `uv tool install "pipelex[cli]"`: its own output carries no Rich formatting, but the command modules it shares with `pipelex` import Rich.
+
 ## Global Options
 
 | Option | Description |
@@ -12511,7 +11400,7 @@ Configuration section: `[runtime.log]`
 
 ## Overview
 
-The logging configuration controls how Pipelex handles log messages, their formatting, and their display. The configuration is split into general logging settings and Rich console output settings.
+The logging configuration controls the levels, where the records go, and how they are rendered. Where they go is one key, `sink`, naming a registered log sink; each shipped sink then reads its own settings from the section, and the rest of the section applies to every sink.
 
 ## General Settings
 
@@ -12523,6 +11412,7 @@ default_log_level = "INFO"
 
 - Sets the default logging level for all loggers
 - Valid values: `"VERBOSE"`, `"DEBUG"`, `"DEV"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`
+- `"OFF"` silences the loggers `[runtime.log.package_log_levels]` does not pin; Pipelex's own loggers are pinned there at `INFO`, so silencing them, whichever sink is selected, is `pipelex = "OFF"` in that section
 
 ### Package-Specific Log Levels
 
@@ -12537,15 +11427,31 @@ pipelex = "INFO"
 
 - Override log levels for specific packages
 - Use `-` instead of `.` in package names (e.g., `urllib3-connectionpool`)
+- A key works at any depth of the logger hierarchy, because Pipelex names every logger after the emitting module: `pipelex` governs the whole runtime, and `pipelex-pipe_operators-pipe_llm = "DEBUG"` opens one module while the rest of `pipelex` stays at its level
 
-### Console Output
+### The Sink
 
 ```toml
-is_console_logging_enabled = true
+sink = "console"
 ```
 
-- Enable/disable console logging
-- Default: `true`
+- Names the registered log sink boot installs on the root logger, the way `runtime.storage.method` names a storage backend
+- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the `json` alternative
+- `"json"`: one JSON object per line, for a server behind a log agent
+- `"otlp"`: the OpenTelemetry logs signal, for a collector
+- `"gcp"`: Google Cloud Logging through the client library, for a process that must write to it directly
+- Any other token an installed plugin registers; a token nobody provides stops the boot naming the registered ones
+- The sink is a plugin capability: how it is discovered, selected and written is in [Log Sink Plugins](../../under-the-hood/log-sink-plugins.md)
+
+### Console Log Target
+
+```toml
+console_log_target = "stderr"
+```
+
+- The process stream the `console` and `json` sinks write to: `"stdout"` or `"stderr"`
+- Default: `"stderr"`, because logs are diagnostics and must stay off the data channel
+- `console_print_target`, beside it, is a different knob: the Rich `Console` used for banners and the main CLI's data tables, which default to `"stdout"` so they can be piped to a file
 
 ### Pretty-Print Mode
 
@@ -12554,10 +11460,10 @@ pretty_print_mode = "rich"
 ```
 
 - Controls the panels that `pretty_print(...)` renders, such as the "Output of pipe" panel shown after every operator pipe
-- `"rich"`: Rich tables and panels on the console print target
-- `"poor"`: plain text in a drawn frame on stderr, with no Rich panel; a pipe's output prints as its plain rendering
+- `"rich"`: Rich tables and panels on the console print target. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the two modes below
+- `"poor"`: plain text in a drawn frame on stderr, with no Rich panel and no Rich import; a pipe's output prints as its plain rendering
 - `"silent"`: nothing is printed and no renderable is built, for a host with no console or one that must not spend time rendering on the thread that runs pipes
-- Default: `"rich"`. The agent CLI forces `"silent"`
+- Default: `"rich"`. The agent CLI forces `"silent"`, and a server installed without the `cli` extra sets `"poor"` or `"silent"` beside `sink = "json"`
 - Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to the mode the process held before that boot
 
 ### JSON Formatting
@@ -12567,7 +11473,7 @@ json_logs_indent = 4
 presentation_line_width = 120
 ```
 
-- `json_logs_indent`: Indentation for JSON log output
+- `json_logs_indent`: Indentation of the JSON rendering a structured content (a `dict`, a `list`, a model) gets in the message
 - `presentation_line_width`: Maximum line width for formatted output
 
 ### Caller Information
@@ -12587,6 +11493,44 @@ Available templates:
 - `"func_module"`: "function_name module"
 - `"func_module_line"`: "function_name module 123"
 
+### Redaction
+
+```toml
+[runtime.log.redaction]
+is_enabled = true
+extra_patterns = []
+```
+
+One processor, applied to every record before any sink renders it, whichever sink is selected. It does two things, and the difference between them matters.
+
+**It scrubs secrets** from the message, from the exception's rendered text and from every string a field carries, replacing what a pattern matched with `[REDACTED]` and keeping whatever named the secret, so a reader still sees which header or which entry was carrying it. The shipped families are the ones the hosted plane already ran over its own records:
+
+- an `Authorization` header, whichever scheme it carries — `Bearer`, `Basic`, `Token`, `Digest`, `Negotiate`, `HMAC` — the scheme kept and the credential after it removed,
+- an api-key header or entry, however it is spelled (`x-api-key`, `api-key`, `api_key`),
+- a webhook signature header (`x-signature`, `x-completion-signature`),
+- an OAuth authorization code in a query string (`?code=…`, `&code=…`), read to the `&` or the `#` that ends the parameter rather than through an alphabet of its own, so a percent-encoded code goes whole,
+- a `Cookie` or `Set-Cookie` header's whole value, every crumb and every flag attribute of it. The value has to be a cookie header's own `name=value` grammar, which is what tells a header from a sentence: a quoted crumb is read to its closing quote and a crumb holding an apostrophe is read whole, while prose that merely says "cookie:" before ordinary words keeps its line,
+- a serialised entry, in a JSON object or a Python `repr` alike, whose name is one of the secret names below: its value is removed whether it is quoted — with either quote character, and whichever quoted the name — or a bare number or boolean,
+- those same names again in the plain `name=value` or `name: value` form a query string, a form-encoded body or a header line writes them in, which is the shape a raw request reaches the processor in,
+- a key recognisable by its prefix alone: `sk_`, `plx_sk_`, `pk_`, `bl_`, each spelled with a dash as with an underscore, so `sk-proj-…` and `sk-ant-api03-…` go the way `sk_live_…` does. The prefix is kept and what follows it removed, and what follows has to end in a long unbroken run of letters and digits — which is what keeps this family off an ordinary snake_case identifier, a table or a partition named `pk_customer_reference_index` being words all the way down.
+
+Every family but the serialised entry asks for at least eight characters of what a secret is written in. That bound is what keeps a family reading a `name: value` shape off ordinary prose, and it is the one the hosted plane's own scrubber was written with; a secret shorter than it is below what the shipped families read at all.
+
+The **secret names** are `password`, `pipelex_api_key`, `gateway_api_key`, `jwt_secret_key`, `portkey_api_key`, `client_secret`, `access_token`, `refresh_token`, `id_token`, `authorization`, `api_key`, `x_api_key`, `x_signature`, `x_completion_signature`, `cookie` and `set_cookie`, read in any case and with a dash as an underscore. A **field of the record whose own name is one of them** loses its value whatever it holds — judged by the name the call used, so a field carried under the `field_` collision prefix because the record already owned that name is covered too — and so does a **mapping entry** at any depth, since the mapping split the name from the value the families read together. `code` is deliberately not a secret name: it is the runtime's own identifier for a pipe, a domain and an error, and the OAuth code has its query-string family.
+
+A structured value, a field's `dict` or `list` or the `data` a structured content produces, is walked to any depth, and its strings go through the families above. A pydantic model is dumped and any other object rendered as text before the walk, exactly as the `json` and `otlp` sinks would have done after it, so neither carries a secret past the scrub; a model or an object that refuses to render becomes an `[UNRENDERABLE: <exception type>]` marker, which costs that one value and leaves the record and every other value it carries. A container that contains itself is cut at the cycle with a `[cycle]` marker.
+
+A structured content is redacted by name **before the message is rendered**, so the line a sink writes beside `data` says exactly what `data` holds: a secret nested in an object or held as a number is beyond what a pattern can read back out of text. That holds for content JSON refuses outright too — a circular reference, a mapping with a non-string key — which is rendered as its `repr` and carries no `data`: the names are redacted on that path as well, since a `repr` is no more readable to a pattern than a rendering is. Text a call rendered itself, an f-string of a dictionary for one, is covered by the serialised-entry family alone, which does not see into a nested object.
+
+**It neutralises control characters** in a field's string values, and only there: each becomes its printable escape, so a newline in a caller-supplied value cannot forge a line and a tab cannot forge a field separator, and an escape byte cannot colour a terminal. The message and the `data` attribute keep their control characters, because they are the runtime's own rendering — a titled call and a structured content both put a newline there deliberately, and the wire sinks escape `data` themselves, so a logged prompt keeps its line breaks. `data` is the runtime's name alone: a call that passes a field of that name has it carried as `field_data`, and escaped like every other field.
+
+**It fails closed.** A scrub that raises costs that record its processing, never the log call, and the record it hands on carries nothing of the call: the message becomes `[REDACTION FAILED: <exception type>]` and every field the record carried becomes `[REDACTED]`. Where even that stripping cannot complete — a stack that has run out is the usual reason the scrub failed in the first place, and it can run out again a line later — the record is dropped instead of emitted, so no sink ever receives one the scrub did not read.
+
+- `is_enabled`: `true` by default. `false` turns the processor off for a process that redacts downstream, or one whose records must be reproduced exactly as the calls made them
+- `extra_patterns`: regular expressions added to the shipped families, for the secret shapes only this deployment knows. Every match is replaced by `[REDACTED]`. A pattern the `re` module refuses is a configuration error named when the configuration loads, and so is one that matches the empty string — `x*` where `x+` was meant matches at every position of every line, which would replace the whole of every line the process writes
+
+What the processor does not reach is the `console` sink's Rich traceback, rendered from the exception object rather than from the scrubbed text, so on a person's terminal an exception reads as it was raised. Where the processor runs, and why it edits the record rather than a copy of it, is in [Logging](../../tools/logging.md#redaction).
+
 ### Problem Silencing
 
 ```toml
@@ -12596,23 +11540,9 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 - List of problem IDs to silence
 - Prevents specific warnings from being logged
 
-### Poor Loggers
+## The `console` Sink
 
-```toml
-generic_poor_logger = "#poor-log"
-poor_loggers = [
-    "kajson.decoder.sandbox",
-    "kajson.encoder.sandbox",
-    "class_registry.sandbox"
-]
-```
-
-- Loggers that use simplified formatting without fancy features
-- Useful for sandbox environments or when simple logging is needed
-
-## Rich Console Configuration
-
-Configuration section: `[runtime.log.rich_log]`
+Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`.
 
 ### Display Options
 
@@ -12645,7 +11575,7 @@ is_tracebacks_show_locals = false
 tracebacks_suppress = []
 ```
 
-- Control how Python tracebacks are displayed
+- Control how Python tracebacks are displayed; an exception a call carries with `include_exception=True` is rendered once, as a Rich traceback
 - Enable/disable word wrapping and local variable display
 - Suppress specific traceback patterns
 
@@ -12658,22 +11588,82 @@ keywords_to_hilight = []
 - List of keywords to highlight in log messages
 - Useful for emphasizing important terms
 
+## The `json` Sink
+
+No section of its own: the sink writes to `console_log_target`, one JSON object per line and no ANSI ever. Each line carries `time` (ISO 8601, UTC, milliseconds, `Z`), `severity` (the level name), `logger` (the module-named logger), `message`, `exception` when the record carries one, `trace_id`, `span_id` and `trace_flags` when the record was logged inside a span, and then every field, the run-scoped identifiers and the `data` attribute flat beside them, under their own names. The three trace keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not OTLP, lowercase hex at their full widths (32, 16 and 2 digits), so a collector or an error tracker joins the line to the span it was logged in; the span is the Pipelex span active at the log call, the pipe's own or the LLM call's during a run, and outside one OpenTelemetry's current span, your own code's, which Pipelex reads and never changes (see [Logging](../../tools/logging.md#the-trace-context)); a line logged outside any span carries none of the three. Those keys are reserved on every line, so a field named like one of them is carried under a `field_` prefix whether or not the line carries an exception or a span, and a non-finite float is written as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser.
+
+```json
+{"time": "2026-09-16T10:12:03.417Z", "severity": "INFO", "logger": "pipelex.pipe_operators.pipe_llm", "message": "Running the pipe", "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736", "span_id": "00f067aa0ba902b7", "trace_flags": "01", "request_id": "req-7f3a", "pipeline_run_id": "plr-01", "pipe_run_id": "pr-9c", "model": "gpt-5"}
+```
+
+## The `otlp` Sink
+
+Configuration section: `[runtime.log.otlp]`, read only when `sink = "otlp"`.
+
+```toml
+[runtime.log.otlp]
+endpoint = "http://collector:4318/v1/logs"
+headers = { Authorization = "Bearer ..." }
+```
+
+- `endpoint`: The collector's logs URL. Left unset, the exporter follows the OpenTelemetry environment conventions: `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`, then `OTEL_EXPORTER_OTLP_ENDPOINT` with the `/v1/logs` path, then the collector default on localhost
+- `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge
+- The records are exported in batches on the OTLP HTTP protocol, with the same service identity as the spans the runtime already exports, so a collector files the two together
+- Each record carries the trace context of the span it was logged in, the Pipelex span active at the log call, the pipe's own or the LLM call's during a run, and outside one OpenTelemetry's current span, your own code's, so a collector files the record under that span; a record logged outside any span carries none. Pipelex never makes its own spans current in the process's OpenTelemetry context, so your own instrumentation is never re-parented under them
+- The semantic-convention keys the sink writes itself — the source location `code.file.path`, `code.function.name` and `code.line.number`, and the `exception.*` keys — are reserved on every record whether or not it carries an exception, exactly as the `json` sink reserves its own keys: a field named like one of them is carried under the same `field_` prefix, so nothing is overwritten and a field keeps one wire name whichever sink is selected
+- The sink never exports its own export path: a record the SDK or the transport emits while an export is in flight is rejected before the handler's lock is taken, so an unreachable collector costs a warning on the export thread and never a loop or a hang at exit. A flush at teardown is bounded by the exporter's own timeout, `OTEL_EXPORTER_OTLP_TIMEOUT`, and whatever the sink raises while it flushes or closes is said on stderr rather than left to interrupt the teardown
+
+## The `gcp` Sink
+
+Configuration section: `[runtime.log.gcp]`, read only when `sink = "gcp"`. The sink writes to Google Cloud Logging through the `google-cloud-logging` client library, which the `gcp-logging` extra installs: `uv pip install "pipelex[gcp-logging]"`. Selecting the sink without the extra stops the boot with the install hint and the `json` alternative named.
+
+### Which of the two to pick
+
+**Most processes on Google Cloud should select `json`, not `gcp`.** Cloud Run, GKE and every platform that runs a logging agent over the container's stdout ingest one JSON object per line with a `severity` and a `message` — exactly what the `json` sink writes — and the lines arrive in Cloud Logging with no client library installed, no credentials to hold and no API call on the logging path. Select `gcp` for the process the agent cannot serve: one with nothing ingesting its stdout, or one that must write to a log name or a project that is not the ambient one.
+
+### Settings
+
+```toml
+[runtime.log.gcp]
+log_name = "pipelex"
+project_id = "my-project"
+credentials_file_path = "gcp_credentials.json"
+```
+
+- `log_name`: the Cloud Logging log the entries land under. Default: `"pipelex"`
+- `project_id`: the project to write to. Left unset, the client library resolves it from the credentials or from the metadata server of the machine the process runs on
+- `credentials_file_path`: a service-account JSON file to build the client from. Left unset, authentication is Application Default Credentials, which is what a process already running on Google Cloud has. This is a plain config value rather than a secret id read through the secrets provider, because the log sink is the first capability boot resolves — deliberately ahead of the secrets provider, so that every later line of the boot goes through the sink the configuration chose — and there is no provider to ask when this section is read
+
+### What each entry carries
+
+Each record becomes one Cloud Logging entry with a JSON payload:
+
+- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's two custom levels, `VERBOSE` and `DEV`, both land there
+- The payload carries `message`, `logger` and `exception` when the record carries one, then every field and the `data` attribute flat beside them. The keys the `json` sink reserves are reserved here too, `time`, `severity`, `trace_id`, `span_id` and `trace_flags` included although the payload carries none of them — the client library takes the time and the severity out of band, and the entry's own `trace` field carries the trace — so a field named like one of them is carried under a `field_` prefix under either sink rather than under one and not the other; a value JSON cannot carry — a non-finite float, a model, a circular structure — is written as text rather than costing the line
+- The run-scoped identifiers become the entry's **labels** rather than payload keys: `request_id`, `pipeline_run_id` and `pipe_run_id`, whichever of them the record carries. Cloud Logging indexes labels, so these are what a query filters a run by
+- The entry's `trace` field carries the run's own OpenTelemetry trace id, project-qualified as `projects/<project>/traces/<trace-id>`. The id is derived from `pipeline_run_id` by the same hash the tracer uses, so a line and the spans of the run it belongs to agree on it and Cloud Logging files them together
+- The entries leave through the client library's background-thread transport, which batches them off the thread that logged, so no record costs an API round trip on the calling thread. The teardown flushes and closes it, and the flush carries a deadline of its own because the library's does not
+- What the export path logs never leaves through the sink: the library reports a refused batch through a logger of its own, and a report exported through the pipeline it reports on would fail with it and be reported again. The handler rejects those records, and every record emitted on the library's export thread, before its lock is taken — the same guard the `otlp` sink carries, against the same deadlock at exit
+- A refused write is still said: the library marks a refused batch done, so the flush succeeds and nothing else would report it, and the entries in it are lost. The export path's warnings and errors are printed on stderr instead, the first one in each window of time with its traceback and the ones after it counted in a single line once that window has passed — with the next failure, on the next line the process logs, or at the teardown at the latest — so a process whose credentials Cloud Logging refuses says so without printing once per line it logs
+
 ## Example Configuration
 
 ```toml
 [runtime.log]
 default_log_level = "INFO"
-log_mode = "rich"
+sink = "console"
+console_log_target = "stderr"
+console_print_target = "stdout"
 pretty_print_mode = "rich"
-is_console_logging_enabled = true
 json_logs_indent = 4
 presentation_line_width = 120
 is_caller_info_enabled = true
 caller_info_template = "file_line_func"
-
 silenced_problem_ids = []
-generic_poor_logger = "#poor-log"
-poor_loggers = []
+
+[runtime.log.redaction]
+is_enabled = true
+extra_patterns = ["tnt-[0-9]+"]
 
 [runtime.log.package_log_levels]
 pipelex = "INFO"
@@ -12691,21 +11681,37 @@ is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false
 tracebacks_suppress = []
 keywords_to_hilight = ["error", "warning", "failed"]
+
+[runtime.log.otlp]
+headers = {}
+
+[runtime.log.gcp]
+log_name = "pipelex"
 ```
+
+## Migrating From the Log Mode
+
+`log_mode` (`rich` / `poor`), `poor_loggers`, `generic_poor_logger` and `is_console_logging_enabled` are gone from the schema, and the defaults layer supplies `sink = "console"` in their place. Run `pipelex migrate`: ledger entry `pipelex-config@5` deletes the four keys from an existing file, and the defaults then take over.
+
+Two of those keys chose a behaviour their deletion undoes, and no operation in the migration vocabulary can write the replacement — so where a choice was made, writing the replacement is yours:
+
+- `is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted. Its equivalent is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone; `default_log_level` governs only the loggers that section does not pin, so on its own it silences none of Pipelex's records. Silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, and sending the records elsewhere instead means selecting the sink that goes there. `is_console_logging_enabled = true` was the default and asks for nothing: the migration deletes it and the new default renders the same console.
+- `log_mode = "poor"` chose a plain handler for a process with no terminal; that process now sets `sink = "json"`. `log_mode = "rich"` chose what `console` renders, and asks for nothing either.
+- `poor_loggers` and `generic_poor_logger` have nothing to carry over: every record goes to the one selected sink.
 
 ## Best Practices
 
 1. **Development Environment**:
 
-    - Enable caller info for better debugging
+    - Keep the `console` sink, and enable caller info for better debugging
     - Use verbose logging levels
     - Enable local variables in tracebacks
 
 2. **Production Environment**:
 
+    - Select the `json` sink behind a log agent, the `otlp` sink in front of a collector, or the `gcp` sink for a process that must write to Google Cloud Logging directly
     - Disable caller info for performance
     - Use INFO or higher log levels
-    - Disable local variables in tracebacks
 
 3. **Package Log Levels**:
 
@@ -12716,6 +11722,7 @@ keywords_to_hilight = ["error", "warning", "failed"]
 ## Related Documentation
 
 - [Logging Tool](../../tools/logging.md) - Using Pipelex logging in your code
+- [Log Sink Plugins](../../under-the-hood/log-sink-plugins.md) - The seam behind the `sink` key, and how to write a sink
 
 
 ## Methods
@@ -14933,7 +13940,7 @@ The following Make targets are available for convenience:
 
 ## Overview
 
-Pipelex provides a sophisticated logging system that extends Python's standard logging with additional features like emoji support, rich formatting, and custom log levels.
+Pipelex logs through one facade, `from pipelex import log`, built on Python's standard `logging`. A call takes a message, optional named fields and the usual presentation options; the run-scoped identifiers are bound once at a process entry and stamped onto every record emitted in scope. Fields and identifiers ride the stdlib `LogRecord` as attributes, never spliced into the message text, so a structured sink renders them as fields while the console keeps a narrative line. Where the records go is one config key, `sink` under `[runtime.log]`: `console` renders them through Rich, `json` writes one JSON object per line, `otlp` ships them to an OpenTelemetry collector, and a plugin can register another. The keys are in [Logging Configuration](../configuration/config-practical/logging-config.md) and the seam itself in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md).
 
 ## Log Levels
 
@@ -14950,53 +13957,6 @@ In addition to standard Python log levels, Pipelex introduces custom levels:
 | CRITICAL | 50 | Critical errors |
 | OFF | 999 | Disable logging |
 
-## Logging Features
-
-### 1. Rich Formatting
-
-- Beautiful console output with color coding
-- Syntax highlighting for JSON and other data structures
-- Support for clickable file paths
-- Word wrapping for better readability
-
-### 2. Emoji Support
-
-Built-in emoji indicators for different components:
-
-- 🧠 Pipelex core messages
-- ⚪️ OpenAI-related logs
-- 🌀 Google-related logs
-- ⚡️ Network connections
-- *️⃣ JSON processing
-- 🧿 Poor-log channel (`#poor-log`, the simplified fallback logger)
-
-### 3. Caller Information
-
-Optional inclusion of caller information in logs:
-
-- File name and line number
-- Function name
-- Module name
-- Customizable format templates
-
-### 4. Structured Data Logging
-
-Intelligent handling of different data types:
-
-- Pretty-printing for dictionaries and lists
-- JSON formatting with customizable indentation
-- Special handling for None values
-- Exception traceback integration
-
-### 5. Log Dispatch System
-
-Smart routing of log messages:
-
-- Automatic detection of log origin
-- Separate handlers for different logging needs
-- Configurable rich or poor log modes
-- Support for poor loggers (simplified logging)
-
 ## Using the Logger
 
 ```python
@@ -15005,20 +13965,23 @@ from pipelex import log
 # Basic logging
 log.info("Simple message")
 
+# Named fields ride the record as attributes; the message stays narrative
+log.info("Scanned the inputs", fields={"files": 7, "bytes": 12_288})
+
 # Logging with title
 log.info("Detailed message", title="Process Status")
 
 # Logging with inline title
 log.info("Quick update", inline="Status")
 
-# Logging structured data
+# Logging structured data: rendered as JSON for the console, carried as `data` for a structured sink
 data = {"key": "value", "nested": {"data": True}}
 log.verbose(data, title="Configuration")
 
 # Warning with problem ID
 log.warning("API rate limit approaching", problem_id="rate_limit_warning")
 
-# Error with exception traceback
+# Error carrying the exception being handled, for the sink to render
 log.error("Failed to process", include_exception=True)
 
 # Development logging
@@ -15027,6 +13990,164 @@ log.dev("Testing new feature")
 # Verbose logging
 log.verbose("Detailed debug information")
 ```
+
+Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields`. `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside it. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
+
+## Fields
+
+`fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.files` for the example above, or `%(files)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
+
+A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink ignores it, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later.
+
+### Naming convention
+
+- A field name is a `snake_case` identifier, spelled the way the value is spelled where it comes from: a field carrying a payload's `pipeline_run_id` is `pipeline_run_id`, not `pipelineRunId` or `run`.
+- Where the [OpenTelemetry semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/logs/) define a key for the concept, use that key verbatim, dots included (`http.response.status_code`, `code.function.name`), so an OTLP sink emits it without translation. The three run identifiers have no such key and keep their payload names.
+- `request_id`, `pipeline_run_id` and `pipe_run_id` are reserved for the [run-scoped context](#the-run-scoped-context), and `data` is reserved for [structured content](#structured-content). A field of one of those names is accepted and never dropped: it takes precedence over the context for the three identifiers, and a `data` field rides under `field_data` whatever the content is. Nothing else should use them.
+
+### Names that are not yours to give
+
+The stdlib refuses an `extra` key that would overwrite one of the record's own attributes (`name`, `message`, `lineno`, `module`, `args`, `asctime` and the rest), and a library's log call never raises. An entry of such a name is therefore carried under the prefix `field_`: `fields={"name": "alpha"}` lands as `record.field_name`. What counts as owned is read off the record actually built, through whatever record factory is installed, so an attribute an OpenTelemetry or tracing instrumentation stamps on every record is a collision too, for a field, a context identifier and `data` alike. The prefix is applied until the name lands on an attribute nobody owns, and entries attach in order, so a call that gives both `name` and `field_name` keeps both values whatever their order: the one that arrives second lands on `field_field_name`.
+
+Two kinds of name are reserved though nothing on a fresh record owns them yet, because both are stamped after the entries are attached and the stdlib's refusal therefore cannot cover them: what the formatter sets (`message`, `asctime`) and what Pipelex's own logging machinery sets — `_pipelex_forwarded`, the marker that tells the sink's handler a record reached it through the boot's holding handler already. Both take the same `field_` prefix, and the marker is never handed to a sink as something the record carries. Without that reservation, `fields={"_pipelex_forwarded": True}` would have the sink's own filter read the record as one already delivered and drop it whole.
+
+## The run-scoped context
+
+The identifiers that correlate a record with the run it belongs to are bound once and stamped onto every record emitted while the binding holds:
+
+```python
+with log.context(request_id="req-7f3a", pipeline_run_id="plr-01"):
+    log.info("Loading the bundle")  # carries request_id and pipeline_run_id
+    with log.context(pipe_run_id="pr-9c"):
+        log.info("Running the pipe")  # carries all three
+    log.info("Delivering")  # pipe_run_id is gone again
+log.info("Outside")  # carries none of them
+```
+
+The context is a `LogContext` with three optional identifiers, `request_id`, `pipeline_run_id` and `pipe_run_id`. The rules:
+
+- **Absent means absent.** An identifier that is not bound is not on the record; it is never the string `"None"`.
+- **Nested bindings merge, the inner overriding the outer** for the identifiers it gives. Passing `None` inherits the outer value rather than clearing it.
+- **Exit restores the previous binding**, whether the block returns or raises.
+- **The binding is task-local.** It lives in a `contextvars.ContextVar`, so concurrent asyncio tasks each keep their own and a task started inside the block inherits it.
+- **A field overrides the context for its own record**: `log.info("...", fields={"request_id": "other"})` inside a bound context stamps `other`, for a call site that speaks about a request it is not running under.
+
+`pipelex.tools.log.log_context.get_log_context()` returns the current `LogContext`, or `None` outside any binding.
+
+### Where the context is bound
+
+The identifiers travel in the payload, and the contextvar is in-process plumbing bound after deserialization and nothing else; it never crosses a process boundary. Each process entry binds from the payload it received:
+
+- **A direct-mode run**: `PipeRun.run` binds `request_id` and `pipeline_run_id` from the job's `JobMetadata` for the whole run, delivery included, and releases the binding when the run returns. The metadata a submission builds carries no `pipe_run_id` yet.
+- **Every pipe run**: `live_run_pipe` mints the pipe run's id and binds `pipe_run_id` around the whole of the run, the line announcing it, its span lines and its failure included, so every record emitted during a pipe's run names the run it belongs to, a nested pipe rebinding its own and the outer id coming back when it returns, however it returns. A pipe lifted for absent optional inputs does not run and has no id: its skip line carries the enclosing binding, the parent pipe's or none. This is the binding every orchestration shares, direct or distributed.
+- **An API request**: the runner's request middleware is where `request_id` is bound from the inbound request, for the request's duration.
+- **A durable-execution activity or workflow**: the entry is where the identifiers are bound from the payload the orchestrator handed it.
+
+The last two are the runner's and the orchestration plugin's to bind, beside the payload they read; the runtime only provides `log.context`.
+
+### The trace context
+
+Beside the identifiers, a record is joined to the span it was logged in, and the structured sinks write that on their own, with nothing for a call site to pass: the `json` sink as `trace_id`, `span_id` and `trace_flags`, lowercase hex, the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP, and the `otlp` sink as the record's own trace context, so a collector files the record under the span. The span is found in this order:
+
+1. **The Pipelex span active at the log call**, the pipe's or the LLM call's, while Pipelex runs one.
+2. **Otherwise, OpenTelemetry's current span**, read and never changed, so a line your own code logs under its own span, outside a Pipelex run, joins your trace.
+3. **Otherwise, none**: the `json` line carries none of the three keys, and the `otlp` record no trace context. The `console` sink writes none in any case.
+
+The runtime holds each span it starts as the active Pipelex span from its start to its end, however it ends:
+
+- **A pipe run's span**: `live_run_pipe` starts the span, then runs the pipe with it held, so a line logged by the pipe's own work, a controller's or an operator's and the lines of the extract, image-generation, search or function call an operator makes, names the pipe's span, and a nested pipe's lines name the nested pipe's span until it returns. The line announcing the run is logged before the span starts, under the enclosing span.
+- **An LLM call's span**: the LLM worker runs the provider call with its generation span held, so the lines of the call and of its failure name that span, a provider SDK's own lines included.
+
+The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer: with the Pipelex Gateway's telemetry on, which is automatic when the Gateway serves your inference, or with AI span tracing enabled on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one that starts spans naming no trace, under `OTEL_SDK_DISABLED` for instance, and a line names whatever span your own code runs under, if any. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps its span too, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits the span of the code that started it.
+
+Holding a span is in-process plumbing, like binding the log context: it lives in a context variable of Pipelex's own. **Pipelex never makes its spans current in your process's OpenTelemetry context**, so your own instrumentation, an HTTP client's or a provider SDK's, is never re-parented under a Pipelex span, and an error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. A span's children take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs names a span only while the process runs a span of its own, the LLM call's for instance.
+
+## Structured content
+
+When the content is not a string, it is rendered as JSON for the message, indented by `json_logs_indent`, and the rendering is read back as the record's `data` attribute for a structured sink. `data` is therefore a snapshot of the call, JSON-ready whatever the content held, and the caller may mutate the object afterwards without changing what was emitted:
+
+- a `dict` is carried as a dictionary and a `list` as a list, their values as JSON reads them back: a datetime as its text, a `Decimal` as a string,
+- a pydantic model, or a list of models, is carried as the dictionary or list its serialization produces,
+- a number or a boolean is carried as itself, `log.info(42)` giving `data == 42`,
+- a value JSON cannot serialize goes through the JSON helpers' fallbacks, kajson first and `str` last, and a dictionary that reaches the last fallback is wrapped as `{"!": ...}` to flag it,
+- `None` is rendered as the word `None` and carries no `data`,
+- content `json` refuses outright, a circular reference or a mapping with a non-string key, is rendered as its `repr` and carries no `data`; a log call never raises.
+
+A `NaN` or an infinity survives the round trip as a float; a wire sink writes it as the string `"NaN"`, `"Infinity"` or `"-Infinity"`, since JSON has no token for it that a strict parser accepts.
+
+Structured content owns the `data` name, on every call: a `data` entry in `fields` keeps its value and is carried under `field_data` whatever the content is, a string included — the same prefix a field named like a record attribute or like a sink's reserved key gets. Nothing passed in `fields` is dropped for a name collision.
+
+## Redaction
+
+Every record is scrubbed once, before any sink renders it. The processor replaces what a secret pattern matched with `[REDACTED]`, in the message, in the exception's rendered text and in every string a field carries, and a field or a mapping entry whose own name is a secret's loses its value whatever it holds. It also replaces each control character in a field's string values with its printable escape, so a caller-supplied string cannot forge a line, a field separator or a colour on a terminal. The message keeps its control characters, which are the runtime's own rendering: a titled call and a structured content both put a newline there on purpose. The families, the secret names, the two configuration keys and the limits are in [Logging Configuration](../configuration/config-practical/logging-config.md#redaction).
+
+A structured content is redacted by name before the dispatch renders it, so the message and the `data` attribute agree: `log.info({"password": {"nested": "hunter2"}})` writes `[REDACTED]` in both, where a pattern reading the rendered text could not have seen into the nested object. Content that JSON refuses outright — a circular reference, a mapping with a non-string key — falls back to its `repr` and carries no `data`, and is redacted by name on that path too: the `repr` of an object-valued entry is no more readable to a pattern than the rendering was.
+
+An exception is scrubbed as text: the processor renders the traceback the way the stdlib would, chain included, scrubs it and stores it as the record's `exc_text`, which is what the stdlib formatter, the `json` sink and the `otlp` sink write. The exception object stays on the record, and the `otlp` sink emits `exception.type` and `exception.stacktrace` and no `exception.message`, since that one would be the exception's own text and nothing can scrub an exception. The one boundary that leaves is the `console` sink with `is_rich_tracebacks = true`, the default: Rich renders its traceback from the exception object, so on a person's terminal the exception reads as it was raised. A structured sink a collector reads is scrubbed.
+
+**It runs on the sink's handler, not at the call sites, and it edits the record rather than a copy of it.** Both halves of that are deliberate.
+
+On the handler, because that is where every record passes: a line a third-party library emitted with a raw request in it is exactly the line most likely to carry a bearer token, and no call site of ours is behind it. Scrubbing at the call sites would cover only what the facade emitted, which is the smaller and safer half.
+
+In place, because what the processor does is *remove* something. A record that has lost a secret is strictly safer for any handler that sees it afterwards, so the edit is shared rather than kept to the sink: a handler an integration attached to the root logger after Pipelex booted is behind the scrub too. Handing the sink a redacted copy would have guaranteed the opposite — every other handler on the root logger would receive the secret the sink was spared. One limit follows, and it is the one the runtime cannot close: a handler already on the root logger *before* Pipelex booted runs ahead of the sink's and sees the record as the call made it. Redaction reaches the handlers Pipelex is in front of, and a host that installs its own handler first is in front of Pipelex.
+
+`log.install_sink` is what puts the processor in front of the sink's own, so every sink gets it — the built-in ones, an out-of-tree one, and the console sink `pipelex doctor` falls back to — and no sink knows about it. A boot that dies before its sink arrives runs the same processor, behind the same guard, over every record it held before handing them to the stdlib's last resort on stderr, so the trail a failed boot leaves is scrubbed too. `[runtime.log.redaction] is_enabled = false` installs nothing at all.
+
+The processor fails closed. A sink processor that raises is reported on stderr and the record is handed on, which is the right rule for a processor that enriches; for one that removes, it would mean the secret ships. So when the scrub itself fails, a value nested past the interpreter's recursion limit for one, the record is stripped before the failure is reported: its message becomes `[REDACTION FAILED: <exception type>]`, every field and the `data` attribute become `[REDACTED]`, and the exception text is dropped. The line says the scrub failed, and nothing of the call leaves with it.
+
+The stripping can fail in its turn, and that case is closed too. The commonest reason the scrub fails is a stack that has run out — a `log.<level>(...)` call made a few frames from the limit, by a recursive walker or by an `except RecursionError:` handler — and a stack that could not take the scrub cannot always take the stripping of what it left behind a line later. So the record is marked before the stripping starts, by a plain assignment into its own dictionary that pushes no frame, and unmarked only once the stripping has gone all the way through; a record still carrying the mark when the processors are done is **dropped** rather than emitted. A notice saying the record was quarantined while it still carried the field the scrub never read would be worse than no line at all.
+
+That report names the processor and the type of what it raised, and withholds the exception's own text and traceback — which the stdlib's `handleError` would have printed in full. A processor fails *on the record's values*, so its exception is exactly where they end up: the secret the scrub was removing among them. The same rule covers a record whose arguments do not fit its format string: rather than leave the handler to fail on it and have the stdlib print the format string and every argument raw, the processor renders the scrubbed format string alone, followed by `[ARGUMENTS WITHHELD: the message could not be rendered]`.
+
+## Logger names and levels
+
+Every record is emitted on the stdlib logger named after the module that made the call: a line from `pipelex/pipe_operators/pipe_llm.py` goes to `pipelex.pipe_operators.pipe_llm`, a line from your own `myapp.jobs.nightly` module goes to `myapp.jobs.nightly`. The module is read from one frame lookup at a fixed depth, so a log line costs a dictionary and a frame lookup; nothing walks the stack.
+
+Because the stdlib logger hierarchy inherits levels, a `package_log_levels` key at any depth works, with `-` standing for `.`:
+
+```toml
+[runtime.log.package_log_levels]
+pipelex = "INFO"
+pipelex-pipe_operators-pipe_llm = "DEBUG"
+httpx = "WARNING"
+```
+
+The record's `pathname`, `lineno` and `funcName` point at the calling line, which is what the `console` sink links to and what the caller-info templates render when `is_caller_info_enabled` is on; all of it comes from that same frame, with no source file read.
+
+A filter attached to `logging.getLogger("pipelex")` never sees these records: the stdlib runs a logger's filters only for records emitted on that very logger, and a record is emitted on the module-named one. Attach the filter to the handler instead, which the stdlib runs for every record it handles, or, to reach whichever sink is installed, append a processor to the sink's `processors` list, as described in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md#logsink).
+
+## Before configuration
+
+Logging is configured in two steps at boot. `log.configure` sets the levels and installs a holding handler on the root logger; then, once the plugin registrar is built, the configured sink is looked up, its handler is installed and the held records are replayed to it in order, so the boot's own lines reach the sink selected for them. A record emitted during the handoff reaches the sink either way, replayed or forwarded, and one held record the sink cannot render gets the stdlib's own recovery and costs none of the others. A call before `configure` never raises: the record goes to the stdlib's default handling at the stdlib's default level, so an `INFO` is dropped and a warning reaches stderr through `logging.lastResort`. A boot that fails between the two steps closes the holding handler, which hands every record it held to `logging.lastResort`, once the [redaction](#redaction) has run over each: they all passed the level the configuration set, and a boot that died is when that trail is read. No handler is installed before `configure`, and nothing is swallowed. A library that logs before Pipelex boots, and the boot itself while it configures, are both safe.
+
+## Console rendering
+
+The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install and a server leaves out. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. A server without the extra also sets `pretty_print_mode` to `"poor"` or `"silent"`, since the `"rich"` panels are refused at boot the same way (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+
+### Rich Formatting
+
+- Color coding and syntax highlighting for JSON and other data structures
+- Clickable file paths pointing at the calling line
+- Word wrapping for better readability
+
+### Emoji Support
+
+Built-in emoji indicators for different components, keyed on the logger name's prefix:
+
+- 🧠 Pipelex core messages
+- ⚪️ OpenAI-related logs
+- 🌀 Google-related logs
+- ⚡️ Network connections
+- *️⃣ JSON processing
+
+### Caller Information
+
+Optional inclusion of caller information in logs, prefixed to the console line:
+
+- File name and line number
+- Function name
+- Module name
+- Customizable format templates
 
 ## Best Practices
 
@@ -15040,21 +14161,28 @@ log.verbose("Detailed debug information")
     - Use ERROR for actual errors
     - Use CRITICAL for system-critical issues
 
-2. **Structured Data**:
+2. **Fields over interpolation**:
 
-    - Log complex data structures directly
+    - Put a value a reader might filter or aggregate on in `fields`, and keep the message a sentence
+    - Name a field after the thing it carries, in `snake_case`, or after its OpenTelemetry key when one exists
+    - Leave the run identifiers to the context; bind them at the process entry, never per call
+
+3. **Structured Data**:
+
+    - Log complex data structures directly; they reach the console as JSON and a sink as `data`
     - Use titles for context
     - Include problem IDs for trackable issues
 
-3. **Exception Handling**:
+4. **Exception Handling**:
 
-    - Use `include_exception=True` for error context
+    - Use `include_exception=True` inside the `except` block, and let the sink render the traceback its own way
     - Include relevant data in error logs
     - Use appropriate log levels for exceptions
 
 ## Related Documentation
 
-- [Logging Configuration](../configuration/config-practical/logging-config.md) - Configure log behavior in `pipelex.toml`
+- [Logging Configuration](../configuration/config-practical/logging-config.md) - Configure log behavior and select the sink in `pipelex.toml`
+- [Log Sink Plugins](../under-the-hood/log-sink-plugins.md) - The sink seam, the built-in sinks and how to write one
 - [CLI](./cli/index.md) - Commands that surface runtime logs during development
 
 
@@ -15170,6 +14298,14 @@ Custom telemetry is configured in `.pipelex/telemetry.toml` and allows you to se
 - **OTLP**: Send spans to any OpenTelemetry-compatible backend (receives full span data)
 
 Custom telemetry is completely independent from Gateway telemetry—you can use both, either, or neither.
+
+### Pipelex's spans in your process
+
+Either stream makes Pipelex trace a run: the Gateway stream whenever it is on, and yours when AI span tracing is enabled on your PostHog. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **Pipelex never makes its spans current in your process's OpenTelemetry context**:
+
+- Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
+- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
+- The `json` and `otlp` log sinks still join each line to the Pipelex span it was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, and outside a Pipelex run to your current span, as [Logging](../tools/logging.md#the-trace-context) describes.
 
 ## Quick Setup
 
@@ -20130,6 +19266,8 @@ The same import-light / fail-at-use rules apply: a missing optional extra must r
 
 ## Authoring a backend plugin (minimal example)
 
+[Writing an Inference Plugin](writing-an-inference-plugin.md) walks through a complete plugin you can install and run with no API key, from its entry point to a method served by its model. The example below shows what a plugin wrapping a real SDK adds to that.
+
 A complete LLM backend plugin for a hypothetical `acme` SDK:
 
 ```python
@@ -20254,12 +19392,354 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 
 ## Related
 
+- [Writing an Inference Plugin](writing-an-inference-plugin.md) — a complete plugin, installed and run end to end with no API key
 - [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, riding the same discovery/denylist machinery
 - [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `runtime.storage.method`)
 - [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `runtime.secrets.method`)
 - [Pipe Routing & Execution](pipe-routing-and-execution.md) — where worker construction sits in the run path
 - [Error Model](error-model.md) — how these errors render and dereference
 - [Architecture Overview](architecture-overview.md)
+
+
+## Writing an Inference Plugin
+
+# Writing an Inference Plugin
+
+An inference plugin is an installable Python package that teaches the Pipelex runtime to serve models for a given `sdk` token. This page builds a complete one, `hello-inference-plugin`, whose "LLM" always answers with the same haiku, so every step runs on your own machine without an API key or a network call. It then declares a model served by the plugin, runs a method against it, and shows what happens when the plugin is missing.
+
+[Inference Backend Plugins](inference-backend-plugins.md) is the reference for the seam this page uses: the plugin contract, the Inference SPI a plugin imports, and the errors discovery raises. This page walks through that seam once, end to end.
+
+!!! note "A plugin extends the runtime on your machine"
+    An inference plugin is loaded by the Pipelex runtime you install and run yourself, as in [Run It Yourself](../get-started/run-it-yourself.md). A method you run on the hosted Pipelex API is served by the hosted plane's own backends and cannot use a plugin installed on your machine.
+
+## What you will build
+
+The plugin is its own package:
+
+```
+hello-inference-plugin/
+├── pyproject.toml                 # declares the pipelex.plugins.kernel entry point
+└── hello_inference_plugin/
+    ├── __init__.py                # empty
+    ├── hello_plugin.py            # HelloInferencePlugin: name, targets_api and register()
+    ├── hello_llm_worker.py        # HelloLLMWorker: the model itself
+    └── hello_list.py              # an optional lister behind `pipelex show models hello`
+```
+
+Two more pieces connect a method to it: a model declared with `sdk = "hello"` in your inference configuration, and a method that names that model.
+
+## Step 1: Declare the entry point
+
+The package's `pyproject.toml` publishes the plugin under the `pipelex.plugins.kernel` entry-point group:
+
+```toml
+[project]
+name = "hello-inference-plugin"
+version = "0.1.0"
+description = "Minimal Pipelex inference-backend plugin: a deterministic 'hello' LLM that needs no API key"
+requires-python = ">=3.11"
+dependencies = ["pipelex"]
+
+# The whole integration: once this distribution is installed, Pipelex discovers the plugin
+# through the `pipelex.plugins.kernel` entry-point group. An inference backend builds a worker,
+# never a pipe, so it is a kernel-layer plugin and publishes under the kernel group.
+[project.entry-points."pipelex.plugins.kernel"]
+hello_inference = "hello_inference_plugin.hello_plugin:HelloInferencePlugin"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hello_inference_plugin"]
+```
+
+That entry point is the whole integration. Pipelex has no list of enabled plugins to edit: an installed plugin is discovered at startup, and its presence is what enables it. The entry point may name the plugin class, as here, or an instance of it.
+
+The group is not cosmetic. It declares the plugin's layer, and an inference backend belongs to the kernel layer because it builds a worker and never a pipe. A plugin published under `pipelex.plugins.interpreter` instead would be invisible to a kernel-only boot, and a plugin still published under the retired `pipelex.plugins` group stops Pipelex from starting, with an error naming the group to move to.
+
+## Step 2: Register what the plugin serves
+
+`hello_plugin.py` holds the plugin class and the two callables it registers:
+
+```python
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.inference_backend_registry import InferenceFamily
+from pipelex.plugins.registrar import PluginRegistrar
+from pipelex.plugins.sdk_client_registry import SdkClientRegistry
+from pipelex.reporting.reporting_protocol import ReportingProtocol
+
+
+def _make_hello_llm_worker(
+    *,
+    inference_model: InferenceModelSpec,
+    backend: InferenceBackend,
+    sdk_clients: SdkClientRegistry,
+    reporting_delegate: ReportingProtocol | None,
+) -> InferenceWorkerAbstract:
+    # Heavy work belongs here, inside the closure, never at module import time.
+    # A real plugin would call `require_sdk(...)`, then build and memoize its SDK client
+    # with `sdk_clients.get_or_create(...)`. The hello worker needs neither.
+    from hello_inference_plugin.hello_llm_worker import HelloLLMWorker
+
+    return HelloLLMWorker(inference_model=inference_model, reporting_delegate=reporting_delegate)
+
+
+async def _list_hello_models(
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    from hello_inference_plugin.hello_list import list_hello_models
+
+    list_hello_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
+
+
+class HelloInferencePlugin:
+    """An out-of-tree inference-backend plugin serving the `hello` sdk token.
+
+    `register` is the only method Pipelex calls, and it stays free of side effects:
+    it calls the registrar's menu methods and nothing else.
+    """
+
+    name = "hello_inference"
+    # The plugin API version this plugin was written against, as a literal: never import the
+    # runtime's PLUGIN_API_VERSION here, or the check that catches a breaking runtime upgrade always passes.
+    targets_api = 4
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)
+        # Optional: powers `pipelex show models` for a backend serving this sdk.
+        registrar.add_model_lister(sdk="hello", lister=_list_hello_models)
+```
+
+A plugin is any object with a `name`, a `targets_api` and a `register` method. `targets_api` is the plugin API version the plugin was written against, written as a number: discovery compares it with the runtime's `PLUGIN_API_VERSION` and refuses the plugin with `PluginApiVersionMismatchError` when they differ, which is how a runtime whose plugin contract changed tells you the plugin needs updating. The runtime's own plugins import the constant because they ship with it; a plugin installed separately must not, or the comparison always passes. Pipelex calls `register` at startup and again whenever `pipelex plugins list` rediscovers the plugins, so it must do nothing but call the registrar's menu methods: no hub access, no I/O and no client construction.
+
+`add_inference_backend` registers a worker factory for one pair of family and `sdk` token, here the LLM family and `hello`. When a pipe first calls a model whose `sdk` is `hello`, Pipelex calls the factory with four keyword arguments: the resolved model spec, the backend's configuration, the process-wide cache of SDK clients, and the reporting delegate. The hello worker needs only the first and the last. The factory imports the worker module inside its body, so discovering the plugin imports nothing heavy.
+
+`add_model_lister` is optional. It registers the callable behind `pipelex show models`, which Pipelex awaits when you list the models of a backend whose models use the `hello` token.
+
+## Step 3: Write the worker
+
+`hello_llm_worker.py` holds the model itself:
+
+```python
+from pipelex.cogt.exceptions import LLMCapabilityError
+from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from typing_extensions import override
+
+HELLO_HAIKU = """Hello, World! I am
+a plugin-served model — no
+keys, no clouds, just code."""
+
+
+class HelloLLMWorker(LLMWorkerAbstract):
+    """A deterministic LLM worker that needs no credentials: every completion is the same haiku.
+
+    The base class owns the job lifecycle (validation, capability checks against the model spec,
+    usage reporting, telemetry). A worker implements only the generation itself.
+    """
+
+    @override
+    async def _gen_text(self, llm_job: LLMJob) -> str:
+        completion_text = HELLO_HAIKU
+        # A real worker reads the token counts from its provider's response.
+        if llm_tokens_usage := llm_job.job_report.llm_tokens_usage:
+            prompt_text = llm_job.llm_prompt.user_text or ""
+            llm_tokens_usage.nb_tokens_by_category = {
+                TokenCategory.INPUT: len(prompt_text.split()),
+                TokenCategory.OUTPUT: len(completion_text.split()),
+            }
+        return completion_text
+
+    @override
+    async def _gen_object(
+        self,
+        llm_job: LLMJob,
+        *,
+        schema: type[BaseModelTypeVar],
+    ) -> BaseModelTypeVar:
+        # The model spec declares `outputs = ["text"]`, so Pipelex never routes structured
+        # generation to this model. Raising keeps the worker honest if it is called directly.
+        msg = f"Model '{self.inference_model.name}' does not support structured output: it only writes a haiku."
+        raise LLMCapabilityError(msg)
+```
+
+`LLMWorkerAbstract` owns everything around the generation: it validates the job, checks the prompt against what the model spec says the model accepts, reports the job's usage and records its telemetry. A worker implements `_gen_text` for text and `_gen_object` for structured output. A real plugin would call its provider at the point where this one returns the haiku, and would fill the token counts from the provider's response rather than by counting words.
+
+## Step 4: List the models (optional)
+
+`hello_list.py` is the lister that `_list_hello_models` delegates to. The hello backend has no remote API to ask, so it prints the models declared in the backend's configuration:
+
+```python
+from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.runtime_hub import get_console
+from rich import box
+from rich.table import Table
+
+
+def list_hello_models(
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    """List the models the hello backend declares.
+
+    There is no remote API to ask, so the lister reads the model specs declared in the
+    backend's configuration file.
+    """
+    console = get_console()
+    model_names = backend.list_model_names()
+
+    if flat:
+        if not any_listed:
+            console.print("model_id,sdk,backend")
+        for model_name in model_names:
+            model_spec = backend.get_model_spec(model_name)
+            model_id = model_spec.model_id if model_spec else model_name
+            console.print(f"{model_id},{sdk},{backend_name}")
+        return
+
+    table = Table(
+        title=f"Available Models for Backend '{backend_name}' (SDK: {sdk})",
+        show_header=True,
+        header_style="bold cyan",
+        box=box.SQUARE_DOUBLE_HEAD,
+    )
+    table.add_column("Model ID", style="green")
+    table.add_column("Model Type", style="blue")
+    for model_name in model_names:
+        model_spec = backend.get_model_spec(model_name)
+        if model_spec is None:
+            continue
+        table.add_row(model_spec.model_id, model_spec.model_type)
+    console.print(table)
+```
+
+A backend that cannot list its models simply registers no lister, and `pipelex show models` then reports its `sdk` as one it cannot list.
+
+## Step 5: Declare a model served by the plugin
+
+The plugin serves the `hello` token, but a method names a model, not a token. Three entries in your inference configuration connect the two. They go in the `inference/` directory of your Pipelex configuration: `~/.pipelex/inference/`, which `pipelex init` writes, or your project's `.pipelex/inference/` if the project has one.
+
+First, `backends/hello.toml` declares the model `hello-1`, whose `sdk = "hello"` is the token that selects the plugin's worker factory:
+
+```toml
+[defaults]
+model_type = "llm"
+sdk = "hello"
+thinking_mode = "none"
+
+[hello-1]
+model_id = "hello-1"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+```
+
+Then `backends.toml` gains a `hello` table, which enables the backend that `backends/hello.toml` describes. It has no API key to declare:
+
+```toml
+[hello]
+display_name = "Hello (plugin example)"
+enabled = true
+```
+
+Finally, `routing_profiles.toml` routes the model to that backend. The file already has a table for the profile its `active` key names, here the default `[profiles.all_pipelex_gateway]`, so add one line inside that table rather than a second copy of it, which TOML refuses:
+
+```toml
+optional_routes = { "hello-1" = "hello" }
+```
+
+An optional route applies only while its backend is enabled, so turning the `hello` backend off leaves the profile valid. If you would rather not edit the tracked `backends.toml` and `routing_profiles.toml`, the same entries can go in the personal override files beside them, each under its table's header, as [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides) explains.
+
+## Step 6: Install the plugin and check that Pipelex found it
+
+Install the package into the environment Pipelex runs in. `uv tool install` rebuilds the tool's environment from the requirements it is given, so name Pipelex exactly as you installed it: if you installed it with provider extras, such as `"pipelex[anthropic,google]"`, repeat them here, or uv removes those providers' packages.
+
+```bash
+# Pipelex installed as a uv tool, as in Run It Yourself (repeat any extras you installed it with)
+uv tool install --with-editable ./hello-inference-plugin pipelex
+
+# Pipelex installed in a project's virtual environment
+uv pip install -e ./hello-inference-plugin
+```
+
+Then check that discovery registered it, and that the backend serves its model:
+
+```bash
+pipelex plugins list        # hello_inference: external, pipelex.plugins.kernel, registered
+pipelex show models hello   # lists hello-1
+```
+
+In `pipelex plugins list`, the plugin's row names the group it was found under and what it contributed: `inference backend llm:hello` and `model lister hello`.
+
+## Step 7: Run a method on the plugin's model
+
+Save this method as `hello_plugin.mthds`. It is an ordinary one-pipe method whose `model` names `hello-1`:
+
+```toml
+domain      = "hello_plugin"
+description = "Using a model served by an inference-backend plugin"
+main_pipe   = "hello_plugin"
+
+[pipe.hello_plugin]
+type        = "PipeLLM"
+description = "Write a haiku about Hello World."
+output      = "Text"
+model       = { model = "hello-1", temperature = 0.5 }
+prompt      = "Write a haiku about Hello World."
+```
+
+Run it:
+
+```bash
+pipelex run bundle hello_plugin.mthds
+```
+
+The output is the plugin's haiku. The run calls no provider: the pipe resolves `hello-1` through the routing profile to the `hello` backend, and the plugin's worker writes the answer itself.
+
+## When the plugin is missing
+
+To see what happens without the plugin, turn it off. Naming it in the plugin denylist of your `pipelex.toml` works however you installed it, and uninstalling the package has the same effect:
+
+```toml
+[runtime.plugins]
+disabled = ["hello_inference"]
+```
+
+`pipelex plugins list` now shows the plugin as `disabled`, and running the method again fails loudly when the pipe asks for its worker:
+
+```
+No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?
+```
+
+The model configuration still resolves, since `hello-1` is still declared and routed. Only the worker factory is missing, and Pipelex says so rather than falling back to another backend. A dry run of the method still passes without the plugin, because a dry run never builds a worker.
+
+## Going further: wrapping a real SDK
+
+A plugin that calls a real provider does three more things inside its worker factory, all described in [Inference Backend Plugins](inference-backend-plugins.md):
+
+- it guards its optional SDK with `require_sdk(...)`, so a missing dependency raises `MissingDependencyError` when the backend is used rather than when Pipelex starts;
+- it imports that SDK inside the factory, never at the top of the plugin module;
+- it builds its client through `sdk_clients.get_or_create(...)`, so repeated workers share one connection per model handle.
+
+## Related Documentation
+
+- [Inference Backend Plugins](inference-backend-plugins.md) - The plugin seam, the Inference SPI and its fail-loud guarantees
+- [LLM Providers & Models Configuration](../configuration/config-technical/inference-backend-config.md) - Backends, model specs and routing profiles
+- [Run It Yourself](../get-started/run-it-yourself.md) - Installing the Pipelex runtime on your own machine
 
 
 ## Orchestrator Plugins
@@ -20833,6 +20313,199 @@ Use `pipelex plugins list` to see every discovered plugin, the entry-point group
 - [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, plus the hub-slot mechanism these config-selected seams deliberately avoid
 - [Error Model](error-model.md) — how these errors render and dereference
 - [Architecture Overview](architecture-overview.md)
+
+
+## Log Sink Plugins
+
+# Log Sink Plugins
+
+Every record the runtime emits, a `log.info(...)` in a pipe operator, a warning from a provider, the failure line of a run, leaves the process through a single **log sink** installed on the root logger at boot. Which sink that is comes entirely from data: one config field, `runtime.log.sink`, names a sink, and a **log sink plugin** is what teaches Pipelex how to build it.
+
+Core names no sink by import or by string. The built-in sinks (`json`, `console`, `otlp`, `gcp`) are a plugin too, the always-on `LogSinkPlugin`, riding the exact same seam an out-of-tree package would. This page documents that seam, the contract a plugin registers, what a sink reads off a record, and how to write one.
+
+This is the third application of the mechanism the [storage provider](storage-provider-plugins.md) seam introduced and the [secrets provider](secrets-provider-plugins.md) seam reused; the three pages describe the same shape with the nouns swapped, and this one adds what is particular to logging: the sink is resolved after logging is already configured, and every sink shares one record contract.
+
+---
+
+## The same shape as storage and secrets
+
+A sink is a **process-global singleton selected by its own config key**, independent of the orchestrator and of any call, so it rides the **keyed registry + config-selected singleton** mechanism rather than a per-call registry or a hub slot:
+
+> Plugins register N sink factories into a registry keyed by an open `method` token. At boot, core reads `runtime.log.sink`, looks that token up in the registry, calls the factory to produce the one sink, and installs that sink's handler on the root logger.
+
+There is no `match runtime.log.sink:` anywhere in boot: the token set is open, so validation *is* the registry lookup. Adding a sink means registering a factory for its token; nothing in core changes. Every log call in the runtime and in your own code keeps going through `from pipelex import log`, and is unaffected by which sink was selected.
+
+---
+
+## The seam in one view
+
+```
+RuntimeBoot.__init__
+  └─ log.configure(runtime.log)            # levels set; a holding handler takes every record
+RuntimeBoot.setup
+  └─ build_registrar(config, builtin_plugins=…, …)   # pure, import-light
+       ├─ for each built-in plugin                   (LogSinkPlugin is one)
+       └─ for each installed entry point in the requested groups
+            └─ plugin.register(registrar)            # side-effect-free
+                 └─ registrar.add_log_sink(method=…, factory=…)
+  └─ LogSinkRegistry(registrar.log_sinks)
+  └─ sink = registry.get_required(method=runtime.log.sink)(runtime.log)
+  └─ log.install_sink(sink)                # the sink's handler replaces the holding handler,
+                                           # which replays what it held through it, in order
+teardown
+  └─ log.reset()                           # flushes and closes the sink's handler, removes it; nothing it raises escapes
+```
+
+### Configured before it is selected
+
+Logging is configured as soon as the configuration is read, in `RuntimeBoot.__init__`, so that everything the boot says afterwards is a record on a module-named logger at the configured level. The sink, though, is a plugin capability, and plugin discovery runs a little later, in `setup()`, once the boot knows which built-ins and which entry-point groups it reads. Rather than choose a default renderer for that window, `configure` installs a **holding handler** that keeps every record, and `install_sink` replays them through the selected sink's handler the moment it is installed, in the order they were emitted. A boot's own lines are therefore rendered by the sink the configuration chose, never dropped and never written in a shape nothing chose.
+
+The sink is the first capability resolved out of the registrar, ahead of secrets and storage, precisely so that every later line of the boot goes through it. A boot that dies before that point, on the gateway terms gate for instance, releases its process globals through `log.reset()`, which closes the holding handler: what it still holds gets the stdlib's last-resort treatment: every held record reaches stderr, since each passed the level the configuration set, and the redaction processor runs over each one first, behind the guard a sink's handler would have put it behind.
+
+`pipelex doctor`, which deliberately bypasses `Pipelex.make` to diagnose a broken configuration, selects its sink the same way: the pure `build_registrar` discovery, then the `runtime.log.sink` lookup. Where boot stops on a token nobody registered, the doctor installs the console sink instead and reports the token in a row of its own, naming the registered sinks, so the report it exists to produce is still produced.
+
+---
+
+## The contract
+
+### `LogSinkFactoryFn`
+
+A sink is produced by a typed **callable**, whole log config in, sink out (`pipelex/plugins/log_sink_registry.py`):
+
+```python
+LogSinkFactoryFn = Callable[[LogConfig], LogSink]
+```
+
+Passing the whole `LogConfig` is deliberate: a factory reads whatever it needs, the stream target, its own settings section, at the boot apply-point, never at registration. A plugin contributes one factory per method it serves by calling the registrar menu in its `register`, passing the token as a raw string:
+
+```python
+registrar.add_log_sink(method="gcp", factory=_make_gcp_log_sink)
+```
+
+`register` is **side-effect-free**: it may call the registrar menu and nothing else. That is what keeps `build_registrar` safe to run more than once, at boot and again for the `pipelex plugins list` diagnostic, whose rows show the sinks each plugin contributed as `log sink <method>`.
+
+### `LogSink`
+
+The factory returns a `LogSink` (`pipelex/tools/log/log_sink.py`), an abstract base with one method to implement and two things every sink gets from the base:
+
+```python
+class LogSink(ABC):
+    processors: list[LogRecordProcessor]  # the slot every sink shares
+
+    @abstractmethod
+    def make_handler(self) -> logging.Handler: ...  # built once, at install
+
+    @property
+    def handler(self) -> logging.Handler: ...  # the same handler on every read
+
+    def redirect_to_stderr(self) -> None: ...  # a no-op unless the sink writes to a process stream
+```
+
+- **`make_handler`** builds the stdlib handler the sink installs on the root logger, and is where a heavy import belongs. It is called once per install, so selecting a sink is what pays for its dependency and a sink whose package is missing fails there, at boot, with `MissingDependencyError` naming the extra. A sink object installed again after a `reset` builds a second handler rather than being handed the first one back, because the teardown closed it — and a close is terminal for a sink that really releases what it writes to, so a reused handler would accept every record and drop the lot with nothing raised to say so. **Open the target in `make_handler`, not in `__init__`**, or the second install writes to something already closed. A sink that cannot, because it is handed its target already built, refuses a second handler from `make_handler` instead of building one on the closed target: the built-in `otlp` sink is constructed around its processor and shuts it down with its provider at close, so installing the same `OtlpLogSink` object again raises, and its factory builds a new one at every boot.
+- **`processors`** is the slot a cross-cutting transformation hooks into. A processor is a callable that edits a record in place, `Callable[[logging.LogRecord], None]`, and the base runs every processor over each record before the handler formats it, through a filter on the sink's own handler. Each one is guarded on its own: the stdlib runs a handler's filters outside any `try`, so a processor that raised would raise out of the `log.<level>(...)` call that emitted the record, and instead what it raises is reported on stderr by its type and the processor's name — never its text or its traceback, since a processor fails on the record's own values and its exception is where those end up — guarded in its turn since a closed stderr makes the reporter raise, the processors after it still run, and the record is handed on. A failing processor costs that record its processing, never the call and never the line; the redaction processor, which must not hand on what it failed to scrub, strips the record down to a `[REDACTION FAILED: <exception type>]` notice before it raises, and where even that stripping could not complete it leaves a mark that has the record dropped rather than emitted — the one case in which a sink does not see a record its logger accepted. **Redaction is the first processor, and the base is not what appends it**: `log.install_sink` puts it in front of the sink's own list, so every sink gets it, built-in, out-of-tree or the doctor's fallback, with none of them knowing about it — see [Redaction](../tools/logging.md#redaction) for why it edits the record every root handler shares instead of a copy.
+- **`redirect_to_stderr`** exists for the agent CLI, whose stdout is reserved for its structured envelope: a sink that writes to a process stream moves it to stderr, and one that writes to a collector ignores the call.
+
+### What a sink reads off a record
+
+Every sink reads the same record, shaped by the [logging facade](../tools/logging.md): the message is `record.getMessage()`, and everything the call, the bound context or a record factory attached rides as attributes. `carried_attributes(record=...)` in `pipelex/tools/log/log_fields.py` hands a sink exactly that set, in the order the attributes were attached, by subtracting the attributes the stdlib gives every record and the ones this package stamps on a record itself. An exception a call carried with `include_exception=True` is the record's `exc_info`, the stdlib's own channel, which each sink renders its own way. The trace context is not on the record: it is read from the context when the sink's handler runs, which is inside the log call, or, for a boot line held until the sink arrives, from the context the holding handler copied when the line was logged and replays it under. The runtime holds the pipe's span or the LLM call's in a context variable of its own while it runs, and never makes it OpenTelemetry's current span, so a sink that joins its records to their traces reads it at emit through `pipelex/system/telemetry/current_span.py`: `span_context_for_logs()` returns the active Pipelex span's context, else the valid current OpenTelemetry span's, else `None`, and `otel_context_for_logs()` returns the current context with the active Pipelex span set in it, for an OpenTelemetry API that takes a context. The `json` sink reads the first, the `otlp` sink the second.
+
+Three rules follow for a sink author, and the shipped sinks honour all of them:
+
+- **A sink serializes on emit, synchronously, on the calling thread.** A field's value rides the record by reference, so a value the caller mutates after the call is not what the record said; reading it at emit is what makes the record a faithful account of the call. A sink that queues, the `otlp` sink on its batching exporter for instance, translates the record into its wire form at emit and queues the translation. The `data` attribute needs no such care: it is already a JSON-ready snapshot of the call.
+- **A sink renders every record it is handed and never raises.** A value the wire cannot carry is written as text, a JSON rendering for a mapping, a `repr` for what JSON refuses; a serialization failure is a fact about the value, never a reason to lose the line. A handler failure goes through the stdlib's `handleError`, as any handler's does.
+- **A sink reserves the keys it writes itself, on every record.** A carried attribute named like one of them is written under the `COLLIDING_FIELD_PREFIX` — `field_` — applied until the name lands free, which is the same treatment the record gives a field named after a stdlib attribute. Reserved unconditionally, not only when the sink happens to write the key on this record: a field's wire name must not depend on whether an exception was attached, and a field must not survive one sink and vanish on another. The `json` sink reserves `time`, `severity`, `logger`, `message`, `exception`, `trace_id`, `span_id` and `trace_flags`; the `gcp` sink reserves that same set even though only `message`, `logger` and `exception` are payload keys there, the client library carrying the time and the severity out of band and the entry's own `trace` field carrying the trace, so a field named like one of them is prefixed under either sink rather than under one only; the `otlp` sink reserves its `code.*` and `exception.*` semantic-convention keys.
+
+---
+
+## The built-in `LogSinkPlugin`
+
+`pipelex/providers/log_sinks/log_sink_plugin.py` is the reference sink plugin. It is **core-unconditional**, a process needs somewhere for its records to go, so it joins `KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES` and cannot be disabled into a boot with no sink:
+
+```python
+class LogSinkPlugin:
+    name = "log_sinks"
+    targets_api = PLUGIN_API_VERSION
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.add_log_sink(method=LogSinkMethod.JSON, factory=_make_json_log_sink)
+        registrar.add_log_sink(method=LogSinkMethod.CONSOLE, factory=_make_console_log_sink)
+        registrar.add_log_sink(method=LogSinkMethod.OTLP, factory=_make_otlp_log_sink)
+        registrar.add_log_sink(method=LogSinkMethod.GCP, factory=_make_gcp_log_sink)
+```
+
+| Sink | What it does | Where it reads its settings |
+|------|--------------|-----------------------------|
+| `json` | One JSON object per line on the configured stream: `time`, `severity`, `logger`, `message`, `exception` when there is one, `trace_id`, `span_id` and `trace_flags` in hex when the record was logged inside a span, the active Pipelex span or else the current OpenTelemetry one, under the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP, then the fields, the context identifiers and `data` flat beside them, a field named like one of those keys under a `field_` prefix on every line, a non-finite float as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser, and no ANSI ever. What the hosted plane's runner and worker select. | `console_log_target` |
+| `console` | The Rich handler with the emoji formatter and every `[runtime.log.rich_log]` setting, byte for byte what the console showed before sinks existed. Rich, the `cli` extra, is imported when the handler is built, and a process that selects another sink never loads it through this path. | `console_log_target`, `[runtime.log.rich_log]` |
+| `otlp` | The OpenTelemetry logs signal: a `LoggerProvider` carrying the same service identity as the tracer, a `BatchLogRecordProcessor` and the OTLP HTTP log exporter. The message is the body, the level maps onto the OTel severity scale, the fields, identifiers and `data` ride as attributes (a mapping as JSON text), an exception lands under the `exception.*` semantic-convention keys, each record is filed under the span it was logged in, the active Pipelex span or else the current OpenTelemetry one, and a collector receives the logs beside the spans the runtime already exports. The keys the sink writes itself, the `code.*` source location and the `exception.*` set, are reserved on every record whether or not it carries an exception, so a field named like one of them rides under a `field_` prefix rather than being overwritten. A filter on the handler rejects the records of the sink's own export path, the SDK's by logger name and the transport's by the context value the SDK sets around an export, before the handler's lock is taken, so an export failure never re-enters the pipeline and a shutdown never waits on itself. | `[runtime.log.otlp]` |
+| `gcp` | Google Cloud Logging through the `google-cloud-logging` client library, behind the `gcp-logging` extra. Each record becomes one struct entry: the level maps onto the Cloud Logging severity scale (which has nothing below `DEBUG`, so `VERBOSE` and `DEV` both land there), the message, the logger, the exception and the fields become the JSON payload, the run-scoped identifiers become the entry's labels, which is what Cloud Logging indexes, and the entry's `trace` field carries the run's own OpenTelemetry trace id project-qualified, derived from `pipeline_run_id` by the same hash the tracer uses, so a line and the spans of its run agree on it. The entries leave through the client library's background-thread transport, which batches them off the calling thread. **Most processes on Google Cloud want `json` instead**: a platform whose logging agent reads the container's stdout, Cloud Run and GKE among them, ingests what that sink writes and needs no client at all; `gcp` is for a process with no such agent in front of it, or one writing to a log or a project that is not the ambient one. | `[runtime.log.gcp]` |
+
+The `otlp` factory imports the OpenTelemetry logs SDK when it runs, and the `gcp` factory the Google Cloud Logging client library, never at register, so registering the built-ins imports neither, which the import-light guard pins.
+
+### Why `console` is the default
+
+`pipelex/pipelex.toml` ships `sink = "console"`. A user who installs the CLI expects the rendering the CLI always had, the emoji, the colours, the clickable paths, and a default that changed it would be a regression for every terminal. A server is the process that must choose: it selects `json`, and the fail-loud factory is what makes the choice hard to forget. Rich is the `cli` extra, which a server installs pipelex without, so a server that forgot to select `json` refuses to boot with the extra and the `json` alternative named, rather than shipping ANSI to a log agent. How the rest of the runtime keeps Rich out of such a process, and the guard that holds it there, is in [Rich Imports](../contribute/rich-imports.md).
+
+---
+
+## Selecting a sink by config
+
+`runtime.log.sink` is an **open `str` token**, not a closed enum. The built-ins use `"json"`, `"console"`, `"otlp"` and `"gcp"`; an external plugin registers its own. A config naming an external token **parses fine**, the token is stored verbatim and its installability is validated later, at registry lookup:
+
+```toml
+# .pipelex/pipelex.toml
+[runtime.log]
+sink = "gcp"          # an out-of-tree sink, selected iff its plugin is installed
+```
+
+Whether that token names an *installed* sink is validated at **registry lookup**, not at parse: an unknown token surfaces as `UnknownLogSinkError` at boot, which lists the registered tokens so the fix is obvious.
+
+An external sink has no settings section of its own in `LogConfig`, whose sub-models are the shipped sinks'; until a generic passthrough for external sinks lands, an out-of-tree sink reads its own configuration from the environment or its own file, as an out-of-tree storage provider does.
+
+---
+
+## Fail-loud guarantees
+
+| Condition | Error |
+|-----------|-------|
+| `runtime.log.sink` names no registered sink | `UnknownLogSinkError` (lists the registered tokens) |
+| the selected sink's package is not installed | `MissingDependencyError` (package + `pipelex[<extra>]` hint), raised at install, at boot |
+| two plugins register the same `method` | `DuplicateLogSinkError` (names both plugins) |
+| `name` (`"log_sinks"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
+| published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` |
+| entry point raises while loading/registering | `BrokenPluginError` |
+
+The duplicate detection is the same fail-loud `_add` helper the storage and secrets menus use.
+
+---
+
+## Authoring an out-of-tree log sink plugin
+
+A third-party log sink plugin is a distribution that:
+
+1. implements a `LogSink` subclass whose `make_handler` builds the handler and performs whatever SDK import the handler needs, so the module stays import-light; the handler reads the record through `carried_attributes`, serializes on emit, and never raises;
+2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_log_sink(method="<token>", factory=...)` and nothing else;
+3. advertises itself under the `pipelex.plugins.kernel` entry-point group, a log sink being a kernel-layer capability (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means):
+
+```toml
+# pyproject.toml of your plugin package
+[project.entry-points."pipelex.plugins.kernel"]
+gcp_log_sink = "pipelex_log_gcp.plugin:GcpLogSinkPlugin"
+```
+
+Installing the distribution makes the token selectable (`runtime.log.sink = "gcp"`); uninstalling removes it. No core change, no central registration list: *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist.
+
+Use `pipelex plugins list` to see every discovered plugin, what each contributed (`log sink <method>` among the rows), and its denylist state.
+
+---
+
+## Related
+
+- [Logging](../tools/logging.md): the facade, the fields, the context and what a record carries
+- [Logging Configuration](../configuration/config-practical/logging-config.md): the `sink` key and each shipped sink's settings
+- [Storage Provider Plugins](storage-provider-plugins.md) and [Secrets Provider Plugins](secrets-provider-plugins.md): the sibling config-selected-singleton seams
+- [Inference Backend Plugins](inference-backend-plugins.md): the shared discovery and denylist machinery
+- [Error Model](error-model.md): how these errors render and dereference
 
 
 ## Error Model
@@ -22507,6 +22180,119 @@ Named so this document stays honest.
 ## For consumers outside this repo
 
 `pipelex.hub` is gone; there is no shim. Every external importer must choose a layer. The symbols that crossed the repo boundary are split as follows — kernel-layer ones now come from `pipelex.runtime_hub`, interpreter-layer ones from `pipelex.interpreter_hub`, per the tables above. `get_pipelex_hub` splits into `get_runtime_hub` and `get_interpreter_hub`, so each call site must pick the container it actually meant.
+
+
+## Rich Imports
+
+# Rich imports
+
+[Rich](https://github.com/Textualize/rich) renders everything Pipelex shows in a terminal: the CLI's tables and panels, the `console` log sink, the "Output of pipe" panels of the `rich` pretty-print mode. None of that has a place in a server, which writes JSON lines to a log agent and prints nothing. So Rich is not a core dependency of `pipelex`. It is the **`cli` extra**, which the command-line tools install and a server leaves out:
+
+```bash
+uv tool install "pipelex[cli]"   # the pipelex and pipelex-agent commands
+uv pip install pipelex           # a process that embeds the runtime
+```
+
+## What this delivers, and what it does not
+
+The property the convention on this page holds is that **no code path the runtime takes on the way to running a method needs Rich**: a process that selects the `json` log sink and a Rich-free pretty-print mode boots, runs a method and tears down with every `rich` import refused.
+
+It is **not** that the second install above leaves an environment with no Rich in it. `typer` and `instructor` are core dependencies of `pipelex` and both require `rich` unconditionally, so `uv pip install pipelex` installs Rich anyway, and `import pipelex` loads it — through `httpx`, another core dependency, whose optional command-line module imports `rich.console` inside a `try`. Taking Rich out of that transitive closure is separate work on the install side, and it is not what the guard or the test below measure. It is also why the test measures the property with Rich **blocked** by an import hook rather than by inspecting an environment: in a real environment Rich is present, and its absence is what has to be simulated.
+
+This page is the specification of the convention that keeps the runtime off it, and of the checks that enforce it.
+
+## The rule
+
+> **Outside `pipelex/cli/`, no module imports Rich at module level, no module reaches Rich through a module-level import of a CLI module, and no deferred Rich import is reached before something asked whether Rich is there.**
+
+The CLI package installs the extra, so its modules import Rich at the top of the file like any other dependency. Every other module that renders through Rich imports it inside the function that renders, so importing the module costs a process without Rich nothing.
+
+The third clause is the other half of the same contract: deferring the import is what keeps Rich off the import path, and calling the guard first is what makes the failure a `MissingDependencyError` naming the extra instead of a bare `ModuleNotFoundError`. It is checked one function at a time, in statement order — a guard reaches the statements after it in its own block and everything nested inside them, not the ones above it and not the other branch of its own `if`. A guard that a callee performs is therefore invisible to the check, so a function whose Rich is already assured by something it called spells the guard out beside the import anyway.
+
+"Module level" means what importing the module executes. An import statement counts wherever it sits outside a function body: at the top of the file, inside a module-level `try` or `if` block, in a class body. Two places are exempt, because nothing in them runs at import time:
+
+- a function or coroutine body;
+- the body of an `if TYPE_CHECKING:` or `if typing.TYPE_CHECKING:` block. Its `else` branch is runtime code and is checked, and so is the body of `if not TYPE_CHECKING:`.
+
+There is one escape hatch, and it belongs to the transitive clause alone. That clause walks the module-level import graph the hub-layering guard builds, and a statement carrying that guard's `# hub-layering: ignore` marker is no edge in it — so the marker, whose stated purpose is a different guard, also hides the marked module's own path to Rich. Reach for it only where the hub-layering guard is the reason, and say so in the comment. Nothing else can be switched off: a module that genuinely needs Rich at import time is a CLI module, and it belongs under `pipelex/cli/`.
+
+## Rendering through Rich outside the CLI
+
+A function that renders checks that Rich is installed first, then imports what it renders with. The check raises `MissingDependencyError`, which names the `cli` extra and the install command, so a process without Rich gets an instruction rather than a bare `ModuleNotFoundError`:
+
+```python
+from typing import TYPE_CHECKING
+
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.misc.pretty import require_rich_for_rendering
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
+
+
+class TextContent(StuffContent):
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.markdown import Markdown
+
+        return Markdown(self.text)
+```
+
+- **`require_rich_for_rendering()`** (`pipelex.tools.misc.pretty`) is the check for a rendering: the `rendered_pretty` methods of the content types and the builder specs, and the `rich` pretty-print mode. Its message points at the Rich-free pretty-print modes as well as at the extra.
+- **`require_rich(message=...)`** (`pipelex.tools.misc.rich_extra`) is the check for anything else, with a message saying what needed Rich: the `console` log sink uses it, and so does `get_console()`.
+- **`is_rich_installed()`**, in the same module, answers without raising, for a caller that has a Rich-free fallback. The stuff viewer page uses it, and shows the JSON rendering in its Pretty tab when Rich is absent.
+- **A type-only import goes under `if TYPE_CHECKING:`.** In a module with `from __future__ import annotations`, the annotation can stay unquoted; in a pydantic model module without it, quote the annotation, as `"PrettyPrintable"` is quoted above, since pydantic resolves annotations at class creation.
+
+Ruff agrees with the convention: `pyproject.toml` bans `rich` as a module-level import under `flake8-tidy-imports.banned-module-level-imports` (rule `TID253`), which also exempts a deferred Rich import from `import-outside-top-level`, so none needs a suppression comment. The CLI package and the test suite, which installs every extra, are exempt from the ban in `per-file-ignores`. The ruff rule gives the warning in the editor; the guard below is the gate, because ruff sees neither the import graph nor the allowlist as one declaration.
+
+## What a process without Rich gives up
+
+Nothing a server needs. What needs Rich stops as early as it can, naming the extra:
+
+| Surface | Without Rich |
+|---------|--------------|
+| `sink = "console"` in `[runtime.log]` | The boot stops, naming the extra and the `json` sink. |
+| `pretty_print_mode = "rich"` in `[runtime.log]` | The boot stops, naming the extra and the `poor` and `silent` modes. |
+| `pretty_print_mode = "poor"` | Plain text in a drawn frame, with no Rich import. A panel title's Rich markup is read by a Rich-free reading, `plain_markup_text`, which follows Rich's own tag pattern and escaping. Two differences from Rich, both documented on that function: an emoji code is left as written, since substituting it needs Rich's own code table, and markup Rich would refuse for a reason that needs its style grammar is stripped rather than kept. |
+| `pretty_print_mode = "silent"` | Nothing is built or printed. |
+| `get_console()` | Raises `MissingDependencyError` when called. |
+| A `rendered_pretty()` or `rendered_pretty_text()` call | Raises `MissingDependencyError`. |
+| `pipelex models list`, the pipe listing, the directory diff | Raise `MissingDependencyError`: each builds a Rich table or renderable and has no plain form. |
+| A cost report with `is_log_costs_to_console = true` | The CSV report is written; the console table raises, which the caller reports as a warning. |
+| The stuff viewer page | The Pretty tab shows the JSON rendering. |
+| The `pipelex`, `pipelex-agent` and `pipelex-dev` commands | Would fail at import with a bare `ImportError`. Not reachable on a documented install, since `typer` and `instructor` keep Rich installed; a launcher that names the extra belongs with the work that removes them from the closure. |
+
+The boot checks the sink and the pretty-print mode together, in `runtime_boot.py`, so a server that forgot either setting fails at startup rather than at the first pipe that logs or prints its output.
+
+## Enforcement
+
+The convention is checked twice, by a static guard and by a run, because they fail independently: the guard reads source and cannot see an import assembled at runtime or one a dependency performs, and the run covers one path through the runtime rather than every module.
+
+### The rule: `make check-rich-imports`
+
+```bash
+make check-rich-imports   # alias: make cri
+```
+
+An AST guard (`pipelex-dev check-rich-imports`, core in `pipelex/cli/dev_cli/commands/rich_import_guard.py`) that runs in `make agent-check`, in the `make check` aggregate, and in CI as the `Lint (rich imports)` job and a step of the pre-main fresh lint. It scans `pipelex/` and checks three rules:
+
+1. **The direct rule.** A module outside `pipelex/cli/` may not import `rich` or any `rich.*` module at module level. The match is on the package boundary, so a module named `richer` or `rich_extra` is not Rich, and a relative import never is.
+2. **The transitive rule.** A module outside `pipelex/cli/` may not reach a CLI module that imports Rich at module level, through any chain of module-level imports. It walks the module-level import graph the [hub-layering guard](hub-layering.md) builds, with the same carve-outs — including that guard's `# hub-layering: ignore` marker, which is the one escape hatch named above — and the same modelling of the package `__init__.py` files an import executes on the way, and reports the shortest chain at the line of its first hop. A module outside the CLI that imports Rich itself is the direct rule's finding only: removing that import is the fix for every module that reaches it.
+3. **The ordering rule.** A Rich import deferred into a function body must be preceded, in that function, by something that asked whether Rich is available: `require_rich(...)`, `require_rich_for_rendering()`, `get_console()` — whose own construction raises the named error — or, for a rendering that falls back rather than failing, `is_rich_installed()` or a test on `sys.modules`. The walk is per function and in statement order, so a guard covers what follows it in its own block and what nests inside that, and never the statements above it or the sibling branch of its own `if`. A nested `def` is a scope of its own and carries its own guard. The rule follows no calls, which is deliberate: it keeps the check readable at the site rather than dependent on a call graph, at the cost of a redundant guard in the few functions whose Rich is already assured by a callee.
+
+The guard refuses to pass vacuously: a scan root that yields no module, none under `pipelex/cli/`, or an import graph that does not hold the modules the scan read raises instead of reporting a pass.
+
+### The property: `tests/integration/pipelex/test_rich_free_run.py`
+
+The test runs, in a subprocess, what a server does. A meta-path finder installed before the first `pipelex` import raises `ImportError` for `rich` and every `rich.*` module. The subprocess then boots the kernel with `sink = "json"`, runs a `PipeCompose` pipe in direct mode through `PipelexMTHDSProtocol`, which needs no inference and prints the operator's "Output of pipe" panel, and asserts that the run returns its output and that no Rich module was loaded. It runs once in the `silent` mode, where every line on stderr must be a JSON log record, and once in the `poor` mode, where the panel must print as plain text. A third case boots with `pretty_print_mode = "rich"` and asserts the boot refusal names the extra.
+
+A subprocess is required rather than preferred: the test process has Rich loaded, since the suite installs every extra, and evicting it from `sys.modules` would leave duplicate classes behind for every later test.
+
+Every one of those boots asks for no model specs (`needs_model_specs=False`), which is what lets the test run where inference was never set up — a CI runner — because that branch of the boot wants neither the gateway terms nor the network. `needs_inference` stays true on purpose: a keyless boot forces every run this process starts to DRY, and the dry path never prints the "Output of pipe" panel, which is the Rich reach the test is here for.
+
+The test blocks Rich rather than checking that it is absent from an ordinary environment, because an environment is not the measure. Whether Rich is installed also depends on what the other dependencies of `pipelex` require, and some third-party packages import Rich whenever it is installed. What the runtime owns is that it never needs Rich on a server's path, and that is what the blocked run measures.
+
+`tests/unit/pipelex/tools/test_log_console_sink_without_rich.py` pins the `console` sink's own refusal the same way, and `tests/unit/pipelex/tools/misc/test_plain_markup_text.py` compares the Rich-free markup reading with Rich's.
 
 
 ## Test Duration Map

@@ -281,6 +281,10 @@
          <lastmod>2026-09-25</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/contribute/rich-imports/</loc>
+         <lastmod>2026-09-25</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/contribute/test-duration-map/</loc>
          <lastmod>2026-09-25</lastmod>
     </url>
@@ -294,90 +298,6 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/advisory-board/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/blog-article-generator/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/cv-batch-screening/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/design-slides/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/discord-newsletter/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-dpe/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-gantt/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-generic/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-invoice/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-markdown/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-proof-of-purchase/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-slides/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/extract-table/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/gen-expense-data/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/gen-synthetic-data/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/generate-image/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/hello-world/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/summarize/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/using-inference-plugins/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/validate-expense-data/</loc>
-         <lastmod>2026-09-25</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/cookbook/write-tweet/</loc>
          <lastmod>2026-09-25</lastmod>
     </url>
     <url>
@@ -634,6 +554,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-inference-backend-error/</loc>
+         <lastmod>2026-09-25</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/duplicate-log-sink-error/</loc>
          <lastmod>2026-09-25</lastmod>
     </url>
     <url>
@@ -1645,6 +1569,10 @@
          <lastmod>2026-09-25</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/unknown-log-sink-error/</loc>
+         <lastmod>2026-09-25</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/unknown-pipe-func-execution-mode-error/</loc>
          <lastmod>2026-09-25</lastmod>
     </url>
@@ -1817,6 +1745,10 @@
          <lastmod>2026-09-25</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/get-started/cv-batch-screening/</loc>
+         <lastmod>2026-09-25</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/get-started/mthds-language-tutorial/</loc>
          <lastmod>2026-09-25</lastmod>
     </url>
@@ -1973,6 +1905,10 @@
          <lastmod>2026-09-25</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/under-the-hood/log-sink-plugins/</loc>
+         <lastmod>2026-09-25</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/orchestrator-plugins/</loc>
          <lastmod>2026-09-25</lastmod>
     </url>
@@ -2018,6 +1954,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/tokens-usage-wire-records/</loc>
+         <lastmod>2026-09-25</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/under-the-hood/writing-an-inference-plugin/</loc>
          <lastmod>2026-09-25</lastmod>
     </url>
     <url>
