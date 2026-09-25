@@ -129,11 +129,16 @@ class LogSink(ABC):
         """Forget the handler built for an install, so a sink object installed again builds a fresh one.
 
         A teardown closes the handler, and a close is terminal for a sink that really releases what it
-        writes to: the ``otlp`` sink shuts its logger provider down there, and a file sink closes its
-        file. Handing the same handler back at the next install would install a sink that accepts every
-        record, runs every filter and drops the lot on the floor, with nothing raised to say so. The
-        fresh handler also gets a fresh processor filter, reading whatever ``processors`` holds at that
-        install rather than the list the first one closed over.
+        writes to: a file sink closes its file there. Handing the same handler back at the next install
+        would install a sink that accepts every record, runs every filter and drops the lot on the floor,
+        with nothing raised to say so. The fresh handler also gets a fresh processor filter, reading
+        whatever ``processors`` holds at that install rather than the list the first one closed over.
+
+        A fresh handler is only as live as what ``make_handler`` builds it on. A sink that opens its
+        target there comes back whole; one that was handed its target built, and whose close released
+        it, cannot, and says so from ``make_handler`` rather than build a handler on the dead target:
+        the ``otlp`` sink, whose close shuts down the provider and the processor it was constructed
+        with, is that case.
         """
         self._handler = None
 

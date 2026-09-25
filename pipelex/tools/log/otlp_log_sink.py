@@ -200,12 +200,21 @@ class OtlpLogHandler(logging.Handler):
 
 
 class OtlpLogSink(LogSink):
-    """The OpenTelemetry logs signal behind one log record processor, a batching exporter in production."""
+    """The OpenTelemetry logs signal behind one log record processor, a batching exporter in production.
+
+    One install per object. The processor is handed over already built, and the handler's close shuts
+    the provider down and the processor with it, which nothing can start again: a second handler would
+    accept every record and export none. So a second handler is refused, loudly, at the install that
+    asks for it. The registered ``otlp`` factory builds a new sink at every boot, so a configure/reset
+    cycle through the registry never meets the refusal; a host that keeps a sink object and installs it
+    again does, and builds a new one instead.
+    """
 
     def __init__(self, *, processor: OTelLogRecordProcessor, resource: Resource | None = None) -> None:
         super().__init__()
         self._logger_provider = LoggerProvider(resource=resource)
         self._logger_provider.add_log_record_processor(processor)
+        self._has_built_handler = False
 
     @property
     def logger_provider(self) -> LoggerProvider:
@@ -213,6 +222,14 @@ class OtlpLogSink(LogSink):
 
     @override
     def make_handler(self) -> logging.Handler:
+        if self._has_built_handler:
+            msg = (
+                "This otlp sink was installed once already, and the teardown that closed its handler shut its logger provider and its "
+                "processor down, so it can export nothing again. Build a new OtlpLogSink for this install; the registered 'otlp' factory "
+                "builds one at every boot."
+            )
+            raise RuntimeError(msg)
         handler = OtlpLogHandler(logger_provider=self._logger_provider)
         handler.addFilter(ExportPathFilter())
+        self._has_built_handler = True
         return handler

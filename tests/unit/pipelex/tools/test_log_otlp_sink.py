@@ -290,3 +290,21 @@ class TestOtlpLogSink:
         sink.handler.flush()
 
         force_flush.assert_called_once_with(timeout_millis=FLUSH_TIMEOUT_MILLIS)
+
+    def test_the_same_sink_installed_again_after_a_reset_is_refused_rather_than_exporting_nothing(self) -> None:
+        """The teardown shuts the provider and the processor down, which nothing starts again, so a second install must say so."""
+        exporter = InMemoryLogExporter()
+        sink = OtlpLogSink(processor=SimpleLogRecordProcessor(exporter))
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config())
+        fresh.install_sink(sink)
+        fresh.reset()
+        fresh.configure(log_config=_package_log_config())
+        try:
+            with pytest.raises(RuntimeError, match="installed once already"):
+                fresh.install_sink(sink)
+
+            assert fresh.sink is None
+            assert sink.processors == []
+        finally:
+            fresh.reset()
