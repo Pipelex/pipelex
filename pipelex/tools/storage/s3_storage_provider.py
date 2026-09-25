@@ -1,6 +1,7 @@
 import importlib.util
 import inspect
 from typing import Any
+from urllib.parse import quote
 
 from typing_extensions import override
 
@@ -76,7 +77,11 @@ class S3StorageProvider(StorageProviderAbstract):
         from botocore.config import Config  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
         endpoint_url = f"https://s3.{self._region}.amazonaws.com"
-        config = Config(signature_version="s3v4")  # pyright: ignore[reportUnknownArgumentType]
+        # botocore addresses path-style whenever an endpoint is given, which puts every link on the region's
+        # shared host. A content security policy can allow a bucket only by its own host, so pin the virtual
+        # style: `<bucket>.s3.<region>.amazonaws.com`. botocore still falls back to path-style for a bucket
+        # name that cannot be a hostname, a dotted one included.
+        config = Config(signature_version="s3v4", s3={"addressing_style": "virtual"})  # pyright: ignore[reportUnknownArgumentType]
 
         return {
             "service_name": "s3",
@@ -174,7 +179,14 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageS3Error(msg) from exc
 
     def _make_public_url(self, key: str) -> str:
-        """Build a public URL for an S3 object.
+        """Build an unsigned public URL for an S3 object, on the same host and path a signed one would name.
+
+        The URL is virtual-hosted on the bucket's regional host, except for a bucket name that cannot be a
+        hostname: a dotted name breaks the `*.s3.<region>.amazonaws.com` wildcard certificate over HTTPS, and a
+        legacy name with uppercase letters or an underscore is no hostname at all, so its URL is path-style on
+        the regional host. botocore's own test decides, so the two forms cannot disagree. The key is
+        percent-encoded as botocore signs it, since a caller's own upload can name a key holding a space,
+        a `#` or a `?`.
 
         Args:
             key: Storage key (without scheme prefix).
@@ -182,7 +194,12 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Public URL for the object.
         """
-        return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{key}"
+        from botocore.utils import check_dns_name  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+
+        encoded_key = quote(key, safe="/~")
+        if check_dns_name(self._bucket_name):
+            return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{encoded_key}"
+        return f"https://s3.{self._region}.amazonaws.com/{self._bucket_name}/{encoded_key}"
 
     @override
     async def public_url(self, uri: str) -> str | None:

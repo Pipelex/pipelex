@@ -283,7 +283,7 @@ async def prepare_pipe_job(
                 )
             )
 
-    # Normalize data URLs to pipelex-storage:// URIs if configured.
+    # Normalize data URLs to pipelex-storage:// URIs, and give every image and document input a public_url, if configured.
     if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
         working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope)
 

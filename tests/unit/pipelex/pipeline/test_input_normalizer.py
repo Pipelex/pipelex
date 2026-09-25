@@ -70,7 +70,7 @@ class TestInputNormalizerUrlGuards:
         assert "not a valid http(s) URL" in strict["message"]
 
     async def test_well_formed_http_url_passes_through_unchanged(self, mocker: MockerFixture) -> None:
-        """A well-formed http(s) url is not fetched or probed at shaping time."""
+        """A well-formed http(s) url is not fetched or probed at shaping time, and it becomes its own public_url."""
         _patch_storage_and_config(mocker)
         mock_get = mocker.patch("httpx.AsyncClient.get")
 
@@ -79,6 +79,7 @@ class TestInputNormalizerUrlGuards:
         content = memory.get_stuff("document").content
         assert isinstance(content, DocumentContent)
         assert content.url == "https://example.com/file.pdf"
+        assert content.public_url == "https://example.com/file.pdf"
         mock_get.assert_not_called()
 
     async def test_blank_url_message_survives_strict_disclosure(self, mocker: MockerFixture) -> None:
@@ -125,6 +126,13 @@ class TestInputNormalizerUrlGuards:
 
         with pytest.raises(PipelineInputContentError, match="cannot be read"):
             await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path)), storage_scope="test/scope")
+
+    async def test_path_with_null_byte_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A NUL byte makes the path unusable: the read raises ValueError, not OSError, and it must still be an input error."""
+        _patch_storage_and_config(mocker)
+
+        with pytest.raises(PipelineInputContentError, match="cannot be read"):
+            await normalize_data_urls_to_storage(_memory_with_document(f"{tmp_path}/a\x00b.pdf"), storage_scope="test/scope")
 
     async def test_missing_file_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         _patch_storage_and_config(mocker)
