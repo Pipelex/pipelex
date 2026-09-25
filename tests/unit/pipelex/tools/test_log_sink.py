@@ -55,6 +55,67 @@ class TestLogSink:
         assert isinstance(handler, _RecordingHandler)
         assert handler.seen == ["one|yes", "two|yes"]
 
+    def test_a_processor_that_raises_costs_that_records_processing_and_not_the_log_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The stdlib runs a handler's filters outside any ``try``, so an unguarded processor would raise out of ``log.info``."""
+        sink = _RecordingSink()
+
+        def fail(_record: logging.LogRecord) -> None:
+            msg = "this processor is broken"
+            raise RuntimeError(msg)
+
+        def redact(record: logging.LogRecord) -> None:
+            record.redacted = "yes"
+
+        sink.processors.extend([fail, redact])
+        handler = sink.handler
+        reported = io.StringIO()
+        monkeypatch.setattr(sys, "stderr", reported)
+
+        handler.handle(_record(message="one"))
+
+        assert isinstance(handler, _RecordingHandler)
+        assert handler.seen == ["one|yes"]
+        assert "--- Logging error ---" in reported.getvalue()
+        assert "RuntimeError" in reported.getvalue()
+
+    def test_what_a_failed_processor_raised_is_named_by_its_type_and_never_quoted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A processor fails on the record's own values, so its exception is where they end up: the secret the redaction was removing among them."""
+        sink = _RecordingSink()
+
+        def fail(_record: logging.LogRecord) -> None:
+            msg = "cannot scrub sk_live_0123456789abcdef"
+            raise RuntimeError(msg)
+
+        sink.processors.append(fail)
+        handler = sink.handler
+        reported = io.StringIO()
+        monkeypatch.setattr(sys, "stderr", reported)
+
+        handler.handle(_record(message="one"))
+
+        assert "sk_live_0123456789abcdef" not in reported.getvalue()
+        assert "Traceback" not in reported.getvalue()
+        assert "fail" in reported.getvalue()
+
+    def test_a_reporter_that_raises_on_a_failed_processor_does_not_raise_out_of_the_log_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The report writes to stderr, and a closed stderr makes the write raise; the guard swallows that too, and the record is still delivered."""
+        sink = _RecordingSink()
+
+        def fail(_record: logging.LogRecord) -> None:
+            msg = "this processor is broken"
+            raise RuntimeError(msg)
+
+        sink.processors.append(fail)
+        handler = sink.handler
+        closed = io.StringIO()
+        closed.close()
+        monkeypatch.setattr(sys, "stderr", closed)
+
+        handler.handle(_record(message="one"))
+
+        assert isinstance(handler, _RecordingHandler)
+        assert handler.seen == ["one|-"]
+
     def test_redirect_to_stderr_is_a_no_op_on_a_sink_that_writes_to_no_stream(self) -> None:
         sink = _RecordingSink()
         sink.redirect_to_stderr()

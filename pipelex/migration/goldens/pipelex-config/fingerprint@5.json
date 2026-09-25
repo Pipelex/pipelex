@@ -1128,6 +1128,23 @@
       "default": "rich",
       "open_node": false
     },
+    "runtime.log.redaction": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.log.redaction.extra_patterns": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [],
+      "open_node": false
+    },
+    "runtime.log.redaction.is_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
     "runtime.log.rich_log": {
       "value_type": "table",
       "required": true,
