@@ -1,0 +1,18 @@
+{
+  "answers": {
+    "q": {
+      "choice": "angry",
+      "confidence": 0.96,
+      "probabilities": {
+        "angry": 0.98,
+        "calm": 0.02
+      },
+      "type": "choice"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 352,
+    "output_tokens": 34
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "detail": "Noul question must have criteria or instructions: q"
+  },
+  "class": "TypeSafeBadRequestError",
+  "request_id": "req_01a0b97aea227d749f050819707ddda4",
+  "status": 400,
+  "str": "POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b97aea227d749f050819707ddda4)"
+}

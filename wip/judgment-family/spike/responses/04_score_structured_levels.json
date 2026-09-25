@@ -1,0 +1,33 @@
+{
+  "answers": {
+    "q": {
+      "confidence": 1.0,
+      "legend": {
+        "0": {
+          "level": "cosmetic",
+          "meaning": "No impact on functionality"
+        },
+        "1": {
+          "level": "degraded",
+          "meaning": "A workaround exists"
+        },
+        "2": {
+          "level": "blocking",
+          "meaning": "No workaround exists"
+        }
+      },
+      "probabilities": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 1.0
+      },
+      "score": 2.0,
+      "type": "score"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 411,
+    "output_tokens": 17
+  }
+}

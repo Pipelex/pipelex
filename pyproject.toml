@@ -136,6 +136,9 @@ dev = [
   "types-networkx>=3.3.0.20241020",
   "types-PyYAML>=6.0.12.20250326",
 ]
+typesafe = [
+  "typesafe-sdk>=0.7.0",
+]
 
 [project.scripts]
 pipelex = "pipelex.cli._cli:app"
