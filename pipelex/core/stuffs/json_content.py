@@ -1,14 +1,16 @@
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from json2html import json2html
 from pydantic import Field, field_validator
-from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 # TODO: use pipelex.tools.misc.json_utils.JsonContent to support lists in addition to dicts
@@ -50,5 +52,8 @@ class JSONContent(StuffContent):
         return json.dumps(self.json_obj, indent=4)
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.json import JSON
+
         return JSON.from_data(self.json_obj, indent=4)

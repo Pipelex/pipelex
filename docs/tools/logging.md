@@ -189,7 +189,7 @@ Logging is configured in two steps at boot. `log.configure` sets the levels and 
 
 ## Console rendering
 
-The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is imported when the sink is built and nowhere else, so a process that selects `json` or `otlp` never loads it, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative.
+The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install and a server leaves out. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. A server without the extra also sets `pretty_print_mode` to `"poor"` or `"silent"`, since the `"rich"` panels are refused at boot the same way (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
 
 ### Rich Formatting
 

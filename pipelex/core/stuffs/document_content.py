@@ -1,15 +1,17 @@
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic import Field, model_validator
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.uri.uri_resolver import extract_filename_from_uri, resolve_uri
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class DocumentContent(StuffContent):
@@ -86,7 +88,10 @@ class DocumentContent(StuffContent):
         return result
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.text import Text
+
         source_text = Text()
         if self.title:
             source_text.append(self.title, style="bold")

@@ -7,7 +7,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering drift-check)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports drift-check)
    ```
 
    This runs multiple code quality tools:

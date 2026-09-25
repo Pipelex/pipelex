@@ -1,15 +1,15 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
-from rich.console import Group
-from rich.markup import escape
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenSize
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeImgGenSpec(PipeSpec):
@@ -49,7 +49,12 @@ class PipeImgGenSpec(PipeSpec):
         return value
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.markup import escape
+        from rich.text import Text
+
         # Get base pipe information from parent
         base_group = super().rendered_pretty(title=title, depth=depth)
 
