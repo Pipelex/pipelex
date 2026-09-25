@@ -356,15 +356,23 @@ def redact_secret_entries(*, value: Any, open_containers: set[int] | None = None
             }
         finally:
             open_containers.discard(container_id)
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         if container_id in open_containers:
             return CYCLE_TEXT
-        items = cast("list[Any]", value)
+        sequence = cast("Sequence[Any]", value)
         open_containers.add(container_id)
         try:
-            return [redact_secret_entries(value=item, open_containers=open_containers) for item in items]
+            items = [redact_secret_entries(value=item, open_containers=open_containers) for item in sequence]
         finally:
             open_containers.discard(container_id)
+        if isinstance(value, list):
+            return items
+        # A tuple is walked as the field walk walks one, since the ``repr`` fallback writes whatever it
+        # holds. It keeps its shape there, and it is handed back as it was when nothing in it changed,
+        # so a named tuple that carried no secret keeps its name in the rendering.
+        if all(new is old for new, old in zip(items, sequence, strict=True)):
+            return sequence
+        return tuple(items)
     return value
 
 

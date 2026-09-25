@@ -643,3 +643,18 @@ class TestLogRedaction:
         fresh_log.reset()
 
         assert "sk_live_0123456789abcdef" in capsys.readouterr().err
+
+    def test_a_secret_entry_inside_a_tuple_is_redacted_on_the_repr_fallback(self, fresh_log: Log) -> None:
+        """A cyclic content falls back to its ``repr``, and an entry holding an object is beyond the text families there."""
+        fresh_log.configure(log_config=_package_log_config())
+        sink = _ListSink()
+        fresh_log.install_sink(sink)
+        cyclic: list[Any] = [({"password": {"nested": "hunter2-cyclic"}},)]
+        cyclic.append(cyclic)
+
+        fresh_log.info(cyclic)
+
+        (delivered,) = sink.own_records()
+        message = delivered.getMessage()
+        assert "hunter2-cyclic" not in message
+        assert f"({{'password': '{REDACTED_TEXT}'}},)" in message
