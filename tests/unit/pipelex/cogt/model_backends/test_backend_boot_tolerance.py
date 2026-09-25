@@ -233,8 +233,8 @@ class TestAStaleBackendDirectory:
         they can act on; "migration did not help" would name nothing.
         """
         openai_file = self._backends_dir(machine) / "openai.toml"
-        plant_on_model(path=openai_file, table_header='["gpt-3.5-turbo"]', key="foo", value="1")
-        plant_on_model(path=openai_file, table_header="[gpt-4o]")
+        plant_on_model(path=openai_file, table_header="[gpt-4o]", key="foo", value="1")
+        plant_on_model(path=openai_file, table_header='["gpt-5.5"]')
         retry = mocker.spy(InferenceBackendLibrary, "_local_model_specs_the_ledger_can_explain")
 
         with pytest.raises(InferenceBackendLibraryError) as exc_info:

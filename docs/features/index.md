@@ -67,9 +67,9 @@ This section covers all Pipelex capabilities, organized by area.
 
 <div class="grid cards" markdown>
 
--   **[Claude Code Skills Plugin](claude-code-skills-plugin.md)**
+-   **[Pipelex Plugin](pipelex-plugin.md)**
 
-    Build, run, validate, and edit AI methods directly from Claude Code with the MTHDS skills plugin. Slash commands cover the full method lifecycle.
+    The Pipelex plugin for Claude Code and Codex: skills that build and run methods, a hook that checks every edit, and the Pipelex tools.
 
 -   **[CLI](cli.md)**
 

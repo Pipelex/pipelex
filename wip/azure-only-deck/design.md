@@ -1,0 +1,114 @@
+---
+status: landed
+item: L-260918-941a99
+---
+
+# Azure-only model deck — design
+
+The kit's default model deck resolves to models from several providers: Anthropic for the general and premium tiers, Google for the small vision and creative tiers and the large-context tiers, OpenAI for the small tier, Google again for image generation. This campaign makes the shipped deck resolve exclusively to the models the Pipelex Gateway serves from Azure: the OpenAI language and image models, and Azure Document Intelligence for document extraction. Today's multi-provider deck stays in the codebase, unloaded, and cannot drift from the shipped one.
+
+**Scope.** What the deck resolves to by default in real use, when a method names a preset or an alias, or names nothing at all. Not the test profiles, which keep naming Anthropic and Google handles so the runtime's support for those providers stays tested. Not routing: the Gateway already serves every OpenAI model from Azure through the same SDK, so nothing about where a request goes changes here.
+
+## How the deck works today
+
+The kit ships one deck directory, `pipelex/kit/configs/inference/deck/`, holding the numbered files (`1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`) and the two `x_custom_*` templates. `pipelex init` copies the directory into the project's `.pipelex/inference/deck/` and stamps `.kit_manifest.json` with the kit version and a hash per numbered file (`pipelex/cogt/models/deck_manifest.py`). At boot, the loader reads every `*.toml` in the installed directory in sorted order and deep-merges them into one `ModelDeckBlueprint` (`pipelex/cogt/models/model_manager.py`, `pipelex/cogt/models/model_deck_loader.py`). `pipelex update` and `pipelex doctor` diff the installed numbered files against the kit's by hash and never touch `x_custom_*` files. Nothing in the kit, the loader or the manifest knows of more than one deck.
+
+The deck is a vocabulary. Methods, the cookbook, the test bundles and the authoring skills reference aliases (`@default-premium`) and presets (`$writing-factual`, `$engineering-code`), never a provider. Most presets resolve through an alias; a handful name a model handle directly (`retrieval-cheap`, `retrieval-premium`, `engineering-code-cheap`, `engineering-code-cheaper`, and the `synthesize-*` and image-to-image testing presets in the image deck). The model handles are the only provider-specific content in the deck.
+
+## Decisions
+
+### 1. The alias and preset vocabulary is the contract; the handles are the edition
+
+Every alias and preset name in the shipped deck keeps its name. Only what each name resolves to changes. Nothing downstream needs an edit: the sweep of the tests, the cookbook, `mthds-plugins` and `pipelex-plugins` found them referencing names, not models. The one deliberate exception is decision 8.
+
+### 2. The Azure deck is the kit's one shipped deck
+
+The numbered files under `pipelex/kit/configs/inference/deck/` become the Azure deck, under the same filenames. `init`, `update`, `doctor` and the manifest keep working unchanged.
+
+An edition selector (an `init` flag, an `edition` field in the manifest, and `update` and `doctor` reading it to pick the kit directory to diff against) was considered and declined for now. It is a change at several sites for a switch nobody flips yet. If a second edition is ever wanted at runtime, the parked variant of decision 3 is what the selector would point at.
+
+### 3. Today's deck is parked as an unloaded variant, guarded by a parity test
+
+Today's numbered files move, unchanged, to `pipelex/kit/deck_variants/multi_provider/`. Nothing loads that directory: not `init`, not `update`, not the manifest. Re-enabling it is a directory swap.
+
+The directory sits beside `pipelex/kit/configs/`, not inside it. Everything under `configs/` is treated as a template: `ensure_global_config_exists` copies the whole tree into a new `~/.pipelex/`, and `check-config-sync` holds this repository's `.pipelex/` to the same contents. It must never sit under a `deck/` directory either, because the deck loader reads its directory recursively.
+
+A unit test keeps "disabled" from meaning "rotting": for every directory under `deck_variants/`, it loads the variant's numbered files through the same loader as the shipped deck, checks that they validate as a `ModelDeckBlueprint`, and asserts that the variant defines exactly the same alias names and preset names, per model type, as the shipped deck. The only permitted difference is the set of provider-named aliases the shipped deck drops (decision 8), listed explicitly in the test. A preset added to one deck and not the other fails the test.
+
+### 4. LLM aliases
+
+| Alias | Today | Azure deck | Why |
+| --- | --- | --- | --- |
+| `default-premium`, `default-premium-vision`, `default-premium-structured` | claude-4.8-opus | gpt-6-astra | The flagship, served on the gateway since the remote config publish of 2026-09-20. It fixes the temperature at 1, which decision 10 answers. |
+| `default-general` (the choice default for `for_text` and `for_object`) | claude-4.6-sonnet | gpt-5.4 | The model every unnamed pipe gets. One step below premium, mirroring today's sonnet-below-opus shape. |
+| `default-large-context-text`, `default-large-context-code` | gemini-flash-latest, gemini-pro-latest | gpt-5.4 | General tier. |
+| `default-small`, `default-small-structured`, `default-small-vision`, `default-small-creative` | gpt-4o-mini, gpt-4o-mini, gemini-flash-latest, gemini-flash-latest | gpt-5.4-nano | Current generation with image and PDF input, at a small-tier price. |
+| `best-gpt` | gpt-5.5 | gpt-6-astra | The best GPT the gateway serves. |
+| `best-claude`, `best-gemini`, `best-mistral` | claude-4.8-opus, gemini-pro-latest, mistral-large | removed | Decision 8. |
+
+Presets that name a model directly move to the tier they belong to: `retrieval-premium` to gpt-6-astra, `engineering-codebase-analysis` (today `@best-gemini`) to `@default-premium`, `engineering-code-cheap` to gpt-5.4, `retrieval-cheap` and `engineering-code-cheaper` to gpt-5.4-nano. The two reasoning presets (`deep-analysis`, `quick-reasoning`) keep their `reasoning_effort` and follow `@default-premium`.
+
+### 5. Image generation aliases
+
+| Alias | Today | Azure deck |
+| --- | --- | --- |
+| `default-general` (the image choice default, behind `gen-image`) | nano-banana | gpt-image-2 |
+| `default-premium` (behind `gen-image-high-quality`) | nano-banana-2 | gpt-image-2 |
+| `default-small` (behind `gen-image-fast` and the testing presets) | gpt-image-1-mini | gpt-image-1-mini |
+| `best-gpt` | gpt-image-2 | gpt-image-2 |
+| `best-gemini` | nano-banana-2 | removed |
+
+General and premium resolve to the same model, so `gen-image-high-quality` differs from `gen-image` only by its quality setting. The three presets naming `nano-banana-pro` directly (`synthesize-ui`, `synthesize-chart`, `gen-image-testing-img2img`) move to `@default-premium`; gpt-image-2 accepts input images, which is what those presets need.
+
+### 6. Extract and search decks are unchanged
+
+Document extraction already defaults to `azure-document-intelligence`. The two `pypdfium2-extract-pdf` aliases (`default-text-from-pdf`, `default-no-inference`) call no provider and stay. Search has no Azure equivalent: Linkup is the only search provider, the search section's `choice_default` is a required field, and `default-extract-web-page` is `linkup-fetch`. All of it stays, and the docs state that the Azure scope covers the three families Azure serves: language, image generation and document extraction.
+
+### 7. Test profiles are untouched
+
+`.pipelex-dev/test_profiles.toml` keeps naming Anthropic and Google handles directly so the runtime's support for those providers stays exercised. The `testing-*` presets ride the small tier, so a live run through them now uses gpt-5.4-nano instead of gpt-4o-mini.
+
+### 8. The provider-named aliases are removed from the shipped deck
+
+`best-claude`, `best-gemini` and `best-mistral` name a provider in the alias itself and cannot honestly resolve to a GPT model. They leave the shipped deck and stay defined in the parked variant. A method that references one fails validation with the usual alias-not-found error. A project that wants one back defines it in an `x_custom_*` deck file. The tests that reference `@best-claude` build their own decks or parse syntax only, so they are unaffected. The user-visible examples that name `@best-claude` (the `check-model` argument help, two docstrings, and the promotion example in the `add-model` skill) move to `@best-gpt`. Downstream, the cookbook uses `@best-gemini` in two extract bundles and `mthds-plugins` uses `@best-claude` as its example alias. Both are filed as follow-ups, because they break only once those repositories take the release.
+
+### 9. The `x_custom_*` templates keep their examples
+
+The commented waterfall examples in `x_custom_llm_deck.toml` and `x_custom_extract_deck.toml` list Claude, Gemini and Mistral handles. They exist for a user who brings their own provider keys and are left as they are.
+
+### 10. The premium tier declares `temperature = 1`, because its model fixes it there
+
+> **Superseded on 2026-09-21.** A follow-up change moved the general, large-context and small tiers onto the GPT-5.6 range — `gpt-5.6-terra` for general and large-context, `gpt-5.6-luna` for the small tiers — which is exactly the move this document put out of scope, and it accepted the cost named here. `gpt-6-astra` left the deck entirely in the same follow-up: the premium tier and `best-gpt` are `gpt-5.6-sol`, so the ladder is the GPT-5.6 range and nothing else. Every preset in the deck now declares `temperature = 1`, not only the twelve on the premium tier, and `[llm.choice_defaults].default_temperature` is 1 too, so the alias, waterfall and bare-handle paths stop warning as well. What is written below is the reasoning as it stood when this campaign shipped, and is kept as the record of it.
+
+`gpt-6-astra` carries `valued_constraints = { fixed_temperature = 1 }` on the Azure and OpenAI backends and on both hosted routing profiles. `_apply_constraints` (`pipelex/cogt/llm/llm_worker_abstract.py:338-369`) overrides any other value and logs a warning, once per call, with no memoisation. Today's shipped deck has no preset in that position: `claude-4.8-opus` declares no constraint, and the one fixed-temperature handle it names, `gpt-5.5` behind `best-gpt`, is reached by no preset. This change would put twelve presets there.
+
+So the twelve presets that ride the premium tier declare `temperature = 1` — the value the model will use — instead of a value the worker discards. The deck stops asserting something untrue and stops warning on every premium call. What it costs is real and is accepted: `writing-factual` and `writing-creative` now issue the same call, and `engineering-structured` runs structured extraction at temperature 1, `_gen_object` passing the temperature unconditionally on that path. The premium tier has no temperature control until it resolves to a model that accepts one, and `1_llm_deck.toml` says so above its preset table.
+
+The alternative was moving premium down to `gpt-5.4`, which accepts a temperature but is the general tier's own model. Keeping the flagship was the call.
+
+The repository already had the validator for exactly this conflict — `ModelDeck.final_validate`, which raises when a preset's temperature differs from a model's `fixed_temperature`. It had had no caller since 2025-09-17, and its `except ConfigValidationError` clause was unreachable, `LLMSettingsValidationError` descending from `CogtError` rather than `FatalError`. A guard nothing calls reads as protection that does not exist, so it was deleted rather than revived.
+
+## Out of scope, and why
+
+- **Routing.** The Gateway already serves the OpenAI language and image models from Azure. The deck decides which handles are named, not where a request goes, and nothing about the routing profiles or the remote config changes here.
+- **Fixed-temperature constraints.** Several gpt-5.x handles carry `fixed_temperature = 1`, `gpt-6-astra` among them, so the premium tier has one. The worker forces the model's value and logs a warning on every call where a preset declares a different one, so the twelve presets on the premium tier declare `temperature = 1` outright rather than a value the deck cannot honour. Decision 10 records that, and what it costs.
+- **An edition selector.** Declined, see decision 2.
+- **The GPT-5.6 generation for the general and small tiers.** *(Superseded on 2026-09-21 — the follow-up change made this move; see the note under decision 10.)* `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-6-astra` joined the Azure backend in pipelex v0.61.0 and the gateway serves them since the remote config published on 2026-09-20. The premium tier takes `gpt-6-astra` (decision 4), but the general and small tiers stay on 5.4. Every 5.6 and 6 handle carries `fixed_temperature = 1`, while `gpt-5.4` and `gpt-5.4-nano` carry no constraint, so keeping those two tiers on 5.4 keeps the temperature of every preset that rides them, which is most of the deck. The premium tier, by contrast, has no fixed-temperature-free option: on Azure every handle above `gpt-5.4` carries the constraint, so taking the flagship means taking it (decision 10).
+
+## The backend model list moved first
+
+The backend model lists under `pipelex/kit/configs/inference/backends/` were refreshed ahead of the build, in pipelex v0.61.0: the GPT-5.6 series and GPT-6 Astra were added (#1218) and the GPT-4.1, o-series and GPT-5 to 5.2 generations were retired (#1219). The remote config in `pipelex-remote-config`, the authority on what a handle means, followed with the same roster at its commit `ae91eb8` and was published on 2026-09-20. The handles in the two tables were re-read against both after that publish: every one of them is still declared on the Azure backend and still served by the gateway. The one change the refresh brought is the premium tier, which takes `gpt-6-astra` now that the gateway serves it; the general and small tiers stand as first written.
+
+## What the build changes
+
+- The numbered deck files under `pipelex/kit/configs/inference/deck/`, per decisions 4 to 6, and the copy this repo keeps under `.pipelex/inference/deck/`.
+- The parked variant directory and its parity test, per decision 3.
+- The one test that asserts what the shipped deck resolves to (`@default-general`), and the user-visible examples that name `@best-claude`, the `add-model` skill's among them.
+- The docs that name the current defaults: `docs/get-started/configure-ai-providers.md`, `docs/configuration/config-technical/inference-config.md`, `docs/building-methods/configure-ai-llm-to-optimize-methods.md`, and `docs/tools/cli/update.md` where it describes what an update run reports.
+- A changelog entry marked breaking: the defaults move to Azure-served models, and three aliases are gone.
+
+## Rollout notes
+
+- Every existing install reports its numbered deck files as behind on its next `pipelex update`, and a user who edited a numbered file gets the usual timestamped backup. That is the mechanism working as designed, and the changelog entry says so.
+- The consumers that keep their own deck copies (the hosted worker in `pipelex-server`, `pipelex-api`, the cookbook) pick the change up through the pin bump and `pipelex update`. The worker's numbered files are byte-identical to the kit's today, so nothing there needs hand-editing. The cookbook carries an extra `cookbook.toml` deck file to check for direct model names, and two bundles that reference `@best-gemini`.
+- The implementation tracker is [`plan.md`](plan.md), beside this document.

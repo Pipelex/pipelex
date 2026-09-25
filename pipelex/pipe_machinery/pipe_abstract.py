@@ -29,7 +29,8 @@ from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
-from pipelex.system.job_metadata import JobMetadata, OtelContext
+from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
+from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.system.telemetry.otel_constants import (
@@ -40,6 +41,7 @@ from pipelex.system.telemetry.otel_constants import (
     SpanOutcome,
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
@@ -611,15 +613,22 @@ class PipeAbstract(ABC, BaseModel):
         # so a failed pipe never leaves a stale frame behind on the shared pipe_stack, where it
         # could accumulate entries and trip PipeStackOverflowError. Required cleanup belongs in a
         # `finally` block.
+        #
+        # The run's caller is made the ambient one for as long as the pipe runs, so a
+        # capture with no run in hand — an exception raised in here, captured once it
+        # escapes the interpreter — is still attributed to the person the run is for.
+        # Every pipe, at every depth, opens the scope from its own job metadata: a
+        # Temporal activity runs a sub-pipe with no outer scope to inherit.
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         try:
-            return await self._run_pipe_traced(
-                job_metadata=job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-                output_name=output_name,
-                library_crate=library_crate,
-            )
+            with scoped_caller_identity(caller_identity=CallerIdentity.make_from_run_metadata(run_metadata=job_metadata.run_metadata)):
+                return await self._run_pipe_traced(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                    library_crate=library_crate,
+                )
         finally:
             pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 
@@ -938,7 +947,7 @@ class PipeAbstract(ABC, BaseModel):
                 # Start OTel span first
                 span, is_root_span = self._start_pipe_span(
                     parent_otel_context=parent_otel_context,
-                    pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
+                    run_metadata=job_metadata.run_metadata,
                     working_memory=working_memory,
                 )
                 # Get the actual span_id from OTel (OTel generates its own span_id)
@@ -1040,7 +1049,7 @@ class PipeAbstract(ABC, BaseModel):
         self,
         *,
         parent_otel_context: OtelContext,
-        pipeline_run_id: str,
+        run_metadata: RunMetadata,
         working_memory: WorkingMemory,
     ) -> tuple[Span | None, bool]:
         """Start an OTel span for this pipe execution.
@@ -1050,7 +1059,8 @@ class PipeAbstract(ABC, BaseModel):
 
         Args:
             parent_otel_context: The parent's OTel context.
-            pipeline_run_id: The pipeline run ID for span attributes.
+            run_metadata: The run half of the job metadata — the pipeline run ID for
+                span attributes, and the identity every exporter attributes the span to.
             working_memory: The working memory containing input stuffs for telemetry capture.
 
         Returns:
@@ -1061,6 +1071,8 @@ class PipeAbstract(ABC, BaseModel):
         if tracer is None:
             log.verbose(f"[OTel] No tracer available for pipe '{self.code}'")
             return None, False
+
+        pipeline_run_id = run_metadata.pipeline_run_id
 
         # Always use full pipe code - redaction is handled by exporters
         span_name = f"{self.pipe_type}: {self.code}"
@@ -1086,8 +1098,13 @@ class PipeAbstract(ABC, BaseModel):
             PipelexSpanAttr.PIPE_CODE: self.code,  # Full pipe code, exporter handles redaction
         }
 
+        # The run's own identity, so every exporter attributes the span to the caller
+        # rather than to the process that happens to be running it.
+        is_langfuse_enabled = TelemetryManagerAbstract.get_langfuse_enabled()
+        span_attributes.update(make_run_identity_span_attributes(run_metadata=run_metadata, is_langfuse_enabled=is_langfuse_enabled))
+
         # Langfuse-specific attributes: always send full data
-        if TelemetryManagerAbstract.get_langfuse_enabled():
+        if is_langfuse_enabled:
             span_attributes.update(
                 {
                     LangfuseSpanAttr.TRACE_NAME: parent_otel_context.trace_name,

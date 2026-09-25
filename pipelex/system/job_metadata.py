@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
@@ -51,9 +52,9 @@ class UnitJobId(StrEnum):
 
 
 class RunMetadata(BaseModel):
-    """Who is running, which run it is, and where its bytes go.
+    """Who is running, which run it is, where its bytes go, and what it belongs to.
 
-    **The four facts that are constant for a whole run**, split out from
+    **The facts that are constant for a whole run**, split out from
     :class:`JobMetadata` — which mixes them with per-job facts that change at
     every step (``pipe_code``, ``pipe_run_id``, ``otel_context``,
     ``content_generation_job_id``). Grouping them says which is which: a copy
@@ -65,7 +66,29 @@ class RunMetadata(BaseModel):
     ``JobMetadata`` it was produced under, so a transport that offloads an
     oversized result to storage can key it inside the run's own namespace
     instead of at the root of a bucket.
+
+    **Frozen**, so the field validators below are the last word on every value
+    here rather than a check at construction that a later assignment undoes.
+    Nothing ever needed to reassign one — these are the facts that are constant
+    for a whole run, which is the definition this class exists to draw — and
+    since telemetry began forwarding ``extras`` to a backend and
+    composing ``storage_scope`` into storage keys, "validated at construction"
+    has to mean "validated, full stop".
+
+    **What the freeze does not close**, named here so nobody mistakes any of it
+    for closed. Freezing refuses a REASSIGNMENT and nothing else, so an in-place
+    edit of the mapping (``run_metadata.extras[k] = v``) still reaches
+    a backend unvalidated, and pydantic's two deliberate bypasses —
+    ``model_copy(update=...)`` and ``model_construct`` — still build an instance
+    without running a validator. The runtime does none of the three, and a
+    future consumer must not start: ``copy_with_update`` only ever carries
+    already-validated values forward, and a value that arrives from request data
+    is constructed here or not at all. Closing them properly means re-validating
+    at the point of use, which would put a raise inside a span site, where
+    telemetry must never break the app.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     user_id: str
     pipeline_run_id: str
@@ -95,6 +118,19 @@ class RunMetadata(BaseModel):
     # characters into the log lines or ``ErrorReport`` envelopes that quote it.
     request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
 
+    # The opaque labels the host attaches to this run. Never read by name;
+    # telemetry forwards the whole mapping as the groups of each capture
+    # — see `pipelex.system.run_extras` for why the host's own concepts
+    # (organization, tenant, plan tier) deliberately do not cross this boundary,
+    # and for the charset and the size bound.
+    #
+    # It DEFAULTS, unlike `user_id` and `storage_scope` above, and the asymmetry
+    # is the point: those two refuse to default because a missing identity once
+    # became a present-looking one and a shared storage prefix. An absent label
+    # creates no namespace and misattributes nothing — it only leaves the group
+    # facet empty — so a caller with no labels to send says nothing.
+    extras: dict[str, str] = Field(default_factory=dict)
+
     @field_validator("storage_scope")
     @classmethod
     def _validate_storage_scope(cls, value: str) -> str:
@@ -109,6 +145,28 @@ class RunMetadata(BaseModel):
         request data after this point.
         """
         return validate_storage_scope(value=value)
+
+    @field_validator("extras")
+    @classmethod
+    def _validate_run_extras(cls, value: dict[str, str]) -> dict[str, str]:
+        """Refuse a mapping the runtime could not safely forward, at construction.
+
+        On the TYPE for the same reason as `storage_scope`: the value is caller
+        data that ends up quoted into log lines and handed to a telemetry
+        backend, so a newline in it forges a log line and an unbounded mapping
+        is an unbounded capture payload. Validating here means a mapping that
+        ARRIVED through construction is safe, which is the case that matters:
+        every mapping crossing the wire or a call site is built here.
+
+        The guarantee stops at construction, and deliberately so. The model is
+        frozen, so reassigning the field raises — but freezing does not reach
+        inside the mapping, and mutating it in place
+        (`run_metadata.extras[k] = v`) still bypasses this validator.
+        See the class docstring for that hole and for pydantic's two others.
+        Nothing in the runtime mutates the mapping after construction; a future
+        consumer that forwards it must not start.
+        """
+        return validate_run_extras(value=value)
 
 
 class JobMetadata(BaseModel):

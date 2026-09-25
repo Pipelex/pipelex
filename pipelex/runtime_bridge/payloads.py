@@ -15,8 +15,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
-# Import-light by design (see module docstring): `storage_scope` pulls in `re`
-# and nothing else, so validating here costs the boundary nothing.
+# Import-light by design (see module docstring): `storage_scope` and
+# `extras` each pull in `re` and nothing else, so validating here
+# costs the boundary nothing.
+from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_storage_scope
 
 
@@ -49,6 +51,26 @@ class PipelexPipeRunInput(BaseModel):
         failure inside whichever call first pastes the value into a storage key.
         """
         return validate_storage_scope(value=value)
+
+    # The opaque labels the host attaches to this run. Unlike the two fields
+    # above it DEFAULTS: a host with no labels to send invents nothing by
+    # staying silent, whereas a missing identity or scope used to be invented
+    # for it. See `pipelex.system.run_extras`.
+    extras: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("extras")
+    @classmethod
+    def _validate_run_extras(cls, value: dict[str, str]) -> dict[str, str]:
+        """Refuse a malformed mapping at the WIRE, not inside a telemetry capture.
+
+        Declaring the field `dict[str, str]` says nothing about its contents,
+        and the contents are whatever the other side of the boundary put there.
+        A key with a newline in it, or a mapping with a thousand entries, would
+        decode happily here and surface much later, far from the payload that
+        carried it. Validating at construction makes it a decoding error naming
+        the field.
+        """
+        return validate_run_extras(value=value)
 
     library_crate_dump: dict[str, Any] | None = None
     # Two orthogonal axes: which orchestrator runs the pipe (open token, defaults to the
