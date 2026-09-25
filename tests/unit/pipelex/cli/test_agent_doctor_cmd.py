@@ -63,10 +63,14 @@ class TestAgentDoctorCmd:
     def test_the_doctor_releases_the_logging_it_configured_once_the_report_is_out(self, mocker: MockerFixture) -> None:
         log.reset()
         sink = _NullSink()
+        # The handler the install put on the root logger, captured while it is there: the release discards
+        # it, and ``sink.handler`` read afterwards builds a new one that could never be on the root.
+        installed: list[logging.Handler] = []
 
         def report_through_a_sink(**_options: Any) -> None:
             log.configure(log_config=_package_log_config())
             log.install_sink(sink)
+            installed.append(sink.handler)
 
         mocker.patch.object(agent_doctor_module, "_do_agent_doctor_cmd", side_effect=report_through_a_sink)
         try:
@@ -74,7 +78,8 @@ class TestAgentDoctorCmd:
 
             assert log.sink is None
             assert not log.is_configured
-            assert sink.handler not in logging.getLogger().handlers
+            (handler,) = installed
+            assert handler not in logging.getLogger().handlers
         finally:
             log.reset()
 
