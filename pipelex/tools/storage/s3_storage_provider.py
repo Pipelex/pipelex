@@ -76,7 +76,11 @@ class S3StorageProvider(StorageProviderAbstract):
         from botocore.config import Config  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
         endpoint_url = f"https://s3.{self._region}.amazonaws.com"
-        config = Config(signature_version="s3v4")  # pyright: ignore[reportUnknownArgumentType]
+        # botocore addresses path-style whenever an endpoint is given, which puts every link on the region's
+        # shared host. A content security policy can allow a bucket only by its own host, so pin the virtual
+        # style: `<bucket>.s3.<region>.amazonaws.com`. botocore still falls back to path-style for a bucket
+        # name that cannot be a hostname, a dotted one included.
+        config = Config(signature_version="s3v4", s3={"addressing_style": "virtual"})  # pyright: ignore[reportUnknownArgumentType]
 
         return {
             "service_name": "s3",
@@ -174,7 +178,11 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageS3Error(msg) from exc
 
     def _make_public_url(self, key: str) -> str:
-        """Build a public URL for an S3 object.
+        """Build an unsigned public URL for an S3 object, on the same host a signed one would name.
+
+        The URL is virtual-hosted on the bucket's regional host, except for a bucket name containing a dot:
+        such a name breaks the `*.s3.<region>.amazonaws.com` wildcard certificate over HTTPS, so its URL is
+        path-style on the regional host, as botocore signs it.
 
         Args:
             key: Storage key (without scheme prefix).
@@ -182,6 +190,8 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Public URL for the object.
         """
+        if "." in self._bucket_name:
+            return f"https://s3.{self._region}.amazonaws.com/{self._bucket_name}/{key}"
         return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{key}"
 
     @override
