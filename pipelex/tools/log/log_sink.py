@@ -3,9 +3,9 @@
 A sink owns one stdlib handler on the root logger and everything about how a record leaves the
 process: the stream, the wire shape, the exporter. Which sink a process runs is a registrar
 capability selected by ``[runtime.log] sink``, exactly as the storage and secrets providers are: the
-built-in plugin registers ``json``, ``console`` and ``otlp`` under open string tokens, and an external
-plugin registers its own. This module holds what every sink shares, the base class with its processor
-slot and the stream resolution, and names no sink.
+built-in plugin registers ``json``, ``console``, ``otlp`` and ``gcp`` under open string tokens, and an
+external plugin registers its own. This module holds what every sink shares, the base class with its
+processor slot and the stream resolution, and names no sink.
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ class LogSinkMethod(StrEnum):
     JSON = "json"
     CONSOLE = "console"
     OTLP = "otlp"
+    GCP = "gcp"
 
 
 class ProcessorFilter(logging.Filter):

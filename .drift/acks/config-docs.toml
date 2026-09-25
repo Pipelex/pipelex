@@ -1,13 +1,13 @@
 contract = "config-docs"
-digest = "sha256:c92f24eeb4684a4bcfb92ea177fd96943be6bd045c04881bee14fafb6388166b"
+digest = "sha256:882e711271ff0716aefa3315cc794c70ac30667f386bca3436d260df3ec1f0c7"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-17T13:32:03Z"
-rationale = "The only trigger change is the extra_patterns validator, which now also refuses a regular expression matching the empty string: x* where x+ was meant matches at every position and replaces the whole of every log line the process writes, for the life of the process, so it is named where the pattern is still in front of whoever typed it. It narrows the accepted domain and no fingerprint can see it, which is what this contract asks about, and it takes no migration ledger entry: the shipped default is an empty list, a file already holding such a pattern was already having every line destroyed by it, and no migration can guess what pattern was meant. No field was added, renamed or removed and no other validator moved; check-migration-schemas reports the surfaces accounted for. The review targets were read: docs/configuration/config-practical/logging-config.md now says the refusal beside the one for a pattern re refuses, and names what each shipped family actually reads, since the families were rewritten in the same change; configs.py and config_cogt.py are untouched by it."
+reviewed_at = "2026-09-25T14:40:46Z"
+rationale = "Merge of dev, which now carries the redaction member, into the gcp sink branch. Each side was acked on its own; the merge only combines them: log_config.py holds both GcpLogSinkConfig and LogRedactionConfig with LogConfig carrying both the redaction and gcp sections, and pipelex.toml ships both [runtime.log.gcp] and [runtime.log.redaction]. logging-config.md already documents both sections and both appear in its example configuration; both are additions with shipped defaults, so no migration ledger entry is owed, and the defaults@5 golden carries both tables."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
 "pipelex/cogt/img_gen/img_gen_job_components.py" = "blob:084985080413fd8d6c3b1b9b0747020cb0161858"
-"pipelex/pipelex.toml" = "blob:6140d1296b800011b423e75f421ec4a951efda89"
+"pipelex/pipelex.toml" = "blob:8d5b60c54ea342992546918b718563a02629d31f"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:88e15a92b186088a5ea1c7c4ebcedac830707d3a"
 "pipelex/system/configuration/config_loader.py" = "blob:ac384ce993933656682999c26afffb4c9f9b1975"
@@ -18,4 +18,4 @@ rationale = "The only trigger change is the extra_patterns validator, which now 
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:7070951a6d3e4c10cb7d59822ce168c6590c53be"
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
-"pipelex/tools/log/log_config.py" = "blob:d42123b1bbd64383447e35414a8c4bcbf073b890"
+"pipelex/tools/log/log_config.py" = "blob:5b98b3ebe7090fa306cd5253c96812605f0d3dbc"

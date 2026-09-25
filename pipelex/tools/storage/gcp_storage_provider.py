@@ -67,7 +67,7 @@ class GcpStorageProvider(StorageProviderAbstract):
                     msg,
                 )
 
-            from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+            from google.cloud import storage  # type: ignore[import-untyped, attr-defined]  # ruff: ignore[import-outside-top-level]
 
             credentials_path = Path(self._credentials_file_path)
             if not credentials_path.exists():

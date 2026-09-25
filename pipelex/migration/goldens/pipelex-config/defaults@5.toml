@@ -39,9 +39,10 @@ method = "env" # env (built-in); an external plugin may add e.g. vault
 default_log_level = "INFO"
 # sink names the registered log sink boot installs on the root logger, the way runtime.storage.method
 # names a storage backend: "console" (the Rich handler, for a terminal), "json" (one JSON object per
-# line, for a server behind a log agent), "otlp" (the OpenTelemetry logs signal, for a collector), or a
-# token an installed plugin registers. "console" is the default so the CLI keeps its rendering; a
-# server selects "json". An unregistered token stops the boot naming the registered ones.
+# line, for a server behind a log agent), "otlp" (the OpenTelemetry logs signal, for a collector),
+# "gcp" (Google Cloud Logging through the client library), or a token an installed plugin registers.
+# "console" is the default so the CLI keeps its rendering; a server selects "json". An unregistered
+# token stops the boot naming the registered ones.
 sink = "console"
 # console_log_target controls the stream the console and json sinks write to (log.debug/info/...).
 # Logs are diagnostics → stderr.
@@ -104,6 +105,16 @@ keywords_to_hilight = []
 # the collector default on localhost. Empty headers likewise leave OTEL_EXPORTER_OTLP_HEADERS in charge.
 [runtime.log.otlp]
 headers = {}
+
+# The settings of the "gcp" sink, which writes to Google Cloud Logging through the client library.
+# Most processes want "json" instead: a platform that runs a logging agent over the container's
+# stdout, Cloud Run and GKE among them, ingests the JSON objects that sink writes and needs no client
+# at all. Select "gcp" for a process that must write to Cloud Logging directly. log_name is the
+# Cloud Logging log the entries land under. A project_id key names the project when it is not the
+# ambient one the credentials or the metadata server declare, and a credentials_file_path key names a
+# service-account JSON file when Application Default Credentials are not what the process should use.
+[runtime.log.gcp]
+log_name = "pipelex"
 
 # [runtime.log.redaction] governs the one processor every sink is behind: it scrubs the secret shapes
 # the workspace already knows (an Authorization bearer token, an api-key or signature header, an OAuth
