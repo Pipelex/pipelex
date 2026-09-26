@@ -9,8 +9,9 @@ below the validation service in the import graph (``validate_bundle`` → ``bund
 ``execution_seams``), and both must reach the same translation.
 """
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -27,6 +28,7 @@ from pipelex.core.pipes.exceptions import (
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
+from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import (
@@ -38,6 +40,9 @@ from pipelex.mthds_parsing.handle_pipe_errors import (
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.registries.exceptions import FuncRegistryError
+
+# What a verdict's message reads where it named a file of the host's own library directories.
+HOST_LIBRARY_FILE_PLACEHOLDER = "<host library file>"
 
 
 def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
@@ -220,3 +225,45 @@ def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | Non
         message=message,
         pipelex_bundle_blueprint_validation_errors=[PipelexBundleBlueprintValidationErrorData(message=message)],
     )
+
+
+@contextmanager
+def withholding_host_library_files(*, library_dirs: Sequence[Path]) -> Generator[None, None, None]:
+    """Keep the files of a host's own library directories out of the verdict the block raises.
+
+    A verdict is caller-facing as a whole, and STRICT disclosure hands its message and its items to the caller
+    verbatim, so it must not name a path on the host. When submitted content is validated or run, the library
+    directories loaded beside it are the host's (installed libraries, the defaults, ``PIPELEXPATH``), and an item
+    located in one of their files would name that file, as would a message about it, such as a duplicate
+    declaration or a load that failed. Around such a load, a ``ValidateBundleError`` leaves this block with every
+    file of ``library_dirs`` taken out: the item carries no ``source``, still located by its pipe and domain, and a
+    message reads ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one. The files are the ones the library load
+    reads, in both the spelling it gives a bundle's ``source`` and the resolved one.
+
+    A bundle validated from a file on the caller's own disk, or run with library directories that are the
+    caller's, keeps every path: there the directories are the caller's to read. A package the content depends on
+    by address never needs this, since its bundles are named by the package's address at load.
+    """
+    try:
+        yield
+    except ValidateBundleError as verdict:
+        host_library_files = _library_file_spellings(library_dirs=library_dirs)
+        if not host_library_files:
+            raise
+        withheld_verdict = verdict.withholding_files(withheld_files=host_library_files, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
+        # The withheld verdict takes this one's place over the same cause, so its report inherits the same
+        # classification and the unwithheld verdict is not left on the chain beside it.
+        raise withheld_verdict from verdict.__cause__
+
+
+def _library_file_spellings(*, library_dirs: Sequence[Path]) -> set[str]:
+    """Every spelling of the bundle files the library load reads from ``library_dirs``: as listed, and resolved."""
+    spellings: set[str] = set()
+    for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
+        spellings.add(str(library_file))
+        try:
+            spellings.add(str(library_file.resolve()))
+        except (OSError, RuntimeError):
+            # The load names such a file by its listed spelling only (see ``LibraryManager.load_libraries``).
+            continue
+    return spellings

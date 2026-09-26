@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Sequence
 
@@ -25,7 +26,7 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprin
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
 from pipelex.system.caller_identity import CallerIdentity
 
 
@@ -173,8 +174,14 @@ async def validate_bundle(
 
         loaded_pipes: list[PipeAbstract] | None = None
         loaded_blueprints: list[PipelexBundleBlueprint] | None = None
+        # Submitted content is validated for a caller whose library directories these are not: the verdict names
+        # none of their files, which are paths on the host. A bundle file is validated on the caller's own disk,
+        # among the caller's own directories, and keeps every path.
+        host_library_withholding: AbstractContextManager[None] = (
+            withholding_host_library_files(library_dirs=effective_dirs) if mthds_contents is not None else nullcontext()
+        )
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
-        with translate_to_validate_bundle_error():
+        with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
                 library_manager.load_libraries(

@@ -1,3 +1,6 @@
+from collections.abc import Collection, Sequence
+from typing import TypeVar
+
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
@@ -111,6 +114,32 @@ def _summarize_bundle_validation_message(
     return f"{len(item_messages)} validation errors (first: {first_message})"
 
 
+def _withhold_files_from_text(*, text: str, ordered_files: Sequence[str], placeholder: str) -> str:
+    """``text`` reading ``placeholder`` wherever it named one of ``ordered_files``, longest spelling first."""
+    for withheld_file in ordered_files:
+        text = text.replace(withheld_file, placeholder)
+    return text
+
+
+# The error-data models that carry a ``source`` beside their ``message``.
+_SourcedErrorData = TypeVar("_SourcedErrorData", PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData)
+
+
+def _withhold_files_from_sourced_errors(
+    *, errors: list[_SourcedErrorData], ordered_files: Sequence[str], placeholder: str
+) -> list[_SourcedErrorData]:
+    """The error data without a withheld file as its ``source`` or in its ``message``."""
+    return [
+        error.model_copy(
+            update={
+                "source": None if error.source in ordered_files else error.source,
+                "message": _withhold_files_from_text(text=error.message, ordered_files=ordered_files, placeholder=placeholder),
+            }
+        )
+        for error in errors
+    ]
+
+
 class ValidateBundleError(PipelexError):
     """Raised when a bundle is refused while it is loaded or validated: the invalid verdict, carrying one
     structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one —
@@ -176,6 +205,48 @@ class ValidateBundleError(PipelexError):
                 dry_run_error_message=self.dry_run_error_message,
                 raw_message=message,
             )
+        )
+
+    def withholding_files(self, *, withheld_files: Collection[str], placeholder: str) -> "ValidateBundleError":
+        """This verdict with the given files taken out of every channel that could name them.
+
+        An item whose ``source`` is one of ``withheld_files`` carries no ``source``, and every message, the
+        items' and the verdict's own, reads ``placeholder`` where it named one of them. Everything else is
+        kept, the items' locators included, so it is the same answer about the same bundle. A validator of
+        submitted content uses it to keep the files of the host's own library directories, paths on the host,
+        out of a verdict that STRICT disclosure hands the caller verbatim.
+
+        Args:
+            withheld_files: Every spelling of every file the verdict must not name.
+            placeholder: What a message reads where it named one of them.
+
+        Returns:
+            A new verdict; this one is left as it is.
+        """
+        # Longest first, so a file whose spelling extends another's is replaced whole.
+        ordered_files = sorted(set(withheld_files), key=len, reverse=True)
+        return ValidateBundleError(
+            message=_withhold_files_from_text(text=self.message, ordered_files=ordered_files, placeholder=placeholder),
+            pipelex_bundle_blueprint_validation_errors=_withhold_files_from_sourced_errors(
+                errors=self.pipelex_bundle_blueprint_validation_errors, ordered_files=ordered_files, placeholder=placeholder
+            ),
+            pipe_factory_errors=[
+                error.model_copy(
+                    update={"message": _withhold_files_from_text(text=error.message, ordered_files=ordered_files, placeholder=placeholder)}
+                )
+                for error in self.pipe_factory_errors
+            ],
+            pipe_validation_errors=_withhold_files_from_sourced_errors(
+                errors=self.pipe_validation_errors, ordered_files=ordered_files, placeholder=placeholder
+            ),
+            pipe_concept_instantiation_errors=_withhold_files_from_sourced_errors(
+                errors=self.pipe_concept_instantiation_errors, ordered_files=ordered_files, placeholder=placeholder
+            ),
+            dry_run_error_message=(
+                _withhold_files_from_text(text=self.dry_run_error_message, ordered_files=ordered_files, placeholder=placeholder)
+                if self.dry_run_error_message is not None
+                else None
+            ),
         )
 
     @property

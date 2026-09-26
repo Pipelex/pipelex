@@ -47,7 +47,7 @@ from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
-from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -85,7 +85,9 @@ def acquire_library(
     contents here, so their items carry none: a hosted run request names no file, and giving a
     blueprint a source also changes where its address-based dependencies are searched for. A package
     the bundle depends on by address still loads from its install directory inside this translation,
-    exactly as on the in-memory validate path, so its refusals can name that directory.
+    exactly as on the in-memory validate path, and its refusals name its bundles by the package's
+    address and their path inside it, never by that directory. Beside a host's library directories,
+    the verdict names none of their files either (``withholding_host_library_files``).
 
     ``library_dirs_are_callers`` says whose ``library_dirs`` are. On a local run they are the
     caller's own (a CLI's ``-L``, the directory of the bundle being run), so a refusal while loading
@@ -122,7 +124,11 @@ def acquire_library(
 
         qualified_main_pipe: str | None = None
         if mthds_contents:
-            with translate_to_validate_bundle_error():
+            # Beside a host's library directories, the verdict names none of their files, which are paths on the host.
+            host_library_withholding: AbstractContextManager[None] = (
+                nullcontext() if library_dirs_are_callers else withholding_host_library_files(library_dirs=effective_dirs)
+            )
+            with host_library_withholding, translate_to_validate_bundle_error():
                 all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
                 # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH).
