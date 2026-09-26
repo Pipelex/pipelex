@@ -139,6 +139,28 @@ class TestValidationDetailKept:
         assert str(tmp_path) not in item.message
 
     @pytest.mark.asyncio
+    async def test_a_failure_in_the_callers_own_library_pipe_names_its_file(self, tmp_path: Path) -> None:
+        """Submitted content validated beside directories that are the caller's own: the failing library pipe keeps its file."""
+        library_dir = tmp_path / "caller_library"
+        library_dir.mkdir()
+        library_file = library_dir / "idea_board.mthds"
+        library_file.write_text(ValidationDetailBundles.NESTED_PARALLEL_MISMATCH, encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(
+                mthds_contents=[ValidationDetailBundles.CALLER_OF_LIBRARY_PARALLEL],
+                mthds_sources=[ValidationDetailBundles.CALLER_SOURCE],
+                library_dirs=[library_dir],
+                library_dirs_are_callers=True,
+            )
+
+        (item,) = exc_info.value.to_error_report().validation_errors or []
+        assert item.category == ValidationErrorCategory.DRY_RUN
+        assert (item.pipe_code, item.domain_code) == ("analyze_topic", ValidationDetailBundles.DOMAIN)
+        assert item.source is not None
+        assert Path(item.source).resolve() == library_file.resolve()
+
+    @pytest.mark.asyncio
     async def test_a_failure_in_a_sibling_file_of_a_local_method_names_that_file(self, tmp_path: Path) -> None:
         """Validated from a file on the caller's own disk, a failure in a sibling file of the method keeps that file."""
         method_dir = tmp_path / "method"
