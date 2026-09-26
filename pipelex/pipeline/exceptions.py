@@ -1,8 +1,12 @@
+from typing import Self
+
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.pipe_run.exceptions import find_failure_location
+from pipelex.pipe_run.located_failure import build_located_failure_report, locate_failure_message
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -12,13 +16,22 @@ class PipeExecutionError(PipelexError):
 
 
 class PipelineExecutionError(PipelexError):
-    """Wraps any failure that occurred while running a pipeline.
+    """Wraps any failure that occurred while running a pipeline, reported as its root fault.
 
-    Being a pure wrapper, it has no authoritative classification of its own:
-    ``to_error_report()`` inherits ``error_domain`` / ``user_action`` from the
-    wrapped ``__cause__`` chain (so a categorized ``CogtError`` keeps its
-    ``WAIT_AND_RETRY`` / ``CHECK_BILLING`` action), and only falls back to a
-    generic RUNTIME / UNKNOWN classification when the cause chain surfaces none.
+    The runner raises it around every failure that happens once the run's job exists, so a host
+    catches one class whatever went wrong. Its ``pipe_code`` and ``pipe_stack`` name the pipe where
+    the failure happened and its path from the entry pipe, taken from the innermost location on the
+    cause chain (the ``PipeRouterError`` of the pipe that failed). When the failure was never located
+    (it happened outside any routed pipe run, or it crossed a transport boundary as a report that
+    already names its pipe), ``pipe_code`` is the entry pipe and ``pipe_stack`` is empty.
+
+    Its report is not its own. ``to_error_report()`` takes the identity (``error_type``, ``title``,
+    ``type_uri``), the message and the caller-facing flag of the root fault, the innermost
+    ``PipelexError`` on the cause chain, or the report such an error recovered across a transport
+    boundary; the message is prefixed with the failing pipe and its path. The classification is
+    inherited from the cause chain (so a categorized ``CogtError`` keeps its ``WAIT_AND_RETRY`` /
+    ``CHECK_BILLING`` action), with a ``RUNTIME`` floor and, when nothing on the chain advises an
+    action, a fallback that names the failing pipe. See ``pipelex.pipe_run.located_failure``.
     """
 
     def __init__(
@@ -35,17 +48,44 @@ class PipelineExecutionError(PipelexError):
         self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         super().__init__(message)
 
+    @classmethod
+    def make_for_run_failure(
+        cls,
+        *,
+        failure: PipelexError,
+        run_mode: PipeRunMode,
+        entry_pipe_code: str,
+        output_name: str | None,
+    ) -> Self:
+        """Wrap a run's `failure`, located where it happened; the caller raises the result `from failure`.
+
+        The location is the innermost ``PipeRouterError`` on the failure's cause chain, never the
+        live pipe stack, which has unwound by the time the runner sees the failure.
+        """
+        location = find_failure_location(error=failure)
+        pipe_code: str
+        pipe_stack: list[str]
+        if location is None:
+            pipe_code = entry_pipe_code
+            pipe_stack = []
+        else:
+            pipe_code = location.pipe_code
+            pipe_stack = location.pipe_stack
+        return cls(
+            message=locate_failure_message(failure=failure, pipe_code=pipe_code, pipe_stack=pipe_stack),
+            run_mode=run_mode,
+            pipe_code=pipe_code,
+            output_name=output_name,
+            pipe_stack=pipe_stack,
+        )
+
     @override
     def to_error_report(self) -> ErrorReport:
-        # The report is first enriched from the __cause__ chain; the generic
-        # RUNTIME / UNKNOWN values are only a floor, applied when the cause
-        # surfaced nothing — never overriding a categorized cause action.
-        report = super().to_error_report()
-        return report.model_copy(
-            update={
-                "error_domain": report.error_domain or ErrorDomain.RUNTIME,
-                "user_action": report.user_action or UserAction(kind=UserActionKind.UNKNOWN, detail="Check pipe_stack to identify which pipe failed"),
-            }
+        return build_located_failure_report(
+            wrapper=self,
+            own_report=super().to_error_report(),
+            pipe_code=self.pipe_code,
+            pipe_stack=self.pipe_stack,
         )
 
 

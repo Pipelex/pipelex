@@ -1,4 +1,9 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import Self
+
+from typing_extensions import override
+
+from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, iter_cause_chain
+from pipelex.pipe_run.located_failure import build_located_failure_report, locate_failure_message
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -81,6 +86,16 @@ class DryRunGraphNotProducedError(DryRunError):
 
 
 class PipeRouterError(PipelexError):
+    """A pipe failed while running: the failure, located at the pipe where it happened.
+
+    The pipe router raises it around every failure of the pipe it runs, chained to the failure,
+    with the pipe's code and a snapshot of its stack taken where it failed. A failure that already
+    carries one keeps it as it rises through the routers of the controllers above, so the innermost
+    location is the one reported. Its report is its root fault's, located (see
+    `pipelex.pipe_run.located_failure`): a run whose pipe raised `StuffFactoryError` reports
+    `StuffFactoryError`, with a message naming the pipe and its path, never `PipeRouterError`.
+    """
+
     def __init__(
         self,
         message: str,
@@ -96,3 +111,48 @@ class PipeRouterError(PipelexError):
         self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         self.missing_inputs = missing_inputs
         super().__init__(message)
+
+    @classmethod
+    def make_located(
+        cls,
+        *,
+        failure: PipelexError,
+        run_mode: PipeRunMode,
+        pipe_code: str,
+        output_name: str | None,
+        pipe_stack: list[str],
+    ) -> Self:
+        """Locate `failure` at `pipe_code`; the caller raises the result `from failure`."""
+        return cls(
+            message=locate_failure_message(failure=failure, pipe_code=pipe_code, pipe_stack=pipe_stack),
+            run_mode=run_mode,
+            pipe_code=pipe_code,
+            output_name=output_name,
+            pipe_stack=pipe_stack,
+        )
+
+    @override
+    def to_error_report(self) -> ErrorReport:
+        return build_located_failure_report(
+            wrapper=self,
+            own_report=super().to_error_report(),
+            pipe_code=self.pipe_code,
+            pipe_stack=self.pipe_stack,
+        )
+
+
+def find_failure_location(*, error: BaseException) -> PipeRouterError | None:
+    """Return the innermost `PipeRouterError` on `error`'s cause chain, `error` itself included.
+
+    It names the pipe where the failure happened and that pipe's stack snapshot; `None` means the
+    failure was never located, because it happened outside any routed pipe run. Like the root-fault
+    walk, it stops at the first exception that is not a `PipelexError`: a foreign exception raised
+    from an earlier located failure is a new failure, which the router locates where it happened.
+    """
+    location: PipeRouterError | None = None
+    for node in iter_cause_chain(error):
+        if not isinstance(node, PipelexError):
+            break
+        if isinstance(node, PipeRouterError):
+            location = node
+    return location

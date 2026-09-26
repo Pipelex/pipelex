@@ -33,6 +33,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
@@ -280,5 +281,8 @@ class TestPipeComposeNativeScalarConversions:
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
 
-        with pytest.raises(PipeComposeError, match="time of day"):
+        # The router locates the failure at the pipe that raised it, chained to the failure.
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(pipe_job=pipe_job)
+        assert isinstance(exc_info.value.__cause__, PipeComposeError)
+        assert "time of day" in exc_info.value.__cause__.message

@@ -50,6 +50,7 @@ from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunError
+from pipelex.pipe_run.located_failure import find_foreign_fault
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
@@ -343,6 +344,11 @@ class BundleValidator:
             )
             await self._pipe_run.run(pipe_job)
         except (PipelexError, ValidationError, FactoryException) as exc:
+            # A foreign exception a pipe raised arrives located as a PipelexError by the router: it
+            # is a programming bug, never the bundle's failure, and its text is never the caller's.
+            foreign_fault = find_foreign_fault(error=exc)
+            if foreign_fault is not None and not isinstance(foreign_fault, (ValidationError, FactoryException)):
+                raise
             # SKIPPED = a cross-package unresolved dependency. Routing through PipeRun.run no longer
             # surfaces a bare PipeNotFoundError: the run layer re-raises the original and the router may
             # wrap it (PipeNotFoundError is a PipelexError, so the base catch reaches it). Walk the whole

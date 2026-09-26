@@ -76,10 +76,10 @@ class TestWrapperErrorEnrichment:
         assert report.error_category == InferenceErrorCategory.CONTENT
 
     def test_falls_back_to_runtime_unknown_without_cause(self) -> None:
-        """With no PipelexError cause, PipelineExecutionError reports the generic RUNTIME / UNKNOWN floor."""
+        """With no PipelexError cause, PipelineExecutionError reports the RUNTIME floor and a fallback naming the failing pipe."""
         report = _make_pipeline_execution_error(cause=None).to_error_report()
 
         assert report.error_domain == ErrorDomain.RUNTIME
         assert report.user_action is not None
         assert report.user_action.kind == UserActionKind.UNKNOWN
-        assert report.user_action.detail == "Check pipe_stack to identify which pipe failed"
+        assert report.user_action.detail == "The run failed in pipe 'some_pipe': the message gives the cause."

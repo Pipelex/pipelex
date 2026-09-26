@@ -93,6 +93,11 @@ class TestRunErrorChain:
         assert payload["model"] == WORKER_MODEL
         assert payload["provider"] == WORKER_PROVIDER
         assert payload["pipe_code"] == "greet"
+        assert payload["pipe_stack"] == ["greet"]
+        # The cause fields name the root fault, not the router wrapper right under the run error.
+        assert payload["cause_type"] == "LLMCompletionError"
+        assert payload["cause_message"] == WORKER_ERROR_MESSAGE
+        assert payload["message"] == f"Pipe 'greet' failed: {WORKER_ERROR_MESSAGE}"
 
         # error_source is the cause chain, outermost first: runner -> router -> pipe operator -> worker.
         error_source: list[str] = payload["error_source"]

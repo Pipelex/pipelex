@@ -93,6 +93,10 @@ class TestRunnerExecuteErrorPaths:
         """A PipelexError raised by the pipe run AFTER setup resolved the job is wrapped
         into a PipelineExecutionError carrying the job's identity, and a FAILURE
         telemetry event fires.
+
+        The failure was never located by a router, so the error names the entry pipe with an
+        empty stack — never the live stack, which has unwound by the time the runner sees it —
+        and its message is the failure's own.
         """
         env = self._patch_env(mocker)
         original = PipeExecutionError("boom from pipe")
@@ -109,7 +113,7 @@ class TestRunnerExecuteErrorPaths:
         assert wrapped.pipe_code == "echo_pipe"
         assert wrapped.output_name == "topic_out"
         assert wrapped.run_mode == PipeRunMode.DRY
-        assert wrapped.pipe_stack == ["root_pipe", "echo_pipe"]
+        assert wrapped.pipe_stack == []
         assert wrapped.__cause__ is original
         # The failure event is attributed to the run, not to the process: `run_metadata`
         # is the job's own, which is what carries the caller's user id and groups.

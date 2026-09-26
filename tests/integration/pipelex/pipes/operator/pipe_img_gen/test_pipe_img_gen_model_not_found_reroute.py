@@ -11,6 +11,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
@@ -58,10 +59,13 @@ class TestPipeImgGenModelNotFoundReroute:
             job_metadata=job_metadata,
         )
 
-        with pytest.raises(PipeOperatorModelAvailabilityError) as exc_info:
+        # The router locates the failure at the pipe that raised it, chained to the availability error.
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(pipe_job=pipe_job)
+        assert exc_info.value.pipe_code == pipe.code
 
-        availability_error = exc_info.value
+        availability_error = exc_info.value.__cause__
+        assert isinstance(availability_error, PipeOperatorModelAvailabilityError)
         assert availability_error.model_handle == "sd-not-a-real-model"
         assert availability_error.fallback_list is None
         assert availability_error.pipe_type == "PipeImgGen"

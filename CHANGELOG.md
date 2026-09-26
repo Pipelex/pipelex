@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A run failure reports its root fault, located at the failing pipe (Breaking)**: the report of a `PipelineExecutionError`, and of the `PipeRouterError` under it, now carries the `error_type`, `title`, `type_uri`, caller-facing flag and own message of the root fault, the innermost Pipelex error on the cause chain, with the message prefixed by the failing pipe and its path (`Pipe 'summarize' failed (two_steps → summarize): …`), and the exception's `pipe_code` and `pipe_stack` name that pipe instead of the entry pipe. A bridge's sentence no longer reaches the report, a report recovered from a remote worker is taken as it is, so a run reports the same failure in process, through the in-process orchestrator or on a worker, and the fallback action names the failing pipe instead of saying `Check pipe_stack to identify which pipe failed`. A consumer branching on `error_type == "PipelineExecutionError"` branches on the root fault's type instead, as [the error model](under-the-hood/error-model.md#run-failures-the-root-fault-located) describes.
+- **The pipe router locates every failure (Breaking)**: `PipeRouterProtocol.run()` now re-raises any failure of its pipe as a `PipeRouterError` chained to it, where it used to let everything but a `CogtError` through, and a failure already located by an inner router rises untouched. An exception that is not a Pipelex error becomes a `PipelexUnexpectedError` whose message names its class, and a host router overrides the new `_as_pipelex_failure()` hook to convert its transport's failures or let a control-flow exception through. Code that caught a pipe's own error class from `get_pipe_router().run()` catches `PipeRouterError` and reads its `__cause__`.
+- **`ModelNotFoundError`'s message states the fact only**: a handle missing from the model deck reads `Model handle '<handle>' was not found in the model deck.`, without the local-deck advice it used to carry into every surface, hosted runs included. `pipelex run` now renders the model panel for a run failure, naming the failing pipe, the model and the pipe stack, and the panel's tip carries that advice.
+- **The agent CLI's run errors name the root fault**: `pipelex-agent run` reports a failed run's `pipe_code` and `pipe_stack` at the failing pipe, and its `cause_type` and `cause_message` are the root fault's instead of the wrapper right under the run error.
+
 ## [v0.66.0] - 2026-09-25
 
 ### Highlights
