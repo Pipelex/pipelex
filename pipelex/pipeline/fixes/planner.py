@@ -14,12 +14,11 @@ STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE = "strip-native-concept-redecl"
 STRIP_NAMESPACE_FIX_CODE = "strip-namespace"
 RENAME_MODEL_FIX_CODE = "rename-model"
 
-# Every fix-rule code the planner can emit — the validation set for user-facing rule filters
-# (``--select`` / ``--ignore``). A new rule constant above must be added here; the CLI rejects
-# codes outside this set loudly (a typo'd filter selects *behavior*, so lenient-ignore is wrong).
-# The codes `pipelex fix bundle --select/--ignore` accept: the rules the fix loop can apply, all SAFE.
-# `rename-model` is left out on purpose: it is UNSAFE, so the loop never applies it, and accepting it in
-# `--select` would promise a fix the command then silently skips.
+# The codes `pipelex fix bundle --select/--ignore` accept: every SAFE rule the fix loop can apply. A new
+# SAFE rule constant above must be added here; the CLI rejects codes outside this set loudly (a typo'd
+# filter selects *behavior*, so lenient-ignore is wrong). An UNSAFE rule stays out: the loop never applies
+# it, so accepting it in `--select` would promise a fix the command then silently skips. `rename-model`
+# is the one such rule today.
 KNOWN_FIX_CODES: frozenset[str] = frozenset(
     {
         MATCH_SEQUENCE_OUTPUT_FIX_CODE,
