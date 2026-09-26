@@ -228,6 +228,10 @@ They are the same artifacts a validation report returns under those names, keyed
 
 A run whose main output resolves as a recorded absence (an optional `?` output that produced nothing — e.g. a `PipeCondition` `continue` outcome, or a skipped producer) is a **successful** run. The CLI prints the absence with its reason, and `--save-main-stuff` writes an explicit absence artifact instead of a value dump: `main_stuff.json` is `{"absent": true, ...}` with the absence record, and `main_stuff.md` is a human-readable summary including the provenance chain (no HTML render or interactive viewer is produced — there is nothing to view). `--save-csv` fails with an explicit error and a non-zero exit code, the same way it does for any main output that is not a flat list — there is no tabular value to save.
 
+## An Invalid Bundle
+
+A run loads its bundle before any pipe runs, and refuses an invalid one there, before spending anything. The refusal is reported the way [`pipelex validate`](validate.md) reports the same bundle: the grouped invalid-bundle panel, with one located item per refusal (its pipe, its field, its message and its suggested fix when it has one), and exit code `1`. That holds whether the parse or the load refuses the bundle, and for a refusal found while loading a library directory you pass with `-L` (or the bundle's own directory, for `run bundle <dir>`). When the items carry automatic fixes, the panel names the `pipelex fix bundle` command that applies them.
+
 ## Related Documentation
 
 - [Executing Pipelines](../../building-methods/pipes/executing-pipelines.md)

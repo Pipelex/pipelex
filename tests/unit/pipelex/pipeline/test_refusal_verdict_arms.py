@@ -6,7 +6,7 @@ from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError, Va
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle import translate_to_validate_bundle_error
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.validation_error_types import PipeValidationErrorType
 
 

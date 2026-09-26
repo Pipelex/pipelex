@@ -14,8 +14,8 @@ bundles through ``validate_bundle`` and pin the verdict each refusal produces:
 - **The general arm.** Any other ``input``-domained refusal raised while building a pipe validates to one
   item located on the pipe and its file, keeping its message only when it is caller-facing; a
   ``config``-domained fault raised at the same place still propagates as no verdict.
-- **The run path.** Setting up a run on the unknown-model bundle refuses it with an error naming the
-  pipe, whose STRICT projection is still an HTTP 422 carrying the deck check's sentence.
+- **The run path.** Setting up a run on the unknown-model bundle refuses it with the same verdict, its
+  item naming the pipe, whose STRICT projection is still an HTTP 422 carrying the deck check's sentence.
 
 The deck is the test session's own, so the suggestion lists are read off it rather than pinned in
 full, except for the one-suggestion alias whose rename fix is the point of its case.
@@ -346,7 +346,7 @@ class TestValidateBundleLoadRefusals:
     async def test_run_setup_refuses_the_unknown_model_naming_the_pipe(self) -> None:
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False, mock_inputs=True)
 
-        with pytest.raises(PipeOperatorModelChoiceError) as raised:
+        with pytest.raises(ValidateBundleError) as raised:
             await pipeline_run_setup(
                 storage_scope="test/scope",
                 user_id="test-user",
@@ -356,13 +356,17 @@ class TestValidateBundleLoadRefusals:
                 pipe_run_mode=PipeRunMode.DRY,
             )
 
-        error = raised.value
-        assert error.pipe_code == "write_tide_note"
-        assert error.field_name == "model"
-        report = error.to_error_report()
+        assert isinstance(raised.value.__cause__, PipeOperatorModelChoiceError)
+        report = raised.value.to_error_report()
+        (item,) = report.validation_errors or []
+        assert item.error_type == PipeValidationErrorType.UNKNOWN_MODEL
+        assert item.pipe_code == "write_tide_note"
+        assert item.field_name == "model"
         assert report.http_status == 422
         strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["error_type"] == "PipeOperatorModelChoiceError"
+        assert strict_payload["error_type"] == "ValidateBundleError"
         assert strict_payload["error_domain"] == "input"
         assert "Pipe 'write_tide_note'" in strict_payload["message"]
         assert "Model handle 'gpt-5.1' was not found in the model deck" in strict_payload["message"]
+        (strict_item,) = strict_payload["validation_errors"]
+        assert strict_item["error_type"] == "unknown_model"

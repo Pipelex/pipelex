@@ -116,7 +116,8 @@ class ValidateBundleError(PipelexError):
     structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one —
     the parser, factory and pipe-validation errors, a failing dry run, an unknown model (``unknown_model``)
     and any other refusal of the caller's input — while a failure of the tool or its environment propagates
-    as a no-verdict fault instead.
+    as a no-verdict fault instead. A run raises it too, when the bundle it was given is refused while it
+    loads, before any pipe runs: the same verdict, with the same items, that validating the bundle gives.
 
     This error aggregates validation errors from different stages:
     - Blueprint validation errors (from interpreter)

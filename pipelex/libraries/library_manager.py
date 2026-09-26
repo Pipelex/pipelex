@@ -142,7 +142,8 @@ def _locating_pipe_build_refusals(
 
     - An unknown model is already located on its pipe and field by the operator
       (``PipeOperatorModelChoiceError``); the loop adds the file and lets it go on under its own class,
-      which the run and build surfaces render with their dedicated panel.
+      which the validate and run paths turn into its ``unknown_model`` verdict item and the build
+      surfaces render with their dedicated panel.
     - Any other refusal of the caller's input (an ``input``-domained ``PipelexError``) is raised again
       as a ``PipeLoadRefusalError`` naming the pipe and the file, ``from`` the original.
     - Everything else leaves untouched: a configuration or runtime fault keeps its identity and stays a

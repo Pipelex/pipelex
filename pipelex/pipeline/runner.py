@@ -127,9 +127,14 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
         inputs_base_dir: Path | None = None,
+        # Whose `library_dirs` are: the caller's own on a local CLI run, so a refusal while loading
+        # them is the caller's invalid bundle; a host's own otherwise, loaded untranslated. See
+        # `acquire_library`.
+        library_dirs_are_callers: bool = False,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
+        self.library_dirs_are_callers = library_dirs_are_callers
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
         self.is_mock_usage = is_mock_usage
@@ -249,6 +254,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 storage_scope=self.storage_scope,
                 extras=self.extras,
                 inputs_base_dir=self.inputs_base_dir,
+                library_dirs_are_callers=self.library_dirs_are_callers,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
             pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)

@@ -17,7 +17,8 @@ from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collec
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.execution_seams import acquire_library
-from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, translate_to_validate_bundle_error, validate_bundle
+from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 if TYPE_CHECKING:
     from pathlib import Path
