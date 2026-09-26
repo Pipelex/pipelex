@@ -8,7 +8,7 @@
 
 ### Changed
 
-- **`are_classes_equivalent` answers without a JSON schema when it can**: a class is equivalent to itself, and two models whose schemas would certainly publish different property names are not equivalent, both now decided before any schema is generated, which removes most of the cost of validating a library whose pipes output structured concepts. Verdicts are unchanged: a model whose published properties cannot be read off its fields with certainty still goes to the full schema comparison.
+- **`are_classes_equivalent` answers without a JSON schema when it can**: a class is equivalent to itself, and two plain models with different field names are not equivalent, both now decided before any schema is generated, which removes most of the cost of validating a library whose pipes output structured concepts. A plain model is one built only from an allow-list of annotations (scalars, `Any`, `Literal`, unions, builtin containers and nested plain models), inert constraints and plain defaults, with no alias and no schema hook or schema-shaping setting, so the properties pydantic publishes for it provably equal its field names; the structure classes generated from a concept's `structure` table and most native content classes are plain. Verdicts are unchanged: every other pair still goes to the full schema comparison, and a schema that cannot be generated still raises.
 
 ## [v0.66.0] - 2026-09-25
 
