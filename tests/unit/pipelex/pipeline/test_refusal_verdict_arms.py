@@ -4,6 +4,7 @@ import pytest
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import translate_to_validate_bundle_error
@@ -121,7 +122,10 @@ class TestRefusalVerdictArms:
         assert raised.value is fault
 
     def test_a_produced_verdict_passes_through_unwrapped(self) -> None:
-        verdict = ValidateBundleError(message="already a verdict", dry_run_error_message="the round has no lane")
+        verdict = ValidateBundleError(
+            message="already a verdict",
+            dry_run_failures=[DryRunFailureErrorData(pipe_code="route_parcel", message="the round has no lane")],
+        )
 
         with pytest.raises(ValidateBundleError) as raised, translate_to_validate_bundle_error():
             raise verdict

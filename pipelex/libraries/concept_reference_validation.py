@@ -26,6 +26,20 @@ def _split_concept_ref_context(context: str) -> tuple[str | None, str | None, st
     return None, None, context
 
 
+def _declared_concept_codes(*, domain_code: str, concept_refs: set[str]) -> list[str]:
+    """The bare codes of the concepts among ``concept_refs`` declared in ``domain_code`` itself, sorted.
+
+    A ref belongs to the domain when the domain is its whole prefix: ``legal.X`` is in ``legal``, while
+    ``legal.contracts.X`` is in ``legal.contracts``. Native and cross-package refs never match.
+    """
+    domain_prefix = f"{domain_code}."
+    return sorted(
+        concept_ref.removeprefix(domain_prefix)
+        for concept_ref in concept_refs
+        if concept_ref.startswith(domain_prefix) and "." not in concept_ref.removeprefix(domain_prefix)
+    )
+
+
 def validate_concept_references_in_blueprints(
     blueprints: list[PipelexBundleBlueprint],
     *,
@@ -66,6 +80,10 @@ def validate_concept_references_in_blueprints(
 
     native_codes = {native.value for native in NativeConceptCode.values_list()}
     undeclared: list[str] = []
+    # Each unresolved item lists what its domain declares in this batch, the concepts the reference could
+    # have named in the files submitted. Never the concepts a prior batch loaded: those may come from a
+    # host's own library directories, which a caller's verdict must not enumerate. Computed once per domain.
+    declared_concepts_by_domain: dict[str, list[str]] = {}
     # Pipe-owned references (a pipe input/output) and concept-owned references (a concept's
     # `refines` or a structure field's `concept_ref`) are categorized differently: a pipe-owned
     # miss is a `pipe_validation` item, a concept-owned miss is a `blueprint_validation` item
@@ -96,6 +114,11 @@ def validate_concept_references_in_blueprints(
                 undeclared.append(f"'{concept_ref_or_code}' in {context} is not declared in domain '{domain_code}' (source: '{source or 'unknown'}')")
                 owning_pipe_code, owning_concept_code, field_name = _split_concept_ref_context(context)
                 item_message = f"Concept '{concept_ref_or_code}' in {context} is not declared in domain '{domain_code}' and is not native."
+                if domain_code not in declared_concepts_by_domain:
+                    declared_concepts_by_domain[domain_code] = _declared_concept_codes(
+                        domain_code=domain_code, concept_refs=batch_declared_concept_refs
+                    )
+                declared_concepts = declared_concepts_by_domain[domain_code]
                 if owning_pipe_code is not None:
                     # Pipe-owned reference → pipe_validation, locating the referencing pipe, the
                     # missing concept (concept_code), and the field that holds the reference.
@@ -107,6 +130,7 @@ def validate_concept_references_in_blueprints(
                             pipe_code=owning_pipe_code,
                             concept_code=concept_ref_or_code,
                             field_name=field_name,
+                            declared_concepts=declared_concepts,
                             message=item_message,
                             field_path=context,
                         )
@@ -123,6 +147,7 @@ def validate_concept_references_in_blueprints(
                             domain_code=domain_code,
                             source=source,
                             concept_code=owning_concept_code or concept_ref_or_code,
+                            declared_concepts=declared_concepts,
                             message=item_message,
                         )
                     )

@@ -17,7 +17,7 @@ import typer
 from rich.console import Console
 
 from pipelex.cli.error_handlers import handle_validate_bundle_error
-from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import DryRunFailureErrorData, PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
@@ -175,17 +175,20 @@ class TestValidateSuggestedFixRendering:
         assert "concept 'MissingConcept' is not declared in domain 'demo'" in output
         assert "Declared Concepts: Idea, Report" in output
 
-    def test_dry_run_message_stays_visible_alongside_categorized_errors(self, console: Console) -> None:
-        """The wire builder suppresses the dry-run residual when categorized errors exist; the human surface keeps it."""
+    def test_dry_run_items_stay_visible_alongside_categorized_errors(self, console: Console) -> None:
+        """A dry-run item renders beside the categorized errors, located on its pipe."""
         exc = ValidateBundleError(
             message="validation failed",
             pipe_validation_errors=[_non_fixable_pipe_error()],
-            dry_run_error_message="dry run exploded",
+            dry_run_failures=[
+                DryRunFailureErrorData(pipe_code="third_pipe", domain_code="demo", message="Pipe 'third_pipe' failed its dry run: exploded")
+            ],
         )
 
         with pytest.raises(typer.Exit):
             handle_validate_bundle_error(exc, bundle_path=Path("methods/demo.mthds"))
 
         output = console.export_text()
-        assert "Dry Run Error:" in output
-        assert "dry run exploded" in output
+        assert "Dry Run Errors:" in output
+        assert "Pipe: third_pipe" in output
+        assert "Pipe 'third_pipe' failed its dry run: exploded" in output

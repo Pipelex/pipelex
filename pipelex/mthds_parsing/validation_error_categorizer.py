@@ -1,7 +1,8 @@
 import re
-from typing import Any, cast
+from typing import Any, cast, get_args
 
 from pydantic_core import ErrorDetails
+from pydantic_core.core_schema import CoreSchemaType
 
 from pipelex import log
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
@@ -11,6 +12,7 @@ from pipelex.mthds_parsing.exceptions import (
 )
 from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.mthds_parsing.helpers import ValidationErrorScope, get_error_scope
+from pipelex.pipe_machinery.pipe_blueprint import PIPE_SIGNATURE_TYPE_TAG, PipeType
 from pipelex.validation_error_types import PipeValidationErrorType
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
@@ -26,6 +28,20 @@ PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD = "pipe"
 # recoverable from the message. See `_categorize_typeless_pipe_error`.
 _MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"
 _EXPLICIT_SIGNATURE_TAG_MARKER = "is no longer a pipe type"
+
+# The tags of the union a `[pipe.<code>]` section validates through. Pydantic names the tag it routed to in
+# an error's location (`pipe.<code>.PipeLLM.<field>`), but the tag is not a field of the bundle.
+_PIPE_UNION_TAGS = frozenset([*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG])
+
+# Pydantic's own schema tags that contain a hyphen ("function-after", "tagged-union"...). A key an author
+# writes may contain one too ("prompt-template"), so a hyphen alone does not make a location element pydantic's.
+_PYDANTIC_HYPHENATED_SCHEMA_TAGS = frozenset(tag for tag in get_args(CoreSchemaType) if "-" in tag)
+
+# The pydantic error type of a key the model does not define, whose location ends with the key as written.
+_PYDANTIC_EXTRA_FORBIDDEN_ERROR_TYPE = "extra_forbidden"
+
+# The prefix pydantic puts before the message of a ``ValueError`` a validator raised.
+_PYDANTIC_VALUE_ERROR_PREFIX = "Value error, "
 
 
 def _extract_wrapped_native_concept_redeclaration_error(error: ErrorDetails) -> NativeConceptRedeclarationError | None:
@@ -238,8 +254,9 @@ def _is_pydantic_internal_loc_element(element: str) -> bool:
     internal type discriminators (e.g. "ConceptBlueprint", "dict[str,union[str,function-after]]",
     "function-after", "str"). We filter out the internal ones to build cleaner error paths.
     """
-    # Elements containing brackets or hyphens are pydantic type names (e.g. "dict[str,...]", "function-after")
-    if "[" in element or "-" in element:
+    # Elements containing brackets are pydantic type names (e.g. "dict[str,...]"), and so are its hyphenated
+    # schema tags (e.g. "function-after"); a hyphenated key the author wrote is kept.
+    if "[" in element or element in _PYDANTIC_HYPHENATED_SCHEMA_TAGS:
         return True
     # Builtin type names and pydantic model class names used as union discriminators
     return element in {"str", "int", "float", "bool", "list", "dict", "set", "tuple", "none", "ConceptBlueprint"}
@@ -290,22 +307,75 @@ def _categorize_concept_validation_error(
     )
 
 
+def _bundle_field_path(*, loc: tuple[int | str, ...], ends_with_authored_key: bool) -> str | None:
+    """The dot path from the bundle root that a pydantic ``loc`` names, without pydantic's own elements.
+
+    A pipe section validates through a union tagged by its ``type``, so pydantic puts the tag in the
+    location (``pipe.summarize.PipeLLM.promtp``); the tag and pydantic's type discriminators are
+    dropped, leaving the path the author would follow in the file (``pipe.summarize.promtp``). When the
+    location ends with a key the author wrote (``ends_with_authored_key``), that key is kept whatever it
+    looks like, since a key named ``str`` is still the key to fix.
+    """
+    parts = [str(part) for part in loc]
+    if len(parts) >= 3 and parts[0] == PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD and parts[2] in _PIPE_UNION_TAGS:
+        del parts[2]
+    authored_key = parts.pop() if ends_with_authored_key and parts else None
+    clean_parts = [part for part in parts if not _is_pydantic_internal_loc_element(part)]
+    if authored_key is not None:
+        clean_parts.append(authored_key)
+    return ".".join(clean_parts) or None
+
+
+def _make_uncategorized_blueprint_error(
+    *,
+    error: ErrorDetails,
+    domain: str | None,
+    source: str | None,
+    pipe_code: str | None,
+) -> PipelexBundleBlueprintValidationErrorData:
+    """Keep an error no categorizer knows as an item of its own, with the locators its location gives.
+
+    It carries no ``error_type``: no closed code identifies the fault, as for the parse-level residual.
+    It keeps the ``source`` the parser seeded, the pipe its location names and the ``field_path``, so an
+    error such as a misspelled field reaches the author beside the errors that are categorized, rather
+    than only once those are fixed.
+    """
+    field_path = _bundle_field_path(loc=error["loc"], ends_with_authored_key=error["type"] == _PYDANTIC_EXTRA_FORBIDDEN_ERROR_TYPE)
+    message = error["msg"].removeprefix(_PYDANTIC_VALUE_ERROR_PREFIX)
+    return PipelexBundleBlueprintValidationErrorData(
+        domain_code=domain,
+        source=source,
+        pipe_code=pipe_code,
+        field_path=field_path,
+        message=f"Validation error at '{field_path}': {message}" if field_path else message,
+    )
+
+
 def categorize_blueprint_validation_error(
     error: ErrorDetails,
     *,
     blueprint_dict: dict[str, Any],
 ) -> PipelexBundleBlueprintValidationErrorData | None:
-    """Categorize a BLUEPRINT validation error and create structured error data or return None if the error cannot be categorized.
+    """Categorize a BLUEPRINT validation error into structured error data.
+
+    An error no categorizer knows is kept as an uncategorized item (no ``error_type``) located by its
+    source, pipe and field path, so every error of a bundle becomes an item. ``None`` is returned only
+    for the union-branch noise of a concept declared as ``ConceptBlueprint | str``, whose table branch
+    already reports the fault.
 
     Args:
         error: Pydantic error from PipelexBundleBlueprint.model_validate()
         blueprint_dict: The blueprint dict being validated (for context extraction)
 
     Returns:
-        PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None if error cannot be categorized
+        PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None for concept union noise
     """
-    domain = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD)) if blueprint_dict else None
-    source = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD)) if blueprint_dict else None
+    # Read off the raw dict, whose values are whatever the author wrote: a `domain = 123` is itself one of
+    # the errors being categorized, so a value that is not a string locates nothing.
+    raw_domain = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD) if blueprint_dict else None
+    raw_source = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD) if blueprint_dict else None
+    domain = raw_domain if isinstance(raw_domain, str) else None
+    source = raw_source if isinstance(raw_source, str) else None
 
     loc = error["loc"]
     message = error["msg"]
@@ -448,7 +518,6 @@ def categorize_blueprint_validation_error(
     if syntax_error:
         return syntax_error
 
-    # If we couldn't categorize the error, log a warning
-    log.warning(f"Pipelex bundle blueprint validation error that is not categorized: {error_scope} - {source} - {domain}")
-
-    return None
+    # No categorizer knows it: keep it as an item of its own, never dropped because another item exists.
+    log.verbose(f"Pipelex bundle blueprint validation error that is not categorized: {error_scope} - {source} - {domain}")
+    return _make_uncategorized_blueprint_error(error=error, domain=domain, source=source, pipe_code=pipe_code)

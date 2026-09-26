@@ -31,7 +31,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
@@ -168,7 +168,14 @@ class TestErrorHandlersExtended:
             message="validation failed",
             pipelex_bundle_blueprint_validation_errors=[blueprint_error],
             pipe_validation_errors=[pipe_error],
-            dry_run_error_message="dry run exploded",
+            dry_run_failures=[
+                DryRunFailureErrorData(
+                    pipe_code="third_pipe",
+                    domain_code="demo",
+                    source="bundle.mthds",
+                    message="Pipe 'third_pipe' failed its dry run: dry run exploded",
+                )
+            ],
         )
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -186,8 +193,10 @@ class TestErrorHandlersExtended:
         assert "Inadequate Output Concept" in output
         assert "Field: output" in output
         assert "└─ Path: pipes.other_pipe.output" in output
-        assert "Dry Run Error:" in output
-        assert "dry run exploded" in output
+        assert "Dry Run Errors:" in output
+        assert "1. Dry Run Error" in output
+        assert "Pipe: third_pipe" in output
+        assert "Pipe 'third_pipe' failed its dry run: dry run exploded" in output
 
     def test_handle_validate_bundle_error_minimal_renders_fallback_residual(self, console: Console) -> None:
         """A message-only error renders the fallback residual item, so the message is never lost.

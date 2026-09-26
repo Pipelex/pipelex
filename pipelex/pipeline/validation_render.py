@@ -33,7 +33,7 @@ from typing import Any, cast
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
-from pipelex.tools.misc.string_utils import count_with_noun
+from pipelex.tools.misc.string_utils import count_with_noun, pascal_case_to_sentence
 
 
 def format_validate_markdown(result: dict[str, Any]) -> str:
@@ -160,6 +160,21 @@ def render_invalid_validation_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def validation_item_title(*, item: ValidationErrorItem) -> str:
+    """The heading of one validation item: its ``error_type`` in words, or ``Validation Error`` without one.
+
+    Shared by the human panel and the markdown so both name an item alike. The stage codes are
+    snake_case (``unknown_model`` → ``Unknown Model``); the dry-run code is an exception's name
+    (``DryRunError`` → ``Dry Run Error``).
+    """
+    if not item.error_type:
+        return "Validation Error"
+    error_type = str(item.error_type)
+    if "_" in error_type or error_type.islower():
+        return error_type.replace("_", " ").title()
+    return pascal_case_to_sentence(error_type).title()
+
+
 def _markdown_category_header(category: ValidationErrorCategory) -> str:
     """The section heading for one validation-error category — markdown sibling of the human header."""
     match category:
@@ -170,7 +185,7 @@ def _markdown_category_header(category: ValidationErrorCategory) -> str:
         case ValidationErrorCategory.PIPE_VALIDATION:
             return "Pipe validation errors"
         case ValidationErrorCategory.DRY_RUN:
-            return "Dry run error"
+            return "Dry run errors"
 
 
 def _render_error_item_markdown(item: ValidationErrorItem, *, index: int) -> list[str]:
@@ -179,8 +194,7 @@ def _render_error_item_markdown(item: ValidationErrorItem, *, index: int) -> lis
     Markdown sibling of the human ``_display_validation_error_item`` — same fields in the same
     order, emitting ``**bold**`` / backticks instead of Rich markup.
     """
-    title = item.error_type.replace("_", " ").title() if item.error_type else "Validation Error"
-    lines: list[str] = [f"{index}. **{title}**"]
+    lines: list[str] = [f"{index}. **{validation_item_title(item=item)}**"]
     if item.pipe_code:
         lines.append(f"   - Pipe: `{item.pipe_code}`")
     if item.concept_code:
@@ -225,7 +239,7 @@ def format_validation_error_items_markdown(items: list[ValidationErrorItem]) -> 
 
     Returns:
         A markdown string: one ``## <Category>`` section per populated category, each holding
-        numbered prose items (the ``dry_run`` residual keeps its plain single-message rendering).
+        numbered prose items (one per failing pipe in the ``dry_run`` section).
     """
     items_by_category: dict[ValidationErrorCategory, list[ValidationErrorItem]] = {}
     for item in items:
@@ -239,16 +253,11 @@ def format_validation_error_items_markdown(items: list[ValidationErrorItem]) -> 
         if lines:
             lines.append("")
         lines += [f"## {_markdown_category_header(category)}", ""]
-        match category:
-            case ValidationErrorCategory.DRY_RUN:
-                # The dry-run residual is a single graph-level message with no identity fields —
-                # keep its plain rendering rather than a numbered item, mirroring the human surface.
-                for item in category_items:
-                    lines.append(item.message)
-            case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
-                for error_index, item in enumerate(category_items, 1):
-                    lines += _render_error_item_markdown(item, index=error_index)
-                    lines.append("")
+        # Every category, dry run included, renders numbered items: a dry-run item is located on its
+        # failing pipe like any other, so it names the pipe, the domain and the source.
+        for error_index, item in enumerate(category_items, 1):
+            lines += _render_error_item_markdown(item, index=error_index)
+            lines.append("")
 
     return "\n".join(lines).rstrip()
 

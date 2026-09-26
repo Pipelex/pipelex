@@ -14,7 +14,7 @@ from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetVal
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes
+from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, validation_item_title
 from pipelex.runtime_hub import get_console
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -256,13 +256,12 @@ def _validation_category_header(category: ValidationErrorCategory) -> str:
         case ValidationErrorCategory.PIPE_VALIDATION:
             return "Pipe Validation Errors:"
         case ValidationErrorCategory.DRY_RUN:
-            return "Dry Run Error:"
+            return "Dry Run Errors:"
 
 
 def _display_validation_error_item(*, console: Console, item: ValidationErrorItem, error_index: int) -> None:
     """Render one structured validation-error item: title, identity fields, message, fix, locators."""
-    error_type_display = item.error_type.replace("_", " ").title() if item.error_type else "Validation Error"
-    console.print(f"[bold yellow]{error_index}. {error_type_display}[/bold yellow]")
+    console.print(f"[bold yellow]{error_index}. {escape(validation_item_title(item=item))}[/bold yellow]")
 
     if item.pipe_code:
         console.print(f"   [cyan]Pipe:[/cyan] [yellow]{escape(item.pipe_code)}[/yellow]")
@@ -313,15 +312,10 @@ def display_validation_error_items(*, console: Console, items: list[ValidationEr
         if not category_items:
             continue
         console.print(f"[bold cyan]{_validation_category_header(category)}[/bold cyan]\n")
-        match category:
-            case ValidationErrorCategory.DRY_RUN:
-                # The dry-run residual is a single graph-level message with no identity fields —
-                # keep its historical plain rendering rather than a numbered item.
-                for item in category_items:
-                    console.print(f"[yellow]{escape(item.message)}[/yellow]\n")
-            case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
-                for error_index, item in enumerate(category_items, 1):
-                    _display_validation_error_item(console=console, item=item, error_index=error_index)
+        # Every category, dry run included, renders numbered items: a dry-run item is located on its
+        # failing pipe like any other, so it names the pipe, the domain and the source.
+        for error_index, item in enumerate(category_items, 1):
+            _display_validation_error_item(console=console, item=item, error_index=error_index)
 
 
 def handle_validate_bundle_error(
@@ -352,13 +346,6 @@ def handle_validate_bundle_error(
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]\n")
 
     display_validation_error_items(console=console, items=items)
-
-    # The shared items builder projects the dry-run channel only when it is the sole failure
-    # channel (the wire's structured-info invariant); the human surface keeps printing it
-    # alongside categorized errors so no diagnostic is lost.
-    if exc.dry_run_error_message and not any(item.category.is_dry_run for item in items):
-        console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
-        console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
 
     # A hint needs an action behind it: when fixes exist, the actionable footer replaces the
     # generic tip (two stacked 💡 tips would be noise).

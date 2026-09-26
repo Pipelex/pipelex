@@ -46,6 +46,19 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     message: str
     variable_names: list[str] | None = None
 
+    # The bundle-root dot path of the failing field, set on an error the categorizer does not know,
+    # so the item keeps the location its pydantic ``loc`` named (``pipe.<code>.<field>``).
+    field_path: str | None = None
+
+    # The 1-based position where a TOML syntax error was found, in the file ``source`` names or in
+    # the submitted content when there is none.
+    line: int | None = None
+    column: int | None = None
+
+    # The bare codes of the concepts the validated bundle declares in ``domain_code``, set on an
+    # ``unresolved_concept`` error so the author sees what the reference could have named.
+    declared_concepts: list[str] | None = None
+
     # The namespace-stripped bare code for a strippable same-domain over-qualified pipe code
     # (``strip-namespace`` enrichment). Present only when the fix planner can act; ``pipe_code``
     # discriminates the two raise sites — set to the offending dotted code for a declaration-key
@@ -92,6 +105,12 @@ class PipesAndConceptValidationErrorData(BaseModel):
     # === Variable names for input/output errors ===
     variable_names: list[str] | None = Field(default=None, description="Variable names (for input errors)")
 
+    # === Declared concepts (for unresolved_concept errors) ===
+    declared_concepts: list[str] | None = Field(
+        default=None,
+        description="The bare codes of the concepts the validated bundle declares in the domain the reference was looked up in",
+    )
+
     # === Enriched expected value (for output-mismatch errors) ===
     expected_output_ref: str | None = Field(
         default=None,
@@ -117,3 +136,19 @@ class PipesAndConceptValidationErrorData(BaseModel):
         default=None,
         description="The deck's close matches of the same kind, each spelled as a reference the field accepts",
     )
+
+
+class DryRunFailureErrorData(BaseModel):
+    """Structured error data for one pipe whose dry run failed.
+
+    The dry-run sweep records one per failing pipe, located at the innermost pipe that failed: a
+    failure that makes an enclosing controller fail for the same cause is kept once, at the pipe
+    where it happened. ``message`` is built from that pipe's own failure under the disclosure rule
+    for an item built from a raised error: the failure's own message when it is caller-facing, its
+    title otherwise, because the verdict that carries it is caller-facing as a whole.
+    """
+
+    pipe_code: str | None = Field(default=None, description="Bare code of the pipe whose dry run failed")
+    domain_code: str | None = Field(default=None, description="Domain of the pipe whose dry run failed")
+    source: str | None = Field(default=None, description="Source file of the pipe, when the library knows it")
+    message: str = Field(description="The pipe's own failure, as the disclosure rule allows it")
