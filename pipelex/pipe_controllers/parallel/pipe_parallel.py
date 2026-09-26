@@ -1,11 +1,12 @@
 import asyncio
 import builtins
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, get_origin
 
 from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.core.concepts.annotation_shapes import strip_optional
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -17,6 +18,8 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.exceptions import StuffFactoryError
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -519,12 +522,23 @@ class PipeParallel(PipeController):
 
         # Always combine the branch outputs into the declared output concept and stamp it as main stuff:
         # a pipe run always resolves its declared output — the combine is the parallel's value arm.
-        combined_output_stuff = StuffFactory.combine_stuffs(
-            concept=self.output.concept,
-            stuff_contents=output_stuff_contents,
-            name=output_name,
-            code=final_stuff_code,
-        )
+        try:
+            combined_output_stuff = StuffFactory.combine_stuffs(
+                concept=self.output.concept,
+                stuff_contents=output_stuff_contents,
+                name=output_name,
+                code=final_stuff_code,
+            )
+        except StuffFactoryError as exc:
+            # The combine refused the branch results. When the refusal is a branch whose multiplicity
+            # differs from its field's, say which one to change; any other refusal leaves as it came.
+            next_steps = self._multiplicity_next_steps(structure_class=structure_class, output_stuffs=output_stuffs)
+            if not next_steps:
+                raise
+            output_concept_ref = self._concept_ref_for_message(concept=self.output.concept)
+            lead = f"PipeParallel '{self.code}' cannot combine its branch results into its output '{output_concept_ref}'."
+            msg = " ".join([lead, *next_steps])
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,
             name=output_name,
@@ -601,6 +615,56 @@ class PipeParallel(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
+
+    def _multiplicity_next_steps(self, *, structure_class: builtins.type[StuffContent], output_stuffs: "dict[str, Stuff]") -> list[str]:
+        """Say, for each branch whose result and field differ in multiplicity, which one to change.
+
+        Called only after ``StuffFactory.combine_stuffs`` has refused the combination, to explain that
+        refusal: it refuses nothing itself. A branch result is a list when its content is a
+        ``ListContent``, and a field holds a list when its annotation, an ``X | None`` peeled, is a
+        ``list[...]`` or a ``ListContent`` class, and holds one item when it is any other content class.
+        A field typed otherwise (a primitive, a union, a dict) cannot be told apart, so it gets no sentence.
+        The sentences quote with single quotes only: the dry run carries them inside a representation that
+        would escape every single quote of a message that also held a double one.
+        """
+        if issubclass(structure_class, CompositeContent):
+            return []
+        output_concept_ref = self._concept_ref_for_message(concept=self.output.concept)
+        next_steps: list[str] = []
+        for sub_pipe in self.parallel_sub_pipes:
+            result_name = sub_pipe.output_name
+            if not result_name or result_name not in output_stuffs or result_name not in structure_class.model_fields:
+                continue
+            field_annotation, _ = strip_optional(annotation=structure_class.model_fields[result_name].annotation)
+            is_content_class = isinstance(field_annotation, type) and issubclass(field_annotation, StuffContent)
+            is_field_plural = get_origin(field_annotation) is list or (is_content_class and issubclass(field_annotation, ListContent))
+            is_field_single = is_content_class and not is_field_plural
+            branch_stuff = output_stuffs[result_name]
+            item_concept_ref = self._concept_ref_for_message(concept=branch_stuff.concept)
+            is_branch_plural = branch_stuff.is_list
+            if is_branch_plural and is_field_single:
+                next_steps.append(
+                    f"Branch '{sub_pipe.pipe_code}' gives result '{result_name}' as a list, '{item_concept_ref}[]', but field "
+                    f"'{result_name}' of '{output_concept_ref}' holds a single item. Declare the field as a list in the structure "
+                    f"of '{output_concept_ref}', with type 'list', item_type 'concept' and item_concept_ref '{item_concept_ref}', "
+                    f"or make branch '{sub_pipe.pipe_code}' output a single '{item_concept_ref}'."
+                )
+            elif not is_branch_plural and is_field_plural:
+                next_steps.append(
+                    f"Branch '{sub_pipe.pipe_code}' gives result '{result_name}' as a single '{item_concept_ref}', but field "
+                    f"'{result_name}' of '{output_concept_ref}' holds a list. Declare the field as a single concept in the "
+                    f"structure of '{output_concept_ref}', with type 'concept' and concept_ref '{item_concept_ref}', "
+                    f"or make branch '{sub_pipe.pipe_code}' output '{item_concept_ref}[]'."
+                )
+        return next_steps
+
+    def _concept_ref_for_message(self, *, concept: Concept) -> str:
+        """A concept as the author writes it in this parallel's bundle: its bare code in the parallel's own
+        domain, its full ref otherwise.
+        """
+        if concept.domain_code == self.domain_code:
+            return concept.code
+        return concept.concept_ref
 
     def _register_branch_outputs_with_graph_tracer(
         self,

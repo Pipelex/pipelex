@@ -135,7 +135,9 @@ class ValidateBundleError(PipelexError):
     error_domain = ErrorDomain.INPUT
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
-        detail="Check the validation_errors array for specific issues",
+        # The next step points at the items' own: each item says what is wrong and where, and carries a
+        # suggested fix when one can be derived, so the top level says to follow them rather than to go read them.
+        detail="Edit the bundle as each validation error says: apply its suggested fix where it has one, after confirming an unsafe one",
     )
     # Bundle-validation messages describe faults in the caller's own bundle —
     # caller-facing copy, kept verbatim under STRICT disclosure.

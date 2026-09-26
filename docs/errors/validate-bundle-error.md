@@ -17,6 +17,6 @@ Raised when a bundle is refused while it is loaded or validated: the invalid ver
 | `error_domain` | `input` |
 | Defined in | `pipelex.pipeline.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
-| `user_action` | `change_input` — Check the validation_errors array for specific issues |
+| `user_action` | `change_input` — Edit the bundle as each validation error says: apply its suggested fix where it has one, after confirming an unsafe one |
 
 [Back to Error Reference](index.md)

@@ -147,6 +147,9 @@ class TestValidateBundleErrorFormat:
         assert parsed["error_type"] == "ValidateBundleError"
         assert parsed["is_valid"] is False
         assert parsed["bundle_path"] == str(bundle_path)
-        # The message-only residual makes the structured-info invariant total; the hint stays the JSON boilerplate.
+        # The message-only residual makes the structured-info invariant total; the hint is the class-level next step.
         assert parsed["validation_errors"] == [{"category": "blueprint_validation", "message": "no details"}]
-        assert parsed["hint"] == "Check the validation_errors array for specific issues"
+        assert (
+            parsed["hint"]
+            == "Edit the bundle as each validation error says: apply its suggested fix where it has one, after confirming an unsafe one"
+        )
