@@ -16,6 +16,7 @@ from pipelex.pipeline.advisory_warnings import collect_advisory_warnings
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.validate_bundle import build_validated_pipes, validate_bundle
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,10 +38,13 @@ async def validate_all(
         ValidateBundleError: If validation fails.
     """
     # acquire_and_validate opens a fresh library, loads the resolved dirs, sweeps every loaded pipe,
-    # and tears the library down — the standalone validate-all lifecycle (D6).
-    dry_run_results = await BundleValidator().acquire_and_validate(
-        library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
-    )
+    # and tears the library down — the standalone validate-all lifecycle (D6). A refusal of the
+    # libraries while they load, or of a pipe's dry run, is the invalid verdict, through the shared
+    # bundle-loading cascade, as on `pipelex validate --all`.
+    with translate_to_validate_bundle_error():
+        dry_run_results = await BundleValidator().acquire_and_validate(
+            library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
+        )
 
     # No `pending_signatures` here by design: it is a per-bundle, top-down-build nudge ("which headers
     # are still unimplemented in this bundle"), surfaced only by `validate bundle`. The validate-all
@@ -149,11 +153,15 @@ async def validate_pipe(
         set_current_library(library_id=library_id)
         effective_dirs, _ = resolve_library_dirs(library_dirs)
 
-        if effective_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+        # A refusal of the libraries while they load, or of the pipe's dry run, is the invalid verdict,
+        # through the shared bundle-loading cascade, as on `pipelex validate pipe`. The cascade lets an
+        # unknown pipe code through as its own not-found error.
+        with translate_to_validate_bundle_error():
+            if effective_dirs:
+                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
-        the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
-        dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id)
+            the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
+            dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id)
 
         return {
             "success": True,
