@@ -71,7 +71,7 @@ Then ask your chatbot:
 
 > What methods do I have?
 >
-> Run the invoice method on https://example.com/invoice.pdf
+> Run the invoice method on https://raw.githubusercontent.com/Pipelex/pipelex-cookbook/main/assets/extract_proof_of_purchase/restaurant_invoice.pdf
 
 You get a run id straight away, and you can ask for its status, its results or the files it produced at any time.
 
