@@ -2,11 +2,11 @@ import asyncio
 import builtins
 from typing import TYPE_CHECKING, Any, Literal, get_origin
 
-from pydantic import field_validator
+from pydantic import ValidationError, field_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.concepts.annotation_shapes import strip_optional
+from pipelex.core.concepts.annotation_shapes import list_item_annotation, strip_optional
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -17,6 +17,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
@@ -535,10 +536,15 @@ class PipeParallel(PipeController):
             next_steps = self._multiplicity_next_steps(structure_class=structure_class, output_stuffs=output_stuffs)
             if not next_steps:
                 raise
-            output_concept_ref = self._concept_ref_for_message(concept=self.output.concept)
+            output_concept_ref = self._concept_ref_for_message(concept=self.output.concept, package_alias=None)
             lead = f"PipeParallel '{self.code}' cannot combine its branch results into its output '{output_concept_ref}'."
-            msg = " ".join([lead, *next_steps])
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            message_parts = [lead, *next_steps.values()]
+            # Keep what the combine said about every other field it refused, so a second fault is not hidden
+            # behind the multiplicity one.
+            refused_fields = _refused_field_names(exc=exc)
+            if refused_fields is None or refused_fields - next_steps.keys():
+                message_parts.append(f"The combine also reported: {exc.message}")
+            raise PipeRunError(message=" ".join(message_parts), run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,
             name=output_name,
@@ -616,38 +622,61 @@ class PipeParallel(PipeController):
             library_crate=library_crate,
         )
 
-    def _multiplicity_next_steps(self, *, structure_class: builtins.type[StuffContent], output_stuffs: "dict[str, Stuff]") -> list[str]:
-        """Say, for each branch whose result and field differ in multiplicity, which one to change.
+    def _multiplicity_next_steps(self, *, structure_class: builtins.type[StuffContent], output_stuffs: "dict[str, Stuff]") -> dict[str, str]:
+        """Say, for each branch whose result and field differ only in multiplicity, which one to change.
 
         Called only after ``StuffFactory.combine_stuffs`` has refused the combination, to explain that
-        refusal: it refuses nothing itself. A branch result is a list when its content is a
-        ``ListContent``, and a field holds a list when its annotation, an ``X | None`` peeled, is a
-        ``list[...]`` or a ``ListContent`` class, and holds one item when it is any other content class.
-        A field typed otherwise (a primitive, a union, a dict) cannot be told apart, so it gets no sentence.
+        refusal: it refuses nothing itself. Returns one sentence per result name it can explain.
+
+        A branch result is a list when its content is a ``ListContent``. A field holds a list when its
+        annotation, an ``X | None`` peeled, is a ``list[...]`` or a ``ListContent`` class, and holds one
+        item when it is any other content class; a field typed otherwise (a primitive, a union, a dict)
+        cannot be told apart and gets no sentence. Neither does a branch whose concept does not fit the
+        field's item class, because changing a multiplicity would not make it combine.
+
         The sentences quote with single quotes only: the dry run carries them inside a representation that
         would escape every single quote of a message that also held a double one.
         """
         if issubclass(structure_class, CompositeContent):
-            return []
-        output_concept_ref = self._concept_ref_for_message(concept=self.output.concept)
-        next_steps: list[str] = []
+            return {}
+        output_concept_ref = self._concept_ref_for_message(concept=self.output.concept, package_alias=None)
+        next_steps: dict[str, str] = {}
         for sub_pipe in self.parallel_sub_pipes:
             result_name = sub_pipe.output_name
             if not result_name or result_name not in output_stuffs or result_name not in structure_class.model_fields:
                 continue
             field_annotation, _ = strip_optional(annotation=structure_class.model_fields[result_name].annotation)
-            is_content_class = isinstance(field_annotation, type) and issubclass(field_annotation, StuffContent)
-            is_field_plural = get_origin(field_annotation) is list or (is_content_class and issubclass(field_annotation, ListContent))
-            is_field_single = is_content_class and not is_field_plural
+            field_item_class: Any
+            is_field_plural: bool
+            if get_origin(field_annotation) is list:
+                is_field_plural = True
+                field_item_class = list_item_annotation(annotation=field_annotation)
+            elif isinstance(field_annotation, type) and issubclass(field_annotation, ListContent):
+                # A Python-authored ListContent field: plural, and its item class is not read here.
+                is_field_plural = True
+                field_item_class = None
+            elif isinstance(field_annotation, type) and issubclass(field_annotation, StuffContent):
+                is_field_plural = False
+                field_item_class = field_annotation
+            else:
+                continue
             branch_stuff = output_stuffs[result_name]
-            item_concept_ref = self._concept_ref_for_message(concept=branch_stuff.concept)
-            branch_ref = self._pipe_ref_for_message(pipe_ref=sub_pipe.pipe_code)
             is_branch_plural = branch_stuff.is_list
+            if is_branch_plural == is_field_plural:
+                continue
+            if isinstance(field_item_class, type) and issubclass(field_item_class, StuffContent):
+                branch_item_class = get_concept_library().get_structure_class(concept=branch_stuff.concept)
+                if not issubclass(branch_item_class, field_item_class):
+                    continue
+            package_alias = (
+                QualifiedRef.split_cross_package_ref(sub_pipe.pipe_code).alias if QualifiedRef.has_cross_package_prefix(sub_pipe.pipe_code) else None
+            )
+            item_concept_ref = self._concept_ref_for_message(concept=branch_stuff.concept, package_alias=package_alias)
+            branch_ref = self._pipe_ref_for_message(pipe_ref=sub_pipe.pipe_code)
             # A multiplicity set on the branch itself (nb_output, multiple_output, batch_over) overrides the
             # pipe's declared output, so the branch alternative names that setting rather than the pipe's output.
-            has_branch_override = sub_pipe.output_multiplicity is not None or sub_pipe.batch_params is not None
             branch_alternative: str
-            if has_branch_override:
+            if sub_pipe.output_multiplicity is not None or sub_pipe.batch_params is not None:
                 branch_alternative = (
                     f"or change the nb_output, multiple_output or batch_over that branch '{branch_ref}' sets in the parallel's branches"
                 )
@@ -655,15 +684,15 @@ class PipeParallel(PipeController):
                 branch_alternative = f"or make branch '{branch_ref}' output a single '{item_concept_ref}'"
             else:
                 branch_alternative = f"or make branch '{branch_ref}' output '{item_concept_ref}[]'"
-            if is_branch_plural and is_field_single:
-                next_steps.append(
+            if is_branch_plural:
+                next_steps[result_name] = (
                     f"Branch '{branch_ref}' gives result '{result_name}' as a list, '{item_concept_ref}[]', but field "
                     f"'{result_name}' of '{output_concept_ref}' holds a single item. Declare the field as a list in the structure "
                     f"of '{output_concept_ref}', with type 'list', item_type 'concept' and item_concept_ref '{item_concept_ref}', "
                     f"{branch_alternative}."
                 )
-            elif not is_branch_plural and is_field_plural:
-                next_steps.append(
+            else:
+                next_steps[result_name] = (
                     f"Branch '{branch_ref}' gives result '{result_name}' as a single '{item_concept_ref}', but field "
                     f"'{result_name}' of '{output_concept_ref}' holds a list. Declare the field as a single concept in the "
                     f"structure of '{output_concept_ref}', with type 'concept' and concept_ref '{item_concept_ref}', "
@@ -680,12 +709,14 @@ class PipeParallel(PipeController):
             return pipe_ref.removeprefix(own_domain_prefix)
         return pipe_ref
 
-    def _concept_ref_for_message(self, *, concept: Concept) -> str:
+    def _concept_ref_for_message(self, *, concept: Concept, package_alias: str | None) -> str:
         """A concept as the author writes it in this parallel's bundle: its bare code in the parallel's own
-        domain, its full ref otherwise.
+        domain, its ref behind the package alias when it comes from a dependency, its full ref otherwise.
         """
         if concept.domain_code == self.domain_code:
             return concept.code
+        if package_alias is not None and not Concept.is_native_concept(concept):
+            return f"{package_alias}->{concept.concept_ref}"
         return concept.concept_ref
 
     def _register_branch_outputs_with_graph_tracer(
@@ -771,3 +802,16 @@ class PipeParallel(PipeController):
         self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
+
+
+def _refused_field_names(*, exc: StuffFactoryError) -> set[str] | None:
+    """The top-level fields the combine's pydantic validation refused, or ``None`` when its cause says nothing."""
+    cause = exc.__cause__
+    if not isinstance(cause, ValidationError):
+        return None
+    refused_fields: set[str] = set()
+    for error_details in cause.errors():
+        location = error_details["loc"]
+        if location:
+            refused_fields.add(str(location[0]))
+    return refused_fields

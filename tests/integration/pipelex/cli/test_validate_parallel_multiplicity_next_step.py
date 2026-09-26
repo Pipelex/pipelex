@@ -144,6 +144,14 @@ _BATCHED_INTO_SINGLE_NEXT_STEP = (
     "or change the nb_output, multiple_output or batch_over that branch 'draft_idea' sets in the parallel's branches."
 )
 
+# Two faults in one combine: the ideas are a multiplicity mismatch, while the overview field receives a
+# list of `Idea`, a concept that does not fit `Overview` whatever its multiplicity. Only the first gets a
+# multiplicity next step, and the combine's own report is kept for the second.
+_TWO_FAULTS_IN_ONE_COMBINE = _LIST_BRANCH_INTO_SINGLE_FIELD.replace(
+    '{ pipe = "write_overview", result = "overview" }',
+    '{ pipe = "draft_ideas", result = "overview" }',
+)
+
 _LIST_INTO_SINGLE_NEXT_STEP = (
     "Branch 'draft_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'TopicReview' holds a single item. "
     "Declare the field as a list in the structure of 'TopicReview', with type 'list', item_type 'concept' and item_concept_ref 'Idea', "
@@ -199,6 +207,18 @@ class TestValidateParallelMultiplicityNextStep:
         assert f"💡 Tip: {_TOP_LEVEL_NEXT_STEP}" in output
         assert "Check the validation_errors array" not in output
         assert "Traceback" not in output
+
+    def test_a_concept_mismatch_keeps_the_combine_report(self, tmp_path: Path) -> None:
+        """A branch whose concept does not fit its field gets no multiplicity advice, and its refusal is not hidden."""
+        bundle_path = _write_bundle(directory=tmp_path, content=_TWO_FAULTS_IN_ONE_COMBINE)
+
+        with pytest.raises(ValidateBundleError) as raised:
+            asyncio.run(validate_bundle(mthds_file_path=bundle_path, library_dirs=[bundle_path.parent]))
+
+        (item,) = raised.value.to_error_report().validation_errors or []
+        assert _LIST_INTO_SINGLE_NEXT_STEP in item.message
+        assert "gives result 'overview'" not in item.message
+        assert "The combine also reported: Error combining stuffs for concept TopicReview" in item.message
 
     def test_agent_validate_bundle_json_carries_the_next_step(
         self,
