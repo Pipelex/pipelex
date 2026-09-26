@@ -71,20 +71,27 @@ def _raise_not_found(*, model_handle: str, model_type: ModelType) -> ModelNotFou
 
 class TestModelDeckUnknownReference:
     @pytest.mark.parametrize(
-        ("_topic", "model_handle", "model_type"),
+        ("_topic", "model_handle", "model_type", "needed_model"),
         [
-            ("handle", "method-only-model", ModelType.LLM),
-            ("alias", "@method-only-alias", ModelType.LLM),
-            ("waterfall", "~method-only-waterfall", ModelType.LLM),
-            ("preset_used_as_a_model", "$deck-preset", ModelType.LLM),
-            ("extract_handle", "method-only-extractor", ModelType.TEXT_EXTRACTOR),
+            ("handle", "method-only-model", ModelType.LLM, "an LLM"),
+            ("alias", "@method-only-alias", ModelType.LLM, "an LLM"),
+            ("waterfall", "~method-only-waterfall", ModelType.LLM, "an LLM"),
+            ("preset_used_as_a_model", "$deck-preset", ModelType.LLM, "an LLM"),
+            ("extract_handle", "method-only-extractor", ModelType.TEXT_EXTRACTOR, "a text-extraction model"),
+            ("search_handle", "method-only-search", ModelType.SEARCH, "a search model"),
             # An LLM preset names it, but no image-generation entry does.
-            ("img_gen_handle", "deck-preset-model", ModelType.IMG_GEN),
+            ("img_gen_handle", "deck-preset-model", ModelType.IMG_GEN, "an image-generation model"),
             # The deck serves it, but as an LLM, which an image-generation lookup refuses.
-            ("served_handle_of_another_type", "served-model", ModelType.IMG_GEN),
+            ("served_handle_of_another_type", "served-model", ModelType.IMG_GEN, "an image-generation model"),
         ],
     )
-    def test_a_reference_only_the_method_names_is_the_callers_fault(self, _topic: str, model_handle: str, model_type: ModelType) -> None:
+    def test_a_reference_only_the_method_names_is_the_callers_fault(
+        self,
+        _topic: str,
+        model_handle: str,
+        model_type: ModelType,
+        needed_model: str,
+    ) -> None:
         """A reference the deck neither defines nor names came from the method: input domain, and caller-facing."""
         report = _raise_not_found(model_handle=model_handle, model_type=model_type).to_error_report()
 
@@ -95,14 +102,13 @@ class TestModelDeckUnknownReference:
         assert report.http_status == 422
         # The category still says the setup is wrong for the call; the domain says whose it is.
         assert report.error_category == "configuration"
-        # The next step names the reference as the method wrote it, and nothing of the deck.
-        assert report.user_action == UserAction(
-            kind=UserActionKind.CHANGE_MODEL,
-            detail=f"Change the model '{model_handle}' to one the model deck serves.",
-        )
+        # The next step names the reference as the method wrote it and the type its lookup asked for,
+        # and nothing of the deck: not even the type the deck serves a model of another type as.
+        expected_detail = f"Change the model '{model_handle}' to {needed_model} the model deck serves."
+        assert report.user_action == UserAction(kind=UserActionKind.CHANGE_MODEL, detail=expected_detail)
         strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert strict_payload["message"] == report.message
-        assert strict_payload["user_action"] == {"kind": "change_model", "detail": f"Change the model '{model_handle}' to one the model deck serves."}
+        assert strict_payload["user_action"] == {"kind": "change_model", "detail": expected_detail}
 
     @pytest.mark.parametrize(
         ("_topic", "model_handle", "model_type"),
@@ -142,4 +148,4 @@ class TestModelDeckUnknownReference:
         payload = recovered.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
         assert payload["status"] == 422
         assert payload["detail"] == "Model handle 'method-only-model' was not found in the model deck."
-        assert payload["user_action"] == {"kind": "change_model", "detail": "Change the model 'method-only-model' to one the model deck serves."}
+        assert payload["user_action"] == {"kind": "change_model", "detail": "Change the model 'method-only-model' to an LLM the model deck serves."}

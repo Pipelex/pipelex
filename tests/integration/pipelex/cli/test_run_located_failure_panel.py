@@ -57,7 +57,7 @@ class TestRunLocatedFailurePanel:
         assert f"Error: Model handle '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}' was not found in the model deck." in panel
         # The step names a model no entry of the deck names: the tip gives the caller's next step first,
         # then the local-deck remedy, which lives in the panel's tip and nowhere in the error's own message.
-        assert f"💡 Tip: Change the model '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}' to one the model deck serves." in panel
+        assert f"💡 Tip: Change the model '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}' to an LLM the model deck serves." in panel
         assert "Your local model deck may be out of date" in panel
         assert "run 'pipelex init inference'" in panel
         # The one-line fallback naming the entry pipe is not printed.

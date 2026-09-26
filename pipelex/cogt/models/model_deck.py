@@ -917,17 +917,19 @@ class ModelDeck(ConfigModel):
             msg = f"Model handle '{model_handle}' was not found in the model deck."
             model_not_found_error = ModelNotFoundError(message=msg, model_handle=model_handle)
             if not self._is_deck_model_reference(model_handle=model_handle, model_type=model_type):
-                # The deck neither defines this reference nor names it anywhere, so the method being
-                # run named it, in an inline model setting the load-time check does not look into:
-                # the caller's fault, which that check reports as `ModelChoiceNotFoundError` for a
-                # reference it sees. The message and the next step name nothing but the caller's own
-                # reference, as the method wrote it. A reference the deck itself names but cannot
-                # serve (a preset or an alias target on a backend that is not enabled) stays the
-                # deployment's fault, and stays redacted, with no next step for the caller.
+                # The deck neither defines this reference for this type nor names it anywhere, so the
+                # method being run named it, in an inline model setting the load-time check does not
+                # look into, or as a model the deck serves as another type, which that check does not
+                # tell apart: the caller's fault, which that check reports as
+                # `ModelChoiceNotFoundError` for a reference it sees. The message and the next step
+                # name nothing but the caller's own reference, as the method wrote it, and the type
+                # its pipe asked for, never the type the deck serves it as. A reference the deck
+                # itself names but cannot serve (a preset or an alias target on a backend that is not
+                # enabled) stays the deployment's fault, and stays redacted, with no next step.
                 model_not_found_error.as_caller_fault(
                     user_action=UserAction(
                         kind=UserActionKind.CHANGE_MODEL,
-                        detail=f"Change the model '{model_handle}' to one the model deck serves.",
+                        detail=f"Change the model '{model_handle}' to {model_type.indefinite_description} the model deck serves.",
                     )
                 )
             raise model_not_found_error

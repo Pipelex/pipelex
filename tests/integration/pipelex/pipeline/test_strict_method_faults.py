@@ -90,7 +90,7 @@ class TestStrictMethodFaults:
             document["detail"]
             == f"Pipe 'summarize' failed (two_steps → summarize): Model handle '{unserved_handle}' was not found in the model deck."
         )
-        assert document["user_action"] == {"kind": "change_model", "detail": f"Change the model '{unserved_handle}' to one the model deck serves."}
+        assert document["user_action"] == {"kind": "change_model", "detail": f"Change the model '{unserved_handle}' to an LLM the model deck serves."}
         # Provider and model attribution never reach a STRICT caller, whoever's fault it is.
         assert "model" not in document
 

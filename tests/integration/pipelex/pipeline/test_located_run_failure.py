@@ -108,7 +108,7 @@ class TestLocatedRunFailure:
         # The model lookup advises changing the model the step names, so no fallback is needed.
         assert report.user_action == UserAction(
             kind=UserActionKind.CHANGE_MODEL,
-            detail=f"Change the model '{unserved_handle}' to one the model deck serves.",
+            detail=f"Change the model '{unserved_handle}' to an LLM the model deck serves.",
         )
 
         # The step names the model in an inline setting, and no entry of the deck names it: the
@@ -119,7 +119,7 @@ class TestLocatedRunFailure:
         assert strict_payload["error_type"] == "ModelNotFoundError"
         assert strict_payload["user_action"] == {
             "kind": "change_model",
-            "detail": f"Change the model '{unserved_handle}' to one the model deck serves.",
+            "detail": f"Change the model '{unserved_handle}' to an LLM the model deck serves.",
         }
 
     async def test_parallel_combine_failure_is_reported_at_the_nested_parallel(self) -> None:
