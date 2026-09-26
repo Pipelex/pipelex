@@ -63,7 +63,9 @@ class FixOpKind(StrEnum):
 
 
 class FixSafety(StrEnum):
-    """Whether a fix is safe to auto-apply (SAFE) or requires explicit opt-in (UNSAFE)."""
+    """Whether a fix is safe to auto-apply (SAFE), or a likely correction that needs a person's or an agent's
+    confirmation (UNSAFE), which ``pipelex fix bundle`` never applies.
+    """
 
     SAFE = "safe"
     UNSAFE = "unsafe"

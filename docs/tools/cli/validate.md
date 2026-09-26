@@ -146,7 +146,7 @@ When the deck offers exactly one close match, as here, the error carries a sugge
 
 ## Suggested Fixes
 
-When a validation error has a deterministic fix, the error output includes a `💡 Suggested fix` line describing the change. A safe fix reads `💡 Suggested fix:`, and when at least one error has one, the report ends with the exact command that applies every safe fix automatically:
+When a validation error has a deterministic fix, the error output includes a `💡 Suggested fix` line describing the change. A safe fix reads `💡 Suggested fix:`, and when at least one safe fix targets a file the command may write, the report ends with the exact command that applies those fixes automatically:
 
 ```text
 💡 1 of these errors can be fixed automatically — run: pipelex fix bundle my_pipeline.mthds
