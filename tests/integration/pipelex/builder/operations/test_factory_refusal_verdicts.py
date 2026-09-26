@@ -5,7 +5,8 @@ image nor a document. Its error classes declared no domain, so the validation tr
 recognise them and they escaped every validator raw. They are now the author's input, caller-facing, so
 the refusal validates to one item located on the pipe and its file, carrying the next step. The builder's
 ``validate_ops.validate_pipe`` and ``validate_all`` loaded libraries outside the translation, so a refusal
-there escaped raw too; they now answer it with the same verdict.
+there escaped raw too; they now answer it with the same verdict. The agent CLI's ``validate_all_core``
+translated its load only after the failed library was torn down, so its items lost their file; they keep it now.
 """
 
 from pathlib import Path
@@ -15,6 +16,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.builder.operations.validate_ops import validate_all, validate_pipe
+from pipelex.cli.agent_cli.commands.validate._validate_core import validate_all_core
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError
@@ -160,6 +162,16 @@ class TestFactoryRefusalVerdicts:
 
         with pytest.raises(ValidateBundleError) as raised:
             await validate_all(library_dirs=[tmp_path])
+
+        (item,) = raised.value.to_error_report().validation_errors or []
+        assert item.pipe_code == "summarize_almanac"
+        assert item.source == str(bundle_path)
+
+    async def test_agent_validate_all_locates_a_wiring_refusal_on_its_file(self, tmp_path: Path) -> None:
+        bundle_path = _write_bundle(directory=tmp_path, content=_SEQUENCE_OUTPUT_MISMATCH_BUNDLE)
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await validate_all_core(library_dirs=[tmp_path])
 
         (item,) = raised.value.to_error_report().validation_errors or []
         assert item.pipe_code == "summarize_almanac"

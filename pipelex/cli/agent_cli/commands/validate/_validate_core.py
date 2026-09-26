@@ -44,13 +44,17 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
     # returns only the per-pipe status map and tears the library down before we could compute it.
     prev_library_id = get_current_library_id_or_none()
     # A refusal of the libraries while loading them is the invalid verdict, through the shared
-    # bundle-loading cascade, as on `validate bundle`. acquire_library tears its library down itself on
-    # a failed load.
-    with translate_to_validate_bundle_error():
-        acquired_id, _ = acquire_library(
-            library_id="",
-            library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
-        )
+    # bundle-loading cascade, as on `validate bundle`. The directories are the caller's own, so
+    # acquire_library translates their load itself, while the library is still current: the translation
+    # reads the library's pipe sources to locate an item, and a translation around the call would run
+    # only after acquire_library had torn the failed library down, leaving the item without its file.
+    # The sweep below stays untranslated on purpose: a failing dry run is answered as the DryRunError it
+    # is, as on `validate pipe`.
+    acquired_id, _ = acquire_library(
+        library_id="",
+        library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
+        library_dirs_are_callers=True,
+    )
     try:
         # acquire_library left the freshly-acquired library current, so the inner sweep targets it
         # (it filters signatures in strict mode itself). The returned map is keyed by namespaced pipe_ref.
