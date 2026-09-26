@@ -55,7 +55,8 @@ def _make_deck() -> ModelDeck:
         search_aliases={},
         search_waterfalls={},
         search_presets={},
-        search_choice_default="deck-search-default",
+        # A plain reference to a model the deck serves as another type.
+        search_choice_default="served-model",
         model_deck_config=ModelDeckConfig(is_model_fallback_enabled=True, missing_presets_reaction=ProblemReaction.NONE),
     )
 
@@ -104,6 +105,8 @@ class TestModelDeckUnknownReference:
             ("default_setting", "deck-default-text", ModelType.LLM),
             ("override_setting", "deck-override-object", ModelType.LLM),
             ("unparsable_setting_model", "@", ModelType.LLM),
+            ("plain_reference_default", "deck-img-gen-default", ModelType.IMG_GEN),
+            ("plain_reference_default_of_another_type", "served-model", ModelType.SEARCH),
             ("extract_preset_model", "deck-extract-preset-model", ModelType.TEXT_EXTRACTOR),
         ],
     )

@@ -895,6 +895,14 @@ class ModelDeck(ConfigModel):
         for deck_choice in deck_choices:
             if isinstance(deck_choice, (LLMSetting, ExtractSetting, ImgGenSetting, SearchSetting)):
                 named_references.add(deck_choice.model)
+            elif isinstance(deck_choice, ModelReference):
+                match deck_choice.kind:
+                    case ModelReferenceKind.HANDLE | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
+                        # A default or override written as a plain reference is looked up as it is written.
+                        named_references.add(deck_choice.raw)
+                    case ModelReferenceKind.PRESET:
+                        # A preset choice resolves to the preset's setting, whose model is named above.
+                        pass
         return model_handle in named_references
 
     def get_required_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:
