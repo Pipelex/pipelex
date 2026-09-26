@@ -219,6 +219,27 @@ class TestPipeRouterRun:
         assert report.error_type == "CogtError"
         assert report.message == "Pipe 'leaf' failed (flow → ctrl → leaf): rate limited"
 
+    async def test_a_foreign_exception_raised_from_an_older_location_is_located_here(self) -> None:
+        """A foreign exception raised from an earlier located failure is a new failure: converted and located at this pipe."""
+        older_location = PipeRouterError(
+            message="Pipe 'older_pipe' failed: combine failed",
+            run_mode=PipeRunMode.LIVE,
+            pipe_code="older_pipe",
+            output_name=None,
+            pipe_stack=["older_pipe"],
+        )
+        foreign_failure = KeyError("new failure")
+        foreign_failure.__cause__ = older_location
+        router = _StubPipeRouter(error=foreign_failure)
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await router.run(_make_pipe_job())
+
+        assert exc_info.value.pipe_code == _StubPipe.code
+        assert isinstance(exc_info.value.__cause__, PipelexUnexpectedError)
+        assert exc_info.value.__cause__.__cause__ is foreign_failure
+        assert exc_info.value.to_error_report().error_type == "PipelexUnexpectedError"
+
     async def test_a_host_router_can_let_a_failure_through(self) -> None:
         """A host router whose hook answers None sees its transport's exception propagate unchanged."""
         control_flow_error = RuntimeError("cancelled by the host runtime")

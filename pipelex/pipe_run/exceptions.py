@@ -145,10 +145,14 @@ def find_failure_location(*, error: BaseException) -> PipeRouterError | None:
     """Return the innermost `PipeRouterError` on `error`'s cause chain, `error` itself included.
 
     It names the pipe where the failure happened and that pipe's stack snapshot; `None` means the
-    failure was never located, because it happened outside any routed pipe run.
+    failure was never located, because it happened outside any routed pipe run. Like the root-fault
+    walk, it stops at the first exception that is not a `PipelexError`: a foreign exception raised
+    from an earlier located failure is a new failure, which the router locates where it happened.
     """
     location: PipeRouterError | None = None
     for node in iter_cause_chain(error):
+        if not isinstance(node, PipelexError):
+            break
         if isinstance(node, PipeRouterError):
             location = node
     return location
