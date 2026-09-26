@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:03a8640b2ecb8e8534da81dec26f5575757de5d05f542dec2554de7934df18eb"
+digest = "sha256:18a4780ea549ce087cd52e0745e23bbb169976e9b011e3673034a68fb30f2d1e"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T16:55:21Z"
-rationale = "validate bundle's --graph and --view failure arms now build their pipe_code, pipe_stack, cause_type and cause_message with run_failure_fields(), the same helper as the run commands, so cause_type names the root fault instead of the router wrapper. docs/tools/cli/agent-cli.md already describes those four fields for a failed run and does not describe the validate graph arms' error envelope separately; pipelex/cli/agent_cli/CLAUDE.md names run_failure_fields as the helper. No further doc change needed."
+reviewed_at = "2026-09-26T23:23:16Z"
+rationale = "The model availability panel of pipelex run now gives a caller-fault model error's change_model next step first, then its local-deck remedy, where it used to print the remedy alone whenever the report carried no next step. docs/tools/cli/ does not describe that panel's tip, and pipelex/cli/agent_cli/CLAUDE.md is about the agent CLI, which renders the report's user action as before; the panel's behaviour is documented on docs/errors/model-not-found-error.md, updated in this change. No further doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -127,7 +127,7 @@ rationale = "validate bundle's --graph and --view failure arms now build their p
 "pipelex/cli/commands/validate/pipe_cmd.py" = "blob:d67267571559006459628180f2c8b216ba7fee31"
 "pipelex/cli/commands/which_cmd.py" = "blob:68661d4bab22e2c4dab183d59bd9f2c6dd573472"
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
-"pipelex/cli/error_handlers.py" = "blob:d8b18460743a4ce58f337c09355c04df5afffb3e"
+"pipelex/cli/error_handlers.py" = "blob:dc9a54b931c9a05a5ceab9d0d5f7657812515c4c"
 "pipelex/cli/exceptions.py" = "blob:1d51c3a53ddd3f6cf8de566fa2ade3fa75ab7a3a"
 "pipelex/cli/installed_methods.py" = "blob:09197f47baf8d7251d28d148a0544b4a23ee7365"
 "pipelex/cli/method_resolver.py" = "blob:1230dde5f89ac28bbdcbcbbd0c1d485c71803caf"

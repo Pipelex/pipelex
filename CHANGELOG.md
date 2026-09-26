@@ -11,7 +11,7 @@
 
 ### Fixed
 
-- **A run that fails on the caller's own method reads its reason under STRICT disclosure**: a `PipeParallel` whose branch results do not fit its output, a pipe started without a required input, and a step naming in an inline setting a model the deck neither defines nor names now report the `input` domain, so an HTTP surface answers 422 instead of 500, and a message STRICT disclosure keeps instead of `An internal error occurred.`, with a next step for the first two. A model that the deck itself names but does not serve stays a redacted `config` error. The new `PipelexError.as_caller_fault()` is how a raise site classifies one error of a class whose other instances are not the caller's fault, as [the error model](under-the-hood/error-model.md#classified-where-it-is-raised) describes.
+- **A run that fails on the caller's own method reads its reason under STRICT disclosure**: a `PipeParallel` whose branch results do not fit its output, a pipe started without a required input, and a step naming in an inline setting a model the deck neither defines nor names now report the `input` domain, so an HTTP surface answers 422 instead of 500, a message STRICT disclosure keeps instead of `An internal error occurred.`, and a next step: for the model, a `change_model` action naming the model as the method wrote it, which the model panel of `pipelex run` follows with its local-deck advice. A model that the deck itself names but does not serve stays a redacted `config` error. The new `PipelexError.as_caller_fault()` is how a raise site classifies one error of a class whose other instances are not the caller's fault, as [the error model](under-the-hood/error-model.md#classified-where-it-is-raised) describes.
 
 ## [v0.66.0] - 2026-09-25
 

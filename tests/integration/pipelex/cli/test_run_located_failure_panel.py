@@ -23,7 +23,7 @@ class TestRunLocatedFailurePanel:
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """`pipelex run` on the model example renders the model panel naming the failing step, with the local-deck tip there only."""
+        """`pipelex run` on the model example renders the model panel naming the failing step, its next step, and the local-deck tip there only."""
         console = Console(width=400, record=True, color_system=None)
         mocker.patch("pipelex.cli.error_handlers.get_console", return_value=console)
         mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=console)
@@ -55,8 +55,10 @@ class TestRunLocatedFailurePanel:
         assert f"Model:      '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}'" in panel
         assert "Pipe Stack: two_steps → summarize" in panel
         assert f"Error: Model handle '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}' was not found in the model deck." in panel
-        # The local-deck remedy lives in the panel's tip, and nowhere in the error's own message.
-        assert "💡 Tip: Your local model deck may be out of date" in panel
+        # The step names a model no entry of the deck names: the tip gives the caller's next step first,
+        # then the local-deck remedy, which lives in the panel's tip and nowhere in the error's own message.
+        assert f"💡 Tip: Change the model '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}' to one the model deck serves." in panel
+        assert "Your local model deck may be out of date" in panel
         assert "run 'pipelex init inference'" in panel
         # The one-line fallback naming the entry pipe is not printed.
         assert "Failed to execute pipeline" not in capsys.readouterr().err

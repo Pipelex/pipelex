@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.traceback import Traceback
 
-from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem, iter_cause_chain
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem, error_domain_is_input, iter_cause_chain
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -175,15 +175,25 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
         fields.append(("Pipe Stack", stack_str))
     # The local-deck remedy is given here and nowhere else: the model error's own message reaches
     # every surface, hosted ones included, whose readers have no local deck to refresh.
-    tip = report.user_action_detail() or (
+    local_deck_remedy = (
         "Your local model deck may be out of date: new aliases and presets are added to Pipelex over time, and existing "
         "'.pipelex/inference/deck/*.toml' files are not refreshed automatically. To pick up the latest definitions, delete "
         "your local deck files under '.pipelex/inference/deck/' (or the whole '.pipelex/inference/' directory) and run "
         "'pipelex init inference' to regenerate them.\n"
         "If that does not resolve it, make sure the handle is defined in one of '.pipelex/inference/deck/*.toml', that the "
         "backend it routes to (see '.pipelex/inference/routing_profiles.toml') is enabled in '.pipelex/inference/backends.toml', "
-        f"and that you have the necessary credentials, or specify a different model in the '{exc.pipe_code}' pipe."
+        "and that you have the necessary credentials"
     )
+    user_action_detail = report.user_action_detail()
+    tip: str
+    if user_action_detail is None:
+        tip = f"{local_deck_remedy}, or specify a different model in the '{exc.pipe_code}' pipe."
+    elif error_domain_is_input(report.error_domain):
+        # The method named a model no entry of the deck names, and the lookup's next step is to
+        # change it. A local deck can also be what lacks that model, so the local remedy follows.
+        tip = f"{user_action_detail}\n{local_deck_remedy}."
+    else:
+        tip = user_action_detail
     display_error_panel(
         console=console,
         title=f"{context} failed because a model wasn't available",

@@ -17,6 +17,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.llm.llm_setting import (
     LLMModelChoice,
     LLMSetting,
@@ -919,10 +920,16 @@ class ModelDeck(ConfigModel):
                 # The deck neither defines this reference nor names it anywhere, so the method being
                 # run named it, in an inline model setting the load-time check does not look into:
                 # the caller's fault, which that check reports as `ModelChoiceNotFoundError` for a
-                # reference it sees. The message names nothing but the caller's own reference. A
-                # reference the deck itself names but cannot serve (a preset or an alias target on a
-                # backend that is not enabled) stays the deployment's fault, and stays redacted.
-                model_not_found_error.as_caller_fault()
+                # reference it sees. The message and the next step name nothing but the caller's own
+                # reference, as the method wrote it. A reference the deck itself names but cannot
+                # serve (a preset or an alias target on a backend that is not enabled) stays the
+                # deployment's fault, and stays redacted, with no next step for the caller.
+                model_not_found_error.as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail=f"Change the model '{model_handle}' to one the model deck serves.",
+                    )
+                )
             raise model_not_found_error
         if model_handle not in self.inference_models:
             log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")

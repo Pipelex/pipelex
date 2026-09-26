@@ -5,6 +5,7 @@ from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import ModelNotFoundError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -94,7 +95,14 @@ class TestModelDeckUnknownReference:
         assert report.http_status == 422
         # The category still says the setup is wrong for the call; the domain says whose it is.
         assert report.error_category == "configuration"
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == report.message
+        # The next step names the reference as the method wrote it, and nothing of the deck.
+        assert report.user_action == UserAction(
+            kind=UserActionKind.CHANGE_MODEL,
+            detail=f"Change the model '{model_handle}' to one the model deck serves.",
+        )
+        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert strict_payload["message"] == report.message
+        assert strict_payload["user_action"] == {"kind": "change_model", "detail": f"Change the model '{model_handle}' to one the model deck serves."}
 
     @pytest.mark.parametrize(
         ("_topic", "model_handle", "model_type"),
@@ -119,7 +127,11 @@ class TestModelDeckUnknownReference:
         assert report.error_domain == "config"
         assert report.caller_facing_message is False
         assert report.http_status == 500
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == INTERNAL_ERROR_PLACEHOLDER
+        # The caller cannot fix what the deck names, so no next step is theirs to read.
+        assert report.user_action is None
+        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert strict_payload["message"] == INTERNAL_ERROR_PLACEHOLDER
+        assert "user_action" not in strict_payload
 
     def test_the_classification_rides_the_worker_to_runner_hop(self) -> None:
         """On a hosted run the lookup fails on a worker: the report is packed VERBOSE there and projected STRICT on the runner."""
@@ -130,3 +142,4 @@ class TestModelDeckUnknownReference:
         payload = recovered.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
         assert payload["status"] == 422
         assert payload["detail"] == "Model handle 'method-only-model' was not found in the model deck."
+        assert payload["user_action"] == {"kind": "change_model", "detail": "Change the model 'method-only-model' to one the model deck serves."}
