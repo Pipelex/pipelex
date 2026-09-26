@@ -13,7 +13,8 @@ used to put one there:
   naming one of their files names ``<host library file>`` instead. A run loads a host's directories
   untranslated, so their refusal is no verdict at all, and STRICT redacts it.
 
-A bundle validated from a file keeps the full paths of its library directories: there they are the caller's.
+A bundle validated from a file keeps the full paths of its library directories: there they are the caller's, as
+they are for a runtime told its library directories are the caller's own (``library_dirs_are_callers``).
 """
 
 import json
@@ -27,9 +28,11 @@ from pipelex.base_exceptions import DisclosureMode, PipelexError, ValidationErro
 from pipelex.config import get_config
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.registries.func_registry import func_registry
 from pipelex.validation_error_types import PipeValidationErrorType
 
 _DEPENDENCY_ADDRESS = "github.com/acme-tests/harbour-methods/tides"
@@ -120,6 +123,22 @@ description = "Write a notice to pin on the harbour board"
 inputs      = { tide_times = "Text" }
 output      = "Text"
 prompt      = "Write a short notice for the harbour board from these tide times: $tide_times"
+"""
+
+
+# Two host library files registering a PipeFunc under the same name: the registry refuses the second, naming
+# both by the module names it imported them under, which it spells from their absolute paths.
+_HOST_PIPE_FUNC_NAME = "format_harbour_tide_board_for_host_path_test"
+
+_HOST_PIPE_FUNC_MODULE = f"""
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+@pipe_func()
+async def {_HOST_PIPE_FUNC_NAME}(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="{{flavor}}")
 """
 
 
@@ -305,3 +324,43 @@ class TestVerdictNamesNoHostPath:
         concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]
         assert concept_items, f"expected an unresolved_concept item, got {items!r}"
         assert all(item.source == str(library_file) for item in concept_items)
+
+    async def test_a_host_library_pipe_func_collision_names_no_host_module(self, tmp_path: Path) -> None:
+        host_library_dir = tmp_path / "host" / "library"
+        _write(path=host_library_dir / "board_formatting.py", content=_HOST_PIPE_FUNC_MODULE.format(flavor="board"))
+        _write(path=host_library_dir / "notice_formatting.py", content=_HOST_PIPE_FUNC_MODULE.format(flavor="notice"))
+
+        try:
+            with pytest.raises(ValidateBundleError) as raised:
+                await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
+        finally:
+            if func_registry.has_function(_HOST_PIPE_FUNC_NAME):
+                func_registry.unregister_function_by_name(_HOST_PIPE_FUNC_NAME)
+
+        (item,) = raised.value.to_error_report().validation_errors or []
+        assert _HOST_PIPE_FUNC_NAME in item.message
+        assert item.message.count(HOST_LIBRARY_FILE_PLACEHOLDER) == 2
+        strict_payload = _strict_payload(raised.value)
+        _assert_names_no_host_path(payload=strict_payload, tmp_path=tmp_path)
+        # The module names are the host paths spelled with underscores.
+        assert "host_library_board_formatting" not in json.dumps(strict_payload)
+
+    @pytest.mark.parametrize("library_dirs_are_callers", [False, True], ids=["hosts_library", "callers_library"])
+    async def test_a_runtime_validates_content_against_the_library_it_is_told_is_whose(self, library_dirs_are_callers: bool, tmp_path: Path) -> None:
+        library_dir = tmp_path / "library"
+        library_file = _write(path=library_dir / "harbour_board.mthds", content=_MISSPELLED_CONCEPT_LIBRARY_BUNDLE)
+        runtime = PipelexMTHDSProtocol(
+            library_dirs=[str(library_dir)],
+            library_dirs_are_callers=library_dirs_are_callers,
+            pipe_run_mode=PipeRunMode.DRY,
+            execution_config=_execution_config(),
+        )
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await runtime.validate([_VALID_CALLER_BUNDLE])
+
+        items = raised.value.to_error_report().validation_errors or []
+        concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]
+        assert concept_items, f"expected an unresolved_concept item, got {items!r}"
+        expected_source = str(library_file) if library_dirs_are_callers else None
+        assert all(item.source == expected_source for item in concept_items)

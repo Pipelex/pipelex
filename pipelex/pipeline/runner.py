@@ -461,6 +461,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             graph_pipe_code=graph_pipe_code,
             log_context="Protocol validate",
             caller_identity=self.caller_identity,
+            # The same ownership a run of this runtime reads: the caller's own directories keep their paths.
+            library_dirs_are_callers=self.library_dirs_are_callers,
         )
 
     @override

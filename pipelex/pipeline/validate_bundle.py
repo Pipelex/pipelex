@@ -122,12 +122,20 @@ async def validate_bundle(
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
     caller_identity: CallerIdentity | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> ValidateBundleResult:
     """Load one bundle into a fresh library and dry-run its pipes.
 
     ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
     sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
     inherits the caller already in scope, and with none the sweep belongs to nobody.
+
+    ``library_dirs_are_callers`` says whose library directories are loaded beside submitted
+    ``mthds_contents``, as it does on the run path (``acquire_library``). By default they are a
+    host's, so the verdict names none of their files (``withholding_host_library_files``); a
+    caller validating content against its own directories passes True and keeps every path. A
+    bundle file is validated on the caller's own disk, among the caller's own directories, and
+    keeps every path whatever this says.
     """
     provided_params = sum(
         [
@@ -174,12 +182,15 @@ async def validate_bundle(
 
         loaded_pipes: list[PipeAbstract] | None = None
         loaded_blueprints: list[PipelexBundleBlueprint] | None = None
-        # Submitted content is validated for a caller whose library directories these are not: the verdict names
-        # none of their files, which are paths on the host. A bundle file is validated on the caller's own disk,
-        # among the caller's own directories, and keeps every path.
-        host_library_withholding: AbstractContextManager[None] = (
-            withholding_host_library_files(library_dirs=effective_dirs) if mthds_contents is not None else nullcontext()
-        )
+        # Beside submitted content, a host's library directories are withheld from the verdict: their files are paths
+        # on the host. The caller's own directories, and every directory of a bundle file, keep their paths.
+        host_library_withholding: AbstractContextManager[None]
+        if mthds_contents is not None and not library_dirs_are_callers:
+            host_library_withholding = withholding_host_library_files(
+                library_dirs=effective_dirs, caller_sources=[source for source in mthds_sources or [] if source is not None]
+            )
+        else:
+            host_library_withholding = nullcontext()
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
         with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:

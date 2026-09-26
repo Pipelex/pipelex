@@ -9,13 +9,14 @@ below the validation service in the import graph (``validate_bundle`` → ``bund
 ``execution_seams``), and both must reach the same translation.
 """
 
-from collections.abc import Generator, Sequence
+from collections.abc import Collection, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
+from pipelex.config import get_config
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import (
     PipeFactoryError,
@@ -40,6 +41,8 @@ from pipelex.mthds_parsing.handle_pipe_errors import (
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.registries.exceptions import FuncRegistryError
+from pipelex.tools.misc.file_utils import find_files_in_dir
+from pipelex.tools.typing.module_inspector import convert_file_path_to_module_path
 
 # What a verdict's message reads where it named a file of the host's own library directories.
 HOST_LIBRARY_FILE_PLACEHOLDER = "<host library file>"
@@ -228,42 +231,57 @@ def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | Non
 
 
 @contextmanager
-def withholding_host_library_files(*, library_dirs: Sequence[Path]) -> Generator[None, None, None]:
+def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sources: Collection[str] = ()) -> Generator[None, None, None]:
     """Keep the files of a host's own library directories out of the verdict the block raises.
 
     A verdict is caller-facing as a whole, and STRICT disclosure hands its message and its items to the caller
     verbatim, so it must not name a path on the host. When submitted content is validated or run, the library
     directories loaded beside it are the host's (installed libraries, the defaults, ``PIPELEXPATH``), and an item
     located in one of their files would name that file, as would a message about it, such as a duplicate
-    declaration or a load that failed. Around such a load, a ``ValidateBundleError`` leaves this block with every
-    file of ``library_dirs`` taken out: the item carries no ``source``, still located by its pipe and domain, and a
-    message reads ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one. The files are the ones the library load
-    reads, in both the spelling it gives a bundle's ``source`` and the resolved one.
+    declaration, a load that failed, or two ``@pipe_func`` functions of the same name, which the registry names by
+    a module name spelled from the file's absolute path. Around such a load, a ``ValidateBundleError`` leaves this
+    block with every one of those names taken out: the item carries no ``source``, still located by its pipe and
+    domain, and a message reads ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one. The names are the ones the
+    load gives: each bundle file in the spelling it gives a bundle's ``source`` and resolved, and each Python file's
+    module name. A name the caller submitted as a content's source (``caller_sources``) is the caller's own and is
+    never withheld, even where a host file is spelled the same.
 
-    A bundle validated from a file on the caller's own disk, or run with library directories that are the
-    caller's, keeps every path: there the directories are the caller's to read. A package the content depends on
-    by address never needs this, since its bundles are named by the package's address at load.
+    A bundle validated from a file on the caller's own disk, or validated or run with library directories that
+    are the caller's, keeps every path: there the directories are the caller's to read. A package the content
+    depends on by address never needs this, since its bundles are named by the package's address at load.
     """
     try:
         yield
     except ValidateBundleError as verdict:
-        host_library_files = _library_file_spellings(library_dirs=library_dirs)
-        if not host_library_files:
+        host_library_names = _host_library_names(library_dirs=library_dirs) - set(caller_sources)
+        if not host_library_names:
             raise
-        withheld_verdict = verdict.withholding_files(withheld_files=host_library_files, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
+        withheld_verdict = verdict.withholding_files(withheld_files=host_library_names, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
         # The withheld verdict takes this one's place over the same cause, so its report inherits the same
         # classification and the unwithheld verdict is not left on the chain beside it.
         raise withheld_verdict from verdict.__cause__
 
 
-def _library_file_spellings(*, library_dirs: Sequence[Path]) -> set[str]:
-    """Every spelling of the bundle files the library load reads from ``library_dirs``: as listed, and resolved."""
-    spellings: set[str] = set()
+def _host_library_names(*, library_dirs: Sequence[Path]) -> set[str]:
+    """Every name the library load gives a file of ``library_dirs``.
+
+    A bundle file is named as listed, which is the ``source`` the load gives it, and resolved; a Python file by
+    the module name the function registry imports it under, which is spelled from its resolved path.
+    """
+    names: set[str] = set()
     for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
-        spellings.add(str(library_file))
+        names.add(str(library_file))
         try:
-            spellings.add(str(library_file.resolve()))
+            names.add(str(library_file.resolve()))
         except (OSError, RuntimeError):
             # The load names such a file by its listed spelling only (see ``LibraryManager.load_libraries``).
             continue
-    return spellings
+    for library_dir in library_dirs:
+        if not library_dir.is_dir():
+            continue
+        for python_file in find_files_in_dir(dir_path=library_dir, pattern="*.py", excluded_dirs=list(get_config().interpreter.scan.excluded_dirs)):
+            try:
+                names.add(convert_file_path_to_module_path(python_file))
+            except (OSError, RuntimeError):
+                continue
+    return names
