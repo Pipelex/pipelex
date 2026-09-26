@@ -7,7 +7,7 @@ description: "Reference for the `ValidateBundleError` Pipelex error class."
 
 # Validate bundle
 
-Raised when bundle validation fails.
+Raised when a bundle is refused while it is loaded or validated: the invalid verdict, carrying one structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one — the parser, factory and pipe-validation errors, a failing dry run, an unknown model (``unknown_model``) and any other refusal of the caller's input — while a failure of the tool or its environment propagates as a no-verdict fault instead.
 
 | Field | Value |
 |---|---|

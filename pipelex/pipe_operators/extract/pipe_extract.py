@@ -3,7 +3,6 @@ from typing import Any, Literal
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
@@ -55,11 +54,8 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     @override
     def validate_inputs_static(self):
         if self.extract_choice:
-            try:
+            with self.locating_model_choice(field_name="model"):
                 check_extract_choice_with_deck(extract_choice=self.extract_choice)
-            except ModelChoiceNotFoundError as exc:
-                msg = f"Extract choice '{self.extract_choice}' was not found in the model deck"
-                raise ValueError(msg) from exc
 
     @override
     def validate_inputs_with_library(self):

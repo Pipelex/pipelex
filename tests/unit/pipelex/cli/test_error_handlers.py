@@ -37,6 +37,8 @@ class TestErrorHandlers:
             message="model 'gpt-5' not found",
             pipe_type="llm_text",
             pipe_code="my_pipe",
+            domain_code="my_domain",
+            field_name="model",
             model_type=ModelType.LLM,
             model_choice="gpt-5",
         )

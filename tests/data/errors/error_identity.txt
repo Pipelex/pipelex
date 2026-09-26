@@ -227,6 +227,7 @@ PipeInputsFactoryError | Pipe inputs factory | https://docs.pipelex.com/latest/e
 PipeJobError | Pipe job | https://docs.pipelex.com/latest/errors/pipe-job-error/
 PipeLLMFactoryError | Pipe LLM factory | https://docs.pipelex.com/latest/errors/pipe-llm-factory-error/
 PipeLibraryError | Pipe library | https://docs.pipelex.com/latest/errors/pipe-library-error/
+PipeLoadRefusalError | Pipe load refusal | https://docs.pipelex.com/latest/errors/pipe-load-refusal-error/
 PipeLoadingError | Pipe loading | https://docs.pipelex.com/latest/errors/pipe-loading-error/
 PipeNotFoundError | Pipe not found | https://docs.pipelex.com/latest/errors/pipe-not-found-error/
 PipeOperatorModelAvailabilityError | Pipe operator model availability | https://docs.pipelex.com/latest/errors/pipe-operator-model-availability-error/

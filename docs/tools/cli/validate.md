@@ -122,6 +122,28 @@ pipelex validate method invoice_extractor
 pipelex validate method invoice_extractor --pipe extract_amounts
 ```
 
+## An Invalid Bundle Is a Verdict
+
+Every refusal of your method raised while it is loaded or validated is reported as an invalid bundle: the grouped `❌ Bundle validation failed` output naming each error's pipe, domain, field and file, with exit code `1`. Exit code `2` is kept for the cases where no verdict could be produced — bad arguments, a target that does not resolve, or a failure of Pipelex or its environment. This holds on every subcommand: `validate pipe` and `validate --all` render a pipe whose dry run fails the same way `validate bundle` does, where they used to print a traceback. A few refusals raised while a pipe is built do not classify themselves as a fault of your method yet, and those still stop validation without a verdict.
+
+A pipe that names a model your model deck does not define is the most common case. It is reported as an `Unknown Model` error on that pipe, with the path of the field that names it (`pipe.<code>.model`, or `pipe.<code>.model_to_structure` for the model a `PipeLLM` structures its output with) and the deck's close matches:
+
+```text
+Pipe Validation Errors:
+
+1. Unknown Model
+   Pipe: write_tide_note
+   Domain: tide_tables
+   Field: model
+   → Pipe 'write_tide_note' (PipeLLM), field 'model': Alias 'best-sonet' was not found in the model deck
+
+Did you mean: @best-gpt
+   💡 Suggested fix: Replace model '@best-sonet' of pipe 'write_tide_note' with '@best-gpt', its one close match in the model deck
+   └─ Path: pipe.write_tide_note.model
+```
+
+When the deck offers exactly one close match, as here, the error carries a suggested fix naming it. The fix is marked unsafe and `pipelex fix bundle` does not apply it on its own: the match is a guess from the spelling, and a close name can be a different model, with its own provider, cost and behaviour, so check it before you write it. With several matches, choosing among them is yours; `pipelex-agent check-model <name> -t <type>` and `pipelex-agent models -t <type>` list what the deck defines.
+
 ## Suggested Fixes
 
 When a validation error has a deterministic safe fix, the error output includes a `💡 Suggested fix:` line describing the change, and the report ends with the exact command to apply every suggested fix automatically:
@@ -148,6 +170,7 @@ All validation commands check:
 
 - Syntax correctness of `.mthds` files
 - Concept and pipe definitions are valid
+- Every model a pipe names is defined in your model deck
 - Input/output connections are correct
 - All referenced pipes and concepts exist
 - Dry-run execution succeeds without errors, which implies the logic is correct and the pipe can be run

@@ -1,0 +1,12 @@
+name = "invalid_unknown_model"
+description = "A harbour tide note whose writing pipe names a model that no model deck defines"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.unknown_model",
+]
+
+expected_error = "unknown_model"

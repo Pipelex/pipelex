@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipeBlueprintUnion
 
 
 class LibraryCrate(BaseModel):
@@ -34,6 +34,11 @@ class LibraryCrate(BaseModel):
 
     source_map: dict[str, str] = Field(default_factory=dict)
     """concept_ref or pipe_ref -> source file path (for error reporting)"""
+
+    elaboration_metadata: dict[str, ElaborationMetadata] = Field(default_factory=dict)
+    """pipe_ref -> how the bundle elaborator generated that synthetic pipe (the helpers of a
+    ``preliminary_text`` PipeLLM), so a refusal raised while building a helper is reported on the pipe
+    and the field the author wrote. Like ``source_map``, it is excluded from the fingerprint."""
 
     python_sources: dict[str, str] = Field(default_factory=dict)
     """relpath (within the library dir) -> Python source text, captured WITHOUT importing.

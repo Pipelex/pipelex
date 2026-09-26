@@ -19,7 +19,6 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_rendering import GraphFormat
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
@@ -199,17 +198,6 @@ def validate_bundle_cmd(
         # non-empty on every invalid verdict); markdown renders those items as prose with a fix-aware
         # footer. Signatures never reach here (they are a runnability fact, gated above).
         agent_error_validate_bundle(exc, bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures)
-
-    except PipeOperatorModelChoiceError as exc:
-        agent_error(
-            exc.message,
-            error_type="PipeOperatorModelChoiceError",
-            cause=exc,
-            exit_code=2,
-            pipe_code=exc.pipe_code,
-            model_type=str(exc.model_type),
-            model_choice=str(exc.model_choice),
-        )
 
     except PipeOperatorModelAvailabilityError as exc:
         availability_extra: dict[str, Any] = {

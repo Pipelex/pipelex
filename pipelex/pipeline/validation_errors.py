@@ -120,6 +120,9 @@ def build_validation_error_items(
                 field_path=pipe_error.field_path or None,
                 field_name=pipe_error.field_name,
                 variable_names=pipe_error.variable_names or None,
+                model_reference=pipe_error.model_reference,
+                model_type=pipe_error.model_type,
+                suggestions=pipe_error.suggestions or None,
                 message=pipe_error.message,
                 suggested_fix=plan_fix_for_pipe_validation_error(pipe_error),
             )
