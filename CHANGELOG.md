@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`load_from_crate` takes `is_crate_prevalidated`**: `LibraryManager.load_from_crate(library_id=…, crate=…, is_crate_prevalidated=True)` skips the library validation that ends a load, for a crate built from a library that the same pipelex version already loaded and validated, such as the crate a distributed run hands its worker; everything else the load does still runs, and the default stays the validating load.
+
+### Changed
+
+- **`are_classes_equivalent` answers without a JSON schema when it can**: a class is equivalent to itself, and two models whose schemas would certainly publish different property names are not equivalent, both now decided before any schema is generated, which removes most of the cost of validating a library whose pipes output structured concepts. Verdicts are unchanged: a model whose published properties cannot be read off its fields with certainty still goes to the full schema comparison.
+
 ## [v0.66.0] - 2026-09-25
 
 ### Highlights

@@ -118,7 +118,7 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, *, library_id: str, crate: LibraryCrate, is_crate_prevalidated: bool = False) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
@@ -127,6 +127,9 @@ class LibraryManagerAbstract(ABC):
         Args:
             library_id: The library to load into
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
+            is_crate_prevalidated: Skip the library validation that ends the load. Precondition: the crate
+                was built from a library that this same pipelex version loaded and validated (a runner's
+                crate, handed to the worker that executes it). Everything else the load does still happens.
         """
 
     @abstractmethod

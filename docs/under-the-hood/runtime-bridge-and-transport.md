@@ -77,6 +77,8 @@ Sending a pipe run to a separate worker process introduces three challenges that
 
 The submitter builds a `LibraryCrate` from its loaded library (`pipelex/libraries/library_crate_factory.py`) and attaches it to the `PipeJob`. On the worker, the job's entry point loads the crate into a scoped library, registering the bundle's dynamic concept classes, so `get_required_pipe()` resolves every pipe at every level of nesting. Because a distributed run can fan out into nested jobs (a controller's child pipes), every nested job carries the same crate; loading is idempotent via the fingerprint, so re-receiving a crate already loaded on a worker is a no-op.
 
+A load ends by validating the whole library (`Library.validate_library`), which checks every pipe against the concepts and pipes it depends on. That check is pure — it raises or returns, and leaves nothing behind that a run later reads — and the crate a worker receives was built from a library the submitter already loaded and validated. So a worker running the same pipelex version as its submitter can call `load_from_crate(library_id=…, crate=…, is_crate_prevalidated=True)`, which skips that final validation and nothing else: fingerprint idempotency, domain and concept loading with the registration of the dynamic classes, the concept-cycle check, pipe construction with each pipe's static validation, and source tracking all still run. The precondition belongs to the host: pass it only where submitter and worker ship on the same pipelex, as a deployment that builds them from one lockfile does. A crate from anywhere else keeps the default, validating load.
+
 ---
 
 ## Deferred hydration
