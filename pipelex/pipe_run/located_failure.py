@@ -6,6 +6,8 @@ pipe router's `PipeRouterError`, which knows the failing pipe and its stack, may
 wrong. The report of such a failure is therefore built from its **root fault**, the innermost
 `PipelexError` of the cause chain, and only located by the wrappers:
 
+- the root fault stops at a foreign exception, whose stand-in is the fault, and an error raised from
+  one of its own class counts as the outer, more contextual one (see `find_root_fault`);
 - the identity (`error_type`, `title`, `type_uri`) is the root fault's, and so are its caller-facing
   flag, its `validation_errors` and its `migration`;
 - the message names the failing pipe and its path from the entry pipe, then gives the root fault's
@@ -36,13 +38,20 @@ def find_root_fault(*, error: BaseException) -> PipelexError | None:
     """Return the innermost `PipelexError` on `error`'s cause chain, `error` itself included.
 
     That is the error that knows what went wrong: every `PipelexError` above it on the chain is a
-    wrapper that located it or carried it across a boundary. `None` when the chain holds no
-    `PipelexError` at all.
+    wrapper that located it or carried it across a boundary. Two exceptions to "innermost": the walk
+    stops at the first exception that is not a `PipelexError`, since what caused a foreign exception
+    is that code's own affair and the `PipelexUnexpectedError` standing in for it is the fault; and
+    a `PipelexError` raised from one of its own class restates that fault with more context (an
+    item index, a remedy), so the outer one is kept. `None` when the chain starts with no
+    `PipelexError`.
     """
     root_fault: PipelexError | None = None
     for node in iter_cause_chain(error):
-        if isinstance(node, PipelexError):
-            root_fault = node
+        if not isinstance(node, PipelexError):
+            break
+        if root_fault is not None and type(node) is type(root_fault):
+            continue
+        root_fault = node
     return root_fault
 
 

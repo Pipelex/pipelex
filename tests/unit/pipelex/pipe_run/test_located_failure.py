@@ -82,6 +82,28 @@ class TestLocatedFailureReport:
         assert find_foreign_fault(error=_wrap_in_runner(located_foreign, entry_pipe_code="flow")) is foreign_fault
         assert find_foreign_fault(error=located_pipelex) is None
 
+    def test_a_foreign_exception_ends_the_walk(self) -> None:
+        """A foreign exception raised from an older PipelexError: its stand-in is the root fault, not the older error."""
+        older_error = PipelexError("older failure")
+        foreign_fault = KeyError("boom")
+        foreign_fault.__cause__ = older_error
+        unexpected_failure = make_unexpected_failure(error=foreign_fault)
+        located = _locate(unexpected_failure, pipe_stack=["flow"])
+
+        assert find_root_fault(error=located) is unexpected_failure
+        assert find_foreign_fault(error=located) is foreign_fault
+        assert located.to_error_report().error_type == "PipelexUnexpectedError"
+
+    def test_a_same_class_rethrow_keeps_its_added_context(self) -> None:
+        """An error raised from one of its own class restates the fault with context: the outer one is reported."""
+        low_level = CogtError(message="size out of range", error_category=InferenceErrorCategory.CONTENT)
+        with_remedy = CogtError(message="Size tier '4k' is not satisfiable: use '1k' or '2k'", error_category=InferenceErrorCategory.CONTENT)
+        with_remedy.__cause__ = low_level
+        located = _locate(with_remedy, pipe_stack=["flow", "draw"])
+
+        assert find_root_fault(error=located) is with_remedy
+        assert located.to_error_report().message == "Pipe 'draw' failed (flow → draw): Size tier '4k' is not satisfiable: use '1k' or '2k'"
+
     def test_identity_and_message_are_the_root_faults(self) -> None:
         """Through the router, a bridge and the runner, the report is the root fault's, located once."""
         root_fault = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
