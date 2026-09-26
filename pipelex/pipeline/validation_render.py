@@ -33,6 +33,7 @@ from typing import Any, cast
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
+from pipelex.suggested_fix import FixSafety, SuggestedFix
 from pipelex.tools.misc.string_utils import count_with_noun
 
 
@@ -173,6 +174,23 @@ def _markdown_category_header(category: ValidationErrorCategory) -> str:
             return "Dry run error"
 
 
+def suggested_fix_label(*, fix: SuggestedFix) -> str:
+    """The label a rendered suggested fix opens with, saying whether it may be applied without asking.
+
+    A safe fix is a plain ``Suggested fix``: ``pipelex fix bundle`` applies it on its own. An unsafe
+    one, such as ``rename-model``, whose close match by name can still be a different model, says it is
+    unsafe and needs confirming, because ``pipelex fix bundle`` never applies it and the person or agent
+    reading the line decides. The word is the wire's own ``safety`` value, the one the TypeScript clients
+    show. Shared by the human panel (``cli/error_handlers.py``) and the markdown prose here, so every
+    surface labels a fix the same way.
+    """
+    match fix.safety:
+        case FixSafety.SAFE:
+            return "Suggested fix"
+        case FixSafety.UNSAFE:
+            return "Suggested fix (unsafe, confirm before applying)"
+
+
 def _render_error_item_markdown(item: ValidationErrorItem, *, index: int) -> list[str]:
     """Render one structured item as prose: humanized title, identity fields, message, fix, locators.
 
@@ -201,7 +219,7 @@ def _render_error_item_markdown(item: ValidationErrorItem, *, index: int) -> lis
         lines.append(f"   - Variables: {variables}")
     lines.append(f"   - {item.message}")
     if item.suggested_fix is not None:
-        lines.append(f"   - 💡 Suggested fix: {item.suggested_fix.description}")
+        lines.append(f"   - 💡 {suggested_fix_label(fix=item.suggested_fix)}: {item.suggested_fix.description}")
     if item.field_path:
         lines.append(f"   - Path: `{item.field_path}`")
     if item.source:

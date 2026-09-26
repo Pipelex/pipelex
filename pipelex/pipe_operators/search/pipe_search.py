@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -51,11 +50,8 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     @override
     def validate_inputs_static(self):
         if self.search_choice:
-            try:
+            with self.locating_model_choice(field_name="model"):
                 check_search_choice_with_deck(search_choice=self.search_choice)
-            except ModelChoiceNotFoundError as exc:
-                msg = f"Search choice '{self.search_choice}' was not found in the model deck"
-                raise ValueError(msg) from exc
 
         # Guard-lint (D7): every reference to a declared-optional input must be guarded.
         lint_optional_input_guards(

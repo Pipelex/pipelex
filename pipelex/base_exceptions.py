@@ -331,6 +331,13 @@ class ValidationErrorItem(BaseModel):
     missing_concept_code: str | None = None
     missing_pipe_code: str | None = None
     declared_concepts: list[str] | None = None
+    # The unknown-model locators, carried by an ``unknown_model`` item: the model reference exactly as
+    # the author wrote it, the model type the field takes (``llm``, ``text_extractor``, ``img_gen``,
+    # ``search``), and the deck's close matches of the same kind, each spelled as a reference the field
+    # accepts. Optional and additive, like ``declared_concepts``: every other item serializes unchanged.
+    model_reference: str | None = None
+    model_type: str | None = None
+    suggestions: list[str] | None = None
     # Structured, deterministic fix for this error, when the fix planner derived one from the
     # enriched error data. Optional and additive: non-fixable items serialize unchanged under
     # ``exclude_none``.

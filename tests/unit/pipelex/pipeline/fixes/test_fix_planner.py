@@ -11,8 +11,8 @@ raise sites only), ``expected_inputs``/``declared_inputs`` for ``sync-controller
 import pytest
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.pipeline.fixes.planner import plan_fix_for_pipe_validation_error
-from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixSafety, SetKeyOp
+from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES, RENAME_MODEL_FIX_CODE, plan_fix_for_pipe_validation_error
+from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixSafety, RemapValueOp, SetKeyOp
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # The inputs table of the pipe every input-drift case below is built around.
@@ -54,6 +54,26 @@ def _input_drift_error_data(
         field_path="",
         expected_inputs=expected_inputs,
         declared_inputs=declared_inputs,
+    )
+
+
+def _unknown_model_error_data(
+    *,
+    suggestions: list[str] | None,
+    field_name: str | None = "model",
+    model_reference: str | None = "@best-sonet",
+) -> PipesAndConceptValidationErrorData:
+    return PipesAndConceptValidationErrorData(
+        error_type=PipeValidationErrorType.UNKNOWN_MODEL,
+        domain_code="tide_tables",
+        source="main.mthds",
+        pipe_code="write_tide_note",
+        field_name=field_name,
+        message="unknown model",
+        field_path="pipe.write_tide_note.model",
+        model_reference=model_reference,
+        model_type="llm",
+        suggestions=suggestions,
     )
 
 
@@ -189,3 +209,34 @@ class TestFixPlanner:
         """Without a pipe locator there is no TOML table to patch → no fix."""
         fix = plan_fix_for_pipe_validation_error(_input_drift_error_data(pipe_code=None, expected_inputs={"text": "Text"}, declared_inputs={}))
         assert fix is None
+
+    def test_unknown_model_with_one_suggestion_yields_rename_model_fix(self) -> None:
+        """One close match in the deck is the one obvious correction: remap the field from the reference as written."""
+        fix = plan_fix_for_pipe_validation_error(_unknown_model_error_data(suggestions=["@best-gpt"]))
+        assert fix is not None
+        assert fix.fix_code == RENAME_MODEL_FIX_CODE
+        assert fix.safety == FixSafety.UNSAFE
+        assert RENAME_MODEL_FIX_CODE not in KNOWN_FIX_CODES, "an unsafe code is never selectable: the fix loop would skip it"
+        assert fix.source == "main.mthds"
+        assert fix.ops == [RemapValueOp(table_path=["pipe", "write_tide_note"], key="model", mapping={"@best-sonet": "@best-gpt"})]
+        assert "'@best-sonet'" in fix.description
+        assert "'@best-gpt'" in fix.description
+
+    def test_unknown_model_fix_rewrites_the_field_that_named_it(self) -> None:
+        fix = plan_fix_for_pipe_validation_error(_unknown_model_error_data(suggestions=["@best-gpt"], field_name="model_to_structure"))
+        assert fix is not None
+        assert fix.ops == [RemapValueOp(table_path=["pipe", "write_tide_note"], key="model_to_structure", mapping={"@best-sonet": "@best-gpt"})]
+
+    @pytest.mark.parametrize("suggestions", [None, [], ["$writing-factual", "$writing-creative"]])
+    def test_unknown_model_without_exactly_one_suggestion_yields_none(self, suggestions: list[str] | None) -> None:
+        """No match leaves nothing to write, and several leave the choice to the author."""
+        assert plan_fix_for_pipe_validation_error(_unknown_model_error_data(suggestions=suggestions)) is None
+
+    def test_unknown_model_without_its_locators_yields_none(self) -> None:
+        assert plan_fix_for_pipe_validation_error(_unknown_model_error_data(suggestions=["@best-gpt"], field_name=None)) is None
+        assert plan_fix_for_pipe_validation_error(_unknown_model_error_data(suggestions=["@best-gpt"], model_reference=None)) is None
+
+    def test_uncoded_pipe_error_yields_none(self) -> None:
+        """A located refusal with no closed code (the cascade's general arm) has no fix to plan."""
+        error_data = PipesAndConceptValidationErrorData(pipe_code="write_tide_note", message="refused", field_path="")
+        assert plan_fix_for_pipe_validation_error(error_data) is None

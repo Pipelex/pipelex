@@ -38,6 +38,21 @@ def _fixable_pipe_error(*, source: str | None = None) -> PipesAndConceptValidati
     )
 
 
+def _unsafe_fixable_pipe_error() -> PipesAndConceptValidationErrorData:
+    """An ``unknown_model`` with one close match — the planner derives the UNSAFE ``rename-model`` from it."""
+    return PipesAndConceptValidationErrorData(
+        error_type=PipeValidationErrorType.UNKNOWN_MODEL,
+        domain_code="tide_tables",
+        pipe_code="write_tide_note",
+        field_name="model",
+        message="Alias 'best-sonet' was not found in the model deck",
+        field_path="pipe.write_tide_note.model",
+        model_reference="@best-sonet",
+        model_type="llm",
+        suggestions=["@best-gpt"],
+    )
+
+
 def _non_fixable_pipe_error() -> PipesAndConceptValidationErrorData:
     """The same error type without the enrichment — structurally suppressed by the planner."""
     return PipesAndConceptValidationErrorData(
@@ -139,6 +154,37 @@ class TestValidateSuggestedFixRendering:
         output = console.export_text()
         assert "💡 Suggested fix:" not in output
         assert "can be fixed automatically" not in output
+        assert "💡 Tip:" in output
+
+    def test_unsafe_fix_says_it_needs_confirmation_and_is_not_counted(self, console: Console) -> None:
+        """A safe fix keeps the plain line; an unsafe one says so, and the automatic-fix footer counts only the safe one."""
+        exc = ValidateBundleError(
+            message="validation failed",
+            pipe_validation_errors=[_fixable_pipe_error(), _unsafe_fixable_pipe_error()],
+        )
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(exc, bundle_path=Path("methods/demo.mthds"))
+
+        output = console.export_text()
+        assert "💡 Suggested fix: Set output of pipe 'list_ideas' to 'Idea[]' to match its last step" in output
+        assert (
+            "💡 Suggested fix (unsafe, confirm before applying): Replace model '@best-sonet' of pipe 'write_tide_note' with '@best-gpt'"
+        ) in output
+        assert "💡 Suggested fix: Replace model" not in output
+        assert "1 of these errors can be fixed automatically" in output
+
+    def test_only_unsafe_fix_keeps_generic_tip(self, console: Console) -> None:
+        """An unsafe fix is never applied by `pipelex fix bundle`, so it alone offers no fix command."""
+        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_unsafe_fixable_pipe_error()])
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(exc, bundle_path=Path("methods/demo.mthds"))
+
+        output = console.export_text()
+        assert "💡 Suggested fix (unsafe, confirm before applying): Replace model '@best-sonet'" in output
+        assert "can be fixed automatically" not in output
+        assert "pipelex fix bundle" not in output
         assert "💡 Tip:" in output
 
     def test_fixable_count_sums_only_fixable_items(self, console: Console) -> None:

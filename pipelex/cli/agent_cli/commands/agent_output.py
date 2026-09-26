@@ -104,13 +104,17 @@ def get_agent_cli_error_format() -> CliOutputFormat:
 # drift test — a dead entry is exactly the rot it exists to prevent. When the
 # derived domain is not the one this CLI wants, fix it on the class (declare an
 # explicit error_domain, as ModelChoiceNotFoundError does), never here.
+# An unknown model is the author's input fault, whether it is raised bare by the deck check or located
+# on its pipe: the next step is to correct the reference, not to diagnose the installation.
+_UNKNOWN_MODEL_HINT = (
+    "Check model name for typos. Use 'pipelex-agent check-model <name> -t <type>' "
+    "to validate or 'pipelex-agent models -t <type>' to list available models."
+)
+
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
-    "ModelChoiceNotFoundError": (
-        "Check model name for typos. Use 'pipelex-agent check-model <name> -t <type>' "
-        "to validate or 'pipelex-agent models -t <type>' to list available models."
-    ),
-    "PipeOperatorModelChoiceError": "Run 'pipelex-agent doctor' to check available models and routing configuration",
+    "ModelChoiceNotFoundError": _UNKNOWN_MODEL_HINT,
+    "PipeOperatorModelChoiceError": _UNKNOWN_MODEL_HINT,
     "PipeOperatorModelAvailabilityError": "Run 'pipelex-agent doctor' to check available models and verify API keys",
     "ModelDeckPresetValidatonError": (
         "Run 'pipelex-agent doctor' to check model configuration. "
@@ -210,7 +214,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "CodegenLockError": "input",
     # config = environment/config changes needed
     "ClientAuthenticationError": "config",
-    "PipeOperatorModelChoiceError": "config",
     "PipeOperatorModelAvailabilityError": "config",
     "BinaryNotFoundError": "config",
     "InitConfigError": "config",
@@ -506,7 +509,7 @@ def _render_validate_bundle_markdown(
 
     # A hint needs an action behind it (disease E): when items carry a suggested fix, name the exact
     # fix command — same predicate and command shape as the human footer — instead of the boilerplate
-    # "check the validation_errors array" hint that the JSON envelope keeps.
+    # class-level hint that the JSON envelope keeps.
     fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs)
     if fixable_count:
         fix_command = build_fix_command(

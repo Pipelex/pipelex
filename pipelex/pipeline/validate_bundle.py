@@ -11,8 +11,16 @@ from pydantic import BaseModel, ValidationError
 from typing_extensions import TypedDict
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.pipes.exceptions import PipeFactoryError, PipeRunError, PipeValidationError
+from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError, SecurityError, error_domain_is_input
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.pipes.exceptions import (
+    PipeFactoryError,
+    PipeLoadRefusalError,
+    PipeOperatorModelChoiceError,
+    PipeRunError,
+    PipeValidationError,
+    caller_facing_refusal_text,
+)
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import (
@@ -28,6 +36,7 @@ from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError, PipeNotFou
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import (
     categorize_pipe_factory_error,
+    categorize_pipe_operator_model_choice_error,
     categorize_pipe_validation_error,
     categorize_pipe_validation_with_libraries_error,
 )
@@ -122,11 +131,21 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
 
     Single source of truth for the bundle-loading error cascade, shared by the
     bundle-loading entry points: ``validate_bundle``, ``validate_bundles_from_directory``,
-    and ``pipelex.pipeline.resolve_bundle.resolve_crate_from_contents``.
+    ``pipelex.pipeline.resolve_bundle.resolve_crate_from_contents``, and the library loads and
+    dry-run sweeps of the ``validate pipe`` / ``validate --all`` commands.
     A ``MthdsParserError`` becomes a ``ValidateBundleError`` carrying the
     blueprint validation errors, a ``PipeFactoryError`` carries the categorized
     factory error, etc. Sharing one source of truth means a new handler only
     needs to be added once.
+
+    **Every refusal of the bundle is a verdict.** After the class-specific arms, a final arm turns any
+    other ``PipelexError`` whose report is ``input``-domained (the caller's fault) into a verdict with one
+    item, so a refusal nobody wrote an arm for still reaches the author as an invalid bundle rather than
+    as a crash or a no-verdict fault. Only a failure of the tool or its environment — a ``config`` or
+    ``runtime`` fault, an unclassified one, anything that is not a ``PipelexError`` — propagates as
+    no verdict, along with the refusals that must keep their own class: ``PipeNotFoundError`` (its
+    dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), and a
+    ``ValidateBundleError`` already produced (never re-wrapped).
     """
     try:
         yield
@@ -206,6 +225,60 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
+    except PipeOperatorModelChoiceError as model_choice_error:
+        # A pipe names a model its deck does not define: the operator located it on the pipe and the
+        # field, and the library load added the file, so it becomes one `unknown_model` item carrying
+        # the reference as written, the model type and the deck's suggestions.
+        raise ValidateBundleError(
+            message=model_choice_error.message,
+            pipe_validation_errors=[categorize_pipe_operator_model_choice_error(model_choice_error=model_choice_error)],
+        ) from model_choice_error
+    except (ValidateBundleError, SecurityError):
+        # Both are PipelexErrors the general arm below would otherwise catch. A verdict already produced
+        # (e.g. by a nested load) passes through as it is: re-wrapping it would flatten its items into one.
+        # A security refusal is never absorbed into a domain answer, verdict included.
+        raise
+    except PipelexError as refusal:
+        verdict = _make_refusal_verdict(refusal=refusal)
+        if verdict is None:
+            raise
+        raise verdict from refusal
+
+
+def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | None:
+    """The one-item verdict for a refusal of the caller's input that has no arm of its own, else ``None``.
+
+    ``None`` — no verdict — unless the refusal's report is ``input``-domained: a ``config`` or ``runtime``
+    fault, or an unclassified one, is a failure of the tool or its environment, which the validator must
+    not report as the bundle's fault. The item is ``pipe_validation`` when the library load located the
+    refusal on the pipe it was building (``PipeLoadRefusalError``, with the pipe's code, domain and file),
+    and ``blueprint_validation`` otherwise. It carries no ``error_type``: a refusal with a closed code
+    has its own arm above, and naming one here would claim a diagnosis the refusal does not make.
+
+    The item's text is the refusal's message only when that message was authored as caller-facing copy,
+    and otherwise its title: the verdict is caller-facing as a whole and is kept verbatim under STRICT
+    disclosure, so internal text must not ride it past the redaction it would otherwise get.
+    """
+    if not error_domain_is_input(refusal.to_error_report().error_domain):
+        return None
+    message = caller_facing_refusal_text(refusal=refusal)
+    if isinstance(refusal, PipeLoadRefusalError):
+        return ValidateBundleError(
+            message=message,
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    pipe_code=refusal.pipe_code,
+                    domain_code=refusal.domain_code,
+                    source=refusal.source,
+                    message=message,
+                    field_path="",
+                )
+            ],
+        )
+    return ValidateBundleError(
+        message=message,
+        pipelex_bundle_blueprint_validation_errors=[PipelexBundleBlueprintValidationErrorData(message=message)],
+    )
 
 
 def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:

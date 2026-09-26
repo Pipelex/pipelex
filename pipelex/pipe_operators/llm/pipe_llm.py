@@ -8,6 +8,7 @@ from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
+from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -62,8 +63,14 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     @override
     def validate_inputs_static(self):
         if self.llm_choices:
-            for llm_choice_ref in self.llm_choices.list_choice_references():
-                check_llm_choice_with_deck(llm_choice=llm_choice_ref)
+            # Checked field by field, in declaration order, so a refusal names the field the author wrote
+            # the reference in: `for_text` comes from the blueprint's `model`, `for_object` from its
+            # `model_to_structure`. An inline setting table is not a reference and is not looked up.
+            for field_name, llm_choice in (("model", self.llm_choices.for_text), ("model_to_structure", self.llm_choices.for_object)):
+                if not isinstance(llm_choice, ModelReference):
+                    continue
+                with self.locating_model_choice(field_name=field_name):
+                    check_llm_choice_with_deck(llm_choice=llm_choice)
 
         needed_inputs = self.needed_inputs()
         required_variable_paths = self.required_variables()

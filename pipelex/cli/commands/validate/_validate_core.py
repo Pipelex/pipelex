@@ -11,10 +11,8 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
-    handle_model_choice_error,
     handle_validate_bundle_error,
 )
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.interpreter_hub import (
     get_library_manager,
     get_pipe_library,
@@ -32,7 +30,7 @@ from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
-from pipelex.pipeline.validate_bundle import build_pending_signatures, validate_bundle
+from pipelex.pipeline.validate_bundle import build_pending_signatures, translate_to_validate_bundle_error, validate_bundle
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -80,7 +78,10 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
             # Single public composer for the open/set/load ceremony — leaves the library loaded and
             # current for the sweep below, owning the standard 3-tier dir resolution and load-failure
             # teardown. No teardown on success here: the caller (validate_pipe_cmd) owns Pipelex teardown.
-            load_libraries_and_activate(library_dirs)
+            # The shared bundle-loading cascade turns a refusal of the libraries into the invalid
+            # verdict (exit 1) rendered below, exactly as `validate bundle` does.
+            with translate_to_validate_bundle_error():
+                load_libraries_and_activate(library_dirs)
 
             # The pipe list is needed only to render the "Validating N" line; validate_current_library
             # re-derives its own sweep candidates from the current library (validate_pipes excludes
@@ -92,8 +93,10 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
                 typer.echo(f"Validating {count_with_noun(count=len(pipes), singular='pipe')} from: {dirs_str}")
 
             # validate_current_library owns the static wiring pass and the single PIPE_DRY_RUN telemetry
-            # event — sweeping the library we just loaded, without teardown.
-            asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
+            # event — sweeping the library we just loaded, without teardown. A pipe whose dry run fails
+            # raises DryRunError, which the cascade turns into the same invalid verdict.
+            with translate_to_validate_bundle_error():
+                asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
 
             # Advisory lints over the whole loaded library (the optionality lint's cross-flow
             # aggregation needs every flow) — printed even when the signature gate below exits
@@ -120,10 +123,12 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
             typer.echo(
                 f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count=signature_count)}"
             )
+    except ValidateBundleError as bundle_error:
+        # A produced negative verdict (exit 1): a refusal of the libraries while loading them, an unknown
+        # model among them, or a pipe whose dry run fails — rendered like any other invalid bundle.
+        handle_validate_bundle_error(bundle_error, library_dirs=library_dirs, allow_signatures=allow_signatures)
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
-    except PipeOperatorModelChoiceError as exc:
-        handle_model_choice_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
 
 
 async def _validate_pipe_or_bundle(
@@ -177,19 +182,28 @@ async def _validate_pipe_or_bundle(
         set_current_library(library_id=library_id)
         effective_dirs, _ = resolve_library_dirs(library_dirs)
 
-        if effective_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+        try:
+            # The load and the dry run go through the shared bundle-loading cascade, so a refusal of the
+            # libraries and a pipe whose dry run fails are invalid verdicts (exit 1) rendered like any
+            # other invalid bundle. The entry-pipe lookup between them stays outside it: a code that names
+            # no pipe, or several, is an unresolvable target — no verdict, handled by execute_validate.
+            if effective_dirs:
+                with translate_to_validate_bundle_error():
+                    library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
-        pipe = get_required_entry_pipe(pipe_code=pipe_code)
-        typer.echo(f"Validating pipe '{pipe_code}'...")
-        # Signatures are never an error (D-B): a single-pipe validation reaching a PipeSignature
-        # dry-runs trivially (the placeholder mints a mock). validate pipe makes no library-wide
-        # runnability claim — pending_signatures is a bundle-surface fact — so there is no gate here.
-        await BundleValidator().validate_pipes(
-            pipes=[pipe],
-            library_id=library_id,
-            allow_signatures=allow_signatures,
-        )
+            pipe = get_required_entry_pipe(pipe_code=pipe_code)
+            typer.echo(f"Validating pipe '{pipe_code}'...")
+            # Signatures are never an error (D-B): a single-pipe validation reaching a PipeSignature
+            # dry-runs trivially (the placeholder mints a mock). validate pipe makes no library-wide
+            # runnability claim — pending_signatures is a bundle-surface fact — so there is no gate here.
+            with translate_to_validate_bundle_error():
+                await BundleValidator().validate_pipes(
+                    pipes=[pipe],
+                    library_id=library_id,
+                    allow_signatures=allow_signatures,
+                )
+        except ValidateBundleError as bundle_error:
+            handle_validate_bundle_error(bundle_error, library_dirs=library_dirs, allow_signatures=allow_signatures)
         signature_count = len(collect_signature_refs(pipe=pipe))
         typer.secho(
             f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
@@ -258,8 +272,6 @@ def execute_validate(
             err=True,
         )
         raise typer.Exit(2) from exc
-    except PipeOperatorModelChoiceError as exc:
-        handle_model_choice_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
     finally:

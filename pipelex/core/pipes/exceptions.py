@@ -1,11 +1,6 @@
-from typing_extensions import override
-
-from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.extract.extract_setting import ExtractModelChoice
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
-from pipelex.cogt.llm.llm_setting import LLMModelChoice
+from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
@@ -61,41 +56,116 @@ class PipeRunError(PipelexError):
 
 
 class PipeOperatorModelChoiceError(PipelexError):
+    """Raised by a pipe operator (``PipeLLM``, ``PipeStructure``, ``PipeImgGen``, ``PipeExtract``, ``PipeSearch``)
+    when it is built from its blueprint and a model field names a model the model deck does not define.
+    Bundle validation reports it as an invalid verdict whose item has the error type ``unknown_model``,
+    and a run refuses the bundle with it before any pipe runs.
+
+    The pipe operator raises it from the ``ModelChoiceNotFoundError`` its deck check raised, located on
+    the pipe (its code, type and domain) and on the field (``model``, or ``model_to_structure`` on a
+    ``PipeLLM``), and the library load adds the file the pipe is declared in. Every pipe type that names
+    a model raises this same error, so every one of them gives the same verdict item.
+
+    The message names the pipe and the field, then keeps the deck check's sentence and its suggestions,
+    so it is caller-facing copy: it names only the caller's own model reference and the deck's public
+    handles, and it must reach a hosted caller under STRICT disclosure.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+
     def __init__(
         self,
         message: str,
+        *,
         pipe_type: str,
         pipe_code: str,
+        domain_code: str,
+        field_name: str,
         model_type: ModelType,
-        model_choice: LLMModelChoice | ExtractModelChoice | ImgGenModelChoice,
+        model_choice: str,
+        suggestions: list[str] | None = None,
+        source: str | None = None,
     ):
         self.pipe_type = pipe_type
         self.pipe_code = pipe_code
+        self.domain_code = domain_code
+        self.field_name = field_name
         self.model_type = model_type
+        # The reference exactly as the author wrote it (``gpt-5.1``, ``@best-sonet``, ``$writting-factual``).
         self.model_choice = model_choice
+        # The deck's close matches of the same kind, each spelled as a reference the field accepts.
+        self.suggestions = suggestions or []
+        # The file declaring the pipe. The operator does not know it — pipes carry no source — so the
+        # library load fills it from the crate's source map before the error leaves the load loop.
+        self.source = source
         super().__init__(message)
 
-    def desc(self) -> str:
-        msg = f"{self.message}"
-        msg += f" • pipe='{self.pipe_code}' ({self.pipe_type})"
-        msg += f" • model_type='{self.model_type}'"
+    @classmethod
+    def make_from_model_choice_not_found(
+        cls,
+        *,
+        model_choice_error: ModelChoiceNotFoundError,
+        pipe_type: str,
+        pipe_code: str,
+        domain_code: str,
+        field_name: str,
+    ) -> "PipeOperatorModelChoiceError":
+        """Locate the deck check's refusal on the pipe and the field that named the model."""
+        message = f"Pipe '{pipe_code}' ({pipe_type}), field '{field_name}': {model_choice_error.message}"
+        return cls(
+            message,
+            pipe_type=pipe_type,
+            pipe_code=pipe_code,
+            domain_code=domain_code,
+            field_name=field_name,
+            model_type=model_choice_error.model_type,
+            model_choice=model_choice_error.model_choice,
+            suggestions=list(model_choice_error.suggestions),
+        )
 
-        # Extract the choice identifier from the model_choice union type
-        if isinstance(self.model_choice, str):
-            # It's a raw string (shouldn't happen but handle it)
-            msg += f" • choice='{self.model_choice}'"
-        elif isinstance(self.model_choice, ModelReference):
-            # It's a ModelReference with kind and name
-            msg += f" • choice='{self.model_choice.raw}' ({self.model_choice.kind})"
-        else:
-            # It's a Setting object with a model field and optional desc()
-            msg += f" • choice={self.model_choice.desc()}"
 
-        return msg
+class PipeLoadRefusalError(PipelexError):
+    """Raised by the library load when building one pipe of a bundle raises a refusal of the caller's input
+    that carries no locator of its own. It names the pipe and its file, and bundle validation reports it
+    as an invalid verdict.
 
-    @override
-    def __str__(self) -> str:
-        return self.desc()
+    The load raises it ``from`` the refusal, so the original stays the ``__cause__``. Bundle validation
+    turns it into one ``pipe_validation`` item carrying the pipe code, the domain and the source, with no
+    ``error_type``, since the refusal has no closed code. Only an ``input``-domained refusal is wrapped: a
+    fault of the configuration or of the runtime keeps its own identity and stays a no-verdict fault.
+
+    Its message is built only from caller-facing material, the caller's own pipe code and either the
+    refusal's message, when that message is caller-facing, or the refusal's title, so it is kept under
+    STRICT disclosure.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+
+    def __init__(self, message: str, *, pipe_code: str, domain_code: str, source: str | None):
+        self.pipe_code = pipe_code
+        self.domain_code = domain_code
+        self.source = source
+        super().__init__(message)
+
+    @classmethod
+    def make_from_refusal(cls, *, refusal: PipelexError, pipe_code: str, domain_code: str, source: str | None) -> "PipeLoadRefusalError":
+        """Locate a refusal on the pipe being built, keeping its message only when it is caller-facing."""
+        message = f"Pipe '{pipe_code}' could not be loaded: {caller_facing_refusal_text(refusal=refusal)}"
+        return cls(message, pipe_code=pipe_code, domain_code=domain_code, source=source)
+
+
+def caller_facing_refusal_text(*, refusal: PipelexError) -> str:
+    """The refusal's message when it was authored as caller-facing copy, otherwise its title.
+
+    A validation verdict is caller-facing as a whole — ``ValidateBundleError`` keeps its message under
+    STRICT disclosure — so text taken from a refusal onto a verdict item must be caller-facing too: a
+    refusal whose message is internal is named by its title, which is always public.
+    """
+    if refusal.to_error_report().caller_facing_message:
+        return refusal.message
+    return type(refusal).title()
 
 
 class PipeValidationError(ValueError):
