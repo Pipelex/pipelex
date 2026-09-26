@@ -1,5 +1,6 @@
 from typing import Any
 
+import jinja2
 from pydantic import ValidationError
 from typing_extensions import override
 
@@ -18,6 +19,23 @@ from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocume
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+
+
+def _describe_template_syntax_error(*, validation_error: ValidationError) -> str:
+    """Say why a prompt does not parse, from Jinja2's own diagnosis, without quoting the prompt.
+
+    A ``PipeLLMFactoryError`` is caller-facing, and the prompt it is about may not be the caller's: a pipe
+    with no system prompt of its own inherits its domain's, which a host's library may have declared.
+    Every layer between Jinja2 and this factory appends the template source to its message, so the text
+    of the pydantic error cannot be used; the parser's message and line are what locate the fault.
+    """
+    for error_details in validation_error.errors():
+        cause: BaseException | None = error_details.get("ctx", {}).get("error")
+        while cause is not None:
+            if isinstance(cause, jinja2.exceptions.TemplateSyntaxError):
+                return f"{cause.message} (line {cause.lineno})"
+            cause = cause.__cause__
+    return "the template does not parse"
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
@@ -51,7 +69,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 prompt_owner = "system prompt" if blueprint.system_prompt else f"system prompt of domain '{domain_code}', which it inherits,"
                 error_msg = (
                     f"Template syntax error in the {prompt_owner} for pipe '{pipe_code}' "
-                    f"in domain '{domain_code}': {exc}. Template source:\n{system_prompt}"
+                    f"in domain '{domain_code}': {_describe_template_syntax_error(validation_error=exc)}."
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
@@ -64,10 +82,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
             except ValidationError as exc:
                 # `TemplateBlueprint` reports a template that does not parse as a pydantic validation error.
-                error_msg = (
-                    f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': "
-                    f"{exc}. Template source:\n{blueprint.prompt}"
-                )
+                diagnosis = _describe_template_syntax_error(validation_error=exc)
+                error_msg = f"Template syntax error in the prompt for pipe '{pipe_code}' in domain '{domain_code}': {diagnosis}."
                 raise PipeLLMFactoryError(error_msg) from exc
 
         # Template analyzers read the slot grammar only, so they get the concept-spec projection.

@@ -211,4 +211,7 @@ class TestFactoryRefusalVerdicts:
         assert item.pipe_code == "write_note"
         assert item.source == str(bundle_path)
         assert "system prompt of domain 'almanac_notes', which it inherits, for pipe 'write_note' in domain" in item.message
-        assert "{% if %}" in item.message
+        assert "(line 1)" in item.message
+        # The inherited prompt may be a host's, so its text never rides the caller-facing verdict.
+        strict_report = raised.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert "harbour users" not in str(strict_report)

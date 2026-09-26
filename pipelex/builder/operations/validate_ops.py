@@ -62,8 +62,7 @@ async def validate_all(
 
     # No `pending_signatures` here by design: it is a per-bundle, top-down-build nudge ("which headers
     # are still unimplemented in this bundle"), surfaced only by `validate bundle`. The validate-all
-    # sweep is a whole-library check, not a build step — and `acquire_and_validate` tears its library
-    # down before returning, so the set could not be computed post-hoc without reshaping a shared method.
+    # sweep is a whole-library check, not a build step, so it makes no runnability claim to back.
     return {
         "success": True,
         "is_valid": True,
