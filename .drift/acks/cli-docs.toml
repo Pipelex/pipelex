@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:ca6b0b0d82fcc1591d2f7280eaa3524032ba1798903402c939e49e0ef780c6c5"
+digest = "sha256:03a8640b2ecb8e8534da81dec26f5575757de5d05f542dec2554de7934df18eb"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T16:13:26Z"
-rationale = "The run arms of pipelex-agent now build their extra fields with run_failure_fields(): pipe_code and pipe_stack name the failing pipe and its path, and cause_type and cause_message are the root fault's instead of the router wrapper's. docs/tools/cli/agent-cli.md gains a paragraph on the failed-run envelope, and pipelex/cli/agent_cli/CLAUDE.md records the run arms as the deliberate exception to naming the class that failed. pipelex run's PipelineExecutionError arm now renders the model panel found on the cause chain (handle_dedicated_failure_panel) and the panel's fallback tip carries the local-deck remedy the ModelNotFoundError message used to carry; docs/tools/cli/run.md describes no failure output, so nothing there is stale."
+reviewed_at = "2026-09-26T16:55:21Z"
+rationale = "validate bundle's --graph and --view failure arms now build their pipe_code, pipe_stack, cause_type and cause_message with run_failure_fields(), the same helper as the run commands, so cause_type names the root fault instead of the router wrapper. docs/tools/cli/agent-cli.md already describes those four fields for a failed run and does not describe the validate graph arms' error envelope separately; pipelex/cli/agent_cli/CLAUDE.md names run_failure_fields as the helper. No further doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -49,7 +49,7 @@ rationale = "The run arms of pipelex-agent now build their extra fields with run
 "pipelex/cli/agent_cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:df07de7f203f57041907e080bc5fd80f9f593301"
 "pipelex/cli/agent_cli/commands/validate/app.py" = "blob:d2d0ed19288c2d1c25be1650dd962189fcdb3b86"
-"pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:27cc2c0b0a7fb5d3a232c6c3ce44663572e14260"
+"pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:331a2b2edd036e8d891d7f590707b4efe2f24090"
 "pipelex/cli/agent_cli/commands/validate/method_cmd.py" = "blob:794914167c13975bc0cdff7b301a8268ff1b79b6"
 "pipelex/cli/agent_cli/commands/validate/pipe_cmd.py" = "blob:2f7dce6a1d3d9987aa14146bac79d6b0e7e985e1"
 "pipelex/cli/bundle_target_resolution.py" = "blob:8dccc50b700b877968ed1b2c1c3652ab1c32e956"

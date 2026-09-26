@@ -17,7 +17,8 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipe_run.exceptions import DryRunError
+from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity, scoped_caller_identity
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -200,6 +201,23 @@ class TestBundleValidator:
 
         assert results["dom.sig_pipe"].status.is_success
         prepare_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_foreign_exception_located_by_the_router_propagates(self, mocker: MockerFixture) -> None:
+        """A programming bug a pipe raised, located by the router, is not recorded as the bundle's failure."""
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        unexpected_failure = make_unexpected_failure(error=KeyError("foo"))
+        located = PipeRouterError.make_located(
+            failure=unexpected_failure, run_mode=PipeRunMode.DRY, pipe_code="buggy_pipe", output_name=None, pipe_stack=["buggy_pipe"]
+        )
+        located.__cause__ = unexpected_failure
+        pipe_run.run = mocker.AsyncMock(side_effect=located)
+        pipe = self._make_pipe(mocker, code="buggy_pipe", pipe_ref="dom.buggy_pipe")
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert exc_info.value is located
 
     @pytest.mark.asyncio
     async def test_wiring_error_propagates(self, mocker: MockerFixture) -> None:

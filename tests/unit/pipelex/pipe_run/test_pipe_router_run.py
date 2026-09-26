@@ -4,7 +4,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
+from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -50,6 +50,37 @@ class _PassThroughRouter(_StubPipeRouter):
         if isinstance(error, RuntimeError):
             return None
         return super()._as_pipelex_failure(error=error)
+
+
+class _RecoveredReportCarrierError(PipelexError):
+    """Carries a root fault's report recovered across a transport boundary."""
+
+    def __init__(self, message: str, *, error_report: ErrorReport):
+        super().__init__(message)
+        self.error_report = error_report
+
+    @override
+    def to_error_report(self) -> ErrorReport:
+        return self.error_report
+
+
+class _RelocatingHostRouter(_StubPipeRouter):
+    """A host router whose transport packed the root fault's report and the location found on the far side."""
+
+    def __init__(self, error: Exception, *, packed_report: ErrorReport, packed_pipe_code: str, packed_pipe_stack: list[str]):
+        super().__init__(error=error)
+        self._packed_report = packed_report
+        self._packed_pipe_code = packed_pipe_code
+        self._packed_pipe_stack = packed_pipe_stack
+
+    @override
+    def _as_pipelex_failure(self, *, error: Exception) -> PipelexError | None:
+        carrier = _RecoveredReportCarrierError(self._packed_report.message, error_report=self._packed_report)
+        located = PipeRouterError.make_located(
+            failure=carrier, run_mode=PipeRunMode.LIVE, pipe_code=self._packed_pipe_code, output_name=None, pipe_stack=self._packed_pipe_stack
+        )
+        located.__cause__ = carrier
+        return located
 
 
 class _MiniPayload(BaseModel):
@@ -168,6 +199,25 @@ class TestPipeRouterRun:
             await router.run(_make_pipe_job())
 
         assert exc_info.value is inner_failure
+
+    async def test_a_host_router_rebuilding_the_far_location_is_not_located_again(self) -> None:
+        """A located failure the hook rebuilds from a packed report and location passes through, located once."""
+        root_report = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).to_error_report()
+        router = _RelocatingHostRouter(
+            error=RuntimeError("child workflow failed"),
+            packed_report=root_report,
+            packed_pipe_code="leaf",
+            packed_pipe_stack=["flow", "ctrl", "leaf"],
+        )
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await router.run(_make_pipe_job())
+
+        assert exc_info.value.pipe_code == "leaf"
+        assert isinstance(exc_info.value.__cause__, _RecoveredReportCarrierError)
+        report = exc_info.value.to_error_report()
+        assert report.error_type == "CogtError"
+        assert report.message == "Pipe 'leaf' failed (flow → ctrl → leaf): rate limited"
 
     async def test_a_host_router_can_let_a_failure_through(self) -> None:
         """A host router whose hook answers None sees its transport's exception propagate unchanged."""

@@ -72,6 +72,10 @@ class PipeRouterProtocol(Protocol):
             failure = self._as_pipelex_failure(error=exc)
             if failure is None:
                 raise
+            if find_failure_location(error=failure) is not None:
+                # The host rebuilt the location its transport carried: it is not located again, and the
+                # chain it built down to the recovered report is kept (a `from exc` would cut it off).
+                raise failure from failure.__cause__
             raise PipeRouterError.make_located(
                 failure=failure,
                 run_mode=pipe_job.pipe_run_params.run_mode,
@@ -94,11 +98,18 @@ class PipeRouterProtocol(Protocol):
         Any other exception is foreign to Pipelex: it is wrapped into a `PipelexUnexpectedError`
         that names its class and is never caller-facing, so it no longer escapes the runner raw.
 
-        A host router overrides this for the exceptions its own transport raises. It converts a
-        transport failure that carries a recovered report into a `PipelexError` carrying that
-        report, chained to the transport failure, so the pipe is located with the leaf's identity;
-        and it returns `None` for a control-flow exception its runtime must see unchanged, such as
-        a cancellation.
+        A host router overrides this for the exceptions its own transport raises, and returns `None`
+        for a control-flow exception its runtime must see unchanged, such as a cancellation. A
+        transport failure carrying a recovered report is converted according to what the far side
+        packed, which must never be a report that is already located, since this router would
+        locate it again:
+
+        - the root fault's own report alone (`find_root_fault(...).to_error_report()`): return a
+          `PipelexError` carrying it, and this router locates it at the pipe it ran;
+        - that report together with the location the far side found (`find_failure_location(...)`,
+          its `pipe_code` and `pipe_stack`): return `PipeRouterError.make_located(...)` over a
+          `PipelexError` carrying the report, chained to it. It already names its pipe, so this
+          router raises it untouched, and the report reads exactly as the local run's.
         """
         if isinstance(error, PipelexError):
             return error

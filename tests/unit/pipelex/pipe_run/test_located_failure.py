@@ -9,7 +9,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
-from pipelex.pipe_run.located_failure import compose_located_message, find_root_fault
+from pipelex.pipe_run.located_failure import compose_located_message, find_foreign_fault, find_root_fault, make_unexpected_failure
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -72,6 +72,15 @@ class TestLocatedFailureReport:
     def test_compose_located_message(self, pipe_stack: list[str], expected_message: str) -> None:
         """A nested pipe names its path, an entry pipe does not, and an unknown location leaves the message alone."""
         assert compose_located_message(pipe_code="summarize", pipe_stack=pipe_stack, message="boom") == expected_message
+
+    def test_foreign_fault_is_found_only_behind_a_stand_in(self) -> None:
+        """The foreign exception a located PipelexUnexpectedError stands in for is found; a Pipelex root fault has none."""
+        foreign_fault = KeyError("boom")
+        located_foreign = _locate(make_unexpected_failure(error=foreign_fault), pipe_stack=["flow", "analyze"])
+        located_pipelex = _locate(PipelexError("combine failed"), pipe_stack=["flow", "analyze"])
+
+        assert find_foreign_fault(error=_wrap_in_runner(located_foreign, entry_pipe_code="flow")) is foreign_fault
+        assert find_foreign_fault(error=located_pipelex) is None
 
     def test_identity_and_message_are_the_root_faults(self) -> None:
         """Through the router, a bridge and the runner, the report is the root fault's, located once."""

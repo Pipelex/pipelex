@@ -16,8 +16,10 @@ wrong. The report of such a failure is therefore built from its **root fault**, 
 
 `ErrorReport` has no location field, so the location rides the message until the error contract
 gives it one. A root fault whose report was recovered across a transport boundary (a report
-carried by a `PipelexError`, the way a distributed worker's submitter carries it) is taken as it is,
-so a report located on the worker is not located a second time on the submitter.
+carried by a `PipelexError`, the way a distributed worker's submitter carries it) is taken as it is:
+at the runner, with no location on the chain, it is reported unchanged, and a host router packs
+the root fault's own report with its location rather than a located report (see
+`PipeRouterProtocol._as_pipelex_failure`), so nothing is located twice.
 """
 
 from pydantic import ValidationError
@@ -42,6 +44,23 @@ def find_root_fault(*, error: BaseException) -> PipelexError | None:
         if isinstance(node, PipelexError):
             root_fault = node
     return root_fault
+
+
+def find_foreign_fault(*, error: BaseException) -> BaseException | None:
+    """Return the non-Pipelex exception a run failure stands in for, or `None`.
+
+    That is the cause of a root fault that is a `PipelexUnexpectedError` standing in for a foreign
+    exception, the way the pipe router wraps one. A surface that sorts failures into its own domain
+    failures and programming bugs uses it to let the bugs propagate rather than report them as
+    the caller's.
+    """
+    root_fault = find_root_fault(error=error)
+    if not isinstance(root_fault, PipelexUnexpectedError):
+        return None
+    foreign_fault = root_fault.__cause__
+    if foreign_fault is None or isinstance(foreign_fault, PipelexError):
+        return None
+    return foreign_fault
 
 
 def compose_located_message(*, pipe_code: str, pipe_stack: list[str], message: str) -> str:
