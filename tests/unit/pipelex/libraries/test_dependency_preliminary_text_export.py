@@ -75,6 +75,7 @@ class TestDependencyPreliminaryTextExport:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/review-dep",
             resolved_dep=self._build_resolved_dep(tmp_path=tmp_path, exported={"make_review"}),
         )
 
@@ -101,6 +102,7 @@ class TestDependencyPreliminaryTextExport:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/review-dep",
             resolved_dep=self._build_resolved_dep(tmp_path=tmp_path, exported=set()),
         )
 

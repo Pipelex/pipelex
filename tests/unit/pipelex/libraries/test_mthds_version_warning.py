@@ -84,6 +84,7 @@ class TestMthdsVersionWarning:
 
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/dep-pkg",
             resolved_dep=resolved_dep,
         )
 

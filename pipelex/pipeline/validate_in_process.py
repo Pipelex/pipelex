@@ -50,6 +50,7 @@ async def validate_bundles_in_process(
     graph_pipe_code: str | None = None,
     log_context: str = "validate",
     caller_identity: CallerIdentity | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> PipelexValidationReport:
     """Parse, validate, and dry-run MTHDS bundles in-process; assemble the canonical report.
 
@@ -78,6 +79,9 @@ async def validate_bundles_in_process(
             ambient caller for the whole pass — the sweep's telemetry event and every dry run,
             the graph arm's included — so none of it falls back to the telemetry stream's
             configured id. ``None`` inherits the caller already in scope, if any.
+        library_dirs_are_callers: Whether ``library_dirs`` are the caller's own, whose files the
+            verdict may name; by default they are a host's, whose files it withholds (see
+            ``validate_bundle``).
 
     Returns:
         PipelexValidationReport with the structural artifacts of a valid bundle.
@@ -93,6 +97,7 @@ async def validate_bundles_in_process(
             allow_signatures=allow_signatures,
             graph_pipe_code=graph_pipe_code,
             log_context=log_context,
+            library_dirs_are_callers=library_dirs_are_callers,
         )
 
 
@@ -104,6 +109,7 @@ async def _validate_bundles_in_scope(
     allow_signatures: bool,
     graph_pipe_code: str | None,
     log_context: str,
+    library_dirs_are_callers: bool,
 ) -> PipelexValidationReport:
     """The body of :func:`validate_bundles_in_process`, run inside the caller's scope."""
     # `validate_bundle` deliberately leaves its validation library OPEN and current on
@@ -128,6 +134,7 @@ async def _validate_bundles_in_scope(
             mthds_sources=mthds_sources,
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
+            library_dirs_are_callers=library_dirs_are_callers,
         )
         # Capture the validation library id ONCE, right after validate_bundle leaves it
         # current — the graph arm and the finally must target the SAME library even if

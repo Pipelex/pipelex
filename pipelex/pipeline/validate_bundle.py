@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Sequence
 
@@ -25,7 +26,7 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprin
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
 from pipelex.system.caller_identity import CallerIdentity
 
 
@@ -121,12 +122,20 @@ async def validate_bundle(
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
     caller_identity: CallerIdentity | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> ValidateBundleResult:
     """Load one bundle into a fresh library and dry-run its pipes.
 
     ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
     sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
     inherits the caller already in scope, and with none the sweep belongs to nobody.
+
+    ``library_dirs_are_callers`` says whose library directories are loaded beside submitted
+    ``mthds_contents``, as it does on the run path (``acquire_library``). By default they are a
+    host's, so the verdict names none of their files (``withholding_host_library_files``); a
+    caller validating content against its own directories passes True and keeps every path. A
+    bundle file is validated on the caller's own disk, among the caller's own directories, and
+    keeps every path whatever this says.
     """
     provided_params = sum(
         [
@@ -173,8 +182,17 @@ async def validate_bundle(
 
         loaded_pipes: list[PipeAbstract] | None = None
         loaded_blueprints: list[PipelexBundleBlueprint] | None = None
+        # Beside submitted content, a host's library directories are withheld from the verdict: their files are paths
+        # on the host. The caller's own directories, and every directory of a bundle file, keep their paths.
+        host_library_withholding: AbstractContextManager[None]
+        if mthds_contents is not None and not library_dirs_are_callers:
+            host_library_withholding = withholding_host_library_files(
+                library_dirs=effective_dirs, caller_sources=[source for source in mthds_sources or [] if source is not None]
+            )
+        else:
+            host_library_withholding = nullcontext()
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
-        with translate_to_validate_bundle_error():
+        with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
                 library_manager.load_libraries(

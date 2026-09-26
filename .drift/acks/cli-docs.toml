@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:a850055ad2e80a2b4336e05f2392b2d5e4948d6d1d1c7f89577c58afb9a08949"
+digest = "sha256:229a4949a875eda921bcf2140b72ee235127088224474f799522084b7a25d358"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T20:28:16Z"
-rationale = "validate_all_core lets acquire_library translate the caller's library load itself (library_dirs_are_callers=True) so an item keeps its file; the envelope, exit codes and the DryRunError answer of validate pipe --all are unchanged, so docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md stay accurate."
+reviewed_at = "2026-09-26T22:14:07Z"
+rationale = "PreviewSandbox.to_original now passes a relative name outside the sandbox through as given (a dependency's bundle named by its package's address is not a file); docs/tools/cli/fix.md describes --diff as a preview with the same verdict semantics and never documents the path mapping, and the agent CLI contract is untouched, so both review targets stay accurate."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -84,7 +84,7 @@ rationale = "validate_all_core lets acquire_library translate the caller's libra
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
 "pipelex/cli/commands/doctor_cmd.py" = "blob:26db32ff20d1c064bc421093825a05e980c9b770"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
+"pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:d39c0df92b95567f74881deb01f8c1b3119fc8ef"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:dac7056fcaf50210c910e4cad1ba14328b7f8adc"
 "pipelex/cli/commands/fix/app.py" = "blob:6f019930e8e3e0043ee46d87493ba4602eb33a76"
 "pipelex/cli/commands/fix/bundle_cmd.py" = "blob:427364cc453957dfe0cec879f019050329c13b3c"

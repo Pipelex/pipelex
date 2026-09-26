@@ -66,6 +66,7 @@ class TestDependencyPipeBuildRefusals:
         mocker.patch.object(get_library_manager(), "get_current_library", return_value=library)
         LibraryManager()._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/harbour-board/harbour-dep",
             resolved_dep=resolved_dep,
         )
         return mthds_file
@@ -82,7 +83,7 @@ class TestDependencyPipeBuildRefusals:
         assert refusal.domain_code == _DEP_DOMAIN
         assert refusal.field_name == "model"
         assert refusal.model_choice == "@best-sonet"
-        assert refusal.source == str(tmp_path / "harbour_dep.mthds")
+        assert refusal.source == "github.com/harbour-board/harbour-dep/harbour_dep.mthds"
 
     def test_unknown_model_in_a_dependency_helper_names_the_authored_pipe(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A ``preliminary_text`` helper of a dependency pipe is reported on the pipe and field its author wrote."""
@@ -92,7 +93,7 @@ class TestDependencyPipeBuildRefusals:
         refusal = raised.value
         assert refusal.pipe_code == "extract_tide"
         assert refusal.field_name == "model_to_structure"
-        assert refusal.source == str(tmp_path / "harbour_dep.mthds")
+        assert refusal.source == "github.com/harbour-board/harbour-dep/harbour_dep.mthds"
 
     def test_other_input_refusal_in_a_dependency_pipe_is_located(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Any other refusal of the caller's input raised while building a dependency pipe is located on that pipe and file."""
@@ -108,5 +109,5 @@ class TestDependencyPipeBuildRefusals:
         refusal = raised.value
         assert refusal.pipe_code == "score_tide"
         assert refusal.domain_code == _DEP_DOMAIN
-        assert refusal.source == str(tmp_path / "harbour_dep.mthds")
+        assert refusal.source == "github.com/harbour-board/harbour-dep/harbour_dep.mthds"
         assert isinstance(refusal.__cause__, _InternalInputRefusalError)

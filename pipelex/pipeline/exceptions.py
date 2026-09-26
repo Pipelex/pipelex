@@ -1,3 +1,7 @@
+import re
+from collections.abc import Collection
+from typing import NamedTuple, TypeVar
+
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
@@ -111,6 +115,49 @@ def _summarize_bundle_validation_message(
     return f"{len(item_messages)} validation errors (first: {first_message})"
 
 
+# The error-data models that carry a ``source`` beside their ``message``.
+_SourcedErrorData = TypeVar("_SourcedErrorData", PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData)
+
+# A withheld name counts only standing on its own: not preceded by a character that could continue a path, a URI
+# or an identifier, and not followed by one. So a host file spelled ``notices.mthds`` is not found inside the
+# caller's ``api://notices.mthds`` or a dependency's ``tide_notices.mthds``.
+_NAME_START_GUARD = r"(?<![\w.\-/\\:])"
+_NAME_END_GUARD = r"(?![\w.\-/\\])"
+
+
+class _FileWithholding(NamedTuple):
+    """The names a verdict must not carry, and what a message reads in their place."""
+
+    names: frozenset[str]
+    pattern: re.Pattern[str]
+    placeholder: str
+
+    @classmethod
+    def make_from_names(cls, *, names: Collection[str], placeholder: str) -> "_FileWithholding":
+        if not names:
+            # Nothing to withhold: a pattern that never matches, where an empty alternation would match everywhere.
+            return cls(names=frozenset(), pattern=re.compile(r"(?!)"), placeholder=placeholder)
+        # Longest first, so a name that extends another is replaced whole.
+        alternatives = "|".join(re.escape(name) for name in sorted(set(names), key=len, reverse=True))
+        pattern = re.compile(f"{_NAME_START_GUARD}(?:{alternatives}){_NAME_END_GUARD}")
+        return cls(names=frozenset(names), pattern=pattern, placeholder=placeholder)
+
+    def withheld_text(self, *, text: str) -> str:
+        return self.pattern.sub(lambda _match: self.placeholder, text)
+
+    def withheld_errors(self, *, errors: list[_SourcedErrorData]) -> list[_SourcedErrorData]:
+        """The error data without a withheld name as its ``source`` or in its ``message``."""
+        return [
+            error.model_copy(
+                update={
+                    "source": None if error.source in self.names else error.source,
+                    "message": self.withheld_text(text=error.message),
+                }
+            )
+            for error in errors
+        ]
+
+
 class ValidateBundleError(PipelexError):
     """Raised when a bundle is refused while it is loaded or validated: the invalid verdict, carrying one
     structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one —
@@ -176,6 +223,36 @@ class ValidateBundleError(PipelexError):
                 dry_run_error_message=self.dry_run_error_message,
                 raw_message=message,
             )
+        )
+
+    def withholding_files(self, *, withheld_files: Collection[str], placeholder: str) -> "ValidateBundleError":
+        """This verdict with the given files taken out of every channel that could name them.
+
+        An item whose ``source`` is one of ``withheld_files`` carries no ``source``, and every message, the
+        items' and the verdict's own, reads ``placeholder`` where it named one of them standing on its own,
+        never inside a longer name. Everything else is kept, the items' locators included, so it is the same
+        answer about the same bundle. Every channel the constructor takes is carried here: a channel added to
+        it must be added here too, which ``test_validate_bundle_error_withholding`` pins. A validator of
+        submitted content uses it to keep the files of the host's own library directories, paths on the host,
+        out of a verdict that STRICT disclosure hands the caller verbatim.
+
+        Args:
+            withheld_files: Every spelling of every file the verdict must not name.
+            placeholder: What a message reads where it named one of them.
+
+        Returns:
+            A new verdict; this one is left as it is.
+        """
+        withholding = _FileWithholding.make_from_names(names=withheld_files, placeholder=placeholder)
+        return ValidateBundleError(
+            message=withholding.withheld_text(text=self.message),
+            pipelex_bundle_blueprint_validation_errors=withholding.withheld_errors(errors=self.pipelex_bundle_blueprint_validation_errors),
+            pipe_factory_errors=[
+                error.model_copy(update={"message": withholding.withheld_text(text=error.message)}) for error in self.pipe_factory_errors
+            ],
+            pipe_validation_errors=withholding.withheld_errors(errors=self.pipe_validation_errors),
+            pipe_concept_instantiation_errors=withholding.withheld_errors(errors=self.pipe_concept_instantiation_errors),
+            dry_run_error_message=(withholding.withheld_text(text=self.dry_run_error_message) if self.dry_run_error_message is not None else None),
         )
 
     @property

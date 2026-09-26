@@ -111,6 +111,7 @@ class TestDependencyMultiFileReconciliation:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/summary-dep",
             resolved_dep=self._build_resolved_dep(
                 tmp_path=tmp_path,
                 file_contents=[("header.mthds", DEP_HEADER_MTHDS), ("definition.mthds", DEP_CONCRETE_MTHDS)],
@@ -139,6 +140,7 @@ class TestDependencyMultiFileReconciliation:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/summary-dep",
             resolved_dep=self._build_resolved_dep(
                 tmp_path=tmp_path,
                 file_contents=[("header.mthds", DEP_TYPELESS_HEADER_MTHDS), ("definition.mthds", DEP_CONCRETE_MTHDS)],
@@ -164,6 +166,7 @@ class TestDependencyMultiFileReconciliation:
         with pytest.raises(PipeLibraryError):
             manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 library=library,
+                package_address="github.com/org/summary-dep",
                 resolved_dep=self._build_resolved_dep(
                     tmp_path=tmp_path,
                     file_contents=[("def_a.mthds", DEP_CONCRETE_MTHDS), ("def_b.mthds", DEP_CONCRETE_DUP_MTHDS)],
