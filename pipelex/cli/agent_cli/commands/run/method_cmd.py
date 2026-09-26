@@ -11,7 +11,13 @@ import typer
 from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_success_formatted,
+    run_failure_fields,
+    set_agent_cli_error_format,
+)
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
@@ -194,14 +200,7 @@ def run_method_cmd(
                 )
 
             except PipelineExecutionError as exc:
-                extra_fields: dict[str, Any] = {
-                    "pipe_code": exc.pipe_code,
-                    "pipe_stack": exc.pipe_stack,
-                }
-                if exc.__cause__:
-                    extra_fields["cause_type"] = type(exc.__cause__).__name__
-                    extra_fields["cause_message"] = str(exc.__cause__)
-                agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **extra_fields)
+                agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **run_failure_fields(error=exc))
 
             except PipeOperatorModelChoiceError as exc:
                 agent_error(

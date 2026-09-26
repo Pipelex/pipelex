@@ -15,6 +15,7 @@ from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_p
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_dedicated_failure_panel,
     handle_model_availability_error,
     handle_model_choice_error,
     print_traceback_if_requested,
@@ -242,8 +243,13 @@ async def _execute_run(
         )
         pipe_output = response.pipe_output
     except PipelineExecutionError as exc:
+        # A failure whose cause has a dedicated panel (a model that is not available, a model choice
+        # that cannot be read) renders it: the panel names the pipe that failed, the model and the stack.
+        handle_dedicated_failure_panel(error=exc, context=ErrorContext.PIPE_RUN)
         print_traceback_if_requested(console=get_console())
-        typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
+        # The message names the pipe that failed and its path; the pipeline named first is the entry pipe.
+        entry_pipe_code = exc.pipe_stack[0] if exc.pipe_stack else exc.pipe_code
+        typer.secho(f"Failed to execute pipeline '{entry_pipe_code}': {exc.message}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
     except PipelexError as exc:
         print_traceback_if_requested(console=get_console())

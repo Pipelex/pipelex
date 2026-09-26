@@ -29,7 +29,8 @@ from typing import Any, NoReturn, cast
 import typer
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipe_run.located_failure import find_root_fault
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.tools.misc.json_utils import clean_json_dumps
@@ -452,6 +453,32 @@ def agent_success_formatted(
             agent_success(result)
         case CliOutputFormat.MARKDOWN:
             print(markdown_renderer(result))
+
+
+def run_failure_fields(*, error: PipelineExecutionError) -> dict[str, Any]:
+    """The fields an agent reads off a failed run, beside the report-derived ones.
+
+    ``pipe_code`` and ``pipe_stack`` name the pipe that failed and its path from the entry pipe.
+    ``cause_type`` and ``cause_message`` are the root fault's identity and its own message, not
+    those of the wrapper right under the ``PipelineExecutionError``, which is the pipe router's or
+    a bridge's and says nothing about what went wrong.
+    """
+    fields: dict[str, Any] = {
+        "pipe_code": error.pipe_code,
+        "pipe_stack": error.pipe_stack,
+    }
+    cause = error.__cause__
+    if cause is None:
+        return fields
+    root_fault = find_root_fault(error=cause)
+    if root_fault is None:
+        fields["cause_type"] = type(cause).__name__
+        fields["cause_message"] = str(cause)
+    else:
+        root_report = root_fault.to_error_report()
+        fields["cause_type"] = root_report.error_type
+        fields["cause_message"] = root_report.message
+    return fields
 
 
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:

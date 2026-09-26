@@ -57,9 +57,8 @@ class TestErrorReportLocalFullChain:
             await get_pipe_router().run(pipe_job=failing_pipe_job_local)
 
         # The classification fields — the parity target. error_type / message
-        # legitimately differ from the Temporal arm (PipeRouterError vs
-        # WorkflowExecutionError; PipeLLM wraps the leaf message), so they are
-        # not asserted here.
+        # are not part of this pair (the local report names the root fault,
+        # located at the failing pipe), so they are not asserted here.
         report = exc_info.value.to_error_report()
         assert report.error_category == ErrorReportParityTestData.FAILURE_CATEGORY
         assert report.retryable == ErrorReportParityTestData.EXPECTED_RETRYABLE

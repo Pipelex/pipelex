@@ -26,7 +26,6 @@ from pipelex.interpreter_hub import (
     get_pipeline_manager,
     set_current_library,
 )
-from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -252,32 +251,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
             pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
-        except PipeRouterError as exc:
-            # PipeRouterError can only be raised by get_pipe_run().run(), so pipe_job is guaranteed to exist
-            assert pipe_job is not None  # for type checker
-            properties = {
-                EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
-                EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
-                EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
-            }
-            get_telemetry_manager().track_event(
-                event_name=EventName.PIPELINE_COMPLETE,
-                properties=properties,
-                run_metadata=pipe_job.job_metadata.run_metadata,
-            )
-            raise PipelineExecutionError(
-                message=exc.message,
-                run_mode=pipe_job.pipe_run_params.run_mode,
-                pipe_code=pipe_job.pipe.code,
-                output_name=pipe_job.output_name,
-                # The live pipe_stack has fully unwound by now; PipeRouterError carries the
-                # snapshot taken where the failure occurred.
-                pipe_stack=exc.pipe_stack,
-            ) from exc
         except PipelexError as exc:
-            # Catch other Pipelex errors that bypass the router's PipeRunError handling
-            # (e.g., PipeRunInputsError raised directly from pipe_abstract.py)
-            # If pipe_job is None, the error occurred during pipeline_run_setup before pipe_job was created
+            # If pipe_job is None, the error occurred during pipeline_run_setup, before the job existed:
+            # it is not a run failure, and it propagates untouched.
             if pipe_job is None:
                 raise
             properties = {
@@ -290,12 +266,15 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 properties=properties,
                 run_metadata=pipe_job.job_metadata.run_metadata,
             )
-            raise PipelineExecutionError(
-                message=exc.message,
+            # Every failure of the run, whether a pipe's (located by its router as a PipeRouterError)
+            # or one raised around the pipes (a bridge, a delivery), wrapped into the one class hosts
+            # catch. The location comes from the failure's cause chain: the live pipe_stack has
+            # fully unwound by now.
+            raise PipelineExecutionError.make_for_run_failure(
+                failure=exc,
                 run_mode=pipe_job.pipe_run_params.run_mode,
-                pipe_code=pipe_job.pipe.code,
+                entry_pipe_code=pipe_job.pipe.code,
                 output_name=pipe_job.output_name,
-                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
             ) from exc
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)

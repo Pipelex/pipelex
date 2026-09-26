@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.traceback import Traceback
 
-from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem, iter_cause_chain
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -173,8 +173,16 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
     if len(exc.pipe_stack) > 1:
         stack_str = " [dim]→[/dim] ".join([f"[yellow]{escape(stacked_pipe)}[/yellow]" for stacked_pipe in exc.pipe_stack])
         fields.append(("Pipe Stack", stack_str))
+    # The local-deck remedy is given here and nowhere else: the model error's own message reaches
+    # every surface, hosted ones included, whose readers have no local deck to refresh.
     tip = report.user_action_detail() or (
-        f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
+        "Your local model deck may be out of date: new aliases and presets are added to Pipelex over time, and existing "
+        "'.pipelex/inference/deck/*.toml' files are not refreshed automatically. To pick up the latest definitions, delete "
+        "your local deck files under '.pipelex/inference/deck/' (or the whole '.pipelex/inference/' directory) and run "
+        "'pipelex init inference' to regenerate them.\n"
+        "If that does not resolve it, make sure the handle is defined in one of '.pipelex/inference/deck/*.toml', that the "
+        "backend it routes to (see '.pipelex/inference/routing_profiles.toml') is enabled in '.pipelex/inference/backends.toml', "
+        f"and that you have the necessary credentials, or specify a different model in the '{exc.pipe_code}' pipe."
     )
     display_error_panel(
         console=console,
@@ -188,6 +196,21 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
         ],
     )
     raise typer.Exit(exit_code) from exc
+
+
+def handle_dedicated_failure_panel(*, error: BaseException, context: ErrorContext) -> None:
+    """Render the dedicated panel of the first error on `error`'s cause chain that has one, and exit.
+
+    A run failure reaches the CLI as a `PipelineExecutionError` around the located failure, so a
+    handler written for the model errors never matches it directly: this walks the cause chain for
+    them, and the panel then names the pipe that failed, the model and the stack. Returns without
+    printing anything when no error on the chain has a dedicated panel.
+    """
+    for node in iter_cause_chain(error):
+        if isinstance(node, PipeOperatorModelAvailabilityError):
+            handle_model_availability_error(node, context=context)
+        if isinstance(node, PipeOperatorModelChoiceError):
+            handle_model_choice_error(node, context=context)
 
 
 def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, context: ErrorContext) -> NoReturn:

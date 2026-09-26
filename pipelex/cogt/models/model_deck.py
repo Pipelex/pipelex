@@ -835,19 +835,10 @@ class ModelDeck(ConfigModel):
     def get_required_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:
         inference_model = self.get_optional_inference_model(model_handle=model_handle, model_type=model_type)
         if inference_model is None:
-            msg = (
-                f"Model handle '{model_handle}' was not found in the model deck.\n"
-                "The most likely cause is that your local model deck is out of date: new aliases and presets are added to Pipelex "
-                "over time and existing '.pipelex/inference/deck/*.toml' files are not automatically refreshed (yet). "
-                "To pick up the latest definitions, delete your local deck files under '.pipelex/inference/deck/' "
-                "(or the whole '.pipelex/inference/' directory) and run 'pipelex init inference' to regenerate them.\n"
-                "If that doesn't resolve it: make sure the handle is defined in one of '.pipelex/inference/deck/*.toml', "
-                "that the backend it routes to (see '.pipelex/inference/routing_profiles.toml') is enabled in "
-                "'.pipelex/inference/backends.toml', and that you have the necessary credentials. "
-                "Learn more about the inference backend system in the Pipelex documentation: "
-                f"{URLs.backend_provider_docs}"
-            )
-
+            # The message states the fact and nothing else: it reaches every surface a run failure
+            # reaches, a hosted run's stored error included, whose reader has no local deck. The
+            # remedy for a stale local deck is the local CLI's to give, in its model panel.
+            msg = f"Model handle '{model_handle}' was not found in the model deck."
             raise ModelNotFoundError(message=msg, model_handle=model_handle)
         if model_handle not in self.inference_models:
             log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
