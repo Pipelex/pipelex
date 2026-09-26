@@ -81,9 +81,11 @@ def acquire_library(
     uses, so a run on an invalid bundle is refused before any pipe runs with the ``ValidateBundleError``
     and the same located ``validation_errors`` validating that bundle gives, instead of the raw class
     of whichever check refused it. What the translation leaves raw stays raw: a fault of the tool or
-    its environment, a security refusal, and a ``PipeNotFoundError``. The contents carry no source of
-    their own here, so the items carry none: the run request names no file, and a host's own paths
-    must never ride ``validation_errors[].source``, which STRICT disclosure keeps verbatim.
+    its environment, a security refusal, and a ``PipeNotFoundError``. No source is threaded onto the
+    contents here, so their items carry none: a hosted run request names no file, and giving a
+    blueprint a source also changes where its address-based dependencies are searched for. A package
+    the bundle depends on by address still loads from its install directory inside this translation,
+    exactly as on the in-memory validate path, so its refusals can name that directory.
 
     ``library_dirs_are_callers`` says whose ``library_dirs`` are. On a local run they are the
     caller's own (a CLI's ``-L``, the directory of the bundle being run), so a refusal while loading

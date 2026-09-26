@@ -46,7 +46,7 @@ pipelex-agent run method <NAME> [OPTIONS]
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
-A run refuses an invalid bundle while loading it, before any pipe runs, with exit code `1` and an error envelope whose `error_type` is `ValidateBundleError` and whose `validation_errors` array holds the same located items `validate` gives for that bundle, each with its pipe, its field and its suggested fix when it has one. A refusal found while loading a library directory you pass with `-L` (or the bundle's own directory) is reported the same way. In markdown, the items render as the same grouped prose `validate` prints.
+A run refuses an invalid bundle while loading it, before any pipe runs, with exit code `1` and an error envelope whose `error_type` is `ValidateBundleError` and whose `validation_errors` array holds the items `validate` gives for that bundle, each with its pipe, its field and its suggested fix when it has one. A refusal found while loading a library directory you pass with `-L` (or the bundle's own directory) is reported the same way, its items naming their file in `source`; a bundle file run on its own is loaded from its text, so its items carry no `source`. In markdown, the items render as the same grouped prose `validate` prints.
 
 !!! note "Stdin inputs stay JSON"
     The agent CLI can also read inputs from stdin (a flat dict or a `working_memory` envelope). Stdin inputs are **JSON-only** — the extension-based TOML discrimination applies to `--inputs` file paths only. Like the main CLI, `run bundle <dir>` auto-detects `inputs.json` / `inputs.toml` when `--inputs` is omitted, erroring if both exist. In a `working_memory` envelope each stuff must name its concept as the ref string; anything else there — the full concept object an older runtime dumped, for instance — is refused under `"error_type": "StdinEnvelopeShapeError"`, which is the label for an envelope that parsed as JSON but does not hold the shape the contract asks for, as distinct from the `JSONDecodeError` that means the JSON itself did not parse.
@@ -124,8 +124,6 @@ pipelex-agent inputs method <NAME> [OPTIONS]
 - `--explicit` - Emit the ceremonial `{concept, content}` envelope form instead of the light values
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
-
-A run refuses an invalid bundle while loading it, before any pipe runs, with exit code `1` and an error envelope whose `error_type` is `ValidateBundleError` and whose `validation_errors` array holds the same located items `validate` gives for that bundle, each with its pipe, its field and its suggested fix when it has one. A refusal found while loading a library directory you pass with `-L` (or the bundle's own directory) is reported the same way. In markdown, the items render as the same grouped prose `validate` prints.
 
 !!! note "`inputs --format` is `json|toml`, not `markdown|json`"
     Unlike `run`/`validate`, the `inputs` command's `--format` selects the **template serialization**, not a presentation style. `json` (the default) emits the structured JSON success envelope; `toml` prints the raw TOML template straight to stdout (a pipe with no inputs prints a TOML comment line, which loads back as an empty dict). This mirrors the raw-TOML output of the `concept` and `pipe` commands. `inputs` has no `--error-format` — its errors stay JSON.
