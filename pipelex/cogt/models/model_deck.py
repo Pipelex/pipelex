@@ -842,23 +842,31 @@ class ModelDeck(ConfigModel):
         written inline in the method being run.
         """
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
+        ref: ModelReference | None
         try:
             ref = ModelReference.parse(model_handle)
         except ModelReferenceParseError:
-            return False
-        match ref.kind:
-            case ModelReferenceKind.HANDLE:
-                if ref.name in self.inference_models or ref.name in aliases or ref.name in waterfalls:
-                    return True
-            case ModelReferenceKind.ALIAS:
-                if ref.name in aliases:
-                    return True
-            case ModelReferenceKind.WATERFALL:
-                if ref.name in waterfalls:
-                    return True
-            case ModelReferenceKind.PRESET:
-                # A preset is never a model a lookup can serve, whether or not the deck defines it.
-                pass
+            # A value no reference parses from can still be the deck's own: a default or an
+            # override written as a setting table is not parsed when the deck loads.
+            ref = None
+        if ref is not None:
+            match ref.kind:
+                case ModelReferenceKind.HANDLE:
+                    # A model served as another type is not defined for this lookup, which refuses it.
+                    served_model = self.inference_models.get(ref.name)
+                    if served_model is not None and served_model.model_type != model_type:
+                        served_model = None
+                    if served_model is not None or ref.name in aliases or ref.name in waterfalls:
+                        return True
+                case ModelReferenceKind.ALIAS:
+                    if ref.name in aliases:
+                        return True
+                case ModelReferenceKind.WATERFALL:
+                    if ref.name in waterfalls:
+                        return True
+                case ModelReferenceKind.PRESET:
+                    # A preset is never a model a lookup can serve, whether or not the deck defines it.
+                    pass
 
         named_references: set[str] = set(aliases.values())
         for fallback_list in waterfalls.values():

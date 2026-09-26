@@ -38,7 +38,11 @@ def _make_deck() -> ModelDeck:
             for_text=LLMSetting(model="deck-default-text", temperature=0.7),
             for_object="$deck-preset",
         ),
-        llm_choice_overrides=LLMSettingChoices(for_text=None, for_object=LLMSetting(model="deck-override-object", temperature=0.1)),
+        # A setting table is not parsed when the deck loads, so it can hold a value no reference parses from.
+        llm_choice_overrides=LLMSettingChoices(
+            for_text=LLMSetting(model="@", temperature=0.1),
+            for_object=LLMSetting(model="deck-override-object", temperature=0.1),
+        ),
         extract_aliases={},
         extract_waterfalls={},
         extract_presets={"deck-extract-preset": ExtractSetting(model="deck-extract-preset-model")},
@@ -73,6 +77,8 @@ class TestModelDeckUnknownReference:
             ("extract_handle", "method-only-extractor", ModelType.TEXT_EXTRACTOR),
             # An LLM preset names it, but no image-generation entry does.
             ("img_gen_handle", "deck-preset-model", ModelType.IMG_GEN),
+            # The deck serves it, but as an LLM, which an image-generation lookup refuses.
+            ("served_handle_of_another_type", "served-model", ModelType.IMG_GEN),
         ],
     )
     def test_a_reference_only_the_method_names_is_the_callers_fault(self, _topic: str, model_handle: str, model_type: ModelType) -> None:
@@ -97,6 +103,7 @@ class TestModelDeckUnknownReference:
             ("waterfall_member", "deck-waterfall-member", ModelType.LLM),
             ("default_setting", "deck-default-text", ModelType.LLM),
             ("override_setting", "deck-override-object", ModelType.LLM),
+            ("unparsable_setting_model", "@", ModelType.LLM),
             ("extract_preset_model", "deck-extract-preset-model", ModelType.TEXT_EXTRACTOR),
         ],
     )

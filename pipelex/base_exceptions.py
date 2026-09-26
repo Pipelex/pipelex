@@ -673,8 +673,9 @@ class PipelexError(Exception):
         two facts a class declares with ``error_domain = ErrorDomain.INPUT`` and
         ``_authors_caller_facing_message = True``. It serves a class raised both for the caller's
         faults and for faults that are not the caller's, which therefore cannot declare them: the
-        raise site that knows says so there, for this one error. Neither fact is inherited by a
-        wrapper raised from this error, whose own message is not this one.
+        raise site that knows says so there, for this one error. A plain wrapper raised from this
+        error inherits the ``INPUT`` domain through the cause chain, but never the caller-facing
+        flag, since its own message is not this one.
 
         The raise site vouches for the message: it names only the caller's own method and data
         (pipe codes, concept codes, variable names, the values the caller sent), never a server
