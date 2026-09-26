@@ -7,7 +7,7 @@ description: "Reference for the `PipeLLMFactoryError` Pipelex error class."
 
 # Pipe LLM factory
 
-Raised when a ``PipeLLM``'s prompt or system prompt template does not parse.
+Raised when a ``PipeLLM``'s prompt template, or the system prompt it declares or inherits from its domain, does not parse.
 
 | Field | Value |
 |---|---|

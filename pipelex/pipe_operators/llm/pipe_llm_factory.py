@@ -16,7 +16,6 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
-from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 
@@ -48,9 +47,11 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     category=TemplateCategory.LLM_PROMPT,
                 )
             except ValidationError as exc:
+                # The system prompt is the pipe's own, or else its domain's: name the one that failed.
+                prompt_owner = "system prompt" if blueprint.system_prompt else f"system prompt of domain '{domain_code}', which it inherits,"
                 error_msg = (
-                    f"Template syntax error in system prompt for pipe '{pipe_code}'"
-                    f"in domain '{domain_code}': {exc}. Template source:\n{blueprint.system_prompt}"
+                    f"Template syntax error in the {prompt_owner} for pipe '{pipe_code}' "
+                    f"in domain '{domain_code}': {exc}. Template source:\n{system_prompt}"
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
@@ -61,7 +62,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     template=blueprint.prompt,
                     category=TemplateCategory.LLM_PROMPT,
                 )
-            except Jinja2TemplateSyntaxError as exc:
+            except ValidationError as exc:
+                # `TemplateBlueprint` reports a template that does not parse as a pydantic validation error.
                 error_msg = (
                     f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': "
                     f"{exc}. Template source:\n{blueprint.prompt}"
