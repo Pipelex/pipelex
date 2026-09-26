@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:d93f3f0a7df4c276f6d27495c4f963a002faa345c5aeae8a292c282bb8a2c8b9"
+digest = "sha256:a850055ad2e80a2b4336e05f2392b2d5e4948d6d1d1c7f89577c58afb9a08949"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T20:10:05Z"
-rationale = "The agent run commands (run bundle, run method, run pipe) drop their unreachable PipeOperatorModelChoiceError arms, since an unknown model now reaches them as the ValidateBundleError verdict's unknown_model item; pipelex/cli/agent_cli/CLAUDE.md says no run command keeps a model-choice arm. docs/tools/cli/agent-cli.md already describes a run refusal as that verdict and needs no change."
+reviewed_at = "2026-09-26T20:28:16Z"
+rationale = "validate_all_core lets acquire_library translate the caller's library load itself (library_dirs_are_callers=True) so an item keeps its file; the envelope, exit codes and the DryRunError answer of validate pipe --all are unchanged, so docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md stay accurate."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -47,7 +47,7 @@ rationale = "The agent run commands (run bundle, run method, run pipe) drop thei
 "pipelex/cli/agent_cli/commands/run/pipe_cmd.py" = "blob:50cf92e88c5fb5bace6d52672a8f394ed44fbe41"
 "pipelex/cli/agent_cli/commands/run/stdin_resolver.py" = "blob:c7c7d7495508f1c4e5a46eba336a4ab1694ebcf7"
 "pipelex/cli/agent_cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:13770f3fbf0fee6814d19a3ac3d589a0cd37c096"
+"pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:f407756aa47d3c82691c4697c6c1329e760fb439"
 "pipelex/cli/agent_cli/commands/validate/app.py" = "blob:d2d0ed19288c2d1c25be1650dd962189fcdb3b86"
 "pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:fb4aab0b8e4e381bb0c44cb07308987938d69e41"
 "pipelex/cli/agent_cli/commands/validate/method_cmd.py" = "blob:cf841e73d6af1a7e90d5ddfadaad012928f1a3ba"
