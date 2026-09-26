@@ -128,6 +128,17 @@ class TestBlueprintValidationErrorCategorizer:
         assert typo_error.message == "Validation error at 'pipe.summarize_notes.promtp': Extra inputs are not permitted"
         assert any(error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE for error in errors)
 
+    @pytest.mark.parametrize("misspelled_key", ["prompt-template", "str"])
+    def test_a_misspelled_key_is_named_whatever_it_looks_like(self, misspelled_key: str) -> None:
+        """A key the author wrote stays in the field path even when it looks like one of pydantic's own elements."""
+        mthds_content = _TYPO_BESIDE_UNDECLARED_VARIABLE_MTHDS.replace("promtp = ", f"{misspelled_key} = ")
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="notes.mthds")
+
+        typo_error = next(error for error in exc_info.value.validation_errors if error.error_type is None)
+        assert typo_error.field_path == f"pipe.summarize_notes.{misspelled_key}"
+        assert typo_error.message == f"Validation error at 'pipe.summarize_notes.{misspelled_key}': Extra inputs are not permitted"
+
     def test_a_domain_that_is_not_a_string_locates_nothing(self) -> None:
         """The raw dict holds what the author wrote: a `domain = 123` is an error, never a locator."""
         with pytest.raises(MthdsParserError) as exc_info:

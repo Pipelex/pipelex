@@ -159,7 +159,9 @@ class _DryRunSweepRouter(PipeRouter):
     async def run(self, pipe_job: PipeJob) -> PipeOutput:
         try:
             return await super().run(pipe_job)
-        except Exception as exc:
+        except (PipelexError, ValidationError, FactoryException) as exc:
+            # The failures the sweep classifies (see `BundleValidator._run_and_classify`); anything else
+            # escapes the sweep unclassified, so there is no failure of it to locate.
             recorder = _failing_pipe_recorder.get()
             if recorder is not None:
                 recorder.record(error=exc, pipe=pipe_job.pipe)
@@ -469,12 +471,19 @@ class BundleValidator:
                 return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SKIPPED, error_message=error_message)
             formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
             error_message = f"Dry run failed for pipe '{pipe.pipe_ref}': {formatted_error}"
-            # A failure raised outside any routed pipe run (the mock-input build) is the swept pipe's own.
+            # A failure raised outside any routed pipe run (the mock-input build) is the swept pipe's own. So is
+            # one met at a pipe the configuration allows to fail: that pipe's failure is tolerated, and the
+            # failure that is not is the swept pipe's, which failed because of it.
             failing_pipe = recorder.find_failing_pipe(error=exc) or pipe
+            if failing_pipe.pipe_ref in get_config().inference.dry_run.allowed_to_fail_pipes:
+                failing_pipe = pipe
+            failing_pipe_source = get_library_manager().get_pipe_source(failing_pipe.pipe_ref)
             failure = DryRunFailureErrorData(
                 pipe_code=failing_pipe.code,
                 domain_code=failing_pipe.domain_code,
-                source=get_library_manager().get_pipe_source(failing_pipe.pipe_ref),
+                # Compatibility boundary: injected managers written against the previous protocol may still
+                # return ``Path``. Normalize before assigning to the string-only model.
+                source=str(failing_pipe_source) if failing_pipe_source is not None else None,
                 message=f"Pipe '{failing_pipe.code}' failed its dry run: {_dry_run_failure_text(error=exc)}",
             )
             return DryRunOutput(
@@ -529,7 +538,9 @@ class BundleValidator:
         Each failure is located at the innermost pipe that failed, so a controller that failed because
         a pipe it runs failed carries that pipe's failure; the failures are then kept once per pipe.
         When a pipe's failure reaches the list both through its own dry run and through a controller's,
-        its own is kept, since it names the failure as that pipe met it.
+        its own is kept, since it names the failure as that pipe met it. The pipe is the key rather than
+        the message, because one fault's message differs with the run that met it (the output name a
+        controller gives the pipe appears in it), and keying on it would report that fault twice.
         """
         failures_by_pipe_ref: dict[str, DryRunFailureErrorData] = {}
         for swept_pipe_ref, dry_run_output in unexpected_failures.items():

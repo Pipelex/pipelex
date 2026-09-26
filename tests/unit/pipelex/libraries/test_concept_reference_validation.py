@@ -335,3 +335,26 @@ class TestConceptReferenceValidation:
         assert "DeclaredConcept2" in message
         assert "Native concepts" in message
         assert "Text" in message
+
+    def test_declared_concepts_list_the_validated_bundle_only(self):
+        """An unresolved item lists what the validated bundle declares, never what an earlier load brought in.
+
+        The concepts already loaded may come from a host's own library directories, which a caller's
+        verdict must not enumerate, even in the caller's own domain.
+        """
+        bundle = PipelexBundleBlueprint(
+            domain="test_domain",
+            description="Test bundle",
+            concept={"DeclaredConcept": "A declared concept"},
+            pipe={
+                "my_pipe": PipeLLMBlueprint(
+                    description="Test pipe",
+                    output="UndeclaredConcept",
+                    prompt="Generate",
+                ),
+            },
+        )
+        with pytest.raises(ConceptLibraryError) as exc_info:
+            validate_concept_references_in_blueprints(blueprints=[bundle], already_loaded_concept_refs={"test_domain.HostPrivatePlan"})
+        (unresolved_item,) = exc_info.value.pipe_concept_validation_errors
+        assert unresolved_item.declared_concepts == ["DeclaredConcept"]

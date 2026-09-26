@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
@@ -7,7 +8,7 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.core.pipes.exceptions import PipeRunError
-from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
 from pipelex.pipeline.bundle_validator import (
     BundleValidator,
     DryRunOutput,
@@ -116,3 +117,49 @@ class TestDryRunFailureLocation:
         )
 
         assert failures == [inner_failure_own, other_failure]
+
+    @pytest.mark.asyncio
+    async def test_a_failure_met_at_a_pipe_allowed_to_fail_stays_on_the_swept_pipe(self, mocker: MockerFixture) -> None:
+        """The tolerated pipe is not the failure: the swept pipe that failed because of it is."""
+        mocker.patch("pipelex.pipeline.bundle_validator.get_telemetry_manager")
+        mocker.patch("pipelex.pipeline.bundle_validator.get_config").return_value.inference.dry_run.allowed_to_fail_pipes = ["board.analyze_topic"]
+        mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
+        inner_pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
+        failure = _CallerFacingMethodFaultError("the combine failed")
+
+        def _fail_inside_the_inner_pipe(_pipe_job: object) -> None:
+            recorder = _failing_pipe_recorder.get()
+            assert recorder is not None
+            recorder.record(error=failure, pipe=inner_pipe)
+            raise failure
+
+        pipe_run = mocker.MagicMock()
+        pipe_run.run = mocker.AsyncMock(side_effect=_fail_inside_the_inner_pipe)
+        mocker.patch("pipelex.pipeline.bundle_validator.PipeRun", return_value=pipe_run)
+        outer_pipe = self._make_pipe(mocker, pipe_ref="board.run_workshop")
+        outer_pipe.is_signature = False
+
+        with pytest.raises(DryRunError) as exc_info:
+            await BundleValidator().validate_pipes([outer_pipe], library_id="lib-1")
+
+        (located_failure,) = exc_info.value.failures
+        assert (located_failure.pipe_code, located_failure.domain_code) == ("run_workshop", "board")
+
+    @pytest.mark.asyncio
+    async def test_a_source_the_library_manager_gives_as_a_path_is_kept_as_text(self, mocker: MockerFixture) -> None:
+        """Injected managers written against the previous protocol may still return ``Path``."""
+        mocker.patch("pipelex.pipeline.bundle_validator.get_telemetry_manager")
+        mocker.patch("pipelex.pipeline.bundle_validator.get_config").return_value.inference.dry_run.allowed_to_fail_pipes = ["board.analyze_topic"]
+        mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
+        mocker.patch("pipelex.pipeline.bundle_validator.get_library_manager").return_value.get_pipe_source.return_value = Path("board.mthds")
+        pipe_run = mocker.MagicMock()
+        pipe_run.run = mocker.AsyncMock(side_effect=_CallerFacingMethodFaultError("the combine failed"))
+        mocker.patch("pipelex.pipeline.bundle_validator.PipeRun", return_value=pipe_run)
+        pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
+        pipe.is_signature = False
+
+        results = await BundleValidator().validate_pipes([pipe], library_id="lib-1")
+
+        failure = results["board.analyze_topic"].failure
+        assert failure is not None
+        assert failure.source == "board.mthds"

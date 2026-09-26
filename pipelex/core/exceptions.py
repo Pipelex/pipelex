@@ -55,8 +55,8 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     line: int | None = None
     column: int | None = None
 
-    # The bare codes of the concepts declared in ``domain_code``, set on an ``unresolved_concept``
-    # error so the author sees what the reference could have named.
+    # The bare codes of the concepts the validated bundle declares in ``domain_code``, set on an
+    # ``unresolved_concept`` error so the author sees what the reference could have named.
     declared_concepts: list[str] | None = None
 
     # The namespace-stripped bare code for a strippable same-domain over-qualified pipe code
@@ -108,7 +108,7 @@ class PipesAndConceptValidationErrorData(BaseModel):
     # === Declared concepts (for unresolved_concept errors) ===
     declared_concepts: list[str] | None = Field(
         default=None,
-        description="The bare codes of the concepts declared in the domain the reference was looked up in",
+        description="The bare codes of the concepts the validated bundle declares in the domain the reference was looked up in",
     )
 
     # === Enriched expected value (for output-mismatch errors) ===

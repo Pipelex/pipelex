@@ -1,7 +1,8 @@
 import re
-from typing import Any, cast
+from typing import Any, cast, get_args
 
 from pydantic_core import ErrorDetails
+from pydantic_core.core_schema import CoreSchemaType
 
 from pipelex import log
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
@@ -31,6 +32,13 @@ _EXPLICIT_SIGNATURE_TAG_MARKER = "is no longer a pipe type"
 # The tags of the union a `[pipe.<code>]` section validates through. Pydantic names the tag it routed to in
 # an error's location (`pipe.<code>.PipeLLM.<field>`), but the tag is not a field of the bundle.
 _PIPE_UNION_TAGS = frozenset([*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG])
+
+# Pydantic's own schema tags that contain a hyphen ("function-after", "tagged-union"...). A key an author
+# writes may contain one too ("prompt-template"), so a hyphen alone does not make a location element pydantic's.
+_PYDANTIC_HYPHENATED_SCHEMA_TAGS = frozenset(tag for tag in get_args(CoreSchemaType) if "-" in tag)
+
+# The pydantic error type of a key the model does not define, whose location ends with the key as written.
+_PYDANTIC_EXTRA_FORBIDDEN_ERROR_TYPE = "extra_forbidden"
 
 # The prefix pydantic puts before the message of a ``ValueError`` a validator raised.
 _PYDANTIC_VALUE_ERROR_PREFIX = "Value error, "
@@ -246,8 +254,9 @@ def _is_pydantic_internal_loc_element(element: str) -> bool:
     internal type discriminators (e.g. "ConceptBlueprint", "dict[str,union[str,function-after]]",
     "function-after", "str"). We filter out the internal ones to build cleaner error paths.
     """
-    # Elements containing brackets or hyphens are pydantic type names (e.g. "dict[str,...]", "function-after")
-    if "[" in element or "-" in element:
+    # Elements containing brackets are pydantic type names (e.g. "dict[str,...]"), and so are its hyphenated
+    # schema tags (e.g. "function-after"); a hyphenated key the author wrote is kept.
+    if "[" in element or element in _PYDANTIC_HYPHENATED_SCHEMA_TAGS:
         return True
     # Builtin type names and pydantic model class names used as union discriminators
     return element in {"str", "int", "float", "bool", "list", "dict", "set", "tuple", "none", "ConceptBlueprint"}
@@ -298,17 +307,22 @@ def _categorize_concept_validation_error(
     )
 
 
-def _bundle_field_path(*, loc: tuple[int | str, ...]) -> str | None:
+def _bundle_field_path(*, loc: tuple[int | str, ...], ends_with_authored_key: bool) -> str | None:
     """The dot path from the bundle root that a pydantic ``loc`` names, without pydantic's own elements.
 
     A pipe section validates through a union tagged by its ``type``, so pydantic puts the tag in the
     location (``pipe.summarize.PipeLLM.promtp``); the tag and pydantic's type discriminators are
-    dropped, leaving the path the author would follow in the file (``pipe.summarize.promtp``).
+    dropped, leaving the path the author would follow in the file (``pipe.summarize.promtp``). When the
+    location ends with a key the author wrote (``ends_with_authored_key``), that key is kept whatever it
+    looks like, since a key named ``str`` is still the key to fix.
     """
     parts = [str(part) for part in loc]
     if len(parts) >= 3 and parts[0] == PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD and parts[2] in _PIPE_UNION_TAGS:
         del parts[2]
+    authored_key = parts.pop() if ends_with_authored_key and parts else None
     clean_parts = [part for part in parts if not _is_pydantic_internal_loc_element(part)]
+    if authored_key is not None:
+        clean_parts.append(authored_key)
     return ".".join(clean_parts) or None
 
 
@@ -326,7 +340,7 @@ def _make_uncategorized_blueprint_error(
     error such as a misspelled field reaches the author beside the errors that are categorized, rather
     than only once those are fixed.
     """
-    field_path = _bundle_field_path(loc=error["loc"])
+    field_path = _bundle_field_path(loc=error["loc"], ends_with_authored_key=error["type"] == _PYDANTIC_EXTRA_FORBIDDEN_ERROR_TYPE)
     message = error["msg"].removeprefix(_PYDANTIC_VALUE_ERROR_PREFIX)
     return PipelexBundleBlueprintValidationErrorData(
         domain_code=domain,
