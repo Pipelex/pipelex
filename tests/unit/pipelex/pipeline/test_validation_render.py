@@ -11,6 +11,7 @@ from pipelex.pipeline.validation_render import (
     format_validate_markdown,
     format_validation_error_items_markdown,
     render_invalid_validation_markdown,
+    suggested_fix_label,
 )
 from pipelex.suggested_fix import FixSafety, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType, ValidationResidualErrorType
@@ -193,6 +194,52 @@ class TestValidationRender:
         # The dry_run residual keeps its plain single-message rendering (no numbering, no bullets).
         assert "## Dry run error" in markdown
         assert "Dry run failed: boom." in markdown
+
+    def test_suggested_fix_label_says_when_a_fix_is_unsafe(self):
+        """A safe fix is a plain `Suggested fix`; an unsafe one says it is unsafe and needs confirming."""
+        safe_fix = SuggestedFix(fix_code="match-sequence-output", description="d", safety=FixSafety.SAFE, ops=[])
+        unsafe_fix = SuggestedFix(fix_code="rename-model", description="d", safety=FixSafety.UNSAFE, ops=[])
+
+        assert suggested_fix_label(fix=safe_fix) == "Suggested fix"
+        assert suggested_fix_label(fix=unsafe_fix) == "Suggested fix (unsafe, confirm before applying)"
+
+    def test_invalid_report_markdown_marks_an_unsafe_fix(self):
+        """The hosted `rendered_markdown` path labels an unsafe wire fix, next to a safe one left plain."""
+        report: dict[str, Any] = {
+            "is_valid": False,
+            "message": "MTHDS validation found errors",
+            "validation_errors": [
+                {
+                    "category": "pipe_validation",
+                    "error_type": "inadequate_output_multiplicity",
+                    "message": "Output mismatch.",
+                    "pipe_code": "summarize",
+                    "suggested_fix": {
+                        "fix_code": "match-sequence-output",
+                        "description": "Set output of pipe 'summarize' to 'Contract'",
+                        "safety": "safe",
+                        "ops": [],
+                    },
+                },
+                {
+                    "category": "pipe_validation",
+                    "error_type": "unknown_model",
+                    "message": "Model handle 'gpt-5.1' was not found in the model deck",
+                    "pipe_code": "write",
+                    "suggested_fix": {
+                        "fix_code": "rename-model",
+                        "description": "Replace model 'gpt-5.1' of pipe 'write' with 'gpt-5', its one close match in the model deck",
+                        "safety": "unsafe",
+                        "ops": [],
+                    },
+                },
+            ],
+        }
+
+        markdown = render_invalid_validation_markdown(report)
+
+        assert "   - 💡 Suggested fix: Set output of pipe 'summarize' to 'Contract'" in markdown
+        assert "   - 💡 Suggested fix (unsafe, confirm before applying): Replace model 'gpt-5.1' of pipe 'write' with 'gpt-5'" in markdown
 
     def test_build_fix_command_echoes_library_dirs_and_signatures(self):
         """`build_fix_command` shell-joins the executable, path, each `-L` dir, and `--allow-signatures`."""

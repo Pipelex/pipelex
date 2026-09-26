@@ -10,7 +10,7 @@ Apply deterministic, safe fixes to a bundle and re-validate until it is valid.
 pipelex fix bundle ...    # Fix a bundle file or directory in place
 ```
 
-When `pipelex validate` reports errors that have a deterministic fix, each one carries a `💡 Suggested fix:` line and the output ends with the exact `pipelex fix bundle` command to run. The fix command runs a validate → apply safe fixes → re-validate loop until the bundle is valid, out of fixes, or the iteration cap is reached — and names every change it makes.
+When `pipelex validate` reports errors that have a deterministic safe fix, each one carries a `💡 Suggested fix:` line and the output ends with the exact `pipelex fix bundle` command to run. The fix command runs a validate → apply safe fixes → re-validate loop until the bundle is valid, out of fixes, or the iteration cap is reached — and names every change it makes.
 
 ## Fix Bundle
 
@@ -60,7 +60,7 @@ pipelex fix bundle my_bundle.mthds --select match-sequence-output
 
 ## What Gets Fixed
 
-Only fixes classified as SAFE are applied — deterministic corrections derived from the structured validation errors, never from guesswork. Errors without a safe deterministic fix are left in place and reported as remaining errors. An unsafe fix, such as `rename-model` for a model name the deck only nearly matches, still shows on its error for you to apply by hand, and is not a code `--select` or `--ignore` accepts. The available fix rule codes (for `--select`/`--ignore`) are listed in the error message when you pass an unknown code.
+Only fixes classified as SAFE are applied — deterministic corrections derived from the structured validation errors, never from guesswork. Errors without a safe deterministic fix are left in place and reported as remaining errors. An unsafe fix, such as `rename-model` for a model name the deck only nearly matches, still shows on its error, labelled `💡 Suggested fix (unsafe, confirm before applying):`, for you to check and apply by hand, and is not a code `--select` or `--ignore` accepts. The available fix rule codes (for `--select`/`--ignore`) are listed in the error message when you pass an unknown code.
 
 ## Related Documentation
 
