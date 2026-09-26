@@ -152,6 +152,16 @@ _TWO_FAULTS_IN_ONE_COMBINE = _LIST_BRANCH_INTO_SINGLE_FIELD.replace(
     '{ pipe = "draft_ideas", result = "overview" }',
 )
 
+# No advice where a multiplicity change would not make the branch fit: a single `Text` into a list of
+# plain strings, whose items are not concept contents, and an `Anything[]` branch, whose concept has no
+# structure class to compare. The combine's own refusal reaches the verdict instead.
+_TEXT_INTO_PRIMITIVE_LIST_FIELD = _SINGLE_BRANCH_INTO_LIST_FIELD.replace(
+    'ideas    = { type = "list", item_type = "concept", item_concept_ref = "Idea", description = "The ideas", required = true }',
+    'ideas    = { type = "list", item_type = "text", description = "The ideas", required = true }',
+)
+
+_ANYTHING_LIST_INTO_SINGLE_FIELD = _LIST_BRANCH_INTO_SINGLE_FIELD.replace('output           = "Idea[]"', 'output           = "Anything[]"')
+
 _LIST_INTO_SINGLE_NEXT_STEP = (
     "Branch 'draft_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'TopicReview' holds a single item. "
     "Declare the field as a list in the structure of 'TopicReview', with type 'list', item_type 'concept' and item_concept_ref 'Idea', "
@@ -219,6 +229,22 @@ class TestValidateParallelMultiplicityNextStep:
         assert _LIST_INTO_SINGLE_NEXT_STEP in item.message
         assert "gives result 'overview'" not in item.message
         assert "The combine also reported: Error combining stuffs for concept TopicReview" in item.message
+
+    @pytest.mark.parametrize(
+        "bundle_content",
+        [_TEXT_INTO_PRIMITIVE_LIST_FIELD, _ANYTHING_LIST_INTO_SINGLE_FIELD],
+        ids=["text_into_primitive_list_field", "anything_list_into_single_field"],
+    )
+    def test_no_multiplicity_advice_where_it_would_not_help(self, tmp_path: Path, bundle_content: str) -> None:
+        """The verdict carries the combine's own refusal, never a multiplicity change that could not make it combine."""
+        bundle_path = _write_bundle(directory=tmp_path, content=bundle_content)
+
+        with pytest.raises(ValidateBundleError) as raised:
+            asyncio.run(validate_bundle(mthds_file_path=bundle_path, library_dirs=[bundle_path.parent]))
+
+        (item,) = raised.value.to_error_report().validation_errors or []
+        assert "Error combining stuffs for concept TopicReview" in item.message
+        assert "cannot combine its branch results" not in item.message
 
     def test_agent_validate_bundle_json_carries_the_next_step(
         self,

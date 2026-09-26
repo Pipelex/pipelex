@@ -629,10 +629,10 @@ class PipeParallel(PipeController):
         refusal: it refuses nothing itself. Returns one sentence per result name it can explain.
 
         A branch result is a list when its content is a ``ListContent``. A field holds a list when its
-        annotation, an ``X | None`` peeled, is a ``list[...]`` or a ``ListContent`` class, and holds one
-        item when it is any other content class; a field typed otherwise (a primitive, a union, a dict)
-        cannot be told apart and gets no sentence. Neither does a branch whose concept does not fit the
-        field's item class, because changing a multiplicity would not make it combine.
+        annotation, an ``X | None`` peeled, is a ``list[...]`` of content classes, and holds one item when it
+        is any other content class. Every other field, a primitive list, a Python-authored ``ListContent``,
+        a union or a dict, gets no sentence, and neither does a branch whose concept has no structure class
+        or does not fit the field's item class: changing a multiplicity would not make those combine.
 
         The sentences quote with single quotes only: the dry run carries them inside a representation that
         would escape every single quote of a message that also held a double one.
@@ -652,9 +652,9 @@ class PipeParallel(PipeController):
                 is_field_plural = True
                 field_item_class = list_item_annotation(annotation=field_annotation)
             elif isinstance(field_annotation, type) and issubclass(field_annotation, ListContent):
-                # A Python-authored ListContent field: plural, and its item class is not read here.
-                is_field_plural = True
-                field_item_class = None
+                # A Python-authored ListContent field: its item class is not read here, so whether a
+                # multiplicity change would make the branch fit cannot be told, and no advice is given.
+                continue
             elif isinstance(field_annotation, type) and issubclass(field_annotation, StuffContent):
                 is_field_plural = False
                 field_item_class = field_annotation
@@ -664,10 +664,15 @@ class PipeParallel(PipeController):
             is_branch_plural = branch_stuff.is_list
             if is_branch_plural == is_field_plural:
                 continue
-            if isinstance(field_item_class, type) and issubclass(field_item_class, StuffContent):
-                branch_item_class = get_concept_library().get_structure_class(concept=branch_stuff.concept)
-                if not issubclass(branch_item_class, field_item_class):
-                    continue
+            # The advice is given only when the branch's concept fits the field's item class, so a field
+            # whose items are not concept contents (a primitive list, a Python-authored ListContent) gets none.
+            if not isinstance(field_item_class, type) or not issubclass(field_item_class, StuffContent):
+                continue
+            if not branch_stuff.concept.declares_a_structure_class:
+                continue
+            branch_item_class = get_concept_library().get_structure_class(concept=branch_stuff.concept)
+            if not issubclass(branch_item_class, field_item_class):
+                continue
             package_alias = (
                 QualifiedRef.split_cross_package_ref(sub_pipe.pipe_code).alias if QualifiedRef.has_cross_package_prefix(sub_pipe.pipe_code) else None
             )
@@ -812,6 +817,9 @@ def _refused_field_names(*, exc: StuffFactoryError) -> set[str] | None:
     refused_fields: set[str] = set()
     for error_details in cause.errors():
         location = error_details["loc"]
-        if location:
-            refused_fields.add(str(location[0]))
+        if not location:
+            # A refusal of the whole structure (a model-level validator) belongs to no field, so it can
+            # never be explained by a field's multiplicity: report the combine's own message beside it.
+            return None
+        refused_fields.add(str(location[0]))
     return refused_fields
