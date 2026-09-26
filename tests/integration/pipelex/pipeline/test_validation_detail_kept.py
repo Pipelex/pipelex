@@ -21,11 +21,18 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.cogt.inference.error_classification import UserAction
 from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.validation_error_types import PipeValidationErrorType
 from tests.integration.pipelex.test_data import ValidationDetailBundles
+
+
+def _keep_unclassified(self: StuffFactoryError, *, user_action: UserAction | None = None) -> StuffFactoryError:
+    """Stands in for ``as_caller_fault``, leaving the error unclassified."""
+    del user_action
+    return self
 
 
 async def _validation_items(*, bundle: str, dry_run_pipe_codes: list[str] | None = None) -> list[ValidationErrorItem]:
@@ -54,11 +61,9 @@ class TestValidationDetailKept:
         assert variable_item.variable_names == ["language"]
 
     @pytest.mark.asyncio
-    async def test_a_nested_dry_run_failure_is_one_item_at_the_innermost_pipe(self, mocker: MockerFixture) -> None:
-        # The combine's StuffFactoryError is flagged caller-facing here, as a caller's own method fault is
-        # classified at its raise site, so the item carries the combine's own message.
-        mocker.patch.object(StuffFactoryError, "_authors_caller_facing_message", new=True)
-
+    async def test_a_nested_dry_run_failure_is_one_item_at_the_innermost_pipe(self) -> None:
+        # The combine's refusal is the caller's own method fault, restated with its multiplicity next step
+        # and classified caller-facing at its raise site, so the item carries that restatement.
         items = await _validation_items(bundle=ValidationDetailBundles.NESTED_PARALLEL_MISMATCH)
 
         (item,) = items
@@ -67,12 +72,18 @@ class TestValidationDetailKept:
         assert item.pipe_code == "analyze_topic"
         assert item.domain_code == ValidationDetailBundles.DOMAIN
         assert item.source == ValidationDetailBundles.SOURCE
-        assert item.message.startswith("Pipe 'analyze_topic' failed its dry run: Error combining stuffs for concept IdeaReport")
-        assert "expected idea_board__Idea, got ListContent" in item.message
+        assert item.message.startswith(
+            "Pipe 'analyze_topic' failed its dry run: PipeParallel 'analyze_topic' cannot combine its branch results into its output 'IdeaReport'."
+        )
+        assert "Branch 'propose_ideas' gives result 'ideas' as a list, 'Idea[]'" in item.message
         assert not any(marker in item.message for marker in ValidationDetailBundles.RECORD_REPR_MARKERS)
 
     @pytest.mark.asyncio
-    async def test_a_dry_run_failure_that_is_not_caller_facing_names_its_title(self) -> None:
+    async def test_a_dry_run_failure_that_is_not_caller_facing_names_its_title(self, mocker: MockerFixture) -> None:
+        # The combine classifies its refusal as the caller's fault; with that classification withheld, the
+        # same failure is not caller-facing, and the item names its title.
+        mocker.patch.object(StuffFactoryError, "as_caller_fault", new=_keep_unclassified)
+
         items = await _validation_items(bundle=ValidationDetailBundles.NESTED_PARALLEL_MISMATCH)
 
         (item,) = items

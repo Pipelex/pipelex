@@ -80,12 +80,14 @@ class TestDryRunFailureLocation:
         recorder = _FailingPipeRecorder(tolerated_pipe_refs=frozenset())
         token = _failing_pipe_recorder.set(recorder)
         try:
-            with pytest.raises(_CallerFacingMethodFaultError):
+            # The router locates every failure of its pipe as a PipeRouterError chained to it.
+            with pytest.raises(PipeRouterError) as raised:
                 await _DryRunSweepRouter().run(pipe_job)
         finally:
             _failing_pipe_recorder.reset(token)
 
-        assert recorder.find_failing_pipe(error=failure) is pipe
+        assert raised.value.__cause__ is failure
+        assert recorder.find_failing_pipe(error=raised.value) is pipe
 
     @pytest.mark.parametrize(
         ("error", "expected_text"),
