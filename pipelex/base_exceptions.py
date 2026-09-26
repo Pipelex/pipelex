@@ -263,10 +263,8 @@ class ValidationErrorCategory(StrEnum):
     Mirrors the categorized error-data lists aggregated by ``ValidateBundleError``:
     blueprint validation (from the interpreter), pipe-factory failures (e.g. a
     missing concept), pipe/concept validation (e.g. a missing input variable
-    or a type mismatch), and the ``dry_run`` residual — a dry-run failure with no
-    structured locator (graph-level), carried as a single message-only item so an
-    invalid verdict always surfaces a non-empty ``validation_errors[]`` (the
-    structured-info invariant) instead of a bare ``detail``.
+    or a type mismatch), and ``dry_run`` — one item per pipe whose dry run failed,
+    located at the innermost failing pipe.
     """
 
     BLUEPRINT_VALIDATION = "blueprint_validation"
@@ -331,6 +329,10 @@ class ValidationErrorItem(BaseModel):
     missing_concept_code: str | None = None
     missing_pipe_code: str | None = None
     declared_concepts: list[str] | None = None
+    # The 1-based position a TOML syntax error was found at, carried by the parse-level residual so an
+    # editor can anchor the diagnostic. Optional and additive, like ``declared_concepts``.
+    line: int | None = None
+    column: int | None = None
     # The unknown-model locators, carried by an ``unknown_model`` item: the model reference exactly as
     # the author wrote it, the model type the field takes (``llm``, ``text_extractor``, ``img_gen``,
     # ``search``), and the deck's close matches of the same kind, each spelled as a reference the field

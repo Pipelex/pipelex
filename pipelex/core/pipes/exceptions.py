@@ -163,9 +163,10 @@ def caller_facing_refusal_text(*, refusal: PipelexError) -> str:
     STRICT disclosure — so text taken from a refusal onto a verdict item must be caller-facing too: a
     refusal whose message is internal is named by its title, which is always public.
     """
-    if refusal.to_error_report().caller_facing_message:
-        return refusal.message
-    return type(refusal).title()
+    report = refusal.to_error_report()
+    if report.caller_facing_message:
+        return report.message
+    return report.title
 
 
 class PipeValidationError(ValueError):

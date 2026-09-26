@@ -30,7 +30,6 @@ import typer
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
@@ -460,19 +459,17 @@ def agent_success_formatted(
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     """Project a ``ValidateBundleError`` into the CLI ``validation_errors`` JSON array.
 
-    Thin adapter over the shared ``build_validation_error_items`` builder — the
+    Thin adapter over ``ValidateBundleError.validation_error_items`` — the shared builder,
     same one feeding the API 422's ``ErrorReport.validation_errors`` — so the CLI
     and API structured shapes can never drift. Each typed item is dumped to a
     plain dict with unset fields dropped (``exclude_none``), matching the
     machine-first agent-CLI envelope; the entries carry ``category``,
     ``error_type``, ``message``, and whatever identity / ``source`` fields the
-    underlying error populated. Two residuals make the invariant total: a dry-run
-    failure with no structured locator becomes one ``dry_run``-category item, and
-    a parse-level failure (TOML syntax, an empty blueprint, a bundle elaborator)
-    that carries only a message becomes one ``blueprint_validation`` residual
-    (``fallback_message=exc.message``). So the envelope's ``validation_errors[]``
-    is non-empty on every invalid verdict (the structured-info invariant) — never
-    a bare message.
+    underlying error populated. Each pipe whose dry run failed becomes its own
+    located ``dry_run`` item, and a parse-level failure that carries only a
+    message becomes one ``blueprint_validation`` residual. So the envelope's
+    ``validation_errors[]`` is non-empty on every invalid verdict (the
+    structured-info invariant) — never a bare message.
 
     Args:
         exc: The ValidateBundleError to extract errors from.
@@ -480,14 +477,7 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     Returns:
         List of dicts, each with at minimum ``category`` and ``message``.
     """
-    items = build_validation_error_items(
-        blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
-        factory_errors=exc.pipe_factory_errors,
-        pipe_validation_errors=exc.pipe_validation_error_data,
-        dry_run_error_message=exc.dry_run_error_message,
-        fallback_message=exc.message,
-    )
-    return [item.model_dump(mode="json", exclude_none=True) for item in items]
+    return [item.model_dump(mode="json", exclude_none=True) for item in exc.validation_error_items()]
 
 
 def _render_validate_bundle_markdown(

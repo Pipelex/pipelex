@@ -12,7 +12,7 @@ from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError, SecurityError, error_domain_is_input
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import (
     PipeFactoryError,
     PipeLoadRefusalError,
@@ -216,14 +216,24 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         # untranslated error would give.
         raise ValidateBundleError(message=func_registry_error.message) from func_registry_error
     except PipeRunError as pipe_run_error:
+        # A pipe run failing outside the sweep's per-pipe classification: one dry-run item on its pipe,
+        # whose text follows the disclosure rule, since the verdict carries it past STRICT disclosure.
+        failure_text = caller_facing_refusal_text(refusal=pipe_run_error)
         raise ValidateBundleError(
-            message=pipe_run_error.message,
-            dry_run_error_message=pipe_run_error.message,
+            message=failure_text,
+            dry_run_failures=[
+                DryRunFailureErrorData(
+                    pipe_code=pipe_run_error.pipe_code,
+                    message=f"Pipe '{pipe_run_error.pipe_code}' failed its dry run: {failure_text}",
+                )
+            ],
         ) from pipe_run_error
     except DryRunError as dry_run_error:
+        # The sweep's failures, one per failing pipe, located at the innermost pipe that failed. A
+        # DryRunError raised elsewhere carries none, and becomes one item under the disclosure rule.
         raise ValidateBundleError(
             message=dry_run_error.message,
-            dry_run_error_message=dry_run_error.message,
+            dry_run_failures=dry_run_error.failures or [DryRunFailureErrorData(message=caller_facing_refusal_text(refusal=dry_run_error))],
         ) from dry_run_error
     except PipeOperatorModelChoiceError as model_choice_error:
         # A pipe names a model its deck does not define: the operator located it on the pipe and the
@@ -396,6 +406,9 @@ async def validate_bundle(
                     library_id=library_id,
                     allow_signatures=allow_signatures,
                     caller_identity=caller_identity,
+                    # Submitted content: only its own pipes name their file, never a pipe of the host's
+                    # library directories, which would put a path on the host into the caller's verdict.
+                    source_pipe_refs=frozenset(pipe.pipe_ref for pipe in loaded_pipes),
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -424,6 +437,9 @@ async def validate_bundle(
                     library_id=library_id,
                     allow_signatures=allow_signatures,
                     caller_identity=caller_identity,
+                    # A file on the caller's own disk: every failure names its file, a sibling file of the
+                    # same method included, since the library directories are the caller's own too.
+                    source_pipe_refs=None,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,

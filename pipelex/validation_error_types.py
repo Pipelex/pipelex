@@ -317,18 +317,18 @@ class PipeFactoryErrorType(StrEnum):
 
 
 class ValidationResidualErrorType(StrEnum):
-    """The ``error_type`` of a validation residual — a failure with no stage-level error data.
+    """The ``error_type`` of a failure no validation stage classifies into a code.
 
-    A residual is what the wire projection emits when a bundle failed but no categorized
-    validation stage produced structured data to report. There is exactly one residual that names
-    itself: a dry-run failure surfaces a single message from a raised ``DryRunError`` / ``PipeRunError``,
-    so the item is tagged with that exception's own class name.
+    There is exactly one that names itself: a dry-run failure is raised as an error object, a
+    ``DryRunError`` carrying one located failure per pipe whose dry run failed, so each of its items is
+    tagged with that exception's own class name.
 
-    The other residual — the parse-level one, for a bundle that could not be turned into a
-    blueprint at all (a TOML-syntax error, an empty blueprint, an elaborator failure) — carries no
-    ``error_type`` and therefore no member here. That is not an omission: it fires for several
-    distinct underlying errors, and inventing one code for all of them would tell a consumer it
-    knows which fault occurred when it does not. Its message is the authoritative diagnostic.
+    The items no code identifies — the parse-level residual, for a bundle that could not be turned
+    into a blueprint at all (a TOML-syntax error, an empty blueprint, an elaborator failure), and a
+    pydantic error no categorizer knows — carry no ``error_type`` and therefore no member here. That
+    is not an omission: they stand for many distinct underlying errors, and inventing one code for all
+    of them would tell a consumer it knows which fault occurred when it does not. Their message is the
+    authoritative diagnostic.
     """
 
     DRY_RUN_ERROR = "DryRunError"
