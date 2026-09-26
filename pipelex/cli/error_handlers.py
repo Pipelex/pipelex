@@ -14,7 +14,7 @@ from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetVal
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes
+from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, suggested_fix_label
 from pipelex.runtime_hub import get_console
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -286,7 +286,11 @@ def _display_validation_error_item(*, console: Console, item: ValidationErrorIte
     console.print(f"   [cyan]→[/cyan] {escape(item.message)}")
 
     if item.suggested_fix is not None:
-        console.print(f"   [green]💡 Suggested fix:[/green] {escape(item.suggested_fix.description)}")
+        # The words carry the safety, so the colour only echoes them: an unsafe fix is yellow because
+        # it needs the reader's confirmation, a safe one green because `pipelex fix bundle` applies it.
+        fix_style = "green" if item.suggested_fix.safety.is_safe else "yellow"
+        fix_label = escape(suggested_fix_label(fix=item.suggested_fix))
+        console.print(f"   [{fix_style}]💡 {fix_label}:[/{fix_style}] {escape(item.suggested_fix.description)}")
 
     if item.field_path:
         console.print(f"   [dim]└─ Path: {escape(item.field_path)}[/dim]")

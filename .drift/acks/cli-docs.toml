@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:23181f87f119d19610be5c07c0757df6d1c4fdbca32c2265a9d0987053cb4790"
+digest = "sha256:6a2e48887fd3592e1046ca73ecfc5e99991d869fb03a4e27b545e1a733e30bf2"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T17:15:21Z"
-rationale = "Review round 2: the fix commands' 'suggested fix not applied' tip now counts only safe fixes, and rename-model (unsafe) is not a --select/--ignore code; docs/tools/cli/fix.md says so. validate.md and agent-cli.md reviewed, no further change needed."
+reviewed_at = "2026-09-26T18:16:26Z"
+rationale = "The human validation panel labels an unsafe suggested fix '💡 Suggested fix (unsafe, confirm before applying):' through the shared suggested_fix_label; validate.md (example and Suggested Fixes), fix.md and agent-cli.md now say how an unsafe fix is shown. index.md's plain 💡 line still describes a safe fix; agent_cli/CLAUDE.md needs no change."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -127,7 +127,7 @@ rationale = "Review round 2: the fix commands' 'suggested fix not applied' tip n
 "pipelex/cli/commands/validate/pipe_cmd.py" = "blob:d67267571559006459628180f2c8b216ba7fee31"
 "pipelex/cli/commands/which_cmd.py" = "blob:68661d4bab22e2c4dab183d59bd9f2c6dd573472"
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
-"pipelex/cli/error_handlers.py" = "blob:c704505651f24a0e9bb85fed0da1d00445c9e980"
+"pipelex/cli/error_handlers.py" = "blob:c8489b34da2b5fb255a403b06e2312d4aff5cffc"
 "pipelex/cli/exceptions.py" = "blob:1d51c3a53ddd3f6cf8de566fa2ade3fa75ab7a3a"
 "pipelex/cli/installed_methods.py" = "blob:09197f47baf8d7251d28d148a0544b4a23ee7365"
 "pipelex/cli/method_resolver.py" = "blob:1230dde5f89ac28bbdcbcbbd0c1d485c71803caf"

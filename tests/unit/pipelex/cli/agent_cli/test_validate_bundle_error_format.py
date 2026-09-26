@@ -46,6 +46,25 @@ def _fixable_item(*, source: Path) -> ValidationErrorItem:
     )
 
 
+def _unsafe_fixable_item(*, source: Path) -> ValidationErrorItem:
+    return ValidationErrorItem(
+        category=ValidationErrorCategory.PIPE_VALIDATION,
+        error_type=PipeValidationErrorType.UNKNOWN_MODEL,
+        pipe_code="write_tide_note",
+        domain_code="tide_tables",
+        source=str(source),
+        field_name="model",
+        message="Pipe 'write_tide_note' (PipeLLM), field 'model': Alias 'best-sonet' was not found in the model deck",
+        suggested_fix=SuggestedFix(
+            fix_code="rename-model",
+            description="Replace model '@best-sonet' of pipe 'write_tide_note' with '@best-gpt', its one close match in the model deck",
+            safety=FixSafety.UNSAFE,
+            source=str(source),
+            ops=[],
+        ),
+    )
+
+
 class TestValidateBundleErrorFormat:
     @pytest.fixture(autouse=True)
     def _reset_error_format(self) -> Iterator[None]:
@@ -71,6 +90,23 @@ class TestValidateBundleErrorFormat:
         # Disease E: the boilerplate hint is replaced by a fix-aware footer naming the exact command with -L echoed.
         assert "Check the validation_errors array" not in markdown
         assert f"💡 1 of these errors can be fixed automatically — run: `pipelex-agent fix bundle {bundle_path} -L {tmp_path / 'libs'}`" in markdown
+
+    def test_markdown_says_an_unsafe_fix_needs_confirmation(self, tmp_path: Path) -> None:
+        """A safe fix keeps the plain 💡 line; an unsafe one says it is unsafe, and the footer counts only the safe one."""
+        bundle_path = tmp_path / "bundle.mthds"
+        markdown = _render_validate_bundle_markdown(
+            [_fixable_item(source=bundle_path), _unsafe_fixable_item(source=bundle_path)],
+            bundle_path=bundle_path,
+            library_dirs=None,
+            allow_signatures=False,
+        )
+
+        assert "   - 💡 Suggested fix: Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step" in markdown
+        assert (
+            "   - 💡 Suggested fix (unsafe, confirm before applying): Replace model '@best-sonet' of pipe 'write_tide_note' with '@best-gpt'"
+        ) in markdown
+        assert "💡 Suggested fix: Replace model" not in markdown
+        assert "💡 1 of these errors can be fixed automatically" in markdown
 
     def test_markdown_no_fix_footer_when_nothing_fixable(self, tmp_path: Path) -> None:
         """With no suggested fix, the footer points at the messages instead of naming a fix command."""
