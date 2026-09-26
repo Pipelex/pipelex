@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 from enum import StrEnum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
@@ -133,7 +133,9 @@ class DisclosureMode(StrEnum):
         ``message`` and ``user_action``. The flag is set by error classes whose
         message is genuinely caller-facing copy — text describing the *caller's
         own* input, e.g. ``MthdsParserError`` (a ``.mthds`` syntax error)
-        or ``ValidateBundleError`` (a failed bundle validation).
+        or ``ValidateBundleError`` (a failed bundle validation) — or, for a
+        class raised both for the caller's faults and for others, by the raise
+        site that knows, through :meth:`PipelexError.as_caller_fault`.
       - Every other report has its ``message`` replaced with a generic
         placeholder and its ``user_action`` dropped, keeping only the stable
         identifiers (``error_type``, ``error_domain``, ``error_category``,
@@ -418,7 +420,8 @@ class ErrorReport(BaseModel):
     provider: str | None = None
     provider_metadata: ProviderErrorMetadata | None = None
     # True when ``message`` was authored as caller-facing copy — set at report
-    # construction from ``PipelexError._authors_caller_facing_message``. STRICT
+    # construction from ``PipelexError._authors_caller_facing_message``, or from
+    # the raise site's :meth:`PipelexError.as_caller_fault`. STRICT
     # disclosure keys its ``message`` passthrough on this flag (see
     # :class:`DisclosureMode`). Defaults to False so an unflagged report — and
     # any payload that predates the field — is redacted, never leaked.
@@ -612,6 +615,9 @@ class PipelexError(Exception):
     # (Contrast ``_declared_title`` / ``_declared_type_uri``, which ``title()`` /
     # ``type_uri()`` deliberately read via ``cls.__dict__`` to bypass inheritance.)
     _authors_caller_facing_message: ClassVar[bool] = False
+    # The per-instance counterpart of ``_authors_caller_facing_message``, set only by
+    # :meth:`as_caller_fault`, for a class whose instances are not all the caller's fault.
+    _raised_as_caller_fault: bool = False
 
     @classmethod
     def title(cls) -> str:
@@ -659,6 +665,33 @@ class PipelexError(Exception):
         super().__init__(message)
         self.message = message
 
+    def as_caller_fault(self, *, user_action: UserAction | None = None) -> Self:
+        """Classify this error, where it is raised, as a fault in the caller's own method or inputs.
+
+        Its report then carries the ``INPUT`` domain, so an HTTP surface answers 422, and a
+        caller-facing ``message``, which STRICT disclosure keeps (see :class:`DisclosureMode`): the
+        two facts a class declares with ``error_domain = ErrorDomain.INPUT`` and
+        ``_authors_caller_facing_message = True``. It serves a class raised both for the caller's
+        faults and for faults that are not the caller's, which therefore cannot declare them: the
+        raise site that knows says so there, for this one error. Neither fact is inherited by a
+        wrapper raised from this error, whose own message is not this one.
+
+        The raise site vouches for the message: it names only the caller's own method and data
+        (pipe codes, concept codes, variable names, the values the caller sent), never a server
+        path, a secret, or the text of an exception that is not a Pipelex error.
+
+        Args:
+            user_action: The next step for the caller, when the raise site can name one.
+
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).as_caller_fault()``.
+        """
+        self.error_domain = ErrorDomain.INPUT
+        self._raised_as_caller_fault = True
+        if user_action is not None:
+            self.user_action = user_action
+        return self
+
     def to_error_report(self) -> ErrorReport:
         """Return a structured error report, enriched from the ``__cause__`` chain.
 
@@ -683,7 +716,7 @@ class PipelexError(Exception):
             type_uri=type(self).type_uri(),
             error_domain=self.error_domain,
             user_action=self.user_action,
-            caller_facing_message=self._authors_caller_facing_message,
+            caller_facing_message=self._authors_caller_facing_message or self._raised_as_caller_fault,
         )
         return self._enrich_error_report_from_cause(report)
 

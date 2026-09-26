@@ -832,6 +832,63 @@ class ModelDeck(ConfigModel):
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
         return model_handle in self.inference_models or model_handle in aliases or model_handle in waterfalls
 
+    def _is_deck_model_reference(self, *, model_handle: str, model_type: ModelType) -> bool:
+        """Whether this deck defines the model reference `model_handle` or names it in one of its own entries.
+
+        Every setting the deck hands out names a reference the deck defines (a model it serves, an
+        alias, a waterfall) or one its own entries name (a preset's model, an alias's target, a
+        waterfall's fallback, a default or override written as a setting). A reference that is
+        neither can only have reached a model lookup from outside the deck, from a model setting
+        written inline in the method being run.
+        """
+        aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
+        try:
+            ref = ModelReference.parse(model_handle)
+        except ModelReferenceParseError:
+            return False
+        match ref.kind:
+            case ModelReferenceKind.HANDLE:
+                if ref.name in self.inference_models or ref.name in aliases or ref.name in waterfalls:
+                    return True
+            case ModelReferenceKind.ALIAS:
+                if ref.name in aliases:
+                    return True
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in waterfalls:
+                    return True
+            case ModelReferenceKind.PRESET:
+                # A preset is never a model a lookup can serve, whether or not the deck defines it.
+                pass
+
+        named_references: set[str] = set(aliases.values())
+        for fallback_list in waterfalls.values():
+            named_references.update(fallback_list)
+        deck_settings: list[LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting]
+        deck_choices: list[LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | None]
+        match model_type:
+            case ModelType.LLM:
+                deck_settings = list(self.llm_presets.values())
+                deck_choices = [
+                    self.llm_choice_defaults.for_text,
+                    self.llm_choice_defaults.for_object,
+                    self.llm_choice_overrides.for_text,
+                    self.llm_choice_overrides.for_object,
+                ]
+            case ModelType.TEXT_EXTRACTOR:
+                deck_settings = list(self.extract_presets.values())
+                deck_choices = [self.extract_choice_default]
+            case ModelType.IMG_GEN:
+                deck_settings = list(self.img_gen_presets.values())
+                deck_choices = [self.img_gen_choice_default]
+            case ModelType.SEARCH:
+                deck_settings = list(self.search_presets.values())
+                deck_choices = [self.search_choice_default]
+        named_references.update(deck_setting.model for deck_setting in deck_settings)
+        for deck_choice in deck_choices:
+            if isinstance(deck_choice, (LLMSetting, ExtractSetting, ImgGenSetting, SearchSetting)):
+                named_references.add(deck_choice.model)
+        return model_handle in named_references
+
     def get_required_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:
         inference_model = self.get_optional_inference_model(model_handle=model_handle, model_type=model_type)
         if inference_model is None:
@@ -839,7 +896,16 @@ class ModelDeck(ConfigModel):
             # reaches, a hosted run's stored error included, whose reader has no local deck. The
             # remedy for a stale local deck is the local CLI's to give, in its model panel.
             msg = f"Model handle '{model_handle}' was not found in the model deck."
-            raise ModelNotFoundError(message=msg, model_handle=model_handle)
+            model_not_found_error = ModelNotFoundError(message=msg, model_handle=model_handle)
+            if not self._is_deck_model_reference(model_handle=model_handle, model_type=model_type):
+                # The deck neither defines this reference nor names it anywhere, so the method being
+                # run named it, in an inline model setting the load-time check does not look into:
+                # the caller's fault, which that check reports as `ModelChoiceNotFoundError` for a
+                # reference it sees. The message names nothing but the caller's own reference. A
+                # reference the deck itself names but cannot serve (a preset or an alias target on a
+                # backend that is not enabled) stays the deployment's fault, and stays redacted.
+                model_not_found_error.as_caller_fault()
+            raise model_not_found_error
         if model_handle not in self.inference_models:
             log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
         return inference_model

@@ -226,6 +226,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 f"  Inputs:\n{inputs_desc}\n\n"
                 f"  Error: {type(exc).__name__}: {exc}"
             )
+            # Not classified as the caller's fault: the function's own exception text can carry
+            # whatever the process holds (a path, a setting, a secret), so it stays redacted under
+            # STRICT disclosure.
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
         the_content = execution_result.content

@@ -182,7 +182,7 @@ class InferenceErrorCategory(StrEnum):
 
 ### ErrorDomain
 
-Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the exception, drives HTTP status.
+Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the exception, or on one error by the site that raises it (see [Classified where it is raised](#classified-where-it-is-raised)), drives HTTP status.
 
 | Domain | Meaning | HTTP status | Who can fix it |
 |--------|---------|-------------|----------------|
@@ -209,6 +209,26 @@ own_domain = self.error_category.error_domain if self.error_category is not None
 ```
 
 The consequence worth knowing at the HTTP boundary: a **content-classified inference failure answers 422, not 500** — a content-policy refusal, a malformed prompt image, a bad prompt parameter are all properties of material the caller submitted. Everything else keeps the status it already had; only the report became truthful about why.
+
+#### Classified where it is raised
+
+Most classes state whose fault they are in their body: an `error_domain`, and `_authors_caller_facing_message = True` when their message is copy written for the caller, which STRICT disclosure then keeps instead of replacing it with `An internal error occurred.`. Every instance of such a class is the same kind of fault. A few classes are raised both for faults in the caller's own method or inputs and for faults that are not the caller's, so they cannot state it. For those, the site that raises the error and knows calls `as_caller_fault()` on it: the report then carries the `input` domain, so an HTTP surface answers 422, a caller-facing message, and the next step the raise site passes, if any.
+
+```python
+raise PipeRunInputsError(message=msg, run_mode=run_mode, pipe_code=pipe_code).as_caller_fault(
+    user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Provide the missing required inputs of 'flow': topic."),
+)
+```
+
+The raise site vouches for the message: it names only the caller's own method and data (pipe codes, concept codes, variable names, the values the caller sent), never a path on the host, a secret or the text of a foreign exception. As with the class-level flag, a plain wrapper raised from the error inherits its domain but not its caller-facing flag, since the wrapper's message is its own; the located wrappers of a run failure report their root fault, so they carry both.
+
+| Raise site | Error | Why it is the caller's fault |
+|------------|-------|------------------------------|
+| A `PipeParallel` combining its branch results into its output | `StuffFactoryError` | The method sets which branch feeds which field, what each branch produces and whether it produces a list |
+| A pipe checking that its required inputs are present | `PipeRunInputsError` | The request, or an earlier step of the method, left the input out |
+| A model lookup for a reference the deck neither defines nor names in any of its own entries | `ModelNotFoundError` | Only an inline model setting of the method can have named it; a reference the deck names but cannot serve stays `config` and redacted |
+
+Some failures stay unclassified on purpose, each with a sentence at its raise site saying why: a model output that does not fit its structure, which depends on what the model produced; a `PipeFunc` crash, whose exception text can carry anything the process holds; an input resource the pipe cannot use, whose message names the path as resolved on the host; a template that fails to render, where the same failure can come from the template or from the data; and a working-memory miss, since a step naming a variable nothing produces is refused when the bundle loads.
 
 ---
 
@@ -559,6 +579,9 @@ The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `Extrac
 report = exc.to_error_report()  # enriched from the __cause__ chain
 payload = report.to_dict()  # None-free dict for serialization
 
+# Classify one error as the caller's own fault, where it is raised
+raise SomeError(msg).as_caller_fault(user_action=user_action)  # input domain, caller-facing
+
 # Consume a report
 report.http_status  # 422 / 429 / 500
 report.user_action_detail()  # free-form advice text, or None
@@ -603,6 +626,8 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | Local file extractor raises a builtin (docling, pypdfium2) | `ValueError` / `RuntimeError` / `FileNotFoundError` → `CONTENT` → `error_domain = INPUT` → **HTTP 422**; `OSError` → `TRANSIENT` (see `_LOCAL_EXTRACT_BY_TYPE_NAME`) |
 | LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` → no `error_domain` asserted → HTTP 500 |
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown); `error_domain = RUNTIME` |
+| A step names, in an inline model setting, a model the deck neither defines nor names | `ModelNotFoundError`, classified by the lookup as the caller's: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT. A model the deck itself names but does not serve (a preset or alias on a backend that is not enabled) keeps `CONFIG` → HTTP 500, redacted |
+| A `PipeParallel` cannot combine its branch results, or a pipe starts without a required input | The caller's own method or request: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT, with a `CHANGE_INPUT` next step |
 | Unknown or ambiguous entry `pipe_code` (a CLI argument, a run request's field, the `--pipe` / `pipe_ref` slice selector of bundle validation) | `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` → `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422**, and caller-facing under STRICT. The in-body lookups (`get_optional_pipe` / `get_required_pipe`) keep raising the undomained `PipeNotFoundError` / `PipeLibraryError`: a ref written inside a bundle is not the caller's input |
 | Wrapper exception (no own category) | Inherits cause's classification via enrichment — including the domain the cause derived |
 | A pipe fails during a run | `PipeRouterError` → `PipelineExecutionError`, both reporting the root fault's `error_type` and its own message prefixed with `Pipe '<code>' failed (<path>): `; the classification comes from the chain |

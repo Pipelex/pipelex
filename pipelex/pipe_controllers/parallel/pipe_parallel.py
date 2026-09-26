@@ -6,6 +6,7 @@ from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -17,6 +18,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -519,12 +521,31 @@ class PipeParallel(PipeController):
 
         # Always combine the branch outputs into the declared output concept and stamp it as main stuff:
         # a pipe run always resolves its declared output — the combine is the parallel's value arm.
-        combined_output_stuff = StuffFactory.combine_stuffs(
-            concept=self.output.concept,
-            stuff_contents=output_stuff_contents,
-            name=output_name,
-            code=final_stuff_code,
-        )
+        try:
+            combined_output_stuff = StuffFactory.combine_stuffs(
+                concept=self.output.concept,
+                stuff_contents=output_stuff_contents,
+                name=output_name,
+                code=final_stuff_code,
+            )
+        except StuffFactoryError as exc:
+            # The combine validates the branch results against this parallel's declared output, and
+            # the caller's method sets both: which branch feeds which field, what each branch
+            # produces and whether it produces a list. A mismatch (a list branch feeding a single
+            # field, a concept its field does not accept, a required field no branch feeds) is the
+            # caller's to fix, and the message names only the output concept, the result name and
+            # the combined fields' validation errors.
+            exc.as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=(
+                        f"Change the method so that each branch of PipeParallel '{self.code}' produces what the field of "
+                        f"'{self.output.concept.concept_ref}' it feeds expects, a list only where that field is a list, "
+                        "and so that every required field is fed by a branch."
+                    ),
+                )
+            )
+            raise
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,
             name=output_name,
