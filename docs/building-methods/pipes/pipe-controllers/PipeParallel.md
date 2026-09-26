@@ -32,6 +32,14 @@ A branch result may legitimately be **absent** at run time: the branch pipe decl
 -   **Structured output, non-required field**: the absence is absorbed as the field's default (`null` unless the field declares another default).
 -   **Structured output, required field**: this is rejected **statically** at validation time (`optional_branch_required_field`) — a required field cannot be fed by a maybe-absent branch. Make the field non-required, or sink the absence upstream with a `?` input on the branch path.
 
+### A branch and its field must agree on multiplicity
+
+A branch that produces a list, such as a `PipeBatch` whose output is `Idea[]`, fills a field that holds a list, and a branch that produces one item fills a field that holds one item. When they disagree, the combine refuses the branch results, in the dry run of `pipelex validate` as in a run, and the refusal names the branch, its result and the field, and says which of the two to change; when the branch's multiplicity comes from its own `nb_output`, `multiple_output` or `batch_over` in `branches`, the refusal names that setting instead of the pipe's output. The advice is given only when the branch's concept fits the field, and whatever else the combine refused is reported beside it:
+
+```text
+PipeParallel 'analyze_topics' cannot combine its branch results into its output 'TopicReview'. Branch 'draft_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'TopicReview' holds a single item. Declare the field as a list in the structure of 'TopicReview', with type 'list', item_type 'concept' and item_concept_ref 'Idea', or make branch 'draft_ideas' output a single 'Idea'.
+```
+
 ## Configuration
 
 `PipeParallel` is configured in your pipeline's `.mthds` file.

@@ -509,7 +509,7 @@ def _render_validate_bundle_markdown(
 
     # A hint needs an action behind it (disease E): when items carry a suggested fix, name the exact
     # fix command — same predicate and command shape as the human footer — instead of the boilerplate
-    # "check the validation_errors array" hint that the JSON envelope keeps.
+    # class-level hint that the JSON envelope keeps.
     fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs)
     if fixable_count:
         fix_command = build_fix_command(

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:6a2e48887fd3592e1046ca73ecfc5e99991d869fb03a4e27b545e1a733e30bf2"
+digest = "sha256:7ddc95b5433f26f817137e68c3cc4045dfd0df848ae533f3d27f44aee68606f6"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T18:16:26Z"
-rationale = "The human validation panel labels an unsafe suggested fix '💡 Suggested fix (unsafe, confirm before applying):' through the shared suggested_fix_label; validate.md (example and Suggested Fixes), fix.md and agent-cli.md now say how an unsafe fix is shown. index.md's plain 💡 line still describes a safe fix; agent_cli/CLAUDE.md needs no change."
+reviewed_at = "2026-09-26T18:46:48Z"
+rationale = "Only a comment in agent_output.py changed, naming the validate hint as the class-level one now that ValidateBundleError's user action no longer reads 'Check the validation_errors array'; docs/tools/cli and agent_cli/CLAUDE.md never quoted that hint, so they need no change."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -12,7 +12,7 @@ rationale = "The human validation panel labels an unsafe suggested fix '💡 Sug
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/accept_gateway_terms_cmd.py" = "blob:cb8338c09a7b5dee6088551c156d69dab613213a"
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:49b8bab889d8673e7d4f1d683efe0928e43914b9"
-"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:27f8c90f6a209ee780e06f58f630d7efa59227ab"
+"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:8cacae22e40449077892bf1f32cdd0ba64b03f0a"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
 "pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:91589e517509248a4639a37e82f46a69538f8071"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
