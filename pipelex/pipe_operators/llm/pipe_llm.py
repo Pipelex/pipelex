@@ -269,6 +269,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             except ValidationError as exc:
+                # Not classified as the caller's fault, here or on the object path below, where an
+                # output the model could not fit to the structure surfaces as `LLMCompletionError`:
+                # whether a model's output fits depends on what the model produced this time.
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = format_pydantic_validation_error(exc)
                 msg = f"Error generating text content in PipeLLM {location}: {error_details}"

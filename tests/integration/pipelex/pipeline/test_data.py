@@ -114,3 +114,82 @@ inputs = { clause = "Text!" }
 output = "Text"
 template = "Clause: {{ clause }}"
 """
+
+
+class StrictMethodFaultsTestData:
+    """Bundles whose runs fail on a fault in the caller's own method, and on faults that are not the caller's."""
+
+    # A sequence whose first step needs an input the caller may leave out of the request.
+    MISSING_INPUT_MTHDS: ClassVar[str] = """
+domain = "strict_faults_missing_input"
+description = "A sequence that greets a name the caller must provide"
+
+[pipe.greet_flow]
+type = "PipeSequence"
+description = "Greet the name"
+inputs = { name = "Text" }
+output = "Text"
+steps = [{ pipe = "greet", result = "greeting" }]
+
+[pipe.greet]
+type = "PipeCompose"
+description = "Greet the name"
+inputs = { name = "Text" }
+output = "Text"
+template = "Hello {{ name }}"
+"""
+
+    DECK_PRESET: ClassVar[str] = "strict-faults-deck-preset"
+    DECK_ALIAS: ClassVar[str] = "strict-faults-deck-alias"
+    # A handle the deck's own preset and alias name, which the test profile does not serve.
+    DECK_NAMED_UNSERVED_HANDLE: ClassVar[str] = "strict-faults-deck-named-unserved"
+
+    # Replaced by the model reference a test names the step's model with.
+    MODEL_REFERENCE_SLOT: ClassVar[str] = "<model-reference>"
+
+    # A step that names its model through a preset or an alias of the deck: the deck names the model.
+    DECK_NAMED_MODEL_MTHDS: ClassVar[str] = """
+domain = "strict_faults_deck_model"
+description = "A step whose model the deck names but does not serve"
+
+[pipe.summarize_flow]
+type = "PipeSequence"
+description = "Summarize the topic"
+inputs = { topic = "Text" }
+output = "Text"
+steps = [{ pipe = "summarize", result = "summary" }]
+
+[pipe.summarize]
+type = "PipeLLM"
+description = "Summarize with a model the deck names but does not serve"
+inputs = { topic = "Text" }
+output = "Text"
+model = "<model-reference>"
+prompt = "Summarize $topic"
+"""
+
+    # A step with a structured output, whose model output the test makes unfit for its structure.
+    STRUCTURED_OUTPUT_MTHDS: ClassVar[str] = """
+domain = "strict_faults_structured_output"
+description = "A step whose structured output the model could not fit"
+
+[concept.Verdict]
+description = "A verdict on a claim"
+
+[concept.Verdict.structure]
+label = { type = "text", description = "The verdict's label", required = true }
+
+[pipe.judge_flow]
+type = "PipeSequence"
+description = "Judge the claim"
+inputs = { claim = "Text" }
+output = "Verdict"
+steps = [{ pipe = "judge", result = "verdict" }]
+
+[pipe.judge]
+type = "PipeLLM"
+description = "Judge the claim"
+inputs = { claim = "Text" }
+output = "Verdict"
+prompt = "Judge this claim: $claim"
+"""

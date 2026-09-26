@@ -104,11 +104,15 @@ class TestLocatedRunFailure:
         assert ".pipelex/inference" not in report.message
         assert "pipelex init" not in report.message
         assert report.model == LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE
+        # Nothing on the chain advises an action, so the fallback names the failing pipe.
+        assert report.user_action is not None
+        assert report.user_action.detail == "The run failed in pipe 'summarize': the message gives the cause."
 
-        # A model the deployment does not serve is not the caller's fault: redacted, config domain.
+        # The step names the model in an inline setting, and no entry of the deck names it: the
+        # caller's own fault, whose message STRICT disclosure keeps.
         strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["message"] == INTERNAL_ERROR_PLACEHOLDER
-        assert strict_payload["error_domain"] == "config"
+        assert strict_payload["message"] == report.message
+        assert strict_payload["error_domain"] == "input"
         assert strict_payload["error_type"] == "ModelNotFoundError"
 
     async def test_parallel_combine_failure_is_reported_at_the_nested_parallel(self) -> None:
@@ -122,8 +126,9 @@ class TestLocatedRunFailure:
         assert report.error_type == "StuffFactoryError"
         assert report.message.startswith("Pipe 'analyze' failed (flow → analyze): Error combining stuffs for concept Report")
         assert "expected located_failure_parallel__Idea, got ListContent" in report.message
+        # The combine's own next step, since a mismatched combine is the caller's to fix.
         assert report.user_action is not None
-        assert report.user_action.detail == "The run failed in pipe 'analyze': the message gives the cause."
+        assert report.user_action.detail.startswith("Change the method so that each branch of PipeParallel 'analyze' produces")
 
     async def test_caller_facing_root_keeps_its_message_under_strict(self) -> None:
         """A caller-facing root fault keeps its own message, located, under STRICT."""
