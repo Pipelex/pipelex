@@ -15,6 +15,8 @@ Validation used to lose detail before the verdict was built. These tests load re
   an unresolved concept's item lists the concepts its domain declares.
 """
 
+from pathlib import Path
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -104,3 +106,23 @@ class TestValidationDetailKept:
         assert item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT
         assert item.concept_code == "IdeaRanking"
         assert item.declared_concepts == ["Idea", "IdeaSummary"]
+
+    @pytest.mark.asyncio
+    async def test_a_failure_in_a_library_pipe_never_names_the_host_file(self, tmp_path: Path) -> None:
+        """A pipe loaded from the host's library directories is located, but its file on the host stays out of the verdict."""
+        library_dir = tmp_path / "host_library"
+        library_dir.mkdir()
+        (library_dir / "idea_board.mthds").write_text(ValidationDetailBundles.NESTED_PARALLEL_MISMATCH, encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(
+                mthds_contents=[ValidationDetailBundles.CALLER_OF_LIBRARY_PARALLEL],
+                mthds_sources=[ValidationDetailBundles.CALLER_SOURCE],
+                library_dirs=[library_dir],
+            )
+
+        (item,) = exc_info.value.to_error_report().validation_errors or []
+        assert item.category == ValidationErrorCategory.DRY_RUN
+        assert (item.pipe_code, item.domain_code) == ("analyze_topic", ValidationDetailBundles.DOMAIN)
+        assert item.source is None
+        assert str(tmp_path) not in item.message

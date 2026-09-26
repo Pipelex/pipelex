@@ -406,6 +406,7 @@ async def validate_bundle(
                     library_id=library_id,
                     allow_signatures=allow_signatures,
                     caller_identity=caller_identity,
+                    source_pipe_refs=frozenset(pipe.pipe_ref for pipe in loaded_pipes),
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -434,6 +435,7 @@ async def validate_bundle(
                     library_id=library_id,
                     allow_signatures=allow_signatures,
                     caller_identity=caller_identity,
+                    source_pipe_refs=frozenset(pipe.pipe_ref for pipe in loaded_pipes),
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,

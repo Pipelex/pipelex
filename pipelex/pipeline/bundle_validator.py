@@ -277,6 +277,7 @@ class BundleValidator:
         library_id: str,
         allow_signatures: bool = False,
         caller_identity: CallerIdentity | None = None,
+        source_pipe_refs: frozenset[str] | None = None,
     ) -> dict[str, DryRunOutput]:
         """Classify each pipe ``SUCCESS / FAILURE / SKIPPED`` against an already-open library.
 
@@ -306,6 +307,11 @@ class BundleValidator:
         caller is already in scope, and with none — a local CLI sweep — the dry runs state
         ``DRY_RUN_USER_ID`` and the event goes out under the fallback, as before.
 
+        ``source_pipe_refs`` names the pipes whose file a located failure may carry as its ``source``:
+        a validator of submitted content passes that content's pipes, so a failure located at a pipe
+        loaded from a host's own library directories never names a file on the host. ``None`` lets
+        every failure carry its pipe's file, as a local sweep of one's own library does.
+
         Returns the per-pipe status map (carrying allowed failures + skips). Raises ``DryRunError``
         on ≥1 unexpected failure.
         """
@@ -315,6 +321,7 @@ class BundleValidator:
                 library_id=library_id,
                 allow_signatures=allow_signatures,
                 caller_identity=effective_caller_identity,
+                source_pipe_refs=source_pipe_refs,
             )
 
     async def _validate_pipes_for_caller(
@@ -324,6 +331,7 @@ class BundleValidator:
         library_id: str,
         allow_signatures: bool,
         caller_identity: CallerIdentity | None,
+        source_pipe_refs: frozenset[str] | None,
     ) -> dict[str, DryRunOutput]:
         """The body of :meth:`validate_pipes`, run inside the caller's scope."""
         start_time = time.time()
@@ -394,6 +402,7 @@ class BundleValidator:
                     execution_config=execution_config,
                     dry_run_pipeline_id=dry_run_pipeline_id,
                     caller_identity=caller_identity,
+                    source_pipe_refs=source_pipe_refs,
                 )
 
         # 4. Aggregate + report.
@@ -407,6 +416,7 @@ class BundleValidator:
         execution_config: PipelineExecutionConfig,
         dry_run_pipeline_id: str,
         caller_identity: CallerIdentity | None,
+        source_pipe_refs: frozenset[str] | None,
     ) -> DryRunOutput:
         """Build the mock job and run the pipe DRY through the direct primitive; classify the outcome.
 
@@ -436,6 +446,7 @@ class BundleValidator:
                 dry_run_pipeline_id=dry_run_pipeline_id,
                 caller_identity=caller_identity,
                 recorder=recorder,
+                source_pipe_refs=source_pipe_refs,
             )
         finally:
             _failing_pipe_recorder.reset(recorder_token)
@@ -449,6 +460,7 @@ class BundleValidator:
         dry_run_pipeline_id: str,
         caller_identity: CallerIdentity | None,
         recorder: _FailingPipeRecorder,
+        source_pipe_refs: frozenset[str] | None,
     ) -> DryRunOutput:
         """The body of :meth:`_classify_pipe`, run while ``recorder`` notes where failures happen."""
         try:
@@ -483,7 +495,11 @@ class BundleValidator:
             error_message = f"Dry run failed for pipe '{pipe.pipe_ref}': {formatted_error}"
             # A failure raised outside any routed pipe run (the mock-input build) is the swept pipe's own.
             failing_pipe = recorder.find_failing_pipe(error=exc) or pipe
-            failing_pipe_source = get_library_manager().get_pipe_source(failing_pipe.pipe_ref)
+            # Only a pipe of the content under validation names its file: one loaded from a host's own
+            # library directories would put a path on the host into a caller's verdict.
+            failing_pipe_source: str | None = None
+            if source_pipe_refs is None or failing_pipe.pipe_ref in source_pipe_refs:
+                failing_pipe_source = get_library_manager().get_pipe_source(failing_pipe.pipe_ref)
             failure = DryRunFailureErrorData(
                 pipe_code=failing_pipe.code,
                 domain_code=failing_pipe.domain_code,

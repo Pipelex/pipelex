@@ -529,3 +529,21 @@ prompt      = "Rank the ideas in these notes: $notes"
 
     # What a dry-run item must never carry again: the sweep's internal record, dumped as a Python repr.
     RECORD_REPR_MARKERS: ClassVar[tuple[str, ...]] = ("pipe_ref=", "status=", "DryRunStatus", "error_message=")
+
+    # A caller's bundle whose sequence runs the failing parallel from a library directory the host loads.
+    # ``NESTED_PARALLEL_MISMATCH`` stands in for that library: its ``analyze_topic`` fails its dry run.
+    CALLER_OF_LIBRARY_PARALLEL = """
+domain      = "workshop"
+description = "A caller's bundle that runs the library's analysis"
+main_pipe   = "run_library_analysis"
+
+[pipe.run_library_analysis]
+type        = "PipeSequence"
+description = "Analyze the framed topic with the library's pipe"
+inputs      = { framed_topic = "Text" }
+output      = "idea_board.IdeaReport"
+steps = [
+  { pipe = "idea_board.analyze_topic", result = "report" },
+]
+"""
+    CALLER_SOURCE = "api://bundle-0.mthds"
