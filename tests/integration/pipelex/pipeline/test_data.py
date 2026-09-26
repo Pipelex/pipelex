@@ -246,3 +246,56 @@ inputs = { claim = "Text" }
 output = "Verdict"
 prompt = "Judge this claim: $claim"
 """
+
+
+class ConditionMethodFaultsTestData:
+    """Bundles whose `PipeCondition` refuses the run on a fault in the caller's own method."""
+
+    # Replaced by the inputs, the expression, the outcomes and the default outcome each case gives the condition.
+    INPUTS_SLOT: ClassVar[str] = "<inputs>"
+    EXPRESSION_SLOT: ClassVar[str] = "<expression>"
+    OUTCOMES_SLOT: ClassVar[str] = "<outcomes>"
+    DEFAULT_OUTCOME_SLOT: ClassVar[str] = "<default-outcome>"
+
+    # A condition routing a parcel between two lanes, whose expression each case sets.
+    ROUTING_MTHDS: ClassVar[str] = """
+domain      = "condition_faults_routing"
+description = "Send a parcel down the lane the request names"
+main_pipe   = "route_parcel"
+
+[concept]
+Parcel = "A parcel waiting at the sorting bench"
+
+[pipe.route_parcel]
+type            = "PipeCondition"
+description     = "Choose the lane a parcel goes down"
+inputs          = <inputs>
+output          = "Parcel"
+expression      = "<expression>"
+outcomes        = <outcomes>
+default_outcome = "<default-outcome>"
+
+[pipe.send_express]
+type        = "PipeCompose"
+description = "Note the parcel onto the express lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Express: $parcel"
+
+[pipe.send_standard]
+type        = "PipeCompose"
+description = "Note the parcel onto the standard lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Standard: $parcel"
+"""
+
+    # What the condition reads: the parcel its lanes note, and the lane its expression reads.
+    PARCEL_AND_LANE_INPUTS: ClassVar[str] = '{ parcel = "Parcel", lane = "Text" }'
+    PARCEL_INPUT: ClassVar[str] = '{ parcel = "Parcel" }'
+    LANE_INPUT: ClassVar[str] = '{ lane = "Text" }'
+
+    # Two lanes, and a lane the method refuses on purpose.
+    LANE_OUTCOMES: ClassVar[str] = '{ express = "send_express", standard = "send_standard", reject = "fail" }'
+    # Every outcome, and the default, refuse the run.
+    ALL_FAIL_OUTCOMES: ClassVar[str] = '{ reject = "fail" }'
