@@ -158,9 +158,9 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
     Args:
         exc: The model availability error exception
         context: Context for the error message
-        exit_code: Process exit code; the default is 1. The validate surface never reaches
-            this handler: an unknown model is an invalid verdict there, rendered by
-            :func:`handle_validate_bundle_error`.
+        exit_code: Process exit code. The validate surface passes 2: a model the deck defines
+            but no enabled backend serves is a setup fault of this machine, so no verdict, unlike
+            an unknown model, which is an invalid verdict there. Other contexts keep the default 1.
     """
     console = get_console()
     print_traceback_if_requested(console=console)

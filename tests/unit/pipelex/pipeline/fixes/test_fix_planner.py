@@ -215,7 +215,7 @@ class TestFixPlanner:
         fix = plan_fix_for_pipe_validation_error(_unknown_model_error_data(suggestions=["@best-gpt"]))
         assert fix is not None
         assert fix.fix_code == RENAME_MODEL_FIX_CODE
-        assert fix.safety == FixSafety.SAFE
+        assert fix.safety == FixSafety.UNSAFE
         assert fix.source == "main.mthds"
         assert fix.ops == [RemapValueOp(table_path=["pipe", "write_tide_note"], key="model", mapping={"@best-sonet": "@best-gpt"})]
         assert "'@best-sonet'" in fix.description

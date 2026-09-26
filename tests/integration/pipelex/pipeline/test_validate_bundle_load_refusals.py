@@ -242,7 +242,7 @@ class TestValidateBundleLoadRefusals:
         fix = item.suggested_fix
         assert fix is not None
         assert fix.fix_code == RENAME_MODEL_FIX_CODE
-        assert fix.safety.is_safe
+        assert not fix.safety.is_safe, "a fuzzy match is never auto-applied"
         assert fix.source == str(bundle_path)
         assert fix.ops == [RemapValueOp(table_path=["pipe", "write_tide_note"], key="model", mapping={"@best-sonet": "@best-gpt"})]
 

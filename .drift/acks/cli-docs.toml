@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:f03ae0caaedf4e4b644af61e7ace8a4d9c08597e9b1a48906a9334daa8e5a27a"
+digest = "sha256:7e3a9c06b9fcecfc2dd24e2a1553c2d2cfe31b95c455d2911e857163874f1e86"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T16:11:26Z"
-rationale = "The validate commands (bare and agent) now run their library load inside translate_to_validate_bundle_error, so a load-time refusal and the unknown model leave as a ValidateBundleError verdict with exit 1; the PipeOperatorModelChoiceError exit-2 arms and its config entry in AGENT_ERROR_DOMAINS are gone (the class declares its input domain). Reviewed docs/tools/cli/validate.md and agent-cli.md (updated with the verdict sections) and pipelex/cli/agent_cli/CLAUDE.md (new Validate refusals are verdicts bullet)."
+reviewed_at = "2026-09-26T16:40:03Z"
+rationale = "Review fix: the handle_model_availability_error docstring again says validate passes exit code 2 for a model no backend serves; docs/tools/cli/agent-cli.md and validate.md now state that agent validate pipe answers a failing dry run with the DryRunError envelope and that refusals not classified as input still leave as no verdict, and the rename-model fix is described as unsafe."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -127,7 +127,7 @@ rationale = "The validate commands (bare and agent) now run their library load i
 "pipelex/cli/commands/validate/pipe_cmd.py" = "blob:d67267571559006459628180f2c8b216ba7fee31"
 "pipelex/cli/commands/which_cmd.py" = "blob:68661d4bab22e2c4dab183d59bd9f2c6dd573472"
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
-"pipelex/cli/error_handlers.py" = "blob:b0fb1813633f380a0c4e4f1ea2b2f5b2d57b2c23"
+"pipelex/cli/error_handlers.py" = "blob:c704505651f24a0e9bb85fed0da1d00445c9e980"
 "pipelex/cli/exceptions.py" = "blob:1d51c3a53ddd3f6cf8de566fa2ade3fa75ab7a3a"
 "pipelex/cli/installed_methods.py" = "blob:09197f47baf8d7251d28d148a0544b4a23ee7365"
 "pipelex/cli/method_resolver.py" = "blob:1230dde5f89ac28bbdcbcbbd0c1d485c71803caf"

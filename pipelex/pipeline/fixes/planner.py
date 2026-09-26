@@ -50,10 +50,15 @@ def _plan_rename_model(*, error_data: PipesAndConceptValidationErrorData) -> Sug
     """``rename-model``: an ``unknown_model`` whose deck offers exactly one close match of the same kind
     becomes a ``remap_value`` of the pipe's model field, from the reference as written to that match.
 
-    A single match is the only case with one obvious correction; with several, choosing among them is
+    A single match is the only case with one candidate correction; with several, choosing among them is
     the author's call, and with none there is nothing to write. The remap names the reference as written,
     so the op rewrites the field only while it still holds that exact value and leaves a field the
     author has since edited alone.
+
+    The fix is ``UNSAFE``: the match is a fuzzy guess (a similarity cutoff over the deck's names), so a
+    single match can still be a different model, with its own provider, cost and behaviour, and a wrong
+    sigil the author meant is not weighed against it. It rides the item for an author or an agent to
+    apply deliberately, and ``pipelex fix bundle`` never applies it on its own.
     """
     if error_data.pipe_code is None or error_data.field_name is None or error_data.model_reference is None:
         return None
@@ -64,7 +69,7 @@ def _plan_rename_model(*, error_data: PipesAndConceptValidationErrorData) -> Sug
     return SuggestedFix(
         fix_code=RENAME_MODEL_FIX_CODE,
         description=f"{description}, its one close match in the model deck",
-        safety=FixSafety.SAFE,
+        safety=FixSafety.UNSAFE,
         source=error_data.source,
         ops=[
             RemapValueOp(
