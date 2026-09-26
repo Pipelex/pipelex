@@ -175,6 +175,30 @@ _UNKNOWN_MODEL_CASES: list[_UnknownModelCase] = [
 ]
 
 
+def _preliminary_text_bundle(*, model_line: str) -> str:
+    """A PipeLLM the elaborator splits into ``extract_tide__draft_text`` and ``extract_tide__structure`` helpers."""
+    return f"""
+domain      = "{_DOMAIN}"
+description = "Read the tide fact the harbour board publishes"
+main_pipe   = "extract_tide"
+
+[concept.TideFact]
+description = "When the tide turns at one harbour"
+
+[concept.TideFact.structure]
+harbour = {{ type = "text", description = "The harbour's name", required = true }}
+
+[pipe.extract_tide]
+type               = "PipeLLM"
+description        = "Extract the tide fact from the harbour board's notice"
+inputs             = {{ tide_times = "Text" }}
+output             = "TideFact"
+structuring_method = "preliminary_text"
+{model_line}
+prompt             = "Extract the tide fact from this notice: $tide_times"
+"""
+
+
 def _write_bundle(*, directory: Path, content: str) -> Path:
     bundle_path = directory / "bundle.mthds"
     bundle_path.write_text(content, encoding="utf-8")
@@ -245,6 +269,30 @@ class TestValidateBundleLoadRefusals:
         assert not fix.safety.is_safe, "a fuzzy match is never auto-applied"
         assert fix.source == str(bundle_path)
         assert fix.ops == [RemapValueOp(table_path=["pipe", "write_tide_note"], key="model", mapping={"@best-sonet": "@best-gpt"})]
+
+    @pytest.mark.parametrize(
+        ("model_line", "field_name"),
+        [
+            ('model              = "@best-sonet"', "model"),
+            ('model_to_structure = "@best-sonet"', "model_to_structure"),
+        ],
+        ids=["draft_text_helper", "structure_helper"],
+    )
+    async def test_preliminary_text_helper_refusal_is_located_on_the_authored_pipe(self, tmp_path: Path, model_line: str, field_name: str) -> None:
+        """The elaborator's helper pipes are not in the author's file, so the item and its fix name the authored pipe and field."""
+        bundle_path = _write_bundle(directory=tmp_path, content=_preliminary_text_bundle(model_line=model_line))
+
+        item = await _single_item(bundle_path=bundle_path)
+
+        assert item.error_type == PipeValidationErrorType.UNKNOWN_MODEL
+        assert item.pipe_code == "extract_tide"
+        assert item.field_name == field_name
+        assert item.field_path == f"pipe.extract_tide.{field_name}"
+        assert item.source == str(bundle_path)
+        assert item.message.startswith(f"Pipe 'extract_tide' (PipeLLM), field '{field_name}': ")
+        fix = item.suggested_fix
+        assert fix is not None
+        assert fix.ops == [RemapValueOp(table_path=["pipe", "extract_tide"], key=field_name, mapping={"@best-sonet": "@best-gpt"})]
 
     async def test_several_suggestions_carry_no_fix(self, tmp_path: Path) -> None:
         bundle_path = _write_bundle(directory=tmp_path, content=_llm_bundle(model_line='model       = "$writting-factual"'))

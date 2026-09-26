@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:7e3a9c06b9fcecfc2dd24e2a1553c2d2cfe31b95c455d2911e857163874f1e86"
+digest = "sha256:23181f87f119d19610be5c07c0757df6d1c4fdbca32c2265a9d0987053cb4790"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T16:40:03Z"
-rationale = "Review fix: the handle_model_availability_error docstring again says validate passes exit code 2 for a model no backend serves; docs/tools/cli/agent-cli.md and validate.md now state that agent validate pipe answers a failing dry run with the DryRunError envelope and that refusals not classified as input still leave as no verdict, and the rename-model fix is described as unsafe."
+reviewed_at = "2026-09-26T17:15:21Z"
+rationale = "Review round 2: the fix commands' 'suggested fix not applied' tip now counts only safe fixes, and rename-model (unsafe) is not a --select/--ignore code; docs/tools/cli/fix.md says so. validate.md and agent-cli.md reviewed, no further change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -85,7 +85,7 @@ rationale = "Review fix: the handle_model_availability_error docstring again say
 "pipelex/cli/commands/doctor_cmd.py" = "blob:26db32ff20d1c064bc421093825a05e980c9b770"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
-"pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"
+"pipelex/cli/commands/fix/_fix_core.py" = "blob:dac7056fcaf50210c910e4cad1ba14328b7f8adc"
 "pipelex/cli/commands/fix/app.py" = "blob:6f019930e8e3e0043ee46d87493ba4602eb33a76"
 "pipelex/cli/commands/fix/bundle_cmd.py" = "blob:427364cc453957dfe0cec879f019050329c13b3c"
 "pipelex/cli/commands/graph_cmd.py" = "blob:d54737af7efc9ab9bbf3f978050d017af0e27a41"

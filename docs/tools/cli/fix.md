@@ -60,7 +60,7 @@ pipelex fix bundle my_bundle.mthds --select match-sequence-output
 
 ## What Gets Fixed
 
-Only fixes classified as SAFE are applied — deterministic corrections derived from the structured validation errors, never from guesswork. Errors without a safe deterministic fix are left in place and reported as remaining errors. The available fix rule codes (for `--select`/`--ignore`) are listed in the error message when you pass an unknown code.
+Only fixes classified as SAFE are applied — deterministic corrections derived from the structured validation errors, never from guesswork. Errors without a safe deterministic fix are left in place and reported as remaining errors. An unsafe fix, such as `rename-model` for a model name the deck only nearly matches, still shows on its error for you to apply by hand, and is not a code `--select` or `--ignore` accepts. The available fix rule codes (for `--select`/`--ignore`) are listed in the error message when you pass an unknown code.
 
 ## Related Documentation
 

@@ -17,6 +17,7 @@ from typing_extensions import override
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -50,7 +51,7 @@ from pipelex.methods.fetch_on_miss import resolve_address_based_method
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipelexBundleBlueprint, StepRole
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
@@ -102,8 +103,37 @@ def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint])
     return result
 
 
+def _authored_model_field(*, step_role: StepRole) -> str:
+    """The field of the authored ``preliminary_text`` PipeLLM whose model a synthetic helper was given."""
+    match step_role:
+        case StepRole.DRAFT_TEXT:
+            return "model"
+        case StepRole.STRUCTURE:
+            return "model_to_structure"
+
+
+def _relocate_on_authored_pipe(
+    *, model_choice_error: PipeOperatorModelChoiceError, elaboration: ElaborationMetadata, domain_code: str
+) -> PipeOperatorModelChoiceError:
+    """Move an unknown model refused on a synthetic helper onto the authored pipe and field it came from."""
+    cause = model_choice_error.__cause__
+    if not isinstance(cause, ModelChoiceNotFoundError):
+        return model_choice_error
+    relocated = PipeOperatorModelChoiceError.make_from_model_choice_not_found(
+        model_choice_error=cause,
+        pipe_type="PipeLLM",
+        pipe_code=elaboration.parent_pipe_code,
+        domain_code=domain_code,
+        field_name=_authored_model_field(step_role=elaboration.step_role),
+    )
+    relocated.source = model_choice_error.source
+    return relocated
+
+
 @contextmanager
-def _locating_pipe_build_refusals(*, pipe_code: str, domain_code: str, source: str | None) -> Generator[None, None, None]:
+def _locating_pipe_build_refusals(
+    *, pipe_code: str, domain_code: str, source: str | None, elaboration: ElaborationMetadata | None
+) -> Generator[None, None, None]:
     """Let a refusal raised while building one pipe leave the load loop located on that pipe and its file.
 
     The loop is the one place that holds the pipe's code, its domain and the file it is declared in at
@@ -119,19 +149,31 @@ def _locating_pipe_build_refusals(*, pipe_code: str, domain_code: str, source: s
       no-verdict fault, a security refusal is never absorbed into a verdict, a library error keeps the
       structured items its own arm forwards, and pydantic's ``ValidationError`` and the
       ``PipeValidationError`` family (not ``PipelexError``s) keep their categorizers.
+
+    A synthetic helper the bundle elaborator generated (the ``<code>__draft_text`` and ``<code>__structure``
+    pipes of a ``preliminary_text`` PipeLLM) is not in the author's file, so its refusal is located on
+    the authored pipe instead, and an unknown model on the authored field the helper's model came from.
     """
     try:
         yield
     except PipeOperatorModelChoiceError as model_choice_error:
         if model_choice_error.source is None:
             model_choice_error.source = source
-        raise
+        if elaboration is None:
+            raise
+        relocated = _relocate_on_authored_pipe(model_choice_error=model_choice_error, elaboration=elaboration, domain_code=domain_code)
+        if relocated is model_choice_error:
+            raise
+        raise relocated from model_choice_error
     except (SecurityError, LibraryError):
         raise
     except PipelexError as refusal:
         if not error_domain_is_input(refusal.to_error_report().error_domain):
             raise
-        raise PipeLoadRefusalError.make_from_refusal(refusal=refusal, pipe_code=pipe_code, domain_code=domain_code, source=source) from refusal
+        authored_pipe_code = elaboration.parent_pipe_code if elaboration is not None else pipe_code
+        raise PipeLoadRefusalError.make_from_refusal(
+            refusal=refusal, pipe_code=authored_pipe_code, domain_code=domain_code, source=source
+        ) from refusal
 
 
 class LibraryManager(LibraryManagerAbstract):
@@ -564,7 +606,9 @@ class LibraryManager(LibraryManagerAbstract):
                 concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
                 source = crate.source_map.get(pipe_ref)
-                with _locating_pipe_build_refusals(pipe_code=pipe_code, domain_code=domain_code, source=source):
+                with _locating_pipe_build_refusals(
+                    pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
+                ):
                     pipe = PipeFactory[PipeAbstract].make_from_blueprint(
                         domain_code=domain_code,
                         pipe_code=pipe_code,
@@ -1169,12 +1213,20 @@ class LibraryManager(LibraryManagerAbstract):
                 if has_exports and pipe_code not in all_exported:
                     continue
                 try:
-                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                        domain_code=domain_code,
+                    # The same location the main load path attaches, so a dependency pipe's refusal
+                    # names the dependency's own file.
+                    with _locating_pipe_build_refusals(
                         pipe_code=pipe_code,
-                        blueprint=pipe_blueprint,
-                        concept_codes_from_the_same_domain=domain_concept_codes.get(domain_code, []),
-                    )
+                        domain_code=domain_code,
+                        source=crate.source_map.get(pipe_ref),
+                        elaboration=crate.elaboration_metadata.get(pipe_ref),
+                    ):
+                        pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                            domain_code=domain_code,
+                            pipe_code=pipe_code,
+                            blueprint=pipe_blueprint,
+                            concept_codes_from_the_same_domain=domain_concept_codes.get(domain_code, []),
+                        )
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
                     log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")

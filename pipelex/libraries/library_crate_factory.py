@@ -8,7 +8,7 @@ from pipelex.libraries.contract_match import contracts_match
 from pipelex.libraries.domain.domain_metadata_merge import merge_domain_metadata_field
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 
 if TYPE_CHECKING:
@@ -60,6 +60,7 @@ class LibraryCrateFactory:
         pipes: dict[str, PipeBlueprintUnion] = {}
         domains: dict[str, DomainBlueprint] = {}
         source_map: dict[str, str] = {}
+        elaboration_metadata: dict[str, ElaborationMetadata] = {}
 
         for blueprint in blueprints:
             domain_code = blueprint.domain
@@ -141,10 +142,17 @@ class LibraryCrateFactory:
                             source_map[pipe_ref] = winner.source
                         else:
                             source_map.pop(pipe_ref, None)
+                        if winner.blueprint is pipe_blueprint:
+                            cls._track_elaboration(
+                                elaboration_metadata=elaboration_metadata, pipe_ref=pipe_ref, elaboration=blueprint.get_elaboration_for(pipe_code)
+                            )
                         continue
                     pipes[pipe_ref] = pipe_blueprint
                     if source:
                         source_map[pipe_ref] = source
+                    cls._track_elaboration(
+                        elaboration_metadata=elaboration_metadata, pipe_ref=pipe_ref, elaboration=blueprint.get_elaboration_for(pipe_code)
+                    )
 
         # Concept-reference validation is NOT done here: this factory performs a world-agnostic
         # structural merge. Same-domain concept references resolve against the live library (which
@@ -156,9 +164,18 @@ class LibraryCrateFactory:
             pipes=pipes,
             domains=domains,
             source_map=source_map,
+            elaboration_metadata=elaboration_metadata,
             python_sources=python_sources or {},
             fingerprint=fingerprint,
         )
+
+    @staticmethod
+    def _track_elaboration(*, elaboration_metadata: dict[str, ElaborationMetadata], pipe_ref: str, elaboration: ElaborationMetadata | None) -> None:
+        """Keep the elaboration side-table on the declaration that won ``pipe_ref``, like ``source_map``."""
+        if elaboration is None:
+            elaboration_metadata.pop(pipe_ref, None)
+        else:
+            elaboration_metadata[pipe_ref] = elaboration
 
     @classmethod
     def _reconcile_pipe_collision(

@@ -11,7 +11,7 @@ raise sites only), ``expected_inputs``/``declared_inputs`` for ``sync-controller
 import pytest
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.pipeline.fixes.planner import RENAME_MODEL_FIX_CODE, plan_fix_for_pipe_validation_error
+from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES, RENAME_MODEL_FIX_CODE, plan_fix_for_pipe_validation_error
 from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixSafety, RemapValueOp, SetKeyOp
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -216,6 +216,7 @@ class TestFixPlanner:
         assert fix is not None
         assert fix.fix_code == RENAME_MODEL_FIX_CODE
         assert fix.safety == FixSafety.UNSAFE
+        assert RENAME_MODEL_FIX_CODE not in KNOWN_FIX_CODES, "an unsafe code is never selectable: the fix loop would skip it"
         assert fix.source == "main.mthds"
         assert fix.ops == [RemapValueOp(table_path=["pipe", "write_tide_note"], key="model", mapping={"@best-sonet": "@best-gpt"})]
         assert "'@best-sonet'" in fix.description
