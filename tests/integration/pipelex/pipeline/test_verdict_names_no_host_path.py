@@ -113,6 +113,27 @@ output      = "BoardNotise"
 prompt      = "Write a short notice for the harbour board from these tide times: $tide_times"
 """
 
+# A library sequence declaring an output its last step does not produce: refused while the library is validated,
+# located on the sequence from the pipe-source map.
+_OUTPUT_MISMATCH_LIBRARY_BUNDLE = """
+domain      = "harbour_board"
+description = "Notices of the harbour board"
+
+[pipe.post_board_notice]
+type        = "PipeSequence"
+description = "Post a notice on the harbour board"
+inputs      = { tide_times = "Text" }
+output      = "Image"
+steps       = [{ pipe = "write_board_notice", result = "board_notice" }]
+
+[pipe.write_board_notice]
+type        = "PipeLLM"
+description = "Write a notice for the harbour board"
+inputs      = { tide_times = "Text" }
+output      = "Text"
+prompt      = "Write a short notice for the harbour board from these tide times: $tide_times"
+"""
+
 _BOARD_NOTICE_PIPE_BUNDLE = """
 domain      = "harbour_board"
 description = "Notices of the harbour board"
@@ -285,6 +306,19 @@ class TestVerdictNamesNoHostPath:
         assert all(item.pipe_code == "pin_board_notice" for item in concept_items)
         # Located by its pipe and domain, never by its file on the host.
         assert all(item.source is None for item in items)
+        _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
+
+    async def test_a_host_library_pipe_located_from_its_source_names_no_host_file(self, tmp_path: Path) -> None:
+        host_library_dir = tmp_path / "host" / "library"
+        _write(path=host_library_dir / "harbour_board.mthds", content=_OUTPUT_MISMATCH_LIBRARY_BUNDLE)
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
+
+        (item,) = raised.value.to_error_report().validation_errors or []
+        assert item.pipe_code == "post_board_notice"
+        assert item.source is None
+        assert item.field_path is None
         _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
 
     async def test_a_host_library_message_names_no_host_file_on_submitted_content(self, tmp_path: Path) -> None:
