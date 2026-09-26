@@ -22,20 +22,21 @@ from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 
 
 def _describe_template_syntax_error(*, validation_error: ValidationError) -> str:
-    """Say why a prompt does not parse, from Jinja2's own diagnosis, without quoting the prompt.
+    """Say where a prompt fails to parse, in words that owe nothing to the prompt.
 
     A ``PipeLLMFactoryError`` is caller-facing, and the prompt it is about may not be the caller's: a pipe
     with no system prompt of its own inherits its domain's, which a host's library may have declared.
-    Every layer between Jinja2 and this factory appends the template source to its message, so the text
-    of the pydantic error cannot be used; the parser's message and line are what locate the fault.
+    Every layer between Jinja2 and this factory appends the template source to its message, and Jinja2's
+    own diagnosis quotes the token it stopped at (an unknown tag's name, an unexpected word), so no text
+    of the error can be passed on. The parser's line, counted within the prompt, is what locates the fault.
     """
     for error_details in validation_error.errors():
         cause: BaseException | None = error_details.get("ctx", {}).get("error")
         while cause is not None:
             if isinstance(cause, jinja2.exceptions.TemplateSyntaxError):
-                return f"{cause.message} (line {cause.lineno})"
+                return f"it does not parse at line {cause.lineno} of that prompt"
             cause = cause.__cause__
-    return "the template does not parse"
+    return "it does not parse"
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):

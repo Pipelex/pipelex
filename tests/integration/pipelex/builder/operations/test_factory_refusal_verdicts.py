@@ -201,6 +201,17 @@ class TestFactoryRefusalVerdicts:
         with pytest.raises(EntryPipeAmbiguousError):
             await validate_pipe("write_note", library_dirs=[tmp_path])
 
+    async def test_an_inherited_system_prompt_refusal_quotes_no_token_of_it(self, tmp_path: Path) -> None:
+        content = _INHERITED_SYSTEM_PROMPT_BUNDLE.replace("You write for {% if %} harbour users.", "You write for {% quay_ledger %} harbour users.")
+        bundle_path = _write_bundle(directory=tmp_path, content=content)
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await validate_bundle(mthds_file_path=bundle_path, library_dirs=[tmp_path])
+
+        # Jinja2's diagnosis names the unknown tag; the verdict must not.
+        strict_report = raised.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert "quay_ledger" not in str(strict_report)
+
     async def test_an_inherited_system_prompt_refusal_names_the_domain(self, tmp_path: Path) -> None:
         bundle_path = _write_bundle(directory=tmp_path, content=_INHERITED_SYSTEM_PROMPT_BUNDLE)
 
@@ -211,7 +222,7 @@ class TestFactoryRefusalVerdicts:
         assert item.pipe_code == "write_note"
         assert item.source == str(bundle_path)
         assert "system prompt of domain 'almanac_notes', which it inherits, for pipe 'write_note' in domain" in item.message
-        assert "(line 1)" in item.message
+        assert item.message.endswith("it does not parse at line 1 of that prompt.")
         # The inherited prompt may be a host's, so its text never rides the caller-facing verdict.
         strict_report = raised.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert "harbour users" not in str(strict_report)
