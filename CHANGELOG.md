@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **An unknown model is a located `unknown_model` validation item**: a pipe whose model field names a handle, alias, preset or waterfall the model deck does not define now validates to an invalid verdict with one `pipe_validation` item of the new closed `error_type` `unknown_model`, carrying the `pipe_code`, `domain_code`, `source`, `field_name`, the `field_path` of the reference (`pipe.<code>.model`, or `pipe.<code>.model_to_structure`), and the new optional item fields `model_reference` (the reference as written), `model_type` and `suggestions` (the deck's close matches of the same kind, also kept in the message). Every pipe type that names a model gives the same item, where `PipeExtract` and `PipeSearch` used to give an `unknown_validation_error` whose message was a Python repr, and with exactly one suggestion the item carries a safe `rename-model` fix that `pipelex fix bundle` applies. The MTHDS Test Corpus gains the `invalid_unknown_model` entry covering the new `error.unknown_model` tag.
+
+### Changed
+
+- **Every refusal raised while loading a bundle is a validation verdict (Breaking)**: validation turns any refusal of the caller's input that has no arm of its own into an invalid verdict with one item, keeping the refusal's message only when it is caller-facing and otherwise its title, while a configuration or runtime fault still propagates as no verdict. A refusal raised while a pipe is built leaves the library load as the new `PipeLoadRefusalError`, naming the pipe, its domain and its file with the original as its cause, and gives a `pipe_validation` item located there; any other gives a `blueprint_validation` item. `pipelex validate bundle` no longer prints a traceback for an unknown model, `pipelex-agent validate bundle` answers it with `is_valid: false` and exit 1 instead of the no-verdict envelope and exit 2, and the in-process validator behind `/validate` returns it as an invalid verdict instead of raising.
+- **`PipeOperatorModelChoiceError` is the located unknown-model refusal (Breaking)**: it is now raised whenever a pipe naming an unknown model is built, including on the run path, which still refuses the bundle before any pipe runs with an HTTP 422 whose message now names the pipe and the field; it is `input`-domained and caller-facing, carries `domain_code`, `field_name`, `suggestions` and `source`, and its `model_choice` is the reference as written. The agent CLI's hint for it points at `check-model` rather than `doctor`.
+- **`pipelex validate pipe` and `pipelex validate --all` render a refusal as an invalid bundle**: a pipe whose dry run fails, and a refusal of the libraries while they load, now print the grouped invalid-bundle output and exit 1 instead of a traceback; `pipelex-agent validate pipe` and `--all` answer a load-time refusal with the invalid-verdict envelope.
+
 ## [v0.66.0] - 2026-09-25
 
 ### Highlights

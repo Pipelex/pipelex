@@ -6,12 +6,13 @@ of the validation report — CLI, API, MCP — sees fixes with zero extra plumbi
 """
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixOp, FixSafety, RenameTableKeyOp, SetKeyOp, SuggestedFix
+from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixOp, FixSafety, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
 SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
 STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE = "strip-native-concept-redecl"
 STRIP_NAMESPACE_FIX_CODE = "strip-namespace"
+RENAME_MODEL_FIX_CODE = "rename-model"
 
 # Every fix-rule code the planner can emit — the validation set for user-facing rule filters
 # (``--select`` / ``--ignore``). A new rule constant above must be added here; the CLI rejects
@@ -22,6 +23,7 @@ KNOWN_FIX_CODES: frozenset[str] = frozenset(
         SYNC_CONTROLLER_INPUTS_FIX_CODE,
         STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE,
         STRIP_NAMESPACE_FIX_CODE,
+        RENAME_MODEL_FIX_CODE,
     }
 )
 
@@ -33,11 +35,45 @@ def plan_fix_for_pipe_validation_error(error_data: PipesAndConceptValidationErro
     the correct value — so the same error types raised elsewhere (PipeParallel / PipeCondition /
     operator pipes) carry no enrichment and are suppressed here structurally.
     """
+    if error_data.error_type is None:
+        return None
     if error_data.error_type.is_inadequate_output:
         return _plan_match_sequence_output(error_data)
     if error_data.error_type.is_controller_input_drift:
         return _plan_sync_controller_inputs(error_data)
+    if error_data.error_type.is_unknown_model:
+        return _plan_rename_model(error_data=error_data)
     return None
+
+
+def _plan_rename_model(*, error_data: PipesAndConceptValidationErrorData) -> SuggestedFix | None:
+    """``rename-model``: an ``unknown_model`` whose deck offers exactly one close match of the same kind
+    becomes a ``remap_value`` of the pipe's model field, from the reference as written to that match.
+
+    A single match is the only case with one obvious correction; with several, choosing among them is
+    the author's call, and with none there is nothing to write. The remap names the reference as written,
+    so the op rewrites the field only while it still holds that exact value and leaves a field the
+    author has since edited alone.
+    """
+    if error_data.pipe_code is None or error_data.field_name is None or error_data.model_reference is None:
+        return None
+    if error_data.suggestions is None or len(error_data.suggestions) != 1:
+        return None
+    suggestion = error_data.suggestions[0]
+    description = f"Replace model '{error_data.model_reference}' of pipe '{error_data.pipe_code}' with '{suggestion}'"
+    return SuggestedFix(
+        fix_code=RENAME_MODEL_FIX_CODE,
+        description=f"{description}, its one close match in the model deck",
+        safety=FixSafety.SAFE,
+        source=error_data.source,
+        ops=[
+            RemapValueOp(
+                table_path=["pipe", error_data.pipe_code],
+                key=error_data.field_name,
+                mapping={error_data.model_reference: suggestion},
+            ),
+        ],
+    )
 
 
 def _plan_match_sequence_output(error_data: PipesAndConceptValidationErrorData) -> SuggestedFix | None:

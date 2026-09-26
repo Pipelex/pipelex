@@ -369,7 +369,7 @@ class TestAgentOutput:
         """
         # An error_type in AGENT_ERROR_DOMAINS that is NOT a CogtError subclass, so no derived
         # domain can pre-empt the lookup.
-        error_type = "PipeOperatorModelChoiceError"
+        error_type = "PipeOperatorModelAvailabilityError"
         assert error_type in AGENT_ERROR_DOMAINS, "precondition: error_type must be in AGENT_ERROR_DOMAINS"
 
         cause = CogtError("model not found", error_category=InferenceErrorCategory.UNKNOWN)

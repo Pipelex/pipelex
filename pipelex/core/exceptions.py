@@ -77,8 +77,12 @@ class PipesAndConceptValidationErrorData(BaseModel):
     field_name: str | None = Field(default=None, description="Specific field that failed")
 
     # === Error Classification ===
-    error_type: PipeValidationErrorType = Field(
-        description="Type of pipe/concept validation error",
+    # ``None`` for a refusal no closed code fits: a load-time refusal located on a pipe but carrying no
+    # code of its own (the general arm of the bundle-loading cascade), exactly as the parse-level
+    # residual carries none rather than a code that would claim to know which fault occurred.
+    error_type: PipeValidationErrorType | None = Field(
+        default=None,
+        description="Type of pipe/concept validation error, or None when no closed code fits the refusal",
     )
 
     # === Error Details ===
@@ -104,4 +108,12 @@ class PipesAndConceptValidationErrorData(BaseModel):
         default=None,
         description="The pipe's currently declared inputs mapping, rendered like expected_inputs, "
         "so a fix planner can diff the two without file access",
+    )
+
+    # === Unknown-model locators (for unknown_model errors) ===
+    model_reference: str | None = Field(default=None, description="The model reference exactly as the author wrote it")
+    model_type: str | None = Field(default=None, description="The model type the field takes (llm, text_extractor, img_gen, search)")
+    suggestions: list[str] | None = Field(
+        default=None,
+        description="The deck's close matches of the same kind, each spelled as a reference the field accepts",
     )

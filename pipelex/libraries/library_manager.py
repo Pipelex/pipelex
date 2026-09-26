@@ -1,5 +1,6 @@
 import uuid
-from contextlib import ExitStack
+from collections.abc import Generator
+from contextlib import ExitStack, contextmanager
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,12 +16,14 @@ from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
+from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
+from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
@@ -97,6 +100,38 @@ def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint])
                 break
             current = parent
     return result
+
+
+@contextmanager
+def _locating_pipe_build_refusals(*, pipe_code: str, domain_code: str, source: str | None) -> Generator[None, None, None]:
+    """Let a refusal raised while building one pipe leave the load loop located on that pipe and its file.
+
+    The loop is the one place that holds the pipe's code, its domain and the file it is declared in at
+    the moment a build fails: pipes carry no source, and the pipe-source map is filled only after a
+    pipe is built. So the location is attached here, and bundle validation reads it off the refusal:
+
+    - An unknown model is already located on its pipe and field by the operator
+      (``PipeOperatorModelChoiceError``); the loop adds the file and lets it go on under its own class,
+      which the run and build surfaces render with their dedicated panel.
+    - Any other refusal of the caller's input (an ``input``-domained ``PipelexError``) is raised again
+      as a ``PipeLoadRefusalError`` naming the pipe and the file, ``from`` the original.
+    - Everything else leaves untouched: a configuration or runtime fault keeps its identity and stays a
+      no-verdict fault, a security refusal is never absorbed into a verdict, a library error keeps the
+      structured items its own arm forwards, and pydantic's ``ValidationError`` and the
+      ``PipeValidationError`` family (not ``PipelexError``s) keep their categorizers.
+    """
+    try:
+        yield
+    except PipeOperatorModelChoiceError as model_choice_error:
+        if model_choice_error.source is None:
+            model_choice_error.source = source
+        raise
+    except (SecurityError, LibraryError):
+        raise
+    except PipelexError as refusal:
+        if not error_domain_is_input(refusal.to_error_report().error_domain):
+            raise
+        raise PipeLoadRefusalError.make_from_refusal(refusal=refusal, pipe_code=pipe_code, domain_code=domain_code, source=source) from refusal
 
 
 class LibraryManager(LibraryManagerAbstract):
@@ -528,16 +563,17 @@ class LibraryManager(LibraryManagerAbstract):
 
                 concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
-                pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                    domain_code=domain_code,
-                    pipe_code=pipe_code,
-                    blueprint=pipe_blueprint,
-                    concept_codes_from_the_same_domain=concept_codes_for_domain,
-                )
+                source = crate.source_map.get(pipe_ref)
+                with _locating_pipe_build_refusals(pipe_code=pipe_code, domain_code=domain_code, source=source):
+                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                        domain_code=domain_code,
+                        pipe_code=pipe_code,
+                        blueprint=pipe_blueprint,
+                        concept_codes_from_the_same_domain=concept_codes_for_domain,
+                    )
                 all_pipes.append(pipe)
 
                 # Track source file for this pipe (used by get_pipe_source)
-                source = crate.source_map.get(pipe_ref)
                 if source:
                     self._pipe_source_maps.setdefault(library_id, {})[pipe_ref] = source
 

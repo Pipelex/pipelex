@@ -124,8 +124,9 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: Err
     Args:
         exc: The model choice error exception
         context: Context for the error message
-        exit_code: Process exit code. The validate surface passes 2 (a no-verdict
-            setup/config error per its 0/1/2 policy); other contexts keep the default 1.
+        exit_code: Process exit code; the default is 1. The validate surface never reaches
+            this handler: an unknown model is an invalid verdict there, rendered by
+            :func:`handle_validate_bundle_error`.
     """
     console = get_console()
     print_traceback_if_requested(console=console)
@@ -157,8 +158,9 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
     Args:
         exc: The model availability error exception
         context: Context for the error message
-        exit_code: Process exit code. The validate surface passes 2 (a no-verdict
-            setup/config error per its 0/1/2 policy); other contexts keep the default 1.
+        exit_code: Process exit code; the default is 1. The validate surface never reaches
+            this handler: an unknown model is an invalid verdict there, rendered by
+            :func:`handle_validate_bundle_error`.
     """
     console = get_console()
     print_traceback_if_requested(console=console)

@@ -42,6 +42,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeFactoryError`](pipe-factory-error.md) — Pipe factory
 - [`PipeInputError`](pipe-input-error.md) — Pipe input
 - [`PipeInputsFactoryError`](pipe-inputs-factory-error.md) — Pipe inputs factory
+- [`PipeLoadRefusalError`](pipe-load-refusal-error.md) — Pipe load refusal
 - [`PipeOperatorModelChoiceError`](pipe-operator-model-choice-error.md) — Pipe operator model choice
 - [`PipeRunError`](pipe-run-error.md) — Pipe run
 - [`PipeRunInputsError`](pipe-run-inputs-error.md) — Pipe run inputs

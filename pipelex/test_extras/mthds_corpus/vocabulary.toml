@@ -177,6 +177,10 @@ fails_at = "runtime"
 code = "unresolved_pipe_dependency"
 fails_at = "runtime"
 
+[error.unknown_model]
+code = "unknown_model"
+fails_at = "runtime"
+
 [error.unknown_validation_error]
 code = "unknown_validation_error"
 excluded = "The generic fallback for a validation failure that matched no specific code. Reaching it on purpose would mean authoring a bundle that breaks in a way the categorizer does not recognize — which is a state to fix in the runtime, not to pin in a corpus entry that would then have to be rewritten the moment the fault gets a code of its own."

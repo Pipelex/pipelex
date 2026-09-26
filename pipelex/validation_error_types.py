@@ -91,6 +91,11 @@ class PipeValidationErrorType(StrEnum):
     UNRESOLVED_CONCEPT = "unresolved_concept"
     UNRESOLVED_PIPE_DEPENDENCY = "unresolved_pipe_dependency"
 
+    # A pipe's model field names a handle, alias, preset or waterfall its model deck does not define,
+    # refused when the pipe is built. The item carries the field's path, the reference as written, the
+    # model type and the deck's close matches, so the author can pick one.
+    UNKNOWN_MODEL = "unknown_model"
+
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
 
@@ -123,6 +128,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -153,6 +159,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -190,6 +197,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -221,6 +229,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -244,6 +253,39 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_unknown_model(self) -> bool:
+        """True for the unknown-model refusal, which the fix planner renames when the deck offers one close match."""
+        match self:
+            case PipeValidationErrorType.UNKNOWN_MODEL:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION

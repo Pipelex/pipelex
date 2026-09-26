@@ -17,7 +17,7 @@ from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collec
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.execution_seams import acquire_library
-from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
+from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, translate_to_validate_bundle_error, validate_bundle
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,10 +42,14 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
     # signatures and must read the LIBRARY-WIDE pending set BEFORE teardown — acquire_and_validate
     # returns only the per-pipe status map and tears the library down before we could compute it.
     prev_library_id = get_current_library_id_or_none()
-    acquired_id, _ = acquire_library(
-        library_id="",
-        library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
-    )
+    # A refusal of the libraries while loading them is the invalid verdict, through the shared
+    # bundle-loading cascade, as on `validate bundle`. acquire_library tears its library down itself on
+    # a failed load.
+    with translate_to_validate_bundle_error():
+        acquired_id, _ = acquire_library(
+            library_id="",
+            library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
+        )
     try:
         # acquire_library left the freshly-acquired library current, so the inner sweep targets it
         # (it filters signatures in strict mode itself). The returned map is keyed by namespaced pipe_ref.
@@ -156,7 +160,10 @@ async def validate_pipe_core(
         effective_dirs, _ = resolve_library_dirs(library_dirs)
 
         if effective_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            # A refusal of the libraries while loading them is the invalid verdict, through the shared
+            # bundle-loading cascade, as on `validate bundle`.
+            with translate_to_validate_bundle_error():
+                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
         the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
         dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
