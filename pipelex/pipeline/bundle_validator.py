@@ -102,7 +102,8 @@ class DryRunOutput(BaseModel):
     pipe_ref: str
     status: DryRunStatus
     error_message: str | None = None
-    # On a FAILURE, the failure located at the innermost pipe that failed, which is this pipe or one
+    # On a FAILURE, the failure located at the innermost pipe that failed and is not allowed to fail,
+    # which is this pipe or one
     # it runs, with a message the disclosure rule allows onto a verdict item.
     failure: DryRunFailureErrorData | None = None
 
@@ -113,18 +114,25 @@ _MOCK_DATA_FAILURE_TEXT = "The dry run could not generate mock data for this pip
 
 
 class _FailingPipeRecorder:
-    """The pipes that failed during one pipe's dry run, each with the exception it left with."""
+    """The pipes that failed during one pipe's dry run, each with the exception it left with.
 
-    def __init__(self) -> None:
+    A pipe the configuration allows to fail is never where a failure happened: its failure is tolerated,
+    so the failure is noted at the next pipe outward, the innermost one that is not.
+    """
+
+    def __init__(self, *, tolerated_pipe_refs: frozenset[str]) -> None:
+        self._tolerated_pipe_refs = tolerated_pipe_refs
         self._failures: list[tuple[BaseException, PipeAbstract]] = []
 
     def record(self, *, error: BaseException, pipe: PipeAbstract) -> None:
-        """Remember ``pipe`` as where ``error`` happened, unless a pipe it ran already failed with it."""
+        """Remember ``pipe`` as where ``error`` happened, unless a pipe it ran already failed with it or it may fail."""
+        if pipe.pipe_ref in self._tolerated_pipe_refs:
+            return
         if self.find_failing_pipe(error=error) is None:
             self._failures.append((error, pipe))
 
     def find_failing_pipe(self, *, error: BaseException) -> PipeAbstract | None:
-        """The innermost pipe that failed with ``error`` or with an error on its cause or context chain."""
+        """The innermost pipe not allowed to fail that failed with ``error`` or with an error on its cause or context chain."""
         failing_pipes = {id(recorded_error): pipe for recorded_error, pipe in self._failures}
         seen: set[int] = set()
         stack: list[BaseException] = [error]
@@ -151,7 +159,8 @@ class _DryRunSweepRouter(PipeRouter):
     """The sweep's in-process router: it runs pipes as ``PipeRouter`` does, and notes where each failure happened.
 
     Every pipe a dry run reaches, the swept pipe and each sub-pipe a controller dispatches, goes through
-    this router, so the first pipe a failure leaves is the innermost one that failed. The sweep reports
+    this router, so the first pipe a failure leaves is the innermost one that failed (a pipe allowed to fail
+    aside, see `_FailingPipeRecorder`). The sweep reports
     the failure there, once, rather than once more for every controller it made fail on its way out.
     """
 
@@ -412,11 +421,12 @@ class BundleValidator:
         when the sweep belongs to nobody. It stores nothing either way: ``storage_scope`` stays
         ``DRY_RUN_STORAGE_SCOPE``.
 
-        A FAILURE carries its ``failure``, located at the innermost pipe that failed: the sweep's router
-        notes where each failure happened, so a controller failing because a pipe it runs failed reports
-        that pipe, and ``_aggregate`` keeps the failure once.
+        A FAILURE carries its ``failure``, located at the innermost pipe that failed and is not allowed to
+        fail: the sweep's router notes where each failure happened, so a controller failing because a pipe
+        it runs failed reports that pipe, and ``_aggregate`` keeps the failure once. A failure met at a pipe
+        allowed to fail is reported at the pipe around it that is not, the one whose failure is unexpected.
         """
-        recorder = _FailingPipeRecorder()
+        recorder = _FailingPipeRecorder(tolerated_pipe_refs=frozenset(get_config().inference.dry_run.allowed_to_fail_pipes))
         recorder_token = _failing_pipe_recorder.set(recorder)
         try:
             return await self._run_and_classify(
@@ -471,12 +481,8 @@ class BundleValidator:
                 return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SKIPPED, error_message=error_message)
             formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
             error_message = f"Dry run failed for pipe '{pipe.pipe_ref}': {formatted_error}"
-            # A failure raised outside any routed pipe run (the mock-input build) is the swept pipe's own. So is
-            # one met at a pipe the configuration allows to fail: that pipe's failure is tolerated, and the
-            # failure that is not is the swept pipe's, which failed because of it.
+            # A failure raised outside any routed pipe run (the mock-input build) is the swept pipe's own.
             failing_pipe = recorder.find_failing_pipe(error=exc) or pipe
-            if failing_pipe.pipe_ref in get_config().inference.dry_run.allowed_to_fail_pipes:
-                failing_pipe = pipe
             failing_pipe_source = get_library_manager().get_pipe_source(failing_pipe.pipe_ref)
             failure = DryRunFailureErrorData(
                 pipe_code=failing_pipe.code,
@@ -535,7 +541,7 @@ class BundleValidator:
     def _located_failures(cls, *, unexpected_failures: dict[str, DryRunOutput]) -> list[DryRunFailureErrorData]:
         """One failure per failing pipe, in sweep order.
 
-        Each failure is located at the innermost pipe that failed, so a controller that failed because
+        Each failure is located at the innermost pipe that failed and is not allowed to fail, so a controller that failed because
         a pipe it runs failed carries that pipe's failure; the failures are then kept once per pipe.
         When a pipe's failure reaches the list both through its own dry run and through a controller's,
         its own is kept, since it names the failure as that pipe met it. The pipe is the key rather than

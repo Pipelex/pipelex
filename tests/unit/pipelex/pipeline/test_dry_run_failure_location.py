@@ -46,12 +46,29 @@ class TestDryRunFailureLocation:
         outer_error = PipeRouterError(message="the step failed", run_mode=PipeRunMode.DRY, pipe_code="run_workshop", output_name=None, pipe_stack=[])
         outer_error.__cause__ = inner_error
 
-        recorder = _FailingPipeRecorder()
+        recorder = _FailingPipeRecorder(tolerated_pipe_refs=frozenset())
         recorder.record(error=inner_error, pipe=inner_pipe)
         recorder.record(error=outer_error, pipe=outer_pipe)
 
         assert recorder.find_failing_pipe(error=outer_error) is inner_pipe
         assert recorder.find_failing_pipe(error=_CallerFacingMethodFaultError("unrelated")) is None
+
+    def test_a_failure_at_a_pipe_allowed_to_fail_is_noted_at_the_next_pipe_outward(self, mocker: MockerFixture) -> None:
+        """However deep the controllers, a tolerated pipe's failure is noted once, at the innermost pipe that may not fail."""
+        tolerated_pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
+        middle_pipe = self._make_pipe(mocker, pipe_ref="board.run_workshop")
+        outer_pipe = self._make_pipe(mocker, pipe_ref="board.host_workshop")
+        inner_error = _CallerFacingMethodFaultError("the combine failed")
+        middle_error = PipeRouterError(message="the step failed", run_mode=PipeRunMode.DRY, pipe_code="run_workshop", output_name=None, pipe_stack=[])
+        middle_error.__cause__ = inner_error
+
+        recorder = _FailingPipeRecorder(tolerated_pipe_refs=frozenset(["board.analyze_topic"]))
+        recorder.record(error=inner_error, pipe=tolerated_pipe)
+        recorder.record(error=middle_error, pipe=middle_pipe)
+        recorder.record(error=middle_error, pipe=outer_pipe)
+
+        assert recorder.find_failing_pipe(error=middle_error) is middle_pipe
+        assert recorder.find_failing_pipe(error=inner_error) is None
 
     @pytest.mark.asyncio
     async def test_the_sweep_router_notes_the_pipe_a_failure_left(self, mocker: MockerFixture) -> None:
@@ -60,7 +77,7 @@ class TestDryRunFailureLocation:
         mocker.patch.object(_DryRunSweepRouter, "_run_pipe_job", side_effect=failure)
         pipe_job = mocker.MagicMock()
         pipe_job.pipe = pipe
-        recorder = _FailingPipeRecorder()
+        recorder = _FailingPipeRecorder(tolerated_pipe_refs=frozenset())
         token = _failing_pipe_recorder.set(recorder)
         try:
             with pytest.raises(_CallerFacingMethodFaultError):
