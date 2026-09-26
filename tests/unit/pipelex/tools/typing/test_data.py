@@ -1,3 +1,4 @@
+import datetime
 from typing import Annotated, Any, ClassVar, TypeVar, cast
 
 from annotated_types import Gt
@@ -6,7 +7,7 @@ from pydantic.config import JsonDict
 from pydantic.json_schema import SkipJsonSchema
 from pydantic.types import Strict
 from pydantic_core import PydanticOmit
-from typing_extensions import TypeAliasType
+from typing_extensions import TypeAliasType, override
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -42,6 +43,12 @@ class Named(BaseModel):
 
 class Titled(BaseModel):
     title: str
+
+
+class StampedInUtc(BaseModel):
+    name: str
+    stamp: datetime.datetime = datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
+    alarm: datetime.time = datetime.time(12, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=2)))
 
 
 class ConstrainedPerson(BaseModel):
@@ -133,6 +140,32 @@ class NamedWithOmittingDefault(BaseModel):
 class NamedWithSkippedField(BaseModel):
     name: str
     hidden: SkipJsonSchema[int] = 0
+
+
+class OmittingTimeZone(datetime.tzinfo):
+    """A time zone that drops any property whose default it is set on: pydantic asks it for the offset to encode the default."""
+
+    @override
+    def utcoffset(self, _dt: datetime.datetime | None) -> datetime.timedelta:
+        raise PydanticOmit
+
+    @override
+    def dst(self, _dt: datetime.datetime | None) -> datetime.timedelta:
+        return datetime.timedelta(0)
+
+    @override
+    def tzname(self, _dt: datetime.datetime | None) -> str:
+        return "Omitting"
+
+
+class NamedWithOmittingAwareDatetime(BaseModel):
+    name: str
+    hidden: datetime.datetime = datetime.datetime(2020, 1, 1, tzinfo=OmittingTimeZone())
+
+
+class NamedWithOmittingAwareTime(BaseModel):
+    name: str
+    hidden: datetime.time = datetime.time(12, 0, tzinfo=OmittingTimeZone())
 
 
 # Shapes whose JSON schema cannot be generated: the error must reach the caller, not be hidden behind a `False`.

@@ -118,6 +118,10 @@ def _is_plain_default(*, default_value: object) -> bool:
     while pending_values:
         value = pending_values.pop()
         if _has_one_of_types(value=value, allowed_types=_PLAIN_DEFAULT_SCALAR_TYPES):
+            # An aware datetime or time is encoded through its tzinfo's `utcoffset()`, which user code can make raise
+            # (`PydanticOmit` drops the property); only the stdlib's `datetime.timezone`, which cannot be subclassed, is inert.
+            if isinstance(value, (datetime.datetime, datetime.time)) and value.tzinfo is not None and type(value.tzinfo) is not datetime.timezone:
+                return False
             continue
         if not _has_one_of_types(value=value, allowed_types=_PLAIN_DEFAULT_COLLECTION_TYPES) or id(value) in seen_collection_ids:
             return False

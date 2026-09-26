@@ -29,6 +29,8 @@ from tests.unit.pipelex.tools.typing.test_data import (
     NamedWithHiddenByTitle,
     NamedWithHiddenByTypedExtras,
     NamedWithHiddenListByTitle,
+    NamedWithOmittingAwareDatetime,
+    NamedWithOmittingAwareTime,
     NamedWithOmittingDefault,
     NamedWithSkippedField,
     NamedWithSkippedGeneric,
@@ -37,6 +39,7 @@ from tests.unit.pipelex.tools.typing.test_data import (
     Person,
     PersonTwin,
     PersonWithTextAge,
+    StampedInUtc,
     Titled,
     TitledByAlias,
     TitledByAliasChoices,
@@ -94,6 +97,7 @@ class TestClassEquivalenceShortcuts:
             pytest.param(Invoice, ImageContent, id="structure-vs-native-image"),
             pytest.param(ConstrainedPerson, Named, id="inert-constraints-gt-strict-min-length"),
             pytest.param(TreeNode, Titled, id="self-referencing-model"),
+            pytest.param(StampedInUtc, Person, id="aware-temporal-defaults-in-stdlib-time-zones"),
         ],
     )
     def test_plain_models_with_different_fields_are_rejected_without_a_schema(
@@ -133,6 +137,8 @@ class TestClassEquivalenceShortcuts:
             pytest.param(NamedWithHiddenByTypedExtras, id="nested-typed-extras-omit"),
             pytest.param(NamedWithOmittingDefault, id="default-whose-type-omits"),
             pytest.param(NamedWithSkippedField, id="skip-json-schema-field"),
+            pytest.param(NamedWithOmittingAwareDatetime, id="datetime-default-whose-time-zone-omits"),
+            pytest.param(NamedWithOmittingAwareTime, id="time-default-whose-time-zone-omits"),
         ],
     )
     def test_a_field_pydantic_omits_falls_through_and_stays_equivalent(self, mocker: MockerFixture, class_1: type[BaseModel]):
