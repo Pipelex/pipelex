@@ -435,7 +435,7 @@ class LibraryManager(LibraryManagerAbstract):
         return fingerprint in self._loaded_fingerprints.get(library_id, set())
 
     @override
-    def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, *, library_id: str, crate: LibraryCrate, is_crate_prevalidated: bool = False) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Fingerprint idempotency: if a crate with the same fingerprint was already loaded
@@ -449,6 +449,14 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The library to load into
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
+            is_crate_prevalidated: Skip the library validation that ends the load. Precondition: the crate
+                was built from a library that this same pipelex version loaded and validated — the runner's
+                crate, handed to the worker that executes it. Library validation is a pure check (it writes
+                nothing a run later reads), so skipping it changes no behaviour, only the cost of reaching a
+                verdict already reached. Everything else still happens: fingerprint idempotency, domain and
+                concept loading with class registration, the concept-cycle check, pipe construction with each
+                pipe's static validation, and source tracking. Leave it False for any crate whose library was
+                not validated by this pipelex version.
 
         Returns:
             List of all pipes that were loaded, or empty list if already loaded
@@ -543,7 +551,8 @@ class LibraryManager(LibraryManagerAbstract):
 
             library.pipe_library.add_pipes(pipes=all_pipes)
 
-            library.validate_library()
+            if not is_crate_prevalidated:
+                library.validate_library()
 
             # Only cache fingerprint after the entire load succeeds — if loading fails
             # with an exception, subsequent retries must not be skipped.
