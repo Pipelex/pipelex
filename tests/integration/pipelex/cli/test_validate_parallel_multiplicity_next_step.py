@@ -131,16 +131,29 @@ output      = "Overview"
 template    = "One idea."
 """
 
-_LIST_INTO_SINGLE_NEXT_STEP = (
-    "Branch 'brainstorm.draft_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'TopicReview' holds a single item. "
+# The list comes from the branch itself: `draft_idea` declares one `Idea`, but the branch batches it over
+# the topics, so the next step names that branch setting rather than the pipe's declared output.
+_BATCHED_BRANCH_INTO_SINGLE_FIELD = _LIST_BRANCH_INTO_SINGLE_FIELD.replace(
+    '{ pipe = "draft_ideas", result = "ideas" }',
+    '{ pipe = "draft_idea", result = "ideas", batch_over = "topics", batch_as = "topic" }',
+)
+
+_BATCHED_INTO_SINGLE_NEXT_STEP = (
+    "Branch 'draft_idea' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'TopicReview' holds a single item. "
     "Declare the field as a list in the structure of 'TopicReview', with type 'list', item_type 'concept' and item_concept_ref 'Idea', "
-    "or make branch 'brainstorm.draft_ideas' output a single 'Idea'."
+    "or change the nb_output, multiple_output or batch_over that branch 'draft_idea' sets in the parallel's branches."
+)
+
+_LIST_INTO_SINGLE_NEXT_STEP = (
+    "Branch 'draft_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'TopicReview' holds a single item. "
+    "Declare the field as a list in the structure of 'TopicReview', with type 'list', item_type 'concept' and item_concept_ref 'Idea', "
+    "or make branch 'draft_ideas' output a single 'Idea'."
 )
 
 _SINGLE_INTO_LIST_NEXT_STEP = (
-    "Branch 'brainstorm.draft_idea' gives result 'ideas' as a single 'Idea', but field 'ideas' of 'TopicReview' holds a list. "
+    "Branch 'draft_idea' gives result 'ideas' as a single 'Idea', but field 'ideas' of 'TopicReview' holds a list. "
     "Declare the field as a single concept in the structure of 'TopicReview', with type 'concept' and concept_ref 'Idea', "
-    "or make branch 'brainstorm.draft_idea' output 'Idea[]'."
+    "or make branch 'draft_idea' output 'Idea[]'."
 )
 
 _TOP_LEVEL_NEXT_STEP = "Edit the bundle as each validation error says"
@@ -166,8 +179,9 @@ class TestValidateParallelMultiplicityNextStep:
         [
             (_LIST_BRANCH_INTO_SINGLE_FIELD, _LIST_INTO_SINGLE_NEXT_STEP),
             (_SINGLE_BRANCH_INTO_LIST_FIELD, _SINGLE_INTO_LIST_NEXT_STEP),
+            (_BATCHED_BRANCH_INTO_SINGLE_FIELD, _BATCHED_INTO_SINGLE_NEXT_STEP),
         ],
-        ids=["list_branch_into_single_field", "single_branch_into_list_field"],
+        ids=["list_branch_into_single_field", "single_branch_into_list_field", "batched_branch_into_single_field"],
     )
     def test_bare_validate_bundle_names_the_multiplicity_to_change(
         self, console: Console, tmp_path: Path, bundle_content: str, expected_next_step: str

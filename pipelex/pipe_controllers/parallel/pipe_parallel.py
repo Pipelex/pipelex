@@ -641,22 +641,44 @@ class PipeParallel(PipeController):
             is_field_single = is_content_class and not is_field_plural
             branch_stuff = output_stuffs[result_name]
             item_concept_ref = self._concept_ref_for_message(concept=branch_stuff.concept)
+            branch_ref = self._pipe_ref_for_message(pipe_ref=sub_pipe.pipe_code)
             is_branch_plural = branch_stuff.is_list
+            # A multiplicity set on the branch itself (nb_output, multiple_output, batch_over) overrides the
+            # pipe's declared output, so the branch alternative names that setting rather than the pipe's output.
+            has_branch_override = sub_pipe.output_multiplicity is not None or sub_pipe.batch_params is not None
+            branch_alternative: str
+            if has_branch_override:
+                branch_alternative = (
+                    f"or change the nb_output, multiple_output or batch_over that branch '{branch_ref}' sets in the parallel's branches"
+                )
+            elif is_branch_plural:
+                branch_alternative = f"or make branch '{branch_ref}' output a single '{item_concept_ref}'"
+            else:
+                branch_alternative = f"or make branch '{branch_ref}' output '{item_concept_ref}[]'"
             if is_branch_plural and is_field_single:
                 next_steps.append(
-                    f"Branch '{sub_pipe.pipe_code}' gives result '{result_name}' as a list, '{item_concept_ref}[]', but field "
+                    f"Branch '{branch_ref}' gives result '{result_name}' as a list, '{item_concept_ref}[]', but field "
                     f"'{result_name}' of '{output_concept_ref}' holds a single item. Declare the field as a list in the structure "
                     f"of '{output_concept_ref}', with type 'list', item_type 'concept' and item_concept_ref '{item_concept_ref}', "
-                    f"or make branch '{sub_pipe.pipe_code}' output a single '{item_concept_ref}'."
+                    f"{branch_alternative}."
                 )
             elif not is_branch_plural and is_field_plural:
                 next_steps.append(
-                    f"Branch '{sub_pipe.pipe_code}' gives result '{result_name}' as a single '{item_concept_ref}', but field "
+                    f"Branch '{branch_ref}' gives result '{result_name}' as a single '{item_concept_ref}', but field "
                     f"'{result_name}' of '{output_concept_ref}' holds a list. Declare the field as a single concept in the "
                     f"structure of '{output_concept_ref}', with type 'concept' and concept_ref '{item_concept_ref}', "
-                    f"or make branch '{sub_pipe.pipe_code}' output '{item_concept_ref}[]'."
+                    f"{branch_alternative}."
                 )
         return next_steps
+
+    def _pipe_ref_for_message(self, *, pipe_ref: str) -> str:
+        """A branch pipe as the author writes it in this parallel's bundle: its bare code in the parallel's own
+        domain, its full ref otherwise.
+        """
+        own_domain_prefix = f"{self.domain_code}."
+        if pipe_ref.startswith(own_domain_prefix):
+            return pipe_ref.removeprefix(own_domain_prefix)
+        return pipe_ref
 
     def _concept_ref_for_message(self, *, concept: Concept) -> str:
         """A concept as the author writes it in this parallel's bundle: its bare code in the parallel's own
