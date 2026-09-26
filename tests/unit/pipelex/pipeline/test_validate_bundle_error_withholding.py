@@ -46,7 +46,8 @@ class TestValidateBundleErrorWithholding:
                 PipeFactoryErrorData(error_type=PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR, message=_mentioning_the_host_file(label="factory"))
             ],
             pipe_validation_errors=[
-                PipesAndConceptValidationErrorData(message=_mentioning_the_host_file(label="pipe"), source=_HOST_FILE, field_path="")
+                # Located from the pipe-source map, a pipe-validation error carries its file as its field path too.
+                PipesAndConceptValidationErrorData(message=_mentioning_the_host_file(label="pipe"), source=_HOST_FILE, field_path=_HOST_FILE)
             ],
             pipe_concept_instantiation_errors=[
                 PipesAndConceptValidationErrorData(
@@ -68,6 +69,7 @@ class TestValidateBundleErrorWithholding:
         ]
         # A withheld file's source is dropped; any other source is the same answer as before.
         assert [item.source for item in items] == [None, None, None, "api://bundle-0.mthds", None]
+        assert [item.field_path for item in items] == [None, None, None, None, None]
         assert _HOST_FILE not in withheld.message
 
     def test_a_withheld_name_counts_only_standing_on_its_own(self) -> None:

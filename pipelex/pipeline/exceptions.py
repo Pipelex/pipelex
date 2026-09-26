@@ -190,16 +190,21 @@ class _FileWithholding(NamedTuple):
         return self.pattern.sub(lambda _match: self.placeholder, text)
 
     def withheld_errors(self, *, errors: list[_SourcedErrorData]) -> list[_SourcedErrorData]:
-        """The error data without a withheld name as its ``source`` or in its ``message``."""
-        return [
-            error.model_copy(
-                update={
-                    "source": None if error.source in self.names else error.source,
-                    "message": self.withheld_text(text=error.message),
-                }
-            )
-            for error in errors
-        ]
+        """The error data without a withheld name as its ``source``, its ``field_path`` or in its ``message``.
+
+        A pipe-validation error located from the pipe-source map carries its file as its ``field_path`` too
+        (``categorize_pipe_validation_with_libraries_error``), so a withheld file leaves that field empty.
+        """
+        withheld: list[_SourcedErrorData] = []
+        for error in errors:
+            update: dict[str, str | None] = {
+                "source": None if error.source in self.names else error.source,
+                "message": self.withheld_text(text=error.message),
+            }
+            if isinstance(error, PipesAndConceptValidationErrorData) and error.field_path in self.names:
+                update["field_path"] = ""
+            withheld.append(error.model_copy(update=update))
+        return withheld
 
 
 class ValidateBundleError(PipelexError):
@@ -278,7 +283,8 @@ class ValidateBundleError(PipelexError):
     def withholding_files(self, *, withheld_files: Collection[str], placeholder: str) -> "ValidateBundleError":
         """This verdict with the given files taken out of every channel that could name them.
 
-        An item whose ``source`` is one of ``withheld_files`` carries no ``source``, and every message, the
+        An item whose ``source`` is one of ``withheld_files`` carries no ``source``, an item whose ``field_path``
+        is one carries none either, and every message, the
         items' and the verdict's own, reads ``placeholder`` where it named one of them standing on its own,
         never inside a longer name. Everything else is kept, the items' locators included, so it is the same
         answer about the same bundle. Every channel the constructor takes is carried here: a channel added to

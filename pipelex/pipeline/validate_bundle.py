@@ -213,9 +213,10 @@ async def validate_bundle(
                     library_id=library_id,
                     allow_signatures=allow_signatures,
                     caller_identity=caller_identity,
-                    # Submitted content: only its own pipes name their file, never a pipe of the host's
-                    # library directories, which would put a path on the host into the caller's verdict.
-                    source_pipe_refs=frozenset(pipe.pipe_ref for pipe in loaded_pipes),
+                    # Submitted content beside a host's library directories: only its own pipes name their file,
+                    # never a pipe of the host's directories, which would put a path on the host into the
+                    # caller's verdict. Beside the caller's own directories, every failure names its file.
+                    source_pipe_refs=None if library_dirs_are_callers else frozenset(pipe.pipe_ref for pipe in loaded_pipes),
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
