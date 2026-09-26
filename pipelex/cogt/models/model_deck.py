@@ -897,11 +897,13 @@ class ModelDeck(ConfigModel):
                 named_references.add(deck_choice.model)
             elif isinstance(deck_choice, ModelReference):
                 match deck_choice.kind:
-                    case ModelReferenceKind.HANDLE | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
-                        # A default or override written as a plain reference is looked up as it is written.
-                        named_references.add(deck_choice.raw)
-                    case ModelReferenceKind.PRESET:
-                        # A preset choice resolves to the preset's setting, whose model is named above.
+                    case ModelReferenceKind.HANDLE:
+                        # A default or override written as a handle reaches the lookup by its name,
+                        # whatever prefix spells it.
+                        named_references.add(deck_choice.name)
+                    case ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL | ModelReferenceKind.PRESET:
+                        # These reach the lookup as a name the deck defines or names above: an
+                        # alias's target, a waterfall's own name or members, a preset's model.
                         pass
         return model_handle in named_references
 

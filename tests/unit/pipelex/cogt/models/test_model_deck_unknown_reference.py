@@ -51,7 +51,8 @@ def _make_deck() -> ModelDeck:
         img_gen_aliases={},
         img_gen_waterfalls={},
         img_gen_presets={},
-        img_gen_choice_default="deck-img-gen-default",
+        # A handle spelled with its prefix reaches the lookup by its bare name.
+        img_gen_choice_default="handle:deck-img-gen-default",
         search_aliases={},
         search_waterfalls={},
         search_presets={},
