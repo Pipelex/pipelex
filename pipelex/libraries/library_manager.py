@@ -103,6 +103,21 @@ def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint])
     return result
 
 
+def _dependency_bundle_source(*, package_address: str, package_root: Path, mthds_path: Path) -> str:
+    """Name a dependency's bundle by the package's address and the bundle's path inside the package.
+
+    The name is the bundle's ``source``, which rides every item a refusal inside the package gives, the
+    files a duplicate declaration names included, and a verdict is caller-facing: where the host installed
+    the package is the host's own path, which a hosted caller must never read. A bundle found outside the
+    package root, which discovery does not produce, is named by its file name alone rather than by its path.
+    """
+    for candidate_root in (package_root, package_root.resolve()):
+        for candidate_path in (mthds_path, mthds_path.resolve()):
+            if candidate_path.is_relative_to(candidate_root):
+                return f"{package_address}/{candidate_path.relative_to(candidate_root).as_posix()}"
+    return f"{package_address}/{mthds_path.name}"
+
+
 def _authored_model_field(*, step_role: StepRole) -> str:
     """The field of the authored ``preliminary_text`` PipeLLM whose model a synthetic helper was given."""
     match step_role:
@@ -142,7 +157,8 @@ def _locating_pipe_build_refusals(
 
     - An unknown model is already located on its pipe and field by the operator
       (``PipeOperatorModelChoiceError``); the loop adds the file and lets it go on under its own class,
-      which the run and build surfaces render with their dedicated panel.
+      which the validate and run paths turn into its ``unknown_model`` verdict item and the build
+      surfaces render with their dedicated panel.
     - Any other refusal of the caller's input (an ``input``-domained ``PipelexError``) is raised again
       as a ``PipeLoadRefusalError`` naming the pipe and the file, ``from`` the original.
     - Everything else leaves untouched: a configuration or runtime fault keeps its identity and stays a
@@ -1073,6 +1089,7 @@ class LibraryManager(LibraryManagerAbstract):
             self._load_single_dependency(
                 library=library,
                 resolved_dep=resolved_dep,
+                package_address=resolved_dep.address,
             )
 
         # Wire concept resolver after all deps are loaded so cross-package
@@ -1084,6 +1101,7 @@ class LibraryManager(LibraryManagerAbstract):
         library: Library,
         *,
         resolved_dep: ResolvedDependency,
+        package_address: str,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
 
@@ -1091,9 +1109,14 @@ class LibraryManager(LibraryManagerAbstract):
         into it, registers it in library.dependency_libraries, and adds aliased
         entries to the main library for backward-compatible cross-package lookups.
 
+        Each bundle's ``source`` is ``<package_address>/<path inside the package>``, never the file's
+        path on the host (see ``_dependency_bundle_source``), so a refusal inside the dependency names it
+        that way on every surface.
+
         Args:
             library: The main library to load into
             resolved_dep: The resolved dependency info
+            package_address: The dependency's address as a reference names it, without any ``@<tag>``
         """
         alias = resolved_dep.alias
 
@@ -1102,7 +1125,9 @@ class LibraryManager(LibraryManagerAbstract):
         for mthds_path in resolved_dep.mthds_files:
             try:
                 blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
-                blueprint.source = str(mthds_path)
+                blueprint.source = _dependency_bundle_source(
+                    package_address=package_address, package_root=resolved_dep.package_root, mthds_path=mthds_path
+                )
             except (FileNotFoundError, MthdsParserError) as exc:
                 log.warning(f"Could not parse dependency '{alias}' bundle '{mthds_path}': {exc}")
                 continue
@@ -1349,6 +1374,8 @@ class LibraryManager(LibraryManagerAbstract):
         self._load_single_dependency(
             library=library,
             resolved_dep=resolved_dep,
+            # The address the lookup matched (the manifest's address and the method's name), never a tag.
+            package_address=f"{installed.manifest.address}/{installed.name}",
         )
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:

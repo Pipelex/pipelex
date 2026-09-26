@@ -7,7 +7,7 @@ description: "Reference for the `ValidateBundleError` Pipelex error class."
 
 # Validate bundle
 
-Raised when a bundle is refused while it is loaded or validated: the invalid verdict, carrying one structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one — every parser error, categorized or not, the factory and pipe-validation errors, one ``dry_run`` item per pipe whose dry run failed, an unknown model (``unknown_model``) and any other refusal of the caller's input — each keeping the locators its raise site had, such as a TOML syntax error's ``line`` and ``column`` and an unresolved concept's ``declared_concepts``, while a failure of the tool or its environment propagates as a no-verdict fault instead.
+Raised when a bundle is refused while it is loaded or validated: the invalid verdict, carrying one structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one — every parser error, categorized or not, the factory and pipe-validation errors, one ``dry_run`` item per pipe whose dry run failed, an unknown model (``unknown_model``) and any other refusal of the caller's input — each keeping the locators its raise site had, such as a TOML syntax error's ``line`` and ``column`` and an unresolved concept's ``declared_concepts``, while a failure of the tool or its environment propagates as a no-verdict fault instead. A run raises it too, when the bundle it was given is refused while it loads, before any pipe runs: the same verdict, with the same items, that validating the bundle gives.
 
 | Field | Value |
 |---|---|

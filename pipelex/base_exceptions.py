@@ -62,14 +62,17 @@ INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 # it is kept here — not by the caller-facing branch's bespoke logic — so the
 # decision lives in this one allowlist.
 #
-# Caveat — ``validation_errors[].source``: on the *in-memory* validate path
-# ``source`` is the caller-supplied logical source (e.g. ``api://bundle-0.mthds``),
-# which is the hosted/STRICT case and safe to surface. On the *on-disk* path it
-# is a real server filesystem path, and STRICT does NOT redact it (consistent
-# with ``DisclosureMode`` being a classification-projection, not a path-leak
-# shield — see its docstring). A hosted surface that validates from disk should
-# therefore use the in-memory path with logical sources rather than rely on STRICT
-# to scrub the path.
+# Caveat — ``validation_errors[].source``: on the *in-memory* validate and run
+# paths ``source`` is the caller-supplied logical source (e.g. ``api://bundle-0.mthds``),
+# which is the hosted/STRICT case and safe to surface; a bundle of an address-based
+# dependency is named by the package's address and its path inside the package, and
+# a file of the host's own library directories is withheld from the verdict, source
+# and messages alike (``withholding_host_library_files``). On the *on-disk* path a
+# ``source`` is a real server filesystem path, and STRICT does NOT redact it
+# (consistent with ``DisclosureMode`` being a classification-projection, not a
+# path-leak shield — see its docstring). A hosted surface that validates from disk
+# should therefore use the in-memory path with logical sources rather than rely on
+# STRICT to scrub the path.
 #
 # ``migration`` is NOT surfaced, and the contrast with ``validation_errors`` is
 # the whole reason: a pending configuration migration describes the *host's* own

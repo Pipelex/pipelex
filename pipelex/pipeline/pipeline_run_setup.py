@@ -62,6 +62,7 @@ async def pipeline_run_setup(
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -149,12 +150,23 @@ async def pipeline_run_setup(
         Inputs D3) — the inputs file's parent when a CLI file-loaded the inputs. ``None`` for
         API/SDK callers (they pass absolute urls / storage uris). Only the shaper's file-ish /
         CSV arms consult it.
+    library_dirs_are_callers:
+        Whether ``library_dirs`` are the caller's own, as on a local CLI run, so a refusal while
+        loading them is the caller's invalid bundle. ``False`` (a host's own directories) loads them
+        untranslated. The ``mthds_contents`` are always the caller's: a refusal while loading them is
+        always the ``ValidateBundleError`` verdict. See :func:`acquire_library`.
 
     Returns:
     -------
     tuple[PipeJob, str, str]
         A tuple containing the pipe job ready for execution, the pipeline run ID,
         and the library ID.
+
+    Raises:
+    -------
+    ValidateBundleError
+        The bundle was refused while it loaded, before any pipe ran: the same verdict, with the same
+        located ``validation_errors``, that validating the bundle gives.
 
     """
     # NO `user_id or DEFAULT_USER_ID` HERE, DELIBERATELY.
@@ -255,6 +267,7 @@ async def pipeline_run_setup(
             library_dirs=library_dirs,
             mthds_contents=mthds_contents,
             bundle_uris=bundle_uris,
+            library_dirs_are_callers=library_dirs_are_callers,
         )
         library_acquired = True
 

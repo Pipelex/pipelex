@@ -17,7 +17,6 @@ from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -178,16 +177,6 @@ def run_pipe_cmd(
                     extra_fields["cause_type"] = type(exc.__cause__).__name__
                     extra_fields["cause_message"] = str(exc.__cause__)
                 agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **extra_fields)
-
-            except PipeOperatorModelChoiceError as exc:
-                agent_error(
-                    exc.message,
-                    error_type="PipeOperatorModelChoiceError",
-                    cause=exc,
-                    pipe_code=exc.pipe_code,
-                    model_type=str(exc.model_type),
-                    model_choice=str(exc.model_choice),
-                )
 
             except PipeOperatorModelAvailabilityError as exc:
                 availability_extra: dict[str, Any] = {

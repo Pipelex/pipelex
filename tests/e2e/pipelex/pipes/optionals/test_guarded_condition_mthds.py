@@ -8,11 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.core.memory.absence import AbsenceKind
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _FIXTURE_DIR = Path(__file__).parent / "guarded_condition"
 _BUNDLE_PATH = _FIXTURE_DIR / "guarded_condition.mthds"
@@ -64,11 +65,13 @@ class TestGuardedConditionExpression:
         FuncRegistryUtils.register_funcs_in_folder(folder_path=_FIXTURE_DIR)
 
         runner = PipelexMTHDSProtocol()
-        with pytest.raises(PipelexError) as exc_info:
+        with pytest.raises(ValidateBundleError) as exc_info:
             await runner.execute(mthds_contents=[unguarded_text], inputs={})
 
-        # The load-time guard lint (OPTIONAL_INPUT_UNGUARDED) is raised inside a pydantic validator,
-        # so it surfaces wrapped in a PipeExecutionError → pydantic ValidationError rather than on the
-        # __cause__ chain. Match its distinctive verdict text: the missing-function error (the wrong
-        # reason this control used to pass for) never contains "unguarded".
-        assert "'flag' unguarded" in str(exc_info.value)
+        # The load-time guard lint (OPTIONAL_INPUT_UNGUARDED) is raised inside a pydantic validator, and
+        # the run refuses the bundle with the verdict validating it gives: its item names the lint, so
+        # the missing-function error (the wrong reason this control used to pass for) cannot pass it.
+        items = exc_info.value.to_error_report().validation_errors or []
+        unguarded_items = [item for item in items if item.error_type == PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED]
+        assert unguarded_items, f"expected an optional_input_unguarded item, got {items!r}"
+        assert "'flag'" in unguarded_items[0].message
