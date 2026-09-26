@@ -66,6 +66,32 @@ class TestStrictMethodFaults:
         assert document["user_action"]["detail"].startswith(next_step)
         assert "make branch 'gen_ideas' output a single 'Idea'" in document["user_action"]["detail"]
 
+    async def test_parallel_combine_refusal_no_multiplicity_explains_is_the_callers_fault(self) -> None:
+        """A single `Idea` branch feeding a list of plain texts: no multiplicity to change, the combine's own refusal at 422."""
+        error = await _run_failing(
+            pipe_code="flow",
+            mthds_content=StrictMethodFaultsTestData.PARALLEL_NO_MULTIPLICITY_MTHDS,
+            inputs={},
+            pipe_run_mode=PipeRunMode.DRY,
+        )
+
+        document = _strict_problem_document(error)
+        assert document["status"] == 422
+        assert document["error_domain"] == "input"
+        assert document["error_type"] == "StuffFactoryError"
+        # The combine's own refusal, kept under STRICT, with no multiplicity advice that could not make it fit.
+        assert document["detail"].startswith("Pipe 'analyze' failed (flow → analyze): Error combining stuffs for concept Review")
+        assert "cannot combine its branch results" not in document["detail"]
+        assert "gives result" not in document["detail"]
+        assert document["user_action"] == {
+            "kind": "change_input",
+            "detail": (
+                "Change the method so that each branch of PipeParallel 'analyze' produces what the field of "
+                "'Review' it feeds expects, a list only where that field is a list, "
+                "and so that every required field is fed by a branch."
+            ),
+        }
+
     async def test_missing_required_input_is_the_callers_fault(self) -> None:
         """A run missing a required input: HTTP 422, with a message and a next step naming the input."""
         error = await _run_failing(pipe_code="greet_flow", mthds_content=StrictMethodFaultsTestData.MISSING_INPUT_MTHDS, inputs={})

@@ -139,6 +139,59 @@ output = "Text"
 template = "Hello {{ name }}"
 """
 
+    # A parallel nested in a sequence, whose single `Idea` branch feeds a field holding a list of plain
+    # texts: the combine refuses it, and no multiplicity change would make it fit, since the field's
+    # items are not concept contents. Every pipe is a PipeCompose or a controller.
+    PARALLEL_NO_MULTIPLICITY_MTHDS: ClassVar[str] = """
+domain = "strict_faults_parallel"
+description = "A parallel whose single branch feeds a list of plain texts, nested in a sequence"
+
+[concept.Idea]
+description = "One idea"
+refines = "Text"
+
+[concept.Overview]
+description = "A one-line overview"
+refines = "Text"
+
+[concept.Review]
+description = "Ideas and an overview"
+
+[concept.Review.structure]
+ideas = { type = "list", item_type = "text", description = "The ideas", required = true }
+overview = { type = "concept", concept_ref = "strict_faults_parallel.Overview", description = "The overview", required = true }
+
+[pipe.flow]
+type = "PipeSequence"
+description = "Review the topic"
+inputs = { topic = "Text" }
+output = "Review"
+steps = [{ pipe = "analyze", result = "review" }]
+
+[pipe.analyze]
+type = "PipeParallel"
+description = "Draft an idea and an overview at the same time"
+inputs = { topic = "Text" }
+output = "Review"
+branches = [
+  { pipe = "draft_idea", result = "ideas" },
+  { pipe = "write_overview", result = "overview" },
+]
+
+[pipe.draft_idea]
+type = "PipeCompose"
+description = "Draft one idea about the topic"
+inputs = { topic = "Text" }
+output = "Idea"
+template = "An idea about $topic"
+
+[pipe.write_overview]
+type = "PipeCompose"
+description = "Write a one-line overview"
+output = "Overview"
+template = "One idea."
+"""
+
     DECK_PRESET: ClassVar[str] = "strict-faults-deck-preset"
     DECK_ALIAS: ClassVar[str] = "strict-faults-deck-alias"
     # A handle the deck's own preset and alias name, which the test profile does not serve.

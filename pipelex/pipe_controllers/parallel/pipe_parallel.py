@@ -538,9 +538,11 @@ class PipeParallel(PipeController):
             # field, a concept its field does not accept, a required field no branch feeds) is the
             # caller's to fix, and the message names only the output concept, the result name and
             # the combined fields' validation errors.
+            # The output concept as the author writes it in this bundle, in the next step as in the restatement below.
+            output_concept_ref = self._concept_ref_for_message(concept=self.output.concept, package_alias=None)
             method_next_step = (
                 f"Change the method so that each branch of PipeParallel '{self.code}' produces what the field of "
-                f"'{self.output.concept.concept_ref}' it feeds expects, a list only where that field is a list, "
+                f"'{output_concept_ref}' it feeds expects, a list only where that field is a list, "
                 "and so that every required field is fed by a branch."
             )
             # When the refusal is a branch whose multiplicity differs from its field's, say which one to change;
@@ -549,7 +551,6 @@ class PipeParallel(PipeController):
             if not next_steps:
                 exc.as_caller_fault(user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=method_next_step))
                 raise
-            output_concept_ref = self._concept_ref_for_message(concept=self.output.concept, package_alias=None)
             lead = f"PipeParallel '{self.code}' cannot combine its branch results into its output '{output_concept_ref}'."
             message_parts = [lead, *next_steps.values()]
             next_step_parts = list(next_steps.values())
