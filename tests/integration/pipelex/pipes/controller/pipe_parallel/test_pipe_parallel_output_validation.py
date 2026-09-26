@@ -3,13 +3,14 @@
 The declared output must be `Composite` or a structured concept whose fields are compatible with
 the branch result names (required fields ⊆ result names; result names ⊆ declared fields). This is
 enforced at library validation time so `/validate` surfaces it as an author-time error instead of
-a runtime combine failure.
+a runtime combine failure, and a run refuses the bundle with the same verdict while loading it.
 """
 
 import pytest
 
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.interpreter_hub import clear_current_library, get_library_manager
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 
 _BUNDLE_HEADER = """
@@ -174,8 +175,9 @@ class TestPipeParallelOutputValidation:
         ],
     )
     def test_rejected_outputs(self, test_id: str, mthds_content: str, expected_fragment: str):
-        with pytest.raises(PipeValidationError) as exc_info:
+        with pytest.raises(ValidateBundleError) as exc_info:
             acquire_library(library_id=f"pv_reject_{test_id}", mthds_contents=[mthds_content])
+        assert isinstance(exc_info.value.__cause__, PipeValidationError)
         assert expected_fragment in str(exc_info.value)
 
     def test_a_one_count_plural_branch_is_type_checked(self):
@@ -185,6 +187,7 @@ class TestPipeParallelOutputValidation:
         declaration alone let an incompatible singular result pass `/validate` and fail later in
         `StuffFactory.combine_stuffs`.
         """
-        with pytest.raises(PipeValidationError) as exc_info:
+        with pytest.raises(ValidateBundleError) as exc_info:
             acquire_library(library_id="pv_reject_one_count_plural_branch", mthds_contents=[_BUNDLE_HEADER + _ONE_COUNT_PLURAL_BRANCH])
+        assert isinstance(exc_info.value.__cause__, PipeValidationError)
         assert "tone_result" in str(exc_info.value)

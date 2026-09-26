@@ -59,7 +59,7 @@ class PipeOperatorModelChoiceError(PipelexError):
     """Raised by a pipe operator (``PipeLLM``, ``PipeStructure``, ``PipeImgGen``, ``PipeExtract``, ``PipeSearch``)
     when it is built from its blueprint and a model field names a model the model deck does not define.
     Bundle validation reports it as an invalid verdict whose item has the error type ``unknown_model``,
-    and a run refuses the bundle with it before any pipe runs.
+    and a run, which loads its bundle before any pipe runs, refuses the bundle with that same verdict.
 
     The pipe operator raises it from the ``ModelChoiceNotFoundError`` its deck check raised, located on
     the pipe (its code, type and domain) and on the field (``model``, or ``model_to_structure`` on a

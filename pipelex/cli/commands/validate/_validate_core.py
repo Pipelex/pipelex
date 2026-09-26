@@ -30,7 +30,8 @@ from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
-from pipelex.pipeline.validate_bundle import build_pending_signatures, translate_to_validate_bundle_error, validate_bundle
+from pipelex.pipeline.validate_bundle import build_pending_signatures, validate_bundle
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty

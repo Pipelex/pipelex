@@ -25,9 +25,9 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexUnexpectedError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle import (
+from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle_translation import (
     _backfill_pipe_error_source,  # pyright: ignore[reportPrivateUsage]
-    validate_bundle,
 )
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -150,7 +150,7 @@ class TestValidateBundleSourceThreading:
         source_path = tmp_path / "legacy.mthds"
         manager = mocker.Mock()
         manager.get_pipe_source.return_value = source_path
-        mocker.patch("pipelex.pipeline.validate_bundle.get_library_manager", return_value=manager)
+        mocker.patch("pipelex.pipeline.validate_bundle_translation.get_library_manager", return_value=manager)
         pipe_error = PipeValidationError(message="invalid", domain_code="demo", pipe_code="broken")
 
         _backfill_pipe_error_source(pipe_error)

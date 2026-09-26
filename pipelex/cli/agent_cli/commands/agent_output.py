@@ -264,6 +264,11 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     wrong, and the loop it opens is ``pipelex-agent migrate --dry-run --format json`` followed by
     ``--yes``. Emitted only when the report carries one, so branching on its presence is the
     whole test.
+
+    ``validation_errors`` comes from the report as well, whenever it carries any: a command that
+    refuses an invalid bundle (a run refused before any pipe ran, for one) hands the agent the same
+    located items ``validate`` gives, each with its pipe, its field and its fix, rather than only the
+    summary sentence. They are the items :func:`extract_validation_errors` projects, dumped the same way.
     """
     error_json: dict[str, Any] = {
         "error": True,
@@ -290,6 +295,8 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
             report_extras["provider"] = report.provider
         if report.migration is not None:
             report_extras["migration"] = report.migration.model_dump(mode="json")
+        if report.validation_errors:
+            report_extras["validation_errors"] = [item.model_dump(mode="json", exclude_none=True) for item in report.validation_errors]
 
     # hint: report-first, fallback to lookup dict
     hint = report_hint or AGENT_ERROR_HINTS.get(error_type)
@@ -328,16 +335,25 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
 # ``error_source`` is dropped from markdown — it's internal stack frames that
 # don't help an LLM fix a `.mthds` file. The field stays in the JSON envelope
 # for programmatic consumers.
-_MARKDOWN_RESERVED_KEYS: frozenset[str] = frozenset({"error", "error_type", "message", "hint", "error_source"})
+_MARKDOWN_RESERVED_KEYS: frozenset[str] = frozenset({"error", "error_type", "message", "hint", "error_source", "validation_errors"})
 
 
 def _render_error_markdown(payload: dict[str, Any]) -> str:
-    """Render an assembled error payload as agent-readable markdown."""
+    """Render an assembled error payload as agent-readable markdown.
+
+    ``validation_errors`` render as the same grouped prose ``validate`` prints, rather than as a JSON
+    dump under Details, so an agent reads a refused run's items the way it reads an invalid verdict's.
+    """
     lines: list[str] = [f"# Error: {payload['error_type']}", "", str(payload["message"])]
 
     hint = payload.get("hint")
     if hint:
         lines += ["", f"> 💡 **Hint:** {hint}"]
+
+    validation_errors = payload.get("validation_errors")
+    if isinstance(validation_errors, list) and validation_errors:
+        items = [ValidationErrorItem.model_validate(item) for item in cast("list[dict[str, Any]]", validation_errors)]
+        lines += ["", format_validation_error_items_markdown(items)]
 
     detail_keys = [key for key in payload if key not in _MARKDOWN_RESERVED_KEYS]
     if detail_keys:

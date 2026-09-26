@@ -17,13 +17,12 @@ from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdo
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 
 def run_bundle_cmd(
@@ -140,7 +139,10 @@ def run_bundle_cmd(
         try:
             mthds_content = Path(bundle_path).read_text(encoding="utf-8")
             if not pipe_code:
-                bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+                # A bundle that does not parse is the invalid verdict, with the items `validate` gives,
+                # as it is when the run refuses it while loading.
+                with translate_to_validate_bundle_error():
+                    bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_path)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
                     agent_error(
@@ -152,8 +154,8 @@ def run_bundle_cmd(
             agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
         except (OSError, UnicodeDecodeError) as exc:
             agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", error_type=type(exc).__name__, cause=exc)
-        except MthdsParserError as exc:
-            agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", error_type=type(exc).__name__, cause=exc)
+        except ValidateBundleError as exc:
+            agent_error(f"Failed to parse bundle '{bundle_path}': {exc.message}", error_type="ValidateBundleError", cause=exc)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback, then auto-detected
     parsed_inputs = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_dir=auto_inputs_dir)
@@ -227,16 +229,6 @@ def run_bundle_cmd(
                     extra_fields["cause_type"] = type(exc.__cause__).__name__
                     extra_fields["cause_message"] = str(exc.__cause__)
                 agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **extra_fields)
-
-            except PipeOperatorModelChoiceError as exc:
-                agent_error(
-                    exc.message,
-                    error_type="PipeOperatorModelChoiceError",
-                    cause=exc,
-                    pipe_code=exc.pipe_code,
-                    model_type=str(exc.model_type),
-                    model_choice=str(exc.model_choice),
-                )
 
             except PipeOperatorModelAvailabilityError as exc:
                 availability_extra: dict[str, Any] = {
