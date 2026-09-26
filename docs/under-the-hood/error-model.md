@@ -34,8 +34,8 @@ An error rises through a series of layers. Each layer has exactly one job.
 |-------|------|--------------------------|
 | **5 — CLI entry points** | `pipelex` / `pipelex-agent` commands | Catch, format for human (Rich) / agent (JSON·MD) / HTTP |
 | **4 — CLI factories** | `cli_factory.py`, `agent_cli_factory.py` | Catch setup errors, route to handlers |
-| **3 — Pipeline runner** | `PipelexMTHDSProtocol.execute()` | Catch + wrap as `PipelineExecutionError` |
-| **2 — Pipe router / operators** | `PipeRouter`, pipe operators | Catch + wrap with pipe context (`pipe_code`, `pipe_stack`) |
+| **3 — Pipeline runner** | `PipelexMTHDSProtocol.execute()` | Catch + wrap as `PipelineExecutionError`, which reports the located root fault |
+| **2 — Pipe router / operators** | `PipeRouter`, pipe operators | Catch + locate every failure as a `PipeRouterError` (`pipe_code`, `pipe_stack`); a foreign exception first becomes a `PipelexUnexpectedError` |
 | **1 — Workers / SDK calls** | `pipelex/providers/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
 
@@ -194,7 +194,7 @@ class InferenceErrorCategory(StrEnum):
 
 ### ErrorDomain
 
-Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the exception, drives HTTP status.
+Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the exception, or on one error by the site that raises it (see [Classified where it is raised](#classified-where-it-is-raised)), drives HTTP status.
 
 | Domain | Meaning | HTTP status | Who can fix it |
 |--------|---------|-------------|----------------|
@@ -221,6 +221,26 @@ own_domain = self.error_category.error_domain if self.error_category is not None
 ```
 
 The consequence worth knowing at the HTTP boundary: a **content-classified inference failure answers 422, not 500** — a content-policy refusal, a malformed prompt image, a bad prompt parameter are all properties of material the caller submitted. Everything else keeps the status it already had; only the report became truthful about why.
+
+#### Classified where it is raised
+
+Most classes state whose fault they are in their body: an `error_domain`, and `_authors_caller_facing_message = True` when their message is copy written for the caller, which STRICT disclosure then keeps instead of replacing it with `An internal error occurred.`. Every instance of such a class is the same kind of fault. A few classes are raised both for faults in the caller's own method or inputs and for faults that are not the caller's, so they cannot state it. For those, the site that raises the error and knows calls `as_caller_fault()` on it: the report then carries the `input` domain, so an HTTP surface answers 422, a caller-facing message, and the next step the raise site passes, if any.
+
+```python
+raise PipeRunInputsError(message=msg, run_mode=run_mode, pipe_code=pipe_code).as_caller_fault(
+    user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Provide the missing required inputs of 'flow': topic."),
+)
+```
+
+The raise site vouches for the message: it names only the caller's own method and data (pipe codes, concept codes, variable names, the values the caller sent), never a path on the host, a secret or the text of a foreign exception. As with the class-level flag, a plain wrapper raised from the error inherits its domain but not its caller-facing flag, since the wrapper's message is its own; the located wrappers of a run failure report their root fault, so they carry both.
+
+| Raise site | Error | Why it is the caller's fault |
+|------------|-------|------------------------------|
+| A `PipeParallel` combining its branch results into its output | `StuffFactoryError` | The method sets which branch feeds which field, what each branch produces and whether it produces a list |
+| A pipe checking that its required inputs are present | `PipeRunInputsError` | The request, or an earlier step of the method, left the input out |
+| A model lookup for a reference the deck neither defines nor names in any of its own entries | `ModelNotFoundError` | Only an inline model setting of the method can have named it; a reference the deck names but cannot serve stays `config` and redacted |
+
+Some failures stay unclassified on purpose, each with a sentence at its raise site saying why: a model output that does not fit its structure, which depends on what the model produced; a `PipeFunc` crash, whose exception text can carry anything the process holds; an input resource the pipe cannot use, whose message names the path as resolved on the host; a template that fails to render, where the same failure can come from the template or from the data; and a working-memory miss, since a step naming a variable nothing produces is refused when the bundle loads.
 
 ---
 
@@ -398,10 +418,35 @@ def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
     )
 ```
 
-A wrapper keeps its own `error_type` and `message` but inherits every classification field it does not set itself.
+A wrapper keeps its own `error_type` and `message` but inherits every classification field it does not set itself. The two wrappers of a run failure go further, and report their root fault instead of themselves: see [Run Failures: the Root Fault, Located](#run-failures-the-root-fault-located).
 
 !!! warning "Overrides must call the enrichment helper"
     A `to_error_report()` override on a subclass **must** end with `self._enrich_error_report_from_cause(report)`. Otherwise that subclass becomes a black hole that drops the cause's classification. A cyclic-`__cause__` guard ensures a malformed chain can never turn error reporting into a `RecursionError`.
+
+---
+
+## Run Failures: the Root Fault, Located
+
+When a pipe fails during a run, the error a surface receives sits under several wrappers: the pipe router's `PipeRouterError`, maybe a runtime bridge's `PipelexBridgeDispatchError`, and the runner's `PipelineExecutionError`. None of them is what went wrong, and a report reading `PipelineExecutionError` with a bridge's sentence for a message tells the reader nothing. So the two located wrappers, `PipeRouterError` and `PipelineExecutionError`, report the **root fault**, the innermost `PipelexError` on the cause chain, and only add where it happened (`pipelex/pipe_run/located_failure.py`). The walk stops at the first exception that is not a `PipelexError`, whose stand-in is then the fault, and an error raised from one of its own class (a remedy or an item index added to the same fault) counts as the outer one.
+
+**Locating.** `PipeRouterProtocol.run()` catches every failure of the pipe it runs and re-raises it as a `PipeRouterError` chained to it, with the pipe's code and a snapshot of its stack taken where it failed. A failure that already carries a `PipeRouterError` rises untouched through the routers of the controllers above, so the innermost location is the one reported. An exception that is not a `PipelexError` first becomes a `PipelexUnexpectedError` whose message names its class (`KeyError: 'boom'`); it is never caller-facing, and a dry run that sorts its own failures from programming bugs (the bundle validator's sweep, the validate surfaces' graph step) finds the foreign exception behind it with `find_foreign_fault()` and lets it propagate rather than report it as the bundle's failure. A host router whose transport raises its own failures overrides the `_as_pipelex_failure()` hook, and returns `None` for a control-flow exception such as a cancellation, which then propagates as it is. For a transport failure carrying a recovered report, the far side packs the root fault's own report, never a located one: when it packs that report alone, the hook returns a `PipelexError` carrying it and the router locates it at the pipe it ran; when it packs the location it found as well, the hook returns a `PipeRouterError` rebuilt over that report with `make_located()`, which the router raises untouched, so the report reads exactly as the local run's. The runner wraps any failure of the run into a `PipelineExecutionError` with `make_for_run_failure()`, which takes the location from the innermost `PipeRouterError` on the chain (`find_failure_location()`), never from the live stack, which has unwound by then.
+
+**The report.** Both wrappers build the same report from the same root fault (`find_root_fault()`):
+
+| Field | Taken from |
+|-------|------------|
+| `error_type`, `title`, `type_uri` | The root fault |
+| `message` | The root fault's own message, prefixed with the failing pipe and its path |
+| `caller_facing_message`, `validation_errors`, `migration` | The root fault |
+| `error_category`, `retryable`, `model`, `provider`, `provider_metadata` | The cause-chain enrichment |
+| `error_domain` | The cause-chain enrichment, with a `runtime` floor |
+| `user_action` | The cause-chain enrichment or, when nothing on the chain advises an action, a fallback naming the failing pipe |
+
+The message reads `Pipe 'summarize' failed (two_steps → summarize): Model handle 'x' was not found in the model deck.` for a nested pipe, and `Pipe 'flow' failed: …` for the entry pipe. Pipe codes are the caller's own names, so the located message is caller-facing exactly when the root fault's message is, and STRICT disclosure keeps it exactly then. `ErrorReport` has no location field, so the location rides the message; `PipeRouterError` and `PipelineExecutionError` carry it structurally as `pipe_code` and `pipe_stack`.
+
+**A recovered report is taken as it is.** A distributed submitter receives a report that was already located on the worker. When it raises that report inside a `PipelexError` whose `to_error_report()` returns it, and no `PipeRouterError` sits on the submitter's own chain, the runner's `PipelineExecutionError` reports it verbatim: its `pipe_code` is the entry pipe, its `pipe_stack` is empty, and the message is not located a second time. A located report must never reach a router this way, since the router would locate it again: that is why a host router's transport packs the root fault's own report. A bridge's own sentence (`Pipe execution failed in DIRECT mode …`) appears in neither the report nor the message, so a run gives the same report whether it ran in process, through the in-process orchestrator or on a remote worker.
+
+**Where the remedy goes.** A root fault's message states the fact and nothing else, because it reaches every surface, a hosted run's stored error included. Advice that only a local reader can act on belongs to the local CLI: `pipelex run` renders the model panel of a `PipeOperatorModelAvailabilityError` found anywhere on the chain, and the panel's tip is where the local model deck remedy lives.
 
 ---
 
@@ -474,7 +519,7 @@ A downstream FastAPI exception handler calls `ErrorReport.http_status` and is a 
 flowchart TB
     SDK["Layer 0 — SDK exception<br/>(openai.RateLimitError)"]
     W["Layer 1 — Worker classifies<br/>is_quota_exhaustion_*() → CogtError<br/>+ InferenceErrorCategory + ProviderErrorMetadata"]
-    WRAP["Layers 2-3 — Wrappers<br/>PipeRouterError → PipelineExecutionError<br/>(attach pipe context)"]
+    WRAP["Layers 2-3 — Wrappers<br/>PipeRouterError → PipelineExecutionError<br/>(locate the root fault)"]
     REPORT["ErrorReport<br/>via to_error_report() + cause-chain enrichment"]
 
     SDK -->|"raise ... from exc"| W
@@ -519,11 +564,11 @@ Exception
     │   │   ├── LLMModelNotFoundError / ImgGenModelNotFoundError
     │   │   └── ExtractModelNotFoundError / SearchModelNotFoundError
     │   └── ... (see worker classification) ...
-    ├── PipelineExecutionError      pipeline/exceptions.py — error_domain = RUNTIME, but only as a floor
+    ├── PipelineExecutionError      pipeline/exceptions.py — reports its located root fault, RUNTIME only as a floor
     └── ... (one exceptions.py per package) ...
 ```
 
-`PipelineExecutionError`'s `RUNTIME` is deliberately a *floor*, applied only when the cause chain surfaced no domain — so a `CONTENT`-categorized inference failure now reaches the HTTP boundary as `INPUT` / 422 through every wrapping layer instead of being flattened to the wrapper's generic 500.
+`PipelineExecutionError`'s `RUNTIME` is deliberately a *floor*, applied only when the cause chain surfaced no domain — so a `CONTENT`-categorized inference failure now reaches the HTTP boundary as `INPUT` / 422 through every wrapping layer instead of being flattened to the wrapper's generic 500. Its identity and message are its root fault's (see [Run Failures: the Root Fault, Located](#run-failures-the-root-fault-located)).
 
 ### Factory-time vs Runtime
 
@@ -545,6 +590,9 @@ The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `Extrac
 # Produce a report from any PipelexError
 report = exc.to_error_report()  # enriched from the __cause__ chain
 payload = report.to_dict()  # None-free dict for serialization
+
+# Classify one error as the caller's own fault, where it is raised
+raise SomeError(msg).as_caller_fault(user_action=user_action)  # input domain, caller-facing
 
 # Consume a report
 report.http_status  # 422 / 429 / 500
@@ -590,8 +638,12 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | Local file extractor raises a builtin (docling, pypdfium2) | `ValueError` / `RuntimeError` / `FileNotFoundError` → `CONTENT` → `error_domain = INPUT` → **HTTP 422**; `OSError` → `TRANSIENT` (see `_LOCAL_EXTRACT_BY_TYPE_NAME`) |
 | LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` → no `error_domain` asserted → HTTP 500 |
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown); `error_domain = RUNTIME` |
+| A step names, in an inline model setting, a model the deck neither defines nor names | `ModelNotFoundError`, classified by the lookup as the caller's: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT. A model the deck itself names but does not serve (a preset or alias on a backend that is not enabled) keeps `CONFIG` → HTTP 500, redacted |
+| A `PipeParallel` cannot combine its branch results, or a pipe starts without a required input | The caller's own method or request: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT, with a `CHANGE_INPUT` next step |
 | Unknown or ambiguous entry `pipe_code` (a CLI argument, a run request's field, the `--pipe` / `pipe_ref` slice selector of bundle validation) | `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` → `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422**, and caller-facing under STRICT. The in-body lookups (`get_optional_pipe` / `get_required_pipe`) keep raising the undomained `PipeNotFoundError` / `PipeLibraryError`: a ref written inside a bundle is not the caller's input |
 | Wrapper exception (no own category) | Inherits cause's classification via enrichment — including the domain the cause derived |
+| A pipe fails during a run | `PipeRouterError` → `PipelineExecutionError`, both reporting the root fault's `error_type` and its own message prefixed with `Pipe '<code>' failed (<path>): `; the classification comes from the chain |
+| A pipe raises a non-Pipelex exception | Located as a `PipelexUnexpectedError` whose message names the original class; redacted under STRICT |
 | Failure on a distributed worker | `ErrorReport` recovered from the transport's serialized details — same classification as local |
 | Worker exception with no `ErrorReport` | Synthesized fallback report — `error_domain = RUNTIME` |
 

@@ -36,7 +36,7 @@ from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError, iter_cause_chain
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.exceptions import DryRunFailureErrorData
@@ -55,6 +55,7 @@ from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunError
+from pipelex.pipe_run.located_failure import find_foreign_fault, find_root_fault
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
@@ -181,15 +182,13 @@ def _dry_run_failure_text(*, error: Exception) -> str:
     """The text a dry-run failure puts on its verdict item: the failure's own message only when it is caller-facing.
 
     The text is its root fault's, the innermost ``PipelexError`` on the cause chain, since a wrapper
-    around it neither knows more nor authors caller-facing copy of its own. A message that is not
+    around it neither knows more nor authors caller-facing copy of its own; of two faults of the same
+    class the outer one, which restates the inner with more context, is the root, as a run failure's
+    report takes it (see ``find_root_fault``). A message that is not
     caller-facing is replaced by the fault's title, because the verdict is caller-facing as a whole
     and would otherwise carry a configuration or storage failure's internals past STRICT disclosure.
     """
-    root_fault: PipelexError | None = None
-    for node in iter_cause_chain(error):
-        if not isinstance(node, PipelexError):
-            break
-        root_fault = node
+    root_fault = find_root_fault(error=error)
     if root_fault is None:
         return _MOCK_DATA_FAILURE_TEXT
     return caller_facing_refusal_text(refusal=root_fault)
@@ -483,6 +482,11 @@ class BundleValidator:
             )
             await self._pipe_run.run(pipe_job)
         except (PipelexError, ValidationError, FactoryException) as exc:
+            # A foreign exception a pipe raised arrives located as a PipelexError by the router: it
+            # is a programming bug, never the bundle's failure, and its text is never the caller's.
+            foreign_fault = find_foreign_fault(error=exc)
+            if foreign_fault is not None and not isinstance(foreign_fault, (ValidationError, FactoryException)):
+                raise
             # SKIPPED = a cross-package unresolved dependency. Routing through PipeRun.run no longer
             # surfaces a bare PipeNotFoundError: the run layer re-raises the original and the router may
             # wrap it (PipeNotFoundError is a PipelexError, so the base catch reaches it). Walk the whole
