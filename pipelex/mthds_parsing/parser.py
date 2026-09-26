@@ -61,6 +61,9 @@ class MthdsParser(BaseModel):
                     PipelexBundleBlueprintValidationErrorData(
                         source=source,
                         message=msg,
+                        # tomli counts both from 1, as the item's locators do.
+                        line=exc.lineno,
+                        column=exc.colno,
                     )
                 ],
             ) from exc
@@ -76,6 +79,8 @@ class MthdsParser(BaseModel):
             pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
+            # Every error becomes an item, categorized or not, so none hides another; only a concept's
+            # union-branch noise is left out, its table branch reporting the same fault.
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
             for error in exc.errors():

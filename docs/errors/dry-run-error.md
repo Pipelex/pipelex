@@ -7,7 +7,7 @@ description: "Reference for the `DryRunError` Pipelex error class."
 
 # Dry run
 
-Raised when a dry run fails due to missing inputs or other validation issues.
+Raised when a dry run fails. The validation sweep raises it with one failure per pipe whose dry run failed, located at the innermost failing pipe, so a controller that failed because a pipe it runs failed is reported once, at that pipe. Bundle validation reports each failure as its own ``dry_run`` item, with the error type ``DryRunError``, the pipe's code, domain and source, and a message that keeps the failure's own text only when that text is caller-facing and otherwise names the failure's title.
 
 | Field | Value |
 |---|---|

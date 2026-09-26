@@ -1,8 +1,13 @@
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
+from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError, ValidationErrorItem
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import (
+    DryRunFailureErrorData,
+    PipeFactoryErrorData,
+    PipelexBundleBlueprintValidationErrorData,
+    PipesAndConceptValidationErrorData,
+)
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -77,7 +82,7 @@ def _summarize_bundle_validation_message(
     blueprint_errors: list[PipelexBundleBlueprintValidationErrorData],
     factory_errors: list[PipeFactoryErrorData],
     pipe_validation_errors: list[PipesAndConceptValidationErrorData],
-    dry_run_error_message: str | None,
+    dry_run_failures: list[DryRunFailureErrorData],
     raw_message: str,
 ) -> str:
     """Compose a clean, author-facing top-line summary of a bundle-validation failure (disease C).
@@ -95,14 +100,13 @@ def _summarize_bundle_validation_message(
     failure (TOML syntax, an empty blueprint, a bundle elaborator) whose raw message is the
     authoritative description and the sole diagnostic. Reads only the ``message`` field off each
     error-data model — no fix planning — so it is cheap enough to run in ``__init__``. Ordering
-    mirrors ``build_validation_error_items`` (blueprint → factory → pipe/concept → dry-run residual)
-    so the "first" message is the same item the structured surfaces list first.
+    mirrors ``build_validation_error_items`` (blueprint → factory → pipe/concept → dry run) so the
+    "first" message is the same item the structured surfaces list first.
     """
     item_messages = [error.message for error in blueprint_errors]
     item_messages += [error.message for error in factory_errors]
     item_messages += [error.message for error in pipe_validation_errors]
-    if not item_messages and dry_run_error_message:
-        item_messages = [dry_run_error_message]
+    item_messages += [failure.message for failure in dry_run_failures]
     if not item_messages:
         return raw_message
     first_message = item_messages[0]
@@ -114,16 +118,18 @@ def _summarize_bundle_validation_message(
 class ValidateBundleError(PipelexError):
     """Raised when a bundle is refused while it is loaded or validated: the invalid verdict, carrying one
     structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one —
-    the parser, factory and pipe-validation errors, a failing dry run, an unknown model (``unknown_model``)
-    and any other refusal of the caller's input — while a failure of the tool or its environment propagates
-    as a no-verdict fault instead.
+    every parser error, categorized or not, the factory and pipe-validation errors, one ``dry_run`` item
+    per pipe whose dry run failed, an unknown model (``unknown_model``) and any other refusal of the
+    caller's input — each keeping the locators its raise site had, such as a TOML syntax error's ``line``
+    and ``column`` and an unresolved concept's ``declared_concepts``, while a failure of the tool or its
+    environment propagates as a no-verdict fault instead.
 
     This error aggregates validation errors from different stages:
     - Blueprint validation errors (from interpreter)
     - Pipe factory errors (from PipeFactoryError exceptions, e.g., missing concepts)
     - Pipe validation errors (from PipeValidationError exceptions)
     - Pipe/Concept instantiation errors (from Pydantic ValidationError during factory instantiation)
-    - Dry run errors (the residual message, projected as one ``dry_run`` item by the shared builder)
+    - Dry run failures (one per failing pipe, each projected as its own ``dry_run`` item)
 
     Signatures are **never** an error (D-B): an unimplemented ``PipeSignature`` reached during
     validation is a runnability fact (reported library-wide via the report's ``pending_signatures``
@@ -148,7 +154,7 @@ class ValidateBundleError(PipelexError):
         pipe_factory_errors: list[PipeFactoryErrorData] | None = None,
         pipe_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         pipe_concept_instantiation_errors: list[PipesAndConceptValidationErrorData] | None = None,
-        dry_run_error_message: str | None = None,
+        dry_run_failures: list[DryRunFailureErrorData] | None = None,
     ):
         self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
         self.pipe_factory_errors = pipe_factory_errors or []
@@ -158,7 +164,8 @@ class ValidateBundleError(PipelexError):
         # TODO: Currently not caught, but structure is prepared for future implementation
         self.pipe_concept_instantiation_errors = pipe_concept_instantiation_errors or []
 
-        self.dry_run_error_message = dry_run_error_message
+        # One located failure per pipe whose dry run failed (see ``BundleValidator``).
+        self.dry_run_failures = dry_run_failures or []
 
         # Disease C: the top-line ``message`` is often a leaky ``str(pydantic ValidationError)``
         # (``Value errors: '<field>': Value error, …``). Replace it at the source with a clean
@@ -172,7 +179,7 @@ class ValidateBundleError(PipelexError):
                 blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
                 factory_errors=self.pipe_factory_errors,
                 pipe_validation_errors=self.pipe_validation_error_data,
-                dry_run_error_message=self.dry_run_error_message,
+                dry_run_failures=self.dry_run_failures,
                 raw_message=message,
             )
         )
@@ -186,40 +193,42 @@ class ValidateBundleError(PipelexError):
         # TODO: refactor so we don't need this anymore?
         return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
 
+    def validation_error_items(self) -> list[ValidationErrorItem]:
+        """Project every channel this verdict carries into typed wire items, via the shared builder.
+
+        The one projection behind the API report (:meth:`to_error_report`), the agent CLI's
+        ``validation_errors`` array and ``pipelex fix``, so no surface can drop a channel another
+        keeps. The pipe-validation arm uses :attr:`pipe_validation_error_data` (pipe validation
+        **plus** pipe/concept instantiation errors) so the instantiation category is not silently
+        dropped. Each dry-run failure becomes its own located ``dry_run`` item. Finally
+        ``fallback_message=self.message`` is passed so a parse-level failure (TOML syntax, an empty
+        blueprint, a bundle elaborator) — which carries only a message — still surfaces one
+        ``blueprint_validation`` residual item. Together these make the structured-info invariant
+        **total**: an invalid verdict never rides a bare ``detail`` with an empty
+        ``validation_errors[]``.
+        """
+        return build_validation_error_items(
+            blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
+            factory_errors=self.pipe_factory_errors,
+            pipe_validation_errors=self.pipe_validation_error_data,
+            dry_run_failures=self.dry_run_failures,
+            fallback_message=self.message,
+        )
+
     @override
     def to_error_report(self) -> ErrorReport:
         """Attach the structured ``validation_errors`` list onto the base report.
 
         ``super().to_error_report()`` builds the report and enriches it from the
         ``__cause__`` chain; this override then attaches the per-error structured
-        list — the same items the agent CLI emits, via the shared
-        ``build_validation_error_items`` builder — so the API 422 problem
-        document carries machine-mappable diagnostics. The list is set to
-        ``None`` when empty so it drops out of the ``exclude_none`` wire
-        projection (and the round-trip stays identical to a plain report).
-
-        The pipe-validation arm uses :attr:`pipe_validation_error_data` (pipe
-        validation **plus** pipe/concept instantiation errors) so the
-        instantiation category is not silently dropped from the wire. The
-        ``dry_run_error_message`` channel is a single message, not per-error data
-        with identity fields, so the shared builder projects it as one
-        ``dry_run``-category item **only** when no categorized error has data.
-        Finally ``fallback_message=self.message`` is passed so a parse-level
-        failure (TOML syntax, an empty blueprint, a bundle elaborator) — which
-        carries only a message — still surfaces one ``blueprint_validation``
-        residual item. Together these make the structured-info invariant
-        **total**: an invalid verdict never rides a bare ``detail`` with an empty
-        ``validation_errors[]``.
+        list from :meth:`validation_error_items` — the same items the agent CLI
+        emits — so the API problem document carries machine-mappable diagnostics.
+        The list is set to ``None`` when empty so it drops out of the
+        ``exclude_none`` wire projection (and the round-trip stays identical to a
+        plain report).
         """
         report = super().to_error_report()
-        validation_error_items = build_validation_error_items(
-            blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
-            factory_errors=self.pipe_factory_errors,
-            pipe_validation_errors=self.pipe_validation_error_data,
-            dry_run_error_message=self.dry_run_error_message,
-            fallback_message=self.message,
-        )
-        return report.model_copy(update={"validation_errors": validation_error_items or None})
+        return report.model_copy(update={"validation_errors": self.validation_error_items() or None})
 
 
 class PipeIOContractError(PipelexError):

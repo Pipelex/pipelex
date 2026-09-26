@@ -86,11 +86,8 @@ def inputs_method_cmd(
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
+        # A failing dry run rides validation_errors as one located dry_run item per failing pipe.
+        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, validation_errors=extract_validation_errors(exc))
 
     except NoInputsRequiredError as exc:
         emit_no_inputs_result(pipe_code=pipe_code, message=str(exc), template_format=template_format)

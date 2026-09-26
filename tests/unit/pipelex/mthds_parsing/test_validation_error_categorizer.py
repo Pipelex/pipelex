@@ -46,6 +46,28 @@ steps = [
 ]
 """
 
+# A misspelled field (`promtp`, pydantic's `extra_forbidden`, which no categorizer knows) in one pipe and
+# an undeclared prompt variable in another.
+_TYPO_BESIDE_UNDECLARED_VARIABLE_MTHDS = """
+domain = "notes"
+description = "Summarize and translate notes"
+
+[pipe.summarize_notes]
+type = "PipeLLM"
+description = "Summarize the notes"
+inputs = { notes = "Text" }
+output = "Text"
+promtp = "Summarize these notes"
+prompt = "Summarize these notes: $notes"
+
+[pipe.translate_notes]
+type = "PipeLLM"
+description = "Translate the notes"
+inputs = { notes = "Text" }
+output = "Text"
+prompt = "Translate these notes into $language: $notes"
+"""
+
 
 class TestBlueprintValidationErrorCategorizer:
     @pytest.mark.parametrize(
@@ -89,3 +111,39 @@ class TestBlueprintValidationErrorCategorizer:
         # The recovered message is the PipeValidationError's own clean text, not pydantic's
         # "Value error, " prefixed wrapper.
         assert not item.message.startswith("Value error"), f"Expected the unwrapped clean message, got: {item.message!r}"
+
+    def test_an_uncategorized_error_is_kept_beside_a_categorized_one(self) -> None:
+        """An error no categorizer knows is an item of its own, located by its source, pipe and field path."""
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_TYPO_BESIDE_UNDECLARED_VARIABLE_MTHDS, mthds_source="notes.mthds")
+
+        errors = exc_info.value.validation_errors
+        assert len(errors) == 2
+        typo_error = next(error for error in errors if error.error_type is None)
+        assert typo_error.pipe_code == "summarize_notes"
+        assert typo_error.domain_code == "notes"
+        assert typo_error.source == "notes.mthds"
+        # The union tag pydantic routed through (`PipeLLM`) is not a field of the bundle.
+        assert typo_error.field_path == "pipe.summarize_notes.promtp"
+        assert typo_error.message == "Validation error at 'pipe.summarize_notes.promtp': Extra inputs are not permitted"
+        assert any(error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE for error in errors)
+
+    def test_a_domain_that_is_not_a_string_locates_nothing(self) -> None:
+        """The raw dict holds what the author wrote: a `domain = 123` is an error, never a locator."""
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content='domain = 123\ndescription = "d"\n', mthds_source="numbers.mthds")
+
+        (domain_error,) = exc_info.value.validation_errors
+        assert domain_error.error_type is None
+        assert domain_error.domain_code is None
+        assert domain_error.source == "numbers.mthds"
+        assert domain_error.field_path == "domain"
+
+    def test_a_toml_syntax_error_carries_its_line_and_column(self) -> None:
+        """Tomli counts both from 1, as the item's locators do."""
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content='domain = "notes"\ndescription = "unterminated\n', mthds_source="notes.mthds")
+
+        (syntax_error,) = exc_info.value.validation_errors
+        assert (syntax_error.line, syntax_error.column) == (2, 28)
+        assert syntax_error.source == "notes.mthds"

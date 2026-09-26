@@ -144,7 +144,8 @@ class TestValidateLoadRefusalsCli:
         assert exc_info.value.exit_code == 1
         output = console.export_text()
         assert "Bundle validation failed" in output
-        assert "Dry Run Error:" in output
+        assert "Dry Run Errors:" in output
+        assert f"Pipe: {_DRY_RUN_FAILURE_PIPE}" in output
         assert "Traceback" not in output
 
     @pytest.mark.usefixtures("restore_current_library")
@@ -157,7 +158,8 @@ class TestValidateLoadRefusalsCli:
         assert exc_info.value.exit_code == 1
         output = console.export_text()
         assert "Bundle validation failed" in output
-        assert "Dry Run Error:" in output
+        assert "Dry Run Errors:" in output
+        assert f"Pipe: {_DRY_RUN_FAILURE_PIPE}" in output
         assert "Traceback" not in output
 
     @pytest.mark.usefixtures("restore_current_library")

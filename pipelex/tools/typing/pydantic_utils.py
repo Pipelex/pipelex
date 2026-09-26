@@ -57,10 +57,22 @@ class PydanticValidationErrorAnalysis(BaseModel):
     literal_errors: list[str]
     union_tag_errors: list[str]
     model_type_errors: list[str]
+    other_errors: list[str]
+
+
+# The error kinds the analysis lists under a heading of its own; every other kind is listed under
+# "Other validation errors", so no error is left out of the message because another kind is present.
+_LISTED_ERROR_KINDS = frozenset(
+    {"missing", "extra_forbidden", "type_error", "value_error", "enum", "literal_error", "union_tag_not_found", "model_type"}
+)
 
 
 def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidationErrorAnalysis:
     """Analyze a Pydantic ValidationError into a readable string with detailed error information.
+
+    Every error is rendered: the kinds it lists get their own heading, and all the others (an
+    ``int_parsing`` or ``string_type`` error, say) are rendered under "Other validation errors",
+    whatever else is present.
 
     Args:
         exc: The Pydantic ValidationError exception
@@ -123,11 +135,14 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
     if model_type_errors:
         error_msg += f"\n\nModel type errors: {', '.join(model_type_errors)}"
 
-    # If none of the specific error types were found, add the raw error messages
-    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, literal_errors, union_tag_errors, model_type_errors]):
+    # Every kind without a heading of its own, rendered whatever else is present.
+    other_errors = [
+        f"{'.'.join(map(str, err['loc']))}: {err['type']}: {err['msg']}" for err in exc.errors() if err["type"] not in _LISTED_ERROR_KINDS
+    ]
+    if other_errors:
         error_msg += "\n\nOther validation errors:"
-        for err in exc.errors():
-            error_msg += f"\n{'.'.join(map(str, err['loc']))}: {err['type']}: {err['msg']}"
+        for other_error in other_errors:
+            error_msg += f"\n{other_error}"
 
     return PydanticValidationErrorAnalysis(
         error_msg=error_msg,
@@ -139,6 +154,7 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
         literal_errors=literal_errors,
         union_tag_errors=union_tag_errors,
         model_type_errors=model_type_errors,
+        other_errors=other_errors,
     )
 
 
@@ -218,6 +234,7 @@ def format_pydantic_validation_error_for_agent(exc: ValidationError) -> tuple[st
         "literal_errors": analysis.literal_errors,
         "union_tag_errors": analysis.union_tag_errors,
         "model_type_errors": analysis.model_type_errors,
+        "other_errors": analysis.other_errors,
     }
     categories = {key: value for key, value in all_categories.items() if value}
 
@@ -257,6 +274,8 @@ def format_pydantic_validation_error_for_agent(exc: ValidationError) -> tuple[st
         category_summaries.append(f"union tag errors: {', '.join(analysis.union_tag_errors)}")
     if analysis.model_type_errors:
         category_summaries.append(f"model type errors: {', '.join(analysis.model_type_errors)}")
+    if analysis.other_errors:
+        category_summaries.append(f"other errors: {', '.join(analysis.other_errors)}")
 
     error_word = "error" if error_count == 1 else "errors"
     if category_summaries:

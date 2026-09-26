@@ -53,7 +53,10 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
     try:
         # acquire_library left the freshly-acquired library current, so the inner sweep targets it
         # (it filters signatures in strict mode itself). The returned map is keyed by namespaced pipe_ref.
-        dry_run_results = await BundleValidator().validate_current_library(allow_signatures=allow_signatures)
+        # A pipe whose dry run fails is the invalid verdict, one located dry_run item per failing pipe,
+        # through the same cascade and item builder as `validate bundle`.
+        with translate_to_validate_bundle_error():
+            dry_run_results = await BundleValidator().validate_current_library(allow_signatures=allow_signatures)
 
         # pending_signatures is the library-wide set of still-unimplemented forward declarations;
         # is_runnable = not pending. `validate all` now makes a strict runnability claim (the consumer
@@ -165,8 +168,11 @@ async def validate_pipe_core(
             with translate_to_validate_bundle_error():
                 library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
+        # The entry-pipe lookup stays outside the cascade: a code naming no pipe is no verdict. A pipe whose
+        # dry run fails is the invalid verdict, one located dry_run item per failing pipe, as on `validate bundle`.
         the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
-        dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
+        with translate_to_validate_bundle_error():
+            dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
 
         return {
             "success": True,

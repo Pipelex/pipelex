@@ -1,4 +1,5 @@
 from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -66,7 +67,19 @@ class StorageDeliveryError(DeliveryError):
 
 
 class DryRunError(PipelexError):
-    """Raised when a dry run fails due to missing inputs or other validation issues."""
+    """Raised when a dry run fails. The validation sweep raises it with one failure per pipe whose dry run
+    failed, located at the innermost failing pipe, so a controller that failed because a pipe it runs
+    failed is reported once, at that pipe. Bundle validation reports each failure as its own ``dry_run``
+    item, with the error type ``DryRunError``, the pipe's code, domain and source, and a message that
+    keeps the failure's own text only when that text is caller-facing and otherwise names the failure's
+    title.
+
+    Raised elsewhere it may carry no failures, and validation then reports it as one item.
+    """
+
+    def __init__(self, message: str, *, failures: list[DryRunFailureErrorData] | None = None):
+        self.failures = failures or []
+        super().__init__(message)
 
 
 class DryRunGraphNotProducedError(DryRunError):
