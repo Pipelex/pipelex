@@ -42,7 +42,10 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.dev_cli.commands.projection_reference import (
     ENVELOPE_CONTENT_KEY,
+    JSON_CONTENT_KEY,
+    NATIVE_JSON,
     keeps_envelope,
+    native_code,
     project_concept_comments,
     project_inputs_template,
 )
@@ -143,19 +146,14 @@ DIVERGENCE_ITEMS: dict[str, str] = {
 # that carries nothing else; where a corpus bundle would otherwise mix it with slots that do shape,
 # the bundle isolates it instead of widening the declaration.
 #
-# Two gaps are declared. `L-260830-191719` is the nested-list descriptor gap (`matrix` in `Widget`),
-# which takes both shapes of both probe pipes that reach it. `L-260902-10eb56` is `native.Anything`,
-# which is why `scaffold_anything_slot` holds that native alone: its template value is the empty
-# object every `unknown` node renders, and the shaper accepts a bare string alone at an `Anything`
-# position — so the contract publishes a template the runtime cannot take back. Each fix deletes its
-# own entries and regenerates.
+# One gap is declared: `L-260830-191719`, the nested-list descriptor gap (`matrix` in `Widget`),
+# which takes both shapes of both probe pipes that reach it. Its fix deletes its entries and
+# regenerates.
 EXPECTED_UNSHAPEABLE: dict[tuple[str, str], str] = {
     ("input_semantics_probe.probe_markers", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_markers", EXPLICIT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", EXPLICIT_SHAPE): "L-260830-191719",
-    ("input_semantics_scaffold.scaffold_anything_slot", COMPACT_SHAPE): "L-260902-10eb56",
-    ("input_semantics_scaffold.scaffold_anything_slot", EXPLICIT_SHAPE): "L-260902-10eb56",
 }
 
 
@@ -236,16 +234,15 @@ def _write_text(*, path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _engine_dict_placeholder(*, path: list[str]) -> dict[str, str]:
+def _engine_dict_placeholder(*, field_name: str) -> dict[str, str]:
     """What the engine renders at a dict-typed field, which is exactly where the descriptor says `unknown`.
 
     `ConceptRepresentationGenerator._generate_dict_value` returns `{f"{name}_key": f"{name}_value"}`,
     and `generate_field_value` is its only caller — dispatched on `origin is dict`, the same test that
     makes the input-form deriver state the node as `unknown`. A dict inside a list never reaches it
     (`_generate_list_value` routes items through `_generate_basic_value`, which returns no dicts), so
-    the placeholder is always keyed by the field's own name — the last segment of the walk's path.
+    the placeholder is always keyed by the field's own name.
     """
-    field_name = path[-1]
     return {f"{field_name}_key": f"{field_name}_value"}
 
 
@@ -274,6 +271,8 @@ class DivergenceCollector:
         self.examples: dict[str, list[DivergenceExample]] = {}
         self.unclassified: list[str] = []
         self._fixed_counts: dict[tuple[str, ...], int] = {}
+        self._json_slot_paths: set[tuple[str, ...]] = set()
+        self._json_list_slot_paths: set[tuple[str, ...]] = set()
 
     def register_fixed_counts(self, *, pipe_ref: str, descriptor: PipeInputFormDescriptor) -> None:
         """Record where this pipe's descriptor declares a fixed element count, by the path the walk meets.
@@ -299,6 +298,28 @@ class DivergenceCollector:
             else:
                 self._fixed_counts[pipe_ref, COMPACT_SHAPE, field.name] = field.item_count
 
+    def register_json_unwraps(self, *, pipe_ref: str, descriptor: PipeInputFormDescriptor) -> None:
+        """Record where this pipe's compact shape unwraps a `native.JSON` slot, by the path the walk meets.
+
+        The compact shape renders a `JSON` slot, or each item of a `JSON[]` slot, as the object its
+        `json_obj` holds, so the walk meets the engine's dict placeholder at the slot's own path (or
+        at an item's index) rather than at a segment named `json_obj`. The placeholder is keyed by
+        the field that holds the dict, which only the descriptor can name there. Only top-level slots
+        unwrap: a `JSON` node nested in a structure keeps its content form in both shapes.
+        """
+        for field in descriptor.fields:
+            if isinstance(field, ListField):
+                if native_code(node=field.item) == NATIVE_JSON:
+                    self._json_list_slot_paths.add((pipe_ref, COMPACT_SHAPE, field.name))
+            elif native_code(node=field) == NATIVE_JSON:
+                self._json_slot_paths.add((pipe_ref, COMPACT_SHAPE, field.name))
+
+    def _dict_field_name(self, *, path: list[str]) -> str:
+        """The name of the field holding the dict at `path`: its last segment, unless an unwrapped `JSON` slot sits there."""
+        if tuple(path) in self._json_slot_paths or tuple(path[:-1]) in self._json_list_slot_paths:
+            return JSON_CONTENT_KEY
+        return path[-1]
+
     def _record(self, *, divergence_id: str, path: list[str], engine: Any, expected: Any) -> None:
         self.counts[divergence_id] = self.counts.get(divergence_id, 0) + 1
         sites = self.examples.setdefault(divergence_id, [])
@@ -323,7 +344,8 @@ class DivergenceCollector:
         # time: a projection rendering nothing where the engine renders an object is one fact, not N.
         # Reached by the required dict inside `native.JSON` — `json_obj`, whose descriptor node is
         # `unknown` like every dict field, so the projection renders the empty object while the
-        # engine fills it with a sample key. The corpus's optional dict fields never reach here:
+        # engine fills it with a sample key. In the compact shape that dict is the slot's whole value,
+        # `json_obj` unwrapped, which is why the placeholder's key comes from `_dict_field_name`. The corpus's optional dict fields never reach here:
         # the engine drops those entirely, which is `optional-field-included`.
         #
         # Recognised by the engine's own placeholder rather than by the empty object alone, because
@@ -336,7 +358,8 @@ class DivergenceCollector:
         # what makes the descriptor node `unknown`. A non-matching value falls through to the dict
         # walk below, where each key the projection dropped is `engine-only-field` and the capture
         # refuses.
-        if isinstance(engine_value, dict) and projected_value == {} and engine_value == _engine_dict_placeholder(path=path):
+        engine_placeholder = _engine_dict_placeholder(field_name=self._dict_field_name(path=path))
+        if isinstance(engine_value, dict) and projected_value == {} and engine_value == engine_placeholder:
             self._record(divergence_id="unknown-empty-object", path=path, engine=engine_value, expected=projected_value)
             return
         if (
@@ -551,6 +574,7 @@ def _capture_pipe(
     templates_dir = output_dir / TEMPLATES_DIR_NAME
     engine_dir = output_dir / ENGINE_DIR_NAME
     collector.register_fixed_counts(pipe_ref=pipe.pipe_ref, descriptor=descriptor)
+    collector.register_json_unwraps(pipe_ref=pipe.pipe_ref, descriptor=descriptor)
     for explicit in (False, True):
         shape = EXPLICIT_SHAPE if explicit else COMPACT_SHAPE
         template, json_text, toml_text = _render_projection(descriptor=descriptor, explicit=explicit)

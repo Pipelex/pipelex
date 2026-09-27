@@ -166,6 +166,16 @@ description = "A condensed version of a longer text"
 refines = "Text"
 ```
 
+### Refining JSON
+
+Data you already have as JSON objects is best named by a concept refining `JSON`. It takes the object exactly as you have it, with no structure to write, and its name and description say what the object means. See [Choosing among `Anything`, `JSON` and `Dynamic`](native-concepts.md#choosing-among-anything-json-and-dynamic).
+
+```toml
+[concept.Order]
+description = "A customer order, as the shop's API returns it"
+refines = "JSON"
+```
+
 ### Building Concept Hierarchies
 
 You can build hierarchies by refining concepts that have their own structures. The refined concept inherits the structure from the base concept:

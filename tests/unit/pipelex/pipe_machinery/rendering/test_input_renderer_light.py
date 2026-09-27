@@ -83,6 +83,20 @@ class TestInputRendererLight:
         entry = {"concept": "native.Anything", "content": {"whatever": "value"}}
         assert _delighten_entry(entry, kind=InputKind.DYNAMIC) == entry
 
+    def test_json_unwraps_to_the_bare_object(self) -> None:
+        """A JSON input's ``{"json_obj": ...}`` content becomes the bare object the caller has."""
+        entry: dict[str, Any] = {"concept": "native.JSON", "content": {"json_obj": {}}}
+        assert _delighten_entry(entry, kind=InputKind.JSON) == {}
+
+    def test_json_multiple_unwraps_to_a_list_of_bare_objects(self) -> None:
+        entry: dict[str, Any] = {"concept": "native.JSON", "content": [{"json_obj": {"a": 1}}, {"json_obj": {}}]}
+        assert _delighten_entry(entry, kind=InputKind.JSON) == [{"a": 1}, {}]
+
+    def test_anything_keeps_the_whole_envelope(self) -> None:
+        """An `Anything` input keeps its envelope: the bare placeholder `{}` would read as "send an object"."""
+        entry: dict[str, Any] = {"concept": "native.Anything", "content": {}}
+        assert _delighten_entry(entry, kind=InputKind.ANYTHING) == entry
+
     def test_scalar_with_extra_required_fields_falls_back_to_envelope(self) -> None:
         """A scalar whose content is not a single field can't be delightened losslessly — keep the envelope."""
         entry = {"concept": "demo.Weird", "content": {"text": "t", "extra": "x"}}

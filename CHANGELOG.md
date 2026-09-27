@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A bare string at an `Anything` input is an `Anything` value (Breaking)**: it becomes a `native.Anything` stuff holding text, where it used to become a `native.Text` stuff.
+- **A `JSON` input reads a JSON object literally (Breaking)**: a bare string at a `JSON` input is refused instead of becoming `native.Text`, the compact inputs template of a `JSON` input is the bare object rather than the envelope `{"concept": "native.JSON", "content": {"json_obj": …}}`, and a `JSONContent` holding a value JSON cannot encode, such as a date or a set, raises a pydantic `ValidationError` instead of a `TypeError`.
+- **An envelope-shaped item of a bare `Anything[]` or `JSON[]` list is refused (Breaking)**: an item holding `concept` and `content` keys is no longer read as data; wrap the whole list in one envelope to type it.
+- **A value the fallback has no reading for is a `StructureValidationError` (Breaking)**: at a `Dynamic` or container-native input, a bare value the bottom-up reading cannot build, such as a list of plain objects, raises `StructureValidationError` naming the input and its concept instead of an unnamed `StuffFactoryError`, and its next step names the declaration that reads the value (`JSON`, `JSON[]`, `Anything` or `Anything[]`) when one does.
+- **An explicit single value at a fixed-count input is refused (Breaking)**: an envelope holding one value at a `Concept[N]` input raises `MultiplicityCountMismatchError` instead of being stored as a single value.
+- **NaN and the infinities are refused at `Number`, `JSON` and `Anything` inputs (Breaking)**: a TOML inputs file can spell `nan` and `inf`, which JSON cannot hold, so a `Number` or `Anything` input given one raises `WrongScalarKindError`, and an object holding one anywhere inside it raises `StructureValidationError`, where each used to store a number that JSON serialization turns into `null`. A `JSONContent` or a `NumberContent` holding one raises a pydantic `ValidationError`, which is also what an explicit envelope building one reports.
+- **Chaining an `Anything` value through `--with-memory` changes it (Breaking)**: an `Anything` stuff's content is dumped as its content class's fields, so a bare `"hi"` sent to an `Anything` input is dumped as `{"text": "hi"}`, and a method reading that memory at an `Anything` input receives that object rather than the string; a list is dumped as one object holding its `items`. It used to travel as `native.Text`, since a bare string at an `Anything` input became a `native.Text` stuff.
+- **The `Anything` input schema excludes array and null**: the JSON Schema published for an `Anything` input carries `"not": {"type": ["array", "null"]}`, and so does each item of an `Anything[]` input's schema.
+
+### Fixed
+
+- **`Anything` inputs take any JSON value**: a string, a number, a boolean, an object or a date at an `Anything` input becomes its natural content under the `Anything` concept, `Anything[]` takes a list of them, a prebuilt list mixing contents of different kinds included, and a typed envelope keeps its own concept; they used to be refused, a bare string aside. A sequence declaring an `Anything` output over a narrower last step now validates.
+- **`JSON` inputs take objects and lists of objects**: a JSON object at a `JSON` input, and a list of them at a `JSON[]` input, now build, where a list of plain objects used to be refused with an error naming neither the input nor its concept.
+- **A single `Anything` value survives the transport boundary**: a stuff whose concept is `native.Anything` keeps its content's class through `dump_for_transport` and hydration, which a distributed or sandboxed run relies on; hydration used to fail looking for an `AnythingContent` class.
+- **A composite nested in an `Anything` value or in another composite survives transport**: its components, a nested composite and a list of composites included, come back through hydration as typed contents, where they came back as dicts carrying class markers.
+- **The result files of an `Anything` output render its value**: a delivery whose main output is `Anything` renders `main_stuff.json`, `.md` and `.html` from the hydrated content, where it fell back to a raw dump of the transport form.
+- **A prebuilt list is refused where one value belongs**: a `ListContent` given as an item of a plural input, or as the content of an `Anything` envelope at a single input, is refused instead of being stored nested or in a singular slot.
+
 ## [v0.68.0] - 2026-09-27
 
 ### Highlights

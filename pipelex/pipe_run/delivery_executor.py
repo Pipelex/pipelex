@@ -287,14 +287,15 @@ class DeliveryExecutor:
             if concept is None:
                 log.warning(f"Local hydration failed for delivery main stuff, falling back to raw render: concept '{concept_ref}' not known locally")
                 return None
-            registry = get_class_registry()
-            item_class = registry.get_class(name=concept.structure_class_name)
-            if item_class is None or not issubclass(item_class, StuffContent):
-                log.warning(
-                    f"Local hydration failed for delivery main stuff, falling back to raw render: "
-                    f"class '{concept.structure_class_name}' not registered locally"
-                )
-                return None
+            # A structureless concept (`native.Anything`) names no class to look up: its content carries its own.
+            if concept.declares_a_structure_class:
+                item_class = get_class_registry().get_class(name=concept.structure_class_name)
+                if item_class is None or not issubclass(item_class, StuffContent):
+                    log.warning(
+                        f"Local hydration failed for delivery main stuff, falling back to raw render: "
+                        f"class '{concept.structure_class_name}' not registered locally"
+                    )
+                    return None
             content = hydrate_content(concept=concept, raw_content=stuff_raw["content"])
             return Stuff(
                 stuff_code=stuff_raw["stuff_code"],
