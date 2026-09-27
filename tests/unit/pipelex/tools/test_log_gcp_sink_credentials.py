@@ -126,7 +126,7 @@ def _refreshed() -> None:
     return None
 
 
-def _write_service_account_key(*, path: Path, token_uri: str) -> None:
+def _write_service_account_key(*, path: Path, token_uri: str, project_id: str | None = "a-test-project") -> None:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     private_key_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -135,13 +135,14 @@ def _write_service_account_key(*, path: Path, token_uri: str) -> None:
     ).decode()
     key_info = {
         "type": "service_account",
-        "project_id": "a-test-project",
         "private_key_id": "0123456789abcdef",
         "private_key": private_key_pem,
         "client_email": "pipelex-test@a-test-project.iam.gserviceaccount.com",
         "client_id": "123456789",
         "token_uri": token_uri,
     }
+    if project_id is not None:
+        key_info["project_id"] = project_id
     path.write_text(json.dumps(key_info), encoding="utf-8")
 
 
@@ -290,9 +291,33 @@ class TestGcpLogSinkCredentials:
         assert "gcloud auth application-default login" in message
         assert isinstance(exc_info.value.__cause__, google_auth_exceptions.DefaultCredentialsError)
 
-    def test_a_malformed_key_file_stops_the_boot_naming_the_file(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        ("key_content", "failure_type"),
+        [
+            (None, FileNotFoundError),
+            ("", json.JSONDecodeError),
+            ("not json", json.JSONDecodeError),
+            (json.dumps({"type": "service_account"}), google_auth_exceptions.MalformedError),
+            (
+                json.dumps(
+                    {
+                        "type": "service_account",
+                        "private_key": "-----BEGIN PRIVATE KEY-----\nnot a key\n-----END PRIVATE KEY-----\n",
+                        "client_email": "pipelex-test@a-test-project.iam.gserviceaccount.com",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                ),
+                ValueError,
+            ),
+        ],
+    )
+    def test_a_key_file_that_cannot_be_loaded_stops_the_boot_naming_the_file(
+        self, tmp_path: Path, key_content: str | None, failure_type: type[Exception]
+    ) -> None:
+        """A missing file, one that is not JSON, and one whose key is incomplete or not a key each raise something else from the library."""
         key_path = tmp_path / "key.json"
-        key_path.write_text(json.dumps({"type": "service_account"}), encoding="utf-8")
+        if key_content is not None:
+            key_path.write_text(key_content, encoding="utf-8")
 
         with pytest.raises(GcpLogSinkCredentialsError) as exc_info:
             make_gcp_log_sink(config=GcpLogSinkConfig(log_name="pipelex", project_id="a-test-project", credentials_file_path=str(key_path)))
@@ -300,6 +325,21 @@ class TestGcpLogSinkCredentials:
         message = str(exc_info.value)
         assert f"could not load the service-account key at '{key_path}'" in message
         assert "credentials_file_path" in message
+        assert "'json' sink" in message
+        assert isinstance(exc_info.value.__cause__, failure_type)
+
+    def test_a_key_file_without_a_project_is_not_a_credentials_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """The client raises ``OSError`` when no project can be determined, which the key file's catch must not relabel."""
+        for variable in ("GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT"):
+            monkeypatch.delenv(variable, raising=False)
+        mocker.patch("google.cloud.client._determine_default_project", return_value=None)
+        key_path = tmp_path / "key.json"
+        _write_service_account_key(path=key_path, token_uri="http://127.0.0.1:9/token", project_id=None)
+
+        with pytest.raises(OSError, match="Project was not passed"):
+            make_gcp_log_sink(config=GcpLogSinkConfig(log_name="pipelex", credentials_file_path=str(key_path)))
 
     def test_a_key_google_refuses_stops_the_boot_before_the_transport_starts(self, tmp_path: Path, refusing_token_endpoint: str) -> None:
         """The reported failure end to end: the client the factory builds, the refresh of the credentials it holds, the refusal it meets."""

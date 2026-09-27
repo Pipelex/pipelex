@@ -592,6 +592,14 @@ def _credentials_remedy(*, config: GcpLogSinkConfig) -> str:
     return "Point `credentials_file_path` in [runtime.log.gcp] at a valid service-account key"
 
 
+def _unloaded_credentials_message(*, source: str, remedy: str, failure: Exception) -> str:
+    """What stops the boot when the credentials could not be loaded at all."""
+    return (
+        f"The '{LogSinkMethod.GCP}' log sink could not load {source} to write to Google Cloud Logging with "
+        f"({describe_failure(failure=failure)}). {remedy}, or select the '{LogSinkMethod.JSON}' sink in [runtime.log]."
+    )
+
+
 def confirm_credentials_at_boot(*, credentials_check: GcpCredentialsCheck, remedy: str) -> None:
     """Refresh the credentials once before the transport starts, and stop the boot when Google refuses them.
 
@@ -636,13 +644,15 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
     another sink never loads it, and one that selected this sink without the extra fails here, at
     boot, with the extra and the ``json`` alternative named.
 
-    Where the credentials are proved: the client is built exactly as the library builds it, and the
-    credentials it holds are refreshed once before the transport's thread starts, so a boot whose
-    credentials Google refuses stops here naming them rather than losing every record in silence.
+    Where the credentials are proved: a key file that cannot be read or holds no valid key, and
+    Application Default Credentials that cannot be found, stop the boot before the client exists; the
+    credentials the client then holds are refreshed once before the transport's thread starts, so a
+    boot whose credentials Google refuses stops here naming them rather than losing every record in
+    silence.
 
     Raises:
         MissingDependencyError: If ``google-cloud-logging`` is not installed.
-        GcpLogSinkCredentialsError: If no credentials can be loaded, or Google refuses them.
+        GcpLogSinkCredentialsError: If the credentials cannot be loaded, or Google refuses them.
 
     """
     try:
@@ -652,6 +662,7 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
         from google.cloud.logging_v2.handlers.transports import (  # ruff: ignore[import-outside-top-level]
             BackgroundThreadTransport,
         )
+        from google.oauth2 import service_account as google_service_account  # ruff: ignore[import-outside-top-level]
     except ImportError as exc:
         msg = (
             f"The '{LogSinkMethod.GCP}' log sink writes to Google Cloud Logging through the client library. "
@@ -668,20 +679,27 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
     source = _credentials_source(config=config)
     remedy = _credentials_remedy(config=config)
     client: Any
-    try:
-        if config.credentials_file_path is not None:
-            client = cloud_logging.Client.from_service_account_json(  # pyright: ignore[reportUnknownMemberType]
-                config.credentials_file_path,
-                project=config.project_id,
+    if config.credentials_file_path is not None:
+        # The key is loaded apart from the client, so that the catch covers the file and nothing else: a
+        # key file that is missing or unreadable raises ``OSError``, and one that is not JSON or holds no
+        # valid key raises ``ValueError``, the auth library's ``MalformedError`` among them. The client
+        # raises ``OSError`` too when no project can be determined, which is not a credentials failure.
+        # Handed the key, it takes the project from it when ``project_id`` is unset, as the library's own
+        # ``from_service_account_json`` does.
+        try:
+            key_credentials = google_service_account.Credentials.from_service_account_file(  # pyright: ignore[reportUnknownMemberType]
+                config.credentials_file_path
             )
-        else:
+        except (OSError, ValueError) as exc:
+            msg = _unloaded_credentials_message(source=source, remedy=remedy, failure=exc)
+            raise GcpLogSinkCredentialsError(msg) from exc
+        client = cloud_logging.Client(project=config.project_id, credentials=key_credentials)
+    else:
+        try:
             client = cloud_logging.Client(project=config.project_id)
-    except google_auth_exceptions.DefaultCredentialsError as exc:
-        msg = (
-            f"The '{LogSinkMethod.GCP}' log sink could not load {source} to write to Google Cloud Logging with "
-            f"({describe_failure(failure=exc)}). {remedy}, or select the '{LogSinkMethod.JSON}' sink in [runtime.log]."
-        )
-        raise GcpLogSinkCredentialsError(msg) from exc
+        except google_auth_exceptions.DefaultCredentialsError as exc:
+            msg = _unloaded_credentials_message(source=source, remedy=remedy, failure=exc)
+            raise GcpLogSinkCredentialsError(msg) from exc
 
     # The object the client authenticates every call with, after the scoping it applied: refreshing it
     # proves the credentials the transport will use, and for credentials that fetch a token, the token
