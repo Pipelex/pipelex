@@ -560,3 +560,6 @@ method-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
 class-rgx = "^(?!.$)[A-Z_][a-zA-Z0-9_]*$"
 typevar-rgx = "^[A-Za-z_][A-Za-z0-9_]*$"
 good-names = ["_"]
+
+[tool.uv.sources]
+mthds = { git = "https://github.com/mthds-ai/mthds-python.git", rev = "a32f07a89f3bc9d71fe87e6e637f24621c3bef67" }
