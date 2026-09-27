@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 GCP_LOGGING_DEPENDENCY_NAME = "google-cloud-logging"
 GCP_LOGGING_EXTRA_NAME = "gcp-logging"
 
-# The sink writes five of the ``json`` sink's keys into the payload — its ``message``, ``logger`` and
+# The sink writes some of the ``json`` sink's keys into the payload — its ``message``, ``logger`` and
 # ``exception``, and the ``pipelex.trace_id`` and ``pipelex.span_id`` of the held Pipelex span, all
 # imported rather than respelled — and reserves that sink's whole set against a carried attribute, so one
 # field keeps one wire name whichever of the two a process selects. ``time`` and ``severity`` are not
