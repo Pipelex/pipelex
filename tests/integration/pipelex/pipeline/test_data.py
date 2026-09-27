@@ -299,3 +299,97 @@ template    = "Standard: $parcel"
     LANE_OUTCOMES: ClassVar[str] = '{ express = "send_express", standard = "send_standard", reject = "fail" }'
     # Every outcome, and the default, refuse the run.
     ALL_FAIL_OUTCOMES: ClassVar[str] = '{ reject = "fail" }'
+
+    # The literal a lane the condition holds renders to, text of the expression the absence reason must not quote.
+    HELD_LANE_LITERAL: ClassVar[str] = "hold_at_the_depot_quietly"
+    # A sequence whose condition resolves a held lane to 'continue', and whose next step force-unwraps its absent result.
+    CONTINUE_THEN_FORCE_MTHDS: ClassVar[str] = """
+domain      = "condition_faults_routing"
+description = "Stamp a parcel once it is routed down a lane"
+main_pipe   = "route_and_stamp"
+
+[concept]
+Parcel = "A parcel waiting at the sorting bench"
+
+[pipe.route_and_stamp]
+type        = "PipeSequence"
+description = "Route the parcel, then stamp it"
+inputs      = { parcel = "Parcel", lane = "Text" }
+output      = "Parcel"
+steps       = [{ pipe = "route_parcel", result = "routed" }, { pipe = "stamp_parcel", result = "stamped" }]
+
+[pipe.route_parcel]
+type                = "PipeCondition"
+description         = "Choose the lane a parcel goes down, or hold it"
+inputs              = { parcel = "Parcel", lane = "Text" }
+output              = "Parcel?"
+expression_template = "{% if lane.text == 'hold' %}hold_at_the_depot_quietly{% else %}standard{% endif %}"
+outcomes            = { standard = "send_standard" }
+default_outcome     = "continue"
+
+[pipe.send_standard]
+type        = "PipeCompose"
+description = "Note the parcel onto the standard lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Standard: $parcel"
+
+[pipe.stamp_parcel]
+type        = "PipeCompose"
+description = "Stamp the routed parcel, which must be present"
+inputs      = { routed = "Parcel!" }
+output      = "Parcel"
+template    = "Stamped: $routed"
+"""
+
+
+class ConditionExpressionParseTestData:
+    """Bundles whose `PipeCondition` declares an expression that does not parse."""
+
+    # A template whose second line opens a tag Jinja2 does not know.
+    UNKNOWN_TAG_TEMPLATE_MTHDS: ClassVar[str] = '''
+domain      = "condition_faults_routing"
+description = "Send a parcel down the lane the request names"
+main_pipe   = "route_parcel"
+
+[concept]
+Parcel = "A parcel waiting at the sorting bench"
+
+[pipe.route_parcel]
+type                = "PipeCondition"
+description         = "Choose the lane a parcel goes down"
+inputs              = { parcel = "Parcel", lane = "Text" }
+output              = "Parcel"
+expression_template = """{% if lane == 'express' %}express{% else %}standard
+{% frobnicate_the_parcel %}{% endif %}"""
+outcomes            = { express = "send_express", standard = "send_standard" }
+default_outcome     = "send_standard"
+
+[pipe.send_express]
+type        = "PipeCompose"
+description = "Note the parcel onto the express lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Express: $parcel"
+
+[pipe.send_standard]
+type        = "PipeCompose"
+description = "Note the parcel onto the standard lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Standard: $parcel"
+'''
+
+    # A caller's bundle that is valid on its own, validated beside a host library holding an unparsable condition.
+    VALID_CALLER_MTHDS: ClassVar[str] = """
+domain      = "harbour_notices"
+description = "Post notices on the harbour board"
+main_pipe   = "write_board_notice"
+
+[pipe.write_board_notice]
+type        = "PipeLLM"
+description = "Write the notice for the harbour board"
+inputs      = { tide_times = "Text" }
+output      = "Text"
+prompt      = "Write a short notice for the harbour board from these tide times: $tide_times"
+"""
