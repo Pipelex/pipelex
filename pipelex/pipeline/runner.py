@@ -32,6 +32,7 @@ from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.caller_identity import CallerIdentity
+from pipelex.system.job_metadata import validate_request_id
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -169,6 +170,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
+        request_id: str | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a pipeline and wait for its completion.
 
@@ -204,6 +206,14 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         delivery_assignment:
             Internal delivery hook used by the API layer (in-process, not a
             wire extension).
+        request_id:
+            The inbound request id the host is serving, put on the run's
+            ``RunMetadata.request_id`` so every log line of the run, on
+            whichever worker runs it, and the run's error reports carry it.
+            An in-process host hook, like ``delivery_assignment``, not a wire
+            extension. It must be one to 128 printable ASCII characters: any
+            other value is the host's bug, refused with a ``ValueError``
+            before the run is set up.
 
         Returns:
         -------
@@ -217,6 +227,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         if extra:
             msg = f"The local runtime defines no extension args; got {sorted(extra)}."
             raise PipelineRequestError(msg)
+        # Refused here, before the `try`: `RunMetadata` would refuse it inside the setup, where the
+        # `ValidationError` arm below would report the host's bug as the caller's invalid input.
+        if request_id is not None:
+            validate_request_id(value=request_id)
 
         created_at = datetime.now(UTC).isoformat()
 
@@ -254,6 +268,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 extras=self.extras,
                 inputs_base_dir=self.inputs_base_dir,
                 library_dirs_are_callers=self.library_dirs_are_callers,
+                request_id=request_id,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
             pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)

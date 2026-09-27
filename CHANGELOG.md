@@ -6,6 +6,7 @@
 
 - **`PipelexKernel.log_context()` and `JobMetadata.log_context()`**: `JobMetadata.log_context()` binds a job's `request_id`, `pipeline_run_id` and `pipe_run_id` onto the log context in one call, and `PipelexKernel.log_context()` binds a kernel run's `request_id` and `pipeline_run_id`, which a host wraps its run in so the lines it emits between kernel calls name the run.
 - **`PipelexKernel.make` takes `request_id` and `pipeline_run_id`**: a kernel-driven run can now carry the inbound request id a hosted deployment filters its logs on, and name itself with an id the host chooses. A host inside a replay-based executor passes a `pipeline_run_id` or a trace context, since the default `uuid4` changes on every replay; a trace context and a `pipeline_run_id` that disagree, or an empty `pipeline_run_id`, raise `ValueError`.
+- **`PipelexMTHDSProtocol.execute` takes `request_id`**: a host running `execute` passes the inbound request id, which the run's `RunMetadata` carries, so the log lines of a run dispatched to a distributed orchestrator's workers carry `request_id` as a direct run's do. A value that is not one to 128 printable ASCII characters is refused with a `ValueError` before the run is set up, where it used to surface as a `PipeExecutionError` blaming the caller's input; the constraint is stated once, as `validate_request_id` in `pipelex.system.job_metadata`, which `RunMetadata` applies too.
 
 ### Fixed
 
