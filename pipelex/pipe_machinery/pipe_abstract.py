@@ -980,9 +980,10 @@ class PipeAbstract(ABC, BaseModel):
             # Run pipe ------------------------------------------------------------
 
             # The span is the Pipelex span active here until it ends, whichever way it ends, so a log
-            # line inside the run is joined to it. OpenTelemetry's current context is left alone, so a
-            # host's own instrumentation is never re-parented, and the span's children still take their
-            # parent from `child_metadata`.
+            # line inside the run names it under `pipelex.*`. OpenTelemetry's current context is left
+            # alone, so a host's own instrumentation is never re-parented and a line's standard trace
+            # fields keep naming the host's span, and the span's children still take their parent from
+            # `child_metadata`.
             with pipelex_span_active(span=span):
                 try:
                     pipe_output = await self._live_run_pipe(
@@ -1168,7 +1169,7 @@ class PipeAbstract(ABC, BaseModel):
             attributes=span_attributes,
         )
 
-        # Debug logging, under the span it announces, so the line's trace context names that span
+        # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
         span_ctx = span.get_span_context()
         with pipelex_span_active(span=span):
             log.verbose(

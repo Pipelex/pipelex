@@ -1,5 +1,5 @@
 ---
-status: draft
+status: landed
 item: L-260927-6b356b
 ---
 
@@ -28,6 +28,7 @@ The design is [`design.md`](design.md). The work is one pull request on `feature
 - `pipelex-api/docs/logging.md:28` describes the trace fields as present on any line inside a traced run, which stops being true: L-260927-a12b10, owned by `pipelex-api`.
 - `pipelex-server/docs/logging.md:14` describes the trace fields without the Pipelex ones: L-260927-4e4777, owned by `pipelex-server` and related to L-260927-f30932, which changes the same paragraph again when the hosted plane opts in.
 
-## Open question
+## Decided while building
 
-- **Release together with L-260927-f30a84, or alone?** Alone, the change opens the window the design's "What it costs" names for an operator who exports Pipelex's spans to their own backend. The recommendation is to land this independently, since it is small and the opt-in is not, and to release it alone unless the opt-in is ready for the same release; the CHANGELOG entry covers the window either way.
+- **Landed independently of L-260927-f30a84**, as the plan recommended: the change is small and the opt-in is not. Whether they ship in one release is the release's call; the CHANGELOG entry tells an operator exporting Pipelex's spans to join on `pipelex.trace_id` meanwhile.
+- **Beyond the steps above**, the `json`/`gcp` payload-parity test gained the two `pipelex.*` keys (same spelling under both sinks, prefixed under both when a field collides), the client-library contract test drives `trace`, `span_id` and `trace_sampled` through the real worker queue and `Batch.log` rather than a hand-built entry, and the comments at the `pipelex_span_active` call sites (`pipe_abstract.py`, `llm_worker_abstract.py`, `bedrock_client_boto3.py`) say which fields the held span now reaches.

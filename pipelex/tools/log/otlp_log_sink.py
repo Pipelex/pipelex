@@ -5,11 +5,13 @@ is the body, the level maps onto the OTel severity scale, the record's fields, c
 ``data`` ride as attributes, with a value the wire cannot carry as is written as JSON text, and an
 exception lands under the ``exception.*`` semantic-convention keys, the stacktrace being the record's
 rendered exception text so that what the redaction processor scrubbed is what leaves. The
-semantic-convention keys the sink writes itself — the source location and the exception — are reserved
-whether or not the record carries an exception, exactly as the ``json`` sink reserves its own keys: a
-field named like one is carried under the same ``field_`` prefix, so the same field survives a change of
-sink. Each record is filed under the Pipelex span active when it was logged, a pipe's or an LLM
-call's, or, outside one, under OpenTelemetry's current span, which is only read. The records the sink's
+semantic-convention keys the sink writes itself — the source location, the ``pipelex.trace_id`` and
+``pipelex.span_id`` of the Pipelex span and the exception — are reserved whether or not the record
+carries them, exactly as the ``json`` sink reserves its own keys: a field named like one is carried under
+the same ``field_`` prefix, so the same field survives a change of sink. Each record is filed under
+OpenTelemetry's current span when it was logged, the host's own, which is only read, and under no span
+when it names no trace; the Pipelex span held when it was logged, a pipe's or an LLM call's, rides beside
+it as the two ``pipelex.*`` attributes, in hex, whether or not it is also the current span. The records the sink's
 own export path emits, the SDK's and the transport's, are rejected by a filter on the handler and never
 exported. This module imports the OpenTelemetry SDK at load, which is why the built-in plugin imports it
 inside the ``otlp`` factory and nowhere else.
@@ -25,6 +27,7 @@ from typing import TYPE_CHECKING, Any, cast
 from opentelemetry._logs import SeverityNumber  # ruff: ignore[import-private-name]
 from opentelemetry.context import (
     _SUPPRESS_INSTRUMENTATION_KEY,  # ruff: ignore[import-private-name] # pyright: ignore[reportPrivateUsage]
+    get_current,
     get_value,
 )
 from opentelemetry.sdk._logs import LoggerProvider  # ruff: ignore[import-private-name]
@@ -32,7 +35,7 @@ from opentelemetry.semconv._incubating.attributes import code_attributes  # ruff
 from opentelemetry.semconv.attributes import exception_attributes
 from typing_extensions import override
 
-from pipelex.system.telemetry.current_span import otel_context_for_logs
+from pipelex.system.telemetry.current_span import PIPELEX_SPAN_ID_KEY, PIPELEX_TRACE_ID_KEY, pipelex_trace_fields_for_logs
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
 from pipelex.tools.log.log_sink import LogSink, render_json
@@ -64,6 +67,8 @@ RESERVED_ATTRIBUTE_KEYS = frozenset(
         code_attributes.CODE_FILE_PATH,
         code_attributes.CODE_FUNCTION_NAME,
         code_attributes.CODE_LINE_NUMBER,
+        PIPELEX_TRACE_ID_KEY,
+        PIPELEX_SPAN_ID_KEY,
         exception_attributes.EXCEPTION_TYPE,
         exception_attributes.EXCEPTION_MESSAGE,
         exception_attributes.EXCEPTION_STACKTRACE,
@@ -146,7 +151,7 @@ class OtlpLogHandler(logging.Handler):
             logger.emit(
                 timestamp=int(record.created * 1e9),
                 observed_timestamp=time_ns(),
-                context=otel_context_for_logs(),
+                context=get_current(),
                 severity_text=_severity_text(levelname=record.levelname),
                 severity_number=_severity_number(levelno=record.levelno),
                 body=record.getMessage(),
@@ -168,7 +173,7 @@ class OtlpLogHandler(logging.Handler):
 
     @staticmethod
     def _attributes(*, record: logging.LogRecord) -> dict[str, Any]:
-        """The record's source location, its exception and everything it carries, the sink's own keys first.
+        """The record's source location, the held Pipelex span, its exception and everything it carries, the sink's own keys first.
 
         The sink's keys go down before the carried attributes so that a field named like one is prefixed
         rather than silently overwriting the location or the exception it names — and the reservation covers
@@ -180,6 +185,7 @@ class OtlpLogHandler(logging.Handler):
             code_attributes.CODE_FUNCTION_NAME: record.funcName,
             code_attributes.CODE_LINE_NUMBER: record.lineno,
         }
+        attributes.update(pipelex_trace_fields_for_logs())
         if record.exc_info:
             exc_type, exc_value, exc_traceback = record.exc_info
             if exc_type is not None:
