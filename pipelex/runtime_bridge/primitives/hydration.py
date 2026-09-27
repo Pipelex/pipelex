@@ -72,6 +72,10 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
     if class_name is not None:
         item_class = get_class_registry().get_required_subclass(name=class_name, base_class=StuffContent)
         clean_item = {key: val for key, val in raw_item.items() if key not in {"__pipelex_class__", "__pipelex_module__"}}
+        if issubclass(item_class, CompositeContent):
+            # A composite's components are extra="allow" fields with no annotations to drive
+            # validation, so each is rebuilt from its own markers first, at any depth.
+            clean_item = {component_name: _hydrate_composite_component(raw_value) for component_name, raw_value in clean_item.items()}
         return cast("StuffContent", item_class.model_validate(clean_item))
 
     # No __class__ metadata — fall back to TextContent for marker-less simple text dicts.

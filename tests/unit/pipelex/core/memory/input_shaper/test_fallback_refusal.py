@@ -90,6 +90,9 @@ class TestInputShaperFallbackRefusal:
         [
             ("native.Html", True, [], "empty list"),
             ("native.Dynamic", True, [TextContent(text="a"), NumberContent(number=1)], "not of the same type"),
+            # `Anything[]` refuses a nested list and a null item too, so no declaration is advised.
+            ("native.Dynamic", True, [[1, 2], [3]], "could not be built"),
+            ("native.Dynamic", True, [1, None], "could not be built"),
         ],
     )
     def test_a_refusal_that_is_not_about_a_reading_keeps_the_factory_s_reason(

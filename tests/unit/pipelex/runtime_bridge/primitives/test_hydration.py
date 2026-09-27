@@ -12,6 +12,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -321,6 +322,49 @@ class TestHydrateWorkingMemory:
         stuff = hydrated.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
         assert stuff.content == content
+
+    @pytest.mark.parametrize("anything_is_a_list", [False, True])
+    def test_a_composite_under_anything_round_trips_with_typed_components(self, anything_is_a_list: bool) -> None:
+        """A composite carried by its own markers rebuilds its components at every depth, a nested
+        composite and a list of composites included, instead of leaving marker-bearing dicts.
+        """
+        inner = CompositeContent.model_validate({"note": TextContent(text="inner")})
+        composite = CompositeContent.model_validate(
+            {
+                "title": TextContent(text="hi"),
+                "nested": inner,
+                "many": ListContent(items=[inner, CompositeContent.model_validate({"count": NumberContent(number=2)})]),
+            }
+        )
+        content: StuffContent = ListContent(items=[composite]) if anything_is_a_list else composite
+        working_memory = WorkingMemory()
+        working_memory.root["payload"] = Stuff(
+            stuff_code="test",
+            stuff_name="payload",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.ANYTHING),
+            content=content,
+        )
+
+        raw = json.loads(json.dumps(working_memory.dump_for_transport()))
+        hydrated = hydrate_working_memory(raw)
+
+        hydrated_content = hydrated.root["payload"].content
+        if anything_is_a_list:
+            assert isinstance(hydrated_content, ListContent)
+            hydrated_composite = cast("ListContent[StuffContent]", hydrated_content).items[0]
+        else:
+            hydrated_composite = hydrated_content
+        assert isinstance(hydrated_composite, CompositeContent)
+        components = hydrated_composite.components
+        assert components["title"] == TextContent(text="hi")
+        assert isinstance(components["nested"], CompositeContent)
+        assert components["nested"].components == {"note": TextContent(text="inner")}
+        many = components["many"]
+        assert isinstance(many, ListContent)
+        many_items = cast("ListContent[StuffContent]", many).items
+        assert all(isinstance(item, CompositeContent) for item in many_items)
+        assert cast("CompositeContent", many_items[1]).components == {"count": NumberContent(number=2)}
+        assert "__pipelex_class__" not in json.dumps(hydrated.smart_dump(), default=str)
 
     def test_dump_for_transport_list_items_carry_pipelex_markers_only(self) -> None:
         """dump_for_transport must emit pipelex-private type markers, never kajson's __class__/__module__.

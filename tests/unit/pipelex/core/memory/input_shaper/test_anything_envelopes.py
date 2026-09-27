@@ -101,6 +101,24 @@ class TestInputShaperAnythingEnvelopes:
         assert stuff.concept.concept_ref == "native.Anything"
         assert stuff.content == ListContent(items=[TextContent(text="a"), NumberContent(number=1)])
 
+    def test_a_prebuilt_list_of_different_kinds_at_anything_list_is_the_list_of_its_items(self) -> None:
+        """A mixed `ListContent` infers no single concept, so it is read as the bare list of its items."""
+        input_specs = build_input_specs([("payload", "native.Anything", True)])
+        prebuilt: ListContent[StuffContent] = ListContent(items=[TextContent(text="a"), NumberContent(number=1)])
+
+        working_memory = InputShaper.shape({"payload": prebuilt}, input_specs=input_specs, concept_provider=get_concept_library())
+
+        stuff = working_memory.root["payload"]
+        assert stuff.concept.concept_ref == "native.Anything"
+        assert stuff.content == prebuilt
+
+    def test_a_prebuilt_list_of_different_kinds_at_a_single_anything_slot_raises(self) -> None:
+        input_specs = build_input_specs([("payload", "native.Anything", None)])
+        prebuilt: ListContent[StuffContent] = ListContent(items=[TextContent(text="a"), NumberContent(number=1)])
+
+        with pytest.raises(ListWhereSingularError, match="declares a single"):
+            InputShaper.shape({"payload": prebuilt}, input_specs=input_specs, concept_provider=get_concept_library())
+
     def test_nested_envelope_escape_holds_an_envelope_shaped_object(self) -> None:
         """An object keyed exactly `concept` and `content` travels as raw data inside an `Anything` envelope."""
         input_specs = build_input_specs([("payload", "native.Anything", None)])

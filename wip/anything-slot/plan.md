@@ -138,13 +138,7 @@ A second session reviewed the design from two sides, what keeps the language cle
 
 **Ratified, 2026-09-27.** Louis answered every open question of `design.md` and the choices this review had made on its own, each as recommended: R4 narrows the `Anything` schema, so Phase 4 is built unconditionally; `anything_in` folds back into `scaffold_open_natives`; `JSON` stays an object, recorded and closed on L-260927-a8ec06; `Anything`'s compact template keeps its envelope; the content of an `Anything` envelope is raw data at every depth, list items included, which is R10's escape; and R11 advises against `Dynamic` for inputs while L-260927-bea35e is open. Both documents are `active` from this change. One point is left to measurement rather than decision: R10's escape for `JSON[]`, a `JSON` envelope around a list, which Phase 3 tests and Checkpoint 1 decides if the factory cannot build it.
 
-**Next.** `dev` was merged into the branch after the ratification, bringing it to the v0.67.1 release and the `mthds` 0.17.0 pin, so the next session claims the item and starts Phase 1:
-
-```bash
-cd /Users/lchoquel/repos/Pipelex/_pipelex--anything-slot-shaping
-ledger claim L-260902-10eb56 --renew
-.venv/bin/pytest -x -q tests/unit/pipelex/libraries/test_concept_library_compatibility.py tests/unit/pipelex/core/memory/input_shaper/
-```
+**Next, done since.** `dev` was merged into the branch after the ratification, bringing it to the v0.67.1 release and the `mthds` 0.17.0 pin, and the build session below claimed the item and started Phase 1.
 
 ## Handoff — build session, 2026-09-27
 
@@ -162,16 +156,7 @@ ledger claim L-260902-10eb56 --renew
 5. **The corpus gate, the stale docs and the missing changelog entry** (Codex review twice, cubic). This is Phase 5, planned.
 6. **Test layout** (cubic, P3): `test_explicit_forms.py` now holds three test classes and `test_errors.py` two, and the new classes carry docstrings, against the repo's testing rules. Move `TestInputShaperAnythingEnvelopes`, `TestInputShaperJSONEnvelopes` and `TestInputShaperFallbackRefusal` into their own modules, as `test_list_of_objects_report.py` already is, and drop the class docstrings.
 
-**Next.** Claim the item, verify findings 1 to 3 with one verifier subagent each case, triage them against the `open` bar, fix what survives (finding 6 is mechanical), then record the pass and read the verdict before starting Phase 4:
-
-```bash
-cd /Users/lchoquel/repos/Pipelex/_pipelex--anything-slot-shaping
-ledger claim L-260902-10eb56 --renew
-.venv/bin/pytest -x -q tests/unit/pipelex/core/memory/input_shaper/
-SHA=$(git log --format=%H -1 --grep='Shape Anything and JSON slots top-down')
-ledger review-pass L-260902-10eb56 --branch 'fix/Anything-slot-shaping' --repo pipelex --profile 4 --round 1 --sha "$SHA" --outcome <fixed|clean|…> --tip <the fix commit> --reviewers cubic,codex,code-review
-ledger review-round L-260902-10eb56 --branch 'fix/Anything-slot-shaping' --json
-```
+**Next, done since.** The triage below verified findings 1 to 3, fixed what survived and recorded the pass before Phase 4 started.
 
 Read for Phases 4 and 5 while the reviewers ran, so none of it needs re-deriving:
 
@@ -202,6 +187,23 @@ Decided on the way:
 - **`docs/errors/structure-validation-error.md` is an authored page now**, and the error identity did not change.
 - **The docs' `Order` example** (a concept refining `JSON`, singly and as `Order[]`) was probed through `validate_bundle` and `shape_inputs` before it was written down.
 
+## Checkpoint 2's review, triaged — 2026-09-27
+
+`/rev` at profile 4, round 2, bar `defects`, on the branch against `origin/dev` at the commit "Fix the Checkpoint 1 review findings, narrow the Anything schema, and land the corpus and docs". All four reviewers returned: cubic, Codex's review and adversarial runs, and the bundled `code-review` at `medium`, whose provenance matched the worktree, the commit and the diff's files. Every fix below was mutation-tested.
+
+- **A composite under `Anything` loses its components across transport** (`code-review`): fixed. `_hydrate_list_item` rebuilds a composite's components from their own markers at any depth, which also closes the nested-composite gap `wip/nested-composite-hydration-not-recursive.md` recorded, so that note is gone.
+- **The delivery cannot hydrate an `Anything` main stuff** (cubic, outside the diff but made visible by it): fixed. `try_local_hydrate_stuff` looked the concept's class up in the registry first, which a structureless concept never has, so the result files fell back to a raw dump that now showed the class markers.
+- **The fallback advises `Anything[]` for lists it refuses** (cubic, Codex review): fixed. A list holding nulls or nested lists gets no suggested declaration and keeps the factory's reason.
+- **A prebuilt `ListContent` mixing kinds is refused at `Anything[]`** (cubic): fixed. It is read as the bare list of its items, as inside an `Anything` envelope.
+- **NaN and the infinities** (Codex review): fixed at `Number` and `Anything` inputs, which refuse them as numbers JSON cannot hold.
+- **The changelog and the error page** (cubic): the chaining change through `--with-memory` is now a Breaking entry and a caveat in `provide-inputs.md`, the `JSONContent` entry names the case that actually changed (a value JSON cannot encode), and the error page no longer calls the container natives structureless.
+- **This plan's stale "Next" blocks and a local path** (cubic): the handoffs' next steps are marked done and the paths are gone.
+- **Chaining an `Anything` value through `--with-memory` changes its type** (Codex adversarial, high): deferred as ruled. It is R9, which `design.md` keeps out of this branch because it changes the run result and what every consumer displays; L-260927-da1b09 carries it with its round-trip test, blocked by this item.
+- **A typed singular envelope at `Anything[]` is stored unwrapped** (Codex adversarial, medium): deferred to Gap A's auto-wrap question, recorded in `wip/inputs/input-shaper-multiplicity-gaps.md`.
+- **A TOML date inside an object at a `JSON` or `Anything` input is refused** (cubic): deferred below. The refusal is typed and names the input; whether a date inside an object should become its ISO string is a reading of its own.
+
+**Next.** Record the round, open the pull request, file Phase 6's three items, then land with `/ledger-land`.
+
 ## Ledger
 
 - L-260902-10eb56 is claimed from the worktree; `ledger claim L-260902-10eb56 --renew` at the start of each session.
@@ -218,3 +220,4 @@ Decided on the way:
 - **The output side of an `Anything` value (R9)** is L-260927-da1b09 and L-260927-223013, with the round-trip test.
 - **A JSON file reference into `JSON[]`**, the way D11 reads a CSV into a structured list, is L-260927-702c56.
 - **Per-item envelopes in a list**, for every kind, would be a feature of their own; R10 refuses the spelling rather than read it for two kinds only.
+- **A TOML date inside an object** at a `JSON` or `Anything` input is refused as a value JSON cannot hold, though the same date at the top of an `Anything` input is read. Converting it to its ISO string would be a reading of its own, left until a caller asks.

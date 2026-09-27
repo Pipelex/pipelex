@@ -19,6 +19,7 @@ See ``wip/inputs/smart-inputs-design.md`` (D1-D11) for the full rationale, and
 
 import datetime
 import json
+import math
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, cast
@@ -544,8 +545,7 @@ class InputShaper:
                     concept, concept_provider=concept_provider, value={"text": value}, stuff_spec=stuff_spec, variable_name=variable_name
                 )
             case InputKind.NUMBER:
-                # bool is a subclass of int — exclude it explicitly so a boolean never becomes a number.
-                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                if not cls._is_json_number(value=value):
                     raise cls._wrong_kind(
                         concept_provider=concept_provider, stuff_spec=stuff_spec, variable_name=variable_name, expected_kind="a number", value=value
                     )
@@ -658,7 +658,7 @@ class InputShaper:
         # bool before number: bool is a subclass of int, and a boolean is never a number.
         if isinstance(value, bool):
             native_code, canonical = NativeConceptCode.YES_NO, value
-        elif isinstance(value, (int, float)):
+        elif cls._is_json_number(value=value):
             native_code, canonical = NativeConceptCode.NUMBER, {"number": value}
         elif isinstance(value, datetime.time):
             native_code, canonical = NativeConceptCode.TIME, value
@@ -789,6 +789,20 @@ class InputShaper:
         )
         if structureless_envelope_stuff is not None:
             return structureless_envelope_stuff
+
+        if isinstance(value, ListContent) and not declared_concept.declares_a_structure_class:
+            prebuilt_items = cast("ListContent[StuffContent]", value).items
+            if len({type(item) for item in prebuilt_items}) > 1:
+                # A prebuilt list mixing kinds infers no single concept, so at an `Anything` slot it is
+                # the bare list of its items, exactly as it is inside an `Anything` envelope.
+                return cls._shape_one(
+                    list(prebuilt_items),
+                    concept_provider=concept_provider,
+                    stuff_spec=stuff_spec,
+                    variable_name=variable_name,
+                    search_scope=search_scope,
+                    inputs_base_dir=None,
+                )
 
         stuff = StuffFactory.make_stuff_from_stuff_content_or_data(
             stuff_content_or_data=cast("StuffContentOrData", value),
@@ -954,14 +968,15 @@ class InputShaper:
 
     @classmethod
     def _declaration_suggested_for(cls, *, value: Any) -> str | None:
-        """The declaration that reads a bare value the fallback has no reading for, or ``None`` when the
-        refusal is not about a reading at all (an empty list, or a list holding prebuilt contents).
+        """The declaration that reads a bare value the fallback has no reading for, or ``None`` when no
+        declaration reads it: an empty list, or a list holding prebuilt contents, nested lists or nulls,
+        which an `Anything[]` input refuses too.
         """
         if isinstance(value, dict):
             return "'JSON'"
         if isinstance(value, list):
             items = cast("list[Any]", value)
-            if not items or any(isinstance(item, StuffContent) for item in items):
+            if not items or any(item is None or isinstance(item, (StuffContent, list)) for item in items):
                 return None
             if all(isinstance(item, dict) for item in items):
                 return "'JSON[]'"
@@ -975,6 +990,16 @@ class InputShaper:
         return json.dumps(rendered, ensure_ascii=False)
 
     @classmethod
+    def _is_json_number(cls, *, value: Any) -> bool:
+        """Whether a value is a number JSON can hold: never a boolean, and never NaN or an infinity,
+        which a TOML inputs file can spell but JSON serialization turns into `null`.
+        """
+        # bool is a subclass of int, and a boolean is never a number.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        return not isinstance(value, float) or math.isfinite(value)
+
+    @classmethod
     def _describe_value(cls, value: Any) -> str:
         """A short human description of a provided value, for error messages."""
         # bool before int: bool is a subclass of int.
@@ -982,6 +1007,8 @@ class InputShaper:
             return "null"
         if isinstance(value, bool):
             return f"a boolean ({str(value).lower()})"
+        if isinstance(value, float) and not math.isfinite(value):
+            return f"a number JSON cannot hold ({value})"
         if isinstance(value, str):
             return f'a string ("{value[:40]}")'
         if isinstance(value, (int, float)):

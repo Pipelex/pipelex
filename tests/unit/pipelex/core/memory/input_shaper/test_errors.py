@@ -53,6 +53,11 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
     ("anything-null-item", "native.Anything", True, [1, None], WrongScalarKindError, "provided null"),
     ("anything-nested-list-item", "native.Anything", True, [[1, 2]], WrongScalarKindError, "a list of 2 item"),
     ("anything-null-envelope-content", "native.Anything", None, {"concept": "native.Anything", "content": None}, NullInputError, "null"),
+    # NaN and the infinities, which a TOML inputs file can spell, are numbers JSON cannot hold.
+    ("nan-for-number", "shaper_test.Priority", None, float("nan"), WrongScalarKindError, "a number JSON cannot hold"),
+    ("inf-for-number", "native.Number", None, float("inf"), WrongScalarKindError, "a number JSON cannot hold"),
+    ("nan-for-anything", "native.Anything", None, float("nan"), WrongScalarKindError, "a number JSON cannot hold"),
+    ("inf-item-for-anything-list", "native.Anything", True, [1, float("-inf")], WrongScalarKindError, "a number JSON cannot hold"),
     # R1 a Python caller's value that is not JSON at all.
     ("anything-not-a-json-value", "native.Anything", None, {1, 2}, WrongScalarKindError, "a value of type set"),
     # An object holding a value that is not JSON is a typed refusal, not a raw TypeError from the validator.

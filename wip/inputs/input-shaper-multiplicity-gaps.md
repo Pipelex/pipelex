@@ -52,3 +52,7 @@ The Phase-5 reconcile introduced a narrower regression: a singular `native.Dynam
 `InputShaper._shape_explicit` now returns immediately after compatibility when the declared concept is exactly `native.Dynamic`, matching the bare-value Dynamic fallback. Pinned by `test_explicit_list_content_into_dynamic_slot_ok`.
 
 This does **not** resolve the broader Gap B above: declared `Dynamic[]`/`Anything[N]` still do not peel multiplicity, and the empty-list/count/auto-wrap semantics remain deferred to the holistic D2 pass.
+
+## Anything-slot review, round 2 (2026-09-27) — the auto-wrap question now reaches `Anything[]`
+
+The anything-slot branch (`wip/anything-slot/`) made every concept compatible with `native.Anything`, so a typed singular envelope such as `{"concept": "native.Text", "content": "hello"}` at an `Anything[]` input is now accepted and, under Gap A's auto-wrap sub-question, stored as a single `TextContent` rather than a one-item `ListContent`. A consumer iterating the input, such as a `PipeBatch`, then refuses it at run time, while the same bare `"hello"` would have been wrapped. Codex's adversarial review rated it medium. It is the same question as above, reached through a new door rather than a new defect, so it stays with the holistic D2 pass. The fixed-count half is settled on that branch: an explicit single value at a `Concept[N]` input now raises `MultiplicityCountMismatchError`.
