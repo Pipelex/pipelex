@@ -3,8 +3,6 @@ from typing import Any
 import pytest
 
 from pipelex import log
-from pipelex.base_exceptions import ErrorDomain
-from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.core.memory.exceptions import (
     ExplicitConceptIncompatibleError,
     InputShapingError,
@@ -17,7 +15,6 @@ from pipelex.core.memory.exceptions import (
 )
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 
@@ -137,53 +134,3 @@ class TestInputShaperErrors:
         message = str(exc_info.value)
         assert "'question'" in message, "Unknown-name error should list the declared inputs"
         assert "'quesion'" in message, "Unknown-name error should name the offending input"
-
-
-class TestInputShaperFallbackRefusal:
-    """R8: a value the bottom-up fallback has no reading for is a typed input error naming the slot."""
-
-    @pytest.mark.parametrize(
-        ("concept_ref", "multiplicity"),
-        [
-            ("native.Dynamic", None),
-            ("native.Dynamic", True),
-            ("native.Composite", True),
-            ("native.Html", True),
-            ("native.TextAndImages", True),
-            ("native.SearchResult", True),
-            ("native.Page", True),
-        ],
-    )
-    def test_a_list_of_objects_is_refused_naming_the_input(self, concept_ref: str, multiplicity: VariableMultiplicity | None) -> None:
-        input_specs = build_input_specs([("records", concept_ref, multiplicity)])
-        records_input: dict[str, Any] = {"records": [{"a": 1}, {"b": 2}]}
-
-        with pytest.raises(StructureValidationError) as exc_info:
-            InputShaper.shape(records_input, input_specs=input_specs, concept_provider=get_concept_library())
-
-        error = exc_info.value
-        message = str(error)
-        assert "Input 'records'" in message
-        assert f"'{concept_ref}'" in message
-        assert "a list of 2 item(s)" in message
-        assert "Expected shape:" in message
-        # The factory's own text, with its `typing.Union[...]` spelling of what it accepts, stays on
-        # the chain as the cause and out of what a caller reads.
-        assert "typing.Union" not in message
-        assert isinstance(error.__cause__, StuffFactoryError)
-        assert error.error_domain == ErrorDomain.INPUT
-        # The fix is on the author's side: the declaration, and no envelope.
-        assert error.user_action is not None
-        assert error.user_action.kind == UserActionKind.CHANGE_INPUT
-        assert "'JSON[]'" in error.user_action.detail
-        assert "envelope" not in error.user_action.detail
-
-    def test_a_bare_number_at_a_dynamic_slot_is_refused_naming_the_input(self) -> None:
-        input_specs = build_input_specs([("payload", "native.Dynamic", None)])
-        payload_input: dict[str, Any] = {"payload": 3}
-
-        with pytest.raises(StructureValidationError, match=r"Input 'payload' could not be built as 'native\.Dynamic'") as exc_info:
-            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library())
-
-        assert "a number (3)" in str(exc_info.value)
-        assert isinstance(exc_info.value.__cause__, StuffFactoryError)

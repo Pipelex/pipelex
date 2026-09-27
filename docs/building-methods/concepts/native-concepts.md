@@ -41,6 +41,36 @@ Here are all the native concepts you can use out of the box:
 | `Composite` | A named composition of contents | `CompositeContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
+## Choosing among `Anything`, `JSON` and `Dynamic`
+
+Three natives declare no structure of their own, and each takes a different kind of input. Choose in this order:
+
+1. **Data you already have as JSON objects: name it.** Declare a concept that refines `JSON`, with a plain-language description. It takes the object exactly as you have it, with no data model to write, and its name and description tell an agent or a reader what the object means, which a bare `JSON` does not. When you later want the fields validated, turn it into a concept with a structure.
+2. **`JSON` or `JSON[]`** when the data has no name worth giving it. `JSON` is a JSON object, not any JSON value; a list of objects is `JSON[]`.
+3. **`Anything`** when the pipe is generic over its input: it passes a value along or renders it, whatever it is. It is not the place to put JSON data.
+4. **`Dynamic`** is not recommended for inputs for now: what a `Dynamic` input holds is still being settled.
+
+For example, a pipe summarizing orders from a shop's API names them:
+
+```toml
+[concept.Order]
+description = "A customer order, as the shop's API returns it"
+refines = "JSON"
+
+[pipe.summarize_order]
+type = "PipeLLM"
+description = "Summarize a customer order"
+inputs = { order = "Order" }
+output = "Text"
+prompt = """
+Summarize this order in two sentences:
+
+@order
+"""
+```
+
+The input is the object itself, `{"order": {"id": 42, "items": [{"sku": "A-1", "quantity": 2}]}}`, and a list of orders would be declared `Order[]`.
+
 ## Native Concept Structures
 
 Each native concept has a corresponding Python structure that defines its data model. Understanding these structures helps you work with the data they contain.
@@ -240,6 +270,10 @@ class JSONContent(StuffContent):
     json_obj: dict[str, Any]
 ```
 
+A `JSON` input takes a JSON object as it is, `{"a": 1}`, and its inputs template shows the bare object; `JSON[]` takes a list of objects. `JSON` is a JSON object, not any JSON value, so a string or a number there is refused. The explicit form carries the content form: `{"concept": "JSON", "content": {"json_obj": {"a": 1}}}`.
+
+**Use for:** Data you already have as JSON objects, preferably through a concept that refines `JSON` (see [Choosing among `Anything`, `JSON` and `Dynamic`](#choosing-among-anything-json-and-dynamic)).
+
 ### HtmlContent
 
 Represents HTML content with styling:
@@ -289,8 +323,12 @@ Each named sub-content is a top-level field of the composite — there is no wra
 
 ### Anything
 
-!!! note "Special Concepts"
-    `Anything` is referenced in the native concept definitions but does not have specific implementations. It is handled through the generic content system and is primarily used as semantic markers.
+`Anything` has no content class of its own: an `Anything` value is held in the content class matching what it is.
+
+- **As an input**, it takes any JSON value but an array or null. A string, a number, a boolean or an object becomes text, a number, a yes/no or a JSON object, and the input keeps the `Anything` concept. A typed envelope, `{"concept": "Text", "content": "hi"}`, hands it a specific concept, which it keeps, since every concept satisfies `Anything`. `Anything[]` takes a list of such values.
+- **As an output**, it promises nothing narrower: a pipe declared to output `Anything` may produce any concept.
+
+**Use for:** Pipes that are generic over their input, passing a value along or rendering it whatever it is.
 
 ## Using Native Concepts
 

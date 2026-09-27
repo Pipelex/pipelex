@@ -6,15 +6,20 @@ from typing import Any, cast
 import pytest
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.date_content import DateContent
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -90,6 +95,10 @@ class TestHydrateWorkingMemory:
             registry.register_class(YesNoContent)
         if not registry.has_class(name="DateContent"):
             registry.register_class(DateContent)
+        if not registry.has_class(name="TimeContent"):
+            registry.register_class(TimeContent)
+        if not registry.has_class(name="JSONContent"):
+            registry.register_class(JSONContent)
 
     def test_hydrate_with_native_text(self) -> None:
         """A raw dict containing TextContent stuff hydrates to typed TextContent."""
@@ -280,6 +289,38 @@ class TestHydrateWorkingMemory:
         assert list_content.items[0].text == "blue"
         assert list_content.items[1].text == "red"
         assert list_content.items[2].text == "green"
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            TextContent(text="hi"),
+            NumberContent(number=3),
+            YesNoContent(yes_no=True),
+            JSONContent(json_obj={"a": 1}),
+            DateContent(date=datetime.date(2026, 9, 27)),
+            TimeContent(time=datetime.time(12, 30)),
+        ],
+    )
+    def test_a_single_anything_content_round_trips_by_its_own_class(self, content: StuffContent) -> None:
+        """`native.Anything` names no content class, so a single content carries its own class markers
+        across the transport boundary and comes back as the same class, under the same concept.
+        """
+        working_memory = WorkingMemory()
+        working_memory.root["payload"] = Stuff(
+            stuff_code="test",
+            stuff_name="payload",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.ANYTHING),
+            content=content,
+        )
+
+        raw = working_memory.dump_for_transport()
+        assert raw["root"]["payload"]["content"]["__pipelex_class__"] == type(content).__name__
+
+        hydrated = hydrate_working_memory(raw)
+
+        stuff = hydrated.root["payload"]
+        assert stuff.concept.concept_ref == "native.Anything"
+        assert stuff.content == content
 
     def test_dump_for_transport_list_items_carry_pipelex_markers_only(self) -> None:
         """dump_for_transport must emit pipelex-private type markers, never kajson's __class__/__module__.

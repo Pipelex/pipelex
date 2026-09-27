@@ -226,13 +226,13 @@ class Concept(ConceptAbstract):
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for a concept that declares no structure class (`native.Anything`).
 
-        The SCHEMA arm publishes the permissive schema: no constraint keywords, only the concept's
-        identity annotations (`title` = concept ref, `description` = authored description) —
-        semantically the empty schema, "any JSON value", which is what an untyped vehicle means,
-        while keeping the invariant that every rendered input schema carries its concept's
-        identity. The JSON arm renders the empty mapping `{}` — the escape hatch's only honest
-        example value. Multiplicity wraps exactly as for class-backed concepts. PYTHON is refused:
-        there is no class to instantiate.
+        The SCHEMA arm publishes the concept's identity annotations (`title` = concept ref,
+        `description` = authored description) and one constraint: the value is not an array and
+        not null. An untyped vehicle takes any other JSON value, but a list is the multiplicity's
+        to express (`Anything[]`), never a single value's, and null is never an input. The
+        multiplicity wraps exactly as for class-backed concepts, so every item of `Anything[]`
+        carries the same exclusion. The JSON arm renders the empty mapping `{}` — the escape
+        hatch's only honest example value. PYTHON is refused: there is no class to instantiate.
 
         Returns:
             Tuple of (representation dict with "concept" and "content" keys, empty imports set)
@@ -242,7 +242,11 @@ class Concept(ConceptAbstract):
         """
         match output_format:
             case ConceptRepresentationFormat.SCHEMA:
-                json_schema: dict[str, Any] = {"title": self.concept_ref, "description": self.description}
+                json_schema: dict[str, Any] = {
+                    "title": self.concept_ref,
+                    "description": self.description,
+                    "not": {"type": ["array", "null"]},
+                }
                 content = self._wrap_schema_for_multiplicity(json_schema=json_schema, multiplicity=multiplicity)
                 return {"concept": self.concept_ref, "content": content}, set()
             case ConceptRepresentationFormat.JSON:

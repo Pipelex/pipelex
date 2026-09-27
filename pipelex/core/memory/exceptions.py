@@ -164,13 +164,16 @@ class StructureValidationError(InputShapingError):
         variable_name: str,
         declared_concept_ref: str,
         provided_description: str,
+        suggested_declaration: str,
         expected_shape: str,
     ) -> "StructureValidationError":
         """The refusal for a bare value that an input of this concept, which reads a value by its own shape, cannot read.
 
         The advice names the declaration to change rather than an envelope, because the person who
         sent the value usually also declared the input, and an envelope helps only a caller who knows
-        a concept both compatible with the input and able to hold the value.
+        a concept both compatible with the input and able to hold the value. `suggested_declaration`
+        is the one that reads this value: `'JSON'` for an object, `'JSON[]'` for a list of objects,
+        `'Anything'` or `'Anything[]'` for anything else.
         """
         message = (
             f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
@@ -179,8 +182,8 @@ class StructureValidationError(InputShapingError):
         user_action = UserAction(
             kind=UserActionKind.CHANGE_INPUT,
             detail=(
-                f"Declare input '{variable_name}' in the method as 'JSON' (or 'JSON[]' for a list) when the value is plain JSON data, "
-                "or as a concept with a structure that describes it."
+                f"Declare input '{variable_name}' in the method as {suggested_declaration}, "
+                "or as a concept with a structure that describes the value."
             ),
         )
         return cls(message, variable_name=variable_name, user_action=user_action)

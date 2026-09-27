@@ -7,8 +7,21 @@
 - **`PipelexKernel.log_context()` and `JobMetadata.log_context()`**: `JobMetadata.log_context()` binds a job's `request_id`, `pipeline_run_id` and `pipe_run_id` onto the log context in one call, and `PipelexKernel.log_context()` binds a kernel run's `request_id` and `pipeline_run_id`, which a host wraps its run in so the lines it emits between kernel calls name the run.
 - **`PipelexKernel.make` takes `request_id` and `pipeline_run_id`**: a kernel-driven run can now carry the inbound request id a hosted deployment filters its logs on, and name itself with an id the host chooses. A host inside a replay-based executor passes a `pipeline_run_id` or a trace context, since the default `uuid4` changes on every replay; a trace context and a `pipeline_run_id` that disagree, or an empty `pipeline_run_id`, raise `ValueError`.
 
+### Changed
+
+- **A bare string at an `Anything` input is an `Anything` value (Breaking)**: it becomes a `native.Anything` stuff holding text, where it used to become a `native.Text` stuff.
+- **A `JSON` input reads a JSON object literally (Breaking)**: a bare string at a `JSON` input is refused instead of becoming `native.Text`, the compact inputs template of a `JSON` input is the bare object rather than `{"json_obj": …}`, and a `JSONContent` built from anything but an object raises a pydantic `ValidationError` instead of a `TypeError`.
+- **An envelope-shaped item of a bare `Anything[]` or `JSON[]` list is refused (Breaking)**: an item holding `concept` and `content` keys is no longer read as data; wrap the whole list in one envelope to type it.
+- **A value the fallback has no reading for is a `StructureValidationError` (Breaking)**: at a `Dynamic` or container-native input, a bare value the bottom-up reading cannot build, such as a list of plain objects, raises `StructureValidationError` naming the input and its concept instead of an unnamed `StuffFactoryError`, and its next step names the declaration that reads the value (`JSON`, `JSON[]`, `Anything` or `Anything[]`).
+- **An explicit single value at a fixed-count input is refused (Breaking)**: an envelope holding one value at a `Concept[N]` input raises `MultiplicityCountMismatchError` instead of being stored as a single value.
+- **The `Anything` input schema excludes array and null**: the JSON Schema published for an `Anything` input carries `"not": {"type": ["array", "null"]}`, and so does each item of an `Anything[]` input's schema.
+
 ### Fixed
 
+- **`Anything` inputs take any JSON value**: a string, a number, a boolean, an object or a date at an `Anything` input becomes its natural content under the `Anything` concept, `Anything[]` takes a list of them, and a typed envelope keeps its own concept; they used to be refused, a bare string aside. A sequence declaring an `Anything` output over a narrower last step now validates.
+- **`JSON` inputs take objects and lists of objects**: a JSON object at a `JSON` input, and a list of them at a `JSON[]` input, now build, where a list of plain objects used to be refused with an error naming neither the input nor its concept.
+- **A single `Anything` value survives the transport boundary**: a stuff whose concept is `native.Anything` keeps its content's class through `dump_for_transport` and hydration, which a distributed or sandboxed run relies on; hydration used to fail looking for an `AnythingContent` class.
+- **A prebuilt list is refused where one value belongs**: a `ListContent` given as an item of a plural input, or as the content of an `Anything` envelope at a single input, is refused instead of being stored nested or in a singular slot.
 - **A kernel step's log lines name its run and its step**: `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search` and `run_img_gen` now bind the `job_metadata` they are handed for the whole call, so a program driving the kernel directly gets log records carrying `request_id`, `pipeline_run_id` and `pipe_run_id`, as an interpreted run's do. An interpreted run's lines are unchanged.
 
 ## [v0.67.1] - 2026-09-27

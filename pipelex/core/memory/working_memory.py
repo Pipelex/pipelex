@@ -609,6 +609,11 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                     # only exist in a per-workflow ClassRegistry.
                     serialized_items.append(_encode_content_with_class_markers(item))
                 raw_root[stuff_name]["content"] = serialized_items
+            elif not stuff.concept.declares_a_structure_class and stuff_name in raw_root:
+                # A structureless concept (`native.Anything`) names no content class, so the
+                # hydrator cannot find one through the concept: a single content carries its own
+                # class markers, exactly as a list item does.
+                raw_root[stuff_name]["content"] = _encode_content_with_class_markers(cast("StuffContent", content))
             elif isinstance(content, CompositeContent) and stuff_name in raw_root:
                 # Composite components are extra="allow" fields: a plain model_dump loses
                 # their classes, so stamp each component with the same pipelex-private

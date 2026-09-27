@@ -1,10 +1,3 @@
-"""The report that widened this arm: a list of plain JSON objects sent to an input slot.
-
-It hit the bottom-up fallback's `Cannot create Stuff from list of <class 'dict'>` without naming the
-slot. Every declaration below now either takes the list or refuses it with a typed input error, so
-a `StuffFactoryError` can never again reach a caller from a bare value.
-"""
-
 from typing import Any
 
 import pytest
@@ -18,6 +11,10 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import ShaperRecord, build_input_specs
 
+# The report that widened this arm: a list of plain JSON objects sent to an input slot hit the
+# bottom-up fallback's `Cannot create Stuff from list of <class 'dict'>` without naming the slot.
+# Every declaration below now either takes the list or refuses it with a typed input error, so a
+# `StuffFactoryError` can never again reach a caller from a bare value.
 LIST_OF_OBJECTS: list[dict[str, Any]] = [{"a": 1}, {"b": 2}]
 
 # (concept_ref, multiplicity, expected: the content it shapes into, or the error class it raises)

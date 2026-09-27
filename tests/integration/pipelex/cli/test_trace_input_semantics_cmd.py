@@ -92,11 +92,11 @@ class TestTraceInputSemantics:
         hop4_multi = _read_json(output_dir / manifest["hop4_schema_renders"]["trace_tool_test.do_one.items"])
         assert hop4_multi["content"]["type"] == "array"
         # `native.Anything` declares no structure class: hop 3 records the skip rather than resolving
-        # one, and hop 4 still renders — through the structureless arm, as the permissive schema.
+        # one, and hop 4 still renders — through the structureless arm, excluding only array and null.
         assert any("native.Anything" in entry for entry in manifest["hop3_skipped"])
         hop4_loose = _read_json(output_dir / manifest["hop4_schema_renders"]["trace_tool_test.do_one.loose"])
         assert hop4_loose["concept"] == "native.Anything"
-        assert set(hop4_loose["content"]) == {"title", "description"}
+        assert set(hop4_loose["content"]) == {"title", "description", "not"}
 
         # Hop 5: the final wire contracts, keyed by namespaced pipe_ref, with presence flags.
         hop5 = _read_json(output_dir / HOP5_FILE_NAME)

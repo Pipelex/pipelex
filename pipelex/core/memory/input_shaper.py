@@ -227,13 +227,25 @@ class InputShaper:
                         search_scope=search_scope,
                     )
                 except StuffFactoryError as exc:
-                    # (R8) The factory's refusal names neither the input nor its declared concept, and
-                    # spells what it accepts as a `typing.Union`: it stays on the chain as the cause.
+                    # (R8) The factory's refusal names neither the input nor its declared concept, so it
+                    # is re-raised naming both, with the factory's own message as the cause.
+                    expected_shape = cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec)
+                    suggested_declaration = cls._declaration_suggested_for(value=value)
+                    if suggested_declaration is None:
+                        # Not a value without a reading: an empty list, or prebuilt contents the
+                        # factory could not type. Its reason is the one the caller can act on.
+                        raise StructureValidationError.make(
+                            variable_name=variable_name,
+                            declared_concept_ref=declared_concept.concept_ref,
+                            reason=str(exc),
+                            expected_shape=expected_shape,
+                        ) from exc
                     raise StructureValidationError.make_for_unreadable_bare_value(
                         variable_name=variable_name,
                         declared_concept_ref=declared_concept.concept_ref,
                         provided_description=cls._describe_value(value),
-                        expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
+                        suggested_declaration=suggested_declaration,
+                        expected_shape=expected_shape,
                     ) from exc
             case (
                 InputKind.TEXT
@@ -496,6 +508,16 @@ class InputShaper:
         then delegates to ``StuffContentFactory`` so a refining subclass is honored.
         """
         concept = stuff_spec.concept
+        if isinstance(value, ListContent):
+            # A list is the multiplicity's to express (D2), so a list where one value belongs is
+            # refused, as a bare array is: an item of a plural slot, or the content of a single one.
+            raise cls._wrong_kind(
+                concept_provider=concept_provider,
+                stuff_spec=stuff_spec,
+                variable_name=variable_name,
+                expected_kind="a single value, not a list",
+                value=value,
+            )
         if isinstance(value, StuffContent):
             built = StuffFactory.make_stuff_from_stuff_content_or_data(
                 stuff_content_or_data=value, concept_provider=concept_provider, name=variable_name, search_scope=search_scope
@@ -835,10 +857,18 @@ class InputShaper:
             )
         if content is None:
             raise NullInputError.make(variable_name=variable_name, declared_concept_ref=declared_concept.concept_ref, expected_shape=expected_shape)
+        if isinstance(content, ListContent):
+            # A prebuilt list is the same value as the bare list of its items, and is shaped as one.
+            content = list(cast("ListContent[StuffContent]", content).items)
+        shaping_spec = stuff_spec
+        if NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code):
+            # Match `_shape_explicit` at a Dynamic slot: the signature cannot guide list-vs-single
+            # shape there, so the content's own shape decides it.
+            shaping_spec = StuffSpec(concept=declared_concept, multiplicity=True if isinstance(content, list) else None)
         shaped_content = cls._shape_with_multiplicity(
             content,
             concept_provider=concept_provider,
-            stuff_spec=stuff_spec,
+            stuff_spec=shaping_spec,
             input_kind=InputKind.ANYTHING,
             variable_name=variable_name,
             search_scope=search_scope,
@@ -862,10 +892,20 @@ class InputShaper:
         an explicit singular is taken as given, not auto-wrapped.
         """
         content = stuff.content
+        is_list, fixed_count = cls._peel_multiplicity(stuff_spec.multiplicity)
         if not isinstance(content, ListContent):
+            if fixed_count is not None:
+                # A single value is one item, never the N a fixed count declares, whether or not a
+                # singular under `[]` is ever auto-wrapped.
+                raise MultiplicityCountMismatchError.make(
+                    variable_name=variable_name,
+                    declared_concept_ref=stuff_spec.concept.concept_ref,
+                    expected_count=fixed_count,
+                    provided_count=1,
+                    expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
+                )
             return
         list_content = cast("ListContent[StuffContent]", content)
-        is_list, fixed_count = cls._peel_multiplicity(stuff_spec.multiplicity)
         if not is_list:
             raise ListWhereSingularError.make(
                 variable_name=variable_name,
@@ -911,6 +951,22 @@ class InputShaper:
             provided_description=cls._describe_value(value),
             expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
         )
+
+    @classmethod
+    def _declaration_suggested_for(cls, *, value: Any) -> str | None:
+        """The declaration that reads a bare value the fallback has no reading for, or ``None`` when the
+        refusal is not about a reading at all (an empty list, or a list holding prebuilt contents).
+        """
+        if isinstance(value, dict):
+            return "'JSON'"
+        if isinstance(value, list):
+            items = cast("list[Any]", value)
+            if not items or any(isinstance(item, StuffContent) for item in items):
+                return None
+            if all(isinstance(item, dict) for item in items):
+                return "'JSON[]'"
+            return "'Anything[]'"
+        return "'Anything'"
 
     @classmethod
     def _render_expected_shape(cls, *, concept_provider: ConceptProviderAbstract, stuff_spec: StuffSpec) -> str:
