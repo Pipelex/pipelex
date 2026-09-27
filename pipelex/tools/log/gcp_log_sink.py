@@ -103,6 +103,13 @@ CREDENTIALS_CHECK_TIMEOUT_SECONDS = 5.0
 _CREDENTIALS_CHECK_THREAD_NAME = "pipelex-gcp-log-credentials"
 
 
+def _print_record_on_stderr(*, record: logging.LogRecord) -> None:
+    """Print a record the sink rejected on stderr, through the stdlib's last-resort handler, which never takes the sink's lock."""
+    stderr_handler = logging.lastResort
+    if stderr_handler is not None:
+        stderr_handler.handle(record)
+
+
 def _say_on_stderr(*, message: str) -> None:
     """Print one warning of the sink's own on stderr, through the stdlib's last-resort handler.
 
@@ -110,11 +117,8 @@ def _say_on_stderr(*, message: str) -> None:
     when its writes are refused, a line exported through it is lost with the rest. The last resort
     takes its own lock and never the handler's, so saying it cannot deadlock the teardown either.
     """
-    stderr_handler = logging.lastResort
-    if stderr_handler is None:
-        return
-    stderr_handler.handle(
-        logging.makeLogRecord(
+    _print_record_on_stderr(
+        record=logging.makeLogRecord(
             {
                 "name": __name__,
                 "levelno": logging.WARNING,
@@ -176,6 +180,13 @@ class GcpExportPathFilter(logging.Filter):
     it and waits for the queue to drain is a deadlock at exit, and it was reproduced here with the
     installed library.
 
+    The sink's own credentials check is guarded the same way, by the name of its thread. At teardown it
+    runs while the flush that started it waits, and the stdlib's shutdown at exit holds this handler's
+    lock around that flush, so a warning the auth library logs during the refresh would wait on the lock
+    until the check's deadline passed and the check would answer that the refresh did not answer. What
+    that thread logs is printed on stderr through the last resort, every line of it: it is not an export
+    failure, and the check logs a handful of lines at most.
+
     A rejected record at ``WARNING`` or above is printed on stderr through the stdlib's last-resort
     handler rather than dropped. The library reports a refused batch only through that record and then
     marks the batch done, so a flush still succeeds, and the stdlib prints a record through its last
@@ -194,6 +205,10 @@ class GcpExportPathFilter(logging.Filter):
 
     @override
     def filter(self, record: logging.LogRecord) -> bool:
+        if threading.current_thread().name == _CREDENTIALS_CHECK_THREAD_NAME:
+            if record.levelno >= logging.WARNING:
+                _print_record_on_stderr(record=record)
+            return False
         if not self._is_export_path(record=record):
             # Read outside the lock, which keeps an ordinary record's cost to this one read: a count it
             # misses is said on a later record, or when the handler closes.
@@ -228,9 +243,7 @@ class GcpExportPathFilter(logging.Filter):
             unreported_count = self._unreported_count
             self._unreported_count = 0
         self._print_unreported_count(unreported_count=unreported_count)
-        stderr_handler = logging.lastResort
-        if stderr_handler is not None:
-            stderr_handler.handle(record)
+        _print_record_on_stderr(record=record)
 
     def _report_count_once_its_window_has_passed(self) -> None:
         """Print the count an outage that has ended left behind, since no later failure comes to print it.

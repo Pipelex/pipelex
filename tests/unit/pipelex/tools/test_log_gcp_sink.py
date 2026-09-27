@@ -487,6 +487,42 @@ class TestGcpLogSink:
         assert stderr.records == []
         assert closing.close_count == 1
 
+    def test_the_credentials_check_at_teardown_answers_while_the_shutdown_holds_the_handler_lock(self, mocker: MockerFixture) -> None:
+        """The stdlib's shutdown at exit holds this lock around the flush, and the refresh the flush starts logs through the handler it waits on."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        mocker.patch("pipelex.tools.log.gcp_log_sink.CREDENTIALS_CHECK_TIMEOUT_SECONDS", 2.0)
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        auth_logger = logging.getLogger(f"{__name__}.auth")
+        auth_logger.propagate = False
+
+        def refresh_after_a_retry() -> None:
+            auth_logger.warning("Compute Engine Metadata server unavailable on attempt 1 of 5.")
+
+        transport = NeverDrainingTransport()
+        credentials_check = GcpCredentialsCheck(
+            refresh=refresh_after_a_retry, transport_error_types=(ConnectionError,), source="the test credentials"
+        )
+        handler = GcpLogSink(transport=transport, project=PROJECT, credentials_check=credentials_check).make_handler()
+        auth_logger.addHandler(handler)
+
+        handler.acquire()
+        try:
+            handler.flush()
+        finally:
+            handler.release()
+            auth_logger.removeHandler(handler)
+            transport.released.set()
+
+        assert [record.getMessage() for record in stderr.records] == [
+            "Compute Engine Metadata server unavailable on attempt 1 of 5.",
+            (
+                "The 'gcp' log sink's transport was still writing to Cloud Logging when the 0.2-second flush deadline passed, "
+                "and the records it still holds are lost unless it sends them while it closes. "
+                "A refresh of the test credentials still succeeds, so the Cloud Logging API or the network is what holds the write."
+            ),
+        ]
+
     def test_an_export_failure_is_printed_on_stderr_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport], mocker: MockerFixture) -> None:
         """The library reports a refused batch only through this record, and the sink's own handler is never the place it can go."""
         _, transport = gcp_log
