@@ -80,7 +80,9 @@ class PipeConditionBlueprint(PipeBlueprint):
         # does not parse. The parse is the one the built pipe makes when it reads the variables its expression needs.
         # It is then compiled as the run compiles it before rendering, in the same environment, which refuses what
         # parses but cannot be built, such as a filter or a test that does not exist: the run would refuse it on
-        # every input, so the refusal is no stricter for being made at load.
+        # every input, so the refusal is no stricter for being made at load. Jinja2 resolves a filter or a test inside
+        # a conditional only when it renders, so a wrong name there compiles and is left to the run, as it must be:
+        # refusing it here would refuse an expression whose run never reaches it.
         # The message quotes neither the expression nor the parser's diagnosis, which names the token it stopped at:
         # the verdict is kept verbatim under STRICT disclosure, and the condition may be a host library's.
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
