@@ -54,6 +54,35 @@ All in `pipelex/core/memory/input_shaper.py` unless named otherwise.
 
 **Checkpoint 1** — `make agent-check` clean, the shaper suite and the compatibility suite green, and both probe matrices of `design.md` — the `Anything` matrix and the list-of-objects one — re-run, with every row either accepted as the rulings say or refused with a typed error. Record here what was measured and anything decided on the way, then `/rev`.
 
+*Reached, 2026-09-27.* `make agent-check` is clean and the unit suite is green but for the four projection-corpus tests, which fail on the `JSON` unwrap until Phase 5 changes the reference projection. Both matrices were re-run through `shape_inputs` against a probe bundle, and every row lands as ruled:
+
+```
+== carry (anything_in)
+  bare {} / string / 3 / 4.2 / true / {"a": 1} / a TOML date   OK  native.Anything, JSONContent / TextContent / NumberContent / YesNoContent / JSONContent / DateContent
+  bare list, envelope list                                      REFUSED ListWhereSingularError
+  envelope {} / str / num                                       OK  native.Anything, the same contents as bare
+  envelope Text / native.JSON / Question                        OK  each keeps its own concept
+== carry_list (items)
+  bare [{}] / ["a"] / [1, 2] / [] / envelope [{}]               OK  native.Anything, ListContent of the natural contents
+== [{"a": 1}, {"b": 2}] per slot
+  Anything, JSON                                                REFUSED ListWhereSingularError
+  Anything[], JSON[], Record[]                                  OK
+  Dynamic, Dynamic[], Composite[], Html[], TextAndImages[], SearchResult[], Page[]
+                                                                REFUSED StructureValidationError "Input 'x' could not be built as 'native.<X>': you provided a list of 2 item(s), …"
+== JSON slot
+  "hi", 3                                                       REFUSED WrongScalarKindError "expects a JSON object"
+  {"a": 1}, {"json_obj": {"a": 1}}                              OK  JSONContent holding the object literally
+```
+
+Decided on the way:
+
+- **R5's "any other slot" is read through compatibility.** The shaper asks `is_compatible(Anything, declared)` rather than whether the slot is `Anything`, so an `Anything` envelope is also honoured at a `Dynamic` slot, which it satisfies by the dynamic short-circuit, and keeps its concept there (D6, explicit wins when compatible). Everywhere else it is `ExplicitConceptIncompatibleError`, as ruled. A `DictStuff` naming a structureless concept takes the same path as the plain envelope.
+- **R10's check sits in `_shape_list`**, not in the item arm: only a list's items can be envelope-shaped bare values, since a top-level one is an envelope by D6. The flag that clears it inside an `Anything` envelope is `is_raw_data`, threaded through `_shape_with_multiplicity`.
+- **R10's `JSON[]` escape needs no fix**: a `JSON` envelope around a list of content forms builds through the bottom-up factory's Case 2.6 unchanged, pinned by `test_json_envelope_around_a_list_of_content_forms_is_r10s_escape`.
+- **`_make_content` reports the declared concept** in a `StructureValidationError`, since the `Anything` arm builds through a native concept's class. The `JSONContent` validator raises `ValueError` now, and the three `test_json_content_validation.py` tests that pinned the raw `TypeError` pin a `ValidationError`.
+- **R8's refusal is `StructureValidationError.make_for_unreadable_bare_value`**, a sibling of `make`, so the error identity is unchanged.
+- **Mutation-tested**: putting the number check before the boolean one, dropping the null-content check, dropping the R10 check and ignoring its escape flag each turn the matching rows red.
+
 ## Phase 4 — the published schema excludes array and null (R4)
 
 1. `Concept.render_structureless_representation`, SCHEMA arm: add `"not": {"type": ["array", "null"]}` to the element schema. The multiplicity wrapper is unchanged, so `Anything[]` items carry it.

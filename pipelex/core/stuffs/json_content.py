@@ -20,12 +20,11 @@ class JSONContent(StuffContent):
     @field_validator("json_obj", mode="before")
     @classmethod
     def check_valid_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        # A ValueError, never a TypeError: pydantic turns only the former into a ValidationError, so a
+        # dict holding a value that is not JSON is reported like any other invalid content.
         try:
             json.dumps(value)
-        except TypeError as exc:
-            msg = f"json_obj is not valid JSON: {exc}"
-            raise TypeError(msg) from exc
-        except json.JSONDecodeError as exc:
+        except (TypeError, ValueError) as exc:
             msg = f"json_obj is not valid JSON: {exc}"
             raise ValueError(msg) from exc
         return value

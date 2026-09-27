@@ -3,7 +3,9 @@
 The ``InputShaper`` interprets each provided input *top-down against the pipe's declared
 signature* instead of bottom-up from the value's shape alone. A bare string becomes the declared
 concept (a ``legal.Question``, not ``native.Text``); a bare number satisfies a ``Number``-refining
-input; a bare dict validates against a structured concept; a JSON list shapes element-wise into
+input; a bare dict validates against a structured concept; a bare object is the value of a ``JSON``
+input; any JSON value fills a ``native.Anything`` input, held as the natural content for its JSON
+type; a JSON list shapes element-wise into
 ``ListContent[declared]``; the ``{"concept", "content"}`` envelope stays as a compat-checked escape
 hatch.
 
@@ -11,7 +13,8 @@ This module is the top-down *dispatch*: the actual content building reuses the e
 (``StuffContentFactory`` / ``ConceptLibrary.is_compatible`` / the bottom-up ``StuffFactory``). The
 new code decides which arm each value takes; it does not invent new content builders.
 
-See ``wip/inputs/smart-inputs-design.md`` (D1-D11) for the full rationale.
+See ``wip/inputs/smart-inputs-design.md`` (D1-D11) for the full rationale, and
+``wip/anything-slot/design.md`` (R1-R10) for the ``Anything`` and ``JSON`` arms.
 """
 
 import datetime
@@ -27,6 +30,7 @@ from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import (
     ExplicitConceptIncompatibleError,
@@ -41,7 +45,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
-from pipelex.core.stuffs.exceptions import StuffContentFactoryError
+from pipelex.core.stuffs.exceptions import StuffContentFactoryError, StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
@@ -54,10 +58,13 @@ from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 class InputKind(StrEnum):
     """Which interpretation arm a declared input concept takes (D5).
 
-    Resolved once per input from the *declared concept's* nature. ``DYNAMIC`` is the bottom-up
-    fallback used for ``Dynamic`` / ``Anything`` and the out-of-matrix natives (Html, JSON, Page,
-    TextAndImages, SearchResult, Composite) — the signature genuinely does not know how to shape
-    them, so today's shape-driven ``StuffFactory`` path handles the whole value.
+    Resolved once per input from the *declared concept's* nature. ``ANYTHING`` is the structureless
+    ``native.Anything``: it takes any JSON value but an array or a null, held as the natural content
+    for the value's JSON type while the stuff keeps the declared concept (R1). ``JSON`` takes a JSON
+    object as it is (R7). ``DYNAMIC`` is the bottom-up fallback used for ``Dynamic`` and the natives
+    no arm reads top-down (Html, Page, TextAndImages, SearchResult, Composite) — the shape-driven
+    ``StuffFactory`` path handles the whole value there, and a value it has no reading for is
+    refused naming the input (R8).
     """
 
     TEXT = "text"
@@ -68,6 +75,8 @@ class InputKind(StrEnum):
     IMAGE = "image"
     DOCUMENT = "document"
     STRUCTURED = "structured"
+    JSON = "json"
+    ANYTHING = "anything"
     DYNAMIC = "dynamic"
 
     @property
@@ -84,6 +93,31 @@ class InputKind(StrEnum):
                 | InputKind.TIME
                 | InputKind.IMAGE
                 | InputKind.DOCUMENT
+                | InputKind.JSON
+                | InputKind.ANYTHING
+                | InputKind.DYNAMIC
+            ):
+                return False
+
+    @property
+    def reads_objects_literally(self) -> bool:
+        """Whether a bare object is itself the value, rather than the fields of a declared structure.
+
+        Such a kind cannot tell an item shaped like a ``{"concept", "content"}`` envelope from raw
+        data, so an item of that shape in a bare list is refused rather than read either way (R10).
+        """
+        match self:
+            case InputKind.JSON | InputKind.ANYTHING:
+                return True
+            case (
+                InputKind.TEXT
+                | InputKind.NUMBER
+                | InputKind.YES_NO
+                | InputKind.DATE
+                | InputKind.TIME
+                | InputKind.IMAGE
+                | InputKind.DOCUMENT
+                | InputKind.STRUCTURED
                 | InputKind.DYNAMIC
             ):
                 return False
@@ -185,12 +219,22 @@ class InputShaper:
             case InputKind.DYNAMIC:
                 # The signature genuinely does not know how to shape this — hand the whole raw value
                 # to the bottom-up factory (today's behavior, including its own list handling).
-                return StuffFactory.make_stuff_from_stuff_content_or_data(
-                    stuff_content_or_data=value,
-                    concept_provider=concept_provider,
-                    name=variable_name,
-                    search_scope=search_scope,
-                )
+                try:
+                    return StuffFactory.make_stuff_from_stuff_content_or_data(
+                        stuff_content_or_data=value,
+                        concept_provider=concept_provider,
+                        name=variable_name,
+                        search_scope=search_scope,
+                    )
+                except StuffFactoryError as exc:
+                    # (R8) The factory's refusal names neither the input nor its declared concept, and
+                    # spells what it accepts as a `typing.Union`: it stays on the chain as the cause.
+                    raise StructureValidationError.make_for_unreadable_bare_value(
+                        variable_name=variable_name,
+                        declared_concept_ref=declared_concept.concept_ref,
+                        provided_description=cls._describe_value(value),
+                        expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
+                    ) from exc
             case (
                 InputKind.TEXT
                 | InputKind.NUMBER
@@ -200,6 +244,8 @@ class InputShaper:
                 | InputKind.IMAGE
                 | InputKind.DOCUMENT
                 | InputKind.STRUCTURED
+                | InputKind.JSON
+                | InputKind.ANYTHING
             ):
                 content = cls._shape_with_multiplicity(
                     value,
@@ -209,6 +255,7 @@ class InputShaper:
                     variable_name=variable_name,
                     search_scope=search_scope,
                     inputs_base_dir=inputs_base_dir,
+                    is_raw_data=False,
                 )
                 return StuffFactory.make_stuff(concept=declared_concept, content=content, name=variable_name)
 
@@ -221,6 +268,9 @@ class InputShaper:
         """
         if NativeConceptCode.is_dynamic_concept(concept_code=concept.code):
             return InputKind.DYNAMIC
+        if not concept.declares_a_structure_class:
+            # `native.Anything`: decided from the concept alone, since it has no class to resolve.
+            return InputKind.ANYTHING
 
         ordered_natives: list[tuple[NativeConceptCode, InputKind]] = [
             (NativeConceptCode.YES_NO, InputKind.YES_NO),
@@ -230,6 +280,7 @@ class InputShaper:
             (NativeConceptCode.IMAGE, InputKind.IMAGE),
             (NativeConceptCode.DOCUMENT, InputKind.DOCUMENT),
             (NativeConceptCode.TEXT, InputKind.TEXT),
+            (NativeConceptCode.JSON, InputKind.JSON),
         ]
         for native_code, input_kind in ordered_natives:
             wanted_concept = concept_provider.get_native_concept(native_concept=native_code)
@@ -237,8 +288,8 @@ class InputShaper:
                 return input_kind
 
         # A user (non-native) concept whose structure is StructuredContent dispatches its dict
-        # top-down. Everything else — the out-of-matrix natives (Html/JSON/Page/TextAndImages/
-        # SearchResult/Composite/Anything) — falls back to bottom-up building.
+        # top-down. Everything else — the natives no arm reads top-down (Html/Page/TextAndImages/
+        # SearchResult/Composite) — falls back to bottom-up building.
         if not Concept.is_native_concept(concept=concept):
             if issubclass(concept_provider.get_structure_class(concept=concept), StructuredContent):
                 return InputKind.STRUCTURED
@@ -267,8 +318,14 @@ class InputShaper:
         variable_name: str,
         search_scope: str | None,
         inputs_base_dir: Path | None,
+        is_raw_data: bool,
     ) -> StuffContent:
-        """Peel the declared multiplicity (D2), then build the item content(s)."""
+        """Peel the declared multiplicity (D2), then build the item content(s).
+
+        ``is_raw_data`` is set when the value arrived as the content of an ``Anything`` envelope,
+        which is raw data at every depth, so an envelope-shaped list item is read as an object
+        there instead of being refused (R10's escape).
+        """
         is_list, fixed_count = cls._peel_multiplicity(stuff_spec.multiplicity)
 
         # (D11) A declared structured LIST input accepts a table reference — a bare tabular path
@@ -299,6 +356,7 @@ class InputShaper:
                 fixed_count=fixed_count,
                 search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
+                is_raw_data=is_raw_data,
             )
 
         # Singular (no multiplicity, or a count of one). A list here is ambiguous — hard error (D2).
@@ -373,6 +431,7 @@ class InputShaper:
         fixed_count: int | None,
         search_scope: str | None,
         inputs_base_dir: Path | None,
+        is_raw_data: bool,
     ) -> ListContent[StuffContent]:
         """Shape a declared-multiple input element-wise into a ListContent (D2)."""
         # A single bare value auto-wraps into a one-item list; an empty list stays empty (legal).
@@ -385,6 +444,22 @@ class InputShaper:
                 provided_count=len(item_values),
                 expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
+        if input_kind.reads_objects_literally and not is_raw_data:
+            # (R10) The envelope collision rule of D6 applies at the top of a slot only, so an item
+            # shaped like an envelope would otherwise be taken as a raw object here, one spelling
+            # meaning two things depending on where it sits.
+            for item_value in item_values:
+                if cls._is_envelope_dict(item_value):
+                    raise cls._wrong_kind(
+                        concept_provider=concept_provider,
+                        stuff_spec=stuff_spec,
+                        variable_name=variable_name,
+                        expected_kind=(
+                            'a plain value for each list item, not an item shaped like a {"concept", "content"} envelope '
+                            "(to type a list, wrap the whole list in one envelope instead)"
+                        ),
+                        value=item_value,
+                    )
         items = [
             cls._build_item_content(
                 item_value,
@@ -520,11 +595,98 @@ class InputShaper:
                     stuff_spec=stuff_spec,
                     variable_name=variable_name,
                 )
+            case InputKind.JSON:
+                if not isinstance(value, dict):
+                    raise cls._wrong_kind(
+                        concept_provider=concept_provider,
+                        stuff_spec=stuff_spec,
+                        variable_name=variable_name,
+                        expected_kind="a JSON object",
+                        value=value,
+                    )
+                # Built with the declared concept, so a concept refining JSON gets its own class.
+                return cls._build_json_object_content(
+                    cast("dict[str, Any]", value),
+                    concept=concept,
+                    concept_provider=concept_provider,
+                    stuff_spec=stuff_spec,
+                    variable_name=variable_name,
+                )
+            case InputKind.ANYTHING:
+                return cls._build_anything_content(value, concept_provider=concept_provider, stuff_spec=stuff_spec, variable_name=variable_name)
             case InputKind.DYNAMIC:
                 # Unreachable: DYNAMIC short-circuits in `_shape_one` before multiplicity peeling.
                 # Kept so the match over InputKind stays exhaustive.
                 msg = f"Input '{variable_name}': DYNAMIC kind must be handled by the bottom-up fallback, not per-item shaping."
                 raise PipelexUnexpectedError(msg)
+
+    @classmethod
+    def _build_anything_content(
+        cls, value: Any, *, concept_provider: ConceptProviderAbstract, stuff_spec: StuffSpec, variable_name: str
+    ) -> StuffContent:
+        """Build the natural content for one value at an ``Anything`` slot, keyed on its JSON type (R1).
+
+        Nothing is inferred beyond the JSON type: a string that looks like a URL or a date is text.
+        Each content is built through the matching native concept from the injected provider. An
+        array (an item of a list) and a null (an item) have no content to become, and neither has
+        a Python object that is not a JSON value.
+        """
+        native_code: NativeConceptCode
+        canonical: dict[str, Any] | str | bool | datetime.date | datetime.time
+        # bool before number: bool is a subclass of int, and a boolean is never a number.
+        if isinstance(value, bool):
+            native_code, canonical = NativeConceptCode.YES_NO, value
+        elif isinstance(value, (int, float)):
+            native_code, canonical = NativeConceptCode.NUMBER, {"number": value}
+        elif isinstance(value, datetime.time):
+            native_code, canonical = NativeConceptCode.TIME, value
+        elif isinstance(value, datetime.date):
+            # Covers datetime, a subclass of date: DateContent keeps its time of day.
+            native_code, canonical = NativeConceptCode.DATE, value
+        elif isinstance(value, str):
+            native_code, canonical = NativeConceptCode.TEXT, {"text": value}
+        elif isinstance(value, dict):
+            return cls._build_json_object_content(
+                cast("dict[str, Any]", value),
+                concept=concept_provider.get_native_concept(native_concept=NativeConceptCode.JSON),
+                concept_provider=concept_provider,
+                stuff_spec=stuff_spec,
+                variable_name=variable_name,
+            )
+        else:
+            raise cls._wrong_kind(
+                concept_provider=concept_provider,
+                stuff_spec=stuff_spec,
+                variable_name=variable_name,
+                expected_kind="a string, a number, a boolean or an object (a list only as a whole plural input, never null)",
+                value=value,
+            )
+        return cls._make_content(
+            concept_provider.get_native_concept(native_concept=native_code),
+            concept_provider=concept_provider,
+            value=canonical,
+            stuff_spec=stuff_spec,
+            variable_name=variable_name,
+        )
+
+    @classmethod
+    def _build_json_object_content(
+        cls,
+        json_object: dict[str, Any],
+        *,
+        concept: Concept,
+        concept_provider: ConceptProviderAbstract,
+        stuff_spec: StuffSpec,
+        variable_name: str,
+    ) -> StuffContent:
+        """Build a ``JSONContent`` (or the class of a concept refining ``JSON``) holding an object as it is.
+
+        The object is taken literally, ``{"json_obj": ...}`` included: ``json_obj`` is the content
+        form's field, which travels inside an envelope, never a key a bare object is read through.
+        """
+        return cls._make_content(
+            concept, concept_provider=concept_provider, value={"json_obj": json_object}, stuff_spec=stuff_spec, variable_name=variable_name
+        )
 
     @classmethod
     def _make_content(
@@ -537,6 +699,11 @@ class InputShaper:
         variable_name: str,
     ) -> StuffContent:
         """Delegate to ``StuffContentFactory``, wrapping a build failure as a D4 structure error.
+
+        ``concept`` names the structure class that builds the value: the declared concept, except at
+        an ``Anything`` slot, where it is the native concept matching the value's JSON type. A
+        failure is reported against the declared concept either way, since that is what the caller
+        sees in the signature.
 
         The structure class is resolved through the **injected provider**, then handed down as a
         resolved type — the shape ``hub-layering.md`` prescribes for exactly this ("rendering takes
@@ -563,7 +730,7 @@ class InputShaper:
         except (ValidationError, StuffContentFactoryError) as exc:
             raise StructureValidationError.make(
                 variable_name=variable_name,
-                declared_concept_ref=concept.concept_ref,
+                declared_concept_ref=stuff_spec.concept.concept_ref,
                 reason=str(exc),
                 expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             ) from exc
@@ -585,7 +752,22 @@ class InputShaper:
         ``StuffContent``/``ListContent`` all name (or infer) their own concept. ``StuffFactory`` builds
         them exactly as today — so the explicit, possibly more-specific concept is preserved — and the
         one new rule is: that concept must be compatible with the declared one, else a D4 error.
+
+        An envelope naming a structureless concept (``native.Anything``) is the one exception (R5):
+        the factory has no class to build it with, so its content is shaped here as the bare value
+        it is, by the ``Anything`` arm and against the declared multiplicity.
         """
+        structureless_envelope_stuff = cls._try_shape_structureless_envelope(
+            value,
+            concept_provider=concept_provider,
+            declared_concept=declared_concept,
+            stuff_spec=stuff_spec,
+            variable_name=variable_name,
+            search_scope=search_scope,
+        )
+        if structureless_envelope_stuff is not None:
+            return structureless_envelope_stuff
+
         stuff = StuffFactory.make_stuff_from_stuff_content_or_data(
             stuff_content_or_data=cast("StuffContentOrData", value),
             concept_provider=concept_provider,
@@ -604,6 +786,66 @@ class InputShaper:
             return stuff
         cls._reconcile_explicit_multiplicity(stuff, concept_provider=concept_provider, stuff_spec=stuff_spec, variable_name=variable_name)
         return stuff
+
+    @classmethod
+    def _try_shape_structureless_envelope(
+        cls,
+        value: Any,
+        *,
+        concept_provider: ConceptProviderAbstract,
+        declared_concept: Concept,
+        stuff_spec: StuffSpec,
+        variable_name: str,
+        search_scope: str | None,
+    ) -> Stuff | None:
+        """Shape an envelope naming a structureless concept, or return ``None`` for every other explicit form (R5).
+
+        The envelope's concept is resolved through the injected provider first. A concept that does
+        not resolve returns ``None`` too, so the bottom-up factory reports it exactly as it reports
+        any unknown envelope concept. A structureless envelope is honoured wherever its concept is
+        compatible with the declared one, which is an ``Anything`` or a ``Dynamic`` slot, and there
+        its content is raw data at every depth; anywhere else it is refused before anything is built,
+        since an ``Anything`` value is not known to satisfy anything narrower.
+        """
+        envelope_concept_ref: Any
+        content: Any
+        if isinstance(value, DictStuff):
+            envelope_concept_ref, content = value.concept, value.content
+        elif cls._is_envelope_dict(value):
+            envelope_dict = cast("dict[str, Any]", value)
+            envelope_concept_ref, content = envelope_dict["concept"], envelope_dict["content"]
+        else:
+            return None
+        if not isinstance(envelope_concept_ref, str):
+            return None
+        try:
+            envelope_concept = concept_provider.get_required_entry_concept(concept_ref_or_code=envelope_concept_ref, search_scope=search_scope)
+        except ConceptLibraryConceptNotFoundError:
+            return None
+        if envelope_concept.declares_a_structure_class:
+            return None
+
+        expected_shape = cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec)
+        if not concept_provider.is_compatible(tested_concept=envelope_concept, wanted_concept=declared_concept):
+            raise ExplicitConceptIncompatibleError.make(
+                variable_name=variable_name,
+                declared_concept_ref=declared_concept.concept_ref,
+                provided_concept_ref=envelope_concept.concept_ref,
+                expected_shape=expected_shape,
+            )
+        if content is None:
+            raise NullInputError.make(variable_name=variable_name, declared_concept_ref=declared_concept.concept_ref, expected_shape=expected_shape)
+        shaped_content = cls._shape_with_multiplicity(
+            content,
+            concept_provider=concept_provider,
+            stuff_spec=stuff_spec,
+            input_kind=InputKind.ANYTHING,
+            variable_name=variable_name,
+            search_scope=search_scope,
+            inputs_base_dir=None,
+            is_raw_data=True,
+        )
+        return StuffFactory.make_stuff(concept=envelope_concept, content=shaped_content, name=variable_name)
 
     @classmethod
     def _reconcile_explicit_multiplicity(
@@ -651,6 +893,11 @@ class InputShaper:
         """
         if isinstance(value, (DictStuff, StuffContent)):
             return True
+        return cls._is_envelope_dict(value)
+
+    @classmethod
+    def _is_envelope_dict(cls, value: Any) -> bool:
+        """Whether a value is a plain object whose keys are exactly ``concept`` and ``content``."""
         return isinstance(value, dict) and set(cast("dict[Any, Any]", value).keys()) == {"concept", "content"}
 
     @classmethod

@@ -118,9 +118,11 @@ class Concept(ConceptAbstract):
     ) -> bool:
         """Whether the two concepts' *declarations* establish that `concept_1` satisfies `concept_2`.
 
-        This is the string tier of compatibility: dynamic short-circuits, ref equality, declared
-        structure-class-name equality, and `refines` chains — the last resolved through
-        `concept_resolver` when a refinement crosses a package boundary (`dep->domain.Code`).
+        This is the string tier of compatibility: dynamic short-circuits, the structureless top of
+        the lattice (every concept satisfies `native.Anything`, which declares no structure class,
+        while `Anything` satisfies nothing narrower), ref equality, declared structure-class-name
+        equality, and `refines` chains — the last resolved through `concept_resolver` when a
+        refinement crosses a package boundary (`dep->domain.Code`).
 
         The two verdicts are asymmetric, deliberately. `True` means "established by the
         declarations". `False` means "*not established at this tier*" — NOT "incompatible": two
@@ -134,6 +136,10 @@ class Concept(ConceptAbstract):
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_1.code):
             return True
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_2.code):
+            return True
+        if not concept_2.declares_a_structure_class:
+            # `native.Anything` promises no structure, so any value satisfies it; the reverse is
+            # never established here, since an `Anything` value is not known to be anything narrower.
             return True
         if concept_1.concept_ref == concept_2.concept_ref:
             return True

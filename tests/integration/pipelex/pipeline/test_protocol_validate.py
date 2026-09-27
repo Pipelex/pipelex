@@ -59,6 +59,27 @@ output = "Text"
 template = "$anything_in"
 """
 
+_ANYTHING_OUTPUT_SEQUENCE_MTHDS = """
+domain = "protocol_validate_anything_output"
+description = "Bundle whose sequence declares a native.Anything output over a Text-producing last step"
+
+[pipe.seq]
+type = "PipeSequence"
+description = "Echo a text through a sequence that promises nothing narrower than Anything"
+inputs = { doc = "Text" }
+output = "Anything"
+steps = [
+  { pipe = "echo", result = "echoed" },
+]
+
+[pipe.echo]
+type = "PipeCompose"
+description = "Echo the text"
+inputs = { doc = "Text" }
+output = "Text"
+template = "$doc"
+"""
+
 _MAIN_PIPE_MTHDS = """
 domain = "protocol_validate_graph"
 description = "Bundle declaring a main_pipe, for the graph arm"
@@ -163,6 +184,22 @@ class TestProtocolValidate:
             assert set(anything_schema) == {"title", "description"}
             assert anything_schema["title"] == "native.Anything"
             assert anything_schema["description"]
+        finally:
+            clear_current_library()
+
+    async def test_anything_output_sequence_validates(self, load_empty_library: Callable[[], str]) -> None:
+        """Every concept satisfies `native.Anything`, so a sequence declaring `output = "Anything"`
+        validates over a last step producing `Text` — the output check asks the same compatibility
+        question the input shaper does.
+        """
+        load_empty_library()
+        try:
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(mthds_contents=[_ANYTHING_OUTPUT_SEQUENCE_MTHDS])
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.is_runnable is True
+            assert report.pipe_io_contracts["protocol_validate_anything_output.seq"].output.concept_ref == "native.Anything"
         finally:
             clear_current_library()
 

@@ -2652,9 +2652,17 @@ rationale = "Verb-object: renders the absence record; single operand."
 param = "absence_record"
 rationale = "Verb-object: renders the absence record; single operand."
 
+["pipelex/core/memory/input_shaper.py::InputShaper._build_anything_content"]
+param = "value"
+rationale = "Verb-object: builds the content for the raw value; the rest is context."
+
 ["pipelex/core/memory/input_shaper.py::InputShaper._build_item_content"]
 param = "value"
 rationale = "Verb-object: shapes the raw value into content; the rest is context."
+
+["pipelex/core/memory/input_shaper.py::InputShaper._build_json_object_content"]
+param = "json_object"
+rationale = "Verb-object: builds the content holding the JSON object; the concept and the rest are context."
 
 ["pipelex/core/memory/input_shaper.py::InputShaper._check_input_names"]
 param = "pipeline_inputs"
@@ -2663,6 +2671,10 @@ rationale = "Validator: the pipeline inputs are the operand checked against the 
 ["pipelex/core/memory/input_shaper.py::InputShaper._describe_value"]
 param = "value"
 rationale = "Noun-named derivation: describes the value; single operand."
+
+["pipelex/core/memory/input_shaper.py::InputShaper._is_envelope_dict"]
+param = "value"
+rationale = "Predicate on the value; single operand."
 
 ["pipelex/core/memory/input_shaper.py::InputShaper._is_explicit"]
 param = "value"
@@ -2703,6 +2715,10 @@ rationale = "Verb-object: shapes the raw value; the rest is context."
 ["pipelex/core/memory/input_shaper.py::InputShaper._try_shape_csv"]
 param = "value"
 rationale = "Verb-object: shapes the raw value; the rest is context."
+
+["pipelex/core/memory/input_shaper.py::InputShaper._try_shape_structureless_envelope"]
+param = "value"
+rationale = "Verb-object: shapes the raw value when it is a structureless envelope; the rest is context."
 
 ["pipelex/core/memory/input_shaper.py::InputShaper.resolve_input_kind"]
 param = "concept"
