@@ -146,6 +146,40 @@ ledger claim L-260902-10eb56 --renew
 .venv/bin/pytest -x -q tests/unit/pipelex/libraries/test_concept_library_compatibility.py tests/unit/pipelex/core/memory/input_shaper/
 ```
 
+## Handoff — build session, 2026-09-27
+
+**Done.** Phases 1 to 3 are built, tested and committed as "Shape Anything and JSON slots top-down, and refuse the fallback by name", and Checkpoint 1's probe is recorded above. The four tests of `tests/unit/pipelex/cli/dev_cli/test_generate_projection_corpus.py` are expected to fail until Phase 5, with `Undeclared divergence class(es) ['engine-only-field']`, because the engine's `JSON` template is unwrapped while the reference projection is not yet.
+
+**Checkpoint 1's `/rev` ran but is not triaged.** Profile 4, round 1, bar `open`, fix mode `ask`, on the branch against `origin/dev` at the commit named above. All four reviewers returned (cubic, Codex's review and adversarial runs, and the bundled `code-review` at `medium`, whose provenance matched the worktree, the commit and the diff's files). The session stopped at its context threshold before verifying anything, so no finding below has been verified, fixed or rejected, and no `ledger review-pass` is recorded. The merged findings, with the reviewers who raised each:
+
+1. **Transport round-trip of a single `Anything` value** (Codex adversarial, high, `input_shaper.py` `_build_anything_content`). An `Anything` stuff holding a `TextContent`, sent through `dump_for_transport()` then `hydrate_working_memory()`, is reported to raise `PipeJobError: Class 'AnythingContent' not found in registry`, because the singular dump does not keep the concrete content class and hydration resolves the class from the declared concept. Verify with that exact round trip first. If real, it is a critical at every bar (a distributed run loses the input), and it touches R6 (no `AnythingContent` class ever) and R9 (L-260927-da1b09), so the fix is hydration reading the concrete class rather than a new class.
+2. **An envelope can escape the declared multiplicity** (three reviewers, three cases, `input_shaper.py` `_try_shape_structureless_envelope` and `_reconcile_explicit_multiplicity`):
+   - `code-review`: an `Anything` envelope whose content is a prebuilt `ListContent` becomes `ListContent(items=[ListContent(...)])` at `Anything[]`, and a bare `ListContent` at a single `Anything` slot, because `_shape_list` treats a non-`list` value as one item. Reproduced by the reviewer's probe.
+   - Codex adversarial: a typed envelope `{"concept": "native.Text", "content": "hello"}` at `Anything[]` stores a scalar `TextContent`, since reconciliation returns early when the content is not a `ListContent`, and `Anything[N]` counts are not checked. Check whether a `Text` envelope at `Text[]` does the same on `dev`; if so the hole predates this branch but is widened by it.
+   - cubic: at a singular `Dynamic` slot, `{"concept": "native.Anything", "content": [1, 2]}` raises `ListWhereSingularError` while `{"concept": "Text", "content": ["a", "b"]}` is accepted, because the structureless path peels multiplicity where `_shape_explicit` deliberately skips it for `Dynamic`. Decide one behaviour for both.
+3. **R8's refusal is too broad and its advice too narrow** (`code-review`, cubic; `input_shaper.py` `DYNAMIC` arm, `exceptions.py` `make_for_unreadable_bare_value`). It rewrites every `StuffFactoryError` from the fallback, so a list of an unregistered `StructuredContent` (`[Zork(), Zork()]` at a `Dynamic` slot) reports "no reading for this one" and hides that no concept `Zork` is registered, as does a mixed list of prebuilt contents or `[]` at `Html[]`. And it always advises `JSON` or `JSON[]`, which refuses a scalar too (`3` at a `Dynamic` slot). Reword only the no-reading cases, keep the factory's reason otherwise, and advise by the value's shape: a scalar towards `Anything` or its native, an object or a list of objects towards `JSON` or `JSON[]`.
+4. **The published `Anything` schema admits array and null** (both Codex runs). This is Phase 4, planned; the adversarial run adds that `Anything[]` items must carry the exclusion too, which Phase 4's step 1 already says.
+5. **The corpus gate, the stale docs and the missing changelog entry** (Codex review twice, cubic). This is Phase 5, planned.
+6. **Test layout** (cubic, P3): `test_explicit_forms.py` now holds three test classes and `test_errors.py` two, and the new classes carry docstrings, against the repo's testing rules. Move `TestInputShaperAnythingEnvelopes`, `TestInputShaperJSONEnvelopes` and `TestInputShaperFallbackRefusal` into their own modules, as `test_list_of_objects_report.py` already is, and drop the class docstrings.
+
+**Next.** Claim the item, verify findings 1 to 3 with one verifier subagent each case, triage them against the `open` bar, fix what survives (finding 6 is mechanical), then record the pass and read the verdict before starting Phase 4:
+
+```bash
+cd /Users/lchoquel/repos/Pipelex/_pipelex--anything-slot-shaping
+ledger claim L-260902-10eb56 --renew
+.venv/bin/pytest -x -q tests/unit/pipelex/core/memory/input_shaper/
+SHA=$(git log --format=%H -1 --grep='Shape Anything and JSON slots top-down')
+ledger review-pass L-260902-10eb56 --branch 'fix/Anything-slot-shaping' --repo pipelex --profile 4 --round 1 --sha "$SHA" --outcome <fixed|clean|…> --tip <the fix commit> --reviewers cubic,codex,code-review
+ledger review-round L-260902-10eb56 --branch 'fix/Anything-slot-shaping' --json
+```
+
+Read for Phases 4 and 5 while the reviewers ran, so none of it needs re-deriving:
+
+- **Phase 4** also moves `test_anything_input_produces_a_verdict` in `tests/integration/pipelex/pipeline/test_protocol_validate.py`, which pins `set(anything_schema) == {"title", "description"}`, and `tests/integration/pipelex/cli/test_trace_input_semantics_cmd.py`, besides the two files step 2 names.
+- **Phase 5, the reference projection**: in `projection_reference.py`, `keeps_envelope` answers `code in OUT_OF_MATRIX_NATIVES or node.kind is FieldKind.OBJECT`, so the `JSON` code has to answer `False` ahead of the object test, and `_light_value` has to unwrap `json_obj` for a node whose native code is `JSON`.
+- **Phase 5, the divergence collector**: `_engine_dict_placeholder(path)` in `generate_projection_corpus_cmd.py` keys its placeholder by `path[-1]`, which at a compact `JSON` position is the slot name or a list index rather than `json_obj`. Give the collector the exact `JSON` positions from the descriptor, the way `register_fixed_counts` receives the fixed counts, use them in the `unknown-empty-object` arm, and update `tests/unit/pipelex/cli/dev_cli/test_projection_divergence_gate.py` to match. The site counts should not move; the example paths will.
+- **Phase 5, the error page**: `docs/errors/structure-validation-error.md` is generated, so the new case means converting it to an authored page (`<!-- pipelex:authored -->`, modelled on `docs/errors/model-not-found-error.md`) and running `generate-error-pages` and `generate-error-identity`, which should show no identity change.
+
 ## Ledger
 
 - L-260902-10eb56 is claimed from the worktree; `ledger claim L-260902-10eb56 --renew` at the start of each session.
