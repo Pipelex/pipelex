@@ -118,6 +118,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.system.registries.func_registry import func_registry
     from pipelex.system.runtime import IntegrationMode
     from pipelex.tools.jinja2.template_category import TemplateCategory
+    from pipelex.tools.log.log_context import get_log_context
 
     interpreter_packages = frozenset(sys.argv[1:])
     # An empty set would make the sweep flag nothing and the test pass vacuously — the same guard both
@@ -243,14 +244,21 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
             if not isinstance(extracted_item, NumberContent):
                 fail(f"a list extraction helper yielded a {type(extracted_item).__name__}, not the NumberContent it was asked for")
 
-    text_result = asyncio.run(
-        kernel.llm_text(
-            memory=WorkingMemoryFactory.make_empty(),
-            model=model,
-            user="Say something.",
-            result="reply",
+    # The host's run-level log binding, entered the way a host enters it: around its kernel calls.
+    # It binds the run and no step, and releases the binding on exit.
+    with kernel.log_context() as run_binding:
+        if run_binding.pipeline_run_id != kernel.job_metadata.run_metadata.pipeline_run_id or run_binding.pipe_run_id is not None:
+            fail(f"kernel.log_context() bound {run_binding!r}, not the run's own id with no step")
+        text_result = asyncio.run(
+            kernel.llm_text(
+                memory=WorkingMemoryFactory.make_empty(),
+                model=model,
+                user="Say something.",
+                result="reply",
+            )
         )
-    )
+    if get_log_context() is not None:
+        fail("kernel.log_context() did not release its binding on exit")
 
     if not isinstance(text_result, LlmTextResult):
         fail(f"llm_text returned {type(text_result).__name__}, not an LlmTextResult")

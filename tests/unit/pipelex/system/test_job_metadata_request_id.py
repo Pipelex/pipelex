@@ -35,6 +35,8 @@ class TestJobMetadataRequestId:
         "bad_request_id",
         [
             "abc\ndef",  # newline (CRLF log injection)
+            "abc\n",  # trailing newline (a `$` anchor under `re.match` would admit it)
+            "",  # empty
             "abc\rdef",  # carriage return
             "abc\x1b[31mfake",  # ANSI escape (log forgery)
             "abc\x00def",  # NUL byte
