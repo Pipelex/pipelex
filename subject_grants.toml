@@ -4680,10 +4680,6 @@ rationale = "Factory from source: builds the result from the pipe output; single
 param = "extra"
 rationale = "Derivation: extracts from the extra mapping; single operand."
 
-["pipelex/pipeline/validate_bundle.py::_backfill_pipe_error_source"]
-param = "pipe_error"
-rationale = "Verb-object: backfills the pipe error in place; single operand."
-
 ["pipelex/pipeline/validate_bundle.py::_pipes_to_dry_run"]
 param = "loaded_pipes"
 rationale = "Verb-object: selects among the loaded pipes; the requested codes stay keyword."
@@ -4703,6 +4699,10 @@ rationale = "Verb-object: validates the bundle file at the path; options stay ke
 ["pipelex/pipeline/validate_bundle.py::validate_bundles_from_directory"]
 param = "directory"
 rationale = "Verb-object: validates bundles from the directory; options stay keyword."
+
+["pipelex/pipeline/validate_bundle_translation.py::_backfill_pipe_error_source"]
+param = "pipe_error"
+rationale = "Verb-object: backfills the pipe error in place; single operand."
 
 ["pipelex/pipeline/validation_render.py::_markdown_category_header"]
 param = "category"

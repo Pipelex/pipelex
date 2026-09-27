@@ -1,5 +1,6 @@
 import uuid
-from contextlib import ExitStack
+from collections.abc import Generator
+from contextlib import ExitStack, contextmanager
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,12 +16,15 @@ from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
+from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
+from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
@@ -47,7 +51,7 @@ from pipelex.methods.fetch_on_miss import resolve_address_based_method
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipelexBundleBlueprint, StepRole
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
@@ -97,6 +101,95 @@ def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint])
                 break
             current = parent
     return result
+
+
+def _dependency_bundle_source(*, package_address: str, package_root: Path, mthds_path: Path) -> str:
+    """Name a dependency's bundle by the package's address and the bundle's path inside the package.
+
+    The name is the bundle's ``source``, which rides every item a refusal inside the package gives, the
+    files a duplicate declaration names included, and a verdict is caller-facing: where the host installed
+    the package is the host's own path, which a hosted caller must never read. A bundle found outside the
+    package root, which discovery does not produce, is named by its file name alone rather than by its path.
+    """
+    for candidate_root in (package_root, package_root.resolve()):
+        for candidate_path in (mthds_path, mthds_path.resolve()):
+            if candidate_path.is_relative_to(candidate_root):
+                return f"{package_address}/{candidate_path.relative_to(candidate_root).as_posix()}"
+    return f"{package_address}/{mthds_path.name}"
+
+
+def _authored_model_field(*, step_role: StepRole) -> str:
+    """The field of the authored ``preliminary_text`` PipeLLM whose model a synthetic helper was given."""
+    match step_role:
+        case StepRole.DRAFT_TEXT:
+            return "model"
+        case StepRole.STRUCTURE:
+            return "model_to_structure"
+
+
+def _relocate_on_authored_pipe(
+    *, model_choice_error: PipeOperatorModelChoiceError, elaboration: ElaborationMetadata, domain_code: str
+) -> PipeOperatorModelChoiceError:
+    """Move an unknown model refused on a synthetic helper onto the authored pipe and field it came from."""
+    cause = model_choice_error.__cause__
+    if not isinstance(cause, ModelChoiceNotFoundError):
+        return model_choice_error
+    relocated = PipeOperatorModelChoiceError.make_from_model_choice_not_found(
+        model_choice_error=cause,
+        pipe_type="PipeLLM",
+        pipe_code=elaboration.parent_pipe_code,
+        domain_code=domain_code,
+        field_name=_authored_model_field(step_role=elaboration.step_role),
+    )
+    relocated.source = model_choice_error.source
+    return relocated
+
+
+@contextmanager
+def _locating_pipe_build_refusals(
+    *, pipe_code: str, domain_code: str, source: str | None, elaboration: ElaborationMetadata | None
+) -> Generator[None, None, None]:
+    """Let a refusal raised while building one pipe leave the load loop located on that pipe and its file.
+
+    The loop is the one place that holds the pipe's code, its domain and the file it is declared in at
+    the moment a build fails: pipes carry no source, and the pipe-source map is filled only after a
+    pipe is built. So the location is attached here, and bundle validation reads it off the refusal:
+
+    - An unknown model is already located on its pipe and field by the operator
+      (``PipeOperatorModelChoiceError``); the loop adds the file and lets it go on under its own class,
+      which the validate and run paths turn into its ``unknown_model`` verdict item and the build
+      surfaces render with their dedicated panel.
+    - Any other refusal of the caller's input (an ``input``-domained ``PipelexError``) is raised again
+      as a ``PipeLoadRefusalError`` naming the pipe and the file, ``from`` the original.
+    - Everything else leaves untouched: a configuration or runtime fault keeps its identity and stays a
+      no-verdict fault, a security refusal is never absorbed into a verdict, a library error keeps the
+      structured items its own arm forwards, and pydantic's ``ValidationError`` and the
+      ``PipeValidationError`` family (not ``PipelexError``s) keep their categorizers.
+
+    A synthetic helper the bundle elaborator generated (the ``<code>__draft_text`` and ``<code>__structure``
+    pipes of a ``preliminary_text`` PipeLLM) is not in the author's file, so its refusal is located on
+    the authored pipe instead, and an unknown model on the authored field the helper's model came from.
+    """
+    try:
+        yield
+    except PipeOperatorModelChoiceError as model_choice_error:
+        if model_choice_error.source is None:
+            model_choice_error.source = source
+        if elaboration is None:
+            raise
+        relocated = _relocate_on_authored_pipe(model_choice_error=model_choice_error, elaboration=elaboration, domain_code=domain_code)
+        if relocated is model_choice_error:
+            raise
+        raise relocated from model_choice_error
+    except (SecurityError, LibraryError):
+        raise
+    except PipelexError as refusal:
+        if not error_domain_is_input(refusal.to_error_report().error_domain):
+            raise
+        authored_pipe_code = elaboration.parent_pipe_code if elaboration is not None else pipe_code
+        raise PipeLoadRefusalError.make_from_refusal(
+            refusal=refusal, pipe_code=authored_pipe_code, domain_code=domain_code, source=source
+        ) from refusal
 
 
 class LibraryManager(LibraryManagerAbstract):
@@ -536,16 +629,19 @@ class LibraryManager(LibraryManagerAbstract):
 
                 concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
-                pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                    domain_code=domain_code,
-                    pipe_code=pipe_code,
-                    blueprint=pipe_blueprint,
-                    concept_codes_from_the_same_domain=concept_codes_for_domain,
-                )
+                source = crate.source_map.get(pipe_ref)
+                with _locating_pipe_build_refusals(
+                    pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
+                ):
+                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                        domain_code=domain_code,
+                        pipe_code=pipe_code,
+                        blueprint=pipe_blueprint,
+                        concept_codes_from_the_same_domain=concept_codes_for_domain,
+                    )
                 all_pipes.append(pipe)
 
                 # Track source file for this pipe (used by get_pipe_source)
-                source = crate.source_map.get(pipe_ref)
                 if source:
                     self._pipe_source_maps.setdefault(library_id, {})[pipe_ref] = source
 
@@ -993,6 +1089,7 @@ class LibraryManager(LibraryManagerAbstract):
             self._load_single_dependency(
                 library=library,
                 resolved_dep=resolved_dep,
+                package_address=resolved_dep.address,
             )
 
         # Wire concept resolver after all deps are loaded so cross-package
@@ -1004,6 +1101,7 @@ class LibraryManager(LibraryManagerAbstract):
         library: Library,
         *,
         resolved_dep: ResolvedDependency,
+        package_address: str,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
 
@@ -1011,9 +1109,14 @@ class LibraryManager(LibraryManagerAbstract):
         into it, registers it in library.dependency_libraries, and adds aliased
         entries to the main library for backward-compatible cross-package lookups.
 
+        Each bundle's ``source`` is ``<package_address>/<path inside the package>``, never the file's
+        path on the host (see ``_dependency_bundle_source``), so a refusal inside the dependency names it
+        that way on every surface.
+
         Args:
             library: The main library to load into
             resolved_dep: The resolved dependency info
+            package_address: The dependency's address as a reference names it, without any ``@<tag>``
         """
         alias = resolved_dep.alias
 
@@ -1022,7 +1125,9 @@ class LibraryManager(LibraryManagerAbstract):
         for mthds_path in resolved_dep.mthds_files:
             try:
                 blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
-                blueprint.source = str(mthds_path)
+                blueprint.source = _dependency_bundle_source(
+                    package_address=package_address, package_root=resolved_dep.package_root, mthds_path=mthds_path
+                )
             except (FileNotFoundError, MthdsParserError) as exc:
                 log.warning(f"Could not parse dependency '{alias}' bundle '{mthds_path}': {exc}")
                 continue
@@ -1142,12 +1247,20 @@ class LibraryManager(LibraryManagerAbstract):
                 if has_exports and pipe_code not in all_exported:
                     continue
                 try:
-                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                        domain_code=domain_code,
+                    # The same location the main load path attaches, so a dependency pipe's refusal
+                    # names the dependency's own file.
+                    with _locating_pipe_build_refusals(
                         pipe_code=pipe_code,
-                        blueprint=pipe_blueprint,
-                        concept_codes_from_the_same_domain=domain_concept_codes.get(domain_code, []),
-                    )
+                        domain_code=domain_code,
+                        source=crate.source_map.get(pipe_ref),
+                        elaboration=crate.elaboration_metadata.get(pipe_ref),
+                    ):
+                        pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                            domain_code=domain_code,
+                            pipe_code=pipe_code,
+                            blueprint=pipe_blueprint,
+                            concept_codes_from_the_same_domain=domain_concept_codes.get(domain_code, []),
+                        )
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
                     log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
@@ -1261,6 +1374,8 @@ class LibraryManager(LibraryManagerAbstract):
         self._load_single_dependency(
             library=library,
             resolved_dep=resolved_dep,
+            # The address the lookup matched (the manifest's address and the method's name), never a tag.
+            package_address=f"{installed.manifest.address}/{installed.name}",
         )
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:

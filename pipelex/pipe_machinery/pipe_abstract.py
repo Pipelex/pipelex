@@ -9,6 +9,7 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -492,11 +493,19 @@ class PipeAbstract(ABC, BaseModel):
             ]
             if optional_input_names:
                 msg += f" These optional inputs may be omitted: {', '.join(optional_input_names)}."
+            # Whether the caller left the inputs out of the request or an earlier step of their
+            # method did not produce them, the fault is in the caller's own request or method, and
+            # the message names only the pipe and its input names.
             raise PipeRunInputsError(
                 message=msg,
                 run_mode=pipe_run_params.run_mode,
                 pipe_code=self.code,
                 missing_inputs=presence_scan.missing_names,
+            ).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Provide the missing required inputs of '{self.code}': {', '.join(presence_scan.missing_names)}.",
+                )
             )
 
         # The pipe is about to be lifted (skipped): per-pipe validation and resource checks are
@@ -514,6 +523,9 @@ class PipeAbstract(ABC, BaseModel):
                     try:
                         stuff.content.validate_resources()
                     except ValueError as exc:
+                        # Not classified as the caller's fault, although the resource is the
+                        # caller's: the check's message names the path as resolved on this host,
+                        # which STRICT disclosure must not show, as `PipelineInputContentError`'s.
                         msg = f"Input '{variable_name}' of pipe '{self.code}' references an invalid resource: {exc}"
                         raise PipeRunInputsError(
                             message=msg,

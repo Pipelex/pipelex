@@ -195,7 +195,11 @@ class SdkTypeError(CogtError):
 
 
 class ModelChoiceNotFoundError(CogtError):
-    """Error raised when a model choice cannot be found in the model deck.
+    """Raised when a model reference names a handle, alias, preset or waterfall the model deck does not define:
+    by the deck check a pipe runs when it is built, and by the deck when a run resolves a reference. When a
+    pipe is built, the pipe operator raises it again as a ``PipeOperatorModelChoiceError`` located on the pipe
+    and the field, so a bundle naming an unknown model is an invalid validation verdict (error type
+    ``unknown_model``), never a failure of the validator.
 
     Includes available options and migration hints in error message.
     """

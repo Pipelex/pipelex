@@ -106,10 +106,10 @@ def format_fix_still_invalid_markdown(result: FixBundleResult, *, bundle_path: s
     if result.remaining_errors:
         lines += ["", format_validation_error_items_markdown(result.remaining_errors)]
 
-    # A remaining error can still carry a 💡 suggested-fix line — dropped by --select/--ignore, left
+    # A remaining error can still carry a safe 💡 suggested-fix line — dropped by --select/--ignore, left
     # outside the write scope, or unconverged when the loop bailed. Claiming "no safe fix" there would
     # contradict the line just printed, so only say it when nothing fixable remains (mirrors the human tip).
-    if any(item.suggested_fix is not None for item in result.remaining_errors):
+    if any(item.suggested_fix is not None and item.suggested_fix.safety.is_safe for item in result.remaining_errors):
         lines += [
             "",
             (

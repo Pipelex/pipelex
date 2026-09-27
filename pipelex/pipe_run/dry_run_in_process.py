@@ -21,6 +21,7 @@ from pipelex.interpreter_hub import get_library_manager, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
+from pipelex.pipe_run.located_failure import find_foreign_fault
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.execution_seams import prepare_pipe_job
@@ -64,6 +65,11 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
         pipe = get_library_manager().get_library(library_id=library_id).pipe_library.get_required_entry_pipe(pipe_code=pipe_ref)
         return await dry_run_pipe_in_process(pipe=pipe, library_id=library_id)
     except (PipelexError, FactoryException, ValueError) as graph_error:
+        # A foreign exception a pipe raised reaches here located as a PipelexError by the router:
+        # it is a programming bug, not a dry-run domain failure, so it propagates.
+        foreign_fault = find_foreign_fault(error=graph_error)
+        if foreign_fault is not None and not isinstance(foreign_fault, (FactoryException, ValueError)):
+            raise
         log.warning(
             f"{log_context}: graph dry-run of '{pipe_ref}' did not produce a graph "
             f"({type(graph_error).__name__}: {graph_error}); returning validation result without graph_spec"

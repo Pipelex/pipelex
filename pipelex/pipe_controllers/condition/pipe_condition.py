@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from jinja2 import TemplateSyntaxError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -236,11 +238,21 @@ class PipeCondition(PipeController):
             context=working_memory.generate_context(),
         )
         if not evaluated_expression or evaluated_expression == "None":
+            # The expression is the caller's own method, rendered over their run's data: when it renders
+            # nothing, no outcome can be chosen, and the method is theirs to fix. The message names only the pipe.
             error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
             raise PipeRunError(
                 pipe_code=self.code,
                 message=error_msg,
                 run_mode=pipe_run_params.run_mode,
+            ).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=(
+                        f"Change the expression of PipeCondition '{self.code}' so that it always renders a value: "
+                        "the name of one of its outcomes, or any other value, which takes the default outcome."
+                    ),
+                )
             )
 
     @override
@@ -313,8 +325,19 @@ class PipeCondition(PipeController):
 
         if SpecialOutcome.is_fail(outcome):
             self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
-            msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            # The caller's method maps this outcome to 'fail' on purpose, a refusal of the run it was given. The
+            # message names only the pipe: the value the expression rendered can be literal text of the expression,
+            # or an outcome key, of a condition a host library declared. The execution data above keeps that value.
+            msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=(
+                        f"PipeCondition '{self.code}' refuses this run on purpose: change the inputs so that its expression "
+                        "selects another outcome, or map that outcome to a pipe or to 'continue'."
+                    ),
+                )
+            )
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
 
@@ -334,11 +357,16 @@ class PipeCondition(PipeController):
         # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
         missing_names = working_memory.list_missing_names(names=required_stuff_names)
         if missing_names:
-            pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
-            pipe_condition_path_str = ".".join(pipe_condition_path)
-            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{missing_names[0]}'"
-            msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            # The caller's request or an earlier step of their method left out what the chosen pipe needs. The
+            # message names only the pipes and the input names.
+            missing_names_str = ", ".join(missing_names)
+            msg = f"PipeCondition '{self.code}' chose pipe '{outcome}', whose required inputs are missing: {missing_names_str}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Provide the missing required inputs of '{outcome}', which PipeCondition '{self.code}' chose: {missing_names_str}.",
+                )
+            )
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
@@ -373,11 +401,18 @@ class PipeCondition(PipeController):
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
-            msg = (
-                f"Dry run failed for pipe '{self.code}' (PipeCondition): could not detect required variables "
-                f"from expression template: {exc}\nTemplate:\n'{self.expression}'"
-            )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            # The expression is the caller's own method. The message quotes neither the expression nor the parser's
+            # diagnosis, which names the token it stopped at: the condition may be a host library's, whose text
+            # must not reach the caller. The line locates the fault. It is raised from the parser's own error,
+            # past the `Jinja2DetectVariablesError` that quotes the expression: a run failure reports the innermost
+            # Pipelex error on its chain (`find_root_fault`), which must be this refusal.
+            msg = f"Dry run failed for pipe '{self.code}' (PipeCondition): its expression {_describe_expression_parse_failure(error=exc)}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Fix the expression of PipeCondition '{self.code}' so that it parses as a Jinja2 expression.",
+                )
+            ) from exc.__cause__
 
         # Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
@@ -385,14 +420,18 @@ class PipeCondition(PipeController):
             all_pipe_codes.add(self.default_outcome)
         all_pipe_codes -= set(SpecialOutcome.value_list())
 
-        missing_pipes = [pipe_code for pipe_code in all_pipe_codes if not get_optional_pipe(pipe_code=pipe_code)]
+        missing_pipes = sorted(pipe_code for pipe_code in all_pipe_codes if not get_optional_pipe(pipe_code=pipe_code))
 
         if missing_pipes:
-            msg = (
-                f"Dry run failed for PipeCondition '{self.code}': missing pipes: {', '.join(missing_pipes)}. "
-                f"Pipe map: {self.outcome_map}, default: {self.default_outcome}"
+            # The caller's method names these pipes in its outcomes. The message names only the pipe codes.
+            missing_pipes_str = ", ".join(missing_pipes)
+            msg = f"Dry run failed for PipeCondition '{self.code}': its outcomes name pipes that do not exist: {missing_pipes_str}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Declare the pipes {missing_pipes_str}, or change the outcomes of PipeCondition '{self.code}' to name existing pipes.",
+                )
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # Here, it should launch the dry run of all the pipes in the outcomes map.
         # pipe_dependencies() is a set, and every branch dry-runs into the SAME
@@ -423,11 +462,17 @@ class PipeCondition(PipeController):
         # fail at runtime.
         if not self.pipe_dependencies():
             if not self._continue_reachable:
+                # The caller's method maps every outcome to 'fail'. The message names only the pipe.
                 msg = (
                     f"PipeCondition '{self.code}' maps every outcome (and the default) to 'fail': "
                     f"every live run of this pipe raises. Map at least one outcome to a pipe or to 'continue'."
                 )
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=f"Map at least one outcome of PipeCondition '{self.code}' to a pipe or to 'continue'.",
+                    )
+                )
             self._record_declared_absent_output(
                 working_memory=working_memory,
                 output_name=output_name,
@@ -444,3 +489,18 @@ class PipeCondition(PipeController):
             producing_pipe=self.code,
         )
         working_memory.record_new_main_absence(record)
+
+
+def _describe_expression_parse_failure(*, error: Jinja2DetectVariablesError) -> str:
+    """Say where a condition's expression fails to parse, in words that owe nothing to the expression.
+
+    Every layer between Jinja2 and the condition puts the expression in its message, and Jinja2's own
+    diagnosis quotes the token it stopped at, so no text of the error can be passed on. The parser's line,
+    counted within the expression, is what locates the fault.
+    """
+    cause: BaseException | None = error.__cause__
+    while cause is not None:
+        if isinstance(cause, TemplateSyntaxError):
+            return f"does not parse at line {cause.lineno} of that expression"
+        cause = cause.__cause__
+    return "does not parse"

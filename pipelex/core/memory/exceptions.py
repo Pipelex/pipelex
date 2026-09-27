@@ -28,6 +28,9 @@ class WorkingMemoryStuffAttributeNotFoundError(WorkingMemoryVariableError):
 
 
 class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
+    # Not classified as the caller's fault: a step that names a variable nothing produces, a batch
+    # over one included, is refused when the bundle loads, so a miss at run time is the runtime's own
+    # bookkeeping going wrong, not a mistake in the caller's method.
     def __init__(self, message: str, variable_name: str, pipe_code: str | None = None, concept_code: str | None = None):
         super().__init__(message, variable_name)
         self.pipe_code = pipe_code

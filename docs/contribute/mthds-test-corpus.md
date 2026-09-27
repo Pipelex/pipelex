@@ -48,7 +48,7 @@ An entry directory holds either exactly one `.mthds` file, or several with a `bu
     ]
     ```
 
-4. **Name no model.** Presets and aliases are resolved by the validation engine, not only at run time, so an entry pinning one fails validation outright on any consumer whose deck does not define it — which turns an entry about a language feature into an entry about model selection. Leave the choice to each consumer's deck.
+4. **Name no model.** Presets and aliases are resolved by the validation engine, not only at run time, so an entry pinning one fails validation outright on any consumer whose deck does not define it — which turns an entry about a language feature into an entry about model selection. Leave the choice to each consumer's deck. The one entry that names a model is `invalid_unknown_model`, whose defect is exactly that: it names a handle no deck defines, so it fails with `unknown_model` on every consumer.
 
 5. **Validate it locally** — against the local runtime, never the hosted API, which lags it:
 

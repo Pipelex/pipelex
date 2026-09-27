@@ -46,7 +46,6 @@ from pipelex.pipeline.fixes.file_transaction import (
     read_file_snapshot,
 )
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -102,13 +101,7 @@ def _fix_fingerprint(fix: SuggestedFix) -> str:
 
 def _validation_error_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
     """Project the error's categorized lists into wire items — same channels as ``to_error_report``."""
-    return build_validation_error_items(
-        blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
-        factory_errors=exc.pipe_factory_errors,
-        pipe_validation_errors=exc.pipe_validation_error_data,
-        dry_run_error_message=exc.dry_run_error_message,
-        fallback_message=exc.message,
-    )
+    return exc.validation_error_items()
 
 
 def _pending_signatures_from_validation_result(validation_result: Any) -> list[str]:
