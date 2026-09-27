@@ -13,8 +13,9 @@ def make_instructor_schema_retrying(*, max_attempts: int) -> AsyncRetrying:
     transport retry (Tier 1). ``instructor.core.retry.initialize_retrying`` accepts a pre-built
     ``AsyncRetrying`` and uses it as-is, so passing this object instead scopes the retry to genuine
     schema re-ask: a malformed / invalid LLM output is re-asked, while a transport error is *not*
-    retried by ``instructor`` and propagates immediately as the raw SDK exception for the worker's
-    own ``except`` clause to classify.
+    retried by ``instructor``. It ends the loop at once, and ``instructor`` raises an
+    ``InstructorRetryException`` from it, which the worker unwraps with
+    ``extract_underlying_sdk_exception`` to classify the SDK exception.
 
     Args:
         max_attempts: Total number of attempts for the schema re-ask loop — the caller passes
@@ -23,13 +24,13 @@ def make_instructor_schema_retrying(*, max_attempts: int) -> AsyncRetrying:
     Returns:
         A fresh ``AsyncRetrying`` whose retry predicate matches only validation failures.
     """
-    # `instructor` raises its own validation-error types alongside pydantic's; mirror the exact
-    # set `instructor` itself treats as re-askable (see `instructor.core.retry.retry_async`) so a
-    # genuine schema failure is still re-asked regardless of which of the two it surfaces as.
-    from instructor.core import AsyncValidationError  # ruff: ignore[import-outside-top-level]
-    from instructor.core import ValidationError as InstructorValidationError  # ruff: ignore[import-outside-top-level]
+    # Mirror the exact set `instructor` itself re-asks (`_RETRYABLE_PARSE_ERRORS` in
+    # `instructor.core.retry`), so a genuine schema failure is re-asked whichever type it surfaces as:
+    # pydantic's, a JSON decode error, or `ResponseParsingError` for a response with no tool call or no JSON.
+    # A unit test compares this tuple with instructor's, so an upgrade that changes the set fails it.
+    from instructor.core import AsyncValidationError, ResponseParsingError  # ruff: ignore[import-outside-top-level]
 
     return AsyncRetrying(
-        retry=retry_if_exception_type((ValidationError, json.JSONDecodeError, AsyncValidationError, InstructorValidationError)),
+        retry=retry_if_exception_type((ValidationError, json.JSONDecodeError, AsyncValidationError, ResponseParsingError)),
         stop=stop_after_attempt(max_attempts),
     )

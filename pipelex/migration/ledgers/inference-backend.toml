@@ -11,7 +11,7 @@ id = "inference-backend"
 title = "Inference backend model definitions"
 subdirectory = "inference/backends"
 tier_glob = "*.toml"
-current_schema_version = 2
+current_schema_version = 3
 min_supported_schema_version = 0
 
 [[migration]]
@@ -53,3 +53,33 @@ declared_removed_paths = ["*.prompting_target"]
 kind = "delete_key"
 table_path = ["*"]
 key = "prompting_target"
+
+# Unsafe because `sdk` is a free string, an open token each plugin registers, so the schema cannot prove
+# a spelling stale and the remap legality rule forbids a `safe` entry. Being unsafe costs nothing at boot:
+# the old handle still validates, so the boot never reaches the ledger. What the entry buys is that
+# `pipelex migrate` names each file still carrying the old handle, where it would otherwise report nothing
+# to do while every Bedrock call from that file fails on an unregistered SDK.
+[[migration]]
+id = "inference-backend@3"
+to_schema_version = 3
+introduced_in = "0.69.0"
+breaking = true
+safety = "unsafe"
+title = "Rename the bedrock_aioboto3 SDK handle to bedrock_aiobotocore, by hand"
+description = """
+Bedrock's async client now runs on `aiobotocore` directly rather than through `aioboto3`, which pinned \
+`boto3` to an old release, so the SDK handle that selects it is renamed from `bedrock_aioboto3` to \
+`bedrock_aiobotocore`. A backend file that still names the old handle keeps loading, but every call to \
+a model it defines fails, because no plugin registers that SDK any more.
+"""
+guidance = """
+Replace `sdk = "bedrock_aioboto3"` with `sdk = "bedrock_aiobotocore"` wherever the file sets it: in \
+`[defaults]`, which is where the Bedrock file we ship sets it, and in any model table that overrides it. \
+Nothing else changes, and the synchronous `bedrock_boto3` handle keeps its name.
+"""
+
+[[migration.ops]] # `["*"]` is every root table of the file: `[defaults]` and each model alike
+kind = "remap_value"
+table_path = ["*"]
+key = "sdk"
+mapping = { bedrock_aioboto3 = "bedrock_aiobotocore" }

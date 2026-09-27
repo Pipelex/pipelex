@@ -14,7 +14,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import pytest
-from opentelemetry.sdk._logs.export import InMemoryLogExporter, SimpleLogRecordProcessor
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter, SimpleLogRecordProcessor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import INVALID_SPAN_ID, INVALID_TRACE_ID
 
@@ -29,7 +29,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from opentelemetry.sdk._logs import LogRecord
+    from opentelemetry._logs import LogRecord
 
 PIPELEX_TRACE_KEYS: tuple[str, ...] = (PIPELEX_TRACE_ID_KEY, PIPELEX_SPAN_ID_KEY)
 
@@ -39,9 +39,13 @@ def _package_log_config() -> LogConfig:
     return LogConfig.model_validate(config_dict["runtime"]["log"])
 
 
-def _own_records(exporter: InMemoryLogExporter) -> list[LogRecord]:
+def _own_records(exporter: InMemoryLogRecordExporter) -> list[LogRecord]:
     """The records this module emitted, whatever else the process logged meanwhile."""
-    return [log_data.log_record for log_data in exporter.get_finished_logs() if log_data.instrumentation_scope.name == __name__]
+    return [
+        log_data.log_record
+        for log_data in exporter.get_finished_logs()
+        if log_data.instrumentation_scope is not None and log_data.instrumentation_scope.name == __name__
+    ]
 
 
 def _attributes(record: LogRecord) -> dict[str, object]:
@@ -50,10 +54,10 @@ def _attributes(record: LogRecord) -> dict[str, object]:
 
 class TestOtlpSinkTraceContext:
     @pytest.fixture
-    def otlp_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, InMemoryLogExporter]]:
+    def otlp_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, InMemoryLogRecordExporter]]:
         """A fresh ``Log`` with the otlp sink installed on an in-memory exporter, torn down so the root logger is left as found."""
         caplog.set_level(logging.INFO, logger=__name__)
-        exporter = InMemoryLogExporter()
+        exporter = InMemoryLogRecordExporter()
         fresh = Log()
         fresh.configure(log_config=_package_log_config())
         fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
@@ -63,7 +67,7 @@ class TestOtlpSinkTraceContext:
             fresh.reset()
 
     def test_a_record_outside_a_run_under_a_host_span_is_filed_under_it_with_no_pipelex_attributes(
-        self, otlp_log: tuple[Log, InMemoryLogExporter]
+        self, otlp_log: tuple[Log, InMemoryLogRecordExporter]
     ) -> None:
         fresh, exporter = otlp_log
         tracer = TracerProvider().get_tracer(__name__)
@@ -78,7 +82,7 @@ class TestOtlpSinkTraceContext:
         assert not set(PIPELEX_TRACE_KEYS) & set(_attributes(inside))
 
     def test_a_record_in_a_run_under_a_host_span_is_filed_under_the_host_span_and_names_the_pipelex_one(
-        self, otlp_log: tuple[Log, InMemoryLogExporter]
+        self, otlp_log: tuple[Log, InMemoryLogRecordExporter]
     ) -> None:
         fresh, exporter = otlp_log
         tracer = TracerProvider().get_tracer(__name__)
@@ -97,7 +101,7 @@ class TestOtlpSinkTraceContext:
         assert attributes[PIPELEX_SPAN_ID_KEY] == f"{pipelex_context.span_id:016x}"
 
     def test_a_record_in_a_run_with_no_host_span_is_filed_under_none_and_names_the_pipelex_span(
-        self, otlp_log: tuple[Log, InMemoryLogExporter]
+        self, otlp_log: tuple[Log, InMemoryLogRecordExporter]
     ) -> None:
         fresh, exporter = otlp_log
         pipelex_span = TracerProvider().get_tracer(__name__).start_span("pipe")
@@ -112,7 +116,7 @@ class TestOtlpSinkTraceContext:
         assert attributes[PIPELEX_TRACE_ID_KEY] == f"{pipelex_context.trace_id:032x}"
         assert attributes[PIPELEX_SPAN_ID_KEY] == f"{pipelex_context.span_id:016x}"
 
-    def test_a_record_outside_any_span_carries_neither(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_a_record_outside_any_span_carries_neither(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         fresh, exporter = otlp_log
         fresh.info("outside")
 
@@ -121,7 +125,7 @@ class TestOtlpSinkTraceContext:
         assert outside.span_id == INVALID_SPAN_ID
         assert not set(PIPELEX_TRACE_KEYS) & set(_attributes(outside))
 
-    def test_the_pipelex_keys_are_reserved_with_or_without_a_pipelex_span(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_the_pipelex_keys_are_reserved_with_or_without_a_pipelex_span(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         """A field named like a ``pipelex.*`` key is prefixed on every record, so its wire name never depends on a span being held."""
         fresh, exporter = otlp_log
         supplied = dict.fromkeys(PIPELEX_TRACE_KEYS, "supplied")
@@ -139,7 +143,7 @@ class TestOtlpSinkTraceContext:
     def test_a_boot_line_held_until_the_sink_arrives_keeps_the_spans_it_was_logged_in(self, caplog: pytest.LogCaptureFixture) -> None:
         """The holding handler replays each record in the context it was emitted in, not in the one the install runs under."""
         caplog.set_level(logging.INFO, logger=__name__)
-        exporter = InMemoryLogExporter()
+        exporter = InMemoryLogRecordExporter()
         fresh = Log()
         fresh.configure(log_config=_package_log_config())
         tracer = TracerProvider().get_tracer(__name__)

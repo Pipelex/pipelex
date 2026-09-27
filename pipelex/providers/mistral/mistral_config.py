@@ -9,7 +9,7 @@ from pipelex.cogt.llm.reasoning_config_base import EffortToLevelMap, get_reasoni
 from pipelex.system.configuration.config_model import ConfigModel
 
 if TYPE_CHECKING:
-    from mistralai.models import MistralPromptMode
+    from mistralai.client.models import MistralPromptMode
 
     from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 

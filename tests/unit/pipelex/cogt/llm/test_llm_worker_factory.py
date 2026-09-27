@@ -213,7 +213,7 @@ class TestLLMWorkerFactory:
             pytest.param("bedrock_anthropic", ANTHROPIC_CLIENT, ANTHROPIC_WORKER, None, None, None, True, True, id="bedrock_anthropic"),
             pytest.param("mistral", MISTRAL_CLIENT, MISTRAL_WORKER, "mistral_factory", MistralFactory, None, False, False, id="mistral"),
             pytest.param("bedrock_boto3", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_boto3"),
-            pytest.param("bedrock_aioboto3", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_aioboto3"),
+            pytest.param("bedrock_aiobotocore", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_aiobotocore"),
             pytest.param("google", GOOGLE_CLIENT, GOOGLE_WORKER, None, None, None, False, False, id="google"),
         ],
     )
@@ -307,7 +307,7 @@ class TestLLMWorkerFactory:
             pytest.param("bedrock_anthropic", "anthropic", id="bedrock_anthropic"),
             pytest.param("mistral", "mistral", id="mistral"),
             pytest.param("bedrock_boto3", "bedrock", id="bedrock_boto3"),
-            pytest.param("bedrock_aioboto3", "bedrock", id="bedrock_aioboto3"),
+            pytest.param("bedrock_aiobotocore", "bedrock", id="bedrock_aiobotocore"),
             pytest.param("google", "google", id="google"),
         ],
     )
@@ -336,3 +336,4 @@ class TestLLMWorkerFactory:
         assert exc_info.value.sdk == "definitely_not_an_sdk"
         assert "definitely_not_an_sdk" in str(exc_info.value)
         assert "Is its plugin installed and enabled?" in str(exc_info.value)
+        assert "`pipelex migrate` reports each backend file that still sets a retired handle" in str(exc_info.value)

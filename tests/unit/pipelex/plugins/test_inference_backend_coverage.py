@@ -45,7 +45,7 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     (InferenceFamily.LLM, "bedrock_anthropic"),
     (InferenceFamily.LLM, "mistral"),
     (InferenceFamily.LLM, "bedrock_boto3"),
-    (InferenceFamily.LLM, "bedrock_aioboto3"),
+    (InferenceFamily.LLM, "bedrock_aiobotocore"),
     (InferenceFamily.LLM, "google"),
     # IMG_GEN
     (InferenceFamily.IMG_GEN, "gateway_img_gen"),

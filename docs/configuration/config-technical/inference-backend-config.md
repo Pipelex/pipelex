@@ -187,6 +187,8 @@ If you need to customize how a specific model behaves through the Gateway, you c
 
 All other keys will be ignored.
 
+A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through the Gateway's OpenAI-compatible SDKs. One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice.
+
 ```toml
 # .pipelex/inference/backends/pipelex_gateway.toml
 

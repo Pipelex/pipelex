@@ -1,9 +1,10 @@
 from typing import TYPE_CHECKING, Any
 
 import httpx
-from mistralai import Mistral, MistralError
-from mistralai.models import MistralPromptMode, TextChunk, ThinkChunk
-from mistralai.types import UNSET
+from mistralai.client import Mistral
+from mistralai.client.errors import MistralError
+from mistralai.client.models import MistralPromptMode, TextChunk, ThinkChunk
+from mistralai.client.types import UNSET
 from typing_extensions import override
 
 from pipelex import log
@@ -29,8 +30,8 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
-    from mistralai.models import ChatCompletionResponse
-    from mistralai.types import OptionalNullable
+    from mistralai.client.models import ChatCompletionResponse
+    from mistralai.client.types import OptionalNullable
 
 
 class MistralLLMWorker(LLMWorkerAbstract):
@@ -157,7 +158,19 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     detail="Mistral returned a response with no choices — the system will retry automatically",
                 ),
             )
-        mistral_response_content = response.choices[0].message.content
+        message = response.choices[0].message
+        if message is None:
+            msg = "Mistral response.choices[0].message is None"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Mistral returned a choice with no message — the system will retry automatically",
+                ),
+            )
+        mistral_response_content = message.content
         result_text: str
         if isinstance(mistral_response_content, str):
             result_text = mistral_response_content
@@ -223,8 +236,9 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 temperature=job_params.temperature,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
-                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
-                # SDK exception — transport retry is the SDK client floor (Tier 1) alone. Without this
+                # re-asks on a malformed/invalid output but never retries a transport error, which ends the
+                # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
+                # SDK client floor (Tier 1) alone. Without this
                 # the Mistral worker passed no max_retries at all, so structured Mistral got no re-ask.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
             )

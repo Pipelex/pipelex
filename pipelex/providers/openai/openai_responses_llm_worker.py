@@ -33,6 +33,7 @@ from pipelex.config import get_config
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 
 if TYPE_CHECKING:
+    from instructor.core.client import AsyncResponse
     from openai.types.chat import ChatCompletionMessageParam
 
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -209,23 +210,26 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
             inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__
         )
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
+        # An async instructor sets `responses` to an AsyncResponse. Pyright reads that from AsyncInstructor,
+        # but mypy takes the attribute's type from the sync base class, where it is the sync Response, whose
+        # `max_retries` refuses the AsyncRetrying below; the cast is for mypy alone
+        responses_helper = cast("AsyncResponse", self.instructor_for_objects.responses)  # pyright: ignore[reportUnnecessaryCast]
         try:
-            result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]
+            result_object, completion = await responses_helper.create_with_completion(
                 input=cast("list[ChatCompletionMessageParam]", input_items),
                 response_model=schema,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
-                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
-                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
-                # The arg-type ignore below is because instructor's `responses` path is stub-typed
-                # `int | Retrying`, but `initialize_retrying` accepts (and the async path needs) an `AsyncRetrying`.
-                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),  # type: ignore[arg-type]
+                # re-asks on a malformed/invalid output but never retries a transport error, which ends the
+                # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
+                # SDK client floor (Tier 1) alone.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
                 temperature=job_params.temperature,
                 max_output_tokens=job_params.max_tokens or NOT_GIVEN,
                 extra_headers=extra_headers,
                 extra_body=extra_body,
-            )  # type: ignore[arg-type,misc]
+            )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying
             # one so transient/capacity/auth/not-found errors aren't flattened to UNKNOWN.

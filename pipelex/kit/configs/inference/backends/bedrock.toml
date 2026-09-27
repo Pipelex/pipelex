@@ -22,7 +22,7 @@
 
 [defaults]
 model_type = "llm"
-sdk = "bedrock_aioboto3"
+sdk = "bedrock_aiobotocore"
 thinking_mode = "none"
 
 ################################################################################

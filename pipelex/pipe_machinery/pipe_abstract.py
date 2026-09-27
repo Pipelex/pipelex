@@ -1168,6 +1168,10 @@ class PipeAbstract(ABC, BaseModel):
             context=parent_ctx,
             attributes=span_attributes,
         )
+        # A tracer that records nothing, the no-op tracer `OTEL_SDK_DISABLED` hands out for one, gives back the
+        # parent it was handed rather than a span of its own; that is no span, exactly as with no tracer.
+        if span.get_span_context() == parent_span_context:
+            return None, False
 
         # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
         span_ctx = span.get_span_context()

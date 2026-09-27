@@ -28,13 +28,18 @@ class InferenceBackendNotFoundError(PluginError):
 
     Raised by the family worker factories on a registry-lookup miss — typically a
     model whose backend plugin is not installed or was disabled via
-    ``runtime.plugins.disabled``.
+    ``runtime.plugins.disabled``, or a backend file still naming an sdk handle a
+    release renamed, which the plugin that serves it no longer registers.
     """
 
     def __init__(self, *, family: str, sdk: str):
         self.family = family
         self.sdk = sdk
-        message = f"No inference backend registered for sdk '{sdk}' in the {family} family. Is its plugin installed and enabled?"
+        message = (
+            f"No inference backend registered for sdk '{sdk}' in the {family} family. Is its plugin installed and enabled? "
+            f"If it is, '{sdk}' may be a handle a release renamed: `pipelex migrate` reports each backend file "
+            "that still sets a retired handle."
+        )
         super().__init__(message)
 
 

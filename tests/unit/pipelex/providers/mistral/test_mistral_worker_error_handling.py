@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
-from mistralai import MistralError
+from mistralai.client.errors import MistralError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -138,6 +138,20 @@ class TestMistralWorkerErrorHandling:
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
         assert exc_info.value.__cause__ is sdk_exc
 
+    async def test_llm_worker_choice_without_message_is_transient(self, mocker: MockerFixture) -> None:
+        """A choice whose message is missing is retried as a transient failure, not read as empty text."""
+        worker = _make_mistral_llm_worker(mocker)
+        response = mocker.MagicMock()
+        response.choices = [mocker.MagicMock(message=None)]
+        worker.mistral_client_for_text.chat.complete_async.return_value = response  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+
     async def test_llm_worker_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
         """A 404 MistralError specializes to LLMModelNotFoundError (CONFIGURATION) on the LLM path."""
         worker = _make_mistral_llm_worker(mocker)
@@ -179,7 +193,10 @@ class TestMistralWorkerErrorHandling:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+                image_uri="https://example.com/test.png",
+                extract_job_params=mocker.MagicMock(max_nb_images=None, image_min_size=None),
+            )
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
@@ -199,7 +216,10 @@ class TestMistralWorkerErrorHandling:
         )
 
         with pytest.raises(ExtractModelNotFoundError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+                image_uri="https://example.com/test.png",
+                extract_job_params=mocker.MagicMock(max_nb_images=None, image_min_size=None),
+            )
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -247,7 +267,10 @@ class TestMistralWorkerErrorHandling:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+                image_uri="https://example.com/test.png",
+                extract_job_params=mocker.MagicMock(max_nb_images=None, image_min_size=None),
+            )
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "configuration"

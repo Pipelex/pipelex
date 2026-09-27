@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`aiobotocore` replaces `aioboto3`, and the `bedrock_aioboto3` SDK handle is renamed `bedrock_aiobotocore` (Breaking)**: the `bedrock` and `s3` extras depend on `aiobotocore` 3.x instead of `aioboto3`, whose latest release pins `boto3` below 1.40.62, so both extras now take `boto3>=1.42.42`. **Migration:** a backend file that still sets `sdk = "bedrock_aioboto3"` keeps loading but fails on every call to its models, with an error that points at `pipelex migrate`, which names each such file under `inference-backend@3` without rewriting it, so replace the handle with `bedrock_aiobotocore` by hand.
+- **`instructor` 1.17, and the `mistralai` extra on `mistralai` 2.x (Breaking)**: pipelex now requires `instructor>=1.17.0,<2.0.0`, and the `mistralai` extra takes `mistralai>=2.10.0`, whose client lives under `mistralai.client`, so a project that imports `mistralai` 1.x beside pipelex must move to 2.x with it.
+
+### Fixed
+
+- **A transport error inside a structured-output call is classified again under `instructor` 1.16 and later**: those releases wrap a provider's rate limit, timeout or refused connection in their own retry exception, which pipelex classified as an unknown error, or after a re-ask as the earlier parse failure; the provider's error is now read first, so it keeps its category, its retryability and its provider metadata.
+- **A structured-output call is re-asked when the model returns no tool call or no JSON**: under `instructor` 1.16 and later such a response raises a parse error that pipelex's re-ask loop did not retry, so it failed at once; the loop now retries exactly the parse errors `instructor` itself re-asks.
+- **A model whose `structure_method` names a provider-specific `instructor` mode sets up again**: `instructor` 1.17 refuses another provider's mode on an OpenAI-compatible client, which failed the setup of such a model, the gateway's `mistral-large` among them; each structure method now builds with the core mode `instructor` itself resolves it to.
+- **Mistral OCR on an image returns the figures it finds**: an extract from an image, rather than a document, failed with `MistralExtractResponseError` whenever Mistral OCR detected a figure inside it, because the request never asked for the figures' pixels; it now sends the same image options as a document extract, so `max_nb_images` and `image_min_size` apply to images too, and a request for captions, which Mistral OCR cannot write, is refused on an image as it already was on a document instead of returning none.
+- **A no-op tracer no longer stamps a fake Pipelex span on log lines**: from `opentelemetry-api` 1.40, the no-op tracer `OTEL_SDK_DISABLED` hands out returns its parent instead of an invalid span, so every line of a run carried `pipelex.trace_id` and a `pipelex.span_id` of `0000000000000001` naming no span; a pipe or an LLM call now starts no span under such a tracer, as with no tracer at all.
+
+### Removed
+
+- **`pipelex.providers.openai.openai_func` (Breaking)**: the module and its `create_pydantic_model_from_function`, `create_openai_schema_from_function` and `list_openai_tools` helpers are removed; nothing in pipelex called them.
+
 ## [v0.68.0] - 2026-09-27
 
 ### Highlights
