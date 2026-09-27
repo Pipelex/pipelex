@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **The `gcp` log sink stops the boot when Google refuses its credentials (Breaking)**: the sink refreshes its credentials once when it is built, within five seconds, and credentials Google refuses (a revoked or expired refresh token, a deleted service-account key) or that cannot be found raise the new `GcpLogSinkCredentialsError`, a `config`-domain `CredentialsError` naming the credentials, Google's answer and what renews them, which `pipelex doctor` reports in its log-sink row. Such a process used to boot and lose every record in silence, since over gRPC the failed refresh is retried for a minute before anything reports it; a refresh that cannot reach the token endpoint or the metadata server, or does not answer in time, is said on stderr and the boot goes on.
+- **The `gcp` log sink stops the boot when Google refuses its credentials (Breaking)**: the sink refreshes its credentials once when it is built, within five seconds, and credentials Google refuses (a revoked or expired refresh token, a deleted service-account key, a Google Cloud machine with no service account) or that cannot be loaded (no Application Default Credentials, a key file that is missing or holds no valid key) raise the new `GcpLogSinkCredentialsError`, a `config`-domain `CredentialsError` naming the credentials, Google's answer and what renews them, which `pipelex doctor` reports in its log-sink row. Such a process used to boot and lose every record in silence, since over gRPC the failed refresh is retried for a minute before anything reports it; a refresh that cannot reach the token endpoint or the metadata server, or does not answer in time, is said on stderr and the boot goes on.
 
 ### Fixed
 

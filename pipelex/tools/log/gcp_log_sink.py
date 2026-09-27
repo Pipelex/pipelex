@@ -36,6 +36,7 @@ import math
 import threading
 import time
 from enum import StrEnum
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, cast
 
 from typing_extensions import override
@@ -350,11 +351,11 @@ class GcpCredentialsOutcome(StrEnum):
     """What one refresh of the sink's credentials came to."""
 
     REFRESHED = "refreshed"
-    # Google answered and refused them: a revoked or expired refresh token, a deleted key, a service
-    # account the metadata server does not have. Retrying does not change the answer.
+    # Google answered and refused them: a revoked or expired refresh token, a deleted key, a machine
+    # whose metadata server has no service account to hand out. Retrying does not change the answer.
     REFUSED = "refused"
-    # The token endpoint or the metadata server could not be reached, or said to retry: nothing is
-    # known about the credentials themselves.
+    # The token endpoint or the metadata server could not be reached, or answered with a status that
+    # says to retry: nothing is known about the credentials themselves.
     UNREACHABLE = "unreachable"
     # The refresh had not returned when its deadline passed.
     UNANSWERED = "unanswered"
@@ -383,6 +384,9 @@ class GcpCredentialsCheck:
     raised from, is one of them or declares itself retryable — the metadata-server credentials wrap a
     transport failure in the refusal type, so the class of the outermost exception is not enough — and
     ``REFUSED`` otherwise, an exception nobody anticipated included, because the boot it stops names it.
+    A transport failure that carries a final answer is a refusal all the same: the metadata server
+    answers a machine with no service account with a ``404``, and its client raises that as a transport
+    error with the response attached rather than retry it.
     """
 
     def __init__(
@@ -431,7 +435,11 @@ class GcpCredentialsCheck:
         seen: set[int] = set()
         current: BaseException | None = failure
         while current is not None and id(current) not in seen:
-            if isinstance(current, self._transport_error_types) or getattr(current, "retryable", False) is True:
+            if isinstance(current, self._transport_error_types):
+                if _carries_a_final_answer(failure=current):
+                    return GcpCredentialsOutcome.REFUSED
+                return GcpCredentialsOutcome.UNREACHABLE
+            if getattr(current, "retryable", False) is True:
                 return GcpCredentialsOutcome.UNREACHABLE
             seen.add(id(current))
             if current.__cause__ is not None:
@@ -441,6 +449,23 @@ class GcpCredentialsCheck:
             else:
                 current = current.__context__
         return GcpCredentialsOutcome.REFUSED
+
+
+def _carries_a_final_answer(*, failure: BaseException) -> bool:
+    """Whether a transport failure carries an HTTP answer that retrying does not change: a ``4xx`` other than a timeout or a rate limit.
+
+    The auth library's metadata client raises its transport error with the response as the second
+    argument when the server answers with a status it does not retry, and with none when the server
+    could not be reached or its retries ran out; ``5xx``, ``408`` and ``429`` are the ones it retries.
+    """
+    if len(failure.args) < 2:
+        return False
+    status = getattr(failure.args[1], "status", None)
+    if not isinstance(status, int):
+        return False
+    if status in {HTTPStatus.REQUEST_TIMEOUT, HTTPStatus.TOO_MANY_REQUESTS}:
+        return False
+    return HTTPStatus.BAD_REQUEST <= status < HTTPStatus.INTERNAL_SERVER_ERROR
 
 
 def _undelivered_message(*, cause: str | None) -> str:

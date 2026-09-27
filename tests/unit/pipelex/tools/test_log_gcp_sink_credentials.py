@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from google.auth import compute_engine
 from google.auth import exceptions as google_auth_exceptions
 from typing_extensions import override
 
@@ -47,6 +48,19 @@ class RetryableRefusalError(RefusedError):
     @property
     def retryable(self) -> bool:
         return True
+
+
+class MetadataResponse:
+    """What the auth library's metadata client reads of an HTTP response: the status, the body and the content type."""
+
+    def __init__(self, *, status: int) -> None:
+        self.status = status
+        self.data = b"no service account"
+        self.headers = {"content-type": "text/html"}
+
+    @override
+    def __repr__(self) -> str:
+        return f"MetadataResponse(status={self.status})"
 
 
 class CapturingHandler(logging.Handler):
@@ -264,19 +278,59 @@ class TestGcpLogSinkCredentials:
 
         assert stderr.records == []
 
-    def test_the_auth_librarys_metadata_server_shape_is_unreachable_with_the_types_the_factory_passes(self) -> None:
-        """The compute-engine credentials re-raise the transport failure as a ``RefreshError``, so the outer class alone would read as a refusal."""
+    @pytest.mark.parametrize(
+        ("response", "outcome"),
+        [
+            (None, GcpCredentialsOutcome.UNREACHABLE),
+            (MetadataResponse(status=404), GcpCredentialsOutcome.REFUSED),
+            (MetadataResponse(status=403), GcpCredentialsOutcome.REFUSED),
+            (MetadataResponse(status=408), GcpCredentialsOutcome.UNREACHABLE),
+            (MetadataResponse(status=429), GcpCredentialsOutcome.UNREACHABLE),
+            (MetadataResponse(status=502), GcpCredentialsOutcome.UNREACHABLE),
+        ],
+    )
+    def test_the_auth_librarys_metadata_server_shape_is_classified_by_the_answer_it_carries(
+        self, response: MetadataResponse | None, outcome: GcpCredentialsOutcome
+    ) -> None:
+        """The compute-engine credentials re-raise the transport failure as a ``RefreshError``, so the outer class alone would read as a refusal.
 
-        def metadata_server_down() -> None:
+        The transport failure carries the response when the server answered with a status the client does not retry.
+        """
+
+        def metadata_server_fails() -> None:
             try:
-                msg = "metadata server unreachable"
-                raise google_auth_exceptions.TransportError(msg)
+                msg = "Failed to retrieve the service account from the Google Compute Engine metadata service."
+                if response is None:
+                    raise google_auth_exceptions.TransportError(msg)
+                raise google_auth_exceptions.TransportError(msg, response)
             except google_auth_exceptions.TransportError as exc:
                 raise google_auth_exceptions.RefreshError(exc) from exc
 
-        check = GcpCredentialsCheck(refresh=metadata_server_down, transport_error_types=(google_auth_exceptions.TransportError,), source=SOURCE)
+        check = GcpCredentialsCheck(refresh=metadata_server_fails, transport_error_types=(google_auth_exceptions.TransportError,), source=SOURCE)
 
-        assert check.run().outcome == GcpCredentialsOutcome.UNREACHABLE
+        assert check.run().outcome == outcome
+
+    def test_a_machine_whose_metadata_server_has_no_service_account_stops_the_boot(self) -> None:
+        """The reported shape end to end: the library's own compute-engine credentials, and a metadata server answering 404."""
+        metadata_requests: list[str] = []
+
+        def metadata_server(url: str, **kwargs: Any) -> MetadataResponse:
+            metadata_requests.append(f"{kwargs.get('method', 'GET')} {url}")
+            return MetadataResponse(status=404)
+
+        credentials: Any = compute_engine.Credentials()
+        check = GcpCredentialsCheck(
+            refresh=lambda: credentials.refresh(metadata_server),
+            transport_error_types=(google_auth_exceptions.TransportError,),
+            source=SOURCE,
+        )
+
+        with pytest.raises(GcpLogSinkCredentialsError) as exc_info:
+            confirm_credentials_at_boot(credentials_check=check, remedy=REMEDY)
+
+        assert "Status: 404" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, google_auth_exceptions.RefreshError)
+        assert len(metadata_requests) == 1, "a final answer is not retried"
 
     def test_application_default_credentials_that_cannot_be_found_stop_the_boot_naming_the_remedy(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
