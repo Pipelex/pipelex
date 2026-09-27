@@ -20,6 +20,7 @@ from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.pipe_run.located_failure import find_root_fault
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -97,6 +98,8 @@ class TestPipeConditionMethodFaults:
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
 
+        # The refusal is the root fault a run and a dry-run verdict report, not the parser error that quotes the expression.
+        assert find_root_fault(error=exc_info.value) is exc_info.value
         document = _strict_problem_document(exc_info.value)
         assert document["status"] == 422
         assert document["error_domain"] == "input"

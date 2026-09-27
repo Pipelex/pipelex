@@ -105,7 +105,7 @@ class TestConditionMethodFaults:
         assert document["user_action"] == {"kind": "change_input", "detail": _EMPTY_EXPRESSION_NEXT_STEP}
 
     async def test_a_fail_outcome_is_the_callers_fault_under_strict(self) -> None:
-        """A run whose lane the method maps to 'fail': HTTP 422, naming the pipe and the value its expression rendered."""
+        """A run whose lane the method maps to 'fail': HTTP 422, naming the pipe, never the value its expression rendered."""
         error = await _failed_run(bundle=_LANE_BUNDLE, inputs={"parcel": "a box of books", "lane": "reject"})
 
         document = error.to_error_report().to_problem_document(disclosure_mode=DisclosureMode.STRICT)
@@ -113,9 +113,8 @@ class TestConditionMethodFaults:
         assert document["error_domain"] == "input"
         assert document["error_type"] == "PipeRunError"
         assert document["detail"] != INTERNAL_ERROR_PLACEHOLDER
-        assert (
-            document["detail"] == "Pipe 'route_parcel' failed: PipeCondition 'route_parcel' failed with outcome: fail. Evaluated expression: reject"
-        )
+        # The rendered value can be text of a condition a host library declared, so no message carries it.
+        assert document["detail"] == "Pipe 'route_parcel' failed: PipeCondition 'route_parcel' failed with outcome: fail."
         assert document["user_action"] == {
             "kind": "change_input",
             "detail": (

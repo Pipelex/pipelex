@@ -15,7 +15,7 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 3.  **Use Default**: If the key is not found in `outcomes`, the `default_outcome` is used.
 4.  **Execute Chosen Pipe**: The chosen pipe is then executed. It receives the exact same `WorkingMemory` and inputs that were passed to the `PipeCondition` operator. The output of the chosen pipe becomes the output of the `PipeCondition` itself.
 
-When the expression renders nothing, no outcome can be chosen and the run fails with `Conditional expression returned no result`, naming the pipe. That failure, a `fail` outcome, a chosen pipe whose inputs are missing, and the refusals of a dry run (a condition whose every outcome is `fail`) are faults in your method: `pipelex validate` reports each as a `dry_run` item carrying its reason, and a hosted run answers it with HTTP 422, its reason and a next step.
+When the expression renders nothing, no outcome can be chosen and the pipe fails with `Conditional expression returned no result`, naming the pipe. That refusal and the others a condition makes are faults in your method, each reported with its reason and a next step. In a run, an expression that renders nothing, a `fail` outcome and a chosen pipe whose inputs are missing fail the run, which a hosted run answers with HTTP 422. In the dry run of `pipelex validate`, which runs every branch instead of choosing one, an expression that renders nothing over the mock inputs and a condition whose every outcome is `fail` give a `dry_run` item.
 
 ## Configuration
 
@@ -146,7 +146,7 @@ Process this unknown document type...
 
 Beside pipe names, an outcome (or the `default_outcome`) can be one of two special outcomes:
 
-- **`fail`**: the run fails loudly with an error naming the pipe and the evaluated expression. Use it to make "this should never happen" branches explicit. The failure is a refusal written into your method, so a hosted run answers it with HTTP 422 and keeps its message, with a next step, under STRICT disclosure.
+- **`fail`**: the run fails loudly with an error naming the pipe. Use it to make "this should never happen" branches explicit. The failure is a refusal written into your method, so a hosted run answers it with HTTP 422 and keeps its message, with a next step, under STRICT disclosure. The message leaves out the value the expression rendered, which the run's execution graph keeps: that value can be text of a condition a host's library declared.
 - **`continue`**: the condition declares that it produced **no output**. The runtime records an absence for the declared output (with the evaluated expression as the reason) and the run continues as a success — the rest of the working memory is unchanged.
 
 Because `continue` resolves the declared output as absent, a `continue`-reachable condition (any outcome mapped to `continue`, or `default_outcome = "continue"`) **must declare its output optional** — `output = "Constraint?"`. Validation enforces this statically (`optional_output_required`), so the no-output path is always visible to the type system. The same visibility rule applies at the condition's boundary: if a mapped outcome pipe declares an optional output, the condition must declare `?` too (`optional_not_handled`).

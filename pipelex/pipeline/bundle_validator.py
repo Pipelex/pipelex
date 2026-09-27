@@ -307,9 +307,11 @@ class BundleValidator:
         ``DRY_RUN_USER_ID`` and the event goes out under the fallback, as before.
 
         ``source_pipe_refs`` names the pipes whose file a located failure may carry as its ``source``:
-        a validator of submitted content passes that content's pipes, so a failure located at a pipe
-        loaded from a host's own library directories never names a file on the host. ``None`` lets
-        every failure carry its pipe's file, as a local sweep of one's own library does.
+        a validator of submitted content beside a host's library directories passes that content's
+        pipes, so a failure located at a pipe loaded from those directories never names a file on the
+        host. ``None`` lets every failure carry its pipe's file, as a local sweep of one's own library
+        does, and as submitted content validated beside directories that are the caller's own
+        (``library_dirs_are_callers``) does.
 
         Returns the per-pipe status map (carrying allowed failures + skips). Raises ``DryRunError``
         on ≥1 unexpected failure.

@@ -326,8 +326,9 @@ class PipeCondition(PipeController):
         if SpecialOutcome.is_fail(outcome):
             self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
             # The caller's method maps this outcome to 'fail' on purpose, a refusal of the run it was given. The
-            # message names the pipe and the value its expression rendered from the run's own data.
-            msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
+            # message names only the pipe: the value the expression rendered can be literal text of the expression,
+            # or an outcome key, of a condition a host library declared. The execution data above keeps that value.
+            msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_INPUT,
@@ -402,14 +403,16 @@ class PipeCondition(PipeController):
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
             # The expression is the caller's own method. The message quotes neither the expression nor the parser's
             # diagnosis, which names the token it stopped at: the condition may be a host library's, whose text
-            # must not reach the caller. The line locates the fault.
+            # must not reach the caller. The line locates the fault. It is raised from the parser's own error,
+            # past the `Jinja2DetectVariablesError` that quotes the expression: a run failure reports the innermost
+            # Pipelex error on its chain (`find_root_fault`), which must be this refusal.
             msg = f"Dry run failed for pipe '{self.code}' (PipeCondition): its expression {_describe_expression_parse_failure(error=exc)}."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_INPUT,
                     detail=f"Fix the expression of PipeCondition '{self.code}' so that it parses as a Jinja2 expression.",
                 )
-            ) from exc
+            ) from exc.__cause__
 
         # Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
