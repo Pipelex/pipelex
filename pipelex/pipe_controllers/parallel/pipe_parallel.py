@@ -25,7 +25,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.graph.graphspec import IOSpec
+from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.interpreter_hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.absence_taint import (
@@ -774,12 +774,10 @@ class PipeParallel(PipeController):
         if tracer_manager is None or trace_context.parent_node_id is None:
             return
         for output_name_key, output_stuff in output_stuffs.items():
-            output_spec = IOSpec(
+            output_spec = make_stuff_io_spec(
                 name=output_name_key,
-                concept=output_stuff.concept.code,
-                content_type=output_stuff.content.content_type,
-                digest=output_stuff.stuff_code,
-                data=output_stuff.content.smart_dump() if trace_context.data_inclusion.stuff_json_content else None,
+                stuff=output_stuff,
+                include_data=trace_context.data_inclusion.stuff_json_content,
             )
             tracer_manager.register_controller_output(
                 lookup_key=trace_context.lookup_key,
