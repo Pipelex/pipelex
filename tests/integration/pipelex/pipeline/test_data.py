@@ -393,3 +393,21 @@ inputs      = { tide_times = "Text" }
 output      = "Text"
 prompt      = "Write a short notice for the harbour board from these tide times: $tide_times"
 """
+
+
+class ExecuteRequestIdTestData:
+    """A bundle that runs without inference, to see which job `execute` hands its `PipeRunProtocol`."""
+
+    REQUEST_ID: ClassVar[str] = "req-execute-7f3a"
+
+    COMPOSE_MTHDS: ClassVar[str] = """
+domain = "execute_request_id"
+description = "A single compose step, which runs without calling a model"
+
+[pipe.restate]
+type = "PipeCompose"
+description = "Restate the topic"
+inputs = { topic = "Text" }
+output = "Text"
+template = "About {{ topic }}"
+"""

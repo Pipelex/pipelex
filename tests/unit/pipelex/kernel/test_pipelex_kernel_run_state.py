@@ -5,10 +5,15 @@ interpreter run's. These pin the links, because a parity failure there says "no 
 saying which link dropped: the run-level metadata, the per-step copy, or the run mode.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
+from pydantic import ValidationError
 
+from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -26,6 +31,10 @@ from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.log.log_context import LogContext, get_log_context
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 _GRAPH_ID = "kernel-run-state"
 
@@ -65,6 +74,106 @@ class TestPipelexKernelRunState:
 
         assert first.job_metadata.trace_context is None
         assert first.job_metadata.run_metadata.pipeline_run_id != second.job_metadata.run_metadata.pipeline_run_id
+
+    def test_a_request_id_rides_the_run_metadata(self) -> None:
+        """The field a hosted deployment filters its logs on, carried like `user_id` and `storage_scope`."""
+        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", request_id="req-kernel")
+
+        assert kernel.job_metadata.run_metadata.request_id == "req-kernel"
+        assert kernel.make_step_metadata().run_metadata.request_id == "req-kernel"
+
+    def test_a_malformed_request_id_is_refused_by_the_run_metadata(self) -> None:
+        """The validation is `RunMetadata`'s own, so `make` refuses exactly what the pipeline entry points refuse."""
+        with pytest.raises(ValidationError):
+            PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", request_id="forged\nline")
+
+    def test_a_supplied_pipeline_run_id_becomes_the_runs_identity(self) -> None:
+        """A host inside a replay-based executor mints the id from its own replay-safe source and hands it over."""
+        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="plr-host")
+
+        assert kernel.job_metadata.run_metadata.pipeline_run_id == "plr-host"
+        assert kernel.job_metadata.trace_context is None
+
+    def test_a_trace_context_and_an_equal_pipeline_run_id_are_one_identity(self) -> None:
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope",
+            run_mode=PipeRunMode.DRY,
+            user_id="test-user",
+            trace_context=_trace_context(),
+            pipeline_run_id=_GRAPH_ID,
+        )
+
+        assert kernel.job_metadata.run_metadata.pipeline_run_id == _GRAPH_ID
+
+    def test_a_trace_context_and_a_different_pipeline_run_id_are_refused(self) -> None:
+        """Neither silently wins: letting the two diverge would scatter the run's usage events across two ids."""
+        with pytest.raises(ValueError, match="plr-elsewhere"):
+            PipelexKernel.make(
+                storage_scope="test/scope",
+                run_mode=PipeRunMode.DRY,
+                user_id="test-user",
+                trace_context=_trace_context(),
+                pipeline_run_id="plr-elsewhere",
+            )
+
+    def test_an_empty_pipeline_run_id_is_refused(self) -> None:
+        """An empty id is a caller's bug, and minting one in its place would hide it from a replaying host."""
+        with pytest.raises(ValueError, match="empty pipeline_run_id"):
+            PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="")
+
+    def test_with_neither_the_run_id_is_a_fresh_uuid4(self) -> None:
+        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+
+        assert UUID(kernel.job_metadata.run_metadata.pipeline_run_id).version == 4
+
+    def test_the_run_level_log_context_binds_the_run_and_no_step(self) -> None:
+        """The host's binding: the run's two identifiers, and no `pipe_run_id`, which each step binds for itself."""
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope",
+            run_mode=PipeRunMode.DRY,
+            user_id="test-user",
+            request_id="req-kernel",
+            pipeline_run_id="plr-kernel",
+        )
+
+        assert get_log_context() is None
+        with kernel.log_context() as bound:
+            assert bound == LogContext(request_id="req-kernel", pipeline_run_id="plr-kernel")
+            assert get_log_context() == bound
+        assert get_log_context() is None
+
+    @pytest.mark.asyncio
+    async def test_a_facade_call_inside_the_run_level_binding_binds_its_step_over_it(self, mocker: MockerFixture) -> None:
+        """The two layers together, as a host uses them: the run bound by the host, the step by the kernel."""
+        seen: list[LogContext | None] = []
+
+        async def make_llm_text(**kwargs: object) -> str:  # ruff: ignore[unused-function-argument, unused-async]
+            seen.append(get_log_context())
+            return "generated text"
+
+        content_generator = mocker.MagicMock()
+        content_generator.make_llm_text = make_llm_text
+        mocker.patch("pipelex.kernel.llm_ops.get_content_generator", return_value=content_generator)
+        step_ids = iter(["step-0"])
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope",
+            run_mode=PipeRunMode.DRY,
+            user_id="test-user",
+            request_id="req-kernel",
+            pipeline_run_id="plr-kernel",
+            step_id_source=lambda: next(step_ids),
+        )
+
+        with kernel.log_context():
+            await kernel.llm_text(
+                memory=WorkingMemoryFactory.make_empty(),
+                model=LLMSetting(model="kernel-run-state-model", temperature=0.5),
+                user="Say something.",
+                result="reply",
+            )
+            assert get_log_context() == LogContext(request_id="req-kernel", pipeline_run_id="plr-kernel")
+
+        assert seen == [LogContext(request_id="req-kernel", pipeline_run_id="plr-kernel", pipe_run_id="step-0")]
 
     def test_each_step_inherits_the_trace_context_and_carries_its_own_run_id(self) -> None:
         """The per-step copy: same trace context (so every step attributes to it), distinct pipe_run_id."""

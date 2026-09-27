@@ -228,7 +228,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             attributes=span_attributes,
         )
 
-        # Debug logging, under the span it announces, so the line's trace context names that span
+        # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
         span_ctx = span.get_span_context()
         with pipelex_span_active(span=span):
             log.verbose(
@@ -465,8 +465,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.TEXT)
 
         # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
-        # during the call, a provider SDK's included, is joined to it; OpenTelemetry's current context
-        # is left alone.
+        # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
+        # context is left alone, and it is what the line's standard trace fields name.
         with pipelex_span_active(span=span):
             try:
                 text_result = await self._gen_text(llm_job=llm_job)
@@ -508,8 +508,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.OBJECT, output_class_name=schema.__name__)
 
         # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
-        # during the call, a provider SDK's included, is joined to it; OpenTelemetry's current context
-        # is left alone.
+        # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
+        # context is left alone, and it is what the line's standard trace fields name.
         with pipelex_span_active(span=span):
             try:
                 object_result = await self._gen_object(llm_job=llm_job, schema=schema)

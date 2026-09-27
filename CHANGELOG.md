@@ -1,5 +1,28 @@
 # Changelog
 
+## [v0.68.0] - 2026-09-27
+
+### Highlights
+
+**Every log line can be joined to its run and to your own traces.** A run driven through the kernel, each kernel step and a run dispatched to a distributed orchestrator's workers now stamp `request_id`, `pipeline_run_id` and `pipe_run_id` on their lines as an interpreted run does, and a host passes the inbound request id it filters its logs on. A line's standard trace fields now name your process's current OpenTelemetry span, with Pipelex's own span beside them under `pipelex.*`, and the `gcp` sink refuses to boot on credentials Google rejects instead of losing every record in silence.
+
+### Added
+
+- **`PipelexKernel.log_context()` and `JobMetadata.log_context()`**: `JobMetadata.log_context()` binds a job's `request_id`, `pipeline_run_id` and `pipe_run_id` onto the log context in one call, and `PipelexKernel.log_context()` binds a kernel run's `request_id` and `pipeline_run_id`, which a host wraps its run in so the lines it emits between kernel calls name the run.
+- **`PipelexKernel.make` takes `request_id` and `pipeline_run_id`**: a kernel-driven run can now carry the inbound request id a hosted deployment filters its logs on, and name itself with an id the host chooses. A host inside a replay-based executor passes a `pipeline_run_id` or a trace context, since the default `uuid4` changes on every replay; a trace context and a `pipeline_run_id` that disagree, or an empty `pipeline_run_id`, raise `ValueError`.
+- **`PipelexMTHDSProtocol.execute` takes `request_id`**: a host running `execute` passes the inbound request id, which the run's `RunMetadata` carries, so the log lines of a run dispatched to a distributed orchestrator's workers carry `request_id` as a direct run's do. A value that is not one to 128 printable ASCII characters is refused with a `ValueError` before the run is set up, where it used to surface as a `PipeExecutionError` blaming the caller's input; the constraint is stated once, as `validate_request_id` in `pipelex.system.job_metadata`, which `RunMetadata` applies too.
+
+### Changed
+
+- **The `gcp` log sink stops the boot when Google refuses its credentials (Breaking)**: the sink refreshes its credentials once when it is built, within five seconds, and credentials Google refuses (a revoked or expired refresh token, a deleted service-account key, a Google Cloud machine with no service account) or that cannot be loaded (no Application Default Credentials, a key file that is missing or holds no valid key) raise the new `GcpLogSinkCredentialsError`, a `config`-domain `CredentialsError` naming the credentials, Google's answer and what renews them, which `pipelex doctor` reports in its log-sink row. Such a process used to boot and lose every record in silence, since over gRPC the failed refresh is retried for a minute before anything reports it; a refresh that cannot reach the token endpoint or the metadata server, gets an answer that says to retry (a `5xx`, `408` or `429`), or does not answer in time, is said on stderr and the boot goes on.
+- **A log line's standard trace fields name OpenTelemetry's current span, and the Pipelex span rides under `pipelex.*` (Breaking)**: in the `json`, `otlp` and `gcp` sinks, `trace_id`, `span_id` and `trace_flags` (the `otlp` record's own trace context, the `gcp` entry's `trace`) now always name your process's current span and are absent when there is none, inside a Pipelex run too, where they used to name the pipe's or the LLM call's span; that span is written beside them as `pipelex.trace_id` and `pipelex.span_id`, keys in the `json` line and the `gcp` payload and attributes on the `otlp` record, reserved on every line like the sinks' other keys. The `gcp` entry's `trace` is no longer derived from `pipeline_run_id` and is set only under a current span, with the new `spanId` and `traceSampled` beside it, and the `pipeline_run_id` label still selects a run's lines. If you export Pipelex's spans to your own backend, join a line inside a run to them on `pipelex.trace_id` and `pipelex.span_id`. For a sink plugin, `span_context_for_logs()` and `otel_context_for_logs()` are replaced by `current_span_context_for_logs()`, `pipelex_span_context_for_logs()` and `pipelex_trace_fields_for_logs()` in `pipelex.system.telemetry.current_span`.
+
+### Fixed
+
+- **The `gcp` log sink says when its flush runs out of time, and why**: a teardown whose flush reaches its five-second deadline with records still held now prints on stderr that they are lost unless the transport sends them while it closes, followed by what a fresh refresh of the credentials answers, where only the client library's "Failed to send N pending logs." used to appear. A handler that has closed no longer flushes again when the process exits, which cost a second five-second wait.
+- **A `GcpLogSink` installed a second time raises instead of sending nothing**: installing the same sink object again after a reset built a handler on the transport the first teardown had closed, which queued every record and sent none; `make_handler` now raises `RuntimeError`, as the `otlp` sink does, and the registered `gcp` factory still builds a new sink at every boot.
+- **A kernel step's log lines name its run and its step**: `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search` and `run_img_gen` now bind the `job_metadata` they are handed for the whole call, so a program driving the kernel directly gets log records carrying `request_id`, `pipeline_run_id` and `pipe_run_id`, as an interpreted run's do. An interpreted run's lines are unchanged.
+
 ## [v0.67.1] - 2026-09-27
 
 ### Changed

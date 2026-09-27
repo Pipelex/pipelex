@@ -1,3 +1,5 @@
+import re
+from contextlib import AbstractContextManager
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -8,6 +10,33 @@ from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.log.log_context import LogContext, bind_log_context
+
+REQUEST_ID_MAX_LENGTH = 128
+REQUEST_ID_PATTERN = re.compile(r"[\x20-\x7E]+")
+
+
+def validate_request_id(*, value: str) -> str:
+    """Return `value` if it is a usable inbound request id, else raise `ValueError`.
+
+    The one statement of the constraint, which `RunMetadata` applies at construction and a
+    host entry point applies before it builds a run, so both refuse exactly the same values.
+
+    Raises:
+        ValueError: the value is empty, longer than `REQUEST_ID_MAX_LENGTH`, or holds a
+            character outside printable ASCII.
+    """
+    if len(value) > REQUEST_ID_MAX_LENGTH:
+        msg = f"Invalid request_id: it has {len(value)} characters, and at most {REQUEST_ID_MAX_LENGTH} are allowed."
+        raise ValueError(msg)
+    # `fullmatch`, not `match` with a trailing `$`, which would admit one final newline.
+    if not REQUEST_ID_PATTERN.fullmatch(value):
+        msg = (
+            f"Invalid request_id {value!r}: expected one or more printable ASCII characters. "
+            "The value is quoted into log lines and error reports, so a control character in it would forge one."
+        )
+        raise ValueError(msg)
+    return value
 
 
 class SpecialPipelineId(StrEnum):
@@ -113,10 +142,11 @@ class RunMetadata(BaseModel):
     # from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
     # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
     # both can appear together when the API surfaces a provider failure.
-    # Constrained at the wire-format boundary (printable ASCII only, max 128
-    # chars) so an unsanitized upstream value cannot inject newlines or control
-    # characters into the log lines or ``ErrorReport`` envelopes that quote it.
-    request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
+    # Constrained at the wire-format boundary by `validate_request_id` (printable
+    # ASCII only, max 128 chars) so an unsanitized upstream value cannot inject
+    # newlines or control characters into the log lines or ``ErrorReport``
+    # envelopes that quote it.
+    request_id: str | None = None
 
     # The opaque labels the host attaches to this run. Never read by name;
     # telemetry forwards the whole mapping as the groups of each capture
@@ -145,6 +175,14 @@ class RunMetadata(BaseModel):
         request data after this point.
         """
         return validate_storage_scope(value=value)
+
+    @field_validator("request_id")
+    @classmethod
+    def _validate_request_id(cls, value: str | None) -> str | None:
+        """Refuse a request id that would forge a log line, at construction."""
+        if value is None:
+            return None
+        return validate_request_id(value=value)
 
     @field_validator("extras")
     @classmethod
@@ -207,6 +245,22 @@ class JobMetadata(BaseModel):
         if self.started_at is not None and self.completed_at is not None:
             return (self.completed_at - self.started_at).total_seconds()
         return None
+
+    def log_context(self) -> AbstractContextManager[LogContext]:
+        """Bind this job's identifiers onto every record emitted inside the block.
+
+        The one spelling of the binding: ``request_id`` and ``pipeline_run_id`` from the run half,
+        ``pipe_run_id`` from the job half. It merges over whatever is already bound, so an identifier
+        this metadata does not carry (a submission's ``pipe_run_id``, a run with no ``request_id``)
+        inherits the enclosing binding rather than clearing it, and the previous binding comes back
+        when the block exits. ``PipeRun.run`` binds a direct-mode run through it, and every kernel
+        function that takes a ``job_metadata`` binds its step through it.
+        """
+        return bind_log_context(
+            request_id=self.run_metadata.request_id,
+            pipeline_run_id=self.run_metadata.pipeline_run_id,
+            pipe_run_id=self.pipe_run_id,
+        )
 
     def copy_with_update(
         self,

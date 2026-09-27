@@ -55,7 +55,8 @@ Either stream makes Pipelex trace a run: the Gateway stream whenever it is on, a
 
 - Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
 - An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
-- The `json` and `otlp` log sinks still join each line to the Pipelex span it was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, and outside a Pipelex run to your current span, as [Logging](../tools/logging.md#the-trace-context) describes.
+- The standard trace fields of a log line, `trace_id` and `span_id` in the `json` sink, the record's trace context in the `otlp` sink and the entry's `trace` in the `gcp` sink, name your current span, inside a Pipelex run as outside one, so your log backend files a line under your own trace. The Pipelex span a line was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, rides beside them as `pipelex.trace_id` and `pipelex.span_id`, as [Logging](../tools/logging.md#the-trace-context) describes.
+- If you export Pipelex's spans to your own backend, through your PostHog or an OTLP destination, they arrive in a trace of their own, not yours, so a line inside a run joins them on `pipelex.trace_id` and `pipelex.span_id` rather than on the standard fields, which a backend's trace view follows by itself.
 
 ## Quick Setup
 

@@ -1,9 +1,9 @@
 """The boto3 Bedrock client runs its blocking call in a thread that keeps the caller's context.
 
 The LLM worker holds its generation span as the Pipelex span active around the provider call, and the
-promise is that the SDK's own log lines during the call are joined to it, while a span the SDK's
-instrumentation opens has the caller's current span as its parent. The boto3 client blocks, so it runs in
-a thread, and only a thread that carries the context over keeps both there.
+promise is that the SDK's own log lines during the call name it under ``pipelex.*``, while their standard
+trace fields, and any span the SDK's instrumentation opens, follow the caller's current span. The boto3
+client blocks, so it runs in a thread, and only a thread that carries the context over keeps both there.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import INVALID_SPAN_ID
 
 from pipelex.providers.bedrock.bedrock_client_boto3 import BedrockClientBoto3
-from pipelex.system.telemetry.current_span import pipelex_span_active, span_context_for_logs
+from pipelex.system.telemetry.current_span import current_span_context_for_logs, pipelex_span_active, pipelex_span_context_for_logs
 
 
 class _RecordingConverse:
@@ -24,11 +24,14 @@ class _RecordingConverse:
 
     def __init__(self) -> None:
         self.seen_log_span_ids: list[int] = []
+        self.seen_log_current_span_ids: list[int] = []
         self.seen_current_spans: list[object] = []
 
     def converse(self, **_params: Any) -> dict[str, Any]:
-        log_span_context = span_context_for_logs()
+        log_span_context = pipelex_span_context_for_logs()
         self.seen_log_span_ids.append(INVALID_SPAN_ID if log_span_context is None else log_span_context.span_id)
+        log_current_span_context = current_span_context_for_logs()
+        self.seen_log_current_span_ids.append(INVALID_SPAN_ID if log_current_span_context is None else log_current_span_context.span_id)
         self.seen_current_spans.append(trace.get_current_span())
         return {"usage": {"inputTokens": 1, "outputTokens": 2}, "output": {"message": {"content": [{"text": "answer"}]}}}
 
@@ -47,4 +50,5 @@ class TestBedrockBoto3CurrentSpan:
 
         assert text == "answer"
         assert recording.seen_log_span_ids == [llm_span.get_span_context().span_id]
+        assert recording.seen_log_current_span_ids == [host_span.get_span_context().span_id]
         assert recording.seen_current_spans == [host_span]

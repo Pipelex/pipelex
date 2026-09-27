@@ -105,29 +105,41 @@ The context is a `LogContext` with three optional identifiers, `request_id`, `pi
 
 The identifiers travel in the payload, and the contextvar is in-process plumbing bound after deserialization and nothing else; it never crosses a process boundary. Each process entry binds from the payload it received:
 
-- **A direct-mode run**: `PipeRun.run` binds `request_id` and `pipeline_run_id` from the job's `JobMetadata` for the whole run, delivery included, and releases the binding when the run returns. The metadata a submission builds carries no `pipe_run_id` yet.
+- **A direct-mode run**: `PipeRun.run` binds `request_id` and `pipeline_run_id` from the job's `JobMetadata` for the whole run, delivery included, through `JobMetadata.log_context()`, and releases the binding when the run returns. The metadata a submission builds carries no `pipe_run_id` yet.
 - **Every pipe run**: `live_run_pipe` mints the pipe run's id and binds `pipe_run_id` around the whole of the run, the line announcing it, its span lines and its failure included, so every record emitted during a pipe's run names the run it belongs to, a nested pipe rebinding its own and the outer id coming back when it returns, however it returns. A pipe lifted for absent optional inputs does not run and has no id: its skip line carries the enclosing binding, the parent pipe's or none. This is the binding every orchestration shares, direct or distributed.
-- **An API request**: the runner's request middleware is where `request_id` is bound from the inbound request, for the request's duration.
+- **Every kernel step**: each kernel function that takes a `job_metadata` — `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search` and `run_img_gen` — binds it for the length of its call, so a program driving the kernel directly gets lines naming the run and the step. Inside the interpreter the operator hands the kernel the `pipe_run_id` that `live_run_pipe` already bound, so this nested binding changes nothing there.
+- **A kernel-driven run**: the host wraps its run in `PipelexKernel.log_context()`, which binds `request_id` and `pipeline_run_id` and no step. The kernel has no run boundary of its own, so this binding is the host's, and each step's binding merges over it. See [The Pipelex Kernel](../under-the-hood/pipelex-kernel.md#the-log-context).
+- **An API request**: the runner's request middleware is where `request_id` is bound from the inbound request, for the request's duration. The runner then puts the same id on the run's `RunMetadata`, by passing it as `request_id` to `PipelexMTHDSProtocol.execute` or to `pipeline_run_setup`, so the payload carries it to whichever process runs the pipes, and each of them binds it from there.
 - **A durable-execution activity or workflow**: the entry is where the identifiers are bound from the payload the orchestrator handed it.
 
-The last two are the runner's and the orchestration plugin's to bind, beside the payload they read; the runtime only provides `log.context`.
+The last two are the runner's and the orchestration plugin's to bind, beside the payload they read. The runtime provides `log.context` for any identifiers, and `JobMetadata.log_context()` to bind the three a `JobMetadata` carries in one call.
 
 ### The trace context
 
-Beside the identifiers, a record is joined to the span it was logged in, and the structured sinks write that on their own, with nothing for a call site to pass: the `json` sink as `trace_id`, `span_id` and `trace_flags`, lowercase hex, the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP, and the `otlp` sink as the record's own trace context, so a collector files the record under the span. The span is found in this order:
+Beside the identifiers, a record names the spans it was logged in, and the structured sinks write them on their own, with nothing for a call site to pass. There are two, read independently of each other:
 
-1. **The Pipelex span active at the log call**, the pipe's or the LLM call's, while Pipelex runs one.
-2. **Otherwise, OpenTelemetry's current span**, read and never changed, so a line your own code logs under its own span, outside a Pipelex run, joins your trace.
-3. **Otherwise, none**: the `json` line carries none of the three keys, and the `otlp` record no trace context. The `console` sink writes none in any case.
+- **The standard trace fields name OpenTelemetry's current span** in your process, which Pipelex reads and never changes, so your log backend files a line under the same trace as your own spans. The `json` sink writes them as `trace_id`, `span_id` and `trace_flags`, lowercase hex, the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP; the `otlp` sink as the record's own trace context, so a collector files the record under the span; and the `gcp` sink as the entry's `trace`, `spanId` and `traceSampled`. A line logged where no current span names a trace carries none of them.
+- **The Pipelex fields name the Pipelex span active at the log call**, the pipe's or the LLM call's, while Pipelex runs one: `pipelex.trace_id` and `pipelex.span_id`, lowercase hex, as keys in the `json` line and the `gcp` payload and as attributes on the `otlp` record. They are the fields that say which pipe or which LLM call a line belongs to. A line logged outside a Pipelex span carries neither.
+
+So a line carries both, either or neither:
+
+| Where the line is logged | Standard fields | `pipelex.*` fields |
+| --- | --- | --- |
+| In a Pipelex run, under a span of your own | Your span | The pipe's or the LLM call's span |
+| In a Pipelex run, under no span of yours | Absent | The pipe's or the LLM call's span |
+| Outside a Pipelex run, under a span of your own | Your span | Absent |
+| Outside both | Absent | Absent |
+
+The two sets name different traces inside a run: Pipelex's spans belong to a trace of their own, which only Pipelex's exporters receive. If you export Pipelex's spans to your own backend, join a line to them on `pipelex.trace_id` and `pipelex.span_id`. Every line of a run also carries its `pipeline_run_id`, which selects the run's lines whatever the spans. The `console` sink writes no trace context in any case.
 
 The runtime holds each span it starts as the active Pipelex span from its start to its end, however it ends:
 
-- **A pipe run's span**: `live_run_pipe` starts the span, then runs the pipe with it held, so a line logged by the pipe's own work, a controller's or an operator's and the lines of the extract, image-generation, search or function call an operator makes, names the pipe's span, and a nested pipe's lines name the nested pipe's span until it returns. The line announcing the run is logged before the span starts, under the enclosing span.
-- **An LLM call's span**: the LLM worker runs the provider call with its generation span held, so the lines of the call and of its failure name that span, a provider SDK's own lines included.
+- **A pipe run's span**: `live_run_pipe` starts the span, then runs the pipe with it held, so a line logged by the pipe's own work, a controller's or an operator's and the lines of the extract, image-generation, search or function call an operator makes, names the pipe's span under `pipelex.*`, and a nested pipe's lines name the nested pipe's span until it returns. The line announcing the run is logged before the span starts, under the enclosing span.
+- **An LLM call's span**: the LLM worker runs the provider call with its generation span held, so the lines of the call and of its failure name that span under `pipelex.*`, a provider SDK's own lines included.
 
-The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer: with the Pipelex Gateway's telemetry on, which is automatic when the Gateway serves your inference, or with AI span tracing enabled on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one that starts spans naming no trace, under `OTEL_SDK_DISABLED` for instance, and a line names whatever span your own code runs under, if any. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps its span too, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits the span of the code that started it.
+The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer: with the Pipelex Gateway's telemetry on, which is automatic when the Gateway serves your inference, or with AI span tracing enabled on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one that starts spans naming no trace, under `OTEL_SDK_DISABLED` for instance, and a line carries no `pipelex.*` fields. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps both its spans, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits both from the code that started it.
 
-Holding a span is in-process plumbing, like binding the log context: it lives in a context variable of Pipelex's own. **Pipelex never makes its spans current in your process's OpenTelemetry context**, so your own instrumentation, an HTTP client's or a provider SDK's, is never re-parented under a Pipelex span, and an error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. A span's children take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs names a span only while the process runs a span of its own, the LLM call's for instance.
+Holding a span is in-process plumbing, like binding the log context: it lives in a context variable of Pipelex's own. **Pipelex never makes its spans current in your process's OpenTelemetry context**, so your own instrumentation, an HTTP client's or a provider SDK's, is never re-parented under a Pipelex span, and an error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. A span's children take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs carries `pipelex.*` fields only while the process runs a span of its own, the LLM call's for instance.
 
 ## Structured content
 

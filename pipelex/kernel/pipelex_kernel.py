@@ -30,9 +30,15 @@ reading the events back and clearing the registration stay the caller's, and the
 what stands between a kernel run and the interpreter's cost reporting. ``pipelex/tracing/`` holds
 both halves a caller needs (``make_event_log``, ``UsageAggregator``) and is kernel-layer, so none of
 this costs the boot contract. See ``docs/under-the-hood/pipelex-kernel.md``.
+
+**The log context splits the same way.** Each kernel function that takes a ``job_metadata`` binds
+it for the length of its call, so a step's lines name the run and the step. The run-level binding,
+which covers the lines a host emits between steps, is the caller's for the same reason as above:
+the host wraps its run in :meth:`PipelexKernel.log_context`.
 """
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import Any, Self
 from uuid import uuid4
 
@@ -57,6 +63,7 @@ from pipelex.runtime_hub import resolve_run_mode_for_boot
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.log.log_context import LogContext
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
@@ -86,6 +93,8 @@ class PipelexKernel:
         run_mode: PipeRunMode = PipeRunMode.LIVE,
         user_id: str,
         storage_scope: str,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
         extras: dict[str, str] | None = None,
         is_mock_usage: bool = False,
         trace_context: TraceContext | None = None,
@@ -102,12 +111,29 @@ class PipelexKernel:
         so an illegal LIVE request must fail loud on every boot rather than be silently legalised by
         a keyless process forcing it to DRY.
 
+        ``request_id`` is the inbound request this run serves, the identifier a hosted deployment
+        filters its logs on. It rides the run metadata beside ``user_id``, reaches every step's
+        metadata and the log context each step binds, and is validated by ``RunMetadata`` exactly as
+        on the pipeline entry points.
+
         ``trace_context`` is what makes cost/usage reporting reach parity with an interpreter run:
         the cogt leaf emits a usage event only when the metadata it is handed carries one. Passing it
         adopts its ``graph_id`` as this run's ``pipeline_run_id`` rather than minting a fresh id —
         the two are one identity, and letting them diverge would scatter a single run's usage events
         across two ids (the registered-context emit path stamps the event log's id, the runner
         fallback stamps the metadata's), so the read-back would silently miss half of them.
+
+        ``pipeline_run_id`` names the run when no trace context does. The run id is a trace
+        context's ``graph_id`` when one is given, else this value, else a fresh ``uuid4``. A trace
+        context and a ``pipeline_run_id`` that disagree raise ``ValueError``, since neither could
+        win without splitting the run's identity; equal ones are accepted. An empty
+        ``pipeline_run_id`` raises ``ValueError`` too, rather than silently minting an id a
+        replaying host did not ask for. **A host inside a
+        replay-based executor must pass one of the two**: the ``uuid4`` default takes a different
+        value every time the host re-executes the code, so a replayed run would name itself
+        differently from the run it replays. Such a host mints the id from its own replay-safe
+        source and passes the value; unlike a step id, it is minted once per run, so a value is
+        enough where ``step_id_source`` needs a callable.
 
         ``extras`` is the opaque, host-supplied mapping of labels about this run, carried beside
         ``user_id`` and ``storage_scope``. This tier is the direct programmatic entry
@@ -129,7 +155,8 @@ class PipelexKernel:
                 run_metadata=RunMetadata(
                     user_id=user_id,
                     storage_scope=storage_scope,
-                    pipeline_run_id=trace_context.graph_id if trace_context is not None else str(uuid4()),
+                    pipeline_run_id=cls._resolve_pipeline_run_id(trace_context=trace_context, pipeline_run_id=pipeline_run_id),
+                    request_id=request_id,
                     extras=extras or {},
                 ),
                 trace_context=trace_context,
@@ -137,6 +164,33 @@ class PipelexKernel:
             cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode), is_mock_usage=is_mock_usage),
             step_id_source=step_id_source,
         )
+
+    @classmethod
+    def _resolve_pipeline_run_id(cls, *, trace_context: TraceContext | None, pipeline_run_id: str | None) -> str:
+        """The run's id: the trace context's ``graph_id``, else the caller's ``pipeline_run_id``, else a fresh ``uuid4``."""
+        if pipeline_run_id == "":
+            msg = "PipelexKernel.make was given an empty pipeline_run_id: pass the run's id, or None to have one minted."
+            raise ValueError(msg)
+        if trace_context is None:
+            return pipeline_run_id if pipeline_run_id is not None else str(uuid4())
+        if pipeline_run_id is not None and pipeline_run_id != trace_context.graph_id:
+            msg = (
+                f"PipelexKernel.make was given a trace context for run '{trace_context.graph_id}' and a pipeline_run_id "
+                f"'{pipeline_run_id}': they name one run, so they must agree. Pass one of them, or the same id twice."
+            )
+            raise ValueError(msg)
+        return trace_context.graph_id
+
+    def log_context(self) -> AbstractContextManager[LogContext]:
+        """Bind this run's ``request_id`` and ``pipeline_run_id`` onto every record emitted inside the block.
+
+        **The host wraps its run in it**, because the kernel has no run boundary of its own to hang a
+        binding on — the same reason it leaves the usage and trace lifecycle to the caller. It binds
+        the run and no step: the run-level metadata carries no ``pipe_run_id``, and each kernel step
+        function binds its own step's over this one for the length of the call, so a line emitted
+        between two calls names the run and a line emitted during one names the step as well.
+        """
+        return self.job_metadata.log_context()
 
     def make_step_metadata(self, *, pipe_code: str | None = None) -> JobMetadata:
         """A per-step copy of the run-level metadata, carrying its own ``pipe_run_id``.

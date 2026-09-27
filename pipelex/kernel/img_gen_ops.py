@@ -122,31 +122,32 @@ async def run_img_gen(
     image is re-validated onto it, because the content generator returns a plain `ImageContent` and
     the declared output concept may refine it.
     """
-    img_gen_job_config = get_config().inference.img_gen.img_gen_job
-    content_generator = get_content_generator()
-    content: StuffContent
-    if nb_images > 1:
-        image_contents = await content_generator.make_image_list(
-            job_metadata=job_metadata,
-            cogt_run_params=cogt_run_params,
-            img_gen_handle=img_gen_setting.model,
-            img_gen_prompt=img_gen_prompt,
-            nb_images=nb_images,
-            img_gen_job_params=img_gen_job_params,
-            img_gen_job_config=img_gen_job_config,
+    with job_metadata.log_context():
+        img_gen_job_config = get_config().inference.img_gen.img_gen_job
+        content_generator = get_content_generator()
+        content: StuffContent
+        if nb_images > 1:
+            image_contents = await content_generator.make_image_list(
+                job_metadata=job_metadata,
+                cogt_run_params=cogt_run_params,
+                img_gen_handle=img_gen_setting.model,
+                img_gen_prompt=img_gen_prompt,
+                nb_images=nb_images,
+                img_gen_job_params=img_gen_job_params,
+                img_gen_job_config=img_gen_job_config,
+            )
+            content = ListContent(items=[output_class.model_validate(image_content.smart_dump()) for image_content in image_contents])
+        else:
+            image_content = await content_generator.make_single_image(
+                job_metadata=job_metadata,
+                cogt_run_params=cogt_run_params,
+                img_gen_handle=img_gen_setting.model,
+                img_gen_prompt=img_gen_prompt,
+                img_gen_job_params=img_gen_job_params,
+                img_gen_job_config=img_gen_job_config,
+            )
+            content = output_class.model_validate(image_content.smart_dump())
+        return ImgGenResult(
+            memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
+            content=content,
         )
-        content = ListContent(items=[output_class.model_validate(image_content.smart_dump()) for image_content in image_contents])
-    else:
-        image_content = await content_generator.make_single_image(
-            job_metadata=job_metadata,
-            cogt_run_params=cogt_run_params,
-            img_gen_handle=img_gen_setting.model,
-            img_gen_prompt=img_gen_prompt,
-            img_gen_job_params=img_gen_job_params,
-            img_gen_job_config=img_gen_job_config,
-        )
-        content = output_class.model_validate(image_content.smart_dump())
-    return ImgGenResult(
-        memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
-        content=content,
-    )
