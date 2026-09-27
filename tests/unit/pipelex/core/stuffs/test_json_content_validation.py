@@ -37,6 +37,14 @@ class TestJSONContentValidation:
         with pytest.raises(ValidationError, match="json_obj is not valid JSON"):
             JSONContent(json_obj=json_obj)
 
+    @pytest.mark.parametrize("non_finite", [float("nan"), float("inf"), float("-inf")])
+    def test_invalid_json_with_a_nested_non_finite_number(self, non_finite: float):
+        """NaN and the infinities are not JSON, at any depth: serialization would turn them into null."""
+        json_obj = {"outer": {"inner": [1, non_finite]}}
+
+        with pytest.raises(ValidationError, match="json_obj is not valid JSON"):
+            JSONContent(json_obj=json_obj)
+
     def test_invalid_json_with_non_serializable_function(self):
         """Test that functions in JSON object raise a ValidationError, never a raw TypeError."""
 

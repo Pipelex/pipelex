@@ -93,6 +93,11 @@ class TestInputShaperFallbackRefusal:
             # `Anything[]` refuses a nested list and a null item too, so no declaration is advised.
             ("native.Dynamic", True, [[1, 2], [3]], "could not be built"),
             ("native.Dynamic", True, [1, None], "could not be built"),
+            # NaN, an object holding one, and envelope-shaped items are refused by every declaration too.
+            ("native.Dynamic", None, float("nan"), "Unexpected type"),
+            ("native.Dynamic", True, [1, float("inf")], "Cannot create Stuff from list"),
+            ("native.Dynamic", None, {"a": float("nan")}, "should represent a StuffContentOrData"),
+            ("native.Dynamic", True, [{"concept": "Text", "content": "a"}], "Cannot create Stuff from list"),
         ],
     )
     def test_a_refusal_that_is_not_about_a_reading_keeps_the_factory_s_reason(

@@ -58,6 +58,9 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
     ("inf-for-number", "native.Number", None, float("inf"), WrongScalarKindError, "a number JSON cannot hold"),
     ("nan-for-anything", "native.Anything", None, float("nan"), WrongScalarKindError, "a number JSON cannot hold"),
     ("inf-item-for-anything-list", "native.Anything", True, [1, float("-inf")], WrongScalarKindError, "a number JSON cannot hold"),
+    ("json-object-holding-nan", "native.JSON", None, {"a": float("nan")}, StructureValidationError, "not valid JSON"),
+    ("anything-object-holding-an-infinity", "native.Anything", None, {"a": {"b": float("inf")}}, StructureValidationError, "not valid JSON"),
+    ("json-list-item-holding-an-infinity", "native.JSON", True, [{"a": float("-inf")}], StructureValidationError, "not valid JSON"),
     # R1 a Python caller's value that is not JSON at all.
     ("anything-not-a-json-value", "native.Anything", None, {1, 2}, WrongScalarKindError, "a value of type set"),
     # An object holding a value that is not JSON is a typed refusal, not a raw TypeError from the validator.

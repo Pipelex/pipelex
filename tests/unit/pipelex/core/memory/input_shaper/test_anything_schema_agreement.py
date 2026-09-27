@@ -10,7 +10,9 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 
-# (multiplicity, provided value) — every JSON type at each declaration, including the ones refused.
+# (multiplicity, provided value) — every JSON type at each declaration, including the ones refused. The one
+# shape left out is an `Anything[]` item keyed exactly `concept` and `content`, which R10 refuses and the
+# schema does not state: `wip/anything-slot/plan.md` defers it.
 AGREEMENT_CASES: list[tuple[VariableMultiplicity | None, Any]] = [
     (None, {}),
     (None, {"a": 1}),

@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260902-10eb56
 ---
 
@@ -202,7 +202,22 @@ Decided on the way:
 - **A typed singular envelope at `Anything[]` is stored unwrapped** (Codex adversarial, medium): deferred to Gap A's auto-wrap question, recorded in `wip/inputs/input-shaper-multiplicity-gaps.md`.
 - **A TOML date inside an object at a `JSON` or `Anything` input is refused** (cubic): deferred below. The refusal is typed and names the input; whether a date inside an object should become its ISO string is a reading of its own.
 
-**Next.** Record the round, open the pull request, file Phase 6's three items, then land with `/ledger-land`.
+The round was recorded with each Codex run named, and the pull request opened as pipelex#1287, where round 3 ran.
+
+## Checkpoint 2's review, round 3 — 2026-09-27
+
+`/rev` at profile 4, round 3, bar `necessity`, against pipelex#1287 at the commit "Fix the Checkpoint 2 review findings on transport, delivery and the fallback's advice". All four reviewers returned, and `code-review`'s provenance matched. Every fix below was mutation-tested.
+
+- **NaN and the infinities nested in an object** (cubic, both Codex runs; the adversarial run rated it high): fixed as a critical, since JSON serialization turned them into `null`. `JSONContent` validates with `allow_nan=False`, so a `JSON` or `Anything` object holding one anywhere is refused like any other value JSON cannot hold.
+- **The fallback's advice still named declarations that refuse the value** (`code-review`, cubic, Codex adversarial): fixed, because round 2's own fix was incomplete and its NaN refusal added a case. `_declaration_suggested_for` now asks `_anything_reads_item`, which mirrors what the `Anything` arm accepts: an envelope-shaped item, a non-finite number or an object JSON cannot encode gets no suggestion.
+- **The `Anything[]` schema admits an envelope-shaped item that R10 refuses** (cubic, Codex adversarial): deferred below.
+- **The inputs-file loader rewrites every relative `url` key, `JSON` data included** (cubic): deferred to L-260927-55f503. It predates this branch, which only adds a way in.
+- **A single `Anything` output holding a list breaks the narrowed schema** (`code-review`): rejected. An output contract describes the dumped content, and a `ListContent` comes back as an object holding `items`, which the schema admits; the bare array exists only in the private transport encoding.
+- **A `JSON` refinement with sibling fields loses them in the reference projection** (Codex review): rejected. A refining concept cannot declare a structure (`concept_blueprint.py`), so the state cannot occur.
+
+## After the merge
+
+L-260902-10eb56 lands with pipelex#1287, and both campaign documents are `landed` from that merge. Checkpoint 3's cross-repo half is carried by three items, each blocked by this one: L-260927-b1ca80 (`mthds-js`) and L-260927-cd33d1 (`mthds-python`) change their projections and re-commit the regenerated corpus with the `projection-corpus-update` skill, checking it against the Checkpoint 2 summary above, and L-260927-7f1e95 (`conformance`) removes `scaffold_anything_slot` from the census. The three pull requests merge together, or `conformance`'s fixture-drift and census checks go red for everyone.
 
 ## Ledger
 
@@ -210,6 +225,8 @@ Decided on the way:
 - Ruled on here but not built: L-260902-9546ef, L-260926-f7bb28 (now linked to it) and L-260902-db6d1e keep their own fix directions under the design's R6.
 - Filed from this design: L-260927-bea35e (`pipelex`, the `Dynamic` envelope data loss, now also carrying the list half of the report) and L-260927-afaf62 (`mthds`, the runtime guide's compatibility pseudo-code).
 - Filed from the review: L-260927-da1b09 (`pipelex`, R9's runtime half, blocked by this item) and L-260927-223013 (`mthds`, R9's wording in the standard); L-260927-a8ec06 (`mthds`, question 4, decided and closed: `JSON` stays an object); L-260927-702c56 (`pipelex`, a JSON file reference into `JSON[]`, blocked by this item).
+- Filed at the pull request (Phase 6): L-260927-b1ca80 (`mthds-js`), L-260927-cd33d1 (`mthds-python`) and L-260927-7f1e95 (`conformance`), each blocked by this item.
+- Filed from round 3: L-260927-55f503 (`pipelex`, the inputs-file loader's signature-blind `url` rewrite).
 - Not touched: L-260831-1e1a71 owns the explicit arm's untyped escapes, which R8 deliberately leaves alone.
 
 ## Deferred
@@ -221,3 +238,4 @@ Decided on the way:
 - **A JSON file reference into `JSON[]`**, the way D11 reads a CSV into a structured list, is L-260927-702c56.
 - **Per-item envelopes in a list**, for every kind, would be a feature of their own; R10 refuses the spelling rather than read it for two kinds only.
 - **A TOML date inside an object** at a `JSON` or `Anything` input is refused as a value JSON cannot hold, though the same date at the top of an `Anything` input is read. Converting it to its ISO string would be a reading of its own, left until a caller asks.
+- **An envelope-shaped item of an `Anything[]` list** passes the published schema, an object that is neither an array nor null, while R10 refuses it. A schema can state it, as an item that is not an object keyed exactly `concept` and `content`, but every consumer of every `Anything[]` schema would carry that clause for one pathological shape, which a clear refusal already names. `test_anything_schema_agreement.py` says it leaves the shape out.

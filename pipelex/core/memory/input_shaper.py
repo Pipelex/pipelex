@@ -969,19 +969,42 @@ class InputShaper:
     @classmethod
     def _declaration_suggested_for(cls, *, value: Any) -> str | None:
         """The declaration that reads a bare value the fallback has no reading for, or ``None`` when no
-        declaration reads it: an empty list, or a list holding prebuilt contents, nested lists or nulls,
-        which an `Anything[]` input refuses too.
+        declaration reads it, so the refusal never advises a declaration that would refuse the value too.
         """
         if isinstance(value, dict):
-            return "'JSON'"
+            return "'JSON'" if cls._is_json_encodable(value=value) else None
         if isinstance(value, list):
             items = cast("list[Any]", value)
-            if not items or any(item is None or isinstance(item, (StuffContent, list)) for item in items):
+            if not items or not all(cls._anything_reads_item(item=item) for item in items):
                 return None
             if all(isinstance(item, dict) for item in items):
                 return "'JSON[]'"
             return "'Anything[]'"
-        return "'Anything'"
+        return "'Anything'" if cls._anything_reads_item(item=value) else None
+
+    @classmethod
+    def _anything_reads_item(cls, *, item: Any) -> bool:
+        """Whether the `Anything` arm builds a content for one value, as a single value or a list item.
+
+        Mirrors what `_build_anything_content` and `_shape_list` accept: a boolean, a finite number,
+        a string, a date or a time, and an object JSON can encode that is not shaped like an envelope.
+        """
+        if isinstance(item, (bool, str, datetime.date, datetime.time)):
+            return True
+        if isinstance(item, (int, float)):
+            return cls._is_json_number(value=item)
+        if isinstance(item, dict):
+            return not cls._is_envelope_dict(item) and cls._is_json_encodable(value=item)
+        return False
+
+    @classmethod
+    def _is_json_encodable(cls, *, value: Any) -> bool:
+        """Whether JSON can hold a value as it is, with no NaN or infinity anywhere inside it."""
+        try:
+            json.dumps(value, allow_nan=False)
+        except (TypeError, ValueError):
+            return False
+        return True
 
     @classmethod
     def _render_expected_shape(cls, *, concept_provider: ConceptProviderAbstract, stuff_spec: StuffSpec) -> str:
