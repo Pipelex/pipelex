@@ -600,6 +600,9 @@ class GcpLogSink(LogSink):
     The transport, the project and the credentials check are resolved before the sink is built, so the
     sink itself imports nothing and a test builds it around a capture. Without a check, a flush that
     runs out of time is still said, with no cause named.
+
+    It builds one handler. The handler's close closes the transport, whose worker thread nothing starts
+    again, so a handler built on it afterwards would take every record and send none.
     """
 
     def __init__(self, *, transport: GcpLogTransport, project: str, credentials_check: GcpCredentialsCheck | None = None) -> None:
@@ -607,10 +610,20 @@ class GcpLogSink(LogSink):
         self._transport = transport
         self._project = project
         self._credentials_check = credentials_check
+        self._has_built_handler = False
 
     @override
     def make_handler(self) -> logging.Handler:
-        return GcpLogHandler(transport=self._transport, project=self._project, credentials_check=self._credentials_check)
+        if self._has_built_handler:
+            msg = (
+                "This gcp sink was installed once already, and the teardown that closed its handler closed its transport, whose "
+                "worker thread nothing starts again, so it can send nothing to Cloud Logging. Build a new GcpLogSink for this install; "
+                "the registered 'gcp' factory builds one at every boot."
+            )
+            raise RuntimeError(msg)
+        handler = GcpLogHandler(transport=self._transport, project=self._project, credentials_check=self._credentials_check)
+        self._has_built_handler = True
+        return handler
 
 
 def _credentials_source(*, config: GcpLogSinkConfig) -> str:

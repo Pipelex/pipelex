@@ -321,6 +321,24 @@ class TestGcpLogSink:
 
         assert transport.flush_count > 0
 
+    def test_the_same_sink_installed_again_after_a_reset_is_refused_rather_than_sending_nothing(self) -> None:
+        """The teardown closes the transport, whose worker thread nothing starts again, so a second install must say so."""
+        transport = FakeTransport()
+        sink = GcpLogSink(transport=transport, project=PROJECT)
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config())
+        fresh.install_sink(sink)
+        fresh.reset()
+        fresh.configure(log_config=_package_log_config())
+        try:
+            with pytest.raises(RuntimeError, match="installed once already"):
+                fresh.install_sink(sink)
+
+            assert fresh.sink is None
+            assert sink.processors == []
+        finally:
+            fresh.reset()
+
     def test_the_client_librarys_own_export_failure_is_rejected_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport]) -> None:
         """The library reports a refused batch at ``ERROR``; exported, that report fails with the batch and is reported again."""
         _, transport = gcp_log
