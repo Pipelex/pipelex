@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
 import threading
@@ -8,10 +9,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
+import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from google.auth import compute_engine
 from google.auth import exceptions as google_auth_exceptions
+from requests.adapters import HTTPAdapter
 from typing_extensions import override
 
 from pipelex.tools.log.exceptions import GcpLogSinkCredentialsError
@@ -32,6 +35,22 @@ if TYPE_CHECKING:
 
 SOURCE = "the test credentials"
 REMEDY = "Renew the test credentials"
+SOURCE_TOKEN_URI = "https://oauth2.googleapis.com/token"
+# What `gcloud auth application-default login --impersonate-service-account` writes.
+IMPERSONATED_ADC: dict[str, Any] = {
+    "type": "impersonated_service_account",
+    "service_account_impersonation_url": (
+        "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/pipelex-test@a-test-project.iam.gserviceaccount.com:generateAccessToken"
+    ),
+    "source_credentials": {
+        "type": "authorized_user",
+        "client_id": "a-client-id",
+        "client_secret": "a-client-secret",
+        "refresh_token": "a-refresh-token",
+        "token_uri": SOURCE_TOKEN_URI,
+    },
+    "delegates": [],
+}
 
 
 class RefusedError(Exception):
@@ -331,6 +350,64 @@ class TestGcpLogSinkCredentials:
         assert "Status: 404" in str(exc_info.value)
         assert isinstance(exc_info.value.__cause__, google_auth_exceptions.RefreshError)
         assert len(metadata_requests) == 1, "a final answer is not retried"
+
+    @pytest.mark.parametrize(
+        ("iam_status", "is_refused"),
+        [
+            (503, False),
+            (502, False),
+            (429, False),
+            (403, True),
+        ],
+    )
+    def test_impersonated_credentials_are_refused_only_by_an_answer_that_does_not_say_to_retry(
+        self,
+        stderr: CapturingHandler,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: MockerFixture,
+        tmp_path: Path,
+        iam_status: int,
+        is_refused: bool,
+    ) -> None:
+        """The auth library raises the IAM Credentials API's 5xx or 429 as a refusal carrying no status, so the sink reads it off the response."""
+        adc_path = tmp_path / "application_default_credentials.json"
+        adc_path.write_text(json.dumps(IMPERSONATED_ADC), encoding="utf-8")
+        monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(adc_path))
+        requested_urls: list[str] = []
+
+        def answer(_adapter: HTTPAdapter, request: requests.PreparedRequest, **_send_kwargs: Any) -> requests.Response:
+            url = str(request.url)
+            requested_urls.append(url)
+            response = requests.Response()
+            response.request = request
+            response.url = url
+            response.headers["content-type"] = "application/json"
+            if url == SOURCE_TOKEN_URI:
+                response.status_code = 200
+                body: dict[str, Any] = {"access_token": "a-source-token", "expires_in": 3600}
+            else:
+                response.status_code = iam_status
+                body = {"error": {"code": iam_status, "message": "The IAM Credentials API answered."}}
+            response.raw = io.BytesIO(json.dumps(body).encode())
+            return response
+
+        mocker.patch.object(HTTPAdapter, "send", autospec=True, side_effect=answer)
+        config = GcpLogSinkConfig(log_name="pipelex", project_id="a-test-project")
+
+        if is_refused:
+            with pytest.raises(GcpLogSinkCredentialsError, match="was refused at boot"):
+                make_gcp_log_sink(config=config)
+            assert stderr.records == []
+        else:
+            sink = make_gcp_log_sink(config=config)
+            sink.make_handler().close()
+            (record,) = stderr.records
+            assert (
+                "could not confirm at boot that Google accepts the Application Default Credentials: a refresh could not reach the credential "
+                f"endpoint (RefreshError: The credential endpoint answered {iam_status}, a status that says to retry"
+            ) in record.getMessage()
+        assert requested_urls[0] == SOURCE_TOKEN_URI
+        assert "iamcredentials.googleapis.com" in requested_urls[-1]
 
     def test_application_default_credentials_that_cannot_be_found_stop_the_boot_naming_the_remedy(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path

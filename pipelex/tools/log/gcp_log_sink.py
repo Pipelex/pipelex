@@ -476,9 +476,12 @@ def _carries_a_final_answer(*, failure: BaseException) -> bool:
     status = getattr(failure.args[1], "status", None)
     if not isinstance(status, int):
         return False
-    if status in {HTTPStatus.REQUEST_TIMEOUT, HTTPStatus.TOO_MANY_REQUESTS}:
-        return False
-    return HTTPStatus.BAD_REQUEST <= status < HTTPStatus.INTERNAL_SERVER_ERROR
+    return HTTPStatus.BAD_REQUEST <= status < HTTPStatus.INTERNAL_SERVER_ERROR and not says_to_retry(status=status)
+
+
+def says_to_retry(*, status: int) -> bool:
+    """Whether an HTTP status from a credential endpoint says to retry: a ``5xx``, a timeout or a rate limit, the ones the auth library retries."""
+    return status >= HTTPStatus.INTERNAL_SERVER_ERROR or status in {HTTPStatus.REQUEST_TIMEOUT, HTTPStatus.TOO_MANY_REQUESTS}
 
 
 def _undelivered_message(*, cause: str | None) -> str:
@@ -537,7 +540,7 @@ class GcpLogHandler(logging.Handler):
 
     @override
     def flush(self) -> None:
-        """Waits for the transport's queue to drain, and never longer than ``FLUSH_TIMEOUT_SECONDS``.
+        """Waits for the transport's queue to drain for ``FLUSH_TIMEOUT_SECONDS`` at most, then says so when it did not.
 
         The library's own flush waits on the queue with no deadline, and the teardown that calls it runs
         in a ``finally``: a batch the API is refusing, or an export the network is holding, would keep
@@ -547,7 +550,9 @@ class GcpLogHandler(logging.Handler):
         A drain still running when the deadline passes is said on stderr rather than left to the
         library's close, whose only line counts what is still queued and names no reason: the sink
         refreshes its credentials once more and says what that answered, since a refresh the gRPC
-        transport keeps retrying is the likeliest reason a write is held.
+        transport keeps retrying is the likeliest reason a write is held. That refresh has its own
+        deadline, ``CREDENTIALS_CHECK_TIMEOUT_SECONDS``, so a flush that runs out of time returns within
+        the sum of the two. The transport's worker goes on sending meanwhile, so the wait costs no record.
 
         After ``close`` it does nothing. The stdlib's shutdown at exit flushes every handler still
         alive, and a drain left running holds this one alive, so without that it would wait out a
@@ -707,6 +712,7 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
 
     """
     try:
+        import requests  # ruff: ignore[import-outside-top-level]
         from google.auth import exceptions as google_auth_exceptions  # ruff: ignore[import-outside-top-level]
         from google.auth.transport.requests import Request as GoogleAuthRequest  # ruff: ignore[import-outside-top-level]
         from google.cloud import logging as cloud_logging  # ruff: ignore[import-outside-top-level]
@@ -760,7 +766,29 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
     credentials: Any = client._credentials  # ruff: ignore[private-member-access]
 
     def refresh_credentials() -> None:
-        credentials.refresh(GoogleAuthRequest())
+        # The auth library raises a 5xx or a 429 from the IAM Credentials API, from a subject-token URL or
+        # from the STS exchange as a refusal that neither declares itself retryable nor carries the status,
+        # so a transient outage of those endpoints would read as credentials Google refuses and stop the
+        # boot. The status is read instead from a response hook on the request's own session, which keeps
+        # the request the library's type: the metadata client reaches into its session. A refusal after an
+        # answer that says to retry is raised again as retryable; the token endpoint's own already is.
+        answered_statuses: list[int] = []
+
+        def record_status(  # kw-only: ignore — requests calls a hook with the response positionally
+            response: requests.Response, **_hook_kwargs: Any
+        ) -> None:
+            answered_statuses.append(response.status_code)
+
+        session = requests.Session()
+        session.hooks["response"].append(record_status)
+        try:
+            credentials.refresh(GoogleAuthRequest(session=session))
+        except google_auth_exceptions.GoogleAuthError as exc:
+            last_status = answered_statuses[-1] if answered_statuses else None
+            if getattr(exc, "retryable", False) is True or last_status is None or not says_to_retry(status=last_status):
+                raise
+            msg = f"The credential endpoint answered {last_status}, a status that says to retry ({describe_failure(failure=exc)})"
+            raise google_auth_exceptions.RefreshError(msg, retryable=True) from exc
 
     credentials_check = GcpCredentialsCheck(
         refresh=refresh_credentials,
