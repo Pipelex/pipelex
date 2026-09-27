@@ -114,7 +114,9 @@ def sanitize_mermaid_id(node_id: str) -> str:
 def escape_mermaid_label(label: str) -> str:
     """Escape special characters in Mermaid labels.
 
-    Handles characters that could break Mermaid syntax or inject directives.
+    Handles characters that could break Mermaid syntax or inject directives. Square brackets
+    become Mermaid entity codes, which render as the brackets themselves, so a multiplicity
+    marker such as `Record[]` reads as written.
 
     Args:
         label: The label text to escape.
@@ -125,8 +127,8 @@ def escape_mermaid_label(label: str) -> str:
     result = label
     result = result.replace("\\", "\\\\")  # Escape backslashes first
     result = result.replace('"', "'")
-    result = result.replace("[", "(")
-    result = result.replace("]", ")")
+    result = result.replace("[", "#91;")
+    result = result.replace("]", "#93;")
     result = result.replace("{", "(")
     result = result.replace("}", ")")
     result = result.replace("<", "&lt;")

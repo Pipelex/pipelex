@@ -479,8 +479,11 @@ class IOSpec(BaseModel):
     size: int | None  # Content size
     digest: str | None  # Unique identifier for data flow
     data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None  # Full serialized content
+    multiplicity: bool | int | None  # True for a list, None for a single value
     extra: dict[str, Any]  # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
 ```
+
+Every site that records a stuff on a node builds its IOSpec with `make_stuff_io_spec` (`pipelex/graph/stuff_io_spec.py`): a pipe's declared inputs at its start, its main output at its end, a lifted pipe's plural companion slots, and a `PipeParallel`'s branch outputs. `concept` is always the bare concept code, and `multiplicity` says whether the stuff is a list, in the encoding the pipe registry uses for a stuff spec: `true` for a variable-length list, a positive integer for a fixed count, `null` for a single value. A run reads it off the value it holds, so a list is `true` whatever its length, an empty list from a lifted plural output included, and a batch's item is single while its aggregate is a list. It never writes the item count, which would make a one-item list read as single and an empty one write `0`. Because the trace events carry the IOSpec whole, both graph builders show the same marker, and a stuff reads the same on its producer's io item and on its consumers'. The Mermaid renderer labels such a stuff `Record[]`.
 
 !!! warning "Preview Truncation"
     Previews are automatically truncated to 200 characters. Stack traces are truncated to 2000 characters. Use `--graph-full-data` to capture complete content.

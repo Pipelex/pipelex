@@ -60,13 +60,14 @@ def _normalize_node(node: NodeSpec) -> dict[str, Any]:
         "error_type": node.error.error_type if node.error else None,
         "error_message": node.error.message if node.error else None,
         "metrics": node.metrics,
+        # Multiplicity rides along so both builders are held to carry each io item's marker.
         "inputs": sorted(
-            [(spec.name, spec.digest) for spec in node.node_io.inputs],
-            key=lambda pair: (pair[0] or "", pair[1] or ""),
+            [(spec.name, spec.digest, spec.multiplicity) for spec in node.node_io.inputs],
+            key=lambda triple: (triple[0] or "", triple[1] or ""),
         ),
         "outputs": sorted(
-            [(spec.name, spec.digest) for spec in node.node_io.outputs],
-            key=lambda pair: (pair[0] or "", pair[1] or ""),
+            [(spec.name, spec.digest, spec.multiplicity) for spec in node.node_io.outputs],
+            key=lambda triple: (triple[0] or "", triple[1] or ""),
         ),
     }
 
@@ -295,7 +296,7 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: TraceContext) -
         pipe_type="PipeBatch",
         node_kind=NodeKind.CONTROLLER,
         started_at=started_at,
-        input_specs=[IOSpec(name="input_list", digest="digest_list")],
+        input_specs=[IOSpec(name="input_list", digest="digest_list", multiplicity=True)],
     )
 
     # Register batch item extractions
@@ -360,7 +361,7 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: TraceContext) -
     tracer.on_pipe_end_success(
         node_id=ctrl_id,
         ended_at=started_at + timedelta(seconds=4),
-        output_spec=IOSpec(name="output_list", digest="digest_output_list"),
+        output_spec=IOSpec(name="output_list", digest="digest_output_list", multiplicity=True),
     )
 
 
@@ -547,6 +548,20 @@ class TestAssemblerEquivalence:
         """GraphTracer teardown and GraphSpecAssembler produce structurally identical GraphSpecs."""
         direct_spec, assembled_spec = _run_both_paths(scenario_fn)
         _assert_graphs_equivalent(direct_spec, assembled_spec)
+
+    def test_multiplicity_survives_both_builders(self) -> None:
+        """Agreement alone would pass if both builders dropped the marker, so pin its value too:
+        the batch's list io items stay plural and its items stay single, on both routes.
+        """
+        direct_spec, assembled_spec = _run_both_paths(_scenario_batch_fan_out_fan_in)
+        for spec in (direct_spec, assembled_spec):
+            multiplicity_by_digest = {
+                io_spec.digest: io_spec.multiplicity for node in spec.nodes for io_spec in [*node.node_io.inputs, *node.node_io.outputs]
+            }
+            assert multiplicity_by_digest["digest_list"] is True
+            assert multiplicity_by_digest["digest_output_list"] is True
+            assert multiplicity_by_digest["digest_item_0"] is None
+            assert multiplicity_by_digest["digest_result_0"] is None
 
     def test_usage_is_the_one_intentional_divergence(self) -> None:
         """The two builders stay structurally equivalent, and diverge on `usage` on purpose.
