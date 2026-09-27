@@ -26,6 +26,7 @@ from pipelex.tools.log.gcp_log_sink import (
     GCP_WORKER_THREAD_NAME,
     LOGGER_KEY,
     MESSAGE_KEY,
+    GcpCredentialsCheck,
     GcpExportPathFilter,
     GcpLogSeverity,
     GcpLogSink,
@@ -157,6 +158,18 @@ class CapturingHandler(logging.Handler):
     @override
     def emit(self, record: logging.LogRecord) -> None:
         self.records.append(record)
+
+
+def _refuse_the_grant() -> None:
+    """A refresh the token endpoint refuses, as it refuses a revoked refresh token."""
+    msg = "invalid_grant: Token has been expired or revoked."
+    raise PermissionError(msg)
+
+
+def _miss_the_endpoint() -> None:
+    """A refresh that cannot reach the token endpoint."""
+    msg = "connection refused"
+    raise ConnectionError(msg)
 
 
 class TestGcpLogSink:
@@ -308,6 +321,24 @@ class TestGcpLogSink:
 
         assert transport.flush_count > 0
 
+    def test_the_same_sink_installed_again_after_a_reset_is_refused_rather_than_sending_nothing(self) -> None:
+        """The teardown closes the transport, whose worker thread nothing starts again, so a second install must say so."""
+        transport = FakeTransport()
+        sink = GcpLogSink(transport=transport, project=PROJECT)
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config())
+        fresh.install_sink(sink)
+        fresh.reset()
+        fresh.configure(log_config=_package_log_config())
+        try:
+            with pytest.raises(RuntimeError, match="installed once already"):
+                fresh.install_sink(sink)
+
+            assert fresh.sink is None
+            assert sink.processors == []
+        finally:
+            fresh.reset()
+
     def test_the_client_librarys_own_export_failure_is_rejected_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport]) -> None:
         """The library reports a refused batch at ``ERROR``; exported, that report fails with the batch and is reported again."""
         _, transport = gcp_log
@@ -393,6 +424,122 @@ class TestGcpLogSink:
 
         with pytest.raises(RuntimeError, match="the API refused the batch"):
             handler.flush()
+
+    @pytest.mark.parametrize(
+        ("credentials_check", "cause"),
+        [
+            (None, None),
+            (
+                GcpCredentialsCheck(refresh=lambda: None, transport_error_types=(ConnectionError,), source="the test credentials"),
+                "A refresh of the test credentials still succeeds, so the Cloud Logging API or the network is what holds the write.",
+            ),
+            (
+                GcpCredentialsCheck(refresh=_refuse_the_grant, transport_error_types=(ConnectionError,), source="the test credentials"),
+                "A refresh of the test credentials is now refused, which is why: PermissionError: invalid_grant: Token has been expired or revoked.",
+            ),
+            (
+                GcpCredentialsCheck(refresh=_miss_the_endpoint, transport_error_types=(ConnectionError,), source="the test credentials"),
+                "A refresh of the test credentials cannot reach the credential endpoint either: ConnectionError: connection refused",
+            ),
+        ],
+    )
+    def test_a_flush_that_runs_out_of_time_says_so_with_what_a_fresh_refresh_answers(
+        self,
+        mocker: MockerFixture,
+        credentials_check: GcpCredentialsCheck | None,
+        cause: str | None,
+    ) -> None:
+        """The library's close only counts what is still queued; a process whose writes are held must be told, and why."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = NeverDrainingTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT, credentials_check=credentials_check).make_handler()
+
+        try:
+            handler.flush()
+        finally:
+            transport.released.set()
+
+        (record,) = stderr.records
+        message = record.getMessage()
+        assert message.startswith(
+            "The 'gcp' log sink's transport was still writing to Cloud Logging when the 0.2-second flush deadline passed, "
+            "and the records it still holds are lost unless it sends them while it closes."
+        )
+        if cause is None:
+            assert message.endswith("while it closes.")
+        else:
+            assert message.endswith(f" {cause}")
+
+    def test_a_flush_that_drains_in_time_says_nothing(self, mocker: MockerFixture) -> None:
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = FakeTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+
+        handler.flush()
+
+        assert transport.flush_count == 1
+        assert stderr.records == []
+
+    def test_a_closed_handler_neither_flushes_nor_closes_again(self, mocker: MockerFixture) -> None:
+        """The stdlib's shutdown at exit flushes every handler still alive, and a drain left running keeps this one alive."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = NeverDrainingTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+        closing = FakeTransport()
+        closed_handler = GcpLogSink(transport=closing, project=PROJECT).make_handler()
+
+        handler.close()
+        started = time.monotonic()
+        handler.flush()
+        waited = time.monotonic() - started
+        closed_handler.close()
+        closed_handler.close()
+
+        assert not transport.entered.is_set(), "a closed handler reached its transport's flush"
+        assert waited < 0.2
+        assert stderr.records == []
+        assert closing.close_count == 1
+
+    def test_the_credentials_check_at_teardown_answers_while_the_shutdown_holds_the_handler_lock(self, mocker: MockerFixture) -> None:
+        """The stdlib's shutdown at exit holds this lock around the flush, and the refresh the flush starts logs through the handler it waits on."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        mocker.patch("pipelex.tools.log.gcp_log_sink.CREDENTIALS_CHECK_TIMEOUT_SECONDS", 2.0)
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        auth_logger = logging.getLogger(f"{__name__}.auth")
+        auth_logger.propagate = False
+
+        def refresh_after_a_retry() -> None:
+            auth_logger.warning("Compute Engine Metadata server unavailable on attempt 1 of 5.")
+
+        transport = NeverDrainingTransport()
+        credentials_check = GcpCredentialsCheck(
+            refresh=refresh_after_a_retry, transport_error_types=(ConnectionError,), source="the test credentials"
+        )
+        handler = GcpLogSink(transport=transport, project=PROJECT, credentials_check=credentials_check).make_handler()
+        auth_logger.addHandler(handler)
+
+        handler.acquire()
+        try:
+            handler.flush()
+        finally:
+            handler.release()
+            auth_logger.removeHandler(handler)
+            transport.released.set()
+
+        assert [record.getMessage() for record in stderr.records] == [
+            "Compute Engine Metadata server unavailable on attempt 1 of 5.",
+            (
+                "The 'gcp' log sink's transport was still writing to Cloud Logging when the 0.2-second flush deadline passed, "
+                "and the records it still holds are lost unless it sends them while it closes. "
+                "A refresh of the test credentials still succeeds, so the Cloud Logging API or the network is what holds the write."
+            ),
+        ]
 
     def test_an_export_failure_is_printed_on_stderr_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport], mocker: MockerFixture) -> None:
         """The library reports a refused batch only through this record, and the sink's own handler is never the place it can go."""

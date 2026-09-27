@@ -6,7 +6,8 @@ no spelling for our ``VERBOSE`` and ``DEV``, and it rejects the library's own ex
 names and the thread name the library chooses. Every one of those is an assumption about a third party
 whose change would break a production sink silently and no other test would see: a renamed worker
 thread or a renamed transport logger would let a refused batch be reported through the pipeline that
-refused it, which is a spin that never ends and a deadlock at exit.
+refused it, which is a spin that never ends and a deadlock at exit. The sink also refreshes, at boot,
+the credentials the client keeps on a private attribute: renamed, the boot would fail on every process.
 """
 
 from __future__ import annotations
@@ -14,6 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Any, cast
 
+from google.auth.credentials import AnonymousCredentials
+from google.cloud import logging as cloud_logging
 from google.cloud.logging_v2.entries import StructEntry
 from google.cloud.logging_v2.handlers.transports.background_thread import (
     _WORKER_THREAD_NAME,  # pyright: ignore[reportPrivateUsage]
@@ -65,3 +68,9 @@ class TestTheClientLibraryContract:
         assert any(transport_logger.name == prefix or transport_logger.name.startswith(f"{prefix}.") for prefix in GCP_LOGGING_LOGGER_PREFIXES)
         assert transport_logger.propagate
         assert transport_logger.isEnabledFor(logging.ERROR)
+
+    def test_the_client_keeps_the_credentials_it_authenticates_with_where_the_sink_refreshes_them(self) -> None:
+        credentials = AnonymousCredentials()
+        client: Any = cloud_logging.Client(project="p", credentials=credentials)
+
+        assert client._credentials is credentials  # ruff: ignore[private-member-access]
