@@ -1,3 +1,4 @@
+from contextlib import AbstractContextManager
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -8,6 +9,7 @@ from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.log.log_context import LogContext, bind_log_context
 
 
 class SpecialPipelineId(StrEnum):
@@ -207,6 +209,22 @@ class JobMetadata(BaseModel):
         if self.started_at is not None and self.completed_at is not None:
             return (self.completed_at - self.started_at).total_seconds()
         return None
+
+    def log_context(self) -> AbstractContextManager[LogContext]:
+        """Bind this job's identifiers onto every record emitted inside the block.
+
+        The one spelling of the binding: ``request_id`` and ``pipeline_run_id`` from the run half,
+        ``pipe_run_id`` from the job half. It merges over whatever is already bound, so an identifier
+        this metadata does not carry (a submission's ``pipe_run_id``, a run with no ``request_id``)
+        inherits the enclosing binding rather than clearing it, and the previous binding comes back
+        when the block exits. ``PipeRun.run`` binds a direct-mode run through it, and every kernel
+        function that takes a ``job_metadata`` binds its step through it.
+        """
+        return bind_log_context(
+            request_id=self.run_metadata.request_id,
+            pipeline_run_id=self.run_metadata.pipeline_run_id,
+            pipe_run_id=self.pipe_run_id,
+        )
 
     def copy_with_update(
         self,
