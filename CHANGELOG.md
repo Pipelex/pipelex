@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`pipelex-agent --runner api run` reports the runner's refusal, not its status line**: when the API runner answers `run pipe`, `run bundle` or `run method` with a non-2xx status, the error envelope, in markdown and in JSON, now carries what its problem document says: the runner's error class as `error_type` (`ValidateBundleError`, `ModelNotFoundError`, `StuffFactoryError`), a `message` quoting its reason, which names the failing pipe and its path on a failed run, its next step as `hint`, its `error_domain`, `error_category` and `retryable`, its `validation_errors` rendered as `validate` renders them, `pipe_code` and `pipe_stack` when it carries them, its `code` as `error_code`, the `Retry-After` delay as `retry_after_seconds`, and `http_status` and `request_id`, where the envelope used to read only `HTTPStatusError` and `Client error '422 Unprocessable Entity'`. An answer that advises no next step gets one from its status: a 401 or 403 points at the API key, a 404 at `MTHDS_BASE_URL`, a 429 says to wait and retry and is `retryable`, a 503 warns that a retry can repeat a paid run, any other 4xx says to change the request, and any other status says to report the `request_id`. It requires mthds 0.17.0, whose client raises the typed `ApiResponseError`.
+
+### Fixed
+
+- **The API runner's credentials hint names the variables it reads**: a `ClientAuthenticationError` now says to set `MTHDS_API_KEY` and `MTHDS_BASE_URL` or to run `mthds config set`, where it pointed at `pipelex-agent doctor` and `PIPELEX_API_KEY`, which the API runner does not read.
+
 ## [v0.67.0] - 2026-09-27
 
 ### Added

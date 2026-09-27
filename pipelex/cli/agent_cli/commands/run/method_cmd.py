@@ -8,12 +8,15 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from mthds.protocol.exceptions import PipelineRequestError
+from mthds.runners.api.exceptions import ApiResponseError, ClientAuthenticationError
 from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
+    agent_error_api_response,
     agent_success_formatted,
     run_failure_fields,
     set_agent_cli_error_format,
@@ -148,9 +151,6 @@ def run_method_cmd(
             if mock_inputs:
                 agent_error("--mock-inputs is not supported with --runner api", error_type="ArgumentError")
 
-            from mthds.protocol.exceptions import PipelineRequestError  # ruff: ignore[import-outside-top-level]
-            from mthds.runners.api.exceptions import ClientAuthenticationError  # ruff: ignore[import-outside-top-level]
-
             try:
                 result = asyncio.run(
                     run_pipeline_core_api(
@@ -166,6 +166,10 @@ def run_method_cmd(
 
             except ClientAuthenticationError as exc:
                 agent_error(str(exc), error_type="ClientAuthenticationError", cause=exc)
+
+            except ApiResponseError as exc:
+                # The runner answered non-2xx: its problem document says why, where, and what to do next.
+                agent_error_api_response(error=exc)
 
             except PipelineRequestError as exc:
                 agent_error(str(exc), error_type="PipelineRequestError", cause=exc)
