@@ -20,6 +20,7 @@ from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_HINTS,
+    API_REFUSAL_CALLER_HINT,
     API_REFUSAL_HINTS_BY_STATUS,
     CliOutputFormat,
     agent_error_api_response,
@@ -273,7 +274,7 @@ class TestRunApiRefusal:
         assert payload["pipe_code"] == "analyze_topics"
         assert payload["pipe_stack"] == ["review_topics", "analyze_topics"]
         assert payload["retryable"] is True
-        assert payload["hint"] == AGENT_ERROR_HINTS["ApiResponseError"]
+        assert payload["hint"] == API_REFUSAL_CALLER_HINT
 
     def test_markdown_keeps_an_item_this_version_cannot_type(self, capsys: pytest.CaptureFixture[str]) -> None:
         """An item from a newer runner stays readable as JSON under Details rather than failing the rendering."""
@@ -311,16 +312,29 @@ class TestRunApiRefusal:
         for absent in ("retryable", "request_id", "error_code", "retry_after_seconds"):
             assert absent not in payload
 
-    def test_payload_of_an_unreachable_runner_keeps_what_the_answer_said(self) -> None:
-        """A 503 is retryable by default, but an answer that says it is not is taken at its word."""
+    def test_payload_of_an_unavailable_service_is_never_inferred_retryable(self) -> None:
+        """A 503 can follow a run that completed, so only the answer itself can make it retryable."""
         silent = api_response_error_payload(
             error=_refusal(status=503, body=RefusedRunBodies.PLATFORM_RUNNER_UNREACHABLE, headers={"Retry-After": "10"})
         )
-        body_saying_no = json.dumps({**json.loads(RefusedRunBodies.PLATFORM_RUNNER_UNREACHABLE), "retryable": False})
-        saying_no = api_response_error_payload(error=_refusal(status=503, body=body_saying_no))
+        body_saying_yes = json.dumps({**json.loads(RefusedRunBodies.PLATFORM_RUNNER_UNREACHABLE), "retryable": True})
+        saying_yes = api_response_error_payload(error=_refusal(status=503, body=body_saying_yes))
 
-        assert silent["retryable"] is True
+        assert "retryable" not in silent
         assert silent["retry_after_seconds"] == 10
         assert silent["error_code"] == "service_unavailable"
         assert silent["hint"] == API_REFUSAL_HINTS_BY_STATUS[503]
-        assert "retryable" not in saying_no
+        assert "repeat a paid run" in silent["hint"]
+        assert saying_yes["retryable"] is True
+
+    def test_payload_of_a_refusal_the_caller_must_act_on(self) -> None:
+        """A 404 points at MTHDS_BASE_URL, and any other 4xx without a next step asks for a change, not a report."""
+        not_found = api_response_error_payload(error=_refusal(status=404, body='{"detail":"Not Found"}'))
+        unprocessable = api_response_error_payload(error=_refusal(status=422, body='{"detail":"Local file paths cannot be used"}'))
+
+        assert not_found["message"] == "API POST /v1/execute failed (404): Not Found"
+        assert not_found["hint"] == API_REFUSAL_HINTS_BY_STATUS[404]
+        assert "MTHDS_BASE_URL" in not_found["hint"]
+        assert unprocessable["hint"] == API_REFUSAL_CALLER_HINT
+        for payload in (not_found, unprocessable):
+            assert "retryable" not in payload

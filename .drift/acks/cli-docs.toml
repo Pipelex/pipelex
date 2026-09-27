@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:f2cfbe8cbc40de7b5a5ff17570107e3964b80012dfe04042d4c3e01bcadac8bd"
+digest = "sha256:765de3b76ea67aa0b78b067280e6ed1beadf1219fe064414061b6734ca8c7564"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-27T13:37:14Z"
-rationale = "Review round 1 made the API runner's refusal envelope follow the status when the answer advises no next step and carry error_code and retry_after_seconds; docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md now say so."
+reviewed_at = "2026-09-27T14:03:58Z"
+rationale = "Round 2 review fixes: the API refusal paragraph and the agent CLI guide now say error_type is the local cause_type on a failed run, a 404 points at MTHDS_BASE_URL, another 4xx asks for a change, and only a 429 is inferred retryable"
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -12,7 +12,7 @@ rationale = "Review round 1 made the API runner's refusal envelope follow the st
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/accept_gateway_terms_cmd.py" = "blob:cb8338c09a7b5dee6088551c156d69dab613213a"
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:49b8bab889d8673e7d4f1d683efe0928e43914b9"
-"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:2e3b609247d066bbaa0d7b2834d473818616316e"
+"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:30ecf4a3b1cb778864ed821a7b9918f62407a7f4"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
 "pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:91589e517509248a4639a37e82f46a69538f8071"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
