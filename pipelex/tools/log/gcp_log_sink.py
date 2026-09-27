@@ -2,8 +2,11 @@
 
 Each record becomes one struct entry: the level maps onto the Cloud Logging severity scale, the
 message and the call's fields become the JSON payload, the run-scoped identifiers become labels, and
-the run's OpenTelemetry trace id becomes the entry's ``trace`` field, so Cloud Logging files the line
-under the same trace as the spans the runtime exports. The entries leave through the client library's
+OpenTelemetry's current span, the host's own, which is only read, becomes the entry's ``trace``,
+``spanId`` and ``traceSampled``, so Cloud Logging files the line under the trace of the host's spans; a
+line logged under no current span has none of the three. The Pipelex span held when the record was
+logged, a pipe's or an LLM call's, rides in the payload as ``pipelex.trace_id`` and ``pipelex.span_id``,
+in hex, exactly as the ``json`` sink writes it. The entries leave through the client library's
 transport, a batching background thread in production, so no record costs an API round trip on the
 thread that logged it. What that thread itself logs never leaves through the sink: the library reports
 a refused batch through a logger of its own, and a report exported through the pipeline it reports on
@@ -39,15 +42,16 @@ from enum import StrEnum
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, cast
 
+from opentelemetry import trace
 from typing_extensions import override
 
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.telemetry.current_span import current_span_context_for_logs, pipelex_trace_fields_for_logs
 from pipelex.tools.log.exceptions import GcpLogSinkCredentialsError
 from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, FIXED_KEYS, LOGGER_KEY, MESSAGE_KEY
 from pipelex.tools.log.log_context import PIPE_RUN_ID_FIELD, PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, render_json
-from pipelex.tools.misc.hash_utils import hash_md5_to_int
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -58,12 +62,14 @@ if TYPE_CHECKING:
 GCP_LOGGING_DEPENDENCY_NAME = "google-cloud-logging"
 GCP_LOGGING_EXTRA_NAME = "gcp-logging"
 
-# The sink writes three of the ``json`` sink's keys into the payload — its ``message``, ``logger`` and
-# ``exception``, imported rather than respelled — and reserves that sink's whole set against a carried
-# attribute, so one field keeps one wire name whichever of the two a process selects. ``time`` and
-# ``severity`` are not payload keys here, the client library carrying both out of band, and neither are
-# ``trace_id``, ``span_id`` and ``trace_flags``, the entry's own ``trace`` field carrying the trace, but a
-# field named like one is ``field_time`` or ``field_trace_id`` under either sink rather than under one only.
+# The sink writes some of the ``json`` sink's keys into the payload — its ``message``, ``logger`` and
+# ``exception``, and the ``pipelex.trace_id`` and ``pipelex.span_id`` of the held Pipelex span, all
+# imported rather than respelled — and reserves that sink's whole set against a carried attribute, so one
+# field keeps one wire name whichever of the two a process selects. ``time`` and ``severity`` are not
+# payload keys here, the client library carrying both out of band, and neither are ``trace_id``,
+# ``span_id`` and ``trace_flags``, the entry's own ``trace``, ``spanId`` and ``traceSampled`` carrying the
+# current span, but a field named like one is ``field_time`` or ``field_trace_id`` under either sink
+# rather than under one only.
 FIXED_PAYLOAD_KEYS = FIXED_KEYS
 
 # The stdlib formatter the ``json`` sink renders a traceback through, so both sinks spell one exception
@@ -286,14 +292,9 @@ def severity_for_level(*, levelno: int) -> GcpLogSeverity:
     return GcpLogSeverity.CRITICAL
 
 
-def trace_name_for_run(*, project: str, pipeline_run_id: str) -> str:
-    """The fully qualified Cloud Logging trace name for one pipeline run.
-
-    The trace id is derived from the pipeline run id exactly as the tracer derives it, by the same
-    hash, so a line and the spans of the run it belongs to carry one id without either having to
-    reach the other. Cloud Logging wants that id project-qualified and as 32 hex digits.
-    """
-    return f"projects/{project}/traces/{hash_md5_to_int(pipeline_run_id):032x}"
+def trace_name(*, project: str, trace_id: int) -> str:
+    """The fully qualified Cloud Logging trace name for an OpenTelemetry trace id: project-qualified, as 32 hex digits."""
+    return f"projects/{project}/traces/{trace.format_trace_id(trace_id)}"
 
 
 def _payload_value(*, value: Any) -> Any:
@@ -327,7 +328,7 @@ def _exception_text(*, record: logging.LogRecord) -> str | None:
 
 
 def _entry_payload(*, record: logging.LogRecord) -> dict[str, Any]:
-    """The struct payload for one record: the message, the logger, the exception, then the fields.
+    """The struct payload for one record: the message, the logger, the exception, the held Pipelex span, then the fields.
 
     The run-scoped identifiers are left out: they are the entry's labels. Everything else the call,
     the record factory or the structured content attached rides flat beside the fixed keys, under a
@@ -340,6 +341,7 @@ def _entry_payload(*, record: logging.LogRecord) -> dict[str, Any]:
     exception_text = _exception_text(record=record)
     if exception_text is not None:
         payload[EXCEPTION_KEY] = exception_text
+    payload.update(pipelex_trace_fields_for_logs())
     for name, value in carried_attributes(record=record).items():
         if name in LABEL_ATTRIBUTES:
             continue
@@ -348,6 +350,23 @@ def _entry_payload(*, record: logging.LogRecord) -> dict[str, Any]:
             key = f"{COLLIDING_FIELD_PREFIX}{key}"
         payload[key] = _payload_value(value=value)
     return payload
+
+
+def _entry_trace_context(*, project: str) -> dict[str, Any]:
+    """The entry's ``trace``, ``span_id`` and ``trace_sampled`` for OpenTelemetry's current span, or nothing when it names no trace.
+
+    Passed to the transport as keyword arguments, which the client library's transport forwards to the
+    entry it builds. Only ever the current span: a Pipelex span held here is the payload's, and a run
+    with no current span is filed under no trace, its ``pipeline_run_id`` label being what selects it.
+    """
+    span_context = current_span_context_for_logs()
+    if span_context is None:
+        return {}
+    return {
+        "trace": trace_name(project=project, trace_id=span_context.trace_id),
+        "span_id": trace.format_span_id(span_context.span_id),
+        "trace_sampled": span_context.trace_flags.sampled,
+    }
 
 
 def _entry_labels(*, record: logging.LogRecord) -> dict[str, str]:
@@ -523,14 +542,12 @@ class GcpLogHandler(logging.Handler):
     @override
     def emit(self, record: logging.LogRecord) -> None:
         try:
-            pipeline_run_id = getattr(record, PIPELINE_RUN_ID_FIELD, None)
-            trace = trace_name_for_run(project=self._project, pipeline_run_id=pipeline_run_id) if isinstance(pipeline_run_id, str) else None
             self._transport.send(
                 record,
                 _entry_payload(record=record),
                 severity=severity_for_level(levelno=record.levelno).value,
                 labels=_entry_labels(record=record),
-                trace=trace,
+                **_entry_trace_context(project=self._project),
             )
         except Exception:  # ruff: ignore[blind-except]
             # Unbounded code: a third-party SDK with no documented exception types, over values the caller attached.
