@@ -65,6 +65,19 @@ class RefusedRunBodies:
     )
     UNSERVED_MODEL_NEXT_STEP: ClassVar[str] = "Change the model 'gpt-5.1' to an LLM the model deck serves."
 
+    # The hosted plane's own refusals, authored in front of the runner with no `user_action`, `error_domain` or
+    # `retryable`: the platform's rate limiter (sent with a `Retry-After` header), the API gateway's refusal of a
+    # key (a bare `message`, no problem members at all), and the platform failing to reach the runner.
+    PLATFORM_RATE_LIMITED: ClassVar[str] = (
+        '{"type":"https://pipelex.com/errors/rate_limited","title":"Too Many Requests","status":429,"code":"rate_limited",'
+        '"detail":"Rate limit of 600 requests/minute exceeded for this organization. Retry in 12s.",'
+        '"instance":"urn:request:req_rate","request_id":"req_rate","errors":[]}'
+    )
+    GATEWAY_FORBIDDEN: ClassVar[str] = '{"message":"Forbidden"}'
+    PLATFORM_RUNNER_UNREACHABLE: ClassVar[str] = (
+        '{"type":"https://pipelex.com/errors/service_unavailable","title":"Service Unavailable","status":503,'
+        '"code":"service_unavailable","detail":"The runner is unreachable (/execute). Retry shortly.","request_id":"req_down","errors":[]}'
+    )
     # Not a problem document: a gateway's error page in front of the runner.
     GATEWAY_HTML: ClassVar[str] = "<html><head><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1></body></html>"
     # A refusal carrying the failing pipe and its path as members, and an item of a kind this pipelex does not know.

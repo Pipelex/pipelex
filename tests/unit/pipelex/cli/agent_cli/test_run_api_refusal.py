@@ -20,6 +20,7 @@ from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_HINTS,
+    API_REFUSAL_HINTS_BY_STATUS,
     CliOutputFormat,
     agent_error_api_response,
     api_response_error_payload,
@@ -40,12 +41,12 @@ RUN_PIPE_MODULE = "pipelex.cli.agent_cli.commands.run.pipe_cmd"
 RUN_METHOD_MODULE = "pipelex.cli.agent_cli.commands.run.method_cmd"
 
 
-def _answering(*, status: int, body: str, seen: list[httpx.Request]) -> httpx.MockTransport:
-    """A transport answering every request with ``status`` and ``body``, recording the requests it saw."""
+def _answering(*, status: int, body: str, seen: list[httpx.Request], headers: dict[str, str] | None = None) -> httpx.MockTransport:
+    """A transport answering every request with ``status``, ``body`` and ``headers``, recording the requests it saw."""
 
     def _handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(status, content=body.encode("utf-8"), headers={"content-type": "application/problem+json"})
+        return httpx.Response(status, content=body.encode("utf-8"), headers={"content-type": "application/problem+json", **(headers or {})})
 
     return httpx.MockTransport(_handler)
 
@@ -65,12 +66,12 @@ def _install_runner(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, *, s
     return seen
 
 
-def _refusal(*, status: int, body: str) -> ApiResponseError:
+def _refusal(*, status: int, body: str, headers: dict[str, str] | None = None) -> ApiResponseError:
     """The typed error the real client raises for this answer."""
 
     async def _execute() -> None:
         client = MthdsAPIClient(api_key="test-key-not-a-secret", base_url=RUNNER_URL)
-        client.client = httpx.AsyncClient(transport=_answering(status=status, body=body, seen=[]))
+        client.client = httpx.AsyncClient(transport=_answering(status=status, body=body, seen=[], headers=headers))
         try:
             await client.execute(pipe_code="entry", mthds_contents=["# bundle"])
         finally:
@@ -287,3 +288,39 @@ class TestRunApiRefusal:
         assert '"error_type": "some_future_fault"' in markdown
         assert "- **pipe_code:** analyze_topics" in markdown
         assert '"review_topics",' in markdown
+
+    def test_payload_of_the_platform_rate_limit(self) -> None:
+        """A rate limit the runner did not advise on reads as retryable, with its delay, its code and a wait-and-retry hint."""
+        payload = api_response_error_payload(error=_refusal(status=429, body=RefusedRunBodies.PLATFORM_RATE_LIMITED, headers={"Retry-After": "12"}))
+
+        assert payload["error_type"] == "ApiResponseError"
+        assert payload["hint"] == API_REFUSAL_HINTS_BY_STATUS[429]
+        assert payload["retryable"] is True
+        assert payload["retry_after_seconds"] == 12
+        assert payload["error_code"] == "rate_limited"
+        assert payload["request_id"] == "req_rate"
+        assert "error_domain" not in payload
+
+    def test_payload_of_the_gateway_refusing_a_key(self) -> None:
+        """The gateway's bare 403 points at the key, not at a request_id it never sent."""
+        payload = api_response_error_payload(error=_refusal(status=403, body=RefusedRunBodies.GATEWAY_FORBIDDEN))
+
+        assert payload["message"] == "API POST /v1/execute failed (403): Forbidden"
+        assert payload["hint"] == API_REFUSAL_HINTS_BY_STATUS[403]
+        assert "MTHDS_API_KEY" in payload["hint"]
+        for absent in ("retryable", "request_id", "error_code", "retry_after_seconds"):
+            assert absent not in payload
+
+    def test_payload_of_an_unreachable_runner_keeps_what_the_answer_said(self) -> None:
+        """A 503 is retryable by default, but an answer that says it is not is taken at its word."""
+        silent = api_response_error_payload(
+            error=_refusal(status=503, body=RefusedRunBodies.PLATFORM_RUNNER_UNREACHABLE, headers={"Retry-After": "10"})
+        )
+        body_saying_no = json.dumps({**json.loads(RefusedRunBodies.PLATFORM_RUNNER_UNREACHABLE), "retryable": False})
+        saying_no = api_response_error_payload(error=_refusal(status=503, body=body_saying_no))
+
+        assert silent["retryable"] is True
+        assert silent["retry_after_seconds"] == 10
+        assert silent["error_code"] == "service_unavailable"
+        assert silent["hint"] == API_REFUSAL_HINTS_BY_STATUS[503]
+        assert "retryable" not in saying_no

@@ -113,6 +113,30 @@ _UNKNOWN_MODEL_HINT = (
     "to validate or 'pipelex-agent models -t <type>' to list available models."
 )
 
+_API_CREDENTIALS_HINT = (
+    "Set MTHDS_API_KEY and MTHDS_BASE_URL (the runner's origin), or run 'mthds config set api-key <key>' and 'mthds config set base-url <url>'"
+)
+_API_RETRY_HINT = (
+    "The runner cannot take the request now: wait retry_after_seconds when the error carries it, otherwise a few seconds, then run again"
+)
+
+# The next step of a refusal whose answer advised none, by its HTTP status. These are the answers a
+# hosted plane authors itself, in front of the runner, and they carry no `user_action`: the gateway's
+# refusal of a key, the platform's rate limiter, a runner it cannot reach.
+API_REFUSAL_HINTS_BY_STATUS: dict[int, str] = {
+    401: f"The runner refused the credentials. {_API_CREDENTIALS_HINT}",
+    403: (
+        "The runner refused the request: check that MTHDS_API_KEY is a valid key for the runner at MTHDS_BASE_URL; "
+        "when it is, the message says what this request may not do"
+    ),
+    429: _API_RETRY_HINT,
+    503: _API_RETRY_HINT,
+}
+
+# Statuses that say, by definition, that the same request can succeed later (RFC 6585 for 429, RFC 9110
+# for 503), so the envelope marks them retryable unless the answer said otherwise.
+_API_RETRYABLE_STATUSES: frozenset[int] = frozenset({429, 503})
+
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
     "ModelChoiceNotFoundError": _UNKNOWN_MODEL_HINT,
@@ -166,12 +190,11 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "otherwise update the deck or check the model name."
     ),
     # API runner errors
-    "ClientAuthenticationError": (
-        "Set MTHDS_API_KEY and MTHDS_BASE_URL (the runner's origin), or run 'mthds config set api-key <key>' and 'mthds config set base-url <url>'"
-    ),
+    "ClientAuthenticationError": _API_CREDENTIALS_HINT,
     "PipelineRequestError": "Check that pipe_code or mthds_contents is provided",
-    # The next step of a runner's refusal that advised none. It stands in for the hint keyed on the runner's
-    # own class, which names a local command (doctor, check-model) that cannot fix what a remote runner refused.
+    # The next step of a runner's refusal that advised none, when its status has none of its own in
+    # API_REFUSAL_HINTS_BY_STATUS. It stands in for the hint keyed on the runner's own class, which
+    # names a local command (doctor, check-model) that cannot fix what a remote runner refused.
     "ApiResponseError": (
         "The API runner refused the request: when error_domain is 'input', change the method or the inputs as the message says; "
         "otherwise the fault is the runner's, so report it with the request_id"
@@ -555,12 +578,17 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
     - ``message`` is ``API POST /v1/execute failed (422): <reason>``, the error's own message without the next step
       it appends, which ``hint`` carries. On a failed run the runner's reason is located at the failing pipe and its
       path, ``Pipe 'condense_article' failed (digest_article → condense_article): …``.
-    - ``hint`` is the runner's next step, ``user_action.detail``, else the static ``ApiResponseError`` hint, never
-      the hint keyed on the runner's class, which names a local command that cannot fix a remote refusal.
-    - ``retryable`` (only when true, as on every envelope), ``error_domain`` and ``error_category`` are the runner's,
-      with no local fallback: only the runner knows whether the caller or its operator has to act.
+    - ``hint`` is the runner's next step, ``user_action.detail``. An answer that advised none, such as the ones a
+      hosted plane authors in front of the runner (a refused key, a rate limit, a runner it cannot reach), gets the
+      hint of its status from ``API_REFUSAL_HINTS_BY_STATUS``, else the static ``ApiResponseError`` hint; never the
+      hint keyed on the runner's class, which names a local command that cannot fix a remote refusal.
+    - ``retryable`` (only when true, as on every envelope), ``error_domain`` and ``error_category`` are the answer's,
+      with no local fallback, since only the runner knows whether the caller or its operator has to act. The one
+      exception is ``retryable`` on a 429 or a 503 that did not say, which is true by the status's own definition.
     - ``validation_errors`` are the runner's items, each whole, as it sent them.
     - ``pipe_code`` and ``pipe_stack`` when the problem carries them as members.
+    - ``error_code`` is the problem's ``code`` member, the stable code a hosted plane gives its own refusals
+      (``rate_limited``, ``unauthorized``), and ``retry_after_seconds`` the ``Retry-After`` header's delay.
     - ``http_status`` and ``request_id`` are what to quote when the fault is the runner's.
     - ``error_source`` is the client-side trace, as on every JSON envelope.
     """
@@ -568,7 +596,7 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
     message = str(error)
     hint: str
     if error.user_action is None:
-        hint = AGENT_ERROR_HINTS["ApiResponseError"]
+        hint = API_REFUSAL_HINTS_BY_STATUS.get(error.status) or AGENT_ERROR_HINTS["ApiResponseError"]
     else:
         hint = error.user_action.detail
         message = message.removesuffix(f"\nNext step: {hint}")
@@ -579,7 +607,7 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
         "message": message,
         "hint": hint,
     }
-    if error.retryable:
+    if error.retryable or (error.retryable is None and error.status in _API_RETRYABLE_STATUSES):
         payload["retryable"] = True
     if error.error_domain:
         payload["error_domain"] = error.error_domain
@@ -591,6 +619,11 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
         payload["pipe_code"] = pipe_code
     if pipe_stack := _string_list(value=problem.get("pipe_stack")):
         payload["pipe_stack"] = pipe_stack
+    if error_code := _non_empty_string(value=problem.get("code")):
+        payload["error_code"] = error_code
+    retry_after = error.headers.get("retry-after", "").strip()
+    if retry_after.isdigit():
+        payload["retry_after_seconds"] = int(retry_after)
     payload["http_status"] = error.status
     if error.request_id:
         payload["request_id"] = error.request_id
