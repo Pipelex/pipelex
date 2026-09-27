@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:11954f4889b63ef49b159447c9cd7dd71d0d09c32151802b73922452b0aa357b"
+digest = "sha256:904da72bdd9e3c4c1be10d5a10d7dbdeb3027b8b7a8fba9d40f6bdc1649f4d23"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-26T22:35:57Z"
-rationale = "Integration build only: the four sprint stacks each acked cli-docs for their own changes (#1266/#1267 unsafe-fix label and validate hint, #1273 dry-run items and parse items, #1269-#1274 run-path verdict and factory refusals, #1265/#1268 root-fault run errors); their docs/tools/cli and agent_cli/CLAUDE.md edits were merged side by side in the conflict resolutions, with no new CLI surface introduced by the merge."
+reviewed_at = "2026-09-26T23:58:30Z"
+rationale = "The sprint's pipelex stacks each acked cli-docs for their own changes (the unsafe-fix label and validate hint, dry-run items and parse items, the run-path verdict and factory refusals, root-fault run errors, and the model panel of pipelex run giving a caller-fault model error's change_model next step before its local-deck remedy); their docs/tools/cli and agent_cli/CLAUDE.md edits were merged side by side in the integration's conflict resolutions. docs/tools/cli/ does not describe the model panel's tip, which docs/errors/model-not-found-error.md documents, and the merge introduced no new CLI surface. No further doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -127,7 +127,7 @@ rationale = "Integration build only: the four sprint stacks each acked cli-docs 
 "pipelex/cli/commands/validate/pipe_cmd.py" = "blob:d67267571559006459628180f2c8b216ba7fee31"
 "pipelex/cli/commands/which_cmd.py" = "blob:68661d4bab22e2c4dab183d59bd9f2c6dd573472"
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
-"pipelex/cli/error_handlers.py" = "blob:49977858e81a1930601d2093ee1911c26518149d"
+"pipelex/cli/error_handlers.py" = "blob:4b97a9c89d9b2532f0a9d1406baad130fc4d56f7"
 "pipelex/cli/exceptions.py" = "blob:1d51c3a53ddd3f6cf8de566fa2ade3fa75ab7a3a"
 "pipelex/cli/installed_methods.py" = "blob:09197f47baf8d7251d28d148a0544b4a23ee7365"
 "pipelex/cli/method_resolver.py" = "blob:1230dde5f89ac28bbdcbcbbd0c1d485c71803caf"

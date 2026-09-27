@@ -104,7 +104,7 @@ class TestStrictMethodFaults:
         assert document["user_action"] == {"kind": "change_input", "detail": "Provide the missing required inputs of 'greet_flow': name."}
 
     async def test_model_only_the_method_names_is_the_callers_fault(self) -> None:
-        """A step naming, in an inline setting, a model no entry of the deck names: HTTP 422, and its reason."""
+        """A step naming, in an inline setting, a model no entry of the deck names: HTTP 422, its reason, and a next step naming the model."""
         error = await _run_failing(
             pipe_code="two_steps",
             mthds_content=LocatedRunFailureTestData.MODEL_MTHDS,
@@ -120,6 +120,7 @@ class TestStrictMethodFaults:
             document["detail"]
             == f"Pipe 'summarize' failed (two_steps → summarize): Model handle '{unserved_handle}' was not found in the model deck."
         )
+        assert document["user_action"] == {"kind": "change_model", "detail": f"Change the model '{unserved_handle}' to an LLM the model deck serves."}
         # Provider and model attribution never reach a STRICT caller, whoever's fault it is.
         assert "model" not in document
 
@@ -151,6 +152,7 @@ class TestStrictMethodFaults:
         assert document["error_domain"] == "config"
         assert document["error_type"] == "ModelNotFoundError"
         assert document["detail"] == INTERNAL_ERROR_PLACEHOLDER
+        assert "user_action" not in document
 
     async def test_model_output_that_does_not_fit_its_structure_stays_redacted(self, mocker: MockerFixture) -> None:
         """A model output the structure refuses, after the re-asks, is data-dependent: not flagged caller-facing."""

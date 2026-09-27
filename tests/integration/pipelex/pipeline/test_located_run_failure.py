@@ -6,6 +6,7 @@ import pytest
 from typing_extensions import override
 
 from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorReport, PipelexError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.config import get_config
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
 from pipelex.pipe_run.pipe_router import PipeRouter
@@ -104,9 +105,11 @@ class TestLocatedRunFailure:
         assert ".pipelex/inference" not in report.message
         assert "pipelex init" not in report.message
         assert report.model == LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE
-        # Nothing on the chain advises an action, so the fallback names the failing pipe.
-        assert report.user_action is not None
-        assert report.user_action.detail == "The run failed in pipe 'summarize': the message gives the cause."
+        # The model lookup advises changing the model the step names, so no fallback is needed.
+        assert report.user_action == UserAction(
+            kind=UserActionKind.CHANGE_MODEL,
+            detail=f"Change the model '{unserved_handle}' to an LLM the model deck serves.",
+        )
 
         # The step names the model in an inline setting, and no entry of the deck names it: the
         # caller's own fault, whose message STRICT disclosure keeps.
@@ -114,6 +117,10 @@ class TestLocatedRunFailure:
         assert strict_payload["message"] == report.message
         assert strict_payload["error_domain"] == "input"
         assert strict_payload["error_type"] == "ModelNotFoundError"
+        assert strict_payload["user_action"] == {
+            "kind": "change_model",
+            "detail": f"Change the model '{unserved_handle}' to an LLM the model deck serves.",
+        }
 
     async def test_parallel_combine_failure_is_reported_at_the_nested_parallel(self) -> None:
         """The multiplicity example: the parallel nested in the sequence, with the combine's own identity and message."""
