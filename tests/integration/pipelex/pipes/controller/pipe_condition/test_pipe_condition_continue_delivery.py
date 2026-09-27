@@ -79,9 +79,11 @@ class TestPipeConditionContinueDelivery:
         assert isinstance(resolved_main, AbsenceRecord)
         assert resolved_main.kind == AbsenceKind.DECLARED_ABSENT
         assert resolved_main.producing_pipe == "continue_gate"
-        # The record names the declared output slot and carries the evaluated expression.
+        # The record names the declared output slot, and its reason names the pipe and its outcome but not the
+        # value the expression rendered ("skip"), which a caller force-unwrapping the output would read.
         assert resolved_main.variable_name == "gate_result"
-        assert "skip" in resolved_main.reason
+        assert resolved_main.reason == "PipeCondition 'continue_gate' resolved to its 'continue' outcome"
+        assert "skip" not in resolved_main.reason
         assert result_memory.get_optional_absence("gate_result") == resolved_main
         # Memory otherwise unchanged: the input is still there, untainted.
         assert result_memory.get_optional_stuff("input_text") is not None
