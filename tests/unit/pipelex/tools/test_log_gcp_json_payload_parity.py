@@ -15,8 +15,10 @@ import sys
 from typing import Any
 
 from google.cloud.logging_v2.handlers.transports.base import Transport
+from opentelemetry.sdk.trace import TracerProvider
 from typing_extensions import override
 
+from pipelex.system.telemetry.current_span import PIPELEX_SPAN_ID_KEY, PIPELEX_TRACE_ID_KEY, pipelex_span_active
 from pipelex.tools.log.gcp_log_sink import EXCEPTION_KEY, GcpLogHandler
 from pipelex.tools.log.json_log_sink import JsonLogFormatter
 from pipelex.tools.log.log_fields import attach_log_record_extra
@@ -103,3 +105,18 @@ class TestTheGcpAndJsonPayloadsAgree:
         json_payload, gcp_payload = self._both_payloads(self._record(exc_info=(None, None, None)))
 
         assert gcp_payload[EXCEPTION_KEY] == json_payload[EXCEPTION_KEY]
+
+    def test_the_held_pipelex_span_is_spelled_the_same_way_by_both_sinks(self) -> None:
+        with pipelex_span_active(span=TracerProvider().get_tracer(__name__).start_span("pipe")):
+            json_payload, gcp_payload = self._both_payloads(self._record())
+
+        for key in (PIPELEX_TRACE_ID_KEY, PIPELEX_SPAN_ID_KEY):
+            assert gcp_payload[key] == json_payload[key]
+
+    def test_a_field_named_like_a_pipelex_key_is_prefixed_under_both(self) -> None:
+        json_payload, gcp_payload = self._both_payloads(self._record(fields={PIPELEX_TRACE_ID_KEY: "mine", PIPELEX_SPAN_ID_KEY: "mine"}))
+
+        for payload in (json_payload, gcp_payload):
+            assert payload[f"field_{PIPELEX_TRACE_ID_KEY}"] == "mine"
+            assert payload[f"field_{PIPELEX_SPAN_ID_KEY}"] == "mine"
+            assert PIPELEX_TRACE_ID_KEY not in payload

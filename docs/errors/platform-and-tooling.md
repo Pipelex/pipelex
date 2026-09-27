@@ -29,6 +29,7 @@ own page. Classes are grouped by subsystem.
 - [`CsvFlatnessError`](csv-flatness-error.md) — CSV flatness error
 - [`CsvReadError`](csv-read-error.md) — CSV read error
 - [`FileTypeError`](file-type-error.md) — File type
+- [`GcpLogSinkCredentialsError`](gcp-log-sink-credentials-error.md) — Log sink credentials missing or refused
 - [`Jinja2ContextError`](jinja2-context-error.md) — Jinja 2 context
 - [`Jinja2DetectVariablesError`](jinja2-detect-variables-error.md) — Jinja 2 detect variables
 - [`Jinja2StuffError`](jinja2-stuff-error.md) — Jinja 2 stuff

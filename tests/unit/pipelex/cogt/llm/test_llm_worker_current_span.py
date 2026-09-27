@@ -2,7 +2,7 @@
 
 The span is started with the pipe's span as its explicit parent, read off the job metadata, and that
 stays as it was; what changes is that the provider call runs with the span held, so a log line during
-the call is joined to it, and the previous one comes back when the span ends, whichever way it ends.
+the call names it under ``pipelex.*``, and the previous one comes back when the span ends, whichever way it ends.
 OpenTelemetry's current span is never touched: inside the call it is whatever it was outside, the host's
 or none, so a provider SDK's own instrumentation is never re-parented under the LLM span. Driven through
 the public ``gen_text`` and ``gen_object`` on a worker whose provider half records the spans it runs under.
@@ -32,7 +32,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
-from pipelex.system.telemetry.current_span import span_context_for_logs
+from pipelex.system.telemetry.current_span import pipelex_span_context_for_logs
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
@@ -56,7 +56,7 @@ class _Answer(BaseModel):
 
 
 class _RecordingLLMWorker(LLMWorkerAbstract):
-    """A worker whose provider half records the span a log line is joined to and OpenTelemetry's current span, and fails when asked to."""
+    """A worker whose provider half records the Pipelex span a log line names and OpenTelemetry's current span, and fails when asked to."""
 
     def __init__(self, *, inference_model: InferenceModelSpec, fails: bool) -> None:
         LLMWorkerAbstract.__init__(self, inference_model=inference_model, reporting_delegate=None)
@@ -65,7 +65,7 @@ class _RecordingLLMWorker(LLMWorkerAbstract):
         self.seen_current_spans: list[object] = []
 
     def _record(self) -> None:
-        log_span_context = span_context_for_logs()
+        log_span_context = pipelex_span_context_for_logs()
         self.seen_log_span_ids.append(INVALID_SPAN_ID if log_span_context is None else log_span_context.span_id)
         self.seen_current_spans.append(trace.get_current_span())
         if self.fails:
@@ -84,7 +84,7 @@ class _RecordingLLMWorker(LLMWorkerAbstract):
 
 
 class _SpanRecordingHandler(logging.Handler):
-    """Records each message with the span id a sink would write for it, read at emit as a sink reads it."""
+    """Records each message with the Pipelex span id a sink would write for it under ``pipelex.span_id``, read at emit as a sink reads it."""
 
     def __init__(self) -> None:
         super().__init__(level=logging.NOTSET)
@@ -92,7 +92,7 @@ class _SpanRecordingHandler(logging.Handler):
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
-        span_context = span_context_for_logs()
+        span_context = pipelex_span_context_for_logs()
         self.span_ids_by_message[record.getMessage()] = INVALID_SPAN_ID if span_context is None else span_context.span_id
 
 
@@ -173,7 +173,7 @@ class TestLLMWorkerCurrentSpan:
         assert worker.seen_log_span_ids == [_span_id(llm_span)]
         assert llm_span.parent is not None
         assert llm_span.parent.span_id == PIPE_SPAN_ID
-        assert span_context_for_logs() is None
+        assert pipelex_span_context_for_logs() is None
 
     async def test_gen_object_runs_the_provider_call_under_its_span(self, span_exporter: InMemorySpanExporter) -> None:
         worker = _make_worker()
@@ -182,7 +182,7 @@ class TestLLMWorkerCurrentSpan:
 
         llm_span = _only_span(span_exporter)
         assert worker.seen_log_span_ids == [_span_id(llm_span)]
-        assert span_context_for_logs() is None
+        assert pipelex_span_context_for_logs() is None
 
     async def test_the_call_never_makes_its_span_opentelemetrys_current_one(self, span_exporter: InMemorySpanExporter) -> None:
         """Inside the call the current span is whatever it was outside, so the provider SDK's instrumentation is never re-parented."""
@@ -207,7 +207,7 @@ class TestLLMWorkerCurrentSpan:
 
         llm_span = _only_span(span_exporter)
         assert worker.seen_log_span_ids == [_span_id(llm_span)]
-        assert span_context_for_logs() is None
+        assert pipelex_span_context_for_logs() is None
         # The worker's own error path records the failure; holding the span records nothing more.
         assert llm_span.status.status_code is StatusCode.ERROR
         assert [event.name for event in llm_span.events] == ["exception"]

@@ -139,7 +139,7 @@ class LogSink(ABC):
         target there comes back whole; one that was handed its target built, and whose close released
         it, cannot, and says so from ``make_handler`` rather than build a handler on the dead target:
         the ``otlp`` sink, whose close shuts down the provider and the processor it was constructed
-        with, is that case.
+        with, is that case, and so is the ``gcp`` sink, whose close stops its transport's worker.
         """
         self._handler = None
 
