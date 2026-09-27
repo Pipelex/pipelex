@@ -108,6 +108,7 @@ GatewaySearchResponseError | Gateway search response | https://docs.pipelex.com/
 GatewayTelemetryManagerInjectedError | Gateway telemetry manager injected | https://docs.pipelex.com/latest/errors/gateway-telemetry-manager-injected-error/
 GatewayTermsNotAcceptedError | Gateway terms not accepted | https://docs.pipelex.com/latest/errors/gateway-terms-not-accepted-error/
 GatewayUnknownModelError | Gateway unknown model | https://docs.pipelex.com/latest/errors/gateway-unknown-model-error/
+GcpLogSinkCredentialsError | Log sink credentials missing or refused | https://docs.pipelex.com/latest/errors/gcp-log-sink-credentials-error/
 GeneratedImageError | Generated image | https://docs.pipelex.com/latest/errors/generated-image-error/
 GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/
 GoogleLLMWorkerError | Google LLM worker | https://docs.pipelex.com/latest/errors/google-llm-worker-error/

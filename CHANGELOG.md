@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The `gcp` log sink stops the boot when Google refuses its credentials (Breaking)**: the sink refreshes its credentials once when it is built, within five seconds, and credentials Google refuses (a revoked or expired refresh token, a deleted service-account key) or that cannot be found raise the new `GcpLogSinkCredentialsError`, a `config`-domain `CredentialsError` naming the credentials, Google's answer and what renews them, which `pipelex doctor` reports in its log-sink row. Such a process used to boot and lose every record in silence, since over gRPC the failed refresh is retried for a minute before anything reports it; a refresh that cannot reach the token endpoint or the metadata server, or does not answer in time, is said on stderr and the boot goes on.
+
+### Fixed
+
+- **The `gcp` log sink says when its flush runs out of time, and why**: a teardown whose flush reaches its five-second deadline with records still held now prints on stderr that they are lost unless the transport sends them while it closes, followed by what a fresh refresh of the credentials answers, where only the client library's "Failed to send N pending logs." used to appear. A handler that has closed no longer flushes again when the process exits, which cost a second five-second wait.
+
 ## [v0.67.1] - 2026-09-27
 
 ### Changed

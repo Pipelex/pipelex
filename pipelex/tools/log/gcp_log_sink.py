@@ -9,6 +9,13 @@ thread that logged it. What that thread itself logs never leaves through the sin
 a refused batch through a logger of its own, and a report exported through the pipeline it reports on
 fails with it and is reported again, so the handler rejects the export path before its lock is taken.
 
+The credentials are refreshed once when the sink is built. Over gRPC, the library's default, a refresh
+that fails surfaces as a retriable ``UNAVAILABLE``, so the transport retries the batch for a minute before
+anything reports it, and a process that closes sooner loses every record without a word. The refresh at
+boot is what says it instead: credentials Google refuses stop the boot naming them, and a refresh that
+cannot get an answer is said on stderr. A flush that runs out of time at teardown says so too, naming
+what a fresh refresh of the credentials answers, since that is the likeliest reason a write is held.
+
 **Most processes should not select this sink.** A process on Cloud Run, on GKE, or on any platform
 whose logging agent reads the container's stdout needs no client at all: the agent ingests one JSON
 object per line with a ``severity`` and a ``message``, which is exactly what the ``json`` sink emits,
@@ -29,11 +36,12 @@ import math
 import threading
 import time
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, cast
 
 from typing_extensions import override
 
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.log.exceptions import GcpLogSinkCredentialsError
 from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, FIXED_KEYS, LOGGER_KEY, MESSAGE_KEY
 from pipelex.tools.log.log_context import PIPE_RUN_ID_FIELD, PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
@@ -41,6 +49,8 @@ from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, render_json
 from pipelex.tools.misc.hash_utils import hash_md5_to_int
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pipelex.tools.log.log_config import GcpLogSinkConfig
 
 # The dependency the ``gcp-logging`` extra installs, and the extra's own name, as the install hint spells them.
@@ -83,6 +93,35 @@ EXPORT_FAILURE_REPORT_INTERVAL_SECONDS = 20.0
 # still queued when it expires leaves through ``close``, whose grace period the library bounds itself.
 FLUSH_TIMEOUT_SECONDS = 5.0
 _FLUSH_THREAD_NAME = "pipelex-gcp-log-flush"
+
+# The deadline one refresh of the sink's credentials is given, at boot and again at teardown when a flush
+# has run out of time. A refresh is one round trip to a token endpoint or to the metadata server, but the
+# auth library's own request timeout is two minutes and its metadata client retries, so the bound is
+# imposed the way the flush's is: the refresh runs on a thread of its own and the join carries it.
+CREDENTIALS_CHECK_TIMEOUT_SECONDS = 5.0
+_CREDENTIALS_CHECK_THREAD_NAME = "pipelex-gcp-log-credentials"
+
+
+def _say_on_stderr(*, message: str) -> None:
+    """Print one warning of the sink's own on stderr, through the stdlib's last-resort handler.
+
+    What the sink says about itself cannot go through the sink: at boot it is not installed yet, and
+    when its writes are refused, a line exported through it is lost with the rest. The last resort
+    takes its own lock and never the handler's, so saying it cannot deadlock the teardown either.
+    """
+    stderr_handler = logging.lastResort
+    if stderr_handler is None:
+        return
+    stderr_handler.handle(
+        logging.makeLogRecord(
+            {
+                "name": __name__,
+                "levelno": logging.WARNING,
+                "levelname": logging.getLevelName(logging.WARNING),
+                "msg": message,
+            }
+        )
+    )
 
 
 class GcpLogSeverity(StrEnum):
@@ -210,20 +249,9 @@ class GcpExportPathFilter(logging.Filter):
 
     @classmethod
     def _print_unreported_count(cls, *, unreported_count: int) -> None:
-        stderr_handler = logging.lastResort
-        if not unreported_count or stderr_handler is None:
+        if not unreported_count:
             return
-        stderr_handler.handle(
-            logging.makeLogRecord(
-                {
-                    "name": __name__,
-                    "levelno": logging.WARNING,
-                    "levelname": logging.getLevelName(logging.WARNING),
-                    "msg": "The gcp log sink's transport reported %d more export failures since the last one printed",
-                    "args": (unreported_count,),
-                }
-            )
-        )
+        _say_on_stderr(message=f"The gcp log sink's transport reported {unreported_count} more export failures since the last one printed")
 
 
 def severity_for_level(*, levelno: int) -> GcpLogSeverity:
@@ -318,13 +346,136 @@ def _entry_labels(*, record: logging.LogRecord) -> dict[str, str]:
     return labels
 
 
+class GcpCredentialsOutcome(StrEnum):
+    """What one refresh of the sink's credentials came to."""
+
+    REFRESHED = "refreshed"
+    # Google answered and refused them: a revoked or expired refresh token, a deleted key, a service
+    # account the metadata server does not have. Retrying does not change the answer.
+    REFUSED = "refused"
+    # The token endpoint or the metadata server could not be reached, or said to retry: nothing is
+    # known about the credentials themselves.
+    UNREACHABLE = "unreachable"
+    # The refresh had not returned when its deadline passed.
+    UNANSWERED = "unanswered"
+
+
+class GcpCredentialsVerdict(NamedTuple):
+    """The outcome of one refresh, with the exception it raised when it raised one."""
+
+    outcome: GcpCredentialsOutcome
+    failure: Exception | None = None
+
+
+def describe_failure(*, failure: BaseException | None) -> str:
+    """The exception's class and message, as the sink's lines quote it."""
+    if failure is None:
+        return "no exception"
+    return f"{type(failure).__name__}: {failure}"
+
+
+class GcpCredentialsCheck:
+    """Refreshes the sink's credentials once, off the calling thread and within a deadline, and says what came of it.
+
+    The refresh is the auth library's, handed in as a callable so this module imports none of it and a
+    test substitutes its own. What tells an unreachable endpoint from a refusal is handed in the same way:
+    the auth library's transport error types. A failure is ``UNREACHABLE`` when it, or an exception it was
+    raised from, is one of them or declares itself retryable — the metadata-server credentials wrap a
+    transport failure in the refusal type, so the class of the outermost exception is not enough — and
+    ``REFUSED`` otherwise, an exception nobody anticipated included, because the boot it stops names it.
+    """
+
+    def __init__(
+        self,
+        *,
+        refresh: Callable[[], None],
+        transport_error_types: tuple[type[Exception], ...],
+        source: str,
+    ) -> None:
+        self._refresh = refresh
+        self._transport_error_types = transport_error_types
+        self._source = source
+
+    @property
+    def source(self) -> str:
+        """Which credentials these are, as a sentence names them: the Application Default Credentials, or a key file."""
+        return self._source
+
+    def run(self) -> GcpCredentialsVerdict:
+        """Refresh once and wait no longer than ``CREDENTIALS_CHECK_TIMEOUT_SECONDS`` for the answer.
+
+        A refresh still running when the deadline passes is left to finish on its daemon thread, and
+        whatever it answers then is not read: the verdict is ``UNANSWERED``.
+        """
+        verdicts: list[GcpCredentialsVerdict] = []
+
+        def refresh_once() -> None:
+            try:
+                self._refresh()
+            except Exception as exc:  # ruff: ignore[blind-except]
+                # Unbounded code: the auth library's refresh, whose exceptions depend on the kind of credentials.
+                # Nothing is swallowed: the failure is classified and handed back in the verdict.
+                verdicts.append(GcpCredentialsVerdict(outcome=self._classify(failure=exc), failure=exc))
+                return
+            verdicts.append(GcpCredentialsVerdict(outcome=GcpCredentialsOutcome.REFRESHED))
+
+        refreshing = threading.Thread(target=refresh_once, name=_CREDENTIALS_CHECK_THREAD_NAME, daemon=True)
+        refreshing.start()
+        refreshing.join(timeout=CREDENTIALS_CHECK_TIMEOUT_SECONDS)
+        if not verdicts:
+            return GcpCredentialsVerdict(outcome=GcpCredentialsOutcome.UNANSWERED)
+        return verdicts[0]
+
+    def _classify(self, *, failure: Exception) -> GcpCredentialsOutcome:
+        """``UNREACHABLE`` when a transport failure is anywhere on the chain the traceback would print, ``REFUSED`` otherwise."""
+        seen: set[int] = set()
+        current: BaseException | None = failure
+        while current is not None and id(current) not in seen:
+            if isinstance(current, self._transport_error_types) or getattr(current, "retryable", False) is True:
+                return GcpCredentialsOutcome.UNREACHABLE
+            seen.add(id(current))
+            if current.__cause__ is not None:
+                current = current.__cause__
+            elif current.__suppress_context__:
+                current = None
+            else:
+                current = current.__context__
+        return GcpCredentialsOutcome.REFUSED
+
+
+def _undelivered_message(*, cause: str | None) -> str:
+    """What the sink says when its flush ran out of time, followed by the likeliest cause when one was found."""
+    held = (
+        f"The '{LogSinkMethod.GCP}' log sink's transport was still writing to Cloud Logging when the "
+        f"{FLUSH_TIMEOUT_SECONDS:g}-second flush deadline passed, and the records it still holds are lost unless it sends them while it closes."
+    )
+    if cause is None:
+        return held
+    return f"{held} {cause}"
+
+
+def _cause_from_refresh(*, source: str, verdict: GcpCredentialsVerdict) -> str:
+    """What a refresh made once the flush ran out of time says about why the write is held."""
+    match verdict.outcome:
+        case GcpCredentialsOutcome.REFRESHED:
+            return f"A refresh of {source} still succeeds, so the Cloud Logging API or the network is what holds the write."
+        case GcpCredentialsOutcome.REFUSED:
+            return f"A refresh of {source} is now refused, which is why: {describe_failure(failure=verdict.failure)}"
+        case GcpCredentialsOutcome.UNREACHABLE:
+            return f"A refresh of {source} cannot reach the credential endpoint either: {describe_failure(failure=verdict.failure)}"
+        case GcpCredentialsOutcome.UNANSWERED:
+            return f"A refresh of {source} did not answer within {CREDENTIALS_CHECK_TIMEOUT_SECONDS:g} seconds either."
+
+
 class GcpLogHandler(logging.Handler):
     """Translates each stdlib record into one Cloud Logging entry and hands it to the transport."""
 
-    def __init__(self, *, transport: GcpLogTransport, project: str) -> None:
+    def __init__(self, *, transport: GcpLogTransport, project: str, credentials_check: GcpCredentialsCheck | None = None) -> None:
         super().__init__(level=logging.NOTSET)
         self._transport = transport
         self._project = project
+        self._credentials_check = credentials_check
+        self._is_closed = False
         self._export_path_filter = GcpExportPathFilter()
         self.addFilter(self._export_path_filter)
 
@@ -354,7 +505,18 @@ class GcpLogHandler(logging.Handler):
         in a ``finally``: a batch the API is refusing, or an export the network is holding, would keep
         the process alive with no way out. The drain is given a thread so the join can carry the bound,
         and a failure it raises is re-raised here so the teardown still reports it.
+
+        A drain still running when the deadline passes is said on stderr rather than left to the
+        library's close, whose only line counts what is still queued and names no reason: the sink
+        refreshes its credentials once more and says what that answered, since a refresh the gRPC
+        transport keeps retrying is the likeliest reason a write is held.
+
+        After ``close`` it does nothing. The stdlib's shutdown at exit flushes every handler still
+        alive, and a drain left running holds this one alive, so without that it would wait out a
+        second deadline on a transport already closed and say so a second time.
         """
+        if self._is_closed:
+            return
         failure: list[Exception] = []
 
         def drain() -> None:
@@ -370,33 +532,101 @@ class GcpLogHandler(logging.Handler):
         flushing.join(timeout=FLUSH_TIMEOUT_SECONDS)
         if failure:
             raise failure[0]
+        if flushing.is_alive():
+            self._say_undelivered()
 
     @override
     def close(self) -> None:
-        """Closes the transport, then prints the export failures still counted.
+        """Closes the transport, then prints the export failures still counted. Once: a second close does nothing.
 
         In that order, because the close drains the queue and a refusal met there is counted too.
         """
+        if self._is_closed:
+            return
+        self._is_closed = True
         self._transport.close()
         self._export_path_filter.report_unreported()
         super().close()
+
+    def _say_undelivered(self) -> None:
+        """Say on stderr that the flush ran out of time, with what a fresh refresh of the credentials answers."""
+        cause: str | None = None
+        if self._credentials_check is not None:
+            cause = _cause_from_refresh(source=self._credentials_check.source, verdict=self._credentials_check.run())
+        _say_on_stderr(message=_undelivered_message(cause=cause))
 
 
 class GcpLogSink(LogSink):
     """Google Cloud Logging behind one transport, a batching background thread in production.
 
-    The transport and the project are resolved before the sink is built, so the sink itself imports
-    nothing and a test builds it around a capture.
+    The transport, the project and the credentials check are resolved before the sink is built, so the
+    sink itself imports nothing and a test builds it around a capture. Without a check, a flush that
+    runs out of time is still said, with no cause named.
     """
 
-    def __init__(self, *, transport: GcpLogTransport, project: str) -> None:
+    def __init__(self, *, transport: GcpLogTransport, project: str, credentials_check: GcpCredentialsCheck | None = None) -> None:
         super().__init__()
         self._transport = transport
         self._project = project
+        self._credentials_check = credentials_check
 
     @override
     def make_handler(self) -> logging.Handler:
-        return GcpLogHandler(transport=self._transport, project=self._project)
+        return GcpLogHandler(transport=self._transport, project=self._project, credentials_check=self._credentials_check)
+
+
+def _credentials_source(*, config: GcpLogSinkConfig) -> str:
+    """The credentials the sink authenticates with, as a sentence names them."""
+    if config.credentials_file_path is None:
+        return "the Application Default Credentials"
+    return f"the service-account key at '{config.credentials_file_path}'"
+
+
+def _credentials_remedy(*, config: GcpLogSinkConfig) -> str:
+    """What renews the credentials, for the error that stops the boot."""
+    if config.credentials_file_path is None:
+        return (
+            "Renew them (`gcloud auth application-default login` on a workstation, or the service account the machine runs as "
+            "on Google Cloud), or point `credentials_file_path` in [runtime.log.gcp] at a valid service-account key"
+        )
+    return "Point `credentials_file_path` in [runtime.log.gcp] at a valid service-account key"
+
+
+def confirm_credentials_at_boot(*, credentials_check: GcpCredentialsCheck, remedy: str) -> None:
+    """Refresh the credentials once before the transport starts, and stop the boot when Google refuses them.
+
+    A refusal stops the boot because every record the sink would export is lost, and the transport
+    would say so only after retrying for a minute, which a short process never reaches. A refresh that
+    gets no answer says nothing about the credentials themselves, so it is said on stderr and the boot
+    goes on: the transport retries, and what it cannot deliver is said by the flush at the latest.
+
+    Raises:
+        GcpLogSinkCredentialsError: If Google refuses the credentials.
+
+    """
+    verdict = credentials_check.run()
+    why: str
+    match verdict.outcome:
+        case GcpCredentialsOutcome.REFRESHED:
+            return
+        case GcpCredentialsOutcome.REFUSED:
+            msg = (
+                f"The '{LogSinkMethod.GCP}' log sink cannot write to Google Cloud Logging: a refresh of {credentials_check.source} "
+                f"was refused at boot, so every record it exported would be lost ({describe_failure(failure=verdict.failure)}). "
+                f"{remedy}, or select the '{LogSinkMethod.JSON}' sink in [runtime.log]."
+            )
+            raise GcpLogSinkCredentialsError(msg) from verdict.failure
+        case GcpCredentialsOutcome.UNREACHABLE:
+            why = f"a refresh could not reach the credential endpoint ({describe_failure(failure=verdict.failure)})"
+        case GcpCredentialsOutcome.UNANSWERED:
+            why = f"a refresh did not answer within {CREDENTIALS_CHECK_TIMEOUT_SECONDS:g} seconds"
+    _say_on_stderr(
+        message=(
+            f"The '{LogSinkMethod.GCP}' log sink could not confirm at boot that Google accepts {credentials_check.source}: {why}. "
+            "The sink is installed and its transport retries; records it cannot deliver are said on stderr, "
+            "at the latest when the process tears the sink down."
+        )
+    )
 
 
 def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
@@ -406,11 +636,18 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
     another sink never loads it, and one that selected this sink without the extra fails here, at
     boot, with the extra and the ``json`` alternative named.
 
+    Where the credentials are proved: the client is built exactly as the library builds it, and the
+    credentials it holds are refreshed once before the transport's thread starts, so a boot whose
+    credentials Google refuses stops here naming them rather than losing every record in silence.
+
     Raises:
         MissingDependencyError: If ``google-cloud-logging`` is not installed.
+        GcpLogSinkCredentialsError: If no credentials can be loaded, or Google refuses them.
 
     """
     try:
+        from google.auth import exceptions as google_auth_exceptions  # ruff: ignore[import-outside-top-level]
+        from google.auth.transport.requests import Request as GoogleAuthRequest  # ruff: ignore[import-outside-top-level]
         from google.cloud import logging as cloud_logging  # ruff: ignore[import-outside-top-level]
         from google.cloud.logging_v2.handlers.transports import (  # ruff: ignore[import-outside-top-level]
             BackgroundThreadTransport,
@@ -428,13 +665,39 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
             message=msg,
         ) from exc
 
+    source = _credentials_source(config=config)
+    remedy = _credentials_remedy(config=config)
     client: Any
-    if config.credentials_file_path is not None:
-        client = cloud_logging.Client.from_service_account_json(  # pyright: ignore[reportUnknownMemberType]
-            config.credentials_file_path,
-            project=config.project_id,
+    try:
+        if config.credentials_file_path is not None:
+            client = cloud_logging.Client.from_service_account_json(  # pyright: ignore[reportUnknownMemberType]
+                config.credentials_file_path,
+                project=config.project_id,
+            )
+        else:
+            client = cloud_logging.Client(project=config.project_id)
+    except google_auth_exceptions.DefaultCredentialsError as exc:
+        msg = (
+            f"The '{LogSinkMethod.GCP}' log sink could not load {source} to write to Google Cloud Logging with "
+            f"({describe_failure(failure=exc)}). {remedy}, or select the '{LogSinkMethod.JSON}' sink in [runtime.log]."
         )
-    else:
-        client = cloud_logging.Client(project=config.project_id)
+        raise GcpLogSinkCredentialsError(msg) from exc
+
+    # The object the client authenticates every call with, after the scoping it applied: refreshing it
+    # proves the credentials the transport will use, and for credentials that fetch a token, the token
+    # it earns is the one the first export sends. A service-account key over gRPC signs its own token
+    # instead, so there the refresh costs one exchange the transport never makes, and proves the key.
+    # The library keeps the object on a private attribute, which the contract test pins.
+    credentials: Any = client._credentials  # ruff: ignore[private-member-access]
+
+    def refresh_credentials() -> None:
+        credentials.refresh(GoogleAuthRequest())
+
+    credentials_check = GcpCredentialsCheck(
+        refresh=refresh_credentials,
+        transport_error_types=(google_auth_exceptions.TransportError,),
+        source=source,
+    )
+    confirm_credentials_at_boot(credentials_check=credentials_check, remedy=remedy)
     transport = cast("GcpLogTransport", BackgroundThreadTransport(client, config.log_name))
-    return GcpLogSink(transport=transport, project=str(client.project))
+    return GcpLogSink(transport=transport, project=str(client.project), credentials_check=credentials_check)

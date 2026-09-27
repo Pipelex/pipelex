@@ -1,0 +1,318 @@
+from __future__ import annotations
+
+import json
+import logging
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import TYPE_CHECKING, Any, ClassVar
+
+import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from google.auth import exceptions as google_auth_exceptions
+from typing_extensions import override
+
+from pipelex.tools.log.exceptions import GcpLogSinkCredentialsError
+from pipelex.tools.log.gcp_log_sink import (
+    GCP_WORKER_THREAD_NAME,
+    GcpCredentialsCheck,
+    GcpCredentialsOutcome,
+    confirm_credentials_at_boot,
+    make_gcp_log_sink,
+)
+from pipelex.tools.log.log_config import GcpLogSinkConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from pathlib import Path
+
+    from pytest_mock import MockerFixture
+
+SOURCE = "the test credentials"
+REMEDY = "Renew the test credentials"
+
+
+class RefusedError(Exception):
+    """Stands in for the auth library's refusal type."""
+
+
+class UnreachableError(Exception):
+    """Stands in for the auth library's transport error type."""
+
+
+class RetryableRefusalError(RefusedError):
+    """A refusal that declares itself retryable, as the auth library's does for a 5xx from the token endpoint."""
+
+    @property
+    def retryable(self) -> bool:
+        return True
+
+
+class CapturingHandler(logging.Handler):
+    """Stands in for the stdlib's last-resort handler, keeping what it would have printed on stderr."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.records: list[logging.LogRecord] = []
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+class TokenEndpointRefusingEveryGrant(BaseHTTPRequestHandler):
+    """A token endpoint answering every grant as Google answers a revoked or deleted credential."""
+
+    grant_count: ClassVar[int] = 0
+
+    def do_POST(self) -> None:
+        TokenEndpointRefusingEveryGrant.grant_count += 1
+        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        body = json.dumps({"error": "invalid_grant", "error_description": "Invalid JWT Signature."}).encode()
+        self.send_response(400)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    @override
+    def log_message(self, format: str, *args: Any) -> None:
+        return None
+
+
+def _check(*, refresh: Callable[[], None]) -> GcpCredentialsCheck:
+    return GcpCredentialsCheck(refresh=refresh, transport_error_types=(UnreachableError,), source=SOURCE)
+
+
+def _refused() -> None:
+    msg = "invalid_grant: Bad Request"
+    raise RefusedError(msg)
+
+
+def _unreachable() -> None:
+    msg = "connection refused"
+    raise UnreachableError(msg)
+
+
+def _refused_from_unreachable() -> None:
+    """The metadata-server credentials' shape: the transport failure re-raised as a refusal."""
+    try:
+        _unreachable()
+    except UnreachableError as exc:
+        msg = "metadata server unreachable"
+        raise RefusedError(msg) from exc
+
+
+def _refused_from_none_while_unreachable() -> None:
+    try:
+        _unreachable()
+    except UnreachableError:
+        msg = "refused, the transport failure explicitly left out of the chain"
+        raise RefusedError(msg) from None
+
+
+def _retryable_refusal() -> None:
+    msg = "503 from the token endpoint"
+    raise RetryableRefusalError(msg)
+
+
+def _unanticipated() -> None:
+    msg = "a key the auth library could not parse"
+    raise ValueError(msg)
+
+
+def _refreshed() -> None:
+    return None
+
+
+def _write_service_account_key(*, path: Path, token_uri: str) -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+    key_info = {
+        "type": "service_account",
+        "project_id": "a-test-project",
+        "private_key_id": "0123456789abcdef",
+        "private_key": private_key_pem,
+        "client_email": "pipelex-test@a-test-project.iam.gserviceaccount.com",
+        "client_id": "123456789",
+        "token_uri": token_uri,
+    }
+    path.write_text(json.dumps(key_info), encoding="utf-8")
+
+
+class TestGcpLogSinkCredentials:
+    @pytest.fixture
+    def stderr(self, mocker: MockerFixture) -> CapturingHandler:
+        capture = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", capture)
+        return capture
+
+    @pytest.fixture
+    def refusing_token_endpoint(self) -> Iterator[str]:
+        TokenEndpointRefusingEveryGrant.grant_count = 0
+        server = HTTPServer(("127.0.0.1", 0), TokenEndpointRefusingEveryGrant)
+        serving = threading.Thread(target=server.serve_forever, daemon=True)
+        serving.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_address[1]}/token"
+        finally:
+            server.shutdown()
+            server.server_close()
+            serving.join(timeout=5)
+
+    @pytest.mark.parametrize(
+        ("refresh", "outcome"),
+        [
+            (_refreshed, GcpCredentialsOutcome.REFRESHED),
+            (_refused, GcpCredentialsOutcome.REFUSED),
+            (_unreachable, GcpCredentialsOutcome.UNREACHABLE),
+            (_refused_from_unreachable, GcpCredentialsOutcome.UNREACHABLE),
+            (_retryable_refusal, GcpCredentialsOutcome.UNREACHABLE),
+            (_refused_from_none_while_unreachable, GcpCredentialsOutcome.REFUSED),
+            (_unanticipated, GcpCredentialsOutcome.REFUSED),
+        ],
+    )
+    def test_a_refresh_is_classified_by_the_whole_chain_it_raised(self, refresh: Callable[[], None], outcome: GcpCredentialsOutcome) -> None:
+        """A transport failure anywhere on the chain the traceback prints means nothing is known of the credentials themselves."""
+        verdict = _check(refresh=refresh).run()
+
+        assert verdict.outcome == outcome
+        match verdict.outcome:
+            case GcpCredentialsOutcome.REFRESHED:
+                assert verdict.failure is None
+            case GcpCredentialsOutcome.REFUSED | GcpCredentialsOutcome.UNREACHABLE | GcpCredentialsOutcome.UNANSWERED:
+                assert verdict.failure is not None
+
+    def test_a_refresh_that_outlives_its_deadline_is_unanswered_without_waiting_for_it(self, mocker: MockerFixture) -> None:
+        """The auth library's own request timeout is two minutes, and a boot must not wait on it."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.CREDENTIALS_CHECK_TIMEOUT_SECONDS", 0.2)
+        released = threading.Event()
+
+        def hang() -> None:
+            # Bounded only so a regression fails the test instead of hanging the suite.
+            released.wait(timeout=10)
+
+        started = time.monotonic()
+        try:
+            verdict = _check(refresh=hang).run()
+            waited = time.monotonic() - started
+        finally:
+            released.set()
+
+        assert verdict.outcome == GcpCredentialsOutcome.UNANSWERED
+        assert verdict.failure is None
+        assert waited < 5, f"the check waited {waited:.1f}s on a refresh that never answers"
+
+    def test_credentials_refused_at_boot_stop_it_naming_them_and_the_remedy(self, stderr: CapturingHandler) -> None:
+        with pytest.raises(GcpLogSinkCredentialsError) as exc_info:
+            confirm_credentials_at_boot(credentials_check=_check(refresh=_refused), remedy=REMEDY)
+
+        message = str(exc_info.value)
+        assert SOURCE in message
+        assert "RefusedError: invalid_grant: Bad Request" in message
+        assert REMEDY in message
+        assert "'json' sink" in message
+        assert isinstance(exc_info.value.__cause__, RefusedError)
+        assert stderr.records == []
+
+    @pytest.mark.parametrize(
+        ("refresh", "reason"),
+        [
+            (_unreachable, "could not reach the credential endpoint (UnreachableError: connection refused)"),
+            (_refused_from_unreachable, "could not reach the credential endpoint (RefusedError: metadata server unreachable)"),
+        ],
+    )
+    def test_credentials_that_cannot_be_reached_at_boot_are_said_on_stderr_and_the_boot_goes_on(
+        self,
+        stderr: CapturingHandler,
+        refresh: Callable[[], None],
+        reason: str,
+    ) -> None:
+        confirm_credentials_at_boot(credentials_check=_check(refresh=refresh), remedy=REMEDY)
+
+        (record,) = stderr.records
+        assert record.levelno == logging.WARNING
+        assert f"could not confirm at boot that Google accepts {SOURCE}: a refresh {reason}." in record.getMessage()
+        assert "at the latest when the process tears the sink down" in record.getMessage()
+
+    def test_a_refresh_that_does_not_answer_at_boot_is_said_on_stderr_and_the_boot_goes_on(
+        self, stderr: CapturingHandler, mocker: MockerFixture
+    ) -> None:
+        mocker.patch("pipelex.tools.log.gcp_log_sink.CREDENTIALS_CHECK_TIMEOUT_SECONDS", 0.2)
+        released = threading.Event()
+
+        def hang() -> None:
+            # Bounded only so a regression fails the test instead of hanging the suite.
+            released.wait(timeout=10)
+
+        try:
+            confirm_credentials_at_boot(credentials_check=_check(refresh=hang), remedy=REMEDY)
+        finally:
+            released.set()
+
+        (record,) = stderr.records
+        assert f"could not confirm at boot that Google accepts {SOURCE}: a refresh did not answer within 0.2 seconds." in record.getMessage()
+
+    def test_credentials_that_refresh_at_boot_say_nothing(self, stderr: CapturingHandler) -> None:
+        confirm_credentials_at_boot(credentials_check=_check(refresh=_refreshed), remedy=REMEDY)
+
+        assert stderr.records == []
+
+    def test_the_auth_librarys_metadata_server_shape_is_unreachable_with_the_types_the_factory_passes(self) -> None:
+        """The compute-engine credentials re-raise the transport failure as a ``RefreshError``, so the outer class alone would read as a refusal."""
+
+        def metadata_server_down() -> None:
+            try:
+                msg = "metadata server unreachable"
+                raise google_auth_exceptions.TransportError(msg)
+            except google_auth_exceptions.TransportError as exc:
+                raise google_auth_exceptions.RefreshError(exc) from exc
+
+        check = GcpCredentialsCheck(refresh=metadata_server_down, transport_error_types=(google_auth_exceptions.TransportError,), source=SOURCE)
+
+        assert check.run().outcome == GcpCredentialsOutcome.UNREACHABLE
+
+    def test_application_default_credentials_that_cannot_be_found_stop_the_boot_naming_the_remedy(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(tmp_path / "missing.json"))
+
+        with pytest.raises(GcpLogSinkCredentialsError) as exc_info:
+            make_gcp_log_sink(config=GcpLogSinkConfig(log_name="pipelex", project_id="a-test-project"))
+
+        message = str(exc_info.value)
+        assert "could not load the Application Default Credentials" in message
+        assert "gcloud auth application-default login" in message
+        assert isinstance(exc_info.value.__cause__, google_auth_exceptions.DefaultCredentialsError)
+
+    def test_a_malformed_key_file_stops_the_boot_naming_the_file(self, tmp_path: Path) -> None:
+        key_path = tmp_path / "key.json"
+        key_path.write_text(json.dumps({"type": "service_account"}), encoding="utf-8")
+
+        with pytest.raises(GcpLogSinkCredentialsError) as exc_info:
+            make_gcp_log_sink(config=GcpLogSinkConfig(log_name="pipelex", project_id="a-test-project", credentials_file_path=str(key_path)))
+
+        message = str(exc_info.value)
+        assert f"could not load the service-account key at '{key_path}'" in message
+        assert "credentials_file_path" in message
+
+    def test_a_key_google_refuses_stops_the_boot_before_the_transport_starts(self, tmp_path: Path, refusing_token_endpoint: str) -> None:
+        """The reported failure end to end: the client the factory builds, the refresh of the credentials it holds, the refusal it meets."""
+        key_path = tmp_path / "key.json"
+        _write_service_account_key(path=key_path, token_uri=refusing_token_endpoint)
+        workers_before = {thread.ident for thread in threading.enumerate() if thread.name == GCP_WORKER_THREAD_NAME}
+
+        with pytest.raises(GcpLogSinkCredentialsError) as exc_info:
+            make_gcp_log_sink(config=GcpLogSinkConfig(log_name="pipelex", project_id="a-test-project", credentials_file_path=str(key_path)))
+
+        message = str(exc_info.value)
+        assert f"a refresh of the service-account key at '{key_path}' was refused at boot" in message
+        assert "invalid_grant" in message
+        assert isinstance(exc_info.value.__cause__, google_auth_exceptions.RefreshError)
+        assert TokenEndpointRefusingEveryGrant.grant_count == 1
+        assert {thread.ident for thread in threading.enumerate() if thread.name == GCP_WORKER_THREAD_NAME} == workers_before
