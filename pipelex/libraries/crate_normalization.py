@@ -99,6 +99,7 @@ def normalize_crate(crate: LibraryCrate, *, mthds_version: str) -> LibraryCrate:
         pipes=pipes,
         domains=crate.domains,
         source_map=crate.source_map,
+        elaboration_metadata=crate.elaboration_metadata,
         fingerprint=fingerprint,
     )
 

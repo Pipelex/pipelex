@@ -15,8 +15,10 @@ from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_p
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_dedicated_failure_panel,
     handle_model_availability_error,
     handle_model_choice_error,
+    handle_validate_bundle_error,
     print_traceback_if_requested,
 )
 from pipelex.config import get_config
@@ -28,13 +30,13 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_library_manager
-from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -143,6 +145,11 @@ async def _execute_run(
             typer.secho(f"Failed to --save-csv: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
+    # An invalid bundle is refused with the grouped panel `validate` prints, whichever step refuses it:
+    # the parse below, or the load at the start of the run.
+    bundle_file_path = Path(bundle_path) if bundle_path else None
+    library_dir_paths = [Path(one_library_dir) for one_library_dir in library_dir] if library_dir else None
+
     mthds_content: str | None = None
     if bundle_path:
         try:
@@ -150,7 +157,8 @@ async def _execute_run(
             # Use lightweight parsing to extract main_pipe without full validation
             # Full validation happens later during execute
             if not pipe_code:
-                bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+                with translate_to_validate_bundle_error():
+                    bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_path)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
                     msg = (
@@ -164,10 +172,8 @@ async def _execute_run(
             print_traceback_if_requested(console=get_console())
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-        except MthdsParserError as exc:
-            print_traceback_if_requested(console=get_console())
-            typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from exc
+        except ValidateBundleError as exc:
+            handle_validate_bundle_error(exc, bundle_path=bundle_file_path, library_dirs=library_dir_paths)
     elif not pipe_code:
         typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
@@ -233,6 +239,8 @@ async def _execute_run(
             execution_config=execution_config,
             library_dirs=library_dir,
             inputs_base_dir=inputs_base_dir,
+            # The directories a CLI loads are the caller's own: a refusal there is their invalid bundle.
+            library_dirs_are_callers=True,
         )
         response = await runner.execute(
             pipe_code=pipe_code,
@@ -241,9 +249,17 @@ async def _execute_run(
             dynamic_output_concept_ref=dynamic_output_concept_ref,
         )
         pipe_output = response.pipe_output
+    except ValidateBundleError as exc:
+        # The run refused the bundle while loading it, before any pipe ran.
+        handle_validate_bundle_error(exc, bundle_path=bundle_file_path, library_dirs=library_dir_paths)
     except PipelineExecutionError as exc:
+        # A failure whose cause has a dedicated panel (a model that is not available, a model choice
+        # that cannot be read) renders it: the panel names the pipe that failed, the model and the stack.
+        handle_dedicated_failure_panel(error=exc, context=ErrorContext.PIPE_RUN)
         print_traceback_if_requested(console=get_console())
-        typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
+        # The message names the pipe that failed and its path; the pipeline named first is the entry pipe.
+        entry_pipe_code = exc.pipe_stack[0] if exc.pipe_stack else exc.pipe_code
+        typer.secho(f"Failed to execute pipeline '{entry_pipe_code}': {exc.message}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
     except PipelexError as exc:
         print_traceback_if_requested(console=get_console())

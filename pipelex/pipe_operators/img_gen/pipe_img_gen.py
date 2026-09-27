@@ -65,7 +65,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     def validate_inputs_static(self):
         if self.img_gen_choice:
-            check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
+            with self.locating_model_choice(field_name="model"):
+                check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
             self._validate_param_support_against_model_rules()
 
         # Guard-lint (D7): every reference to a declared-optional input must be guarded.

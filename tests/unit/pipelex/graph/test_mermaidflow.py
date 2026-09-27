@@ -13,6 +13,8 @@ from pipelex.graph.graphspec import (
     PipelineRef,
 )
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
+from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
+from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_metadata
 
 from .conftest import make_graph_config
 
@@ -472,3 +474,36 @@ class TestMermaidflow:
         subgraph_content = "\n".join(lines[subgraph_start_idx : subgraph_end_idx + 1])
         assert "combined_result" in subgraph_content, "Combined output stuff should be inside the controller subgraph"
         assert ":::stuff" in subgraph_content, "Combined output stuff should have :::stuff class styling"
+
+    def test_stuff_labels_carry_the_multiplicity_marker(self) -> None:
+        """A list stuff reads `Record[]` on its Mermaid node and in the viewer's metadata; a single one stays bare."""
+        pipeline_input_consumer = {
+            "node_id": "extract_1",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "extract_records",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[IOSpec(name="documents", concept="Document", digest="docs_digest", multiplicity=True)],
+                outputs=[IOSpec(name="records", concept="Record", digest="records_digest", multiplicity=True)],
+            ),
+        }
+        single_consumer = {
+            "node_id": "summarize_1",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "summarize",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[IOSpec(name="records", concept="Record", digest="records_digest", multiplicity=True)],
+                outputs=[IOSpec(name="summary", concept="Text", digest="summary_digest")],
+            ),
+        }
+        graph = self._make_graph(nodes=[pipeline_input_consumer, single_consumer])
+
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=make_graph_config())
+
+        assert "records<br/>Record#91;#93;" in result.mermaid_code
+        assert "documents<br/>Document#91;#93;" in result.mermaid_code
+        assert 'summary<br/>Text"' in result.mermaid_code
+        metadata = collect_stuff_metadata(graph)
+        assert metadata[make_stuff_id("records_digest")]["concept"] == "Record[]"
+        assert metadata[make_stuff_id("summary_digest")]["concept"] == "Text"

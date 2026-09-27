@@ -29,8 +29,8 @@ from typing import Any, NoReturn, cast
 import typer
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
-from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.pipe_run.located_failure import find_root_fault
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
@@ -104,13 +104,17 @@ def get_agent_cli_error_format() -> CliOutputFormat:
 # drift test — a dead entry is exactly the rot it exists to prevent. When the
 # derived domain is not the one this CLI wants, fix it on the class (declare an
 # explicit error_domain, as ModelChoiceNotFoundError does), never here.
+# An unknown model is the author's input fault, whether it is raised bare by the deck check or located
+# on its pipe: the next step is to correct the reference, not to diagnose the installation.
+_UNKNOWN_MODEL_HINT = (
+    "Check model name for typos. Use 'pipelex-agent check-model <name> -t <type>' "
+    "to validate or 'pipelex-agent models -t <type>' to list available models."
+)
+
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
-    "ModelChoiceNotFoundError": (
-        "Check model name for typos. Use 'pipelex-agent check-model <name> -t <type>' "
-        "to validate or 'pipelex-agent models -t <type>' to list available models."
-    ),
-    "PipeOperatorModelChoiceError": "Run 'pipelex-agent doctor' to check available models and routing configuration",
+    "ModelChoiceNotFoundError": _UNKNOWN_MODEL_HINT,
+    "PipeOperatorModelChoiceError": _UNKNOWN_MODEL_HINT,
     "PipeOperatorModelAvailabilityError": "Run 'pipelex-agent doctor' to check available models and verify API keys",
     "ModelDeckPresetValidatonError": (
         "Run 'pipelex-agent doctor' to check model configuration. "
@@ -210,7 +214,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "CodegenLockError": "input",
     # config = environment/config changes needed
     "ClientAuthenticationError": "config",
-    "PipeOperatorModelChoiceError": "config",
     "PipeOperatorModelAvailabilityError": "config",
     "BinaryNotFoundError": "config",
     "InitConfigError": "config",
@@ -261,6 +264,11 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     wrong, and the loop it opens is ``pipelex-agent migrate --dry-run --format json`` followed by
     ``--yes``. Emitted only when the report carries one, so branching on its presence is the
     whole test.
+
+    ``validation_errors`` comes from the report as well, whenever it carries any: a command that
+    refuses an invalid bundle (a run refused before any pipe ran, for one) hands the agent the same
+    located items ``validate`` gives, each with its pipe, its field and its fix, rather than only the
+    summary sentence. They are the items :func:`extract_validation_errors` projects, dumped the same way.
     """
     error_json: dict[str, Any] = {
         "error": True,
@@ -287,6 +295,8 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
             report_extras["provider"] = report.provider
         if report.migration is not None:
             report_extras["migration"] = report.migration.model_dump(mode="json")
+        if report.validation_errors:
+            report_extras["validation_errors"] = [item.model_dump(mode="json", exclude_none=True) for item in report.validation_errors]
 
     # hint: report-first, fallback to lookup dict
     hint = report_hint or AGENT_ERROR_HINTS.get(error_type)
@@ -325,16 +335,25 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
 # ``error_source`` is dropped from markdown — it's internal stack frames that
 # don't help an LLM fix a `.mthds` file. The field stays in the JSON envelope
 # for programmatic consumers.
-_MARKDOWN_RESERVED_KEYS: frozenset[str] = frozenset({"error", "error_type", "message", "hint", "error_source"})
+_MARKDOWN_RESERVED_KEYS: frozenset[str] = frozenset({"error", "error_type", "message", "hint", "error_source", "validation_errors"})
 
 
 def _render_error_markdown(payload: dict[str, Any]) -> str:
-    """Render an assembled error payload as agent-readable markdown."""
+    """Render an assembled error payload as agent-readable markdown.
+
+    ``validation_errors`` render as the same grouped prose ``validate`` prints, rather than as a JSON
+    dump under Details, so an agent reads a refused run's items the way it reads an invalid verdict's.
+    """
     lines: list[str] = [f"# Error: {payload['error_type']}", "", str(payload["message"])]
 
     hint = payload.get("hint")
     if hint:
         lines += ["", f"> 💡 **Hint:** {hint}"]
+
+    validation_errors = payload.get("validation_errors")
+    if isinstance(validation_errors, list) and validation_errors:
+        items = [ValidationErrorItem.model_validate(item) for item in cast("list[dict[str, Any]]", validation_errors)]
+        lines += ["", format_validation_error_items_markdown(items)]
 
     detail_keys = [key for key in payload if key not in _MARKDOWN_RESERVED_KEYS]
     if detail_keys:
@@ -454,22 +473,46 @@ def agent_success_formatted(
             print(markdown_renderer(result))
 
 
+def run_failure_fields(*, error: PipelineExecutionError) -> dict[str, Any]:
+    """The fields an agent reads off a failed run, beside the report-derived ones.
+
+    ``pipe_code`` and ``pipe_stack`` name the pipe that failed and its path from the entry pipe.
+    ``cause_type`` and ``cause_message`` are the root fault's identity and its own message, not
+    those of the wrapper right under the ``PipelineExecutionError``, which is the pipe router's or
+    a bridge's and says nothing about what went wrong.
+    """
+    fields: dict[str, Any] = {
+        "pipe_code": error.pipe_code,
+        "pipe_stack": error.pipe_stack,
+    }
+    cause = error.__cause__
+    if cause is None:
+        return fields
+    root_fault = find_root_fault(error=cause)
+    if root_fault is None:
+        fields["cause_type"] = type(cause).__name__
+        fields["cause_message"] = str(cause)
+    else:
+        root_report = root_fault.to_error_report()
+        fields["cause_type"] = root_report.error_type
+        fields["cause_message"] = root_report.message
+    return fields
+
+
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     """Project a ``ValidateBundleError`` into the CLI ``validation_errors`` JSON array.
 
-    Thin adapter over the shared ``build_validation_error_items`` builder — the
+    Thin adapter over ``ValidateBundleError.validation_error_items`` — the shared builder,
     same one feeding the API 422's ``ErrorReport.validation_errors`` — so the CLI
     and API structured shapes can never drift. Each typed item is dumped to a
     plain dict with unset fields dropped (``exclude_none``), matching the
     machine-first agent-CLI envelope; the entries carry ``category``,
     ``error_type``, ``message``, and whatever identity / ``source`` fields the
-    underlying error populated. Two residuals make the invariant total: a dry-run
-    failure with no structured locator becomes one ``dry_run``-category item, and
-    a parse-level failure (TOML syntax, an empty blueprint, a bundle elaborator)
-    that carries only a message becomes one ``blueprint_validation`` residual
-    (``fallback_message=exc.message``). So the envelope's ``validation_errors[]``
-    is non-empty on every invalid verdict (the structured-info invariant) — never
-    a bare message.
+    underlying error populated. Each pipe whose dry run failed becomes its own
+    located ``dry_run`` item, and a parse-level failure that carries only a
+    message becomes one ``blueprint_validation`` residual. So the envelope's
+    ``validation_errors[]`` is non-empty on every invalid verdict (the
+    structured-info invariant) — never a bare message.
 
     Args:
         exc: The ValidateBundleError to extract errors from.
@@ -477,14 +520,7 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     Returns:
         List of dicts, each with at minimum ``category`` and ``message``.
     """
-    items = build_validation_error_items(
-        blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
-        factory_errors=exc.pipe_factory_errors,
-        pipe_validation_errors=exc.pipe_validation_error_data,
-        dry_run_error_message=exc.dry_run_error_message,
-        fallback_message=exc.message,
-    )
-    return [item.model_dump(mode="json", exclude_none=True) for item in items]
+    return [item.model_dump(mode="json", exclude_none=True) for item in exc.validation_error_items()]
 
 
 def _render_validate_bundle_markdown(
@@ -506,7 +542,7 @@ def _render_validate_bundle_markdown(
 
     # A hint needs an action behind it (disease E): when items carry a suggested fix, name the exact
     # fix command — same predicate and command shape as the human footer — instead of the boilerplate
-    # "check the validation_errors array" hint that the JSON envelope keeps.
+    # class-level hint that the JSON envelope keeps.
     fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs)
     if fixable_count:
         fix_command = build_fix_command(

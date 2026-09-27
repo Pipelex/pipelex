@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeSpec
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOMultiplicity, NodeSpec, make_io_concept_label
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
@@ -28,7 +28,13 @@ class StuffInfo(BaseModel):
 
     name: str
     concept: str | None = None
+    multiplicity: IOMultiplicity | None = None
     data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None = None
+
+    @property
+    def concept_label(self) -> str | None:
+        """The concept as a renderer labels this stuff, with its multiplicity marker (`Record[]`)."""
+        return make_io_concept_label(concept=self.concept, multiplicity=self.multiplicity)
 
 
 class GraphAnalysis(BaseModel):
@@ -136,6 +142,7 @@ class GraphAnalysis(BaseModel):
                     stuff_registry[output_spec.digest] = StuffInfo(
                         name=output_spec.name,
                         concept=output_spec.concept,
+                        multiplicity=output_spec.multiplicity,
                         data=output_spec.data,
                     )
                     stuff_producers[output_spec.digest] = node.node_id
@@ -148,6 +155,7 @@ class GraphAnalysis(BaseModel):
                         stuff_registry[input_spec.digest] = StuffInfo(
                             name=input_spec.name,
                             concept=input_spec.concept,
+                            multiplicity=input_spec.multiplicity,
                             data=input_spec.data,
                         )
                     stuff_consumers[input_spec.digest].append(node.node_id)

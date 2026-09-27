@@ -9,6 +9,7 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -23,6 +24,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
+from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
@@ -492,11 +494,19 @@ class PipeAbstract(ABC, BaseModel):
             ]
             if optional_input_names:
                 msg += f" These optional inputs may be omitted: {', '.join(optional_input_names)}."
+            # Whether the caller left the inputs out of the request or an earlier step of their
+            # method did not produce them, the fault is in the caller's own request or method, and
+            # the message names only the pipe and its input names.
             raise PipeRunInputsError(
                 message=msg,
                 run_mode=pipe_run_params.run_mode,
                 pipe_code=self.code,
                 missing_inputs=presence_scan.missing_names,
+            ).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Provide the missing required inputs of '{self.code}': {', '.join(presence_scan.missing_names)}.",
+                )
             )
 
         # The pipe is about to be lifted (skipped): per-pipe validation and resource checks are
@@ -514,6 +524,9 @@ class PipeAbstract(ABC, BaseModel):
                     try:
                         stuff.content.validate_resources()
                     except ValueError as exc:
+                        # Not classified as the caller's fault, although the resource is the
+                        # caller's: the check's message names the path as resolved on this host,
+                        # which STRICT disclosure must not show, as `PipelineInputContentError`'s.
                         msg = f"Input '{variable_name}' of pipe '{self.code}' references an invalid resource: {exc}"
                         raise PipeRunInputsError(
                             message=msg,
@@ -670,14 +683,10 @@ class PipeAbstract(ABC, BaseModel):
                         # then discarded. The lightweight IOSpec (name/concept/content_type/digest) is kept
                         # so node ids and usage-event correlation are unaffected.
                         include_graph_data = parent_trace_context.emit_graph_events
-                        input_spec = IOSpec(
+                        input_spec = make_stuff_io_spec(
                             name=var_name,
-                            concept=stuff.concept.code,
-                            content_type=stuff.content.content_type,
-                            digest=stuff.stuff_code,
-                            data=stuff.content.smart_dump()
-                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content)
-                            else None,
+                            stuff=stuff,
+                            include_data=include_graph_data and parent_trace_context.data_inclusion.stuff_json_content,
                         )
                         input_specs.append(input_spec)
 
@@ -778,15 +787,13 @@ class PipeAbstract(ABC, BaseModel):
                 main_stuff = main_resolved
                 # E1: same gating as the input block — skip the discarded payload dumps in costs-only mode.
                 include_graph_data = parent_trace_context.emit_graph_events
-                output_spec = IOSpec(
+                output_spec = make_stuff_io_spec(
                     name=output_name or main_stuff.stuff_name or "main_stuff",
-                    concept=main_stuff.concept.code,
-                    content_type=main_stuff.content.content_type,
-                    digest=main_stuff.stuff_code,
-                    data=main_stuff.content.smart_dump() if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content) else None,
+                    stuff=main_stuff,
+                    include_data=include_graph_data and parent_trace_context.data_inclusion.stuff_json_content,
                     # The optional-edge marker (D8): a data edge fed by this output reports that the
                     # value may be absent in other runs.
-                    extra={"optional": True} if self.output.presence.is_optional else {},
+                    extra={"optional": True} if self.output.presence.is_optional else None,
                 )
 
                 # Serialize output concept for registry if enabled (E1: also gated on emit_graph_events).
@@ -815,11 +822,10 @@ class PipeAbstract(ABC, BaseModel):
                         tracer_manager.register_controller_output(
                             lookup_key=parent_trace_context.lookup_key,
                             node_id=graph_node_id,
-                            output_spec=IOSpec(
+                            output_spec=make_stuff_io_spec(
                                 name=companion_slot.slot_name,
-                                concept=companion_stuff.concept.code,
-                                content_type=companion_stuff.content.content_type,
-                                digest=companion_stuff.stuff_code,
+                                stuff=companion_stuff,
+                                include_data=False,
                             ),
                         )
             else:
