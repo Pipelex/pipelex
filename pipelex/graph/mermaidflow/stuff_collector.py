@@ -100,8 +100,9 @@ def collect_stuff_metadata(graph: GraphSpec) -> dict[str, dict[str, str]]:
 
     def extract_metadata(io_spec: IOSpec) -> dict[str, str]:
         meta: dict[str, str] = {"name": io_spec.name}
-        if io_spec.concept:
-            meta["concept"] = io_spec.concept
+        concept_label = io_spec.concept_label
+        if concept_label:
+            meta["concept"] = concept_label
         return meta
 
     return _collect_stuff_field(graph, extractor=extract_metadata)

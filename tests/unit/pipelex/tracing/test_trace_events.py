@@ -280,7 +280,7 @@ class TestTraceEvents:
         assert restored.metrics == {}
 
     def test_io_spec_survives_round_trip_within_event(self) -> None:
-        """IOSpec fields (digest, preview, concept) are preserved through event serialization."""
+        """IOSpec fields (digest, preview, concept, multiplicity) are preserved through event serialization."""
         io_spec = IOSpec(
             name="complex_stuff",
             concept="StructuredData",
@@ -288,6 +288,7 @@ class TestTraceEvents:
             preview='{"key": "value"}',
             size=16,
             digest="sha256_abc",
+            multiplicity=True,
             extra={"custom_field": "custom_value"},
         )
         event = PipeStartEvent(
@@ -306,6 +307,7 @@ class TestTraceEvents:
         assert restored_io.name == "complex_stuff"
         assert restored_io.concept == "StructuredData"
         assert restored_io.digest == "sha256_abc"
+        assert restored_io.multiplicity is True
         assert restored_io.extra == {"custom_field": "custom_value"}
 
     def test_error_spec_survives_round_trip_within_event(self) -> None:
