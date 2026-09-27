@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260902-10eb56
 ---
 
@@ -110,13 +110,11 @@ The sites that ask `is_compatible` with a wanted concept of `Anything` are the s
 
 This closes Gap B of `input-shaper-multiplicity-gaps.md` for `Anything`. `Dynamic` keeps its bottom-up arm; nothing here rules on it.
 
-### R4 — The published schema says what R3 refuses: no array and no null at an element position *(needs Louis's yes)*
+### R4 — The published schema says what R3 refuses: no array and no null at an element position *(decided with Louis, 2026-09-27)*
 
 **The permissive schema gains one constraint: `{"title": "native.Anything", "description": "…", "not": {"type": ["array", "null"]}}`.** `Anything[]` wraps it exactly as today, so its items exclude arrays and null too, and the standard's rule that a plural schema's items are "exactly what the same concept would carry at single" holds unchanged.
 
 The item asked to close the gap in the shaper rather than narrow the contract to a limitation, and R4 is the one place this design narrows. It is not a limitation of the `Anything` arm, though: D2 (a single slot never holds a list) and D9 (absence is an omitted key, never a null) refuse those two shapes at *every* slot, and every other slot's schema already excludes them — an object schema admits neither an array nor a null. The permissive schema is the one exception on the wire. The standard says a machine consumer validates a payload with `json_schema` and an ordinary validator (`mthds/docs/spec/pipe-io-contracts.md`, Non-Goals), and `mthds-form` does exactly that with ajv, so leaving the schema permissive keeps a gap a client meets as a refused run after its own validation passed.
-
-If the answer is no, R1–R3 stand unchanged and the schema stays permissive; `docs/under-the-hood/pipe-io-contracts.md` then says that the two universal rules still refuse an array or a null at a single `Anything` slot.
 
 ### R5 — The envelope spellings
 
@@ -146,7 +144,7 @@ Neither is widened into this change. They share a principle with it and no code.
 - **A bare object is the JSON object itself**, stored as `json_obj`: `{"a": 1}` becomes `JSONContent(json_obj={"a": 1})`. This is the reading a caller means, and the one the report needed.
 - **Every bare object is read literally, `{"json_obj": {…}}` included.** That object becomes `JSONContent(json_obj={"json_obj": {…}})`, just as a bare `{"text": "hi"}` at a `Text` slot is not read as a text content. The `json_obj` mapping is the content form, and the content form travels inside the envelope, for `JSON` as for every native. There is no collision rule: one looked necessary only because the compact template taught callers the wrapped form, and the next point changes the template instead.
 - **The compact template shows the bare object.** The engine's light template unwraps `json_obj` the way it unwraps `text` for `Text` and `number` for `Number`, and the reference projection and both mirrors do the same, so `JSON` leaves `OUT_OF_MATRIX_NATIVES`. A developer reading the template for a `JSON` slot sees the object they have, not a Python field name inside an envelope. The corpus's `json_in` compact bytes change in all three repos in the regeneration that already retires the two `EXPECTED_UNSHAPEABLE` entries.
-- **Anything else is refused as a wrong kind**, naming "a JSON object": a string, a number, a boolean. `JSONContent` holds an object only, which the pinned native definition fixes (`json_obj`, a `dict`), so a JSON array is not a `JSON` value either. Whether the standard should widen that is open question 4 (L-260927-a8ec06); this design builds "a JSON object" and says so in every doc and error it touches.
+- **Anything else is refused as a wrong kind**, naming "a JSON object": a string, a number, a boolean. `JSONContent` holds an object only, which the pinned native definition fixes (`json_obj`, a `dict`), so a JSON array is not a `JSON` value either. Whether the standard should widen that was question 4 (L-260927-a8ec06), decided: it stays an object, and this design says "a JSON object" in every doc and error it touches.
 - **Multiplicity is peeled like every typed kind.** `JSON[]` shapes each object in turn, a single object is wrapped, `[]` is legal, and an array at a single `JSON` slot is `ListWhereSingularError`, whose detail already names `JSON[]` as the declaration to change.
 - **The envelope is unchanged**: its content is still `JSONContent`'s field mapping, `{"json_obj": {…}}`, built bottom-up and compatibility-checked as today. The published `json_schema` describes that content form, as it does for every native (`Text`'s is `{"text": …}`), so it does not change either, and neither does codegen's `JSON` type.
 
@@ -198,6 +196,7 @@ This is the one place where the two aims of the language meet: the developer kee
 
 - **Infer the natural concept** (`native.Text` for a string, `native.JSON` for an object). It is what the bottom-up path does for a string today, and it has no answer for a heterogeneous `Anything[]`, since one stuff has one concept. It also discards the declaration for a guess, which is exactly what the item objected to.
 - **A real `AnythingContent` class.** Rejected under R6.
+- **Keep the `Anything` schema permissive and document the two refusals instead** (R4's alternative). It narrows nothing, but a client that validates with `json_schema`, as the standard tells it to, would still meet an array or a null refused only when the run starts.
 - **Accept an array at a single `Anything` slot as a `ListContent`.** A single slot holding a list is what D2 exists to prevent, and every controller reads multiplicity through `Stuff.is_list`, so the stuff would be plural wherever it went while its slot says single.
 - **Keep the `DYNAMIC` arm and teach the bottom-up factory about `Anything`.** The factory has no declared concept and no multiplicity to consult. That is the reason the top-down shaper exists.
 - **Treat `JSON` as a structured concept**, so a bare object is the content and must carry `json_obj`. It matches the contract to the letter, but it refuses a plain object, which is what every caller of a `JSON` slot sends and what the report sent.
@@ -231,12 +230,15 @@ This is the one place where the two aims of the language meet: the developer kee
 - L-260927-bea35e (`pipelex`, bug): a `native.Dynamic` envelope silently drops its object content, because `DynamicContent` declares no fields and inherits `extra="ignore"`. Measured: `{"a": 1, "b": "x"}` shapes into `DynamicContent()`. It now also carries the list half of the report: a bare object or a list of objects at a `Dynamic` slot has no reading at all, which after R8 is a typed refusal rather than an accepted value.
 - L-260927-afaf62 (`mthds`, spec): the runtime guide's pseudo-code admits only native concepts into `Anything`.
 - L-260927-da1b09 (`pipelex`, bug) and L-260927-223013 (`mthds`, spec): R9, the plain-value wire form of an `Anything` stuff's content.
-- L-260927-a8ec06 (`mthds`, decision): open question 4.
+- L-260927-a8ec06 (`mthds`, decision): question 4, decided and closed — `JSON` stays an object.
 - L-260927-702c56 (`pipelex`, feature): a `.json` or `.jsonl` file reference read into a `JSON[]` slot, the way D11 reads a CSV into a structured list.
 
-## Open questions
+## Questions, all decided with Louis on 2026-09-27
 
-1. **R4** — narrow the published schema by D2 and D9 (recommended), or leave it permissive and document the two refusals.
-2. **R7's collision rule.** *Decided with Louis, 2026-09-27:* there is none. Every bare object is read literally, and `JSON`'s compact template becomes the bare object, so no caller learns the wrapped form.
-3. **The corpus pipe.** `scaffold_anything_slot` exists only to isolate a declared gap. The plan folds `anything_in` back into `scaffold_open_natives`, the original intent of L-260902-543ad0, which removes one pipe's files from both mirrors and one entry from `conformance`'s corpus census. Keeping the separate pipe is equally correct and changes fewer files; the fold is recommended because a pipe whose only justification is a closed gap would need a new one.
-4. **Should `JSON` hold any JSON value, not only an object?** A question for the standard, filed as L-260927-a8ec06 with its options. The recommendation is to keep it an object: widening makes a single `JSON` slot the one position that holds an array, against D2. Nothing in this design blocks on the answer; it builds and documents "a JSON object".
+1. **R4** — narrow the published schema by D2 and D9, or leave it permissive and document the two refusals. *Decided:* narrow it.
+2. **R7's collision rule.** *Decided:* there is none. Every bare object is read literally, and `JSON`'s compact template becomes the bare object, so no caller learns the wrapped form.
+3. **The corpus pipe.** `scaffold_anything_slot` exists only to isolate a declared gap. *Decided:* fold `anything_in` back into `scaffold_open_natives`, the original intent of L-260902-543ad0, which removes one pipe's files from both mirrors and one entry from `conformance`'s corpus census. Keeping the separate pipe was equally correct and changed fewer files, but a pipe whose only justification is a closed gap would need a new one.
+4. **Should `JSON` hold any JSON value, not only an object?** A question for the standard, filed as L-260927-a8ec06. *Decided:* keep it an object. Widening would make a single `JSON` slot the one position that holds an array, against D2, and every array-shaped payload but a list of lists already has a home.
+5. **`Anything`'s compact template.** *Decided:* it keeps its envelope, because the bare placeholder `{}` would read as "send an object" (see "What deliberately does not change").
+6. **R10's escape.** *Decided:* the content of an `Anything` envelope is raw data at every depth, list items included, so a list of genuine `{concept, content}` objects travels inside one; the alternative, refusing the spelling everywhere and sending such data through a structured concept, was simpler but left a developer's JSON with no way in as it is.
+7. **`Dynamic` in R11.** *Decided:* the docs say `Dynamic` is not recommended for inputs until L-260927-bea35e rules on what its slot holds, rather than leaving it out of the rule while it loses data.

@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260902-10eb56
 ---
 
@@ -54,16 +54,15 @@ All in `pipelex/core/memory/input_shaper.py` unless named otherwise.
 
 **Checkpoint 1** — `make agent-check` clean, the shaper suite and the compatibility suite green, and both probe matrices of `design.md` — the `Anything` matrix and the list-of-objects one — re-run, with every row either accepted as the rulings say or refused with a typed error. Record here what was measured and anything decided on the way, then `/rev`.
 
-## Phase 4 — the published schema excludes array and null (R4, only on Louis's yes)
+## Phase 4 — the published schema excludes array and null (R4)
 
 1. `Concept.render_structureless_representation`, SCHEMA arm: add `"not": {"type": ["array", "null"]}` to the element schema. The multiplicity wrapper is unchanged, so `Anything[]` items carry it.
 2. Tests: `tests/integration/pipelex/pipeline/test_pipe_io_contracts.py` pins the `Anything`, `Anything[]` and `Anything[2]` schemas; `tests/unit/pipelex/core/pipes/test_stuff_spec.py` pins the structureless render. Add a check that validates the design's accepted and refused values against the rendered schema with `jsonschema`, so the contract and the shaper are shown to agree rather than asserted to.
-3. If the answer is no, skip this phase and write the two universal refusals into `docs/under-the-hood/pipe-io-contracts.md` in Phase 5 instead.
 
 ## Phase 5 — the corpus and the docs
 
 1. `pipelex/cli/dev_cli/commands/generate_projection_corpus_cmd.py`: delete the two `L-260902-10eb56` entries from `EXPECTED_UNSHAPEABLE`, and rewrite the comment above it so it describes the one gap still declared, `L-260830-191719`.
-2. `tests/data/input_semantics/scaffold_bundle.mthds`: fold `anything_in = "Anything"` back into `scaffold_open_natives` (inputs and template), delete `scaffold_anything_slot`, and rewrite the comments above both so they describe the four open natives as they now are (design, open question 3).
+2. `tests/data/input_semantics/scaffold_bundle.mthds`: fold `anything_in = "Anything"` back into `scaffold_open_natives` (inputs and template), delete `scaffold_anything_slot`, and rewrite the comments above both so they describe the four open natives as they now are (design, question 3).
 3. `pipelex/cli/dev_cli/commands/projection_reference.py`: remove `JSON` from `OUT_OF_MATRIX_NATIVES` and give a `JSON` slot a compact unwrap of `json_obj`, keyed on the native's identity the way the set already is, since its descriptor node is an `object` and `keeps_envelope` answers `True` for every native object node. Reword the set's comment, which says an input shaper cannot build these natives top-down, to the reason in the design's "What deliberately does not change".
 4. Regenerate into a scratch directory with the four-bundle command from `docs/contribute/generate-projection-corpus.md`, in the order it gives, and read the result: no `input_semantics_scaffold` template declared unshapeable, the divergence classes and their site counts unchanged, `json_in`'s compact template the bare object in both formats with the engine and the reference agreeing, and the `anything_in` contract carrying the Phase 4 schema. Record the summary line (pipes, divergences, templates shaping cleanly) here, because the Phase 6 items check their own regeneration against it.
 5. Update the tests that read the scaffold: `tests/integration/pipelex/pipeline/test_input_form.py` where the scaffold's pipes changed, and `tests/unit/pipelex/cli/dev_cli/test_generate_projection_corpus.py`, which compares the manifest's unshapeable list with `EXPECTED_UNSHAPEABLE` and follows by itself.
@@ -94,7 +93,7 @@ After the merge, each mirror is regenerated from a merged `pipelex` `dev` with t
 
 **Done.** The bug is verified and both documents are written; no code has changed. `design.md` carries the two measured matrices (the `Anything` slot on `dev` at `be796a0d8`, and the list-of-objects report plus the `JSON` slot on `dev` at `d93a24767`) and rulings R1 to R8. The scope widened once, on Louis's go-ahead, from the `Anything` slot alone to R7 (a `JSON` handler) and R8 (the fallback's typed refusal), after a report of a list of plain JSON objects hitting `input_shaper.py:188` → `stuff_factory.py:454` at an unnamed slot. The probe scripts that produced the matrices are not kept; the matrices in `design.md` are the record, and Checkpoint 1 re-runs them against the fix.
 
-**Open, and blocking Phase 4 and the docs only.** Open questions 1 and 3 at the end of `design.md`: R4 (narrow the `Anything` schema by D2 and D9) and folding `anything_in` back into `scaffold_open_natives`. Each carries a recommendation; the documents flip from `draft` to `active` when Louis ratifies them, in the same change that records his answers here. Question 4, whether `JSON` should hold any JSON value, belongs to the standard (L-260927-a8ec06) and blocks nothing here.
+**Open at the time, and answered since (see the ratification below).** Open questions 1 and 3 at the end of `design.md`: R4 (narrow the `Anything` schema by D2 and D9) and folding `anything_in` back into `scaffold_open_natives`. Each carries a recommendation; the documents flip from `draft` to `active` when Louis ratifies them, in the same change that records his answers here. Question 4, whether `JSON` should hold any JSON value, belongs to the standard (L-260927-a8ec06) and blocks nothing here.
 
 ## Handoff — review of the rulings, 2026-09-27
 
@@ -107,6 +106,8 @@ A second session reviewed the design from two sides, what keeps the language cle
 - **R9, new and built elsewhere**: on the output side, an `Anything` stuff's content goes on the public wire as its plain JSON value. Measured, it goes out as its content class's fields today (`{"text": "hi"}`), so once R1 lands a value chained through `--with-memory` changes type. L-260927-da1b09 (`pipelex`) and L-260927-223013 (`mthds`) carry it.
 - **A correction to the first review.** The published `json_schema` and codegen's `JSON` type describe the content form for every native (`Text`'s is `{"text": …}`), so neither is a `JSON`-specific defect and neither changes.
 - **A stale claim in Checkpoint 2, fixed.** `conformance` pins a corpus census as an equality since L-260902-e62273 closed, so the fold of `scaffold_anything_slot` needs a census edit; Phase 6 now files a `conformance` item beside the two mirrors.
+
+**Ratified, 2026-09-27.** Louis answered every open question of `design.md` and the choices this review had made on its own, each as recommended: R4 narrows the `Anything` schema, so Phase 4 is built unconditionally; `anything_in` folds back into `scaffold_open_natives`; `JSON` stays an object, recorded and closed on L-260927-a8ec06; `Anything`'s compact template keeps its envelope; the content of an `Anything` envelope is raw data at every depth, list items included, which is R10's escape; and R11 advises against `Dynamic` for inputs while L-260927-bea35e is open. Both documents are `active` from this change. One point is left to measurement rather than decision: R10's escape for `JSON[]`, a `JSON` envelope around a list, which Phase 3 tests and Checkpoint 1 decides if the factory cannot build it.
 
 **Next.** Rebase the branch onto `dev` (it moved to the v0.67.0 release after the worktree was cut), claim the item, then Phase 1:
 
@@ -122,7 +123,7 @@ ledger claim L-260902-10eb56 --renew
 - L-260902-10eb56 is claimed from the worktree; `ledger claim L-260902-10eb56 --renew` at the start of each session.
 - Ruled on here but not built: L-260902-9546ef, L-260926-f7bb28 (now linked to it) and L-260902-db6d1e keep their own fix directions under the design's R6.
 - Filed from this design: L-260927-bea35e (`pipelex`, the `Dynamic` envelope data loss, now also carrying the list half of the report) and L-260927-afaf62 (`mthds`, the runtime guide's compatibility pseudo-code).
-- Filed from the review: L-260927-da1b09 (`pipelex`, R9's runtime half, blocked by this item) and L-260927-223013 (`mthds`, R9's wording in the standard); L-260927-a8ec06 (`mthds`, open question 4); L-260927-702c56 (`pipelex`, a JSON file reference into `JSON[]`, blocked by this item).
+- Filed from the review: L-260927-da1b09 (`pipelex`, R9's runtime half, blocked by this item) and L-260927-223013 (`mthds`, R9's wording in the standard); L-260927-a8ec06 (`mthds`, question 4, decided and closed: `JSON` stays an object); L-260927-702c56 (`pipelex`, a JSON file reference into `JSON[]`, blocked by this item).
 - Not touched: L-260831-1e1a71 owns the explicit arm's untyped escapes, which R8 deliberately leaves alone.
 
 ## Deferred
