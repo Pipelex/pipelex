@@ -27,6 +27,8 @@ from pathlib import Path
 from typing import Any, NoReturn, cast
 
 import typer
+from mthds.runners.api.exceptions import ApiResponseError
+from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
 from pipelex.pipe_run.located_failure import find_root_fault
@@ -111,6 +113,42 @@ _UNKNOWN_MODEL_HINT = (
     "to validate or 'pipelex-agent models -t <type>' to list available models."
 )
 
+_API_CREDENTIALS_HINT = (
+    "Set MTHDS_API_KEY and MTHDS_BASE_URL (the runner's origin), or run 'mthds config set api-key <key>' and 'mthds config set base-url <url>'"
+)
+_API_RATE_LIMITED_HINT = "Too many requests: wait retry_after_seconds when the error carries it, otherwise a few seconds, then run again"
+# A 503 does not say whether the run happened: a hosted plane can answer it before forwarding the
+# request and also after the run completed, when it failed to record the result. So it is never
+# marked retryable, and its hint warns that running again can repeat a paid run.
+_API_UNAVAILABLE_HINT = (
+    "The runner or the service in front of it was unavailable. It may have failed before the run or after it, "
+    "so running again can repeat a paid run: wait retry_after_seconds when the error carries it, then run again "
+    "only if a repeated run is acceptable"
+)
+# The next step of a 4xx refusal that advised none and whose status has no hint of its own.
+API_REFUSAL_CALLER_HINT = (
+    "The runner refused the request: change what the message names (the method, the inputs or the configuration), then run again"
+)
+
+# The next step of a refusal whose answer advised none, by its HTTP status. These are the answers a
+# hosted plane authors itself, in front of the runner, and they carry no `user_action`: the gateway's
+# refusal of a key, an unknown route, the platform's rate limiter, a service it cannot reach.
+API_REFUSAL_HINTS_BY_STATUS: dict[int, str] = {
+    401: f"The runner refused the credentials. {_API_CREDENTIALS_HINT}",
+    403: (
+        "The runner refused the request: check that MTHDS_API_KEY is a valid key for the runner at MTHDS_BASE_URL; "
+        "when it is, the message says what this request may not do"
+    ),
+    404: "The runner has no such route: check that MTHDS_BASE_URL is the runner's origin, with no path such as /v1",
+    429: _API_RATE_LIMITED_HINT,
+    503: _API_UNAVAILABLE_HINT,
+}
+
+# Statuses that say the request was refused before anything ran, so the same request can succeed later
+# (RFC 6585): the envelope marks them retryable unless the answer said otherwise. A 503 is not one of
+# them, see _API_UNAVAILABLE_HINT.
+_API_RETRYABLE_STATUSES: frozenset[int] = frozenset({429})
+
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
     "ModelChoiceNotFoundError": _UNKNOWN_MODEL_HINT,
@@ -164,8 +202,15 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "otherwise update the deck or check the model name."
     ),
     # API runner errors
-    "ClientAuthenticationError": "Run 'pipelex-agent doctor' to check credentials, or set the PIPELEX_API_KEY environment variable",
+    "ClientAuthenticationError": _API_CREDENTIALS_HINT,
     "PipelineRequestError": "Check that pipe_code or mthds_contents is provided",
+    # The next step of a runner's server-side failure that advised none, when its status has none of its
+    # own in API_REFUSAL_HINTS_BY_STATUS (a 4xx gets API_REFUSAL_CALLER_HINT instead). It stands in for
+    # the hint keyed on the runner's own class, which names a local command (doctor, check-model) that
+    # cannot fix what a remote runner refused.
+    "ApiResponseError": (
+        "The API runner failed on its side: report it with the request_id, or with the http_status when the error carries no request_id"
+    ),
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Input/type errors
@@ -338,11 +383,27 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
 _MARKDOWN_RESERVED_KEYS: frozenset[str] = frozenset({"error", "error_type", "message", "hint", "error_source", "validation_errors"})
 
 
+def _typed_validation_items(*, validation_errors: Any) -> list[ValidationErrorItem] | None:
+    """The payload's ``validation_errors`` as typed items, or ``None`` when there are none to render as prose.
+
+    ``None`` also when an item does not fit this pipelex's ``ValidationErrorItem``: an API runner's
+    items come off the wire, and one from a newer runner can carry an ``error_type`` or a field this
+    version does not know. The caller then keeps the items as JSON under Details rather than losing them.
+    """
+    if not isinstance(validation_errors, list) or not validation_errors:
+        return None
+    try:
+        return [ValidationErrorItem.model_validate(item) for item in cast("list[dict[str, Any]]", validation_errors)]
+    except ValidationError:
+        return None
+
+
 def _render_error_markdown(payload: dict[str, Any]) -> str:
     """Render an assembled error payload as agent-readable markdown.
 
     ``validation_errors`` render as the same grouped prose ``validate`` prints, rather than as a JSON
     dump under Details, so an agent reads a refused run's items the way it reads an invalid verdict's.
+    Items this version cannot type stay under Details as JSON.
     """
     lines: list[str] = [f"# Error: {payload['error_type']}", "", str(payload["message"])]
 
@@ -350,12 +411,15 @@ def _render_error_markdown(payload: dict[str, Any]) -> str:
     if hint:
         lines += ["", f"> 💡 **Hint:** {hint}"]
 
+    reserved_keys = _MARKDOWN_RESERVED_KEYS
     validation_errors = payload.get("validation_errors")
-    if isinstance(validation_errors, list) and validation_errors:
-        items = [ValidationErrorItem.model_validate(item) for item in cast("list[dict[str, Any]]", validation_errors)]
+    items = _typed_validation_items(validation_errors=validation_errors)
+    if items:
         lines += ["", format_validation_error_items_markdown(items)]
+    elif validation_errors:
+        reserved_keys = _MARKDOWN_RESERVED_KEYS - {"validation_errors"}
 
-    detail_keys = [key for key in payload if key not in _MARKDOWN_RESERVED_KEYS]
+    detail_keys = [key for key in payload if key not in reserved_keys]
     if detail_keys:
         lines += ["", "## Details", ""]
         for key in detail_keys:
@@ -497,6 +561,111 @@ def run_failure_fields(*, error: PipelineExecutionError) -> dict[str, Any]:
         fields["cause_type"] = root_report.error_type
         fields["cause_message"] = root_report.message
     return fields
+
+
+def _non_empty_string(*, value: Any) -> str | None:
+    """A problem member that is a non-empty string, else ``None``."""
+    return value if isinstance(value, str) and value else None
+
+
+def _string_list(*, value: Any) -> list[str] | None:
+    """A problem member that is a non-empty list of strings, else ``None``."""
+    if not isinstance(value, list) or not value:
+        return None
+    entries = cast("list[Any]", value)
+    if not all(isinstance(entry, str) for entry in entries):
+        return None
+    return cast("list[str]", entries)
+
+
+def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
+    """The error envelope of a request the API runner answered non-2xx, read off the problem document it sent.
+
+    It has the shape of a local failure's envelope, so an agent reads a hosted refusal the way it reads a local one:
+
+    - ``error_type`` is the runner's error class when the problem names one: ``ValidateBundleError`` for a bundle
+      refused at load, as a local run reports it, and the root fault (``ModelNotFoundError``, ``StuffFactoryError``)
+      for a run that failed, which a local run reports as ``cause_type`` under ``PipelineExecutionError``. There is
+      no ``cause_type`` or ``cause_message`` on this path. ``ApiResponseError`` when the answer names no class, as a
+      gateway's error page does not.
+    - ``message`` is ``API POST /v1/execute failed (422): <reason>``, the error's own message without the next step
+      it appends, which ``hint`` carries. On a failed run the runner's reason is located at the failing pipe and its
+      path, ``Pipe 'condense_article' failed (digest_article → condense_article): …``.
+    - ``hint`` is the runner's next step, ``user_action.detail``. An answer that advised none, such as the ones a
+      hosted plane authors in front of the runner (a refused key, a rate limit, a runner it cannot reach), gets the
+      hint of its status from ``API_REFUSAL_HINTS_BY_STATUS``, else a hint by status class (a 4xx asks for a change to
+      the request, anything else for a report); never the hint keyed on the runner's class, which names a local
+      command that cannot fix a remote refusal.
+    - ``retryable`` (only when true, as on every envelope), ``error_domain`` and ``error_category`` are the answer's,
+      with no local fallback, since only the runner knows whether the caller or its operator has to act. The one
+      exception is ``retryable`` on a 429 that did not say, a refusal sent before anything ran. A 503 is never
+      inferred retryable: a hosted plane can answer it after the run completed.
+    - ``validation_errors`` are the runner's items, each whole, as it sent them.
+    - ``pipe_code`` and ``pipe_stack`` when the problem carries them as members.
+    - ``error_code`` is the problem's ``code`` member, the stable code a hosted plane gives its own refusals
+      (``rate_limited``, ``unauthorized``), and ``retry_after_seconds`` the ``Retry-After`` header's delay.
+    - ``http_status`` and ``request_id`` are what to quote when the fault is the runner's.
+    - ``error_source`` is the client-side trace, as on every JSON envelope.
+    """
+    problem: dict[str, Any] = error.problem or {}
+    message = str(error)
+    hint: str
+    if error.user_action is None:
+        hint = API_REFUSAL_HINTS_BY_STATUS.get(error.status) or (
+            API_REFUSAL_CALLER_HINT if 400 <= error.status < 500 else AGENT_ERROR_HINTS["ApiResponseError"]
+        )
+    else:
+        hint = error.user_action.detail
+        message = message.removesuffix(f"\nNext step: {hint}")
+
+    payload: dict[str, Any] = {
+        "error": True,
+        "error_type": error.error_type or type(error).__name__,
+        "message": message,
+        "hint": hint,
+    }
+    if error.retryable or (error.retryable is None and error.status in _API_RETRYABLE_STATUSES):
+        payload["retryable"] = True
+    if error.error_domain:
+        payload["error_domain"] = error.error_domain
+    if error_category := _non_empty_string(value=problem.get("error_category")):
+        payload["error_category"] = error_category
+    if error.validation_errors:
+        payload["validation_errors"] = [item.model_dump(mode="json") for item in error.validation_errors]
+    if pipe_code := _non_empty_string(value=problem.get("pipe_code")):
+        payload["pipe_code"] = pipe_code
+    if pipe_stack := _string_list(value=problem.get("pipe_stack")):
+        payload["pipe_stack"] = pipe_stack
+    if error_code := _non_empty_string(value=problem.get("code")):
+        payload["error_code"] = error_code
+    retry_after = error.headers.get("retry-after", "").strip()
+    if retry_after.isdigit():
+        payload["retry_after_seconds"] = int(retry_after)
+    payload["http_status"] = error.status
+    if error.request_id:
+        payload["request_id"] = error.request_id
+    payload["error_source"] = _build_error_source(error)
+    return payload
+
+
+def agent_error_api_response(*, error: ApiResponseError) -> NoReturn:
+    """Emit the envelope of a request the API runner refused to stderr, format-aware, and exit 1.
+
+    The sibling of :func:`agent_error` for the one error an API runner's refusal arrives as. It builds its own
+    payload rather than going through :func:`agent_error`'s lookups, whose fallbacks keyed on ``error_type`` are
+    local advice (see :func:`api_response_error_payload`), and renders it with the same JSON dump and the same
+    markdown renderer, so a hosted refusal reads like a local failure.
+
+    Args:
+        error: The refusal the ``MthdsAPIClient`` raised.
+    """
+    payload = api_response_error_payload(error=error)
+    match get_agent_cli_error_format():
+        case CliOutputFormat.JSON:
+            print(clean_json_dumps(payload, indent=2), file=sys.stderr)
+        case CliOutputFormat.MARKDOWN:
+            print(_render_error_markdown(payload), file=sys.stderr)
+    raise typer.Exit(1) from error
 
 
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
