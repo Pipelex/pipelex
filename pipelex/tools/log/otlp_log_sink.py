@@ -4,16 +4,16 @@ Each record becomes one OTel log record on the logger named after the emitting m
 is the body, the level maps onto the OTel severity scale, the record's fields, context identifiers and
 ``data`` ride as attributes, with a value the wire cannot carry as is written as JSON text, and an
 exception lands under the ``exception.*`` semantic-convention keys, the stacktrace being the record's
-rendered exception text so that what the redaction processor scrubbed is what leaves. The
-semantic-convention keys the sink writes itself — the source location, the ``pipelex.trace_id`` and
-``pipelex.span_id`` of the Pipelex span and the exception — are reserved whether or not the record
+rendered exception text so that what the redaction processor scrubbed is what leaves. The keys the
+sink writes itself — the source location and the exception under their semantic-convention names, and
+Pipelex's own ``pipelex.trace_id`` and ``pipelex.span_id`` — are reserved whether or not the record
 carries them, exactly as the ``json`` sink reserves its own keys: a field named like one is carried under
 the same ``field_`` prefix, so the same field survives a change of sink. Each record is filed under
 OpenTelemetry's current span when it was logged, the host's own, which is only read, and under no span
-when it names no trace; the Pipelex span held when it was logged, a pipe's or an LLM call's, rides beside
-it as the two ``pipelex.*`` attributes, in hex, whether or not it is also the current span. The records the sink's
-own export path emits, the SDK's and the transport's, are rejected by a filter on the handler and never
-exported. This module imports the OpenTelemetry SDK at load, which is why the built-in plugin imports it
+when it names no trace; the Pipelex span held when it was logged, a pipe's or an LLM call's, rides
+beside it as the two ``pipelex.*`` attributes, in hex, whether or not it is also the current span. The
+records the sink's own export path emits, the SDK's and the transport's, are rejected by a filter on the
+handler and never exported. This module imports the OpenTelemetry SDK at load, which is why the built-in plugin imports it
 inside the ``otlp`` factory and nowhere else.
 """
 
@@ -58,10 +58,11 @@ FLUSH_TIMEOUT_MILLIS = 5000
 
 _ATTRIBUTE_SCALAR_TYPES = (str, bool, int, float)
 
-# The semantic-convention keys the sink writes itself, reserved on every record whether or not it carries
-# an exception: a field named like one is carried under the same ``field_`` prefix the record uses for a
-# name the stdlib owns, so no value is lost, a field keeps one wire name whatever the record holds, and the
-# same field survives this sink as it survives the ``json`` one.
+# The keys the sink writes itself, the semantic-convention ones and Pipelex's own ``pipelex.*`` pair,
+# reserved on every record whether or not it carries an exception or a span: a field named like one is
+# carried under the same ``field_`` prefix the record uses for a name the stdlib owns, so no value is
+# lost, a field keeps one wire name whatever the record holds, and the same field survives this sink as it
+# survives the ``json`` one.
 RESERVED_ATTRIBUTE_KEYS = frozenset(
     {
         code_attributes.CODE_FILE_PATH,
