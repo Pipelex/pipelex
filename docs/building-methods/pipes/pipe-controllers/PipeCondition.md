@@ -17,6 +17,8 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 
 When the expression renders nothing, no outcome can be chosen and the pipe fails with `Conditional expression returned no result`, naming the pipe. That refusal and the others a condition makes are faults in your method, each reported with its reason and a next step. In a run, an expression that renders nothing, a `fail` outcome and a chosen pipe whose inputs are missing fail the run, which a hosted run answers with HTTP 422. In the dry run of `pipelex validate`, which runs every branch instead of choosing one, an expression that renders nothing over the mock inputs and a condition whose every outcome is `fail` give a `dry_run` item.
 
+An expression that does not parse, whether written as `expression` or as `expression_template`, is refused when the bundle loads, before anything runs. `pipelex validate` reports it as an item on the condition naming the field and the line of it that fails, and a run of the bundle is refused with the same item, which a hosted run answers with HTTP 422. The item quotes none of the expression, which may be a host library's.
+
 ## Configuration
 
 `PipeCondition` is configured in your pipeline's `.mthds` file.

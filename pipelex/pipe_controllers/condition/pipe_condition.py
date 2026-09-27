@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Any, Literal
 
-from jinja2 import TemplateSyntaxError
 from typing_extensions import override
 
 from pipelex import log
@@ -14,6 +13,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
@@ -406,7 +406,7 @@ class PipeCondition(PipeController):
             # must not reach the caller. The line locates the fault. It is raised from the parser's own error,
             # past the `Jinja2DetectVariablesError` that quotes the expression: a run failure reports the innermost
             # Pipelex error on its chain (`find_root_fault`), which must be this refusal.
-            msg = f"Dry run failed for pipe '{self.code}' (PipeCondition): its expression {_describe_expression_parse_failure(error=exc)}."
+            msg = f"Dry run failed for pipe '{self.code}' (PipeCondition): its expression {describe_expression_parse_failure(error=exc)}."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_INPUT,
@@ -489,18 +489,3 @@ class PipeCondition(PipeController):
             producing_pipe=self.code,
         )
         working_memory.record_new_main_absence(record)
-
-
-def _describe_expression_parse_failure(*, error: Jinja2DetectVariablesError) -> str:
-    """Say where a condition's expression fails to parse, in words that owe nothing to the expression.
-
-    Every layer between Jinja2 and the condition puts the expression in its message, and Jinja2's own
-    diagnosis quotes the token it stopped at, so no text of the error can be passed on. The parser's line,
-    counted within the expression, is what locates the fault.
-    """
-    cause: BaseException | None = error.__cause__
-    while cause is not None:
-        if isinstance(cause, TemplateSyntaxError):
-            return f"does not parse at line {cause.lineno} of that expression"
-        cause = cause.__cause__
-    return "does not parse"
