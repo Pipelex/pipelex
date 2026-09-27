@@ -300,6 +300,48 @@ template    = "Standard: $parcel"
     # Every outcome, and the default, refuse the run.
     ALL_FAIL_OUTCOMES: ClassVar[str] = '{ reject = "fail" }'
 
+    # The literal a lane the condition holds renders to, text of the expression the absence reason must not quote.
+    HELD_LANE_LITERAL: ClassVar[str] = "hold_at_the_depot_quietly"
+    # A sequence whose condition resolves a held lane to 'continue', and whose next step force-unwraps its absent result.
+    CONTINUE_THEN_FORCE_MTHDS: ClassVar[str] = """
+domain      = "condition_faults_routing"
+description = "Stamp a parcel once it is routed down a lane"
+main_pipe   = "route_and_stamp"
+
+[concept]
+Parcel = "A parcel waiting at the sorting bench"
+
+[pipe.route_and_stamp]
+type        = "PipeSequence"
+description = "Route the parcel, then stamp it"
+inputs      = { parcel = "Parcel", lane = "Text" }
+output      = "Parcel"
+steps       = [{ pipe = "route_parcel", result = "routed" }, { pipe = "stamp_parcel", result = "stamped" }]
+
+[pipe.route_parcel]
+type                = "PipeCondition"
+description         = "Choose the lane a parcel goes down, or hold it"
+inputs              = { parcel = "Parcel", lane = "Text" }
+output              = "Parcel?"
+expression_template = "{% if lane.text == 'hold' %}hold_at_the_depot_quietly{% else %}standard{% endif %}"
+outcomes            = { standard = "send_standard" }
+default_outcome     = "continue"
+
+[pipe.send_standard]
+type        = "PipeCompose"
+description = "Note the parcel onto the standard lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Standard: $parcel"
+
+[pipe.stamp_parcel]
+type        = "PipeCompose"
+description = "Stamp the routed parcel, which must be present"
+inputs      = { routed = "Parcel!" }
+output      = "Parcel"
+template    = "Stamped: $routed"
+"""
+
 
 class ConditionExpressionParseTestData:
     """Bundles whose `PipeCondition` declares an expression that does not parse."""

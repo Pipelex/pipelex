@@ -316,10 +316,13 @@ class PipeCondition(PipeController):
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
+            # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it to the caller
+            # under STRICT disclosure, and the value the expression rendered can be literal text of a condition a host
+            # library declared. The execution data above keeps that value.
             self._record_declared_absent_output(
                 working_memory=working_memory,
                 output_name=output_name,
-                reason=f"PipeCondition '{self.code}' resolved to 'continue' for evaluated expression '{evaluated_expression}'",
+                reason=f"PipeCondition '{self.code}' resolved to its 'continue' outcome",
             )
             return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 

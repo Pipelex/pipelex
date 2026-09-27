@@ -8,6 +8,7 @@ hosted run answered with `An internal error occurred.`.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -122,3 +123,25 @@ class TestConditionMethodFaults:
                 "selects another outcome, or map that outcome to a pipe or to 'continue'."
             ),
         }
+
+    async def test_a_continue_outcome_leaves_its_rendered_value_out_of_the_absence_reason(self) -> None:
+        """A step force-unwrapping a result the condition resolved to 'continue' fails naming the condition, never the value it rendered."""
+        with pytest.raises(PipelineExecutionError) as exc_info:
+            await PipelexMTHDSProtocol().execute(
+                pipe_code="route_and_stamp",
+                mthds_contents=[ConditionMethodFaultsTestData.CONTINUE_THEN_FORCE_MTHDS],
+                inputs={"parcel": "a box of books", "lane": "hold"},
+            )
+        report = exc_info.value.to_error_report()
+
+        assert report.error_type == "OptionalValueAbsentError"
+        assert (
+            "Absence origin: pipe 'route_parcel' produced no value — \"PipeCondition 'route_parcel' resolved to its 'continue' outcome\""
+            in report.message
+        )
+        assert ConditionMethodFaultsTestData.HELD_LANE_LITERAL not in report.message
+
+        # The message is caller-facing, so STRICT disclosure keeps it, and nothing in the STRICT answer quotes the expression.
+        document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
+        assert document["detail"] == report.message
+        assert ConditionMethodFaultsTestData.HELD_LANE_LITERAL not in json.dumps(document)
