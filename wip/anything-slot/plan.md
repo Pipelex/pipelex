@@ -109,11 +109,10 @@ A second session reviewed the design from two sides, what keeps the language cle
 
 **Ratified, 2026-09-27.** Louis answered every open question of `design.md` and the choices this review had made on its own, each as recommended: R4 narrows the `Anything` schema, so Phase 4 is built unconditionally; `anything_in` folds back into `scaffold_open_natives`; `JSON` stays an object, recorded and closed on L-260927-a8ec06; `Anything`'s compact template keeps its envelope; the content of an `Anything` envelope is raw data at every depth, list items included, which is R10's escape; and R11 advises against `Dynamic` for inputs while L-260927-bea35e is open. Both documents are `active` from this change. One point is left to measurement rather than decision: R10's escape for `JSON[]`, a `JSON` envelope around a list, which Phase 3 tests and Checkpoint 1 decides if the factory cannot build it.
 
-**Next.** Rebase the branch onto `dev` (it moved to the v0.67.0 release after the worktree was cut), claim the item, then Phase 1:
+**Next.** `dev` was merged into the branch after the ratification, bringing it to the v0.67.1 release and the `mthds` 0.17.0 pin, so the next session claims the item and starts Phase 1:
 
 ```bash
 cd /Users/lchoquel/repos/Pipelex/_pipelex--anything-slot-shaping
-git fetch origin && git rebase origin/dev
 ledger claim L-260902-10eb56 --renew
 .venv/bin/pytest -x -q tests/unit/pipelex/libraries/test_concept_library_compatibility.py tests/unit/pipelex/core/memory/input_shaper/
 ```
