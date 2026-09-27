@@ -10,9 +10,10 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 
-# (multiplicity, provided value) — every JSON type at each declaration, including the ones refused. The one
-# shape left out is an `Anything[]` item keyed exactly `concept` and `content`, which R10 refuses and the
-# schema does not state: `wip/anything-slot/plan.md` defers it.
+# (multiplicity, provided value) — every JSON type at each declaration, including the ones refused. Two shapes
+# are left out because the two sides differ on them by design: a single bare value at `Anything[]`, which the
+# shaper wraps into a one-item list, and an `Anything[]` item keyed exactly `concept` and `content`, which R10
+# refuses and the schema does not state (`wip/anything-slot/plan.md` defers it).
 AGREEMENT_CASES: list[tuple[VariableMultiplicity | None, Any]] = [
     (None, {}),
     (None, {"a": 1}),
@@ -41,7 +42,7 @@ AGREEMENT_CASES: list[tuple[VariableMultiplicity | None, Any]] = [
 class TestAnythingSchemaAgreement:
     @pytest.mark.parametrize(("multiplicity", "provided_value"), AGREEMENT_CASES)
     def test_the_schema_admits_exactly_what_the_shaper_takes(self, multiplicity: VariableMultiplicity | None, provided_value: Any) -> None:
-        """R4: the published `Anything` schema and the input shaper accept and refuse the same values."""
+        """R4: the published `Anything` schema and the input shaper accept and refuse the same JSON types."""
         input_specs = build_input_specs([("payload", "native.Anything", multiplicity)])
         stuff_spec = input_specs.root["payload"]
         rendered = stuff_spec.render_stuff_spec(concept_provider=get_concept_library(), output_format=ConceptRepresentationFormat.SCHEMA)

@@ -43,7 +43,7 @@ Here are all the native concepts you can use out of the box:
 
 ## Choosing among `Anything`, `JSON` and `Dynamic`
 
-Three natives declare no structure of their own, and each takes a different kind of input. Choose in this order:
+Three natives hold data whose shape your method does not describe, and each takes a different kind of input. Choose in this order:
 
 1. **Data you already have as JSON objects: name it.** Declare a concept that refines `JSON`, with a plain-language description. It takes the object exactly as you have it, with no data model to write, and its name and description tell an agent or a reader what the object means, which a bare `JSON` does not. When you later want the fields validated, turn it into a concept with a structure.
 2. **`JSON` or `JSON[]`** when the data has no name worth giving it. `JSON` is a JSON object, not any JSON value; a list of objects is `JSON[]`.

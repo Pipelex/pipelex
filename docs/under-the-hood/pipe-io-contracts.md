@@ -39,7 +39,7 @@ The JSON Schema on an input names its concept: `title` is the `concept_ref`, `de
 
 `native.Anything` is the only concept that declares no structure class, so its input schema cannot come from a pydantic render. (That is a different question from the three natives which declare no *pinned structure* — `Dynamic`, `Anything`, `Composite` — and therefore render as `unknown` in the [input-form descriptor](input-form-descriptor.md).) It publishes the identity annotations every rendered input schema carries and one constraint — `{"title": "native.Anything", "description": "…", "not": {"type": ["array", "null"]}}`. An `Anything` value is any JSON value but an array or null: a list is the multiplicity's to express, as `Anything[]`, and null is never an input. Multiplicity wraps exactly as above: `Anything[]` is an array of that schema, so every item carries the same exclusion, and a fixed count adds the bounds.
 
-The schema and the input shaper agree: a string, a number, a boolean or an object at an `Anything` slot is shaped into its natural content (text, number, yes/no, JSON object) under the `native.Anything` concept, and an array or null at a single slot is refused, as the schema says.
+The schema and the input shaper agree on what a value may be: a string, a number, a boolean or an object at an `Anything` slot is shaped into its natural content (text, number, yes/no, JSON object) under the `native.Anything` concept, and an array or null at a single slot is refused, as the schema says. The two differ in two places the schema does not state: it wraps a single bare value sent to an `Anything[]` input into a one-item list, and it refuses an `Anything[]` item keyed exactly `concept` and `content`, which reads as an envelope.
 
 ## Which surfaces carry it
 

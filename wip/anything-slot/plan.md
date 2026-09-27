@@ -215,6 +215,15 @@ The round was recorded with each Codex run named, and the pull request opened as
 - **A single `Anything` output holding a list breaks the narrowed schema** (`code-review`): rejected. An output contract describes the dumped content, and a `ListContent` comes back as an object holding `items`, which the schema admits; the bare array exists only in the private transport encoding.
 - **A `JSON` refinement with sibling fields loses them in the reference projection** (Codex review): rejected. A refining concept cannot declare a structure (`concept_blueprint.py`), so the state cannot occur.
 
+## Checkpoint 2's review, round 4 — 2026-09-27
+
+`/rev` at profile 4, round 4, bar `freeze`, against pipelex#1287 at the commit "Refuse NaN inside JSON objects, advise only declarations that read the value, and land the campaign docs", run by the skill's unattended default for a `freeze` bar. All four reviewers returned, and `code-review`'s provenance matched.
+
+- **An explicit `Number` envelope still carries NaN into a `NumberContent`** (Codex review): fixed as a critical, since serialization turns it into `null`. `NumberContent` refuses a non-finite number itself, so every explicit form and every concept refining `Number` is covered.
+- **Three statements this branch wrote were wrong**, corrected with no behaviour change: the changelog named the old `JSON` compact template as `{"json_obj": …}` where it was the whole envelope (cubic); `native-concepts.md` said `JSON` declares no structure of its own (cubic); and the docs and the agreement test claimed the `Anything` schema and the shaper agree exactly, where the shaper also wraps a single value sent to `Anything[]` (`code-review`).
+- **Repeated from earlier rounds and already traced** (Codex adversarial): the `--with-memory` chaining (R9, L-260927-da1b09), a typed singular envelope at `Anything[]` (Gap A), the inputs-file `url` rewrite (L-260927-55f503) and the `Anything[]` schema's envelope-shaped item (below).
+- **Deferred below**: the advice for an object with non-string keys (Codex review), and the second copy of the `Anything` arm's rules in `_anything_reads_item` (cubic).
+
 ## After the merge
 
 L-260902-10eb56 lands with pipelex#1287, and both campaign documents are `landed` from that merge. Checkpoint 3's cross-repo half is carried by three items, each blocked by this one: L-260927-b1ca80 (`mthds-js`) and L-260927-cd33d1 (`mthds-python`) change their projections and re-commit the regenerated corpus with the `projection-corpus-update` skill, checking it against the Checkpoint 2 summary above, and L-260927-7f1e95 (`conformance`) removes `scaffold_anything_slot` from the census. The three pull requests merge together, or `conformance`'s fixture-drift and census checks go red for everyone.
@@ -239,3 +248,5 @@ L-260902-10eb56 lands with pipelex#1287, and both campaign documents are `landed
 - **Per-item envelopes in a list**, for every kind, would be a feature of their own; R10 refuses the spelling rather than read it for two kinds only.
 - **A TOML date inside an object** at a `JSON` or `Anything` input is refused as a value JSON cannot hold, though the same date at the top of an `Anything` input is read. Converting it to its ISO string would be a reading of its own, left until a caller asks.
 - **An envelope-shaped item of an `Anything[]` list** passes the published schema, an object that is neither an array nor null, while R10 refuses it. A schema can state it, as an item that is not an object keyed exactly `concept` and `content`, but every consumer of every `Anything[]` schema would carry that clause for one pathological shape, which a clear refusal already names. `test_anything_schema_agreement.py` says it leaves the shape out.
+- **The fallback's advice for an object with non-string keys**, which only a Python caller can send: `json.dumps` coerces `{1: "x"}`, so the refusal advises `JSON`, and `JSONContent` then refuses the integer key. The advice is wrong, but the refusal it rides on is right.
+- **`_anything_reads_item` restates what the `Anything` arm accepts** so the fallback never advises a declaration that refuses the value. Deriving both from one predicate would stop them drifting apart; the fallback-refusal tests pin every case the two share today.
