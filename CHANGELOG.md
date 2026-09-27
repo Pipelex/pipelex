@@ -9,6 +9,7 @@
 ### Fixed
 
 - **The `gcp` log sink says when its flush runs out of time, and why**: a teardown whose flush reaches its five-second deadline with records still held now prints on stderr that they are lost unless the transport sends them while it closes, followed by what a fresh refresh of the credentials answers, where only the client library's "Failed to send N pending logs." used to appear. A handler that has closed no longer flushes again when the process exits, which cost a second five-second wait.
+- **A `GcpLogSink` installed a second time raises instead of sending nothing**: installing the same sink object again after a reset built a handler on the transport the first teardown had closed, which queued every record and sent none; `make_handler` now raises `RuntimeError`, as the `otlp` sink does, and the registered `gcp` factory still builds a new sink at every boot.
 
 ## [v0.67.1] - 2026-09-27
 
