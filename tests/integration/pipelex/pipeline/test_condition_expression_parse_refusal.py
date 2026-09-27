@@ -37,6 +37,8 @@ def _routing_bundle(*, expression: str) -> str:
 # A dangling operator, and a tag where an expression is expected: neither parses at the one line of the expression.
 _DANGLING_OPERATOR_BUNDLE = _routing_bundle(expression="lane ==")
 _TAG_INSIDE_EXPRESSION_BUNDLE = _routing_bundle(expression="{% if %}")
+# A filter that does not exist: the expression parses, but the run could not compile it.
+_UNKNOWN_FILTER_BUNDLE = _routing_bundle(expression="lane.text | lenght_of_lane")
 
 _EXPRESSION_REASON = (
     "Validation error at 'pipe.route_parcel': The 'expression' of this PipeCondition does not parse at line 1 of that expression. "
@@ -46,6 +48,10 @@ _TEMPLATE_REASON = (
     "Validation error at 'pipe.route_parcel': The 'expression_template' of this PipeCondition does not parse at line 2 of that expression. "
     "Fix it so that it parses as a Jinja2 template."
 )
+_COMPILE_REASON = (
+    "Validation error at 'pipe.route_parcel': The 'expression' of this PipeCondition does not compile at line 1 of that expression. "
+    "Check that every filter and test it names exists, and fix it so that it compiles as a Jinja2 expression."
+)
 
 _CASES = pytest.mark.parametrize(
     ("bundle", "reason", "expression_text"),
@@ -53,8 +59,9 @@ _CASES = pytest.mark.parametrize(
         (_DANGLING_OPERATOR_BUNDLE, _EXPRESSION_REASON, "lane =="),
         (_TAG_INSIDE_EXPRESSION_BUNDLE, _EXPRESSION_REASON, "{% if %}"),
         (ConditionExpressionParseTestData.UNKNOWN_TAG_TEMPLATE_MTHDS, _TEMPLATE_REASON, "frobnicate_the_parcel"),
+        (_UNKNOWN_FILTER_BUNDLE, _COMPILE_REASON, "lenght_of_lane"),
     ],
-    ids=["dangling_operator", "tag_inside_expression", "unknown_tag_on_line_2"],
+    ids=["dangling_operator", "tag_inside_expression", "unknown_tag_on_line_2", "unknown_filter"],
 )
 
 

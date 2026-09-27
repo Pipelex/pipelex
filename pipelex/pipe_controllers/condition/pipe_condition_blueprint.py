@@ -7,6 +7,7 @@ from typing_extensions import override
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
@@ -77,18 +78,33 @@ class PipeConditionBlueprint(PipeBlueprint):
         # The expression is parsed where the bundle loads, so every surface that loads it refuses an expression that
         # does not parse as an item of its verdict, located on the pipe, as it refuses a prompt or a template that
         # does not parse. The parse is the one the built pipe makes when it reads the variables its expression needs.
+        # It is then compiled as the run compiles it before rendering, in the same environment, which refuses what
+        # parses but cannot be built, such as a filter or a test that does not exist: the run would refuse it on
+        # every input, so the refusal is no stricter for being made at load.
         # The message quotes neither the expression nor the parser's diagnosis, which names the token it stopped at:
         # the verdict is kept verbatim under STRICT disclosure, and the condition may be a host library's.
+        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
+            # Both fields or neither: the validator of the pair refuses that and says why, where a refusal of the
+            # parse of one of them, which runs first, would hide it.
+            return
         runtime_expression = self.runtime_expression
         if runtime_expression is None:
             return
+        field_name = "expression_template" if self.expression_template else "expression"
+        wanted = "a Jinja2 template" if self.expression_template else "a Jinja2 expression"
         try:
             detect_jinja2_required_variables(template_category=TemplateCategory.EXPRESSION, template_source=runtime_expression)
         except Jinja2DetectVariablesError as exc:
-            field_name = "expression_template" if self.expression_template else "expression"
-            wanted = "a Jinja2 template" if self.expression_template else "a Jinja2 expression"
             msg = f"The '{field_name}' of this PipeCondition {describe_expression_parse_failure(error=exc)}. Fix it so that it parses as {wanted}."
             raise ValueError(msg) from exc.__cause__
+        try:
+            make_jinja2_env_without_loader(template_category=TemplateCategory.EXPRESSION).compile(runtime_expression)
+        except TemplateSyntaxError as exc:
+            msg = (
+                f"The '{field_name}' of this PipeCondition does not compile at line {exc.lineno} of that expression. "
+                f"Check that every filter and test it names exists, and fix it so that it compiles as {wanted}."
+            )
+            raise ValueError(msg) from exc
 
     @override
     def validate_output(self):
