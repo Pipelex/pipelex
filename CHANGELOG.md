@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.68.0] - 2026-09-27
+
+### Highlights
+
+**Every log line can be joined to its run and to your own traces.** A run driven through the kernel, each kernel step and a run dispatched to a distributed orchestrator's workers now stamp `request_id`, `pipeline_run_id` and `pipe_run_id` on their lines as an interpreted run does, and a host passes the inbound request id it filters its logs on. A line's standard trace fields now name your process's current OpenTelemetry span, with Pipelex's own span beside them under `pipelex.*`, and the `gcp` sink refuses to boot on credentials Google rejects instead of losing every record in silence.
 
 ### Added
 
