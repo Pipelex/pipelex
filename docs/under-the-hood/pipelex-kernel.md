@@ -174,7 +174,7 @@ with kernel.log_context():
     result = await kernel.llm_text(memory=memory, user="Summarize $topic", result="summary")
 ```
 
-`JobMetadata.log_context()` is the one spelling of the binding, used by both layers and by the interpreter's `PipeRun.run`. Inside the interpreter the kernel's binding changes nothing: the metadata an operator hands the kernel carries the `pipe_run_id` that `live_run_pipe` minted and already bound, so the nested binding rebinds equal values. A test on `PipeLLM` pins that equality, so an operator that one day mints its own id fails the suite instead of re-attributing its lines. `run_compose_template` and `run_func` take no `job_metadata`, so their lines carry the host's run-level binding and no step.
+`JobMetadata.log_context()` is the one spelling of the binding, used by both layers and by the interpreter's `PipeRun.run`. Inside the interpreter the kernel's binding changes nothing: the metadata an operator hands the kernel carries the `pipe_run_id` that `live_run_pipe` minted and already bound, so the nested binding rebinds equal values. A test on `PipeLLM` pins that equality for the operator the other kernel-backed operators follow; none of them copies the metadata it hands down, and one that started minting its own id would re-attribute its lines to a pipe run nobody announced. `run_compose_template` and `run_func` take no `job_metadata`, so their lines carry the host's run-level binding and no step.
 
 ---
 

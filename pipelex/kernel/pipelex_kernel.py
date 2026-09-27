@@ -126,7 +126,9 @@ class PipelexKernel:
         ``pipeline_run_id`` names the run when no trace context does. The run id is a trace
         context's ``graph_id`` when one is given, else this value, else a fresh ``uuid4``. A trace
         context and a ``pipeline_run_id`` that disagree raise ``ValueError``, since neither could
-        win without splitting the run's identity; equal ones are accepted. **A host inside a
+        win without splitting the run's identity; equal ones are accepted. An empty
+        ``pipeline_run_id`` raises ``ValueError`` too, rather than silently minting an id a
+        replaying host did not ask for. **A host inside a
         replay-based executor must pass one of the two**: the ``uuid4`` default takes a different
         value every time the host re-executes the code, so a replayed run would name itself
         differently from the run it replays. Such a host mints the id from its own replay-safe
@@ -166,6 +168,9 @@ class PipelexKernel:
     @classmethod
     def _resolve_pipeline_run_id(cls, *, trace_context: TraceContext | None, pipeline_run_id: str | None) -> str:
         """The run's id: the trace context's ``graph_id``, else the caller's ``pipeline_run_id``, else a fresh ``uuid4``."""
+        if pipeline_run_id == "":
+            msg = "PipelexKernel.make was given an empty pipeline_run_id: pass the run's id, or None to have one minted."
+            raise ValueError(msg)
         if trace_context is None:
             return pipeline_run_id if pipeline_run_id is not None else str(uuid4())
         if pipeline_run_id is not None and pipeline_run_id != trace_context.graph_id:

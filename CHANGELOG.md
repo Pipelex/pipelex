@@ -5,7 +5,7 @@
 ### Added
 
 - **`PipelexKernel.log_context()` and `JobMetadata.log_context()`**: `JobMetadata.log_context()` binds a job's `request_id`, `pipeline_run_id` and `pipe_run_id` onto the log context in one call, and `PipelexKernel.log_context()` binds a kernel run's `request_id` and `pipeline_run_id`, which a host wraps its run in so the lines it emits between kernel calls name the run.
-- **`PipelexKernel.make` takes `request_id` and `pipeline_run_id`**: a kernel-driven run can now carry the inbound request id a hosted deployment filters its logs on, and name itself with an id the host chooses. A host inside a replay-based executor passes a `pipeline_run_id` or a trace context, since the default `uuid4` changes on every replay; a trace context and a `pipeline_run_id` that disagree raise `ValueError`.
+- **`PipelexKernel.make` takes `request_id` and `pipeline_run_id`**: a kernel-driven run can now carry the inbound request id a hosted deployment filters its logs on, and name itself with an id the host chooses. A host inside a replay-based executor passes a `pipeline_run_id` or a trace context, since the default `uuid4` changes on every replay; a trace context and a `pipeline_run_id` that disagree, or an empty `pipeline_run_id`, raise `ValueError`.
 
 ### Fixed
 

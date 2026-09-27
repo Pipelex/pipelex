@@ -116,6 +116,11 @@ class TestPipelexKernelRunState:
                 pipeline_run_id="plr-elsewhere",
             )
 
+    def test_an_empty_pipeline_run_id_is_refused(self) -> None:
+        """An empty id is a caller's bug, and minting one in its place would hide it from a replaying host."""
+        with pytest.raises(ValueError, match="empty pipeline_run_id"):
+            PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="")
+
     def test_with_neither_the_run_id_is_a_fresh_uuid4(self) -> None:
         kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
 

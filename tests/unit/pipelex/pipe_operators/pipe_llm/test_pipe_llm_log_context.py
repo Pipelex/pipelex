@@ -3,9 +3,10 @@
 Every kernel function that takes a ``job_metadata`` binds it (``test_kernel_log_context.py``). Inside
 the interpreter that binding nests within the one ``live_run_pipe`` opened, so it must be a no-op: the
 operator has to hand the kernel metadata carrying the very ``pipe_run_id`` that ``live_run_pipe``
-minted and bound. This pins that equality on ``PipeLLM``, the operator every kernel function family is
-modelled on, so that an operator which one day mints its own id goes red here instead of silently
-re-attributing its lines to a step nobody announced.
+minted and bound. This pins that equality on ``PipeLLM``, so that if it ever hands the kernel a copy
+with an id of its own, it goes red here instead of silently re-attributing its lines to a step nobody
+announced. The other kernel-backed operators hand down their metadata the same way and are not pinned
+here.
 
 The pipe runs in LIVE through ``live_run_pipe`` itself. Two observers sit on the path: a spy on the
 operator's call into ``run_llm_text``, which records the metadata the operator hands down and the
