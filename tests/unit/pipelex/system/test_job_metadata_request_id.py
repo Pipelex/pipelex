@@ -1,5 +1,6 @@
-"""Unit tests for ``JobMetadata.request_id`` — the API-inbound ``X-Request-ID``
-that rides the workflow input across the Temporal serialization boundary.
+"""Unit tests for ``RunMetadata.request_id`` — the API-inbound ``X-Request-ID``
+that rides the workflow input across the Temporal serialization boundary,
+reached from a ``JobMetadata`` through its ``run_metadata``.
 """
 
 import pytest
@@ -10,7 +11,7 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 class TestJobMetadataRequestId:
     def test_request_id_defaults_to_none(self) -> None:
-        """``JobMetadata`` constructed without ``request_id`` carries ``None``."""
+        """A ``RunMetadata`` constructed without ``request_id`` carries ``None``."""
         meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r"))
         assert meta.run_metadata.request_id is None
 
