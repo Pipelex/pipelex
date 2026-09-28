@@ -21,6 +21,7 @@
 - **A composite nested in an `Anything` value or in another composite survives transport**: its components, a nested composite and a list of composites included, come back through hydration as typed contents, where they came back as dicts carrying class markers.
 - **The result files of an `Anything` output render its value**: a delivery whose main output is `Anything` renders `main_stuff.json`, `.md` and `.html` from the hydrated content, where it fell back to a raw dump of the transport form.
 - **A prebuilt list is refused where one value belongs**: a `ListContent` given as an item of a plural input, or as the content of an `Anything` envelope at a single input, is refused instead of being stored nested or in a singular slot.
+- **`bedrock_anthropic` models run with `AWS_BEARER_TOKEN_BEDROCK` set**: under `bedrock_access_variant = "aws_access"`, the default, Anthropic models on Bedrock sign their requests with the configured AWS access keys and ignore a Bedrock bearer token in the environment, where every one of them used to fail at client construction with a raw `ValueError`. When the access keys are missing and the environment carries such a token, the `AwsCredentialsError` now says so and names `bedrock_access_variant = "bedrock_token"` as the way to authenticate with a bearer token.
 
 ## [v0.68.0] - 2026-09-27
 
