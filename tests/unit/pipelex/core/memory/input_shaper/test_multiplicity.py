@@ -6,9 +6,12 @@ import pytest
 from pipelex import log, pretty_print
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import Deadline, Question, ShaperPerson, build_input_specs
 
@@ -88,6 +91,38 @@ MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, 
         "shaper_test.Deadline",
         ListContent(items=[Deadline(date=datetime.date(2026, 1, 1)), Deadline(date=datetime.date(2026, 2, 2))]),
     ),
+    # R3 Anything[]: shaped element-wise, and the items may differ in JSON type.
+    (
+        "anything-list-mixed",
+        "native.Anything",
+        True,
+        ["a", 1, True, {"k": 1}],
+        "native.Anything",
+        ListContent(items=[TextContent(text="a"), NumberContent(number=1), YesNoContent(yes_no=True), JSONContent(json_obj={"k": 1})]),
+    ),
+    ("anything-list-empty", "native.Anything", True, [], "native.Anything", ListContent(items=[])),
+    ("anything-list-auto-wrap-single", "native.Anything", True, "solo", "native.Anything", ListContent(items=[TextContent(text="solo")])),
+    # A single object is wrapped too, rather than read as a list.
+    ("anything-list-auto-wrap-object", "native.Anything", True, {"a": 1}, "native.Anything", ListContent(items=[JSONContent(json_obj={"a": 1})])),
+    (
+        "anything-fixed-count-two",
+        "native.Anything",
+        2,
+        [1, "b"],
+        "native.Anything",
+        ListContent(items=[NumberContent(number=1), TextContent(text="b")]),
+    ),
+    # R7 JSON[]: each object in turn, a single object wrapped, an empty list legal.
+    (
+        "json-list-of-objects",
+        "native.JSON",
+        True,
+        [{"a": 1}, {"b": 2}],
+        "native.JSON",
+        ListContent(items=[JSONContent(json_obj={"a": 1}), JSONContent(json_obj={"b": 2})]),
+    ),
+    ("json-list-auto-wrap-object", "native.JSON", True, {"a": 1}, "native.JSON", ListContent(items=[JSONContent(json_obj={"a": 1})])),
+    ("json-list-empty", "native.JSON", True, [], "native.JSON", ListContent(items=[])),
 ]
 
 

@@ -143,7 +143,7 @@ async def pipeline_run_setup(
         Optional inbound ``X-Request-ID`` from the dispatcher (the value the
         external HTTP caller can use to correlate every log line and every
         ``ErrorReport`` back to its originating request). Threaded onto
-        :class:`pipelex.system.job_metadata.JobMetadata.request_id` so it
+        :attr:`pipelex.system.job_metadata.RunMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
     inputs_base_dir:
         Directory that bare *relative local* file paths in ``inputs`` resolve against (Smart

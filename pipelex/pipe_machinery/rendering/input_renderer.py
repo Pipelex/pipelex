@@ -141,15 +141,28 @@ def _delighten_entry(entry: dict[str, Any], *, kind: InputKind) -> Any:
     """Turn one envelope entry (``{"concept", "content"}``) into the light value the shaper accepts.
 
     Mirrors the shaper's arms (see ``input_shaper.py``): a scalar unwraps to its single content
-    field, a structured value keeps its content dict, and a Dynamic / out-of-matrix value keeps the
+    field — a ``JSON`` input's ``json_obj`` included, so its light value is the bare object — a
+    structured value keeps its content dict, and a Dynamic / out-of-matrix value keeps the
     whole envelope — the signature genuinely can't shape it, so bottom-up building still needs it.
+    An ``Anything`` value keeps its envelope too, though the shaper reads a bare value there: the
+    bare placeholder ``{}`` would read as "send an object", while the envelope names the concept
+    that says any value goes.
     """
     match kind:
-        case InputKind.DYNAMIC:
+        case InputKind.DYNAMIC | InputKind.ANYTHING:
             return entry
         case InputKind.STRUCTURED:
             return entry["content"]
-        case InputKind.TEXT | InputKind.NUMBER | InputKind.YES_NO | InputKind.DATE | InputKind.TIME | InputKind.IMAGE | InputKind.DOCUMENT:
+        case (
+            InputKind.TEXT
+            | InputKind.NUMBER
+            | InputKind.YES_NO
+            | InputKind.DATE
+            | InputKind.TIME
+            | InputKind.IMAGE
+            | InputKind.DOCUMENT
+            | InputKind.JSON
+        ):
             return _unwrap_scalar_content(entry["content"], envelope=entry)
 
 
@@ -157,10 +170,10 @@ def _unwrap_scalar_content(content: Any, *, envelope: dict[str, Any]) -> Any:
     """Unwrap a scalar input's content to its bare field value (element-wise for a list).
 
     Each scalar content is a single-field dict (``{"text": ...}`` / ``{"number": ...}`` / ``{"url":
-    ...}`` / ``{"date": ...}`` / ``{"yes_no": ...}``) — the bare value the shaper re-wraps. A content
-    that is not a single-field dict (a refining scalar with extra required fields, which the shaper
-    can't build from a bare value anyway) can't be delightened losslessly, so the whole envelope is
-    kept for that input, so the template still runs.
+    ...}`` / ``{"date": ...}`` / ``{"yes_no": ...}`` / ``{"json_obj": ...}``) — the bare value the
+    shaper re-wraps. A content that is not a single-field dict (a refining scalar with extra required
+    fields, which the shaper can't build from a bare value anyway) can't be delightened losslessly,
+    so the whole envelope is kept for that input, so the template still runs.
     """
     items: list[Any] = cast("list[Any]", content) if isinstance(content, list) else [content]
     unwrapped: list[Any] = []

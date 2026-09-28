@@ -12,6 +12,8 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -21,6 +23,8 @@ from pipelex.core.pipes.pipe_io_artifacts import (
     PIPE_IO_CONTRACTS_FILE_NAME,
     render_pipe_io_artifact_files,
 )
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
@@ -486,6 +490,27 @@ class TestDeliveryExecutor:
         assert result is not None
         assert isinstance(result.content, TextContent)
         assert result.content.text == "Hello!"
+
+    @pytest.mark.parametrize("anything_is_a_list", [False, True])
+    async def test_try_local_hydrate_stuff_reads_an_anything_content_by_its_own_markers(self, anything_is_a_list: bool) -> None:
+        """`native.Anything` names no class to look up, so the delivery hydrates it from the content's own
+        markers rather than falling back to a raw render that would show them.
+        """
+        working_memory = WorkingMemory()
+        content = ListContent(items=[TextContent(text="a"), NumberContent(number=1)]) if anything_is_a_list else TextContent(text="Hello!")
+        working_memory.root["main_stuff"] = Stuff(
+            stuff_code="test",
+            stuff_name="main_stuff",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.ANYTHING),
+            content=content,
+        )
+        stuff_raw = json.loads(json.dumps(working_memory.dump_for_transport()))["root"]["main_stuff"]
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is not None
+        assert result.concept.concept_ref == "native.Anything"
+        assert result.content == content
 
     async def test_try_local_hydrate_stuff_returns_none_for_unknown_concept(self, mocker: MockerFixture) -> None:
         """A dynamic concept is unknown to a crate-free delivery worker: the ref resolves to nothing, the raw render takes over."""
