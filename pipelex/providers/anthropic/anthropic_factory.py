@@ -20,7 +20,7 @@ from pipelex.plugins.model_handle import ModelHandle
 from pipelex.providers.anthropic.anthropic_bedrock_sigv4 import AsyncAnthropicBedrockSigV4
 from pipelex.providers.anthropic.anthropic_exceptions import AnthropicFactoryError
 from pipelex.system.environment import get_optional_env
-from pipelex.tools.aws.aws_config import BEDROCK_TOKEN_VAR_NAME, BedrockAccessVariant
+from pipelex.tools.aws.aws_config import BEDROCK_TOKEN_VAR_NAME, AwsKeyMethod, BedrockAccessVariant
 from pipelex.tools.aws.exceptions import AwsCredentialsError
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
@@ -105,6 +105,14 @@ class AnthropicFactory:
                                 f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" ignores: to authenticate with a '
                                 f'bearer token instead, set bedrock_access_variant = "{BedrockAccessVariant.BEDROCK_TOKEN}" in [runtime.aws].'
                             )
+                            match aws_config.api_key_method:
+                                case AwsKeyMethod.ENV:
+                                    pass
+                                case AwsKeyMethod.SECRET_PROVIDER:
+                                    msg += (
+                                        f' Under api_key_method = "{AwsKeyMethod.SECRET_PROVIDER}", that variant reads '
+                                        f"{BEDROCK_TOKEN_VAR_NAME} from the secrets provider, not from the environment."
+                                    )
                             raise AwsCredentialsError(msg) from exc
                         if is_bedrock_token_in_env:
                             log.verbose(

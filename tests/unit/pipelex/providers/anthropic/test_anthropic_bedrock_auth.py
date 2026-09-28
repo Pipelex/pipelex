@@ -34,6 +34,7 @@ from pipelex.tools.aws.aws_config import (
     BedrockAccessVariant,
 )
 from pipelex.tools.aws.exceptions import AwsCredentialsError
+from pipelex.tools.secrets.exceptions import SecretNotFoundError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -60,10 +61,15 @@ def _model_handle() -> ModelHandle:
     return ModelHandle(sdk="bedrock_anthropic", backend="bedrock")
 
 
-def _patch_config(mocker: MockerFixture, *, bedrock_access_variant: BedrockAccessVariant) -> None:
+def _patch_config(
+    mocker: MockerFixture,
+    *,
+    bedrock_access_variant: BedrockAccessVariant,
+    api_key_method: AwsKeyMethod = AwsKeyMethod.ENV,
+) -> None:
     config = mocker.MagicMock()
     config.inference.transport_max_retries = 0
-    config.runtime.aws = AwsConfig(api_key_method=AwsKeyMethod.ENV, bedrock_access_variant=bedrock_access_variant)
+    config.runtime.aws = AwsConfig(api_key_method=api_key_method, bedrock_access_variant=bedrock_access_variant)
     mocker.patch("pipelex.providers.anthropic.anthropic_factory.get_config", return_value=config)
 
 
@@ -163,16 +169,27 @@ class TestAnthropicBedrockAuth:
         assert seen_authorizations == [f"Bearer {_ENV_BEARER_TOKEN}"]
 
     @pytest.mark.parametrize("token_in_env", [True, False], ids=["token_in_env", "no_token"])
+    @pytest.mark.parametrize(
+        ("api_key_method", "expects_secrets_provider_note"),
+        [
+            pytest.param(AwsKeyMethod.ENV, False, id="env"),
+            pytest.param(AwsKeyMethod.SECRET_PROVIDER, True, id="secret_provider"),
+        ],
+    )
     def test_missing_keys_hint_at_the_token_only_when_it_is_set(
         self,
         mocker: MockerFixture,
         monkeypatch: pytest.MonkeyPatch,
+        api_key_method: AwsKeyMethod,
+        expects_secrets_provider_note: bool,
         token_in_env: bool,
     ) -> None:
         """Missing access keys raise `AwsCredentialsError`, naming the bearer token and the `bedrock_token` variant only when it is set."""
-        _patch_config(mocker, bedrock_access_variant=BedrockAccessVariant.AWS_ACCESS)
+        _patch_config(mocker, bedrock_access_variant=BedrockAccessVariant.AWS_ACCESS, api_key_method=api_key_method)
         for var_name in (AWS_ACCESS_KEY_ID_VAR_NAME, AWS_SECRET_ACCESS_KEY_VAR_NAME, AWS_REGION_VAR_NAME):
             monkeypatch.delenv(var_name, raising=False)
+        # A secrets provider that holds none of the keys, as a vault missing them would.
+        mocker.patch("pipelex.tools.aws.aws_config.get_secret", side_effect=SecretNotFoundError("Secret not found"))
         if token_in_env:
             monkeypatch.setenv(BEDROCK_TOKEN_VAR_NAME, _ENV_BEARER_TOKEN)
         else:
@@ -182,12 +199,15 @@ class TestAnthropicBedrockAuth:
             AnthropicFactory.make_anthropic_client(model_handle=_model_handle(), backend=mocker.MagicMock())
 
         message = str(exc_info.value)
-        assert AWS_ACCESS_KEY_ID_VAR_NAME in message
         if token_in_env:
+            cause = exc_info.value.__cause__
+            assert isinstance(cause, AwsCredentialsError)
+            assert message.startswith(str(cause))
             assert BEDROCK_TOKEN_VAR_NAME in message
             assert f'bedrock_access_variant = "{BedrockAccessVariant.BEDROCK_TOKEN}"' in message
-            assert isinstance(exc_info.value.__cause__, AwsCredentialsError)
             assert _ENV_BEARER_TOKEN not in message
+            # Under secret_provider, the bedrock_token variant reads the token from the secrets provider, and the hint says so.
+            assert ("from the secrets provider" in message) == expects_secrets_provider_note
         else:
             assert BEDROCK_TOKEN_VAR_NAME not in message
             assert BedrockAccessVariant.BEDROCK_TOKEN not in message

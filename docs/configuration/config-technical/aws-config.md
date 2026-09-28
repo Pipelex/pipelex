@@ -27,7 +27,7 @@ When using `api_key_method = "env"`, Pipelex expects the following environment v
 - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key
 - `AWS_REGION`: Your AWS region
 
-Under `bedrock_access_variant = "bedrock_token"`, Anthropic models on Bedrock authenticate with `AWS_BEARER_TOKEN_BEDROCK` instead of these three (see [Bedrock Access Variant](#bedrock-access-variant)).
+Under `bedrock_access_variant = "bedrock_token"`, Anthropic models on Bedrock authenticate with `AWS_BEARER_TOKEN_BEDROCK` instead of the two access keys, and still take their region from `AWS_REGION` (see [Bedrock Access Variant](#bedrock-access-variant)).
 
 Example `.env` file:
 ```env
@@ -60,15 +60,15 @@ When using `api_key_method = "secret_provider"`, Pipelex will:
 `bedrock_access_variant` chooses how the `bedrock_anthropic` SDK, which serves the Claude models of the `bedrock` backend, authenticates with Amazon Bedrock:
 
 - **`"aws_access"`** (the default) signs every request with AWS Signature Version 4, from `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION`.
-- **`"bedrock_token"`** sends a Bedrock API key as a bearer token, read from `AWS_BEARER_TOKEN_BEDROCK`.
+- **`"bedrock_token"`** sends a Bedrock API key as a bearer token, read from `AWS_BEARER_TOKEN_BEDROCK`. The access keys are not read, and the region comes from `AWS_REGION` in the environment, then from your AWS profile, and otherwise defaults to `us-east-1`.
 
-Either way, `api_key_method` decides where those values come from: the environment under `"env"`, your secret provider under `"secret_provider"`.
+`api_key_method` decides where the credentials come from: the environment under `"env"`, your secret provider under `"secret_provider"`. The region under `"bedrock_token"` is the exception, since it is always read from the environment or the AWS profile, never from a secret provider.
 
 ### The configured variant wins
 
 `AWS_BEARER_TOKEN_BEDROCK` is the standard name for a Bedrock API key, which AWS SDKs and other tools such as Claude Code on Bedrock read, so it is often set in a shell for reasons that have nothing to do with Pipelex. Pipelex never lets it override your configuration:
 
-- Under `"aws_access"`, every `bedrock_anthropic` request is signed with the configured access keys, and a bearer token in the environment is ignored. If the access keys are missing, Pipelex fails with an `AwsCredentialsError` rather than falling back to the token; when the environment does carry one, that error says so and names `bedrock_access_variant = "bedrock_token"` as the way to authenticate with a bearer token.
+- Under `"aws_access"`, every `bedrock_anthropic` request is signed with the configured access keys, and a bearer token in the environment is ignored. If the access keys are missing, Pipelex fails with an `AwsCredentialsError` rather than falling back to the token; when the environment does carry one, that error says so and names `bedrock_access_variant = "bedrock_token"` as the way to authenticate with a bearer token. That variant reads the token from wherever `api_key_method` points, so under `"secret_provider"` the token has to be stored in your secret provider as well.
 - Under `"bedrock_token"`, the token is the only credential used, and the access keys are not read.
 
 ### The other Bedrock models
