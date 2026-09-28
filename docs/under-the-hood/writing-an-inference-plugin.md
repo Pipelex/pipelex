@@ -322,7 +322,7 @@ disabled = ["hello_inference"]
 `pipelex plugins list` now shows the plugin as `disabled`, and running the method again fails loudly when the pipe asks for its worker:
 
 ```
-No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?
+No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled? If it is, 'hello' may be a handle a release renamed: `pipelex migrate` reports each backend file that still sets a retired handle.
 ```
 
 The model configuration still resolves, since `hello-1` is still declared and routed. Only the worker factory is missing, and Pipelex says so rather than falling back to another backend. A dry run of the method still passes without the plugin, because a dry run never builds a worker.

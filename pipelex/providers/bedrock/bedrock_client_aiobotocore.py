@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, cast
 
-import aioboto3
+from aiobotocore.session import get_session
 from typing_extensions import override
 
 from pipelex import log
@@ -12,11 +12,11 @@ if TYPE_CHECKING:
     from types_aiobotocore_bedrock_runtime.type_defs import ConverseResponseTypeDef
 
 
-class BedrockClientAioboto3(BedrockClientProtocol):
+class BedrockClientAiobotocore(BedrockClientProtocol):
     def __init__(self, aws_region: str):
-        log.verbose(f"Init BedrockClientAioboto3 with region '{aws_region}'")
+        log.verbose(f"Init BedrockClientAiobotocore with region '{aws_region}'")
         self.aws_region = aws_region
-        self.session = aioboto3.Session()
+        self.session = get_session()
 
     @override
     async def chat(
@@ -39,8 +39,8 @@ class BedrockClientAioboto3(BedrockClientProtocol):
         if system_text:
             params["system"] = [{"text": system_text}]
 
-        async with self.session.client("bedrock-runtime", region_name=self.aws_region) as aioboto3_session:  # pyright: ignore[reportUnknownMemberType]
-            conversation_response: ConverseResponseTypeDef = await aioboto3_session.converse(**params)
+        async with self.session.create_client("bedrock-runtime", region_name=self.aws_region) as bedrock_runtime_client:  # pyright: ignore[reportUnknownMemberType]
+            conversation_response: ConverseResponseTypeDef = await bedrock_runtime_client.converse(**params)
             resp_dict: dict[str, Any] = cast("dict[str, Any]", conversation_response)
             usage_dict: dict[str, Any] = resp_dict["usage"]
             nb_tokens_by_category: NbTokensByCategoryDict = {

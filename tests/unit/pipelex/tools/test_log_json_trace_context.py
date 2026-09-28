@@ -89,7 +89,9 @@ class TestJsonSinkTraceContext:
         (line,) = _own_lines(buffer)
         assert line[TRACE_ID_KEY] == f"{span_context.trace_id:032x}"
         assert line[SPAN_ID_KEY] == f"{span_context.span_id:016x}"
-        assert line[TRACE_FLAGS_KEY] == "01"
+        # The whole flags byte: the SDK sets W3C Trace Context Level 2's random bit beside the sampled one
+        assert line[TRACE_FLAGS_KEY] == f"{span_context.trace_flags:02x}"
+        assert int(line[TRACE_FLAGS_KEY], 16) & TraceFlags.SAMPLED
         assert re.fullmatch(r"[0-9a-f]{32}", line[TRACE_ID_KEY])
         assert re.fullmatch(r"[0-9a-f]{16}", line[SPAN_ID_KEY])
 
@@ -105,7 +107,7 @@ class TestJsonSinkTraceContext:
         (line,) = _own_lines(buffer)
         assert line[TRACE_ID_KEY] == f"{host_context.trace_id:032x}"
         assert line[SPAN_ID_KEY] == f"{host_context.span_id:016x}"
-        assert line[TRACE_FLAGS_KEY] == "01"
+        assert line[TRACE_FLAGS_KEY] == f"{host_context.trace_flags:02x}"
         assert line[PIPELEX_TRACE_ID_KEY] == f"{pipelex_context.trace_id:032x}"
         assert line[PIPELEX_SPAN_ID_KEY] == f"{pipelex_context.span_id:016x}"
         assert line[PIPELEX_TRACE_ID_KEY] != line[TRACE_ID_KEY]

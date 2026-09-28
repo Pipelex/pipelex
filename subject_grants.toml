@@ -5176,10 +5176,6 @@ rationale = "Factory from source: builds the result from the model_handle; singl
 param = "effort"
 rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
 
-["pipelex/providers/mistral/mistral_extract_worker.py::MistralExtractWorker._extract_page_from_image"]
-param = "image_uri"
-rationale = "Extracts from the image_uri; single operand (qualifiers keyword-only)."
-
 ["pipelex/providers/mistral/mistral_extract_worker.py::MistralExtractWorker._extract_pages_from_document"]
 param = "document_uri"
 rationale = "Extracts from the document_uri; single operand (qualifiers keyword-only)."
@@ -5267,18 +5263,6 @@ rationale = "Resolves the reasoning effort from the job params; single operand."
 ["pipelex/providers/openai/openai_config.py::OpenAIConfig.get_reasoning_level"]
 param = "effort"
 rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
-
-["pipelex/providers/openai/openai_func.py::create_openai_schema_from_function"]
-param = "func"
-rationale = "Factory from source: builds the OpenAI tool schema from the function; single operand."
-
-["pipelex/providers/openai/openai_func.py::create_pydantic_model_from_function"]
-param = "func"
-rationale = "Factory from source: builds the pydantic model from the function; single operand."
-
-["pipelex/providers/openai/openai_func.py::list_openai_tools"]
-param = "openai_message"
-rationale = "Derives the tool-call list from the OpenAI message; single operand."
 
 ["pipelex/providers/openai/openai_img_gen_worker.py::OpenAIImgGenWorker._get_requested_size"]
 param = "args_dict"

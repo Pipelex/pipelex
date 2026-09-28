@@ -225,3 +225,12 @@ class TestLLMWorkerCurrentSpan:
         assert list(started.values()) == [llm_span_id]
         (message,) = started
         assert f"\n  span_id={llm_span_id:016x}\n" in message
+
+    async def test_a_no_op_tracer_holds_no_span_in_the_call(self, mocker: MockerFixture) -> None:
+        """A no-op tracer, what the SDK hands out under ``OTEL_SDK_DISABLED``, gives back the parent it was handed, which is no span of the call's."""
+        mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=trace.NoOpTracer())
+        worker = _make_worker()
+
+        assert await worker.gen_text(llm_job=_make_llm_job()) == "answer"
+
+        assert worker.seen_log_span_ids == [INVALID_SPAN_ID]

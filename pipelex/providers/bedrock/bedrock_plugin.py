@@ -8,7 +8,7 @@ from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
-_BEDROCK_MISSING_MSG = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
+_BEDROCK_MISSING_MSG = "The boto3 and aiobotocore SDKs are required to use Bedrock models."
 
 
 def _make_bedrock_worker(
@@ -18,7 +18,7 @@ def _make_bedrock_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    require_sdk(spec=["boto3", "aioboto3"], extra="bedrock", msg=_BEDROCK_MISSING_MSG)
+    require_sdk(spec=["boto3", "aiobotocore"], extra="bedrock", msg=_BEDROCK_MISSING_MSG)
 
     from pipelex.providers.bedrock.bedrock_factory import BedrockFactory  # ruff: ignore[import-outside-top-level]
     from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker  # ruff: ignore[import-outside-top-level]
@@ -50,13 +50,13 @@ async def _list_bedrock_models(  # ruff: ignore[unused-async]
 
 
 class BedrockPlugin:
-    """Built-in driver for Bedrock models via boto3/aioboto3."""
+    """Built-in driver for Bedrock models via boto3/aiobotocore."""
 
     name = "bedrock"
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_boto3", make_worker=_make_bedrock_worker)
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_aioboto3", make_worker=_make_bedrock_worker)
+        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_aioboto", make_worker=_make_bedrock_worker)
         registrar.add_model_lister(sdk="bedrock", lister=_list_bedrock_models)
-        registrar.add_model_lister(sdk="bedrock_aioboto3", lister=_list_bedrock_models)
+        registrar.add_model_lister(sdk="bedrock_aioboto", lister=_list_bedrock_models)

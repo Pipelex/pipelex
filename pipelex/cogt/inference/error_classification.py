@@ -644,13 +644,15 @@ def _stringify_for_scan(body: Any) -> str:
 
 
 def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | None:
-    """Recover the SDK exception that caused an ``InstructorRetryException``.
+    """Recover the exception that ended instructor's retry loop, from an ``InstructorRetryException``.
 
-    instructor's retry loop wraps the last failed attempt's exception inside
-    ``InstructorRetryException``. We prefer ``failed_attempts[-1].exception``
-    (the documented public attribute) and fall back to walking ``__cause__``
-    (a tenacity ``RetryError`` whose ``last_attempt._exception`` holds the
-    original exception) when ``failed_attempts`` is unset.
+    instructor raises ``InstructorRetryException`` ``from`` the last exception its loop saw. With the
+    schema-only retrying pipelex passes, that is either the raw SDK exception of a call that failed in
+    transport, which is never re-asked, or tenacity's ``RetryError`` once the re-ask budget is spent,
+    whose last attempt holds the final parse failure. So ``__cause__`` is read first.
+    ``failed_attempts`` records only the attempts whose response failed to parse: after a re-ask, a
+    transport failure that follows is not in it, and its last entry would name the wrong exception.
+    It remains the fallback for a wrapper that carries no cause.
 
     Args:
         instructor_exc: The ``InstructorRetryException`` to unwrap. Typed as
@@ -658,25 +660,27 @@ def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | Non
             just for the call site, and so malformed inputs are tolerated.
 
     Returns:
-        The underlying SDK exception when one can be recovered, ``None`` when
+        The underlying exception when one can be recovered, ``None`` when
         neither path yields a ``BaseException``.
     """
+    cause: Any = getattr(instructor_exc, "__cause__", None)
+    retry_last_attempt: Any = getattr(cause, "last_attempt", None)
+    if retry_last_attempt is not None:
+        underlying = getattr(retry_last_attempt, "_exception", None)
+        if isinstance(underlying, BaseException):
+            return underlying
+    elif isinstance(cause, BaseException):
+        return cause
     failed_attempts: Any = getattr(instructor_exc, "failed_attempts", None)
     if failed_attempts:
         try:
-            last_attempt = failed_attempts[-1]
+            last_failed_attempt = failed_attempts[-1]
         except (TypeError, KeyError, IndexError):
-            last_attempt = None
-        if last_attempt is not None:
-            last_exc = getattr(last_attempt, "exception", None)
+            last_failed_attempt = None
+        if last_failed_attempt is not None:
+            last_exc = getattr(last_failed_attempt, "exception", None)
             if isinstance(last_exc, BaseException):
                 return last_exc
-    cause: Any = getattr(instructor_exc, "__cause__", None)
-    last_attempt = getattr(cause, "last_attempt", None)
-    if last_attempt is not None:
-        underlying = getattr(last_attempt, "_exception", None)
-        if isinstance(underlying, BaseException):
-            return underlying
     return None
 
 

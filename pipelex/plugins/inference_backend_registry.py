@@ -34,7 +34,7 @@ def require_sdk(*, spec: str | Sequence[str], extra: str, msg: str, dependency_n
     missing optional extra fails when the backend is actually used, not at boot.
 
     - ``spec``: the import name(s) to probe (e.g. ``"anthropic"`` or
-      ``["boto3", "aioboto3"]`` when several are required together).
+      ``["boto3", "aiobotocore"]`` when several are required together).
     - ``dependency_name``: the human-facing package name shown in the error;
       defaults to the joined names of the *missing* specs only (override when the
       import name differs from the distribution name, e.g. spec

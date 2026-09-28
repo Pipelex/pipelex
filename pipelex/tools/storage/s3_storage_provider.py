@@ -1,5 +1,4 @@
 import importlib.util
-import inspect
 from typing import Any
 from urllib.parse import quote
 
@@ -17,7 +16,7 @@ class S3StorageProvider(StorageProviderAbstract):
     """Storage provider implementation for AWS S3 storage.
 
     Files are stored in an S3 bucket with keys being path strings.
-    Uses aioboto3 for async S3 operations.
+    Uses aiobotocore for async S3 operations.
     """
 
     def __init__(
@@ -39,15 +38,15 @@ class S3StorageProvider(StorageProviderAbstract):
         self._session: Any = None
 
     def _check_dependency(self) -> None:
-        """Check if aioboto3 is installed.
+        """Check if aiobotocore is installed.
 
         Raises:
-            MissingDependencyError: If aioboto3 is not installed.
+            MissingDependencyError: If aiobotocore is not installed.
         """
-        if importlib.util.find_spec("aioboto3") is None:
-            lib_name = "aioboto3"
+        if importlib.util.find_spec("aiobotocore") is None:
+            lib_name = "aiobotocore"
             lib_extra_name = "s3"
-            msg = "aioboto3 is required for S3 storage."
+            msg = "aiobotocore is required for S3 storage."
             raise MissingDependencyError(
                 lib_name,
                 lib_extra_name,
@@ -55,17 +54,17 @@ class S3StorageProvider(StorageProviderAbstract):
             )
 
     def _get_session(self) -> Any:
-        """Get or create the aioboto3 session (lazy initialization).
+        """Get or create the aiobotocore session (lazy initialization).
 
         Returns:
-            The aioboto3 Session.
+            The aiobotocore AioSession.
         """
         self._check_dependency()
 
         if self._session is None:
-            import aioboto3  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            from aiobotocore.session import get_session  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
-            self._session = aioboto3.Session()  # pyright: ignore[reportUnknownMemberType]
+            self._session = get_session()
         return self._session
 
     def _get_client_config(self) -> dict[str, Any]:
@@ -74,14 +73,14 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Dictionary of client configuration parameters.
         """
-        from botocore.config import Config  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+        from aiobotocore.config import AioConfig  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
         endpoint_url = f"https://s3.{self._region}.amazonaws.com"
         # botocore addresses path-style whenever an endpoint is given, which puts every link on the region's
         # shared host. A content security policy can allow a bucket only by its own host, so pin the virtual
         # style: `<bucket>.s3.<region>.amazonaws.com`. botocore still falls back to path-style for a bucket
         # name that cannot be a hostname, a dotted one included.
-        config = Config(signature_version="s3v4", s3={"addressing_style": "virtual"})  # pyright: ignore[reportUnknownArgumentType]
+        config = AioConfig(signature_version="s3v4", s3={"addressing_style": "virtual"})
 
         return {
             "service_name": "s3",
@@ -112,7 +111,7 @@ class S3StorageProvider(StorageProviderAbstract):
         session = self._get_session()
         client_config = self._get_client_config()
 
-        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+        async with session.create_client(**client_config) as client:
             try:
                 response = await client.get_object(Bucket=self._bucket_name, Key=key)
                 async with response["Body"] as stream:
@@ -157,7 +156,7 @@ class S3StorageProvider(StorageProviderAbstract):
         session = self._get_session()
         client_config = self._get_client_config()
 
-        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+        async with session.create_client(**client_config) as client:
             try:
                 put_params: dict[str, Any] = {
                     "Bucket": self._bucket_name,
@@ -224,15 +223,13 @@ class S3StorageProvider(StorageProviderAbstract):
         session = self._get_session()
         client_config = self._get_client_config()
 
-        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+        async with session.create_client(**client_config) as client:
             try:
-                # generate_presigned_url may be sync or async depending on aioboto3 version
-                maybe_url = client.generate_presigned_url(
+                presigned_url: str = await client.generate_presigned_url(
                     "get_object",
                     Params={"Bucket": self._bucket_name, "Key": key},
                     ExpiresIn=self._signed_urls_lifespan,
                 )
-                presigned_url: str = await maybe_url if inspect.isawaitable(maybe_url) else maybe_url
                 return presigned_url
             except (BotoCoreError, ClientError):
                 # ClientError (signing rejected) and BotoCoreError (transport failure) both

@@ -8,13 +8,13 @@ from typing import Any, Mapping, Sequence, cast
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
-from opentelemetry.util.types import AttributeValue
 from posthog import Posthog
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.telemetry.otel_constants import (
     GenAISpanAttr,
+    OTelAttributeValue,
     OTelConstants,
     PipelexSpanAttr,
     PostHogAttr,
@@ -61,7 +61,7 @@ class PostHogSpanExporter(SpanExporter):
         self.run_identity_policy = run_identity_policy
         self.redaction_config = redaction_config
 
-    def _resolve_identity(self, *, attributes: Mapping[str, AttributeValue]) -> TelemetryIdentity:
+    def _resolve_identity(self, *, attributes: Mapping[str, OTelAttributeValue]) -> TelemetryIdentity:
         """Resolve who this span belongs to on this stream."""
         return TelemetryIdentity.make_from_span_attributes(
             attributes=attributes,
@@ -230,7 +230,7 @@ class PostHogSpanExporter(SpanExporter):
             return output_class_name
         return OTelConstants.PIPE_CODE_REDACTED if output_class_name else None
 
-    def _get_base_properties(self, span: ReadableSpan, *, attributes: Mapping[str, AttributeValue]) -> dict[str, Any]:
+    def _get_base_properties(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> dict[str, Any]:
         """Get common properties for all span types."""
         properties: dict[str, Any] = {}
         if span.end_time and span.start_time:
@@ -254,7 +254,7 @@ class PostHogSpanExporter(SpanExporter):
 
         return properties
 
-    def _export_generation_span(self, span: ReadableSpan, *, attributes: Mapping[str, AttributeValue]) -> None:
+    def _export_generation_span(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> None:
         """Export a GenAI generation span."""
         properties = self._get_base_properties(span=span, attributes=attributes)
         provider_operation_combo = f"{attributes.get(GenAISpanAttr.PROVIDER_NAME)}:{attributes.get(GenAISpanAttr.OPERATION_NAME)}"
@@ -324,7 +324,7 @@ class PostHogSpanExporter(SpanExporter):
             identity=self._resolve_identity(attributes=attributes),
         )
 
-    def _export_pipe_span(self, span: ReadableSpan, *, attributes: Mapping[str, AttributeValue]) -> None:
+    def _export_pipe_span(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> None:
         """Export a pipe execution span."""
         properties = self._get_base_properties(span=span, attributes=attributes)
 

@@ -48,8 +48,9 @@ _ACTIVE_PIPELEX_SPAN: ContextVar[Span | None] = ContextVar("pipelex_active_span"
 def pipelex_span_active(*, span: Span | None) -> Generator[None]:
     """Hold ``span`` as the Pipelex span active here while the block runs; no span, or one naming no trace, holds nothing.
 
-    ``None`` is what the runtime holds with no tracer or in a dry run. A span naming no trace is what a
-    no-op tracer starts, under ``OTEL_SDK_DISABLED`` for one, and holding it would hide the enclosing
+    ``None`` is what the runtime holds with no tracer, in a dry run, or under a no-op tracer, the one
+    ``OTEL_SDK_DISABLED`` hands out for one, which from ``opentelemetry-api`` 1.40 gives back the parent
+    it was handed and before that an invalid span. A span naming no trace would hide the enclosing
     Pipelex span from every line of the block. OpenTelemetry's own context is left as it is either way.
     """
     if span is None or not span.get_span_context().is_valid:
