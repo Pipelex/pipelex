@@ -3695,6 +3695,36 @@ Here are all the native concepts you can use out of the box:
 | `Composite` | A named composition of contents | `CompositeContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
+## Choosing among `Anything`, `JSON` and `Dynamic`
+
+Three natives hold data whose shape your method does not describe, and each takes a different kind of input. Choose in this order:
+
+1. **Data you already have as JSON objects: name it.** Declare a concept that refines `JSON`, with a plain-language description. It takes the object exactly as you have it, with no data model to write, and its name and description tell an agent or a reader what the object means, which a bare `JSON` does not. When you later want the fields validated, turn it into a concept with a structure.
+2. **`JSON` or `JSON[]`** when the data has no name worth giving it. `JSON` is a JSON object, not any JSON value; a list of objects is `JSON[]`.
+3. **`Anything`** when the pipe is generic over its input: it passes a value along or renders it, whatever it is. It is not the place to put JSON data.
+4. **`Dynamic`** is not recommended for inputs for now: what a `Dynamic` input holds is still being settled.
+
+For example, a pipe summarizing orders from a shop's API names them:
+
+```toml
+[concept.Order]
+description = "A customer order, as the shop's API returns it"
+refines = "JSON"
+
+[pipe.summarize_order]
+type = "PipeLLM"
+description = "Summarize a customer order"
+inputs = { order = "Order" }
+output = "Text"
+prompt = """
+Summarize this order in two sentences:
+
+@order
+"""
+```
+
+The input is the object itself, `{"order": {"id": 42, "items": [{"sku": "A-1", "quantity": 2}]}}`, and a list of orders would be declared `Order[]`.
+
 ## Native Concept Structures
 
 Each native concept has a corresponding Python structure that defines its data model. Understanding these structures helps you work with the data they contain.
@@ -3894,6 +3924,10 @@ class JSONContent(StuffContent):
     json_obj: dict[str, Any]
 ```
 
+A `JSON` input takes a JSON object as it is, `{"a": 1}`, and its inputs template shows the bare object; `JSON[]` takes a list of objects. `JSON` is a JSON object, not any JSON value, so a string or a number there is refused. The explicit form carries the content form: `{"concept": "JSON", "content": {"json_obj": {"a": 1}}}`.
+
+**Use for:** Data you already have as JSON objects, preferably through a concept that refines `JSON` (see [Choosing among `Anything`, `JSON` and `Dynamic`](#choosing-among-anything-json-and-dynamic)).
+
 ### HtmlContent
 
 Represents HTML content with styling:
@@ -3943,8 +3977,12 @@ Each named sub-content is a top-level field of the composite — there is no wra
 
 ### Anything
 
-!!! note "Special Concepts"
-    `Anything` is referenced in the native concept definitions but does not have specific implementations. It is handled through the generic content system and is primarily used as semantic markers.
+`Anything` has no content class of its own: an `Anything` value is held in the content class matching what it is.
+
+- **As an input**, it takes any JSON value but an array or null. A string, a number, a boolean or an object becomes text, a number, a yes/no or a JSON object, and the input keeps the `Anything` concept. A typed envelope, `{"concept": "Text", "content": "hi"}`, hands it a specific concept, which it keeps, since every concept satisfies `Anything`. `Anything[]` takes a list of such values.
+- **As an output**, it promises nothing narrower: a pipe declared to output `Anything` may produce any concept.
+
+**Use for:** Pipes that are generic over their input, passing a value along or rendering it whatever it is.
 
 ## Using Native Concepts
 
@@ -4273,6 +4311,16 @@ refines = "Text"
 [concept.Summary]
 description = "A condensed version of a longer text"
 refines = "Text"
+```
+
+### Refining JSON
+
+Data you already have as JSON objects is best named by a concept refining `JSON`. It takes the object exactly as you have it, with no structure to write, and its name and description say what the object means. See [Choosing among `Anything`, `JSON` and `Dynamic`](native-concepts.md#choosing-among-anything-json-and-dynamic).
+
+```toml
+[concept.Order]
+description = "A customer order, as the shop's API returns it"
+refines = "JSON"
 ```
 
 ### Building Concept Hierarchies
@@ -5599,7 +5647,7 @@ Match the value to the input's declared concept. The declared concept is applied
 | Declared concept refines… | Provide | Example |
 | --- | --- | --- |
 | `Text` | a string | `"What are the fees?"` |
-| `Number` | a number (not a boolean) | `42` or `3.14` |
+| `Number` | a finite number (not a boolean, not NaN or an infinity) | `42` or `3.14` |
 | `YesNo` | a boolean | `true` / `false` |
 | `Date` | an extended ISO 8601 date/datetime string (or a TOML date literal) | `"2026-09-01"` |
 | `Image` / `Document` | a URL or file path | `"photo.jpg"`, `"https://…/a.pdf"` |
@@ -5624,8 +5672,15 @@ Each value is typed as the **declared** concept — `question` becomes a `legal.
 !!! note "Numbers vs. booleans"
     A boolean is never read as a number, even though `true`/`false` look numeric to some languages. Provide `true`/`false` only for a `YesNo`-refining input; provide `42` for a `Number`-refining one.
 
+!!! note "`Anything` and `JSON` inputs"
+    An input declared `Anything` takes any JSON value but an array or null: a string, a number, a boolean or an object becomes the matching content (text, number, yes/no, JSON object), and the input keeps the `Anything` concept. Provide a typed envelope, `{"concept": "Text", "content": "hi"}`, to hand it a specific concept instead, which it keeps. `Anything[]` takes a list of such values. A working memory dumps an `Anything` stuff's content as its content class's fields, `{"text": "hi"}` for a string, so a `--with-memory` envelope piped into another method's `Anything` input hands it that object rather than the original value.
+
+    An input declared `JSON` takes a JSON object as it is, and `JSON[]` takes a list of them; its inputs template shows the bare object. A string or a number at a `JSON` input is refused.
+
+    In a bare list for `Anything[]` or `JSON[]`, an item shaped like an envelope (an object with `concept` and `content` keys) is refused rather than guessed at. To type a list, wrap the whole list in one envelope instead.
+
 !!! note "Concepts the signature can't shape"
-    A handful of concepts carry no single expected value shape — `Dynamic`, `Anything`, and the container/structural natives (`Html`, `JSON`, `Page`, `TextAndImages`, `SearchResult`, `Composite`). For an input declared as one of these, the signature can't guide interpretation, so the value is read by its own shape (a bare string becomes `native.Text`, and so on). Use the explicit format if you need a specific concept there.
+    A few concepts still carry no single expected value shape — `Dynamic` and the container natives (`Html`, `Page`, `TextAndImages`, `SearchResult`, `Composite`). For an input declared as one of these, the value is read by its own shape (a bare string becomes `native.Text`, and so on), and a value with no reading, such as a list of plain objects, is refused with an error naming the input and the declaration to change. Use the explicit format if you need a specific concept there.
 
 ## Lists and multiplicity
 
@@ -12278,8 +12333,10 @@ The AWS configuration controls how Pipelex authenticates with AWS services. It s
 ```toml
 [runtime.aws]
 api_key_method = "env"  # or "secret_provider"
-bedrock_access_variant = "bedrock_token" # or "aws_access"
+bedrock_access_variant = "aws_access"  # or "bedrock_token"
 ```
+
+`api_key_method` says where the credentials are read from, and `bedrock_access_variant` says which credentials Anthropic models on Amazon Bedrock authenticate with. The values above are the defaults.
 
 ### Environment Variables Method (`"env"`)
 When using `api_key_method = "env"`, Pipelex expects the following environment variables:
@@ -12287,6 +12344,8 @@ When using `api_key_method = "env"`, Pipelex expects the following environment v
 - `AWS_ACCESS_KEY_ID`: Your AWS access key ID
 - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key
 - `AWS_REGION`: Your AWS region
+
+Under `bedrock_access_variant = "bedrock_token"`, Anthropic models on Bedrock authenticate with `AWS_BEARER_TOKEN_BEDROCK` instead of the two access keys, and still take their region from `AWS_REGION` (see [Bedrock Access Variant](#bedrock-access-variant)).
 
 Example `.env` file:
 ```env
@@ -12313,6 +12372,26 @@ When using `api_key_method = "secret_provider"`, Pipelex will:
 1. Configure a secret provider in your project using the `SecretsProviderAbstract`: See more in the [Secrets](../../advanced/secrets-provider-injection.md) documentation.
 2. Store your AWS credentials in your secret provider
 3. Ensure your secret provider is properly authenticated
+
+## Bedrock Access Variant
+
+`bedrock_access_variant` chooses how the `bedrock_anthropic` SDK, which serves the Claude models of the `bedrock` backend, authenticates with Amazon Bedrock:
+
+- **`"aws_access"`** (the default) signs every request with AWS Signature Version 4, from `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION`.
+- **`"bedrock_token"`** sends a Bedrock API key as a bearer token, read from `AWS_BEARER_TOKEN_BEDROCK`. The access keys are not read, and the region comes from `AWS_REGION` in the environment, then from your AWS profile, and otherwise defaults to `us-east-1`.
+
+`api_key_method` decides where the credentials come from: the environment under `"env"`, your secret provider under `"secret_provider"`. The region under `"bedrock_token"` is the exception, since it is always read from the environment or the AWS profile, never from a secret provider.
+
+### The configured variant wins
+
+`AWS_BEARER_TOKEN_BEDROCK` is the standard name for a Bedrock API key, which AWS SDKs and other tools such as Claude Code on Bedrock read, so it is often set in a shell for reasons that have nothing to do with Pipelex. Pipelex never lets it override your configuration:
+
+- Under `"aws_access"`, every `bedrock_anthropic` request is signed with the configured access keys, and a bearer token in the environment is ignored. If the access keys are missing, Pipelex fails with an `AwsCredentialsError` rather than falling back to the token; when the environment does carry one, that error says so and names `bedrock_access_variant = "bedrock_token"` as the way to authenticate with a bearer token. That variant reads the token from wherever `api_key_method` points, so under `"secret_provider"` the token has to be stored in your secret provider as well.
+- Under `"bedrock_token"`, the token is the only credential used, and the access keys are not read.
+
+### The other Bedrock models
+
+The models of the `bedrock` backend whose `sdk` is not `bedrock_anthropic` do not read `[runtime.aws]`. They follow boto's own credential chain (environment variables, the shared AWS configuration files, an instance or container role) and take their region from the backend's `aws_region` setting. In that chain, a set `AWS_BEARER_TOKEN_BEDROCK` takes precedence over access keys, so for these models a bearer token in the environment is what authenticates.
 
 ## Dependency Injection
 
@@ -12728,7 +12807,7 @@ If you need to customize how a specific model behaves through the Gateway, you c
 - `sdk`: The SDK to use for the model (e.g., `gateway_completions`)
 - `structure_method`: The method for structured output (e.g., `instructor/openai_tools`)
 
-All other keys will be ignored.
+All other keys will be ignored. What each structure method sends is described under [Structure methods](#structure-methods).
 
 ```toml
 # .pipelex/inference/backends/pipelex_gateway.toml
@@ -12840,7 +12919,10 @@ Each backend has its own model specification file in `.pipelex/inference/backend
 
 ```toml
 # openai.toml
-default_sdk = "openai"
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-4o-mini]
 model_id = "gpt-4o-mini"
@@ -12856,10 +12938,22 @@ costs = { input = 2.5, output = 15.0 }
 
 [gpt-image-1]
 model_id = "gpt-image-1"
+sdk = "openai_img_gen"
+model_type = "img_gen"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.04, output = 0.0 }
 ```
+
+The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
+
+#### Structure methods
+
+`structure_method` says how a model is asked for structured output. A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and so is `instructor/openai_structured_outputs`, which sends OpenAI a non-strict tool schema; `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through the Gateway's OpenAI-compatible SDKs.
+
+One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice.
+
+The `google` backend uses `instructor/genai_structured_outputs`, Gemini's native JSON output. `instructor/genai_tools` works on it too: Gemini returns the function-call arguments as plain values, so pipelex validates them in pydantic's lax mode, where a string reaches an enum field as its member.
 
 #### Sending extra request headers per model
 
@@ -14128,7 +14222,7 @@ The runtime holds each span it starts as the active Pipelex span from its start 
 - **A pipe run's span**: `live_run_pipe` starts the span, then runs the pipe with it held, so a line logged by the pipe's own work, a controller's or an operator's and the lines of the extract, image-generation, search or function call an operator makes, names the pipe's span under `pipelex.*`, and a nested pipe's lines name the nested pipe's span until it returns. The line announcing the run is logged before the span starts, under the enclosing span.
 - **An LLM call's span**: the LLM worker runs the provider call with its generation span held, so the lines of the call and of its failure name that span under `pipelex.*`, a provider SDK's own lines included.
 
-The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer: with the Pipelex Gateway's telemetry on, which is automatic when the Gateway serves your inference, or with AI span tracing enabled on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one that starts spans naming no trace, under `OTEL_SDK_DISABLED` for instance, and a line carries no `pipelex.*` fields. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps both its spans, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits both from the code that started it.
+The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer: with the Pipelex Gateway's telemetry on, which is automatic when the Gateway serves your inference, or with AI span tracing enabled on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one, under `OTEL_SDK_DISABLED` for instance, which starts no span of its own, and a line carries no `pipelex.*` fields. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps both its spans, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits both from the code that started it.
 
 Holding a span is in-process plumbing, like binding the log context: it lives in a context variable of Pipelex's own. **Pipelex never makes its spans current in your process's OpenTelemetry context**, so your own instrumentation, an HTTP client's or a provider SDK's, is never re-parented under a Pipelex span, and an error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. A span's children take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs carries `pipelex.*` fields only while the process runs a span of its own, the LLM call's for instance.
 
@@ -15714,9 +15808,9 @@ The JSON Schema on an input names its concept: `title` is the `concept_ref`, `de
 
 ## The one concept with no structure class: `native.Anything`
 
-`native.Anything` is the only concept that declares no structure class, so its input schema cannot come from a pydantic render. (That is a different question from the three natives which declare no *pinned structure* — `Dynamic`, `Anything`, `Composite` — and therefore render as `unknown` in the [input-form descriptor](input-form-descriptor.md).) It publishes the **permissive schema**: no constraint keywords, only the identity annotations every rendered input schema carries — `{"title": "native.Anything", "description": "…"}`. Annotation keywords constrain nothing, so this is semantically the empty schema (any JSON value), which is what an untyped vehicle means, while consumers still see the concept's identity instead of a bare `{}` they would have to special-case. Multiplicity wraps exactly as above: `Anything[]` is an array of that schema, a fixed count adds the bounds.
+`native.Anything` is the only concept that declares no structure class, so its input schema cannot come from a pydantic render. (That is a different question from the three natives which declare no *pinned structure* — `Dynamic`, `Anything`, `Composite` — and therefore render as `unknown` in the [input-form descriptor](input-form-descriptor.md).) It publishes the identity annotations every rendered input schema carries and one constraint — `{"title": "native.Anything", "description": "…", "not": {"type": ["array", "null"]}}`. An `Anything` value is any JSON value but an array or null: a list is the multiplicity's to express, as `Anything[]`, and null is never an input. Multiplicity wraps exactly as above: `Anything[]` is an array of that schema, so every item carries the same exclusion, and a fixed count adds the bounds.
 
-The schema states what the *concept* admits, not what today's input shaper accepts: an `Anything` slot currently takes a string (shaped into a `native.Text` stuff) and refuses the other JSON types. Narrowing the published schema to match would be stating a runtime limitation as a contract, so the schema stays permissive and the shaper is what has to catch up.
+The schema and the input shaper agree on what a value may be: a string, a number, a boolean or an object at an `Anything` slot is shaped into its natural content (text, number, yes/no, JSON object) under the `native.Anything` concept, and an array or null at a single slot is refused, as the schema says. The two differ in two places the schema does not state: it wraps a single bare value sent to an `Anything[]` input into a one-item list, and it refuses an `Anything[]` item keyed exactly `concept` and `content`, which reads as an envelope.
 
 ## Which surfaces carry it
 
@@ -17418,7 +17512,7 @@ flowchart TB
     C -->|Anthropic| E["_build_thinking_params()<br>-> _ThinkingParams"]
     C -->|Google| F["_build_thinking_config()<br>-> ThinkingConfig"]
     C -->|Mistral| G["_resolve_prompt_mode()<br>-> prompt_mode"]
-    C -->|Bedrock (aioboto3)| H["_validate_no_reasoning_params()<br>-> LLMCapabilityError if set"]
+    C -->|Bedrock (aiobotocore)| H["_validate_no_reasoning_params()<br>-> LLMCapabilityError if set"]
 ```
 
 ---
@@ -17568,9 +17662,9 @@ Mistral does not support `reasoning_budget` or `thinking_mode = "adaptive"`. Bot
 
 Temperature is passed normally to the Mistral API regardless of reasoning mode.
 
-### Bedrock (aioboto3 native models)
+### Bedrock (aiobotocore native models)
 
-Bedrock native models using the `bedrock_aioboto3` SDK do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
+Bedrock native models using the `bedrock_aioboto` SDK do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
 
 !!! note
     Claude models accessed through Bedrock use the `bedrock_anthropic` SDK variant and go through the Anthropic worker, which does support reasoning.
@@ -17683,7 +17777,7 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `reasoning_effort` on a `thinking_mode = "none"` model | "does not support reasoning" |
 | `reasoning_budget` on a provider that doesn't support it | "does not support reasoning_budget" |
 | `thinking_mode = "adaptive"` on OpenAI or Mistral | "adaptive ... not supported" |
-| Any reasoning param on Bedrock (aioboto3) models | "does not support reasoning parameters" |
+| Any reasoning param on Bedrock (aiobotocore) models | "does not support reasoning parameters" |
 | Reasoning params during structured generation | "does not support reasoning parameters for structured generation" |
 | Both `reasoning_effort` and `reasoning_budget` set | `ValueError` / `LLMSettingValueError` (mutual exclusivity) |
 
@@ -19814,7 +19908,7 @@ disabled = ["hello_inference"]
 `pipelex plugins list` now shows the plugin as `disabled`, and running the method again fails loudly when the pipe asks for its worker:
 
 ```
-No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?
+No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled? If it is, 'hello' may be a handle a release renamed: `pipelex migrate` reports each backend file that still sets a retired handle.
 ```
 
 The model configuration still resolves, since `hello-1` is still declared and routed. Only the worker factory is missing, and Pipelex says so rather than falling back to another backend. A dry run of the method still passes without the plugin, because a dry run never builds a worker.
@@ -20138,7 +20232,7 @@ registrar.add_storage_provider(method="azure", factory=_make_azure_storage_provi
 
 The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
 
-- **Import-light.** The plugin module must import no backend SDK at module load. Registering the built-in `s3`/`gcp` factories pulls in neither `aioboto3` nor `google-cloud-storage` — the SDK guard lives *inside* the provider's I/O methods (`_get_session` / `_get_bucket`), not its `__init__`. Selecting `s3` therefore *constructs* an `S3StorageProvider` even with the extra absent; the guard fires only on the first actual load/store.
+- **Import-light.** The plugin module must import no backend SDK at module load. Registering the built-in `s3`/`gcp` factories pulls in neither `aiobotocore` nor `google-cloud-storage` — the SDK guard lives *inside* the provider's I/O methods (`_get_session` / `_get_bucket`), not its `__init__`. Selecting `s3` therefore *constructs* an `S3StorageProvider` even with the extra absent; the guard fires only on the first actual load/store.
 - **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
 
 ---
@@ -20951,7 +21045,7 @@ Everything said above about the request limits holds here too — the code is th
 
 #### When the model cannot be routed
 
-The third family, and the one no request escapes: whatever else it asks, it has to be *routed* first — the gateway reads the model out of it, looks that model up in its own routing table, and hands the call to the integration that serves it. When that resolution fails there is no provider to send the request to, so the gateway refuses it itself. `GatewayRoutingRefusal` is the runtime's name for each outcome.
+The third family, and the one no request escapes: whatever else it asks, it has to be *routed* first — the gateway reads the model out of it, looks that model up in its own routing table, and hands the call to the integration that serves it. When that resolution fails there is no provider to send the request to, so the gateway refuses it itself; and when it succeeds, the integration it lands on may still refuse a model it does not allow. `GatewayRoutingRefusal` is the runtime's name for each outcome.
 
 | Gateway code | HTTP | `GatewayRoutingRefusal` | Category / action | What the caller is told |
 |---|---|---|---|---|
@@ -20959,15 +21053,17 @@ The third family, and the one no request escapes: whatever else it asks, it has 
 | `pig-02` | 400 | `DISABLED_INTEGRATION` | `CONFIGURATION` / `CONTACT_SUPPORT` | the model's integration is not enabled on this deployment — its credentials are unset |
 | `pig-05` | 400 | `WRONG_PROTOCOL` | `CONFIGURATION` / `CHANGE_MODEL` | the model is served, but not over the protocol the request used for it |
 | `pig-06` | 400 | `UNSERVED_CAPABILITY` | `CONFIGURATION` / `CHANGE_MODEL` | the model's integration does not serve that capability (extract, search) |
+| `model_not_allowed_error` | 412 | `MODEL_NOT_ALLOWED` | `CONFIGURATION` / `CHANGE_MODEL` | the gateway does not allow the model, named by its handle, for this account — pick another; if the pipe named it, leaving the pipe's model unset uses the default |
 
-Everything said about the two families above holds here too — the code is the discriminator rather than the provider, the check runs ahead of the status ladder, the advice defers every specific to the gateway's own message, and nothing is ever retried. Four things are particular to this family:
+Everything said about the two families above holds here too — the code is the discriminator rather than the provider, the check runs ahead of the status ladder, the advice defers every specific to the gateway's own message, with the one exception below, and nothing is ever retried. What is particular to this family:
 
-- **The category is `CONFIGURATION`, never `CONTENT`, and that is the whole bug this family fixes.** Nothing in the prompt, the parameters or the inputs causes any of these, and no edit to them avoids one. Before the family existed all four fell through to the status ladder's 400 arm, so a caller who named a model the deployment does not serve was told *"The provider rejected the request — review the prompt, parameters, and inputs"* and received an `LLMCompletionError`.
-- **Every member is its own wire code, unlike the two families above.** Grouping is by remedy in all three, and here each code names a different thing that has to change — so the grouping happens to be one-to-one rather than by design.
-- **Only `pig-01` sets `is_model_not_found`.** The flag is not a category: it selects the family's `*ModelNotFoundError` class, which `pipe_operator.py` re-raises as a `PipeOperatorModelAvailabilityError` carrying the model handle — the pipe-level error a caller already gets when the model deck itself cannot find a model. `pig-01` is exactly that case seen from the gateway. For `pig-05` and `pig-06` the model *does* exist and *is* served, so claiming it was not found would be false; they stay on the generic failure class and carry the distinction in the advice.
+- **The category is `CONFIGURATION`, never `CONTENT`, and that is the whole bug this family fixes.** Nothing in the prompt, the parameters or the inputs causes any of these, and no edit to them avoids one. Before the family existed the `pig-` members fell through to the status ladder's 400 arm, so a caller who named a model the deployment does not serve was told *"The provider rejected the request — review the prompt, parameters, and inputs"* and received an `LLMCompletionError`. `model_not_allowed_error` fell through to the ladder's generic 4xx arm instead, which gave it the right category and the same wrong advice.
+- **Every member is its own wire code, unlike the two families above.** Grouping is by remedy in all three, and here each code names a different thing that has to change — so the grouping happens to be one-to-one rather than by design. One code is not in the `pig-` namespace: `model_not_allowed_error` is the code of the Portkey substrate the gateway is built on, answered at 412 when an integration does not allow every model and does not list this one, or lists it as archived. No model vendor uses it. Portkey's cloud emits it both for the integrations `pipelex_gateway` reaches by default and for a user's own workspace behind the `portkey` backend, and the manifold's vendored middleware emits it too. The refusal means the same thing and calls for the same move from any of them, so it is matched on the code alone like the rest. It carries its code in `error.type` with `error.code` null, and every Extract hop recovers it from there.
+- **Only `pig-01` sets `is_model_not_found`.** The flag is not a category: it selects the family's `*ModelNotFoundError` class, which `pipe_operator.py` re-raises as a `PipeOperatorModelAvailabilityError` carrying the model handle — the pipe-level error a caller already gets when the model deck itself cannot find a model. `pig-01` is exactly that case seen from the gateway. For `pig-05`, `pig-06` and `model_not_allowed_error` the model *does* exist and *is* served, so claiming it was not found would be false; they stay on the generic failure class and carry the distinction in the advice.
 - **`pig-02` is the family's `CONTACT_SUPPORT` arm**, the same call `STORAGE_NOT_SERVED` and `BODY_LENGTH_REQUIRED` get. A switched-off integration is the gateway operator's fact: `CHECK_CREDENTIALS` would send a hosted caller to rotate their own perfectly valid key, and `CHANGE_MODEL` would send them shopping for a model over an unset variable. The gateway's message names the integration and the variables to set, and the advice points at it.
+- **`model_not_allowed_error` is the one member whose advice names the model.** The others defer every specific to the gateway's message, but this one's message names only the backend's wire id (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`), which the method's author never wrote. So its advice names the model handle the deck resolved the pipe's model to, which `render_inference_error` already receives. Both of its hints are conditional, because the Render step cannot tell the cases apart: leaving the pipe's model unset helps only when the pipe named the refused model rather than falling back to it as the default, and a model deck that lists a model the allow-list refuses is Pipelex's to settle on the Pipelex gateway and the user's own on a Portkey workspace of theirs, which report the same provider.
 
-**Moving the family to `CONFIGURATION` moves its HTTP answer too, and that is worth stating out loud.** `InferenceErrorCategory.CONFIGURATION` implies `ErrorDomain.CONFIG`, which `error_domain_to_http_status` renders as **500**, where `CONTENT` implies `INPUT` and renders as 422. So on any surface built on `ErrorReport.http_status`, all four of these now answer 500 where they answered 422 — the same answer the status ladder's 404 arm has always given a missing model, and the right one in kind, since none of them is a property of what the caller submitted. Two consequences follow: these land in server-error alerting rather than client-error, and 500 is a status outer HTTP clients and orchestrators retry. "Never retried" above is a statement about `InferenceErrorCategory.is_retryable` inside this process; it says nothing about what a caller's own client does with the status, and an outer retry of any of these earns an identical refusal.
+**Moving the family to `CONFIGURATION` moves its HTTP answer too, and that is worth stating out loud.** `InferenceErrorCategory.CONFIGURATION` implies `ErrorDomain.CONFIG`, which `error_domain_to_http_status` renders as **500**, where `CONTENT` implies `INPUT` and renders as 422. So on any surface built on `ErrorReport.http_status`, the `pig-` members now answer 500 where they answered 422 — the same answer the status ladder's 404 arm has always given a missing model, and the right one in kind, since none of them is a property of what the caller submitted. Two consequences follow: these land in server-error alerting rather than client-error, and 500 is a status outer HTTP clients and orchestrators retry. "Never retried" above is a statement about `InferenceErrorCategory.is_retryable` inside this process; it says nothing about what a caller's own client does with the status, and an outer retry of any of these earns an identical refusal. `model_not_allowed_error` is the exception: the ladder's generic 4xx arm already read its 412 as `CONFIGURATION`, so it answered 500 before the family took it in, and only its `user_action` moved.
 
 `pig-05` and `pig-06` are as often a deck-versus-gateway disagreement as a caller's mistake — the runtime picks the protocol and the route from its own model deck — so both details say "your model deck" out loud rather than only "pick another model", which would leave an operator hunting for a model problem that is a configuration problem.
 
@@ -20986,7 +21082,7 @@ The gateway's remaining codes belong to no family and classify on their status l
 
 ### The `instructor` Unwrap
 
-On structured-generation paths, `instructor` wraps the real SDK exception in an `InstructorRetryException`. `extract_underlying_sdk_exception()` recovers it, so it routes through the same per-provider categorization as the plain-text path. A genuinely unrecognized inner exception (e.g. a `pydantic.ValidationError` from a schema mismatch) lands in `UNKNOWN` rather than being mis-labelled as a `CONTENT`-policy violation.
+On structured-generation paths, `instructor` raises an `InstructorRetryException` from the exception that ended its retry loop. The loop re-asks only a response that fails the schema, so that exception is either the raw SDK exception of a call that failed in transport, or, once the re-ask budget is spent, the last parse failure. `extract_underlying_sdk_exception()` recovers it from the wrapper's cause, not from `failed_attempts`, which lists only parse failures and would name an earlier one when a re-ask then fails in transport. The recovered exception routes through the same per-provider categorization as the plain-text path. Once the re-ask budget is spent, the recovered exception is the last `pydantic.ValidationError`, which `_STATUSLESS_BY_TYPE_NAME` classifies as `CONTENT` / `CHANGE_INPUT`, so it answers 422. A recovered exception the classifier does not recognize lands in `UNKNOWN`.
 
 ### Model and Provider Attribution
 
@@ -21236,7 +21332,8 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | Malformed prompt image / bad prompt parameter | `CONTENT` class-level (`PromptImageFormatError`, `LLMPromptParameterError`, …) → `error_domain = INPUT` → **HTTP 422** |
 | Any other provider **HTTP 400** | `CONTENT` → `error_domain = INPUT` → **HTTP 422**. This is the widest reach of the derivation: a 400 covers a context-length overflow and a parameter the model rejects alike, and an engine-side request-construction fault lands here too — reported as the caller's to fix, and absent from the 5xx rate |
 | Local file extractor raises a builtin (docling, pypdfium2) | `ValueError` / `RuntimeError` / `FileNotFoundError` → `CONTENT` → `error_domain = INPUT` → **HTTP 422**; `OSError` → `TRANSIENT` (see `_LOCAL_EXTRACT_BY_TYPE_NAME`) |
-| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` → no `error_domain` asserted → HTTP 500 |
+| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → the last `pydantic.ValidationError` → `CONTENT` / `CHANGE_INPUT` → `error_domain = INPUT` → **HTTP 422** |
+| The gateway does not allow the model for this account (`model_not_allowed_error`, HTTP 412) | `CONFIGURATION` / `CHANGE_MODEL`, never retried; the advice names the model handle; `error_domain = CONFIG` → HTTP 500 |
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown); `error_domain = RUNTIME` |
 | A step names, in an inline model setting, a model the deck neither defines nor names | `ModelNotFoundError`, classified by the lookup as the caller's: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT, with a `CHANGE_MODEL` next step naming the model as the method wrote it and the type of model the step needs. A model the deck itself names but does not serve (a preset or alias on a backend that is not enabled) keeps `CONFIG` → HTTP 500, redacted |
 | A `PipeParallel` cannot combine its branch results, or a pipe starts without a required input | The caller's own method or request: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT, with a `CHANGE_INPUT` next step |
@@ -22928,15 +23025,15 @@ The verdict follows the same declared-never-discovered discipline as the diverge
 
 The manifest holds the error's **class name**, never its message. The class name is contract-stable — the error-identity snapshot makes a rename a reviewable diff — while the message is wording that would churn these committed bytes across pydantic versions, so it goes to the console and to the refusal only. Passing verdicts are printed as a count, never committed: a template the shaper takes back is the state every entry is working towards, not a fact worth pinning.
 
-Two gaps are declared today, and each entry names the item whose fix retires it. One is a descriptor gap — a nested list inside a structure — which takes both shapes of the two probe pipes that reach it. The other is `native.Anything`, whose slot the input shaper refuses: it accepts a bare string alone at an `Anything` position, so the empty object the contract publishes as that slot's template is a template the runtime cannot take back. Closing either one deletes its own entries; the lapse rule fails the command until somebody does.
+One gap is declared today, and its entries name the item whose fix retires it: a descriptor gap — a nested list inside a structure — which takes both shapes of the two probe pipes that reach it. Closing it deletes its entries; the lapse rule fails the command until somebody does.
 
-A key is a whole template and never a slot, and the shaper stops at the first slot it refuses — so an entry suspends this check for every other slot in the same pipe. Put a known-open gap in a pipe of its own rather than declaring the pipe that happens to contain it: `scaffold_anything_slot` exists for exactly that reason, so that `scaffold_open_natives` beside it keeps round-tripping and the `unknown-empty-object` claim keeps the one site that demonstrates it.
+A key is a whole template and never a slot, and the shaper stops at the first slot it refuses — so an entry suspends this check for every other slot in the same pipe. Put a known-open gap in a pipe of its own rather than declaring the pipe that happens to contain it, so that the slots beside it keep round-tripping and every divergence claim keeps the sites that demonstrate it.
 
 ## The bundles
 
-`tests/data/input_semantics/` holds the corpus bundles, and the command above names every one of them: a bundle that exists in that directory but is left off the command line does not appear in the capture, and the regeneration silently drops the pipes it contributed. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `output_bundle.mthds` covers the output form specifically, since every bundle before it resolved to `Text`; `scaffold_bundle.mthds` was added for this corpus and covers what the others do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept. Its `scaffold_open_natives` pipe holds the natives whose payload shape the descriptor states openly, at slot positions: `native.Dynamic` and `native.Composite`, which declare no pinned structure and whose node is therefore `unknown`, beside `native.JSON`, which does declare one — its pinned blueprint carries a required `json_obj`, so it expands like any other pinned native and its dict is where `unknown-empty-object` is measured. Its `scaffold_dynamic_prompt` pipe puts a `native.Dynamic` slot at an LLM prompt position under both markers, which the corpus could not carry while the prompt analyzers read a dynamic concept's universal compatibility as identity and demanded an `ImageContent` for it.
+`tests/data/input_semantics/` holds the corpus bundles, and the command above names every one of them: a bundle that exists in that directory but is left off the command line does not appear in the capture, and the regeneration silently drops the pipes it contributed. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `output_bundle.mthds` covers the output form specifically, since every bundle before it resolved to `Text`; `scaffold_bundle.mthds` was added for this corpus and covers what the others do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept. Its `scaffold_open_natives` pipe holds the natives whose payload shape the descriptor states openly, at slot positions: `native.Dynamic`, `native.Composite` and `native.Anything`, which declare no pinned structure and whose node is therefore `unknown`, beside `native.JSON`, which does declare one — its pinned blueprint carries a required `json_obj`, so its explicit template expands like any other pinned native's, while its compact template is the bare object with `json_obj` unwrapped, and that dict is where `unknown-empty-object` is measured. Its `scaffold_dynamic_prompt` pipe puts a `native.Dynamic` slot at an LLM prompt position under both markers, which the corpus could not carry while the prompt analyzers read a dynamic concept's universal compatibility as identity and demanded an `ImageContent` for it.
 
-`native.Anything` is the third of that family, and it sits in `scaffold_anything_slot` on its own — the one slot the corpus carries knowing the runtime refuses it. It no longer crashes the engine's renderer — the structureless arm renders it without resolving a class — but its template value is the empty mapping `{}`, which the input shaper takes back in neither shape: at an `Anything` position the shaper accepts a bare string alone, and returns it as a `native.Text` stuff rather than an `Anything` one. That is a runtime gap, not a projection one — the descriptor states `Anything` as `unknown` exactly as it states `Dynamic` and `Composite`, and a projection reading only the descriptor has nothing to render there but the empty object. So the slot is captured and both shapes of its own pipe are declared in `EXPECTED_UNSHAPEABLE` against the item tracking the shaper fix, which is the mechanism this page describes for a known-open gap. Giving it a pipe to itself is what keeps that declaration from reaching the three natives beside it that do round-trip. Closing it deletes those entries and regenerates.
+`native.Anything`'s compact template keeps its envelope, `{"concept": "native.Anything", "content": {}}`, in the engine and in every projection: its bare placeholder, `{}`, would read as "send an object", while the envelope names the concept that says any value goes. The input shaper takes that envelope back, reading its empty object as a JSON object under the `Anything` concept.
 
 ## When to rerun it
 
