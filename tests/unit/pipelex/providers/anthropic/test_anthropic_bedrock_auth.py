@@ -127,6 +127,18 @@ class TestAnthropicBedrockAuth:
         assert len(seen_authorizations) == 1
         assert seen_authorizations[0].startswith(_SIGV4_PREFIX)
 
+    def test_copy_forwards_the_options_the_subclass_does_not_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Later SDK releases pass new options through `copy` (`middleware` from 0.108): the subclass forwards what it does not name."""
+        monkeypatch.setenv(BEDROCK_TOKEN_VAR_NAME, _ENV_BEARER_TOKEN)
+        client = AsyncAnthropicBedrockSigV4(aws_access_key=_KEY_ID, aws_secret_key=_SECRET_KEY, aws_region=_REGION, max_retries=0)
+
+        copied_client = client.copy(_extra_kwargs={"_strict_response_validation": True})
+
+        assert isinstance(copied_client, AsyncAnthropicBedrockSigV4)
+        assert copied_client._strict_response_validation is True  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        assert copied_client.api_key is None
+        assert copied_client.aws_access_key == _KEY_ID
+
     @pytest.mark.parametrize("token_in_env", [True, False], ids=["token_in_env", "no_token"])
     def test_factory_builds_the_sigv4_client_under_aws_access(
         self,
@@ -202,7 +214,7 @@ class TestAnthropicBedrockAuth:
         if token_in_env:
             cause = exc_info.value.__cause__
             assert isinstance(cause, AwsCredentialsError)
-            assert message.startswith(str(cause))
+            assert message.startswith(f"{str(cause).rstrip('.')}. The environment sets {BEDROCK_TOKEN_VAR_NAME}")
             assert BEDROCK_TOKEN_VAR_NAME in message
             assert f'bedrock_access_variant = "{BedrockAccessVariant.BEDROCK_TOKEN}"' in message
             assert _ENV_BEARER_TOKEN not in message

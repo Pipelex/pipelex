@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260927-06f4db
 ---
 
@@ -61,3 +61,4 @@ Three neighbouring gaps turned up while reading this code. None is the clash, an
 - **`bedrock_token` passes no region.** The SDK then infers one from `AWS_REGION`, the boto profile, or `us-east-1`, so under `api_key_method = "secret_provider"` a region stored with the secrets is ignored.
 - **`aws_access` passes no session token.** `get_aws_access_keys` reads neither `AWS_SESSION_TOKEN` nor its secret, so temporary STS credentials cannot sign a `bedrock_anthropic` request.
 - **The SDK's `copy` drops `aws_profile`.** Upstream, and harmless to pipelex, which never passes a profile.
+- **anthropic 1.x moves to `httpx2`.** Its base client refuses `httpx` objects, so at that bump the subclass's `httpx` type hints and the wire tests' `httpx.MockTransport` change with the rest of pipelex's anthropic usage; the wire tests turning red there is the tripwire working, not a regression.

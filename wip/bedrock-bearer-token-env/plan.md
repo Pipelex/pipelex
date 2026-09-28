@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260927-06f4db
 ---
 
@@ -34,5 +34,5 @@ A new `tests/unit/pipelex/providers/anthropic/test_anthropic_bedrock_auth.py`, o
 - [x] `make agent-check`, with the changes staged first since the drift digest reads the index; handle any drift contract the anthropic or docs change opens.
 - [x] `make agent-test`.
 - [ ] Optional live check, paid, only on the user's go-ahead: `TestLLMGenText` on `claude-4.5-haiku` via `bedrock` with `AWS_BEARER_TOKEN_BEDROCK` set, which failed all its cases in the evidence run. Not run under the goal that executed this plan, which gave no go-ahead for paid inference; the offline wire tests stand in for it.
-- [ ] `/rev`.
-- [ ] PR `fix/Bedrock-bearer-token-env · L-260927-06f4db`, body ending `Closes L-260927-06f4db`; this document and `design.md` flip to `active` when the plan is ratified, and `/ledger-land` flips them to `landed`.
+- [x] `/rev`, two rounds at profile 3. The first made the docs say that `bedrock_token` still takes its region from `AWS_REGION` or the AWS profile, and made the missing-keys hint say that under `secret_provider` the `bedrock_token` variant reads the token from the secrets provider. The second gave the hint its own sentence, made the subclass forward the constructor options it does not name (anthropic 0.108 passes `middleware` through `copy`), and moved the `landed` flip into the pull request.
+- [x] PR `fix/Bedrock-bearer-token-env · L-260927-06f4db`, body ending `Closes L-260927-06f4db`. `/ledger-land` does not flip a document in a code repo's `wip/`, so this document and `design.md` say `landed` from the pull request's last commit.

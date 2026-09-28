@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from typing import Any
 
 import httpx
 from anthropic import DEFAULT_MAX_RETRIES, NOT_GIVEN, NotGiven
@@ -18,9 +19,10 @@ class AsyncAnthropicBedrockSigV4(AsyncAnthropicBedrock):
     signs with SigV4 whenever `api_key` is `None`, reading exactly these attributes.
 
     The SDK's `copy` (alias `with_options`) rebuilds the client through `self.__class__` with the stored credentials and
-    `api_key=None`, so a copy takes the same path. This couples to four public attributes of the SDK client and to the
-    rule that `api_key is None` means SigV4; `test_anthropic_bedrock_auth.py` guards the coupling on the wire, so an SDK
-    release that changes it fails there at the dependency bump.
+    `api_key=None`, so a copy takes the same path. Options that later SDK releases add to the constructor and pass through
+    `copy`, such as `middleware` from anthropic 0.108, reach the parent unchanged through `**kwargs`. This couples to four
+    public attributes of the SDK client and to the rule that `api_key is None` means SigV4; `test_anthropic_bedrock_auth.py`
+    guards the coupling on the wire, so an SDK release that changes it fails there at the dependency bump.
     """
 
     def __init__(
@@ -37,6 +39,7 @@ class AsyncAnthropicBedrockSigV4(AsyncAnthropicBedrock):
         default_headers: Mapping[str, str] | None = None,
         default_query: Mapping[str, object] | None = None,
         http_client: httpx.AsyncClient | None = None,
+        **kwargs: Any,
     ) -> None:
         # The parameter exists only because the SDK's `copy` always passes one.
         if api_key is not None:
@@ -53,6 +56,7 @@ class AsyncAnthropicBedrockSigV4(AsyncAnthropicBedrock):
             default_headers=default_headers,
             default_query=default_query,
             http_client=http_client,
+            **kwargs,
         )
         # The parent has just filled api_key from AWS_BEARER_TOKEN_BEDROCK if it is set: None is what makes it sign with SigV4.
         self.api_key = None

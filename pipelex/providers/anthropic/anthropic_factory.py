@@ -100,8 +100,10 @@ class AnthropicFactory:
                         except AwsCredentialsError as exc:
                             if not is_bedrock_token_in_env:
                                 raise
+                            # The cause's message may or may not end its sentence, depending on where the keys were looked for.
+                            cause_message = str(exc).rstrip(".")
                             msg = (
-                                f"{exc} The environment sets {BEDROCK_TOKEN_VAR_NAME}, a Bedrock bearer token, which "
+                                f"{cause_message}. The environment sets {BEDROCK_TOKEN_VAR_NAME}, a Bedrock bearer token, which "
                                 f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" ignores: to authenticate with a '
                                 f'bearer token instead, set bedrock_access_variant = "{BedrockAccessVariant.BEDROCK_TOKEN}" in [runtime.aws].'
                             )
