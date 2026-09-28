@@ -24,10 +24,10 @@ def list_bedrock_models(
     any_listed: bool,
 ) -> None:
     """List Bedrock models."""
-    if importlib.util.find_spec("boto3") is None or importlib.util.find_spec("aioboto3") is None:
-        lib_name = "boto3,aioboto3"
+    if importlib.util.find_spec("boto3") is None or importlib.util.find_spec("aiobotocore") is None:
+        lib_name = "boto3,aiobotocore"
         lib_extra_name = "bedrock"
-        msg = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
+        msg = "The boto3 and aiobotocore SDKs are required to use Bedrock models."
         raise MissingDependencyError(
             lib_name,
             lib_extra_name,

@@ -47,6 +47,56 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
     ("structure-missing-field", "shaper_test.ShaperInvoice", None, {"invoice_number": "INV-1"}, StructureValidationError, "could not be built"),
     # D4 a non-ISO date string is the right kind but an invalid value.
     ("non-iso-date", "shaper_test.Deadline", None, "March 7, 2026", StructureValidationError, "ISO 8601"),
+    # R3 Anything keeps D2 and D9: a list at a single slot, a count mismatch, a null anywhere.
+    ("anything-list-where-singular", "native.Anything", None, [1, 2], ListWhereSingularError, "single"),
+    ("anything-count-mismatch", "native.Anything", 2, [1], MultiplicityCountMismatchError, "exactly 2"),
+    ("anything-null-item", "native.Anything", True, [1, None], WrongScalarKindError, "provided null"),
+    ("anything-nested-list-item", "native.Anything", True, [[1, 2]], WrongScalarKindError, "a list of 2 item"),
+    ("anything-null-envelope-content", "native.Anything", None, {"concept": "native.Anything", "content": None}, NullInputError, "null"),
+    # NaN and the infinities, which a TOML inputs file can spell, are numbers JSON cannot hold.
+    ("nan-for-number", "shaper_test.Priority", None, float("nan"), WrongScalarKindError, "a number JSON cannot hold"),
+    ("inf-for-number", "native.Number", None, float("inf"), WrongScalarKindError, "a number JSON cannot hold"),
+    ("nan-for-anything", "native.Anything", None, float("nan"), WrongScalarKindError, "a number JSON cannot hold"),
+    ("inf-item-for-anything-list", "native.Anything", True, [1, float("-inf")], WrongScalarKindError, "a number JSON cannot hold"),
+    ("json-object-holding-nan", "native.JSON", None, {"a": float("nan")}, StructureValidationError, "not valid JSON"),
+    ("anything-object-holding-an-infinity", "native.Anything", None, {"a": {"b": float("inf")}}, StructureValidationError, "not valid JSON"),
+    ("json-list-item-holding-an-infinity", "native.JSON", True, [{"a": float("-inf")}], StructureValidationError, "not valid JSON"),
+    # R1 a Python caller's value that is not JSON at all.
+    ("anything-not-a-json-value", "native.Anything", None, {1, 2}, WrongScalarKindError, "a value of type set"),
+    # An object holding a value that is not JSON is a typed refusal, not a raw TypeError from the validator.
+    ("anything-object-holding-a-non-json-value", "native.Anything", None, {"a": object()}, StructureValidationError, "not valid JSON"),
+    # R10 an item of a bare list shaped like an envelope is refused, and the message says how to type a list.
+    (
+        "anything-envelope-shaped-item",
+        "native.Anything",
+        True,
+        [{"concept": "Image", "content": {"url": "photo.jpg"}}, "caption"],
+        WrongScalarKindError,
+        "wrap the whole list in one",
+    ),
+    # R5 an Anything envelope is not known to satisfy anything narrower.
+    (
+        "anything-envelope-at-text-slot",
+        "native.Text",
+        None,
+        {"concept": "native.Anything", "content": "hi"},
+        ExplicitConceptIncompatibleError,
+        "not compatible",
+    ),
+    # R7 a JSON slot takes a JSON object and nothing else. A string used to become native.Text.
+    ("json-string", "native.JSON", None, "hi", WrongScalarKindError, "expects a JSON object"),
+    ("json-number", "native.JSON", None, 3, WrongScalarKindError, "expects a JSON object"),
+    ("json-boolean", "native.JSON", None, True, WrongScalarKindError, "expects a JSON object"),
+    ("json-list-where-singular", "native.JSON", None, [{"a": 1}], ListWhereSingularError, "single"),
+    ("json-array-item", "native.JSON", True, [{"a": 1}, [1, 2]], WrongScalarKindError, "expects a JSON object"),
+    (
+        "json-envelope-shaped-item",
+        "native.JSON",
+        True,
+        [{"concept": "JSON", "content": {"json_obj": {}}}],
+        WrongScalarKindError,
+        "wrap the whole list in one",
+    ),
     # D6 an explicit envelope naming an incompatible concept.
     (
         "explicit-incompatible",

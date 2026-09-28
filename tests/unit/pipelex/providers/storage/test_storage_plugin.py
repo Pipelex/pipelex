@@ -87,7 +87,7 @@ class TestStoragePlugin:
         sub_config_factory: Callable[[], Any],
         expected_type: type[StorageProviderAbstract],
     ) -> None:
-        """Selecting a method through the registry constructs its provider (s3 needs no aioboto3 to build)."""
+        """Selecting a method through the registry constructs its provider (s3 needs no aiobotocore to build)."""
         registry = _build_storage_registry()
         kwargs: dict[str, Any] = {"method": method, field_name: sub_config_factory()}
         provider = registry.get_required(method=method)(StorageProviderConfig(**kwargs))

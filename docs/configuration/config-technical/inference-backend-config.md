@@ -185,7 +185,7 @@ If you need to customize how a specific model behaves through the Gateway, you c
 - `sdk`: The SDK to use for the model (e.g., `gateway_completions`)
 - `structure_method`: The method for structured output (e.g., `instructor/openai_tools`)
 
-All other keys will be ignored.
+All other keys will be ignored. What each structure method sends is described under [Structure methods](#structure-methods).
 
 ```toml
 # .pipelex/inference/backends/pipelex_gateway.toml
@@ -297,7 +297,10 @@ Each backend has its own model specification file in `.pipelex/inference/backend
 
 ```toml
 # openai.toml
-default_sdk = "openai"
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-4o-mini]
 model_id = "gpt-4o-mini"
@@ -313,10 +316,22 @@ costs = { input = 2.5, output = 15.0 }
 
 [gpt-image-1]
 model_id = "gpt-image-1"
+sdk = "openai_img_gen"
+model_type = "img_gen"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.04, output = 0.0 }
 ```
+
+The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
+
+#### Structure methods
+
+`structure_method` says how a model is asked for structured output. A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and so is `instructor/openai_structured_outputs`, which sends OpenAI a non-strict tool schema; `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through the Gateway's OpenAI-compatible SDKs.
+
+One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice.
+
+The `google` backend uses `instructor/genai_structured_outputs`, Gemini's native JSON output. `instructor/genai_tools` works on it too: Gemini returns the function-call arguments as plain values, so pipelex validates them in pydantic's lax mode, where a string reaches an enum field as its member.
 
 #### Sending extra request headers per model
 

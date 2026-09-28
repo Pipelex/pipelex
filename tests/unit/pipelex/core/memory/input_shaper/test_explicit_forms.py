@@ -2,6 +2,7 @@ import datetime
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex import log, pretty_print
 from pipelex.core.memory.exceptions import (
@@ -125,6 +126,22 @@ class TestInputShaperExplicitForms:
 
         with pytest.raises(MultiplicityCountMismatchError, match="exactly 2 items"):
             InputShaper.shape({"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library())
+
+    @pytest.mark.parametrize("declared_concept", ["native.Number", "native.Anything"])
+    def test_explicit_number_envelope_holding_nan_raises(self, declared_concept: str) -> None:
+        """An explicit envelope builds its content bottom-up, and `NumberContent` refuses a number JSON cannot hold."""
+        input_specs = build_input_specs([("payload", declared_concept, None)])
+        provided: dict[str, Any] = {"concept": "Number", "content": {"number": float("nan")}}
+
+        with pytest.raises(ValidationError, match="number must be finite"):
+            InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+
+    def test_explicit_single_into_fixed_count_raises(self) -> None:
+        """A single value is one item, never the N a fixed count declares."""
+        input_specs = build_input_specs([("answers", "native.Text", 2)])
+        provided = {"concept": "native.Text", "content": "hello"}
+        with pytest.raises(MultiplicityCountMismatchError, match="but you provided 1"):
+            InputShaper.shape({"answers": provided}, input_specs=input_specs, concept_provider=get_concept_library())
 
     def test_explicit_list_into_list_slot_ok(self) -> None:
         """D2/D6: an explicit ListContent whose length matches a declared list slot shapes cleanly."""

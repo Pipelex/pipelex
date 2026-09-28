@@ -248,11 +248,10 @@ class TestOpenAICompletionsWorkerObjectErrorHandling:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.sdk_exception_type == "ValueError"
 
-    async def test_real_instructor_propagates_transport_error_raw(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library with an SDK transport exception and
-        verify the W2.3 behavior — instructor, confined to schema re-ask, does NOT retry the
-        transport error and does NOT wrap it in ``InstructorRetryException``. It propagates as
-        the raw SDK exception, which the worker classifies as TRANSIENT with provider metadata.
+    async def test_real_instructor_transport_error_is_unwrapped(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library with an SDK transport exception and verify
+        that instructor, confined to schema re-ask, does not retry it: it raises an ``InstructorRetryException``
+        from it after the one attempt, which the worker unwraps to classify the SDK exception as TRANSIENT.
         """
         import instructor  # ruff: ignore[import-outside-top-level]  # imported here to mirror runtime usage
 
@@ -273,8 +272,58 @@ class TestOpenAICompletionsWorkerObjectErrorHandling:
         assert metadata is not None
         assert metadata.provider == "openai"
         assert metadata.status_code == 429
-        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
-        assert exc_info.value.__cause__ is sdk_exc
+        # instructor raises its InstructorRetryException from the SDK exception, which it did not retry
+        wrapper_exc = exc_info.value.__cause__
+        assert wrapper_exc is not None
+        assert wrapper_exc.__cause__ is sdk_exc
+
+    async def test_real_instructor_transport_error_after_a_reask_is_unwrapped(self, mocker: MockerFixture) -> None:
+        """The first response fails the schema and is re-asked, then the re-ask fails in transport. The
+        transport error ended the loop, so it is what the worker classifies, not the earlier parse failure
+        that instructor keeps in ``failed_attempts``.
+        """
+        import instructor  # ruff: ignore[import-outside-top-level]  # imported here to mirror runtime usage
+        from openai.types.chat import ChatCompletion  # ruff: ignore[import-outside-top-level]
+
+        worker = _make_worker(mocker)
+        off_schema_completion = ChatCompletion.model_validate(
+            {
+                "id": "chatcmpl-off-schema",
+                "object": "chat.completion",
+                "created": 0,
+                "model": "gpt-4o",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {"id": "call_1", "type": "function", "function": {"name": "DummySchema", "arguments": '{"wrong": 1}'}},
+                            ],
+                        },
+                    }
+                ],
+            }
+        )
+        sdk_exc = _make_openai_rate_limit_error("Rate limit exceeded — please retry")
+        openai_client = openai.AsyncOpenAI(api_key="fake")
+        create = mocker.AsyncMock(side_effect=[off_schema_completion, sdk_exc])
+        openai_client.chat.completions.create = create  # type: ignore[method-assign]
+        worker.instructor_for_objects = instructor.from_openai(openai_client)
+        llm_job = make_llm_job(mocker)
+        llm_job.job_config.schema_reask_max_attempts = 3
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=llm_job, schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert create.call_count == 2
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.status_code == 429
+        assert metadata.sdk_exception_type == "RateLimitError"
 
     @pytest.mark.parametrize(
         ("sdk_exc", "expected_category"),
@@ -290,9 +339,9 @@ class TestOpenAICompletionsWorkerObjectErrorHandling:
         sdk_exc: Exception,
         expected_category: InferenceErrorCategory,
     ) -> None:
-        """W2.3 regression: now that ``instructor`` no longer retries transport errors, a raw SDK
-        transport exception is the primary path out of ``create_with_completion`` — it must be
-        classified into the right category, never flattened to ``UNKNOWN``, never escape unhandled.
+        """W2.3 regression: a raw SDK transport exception reaching the worker unwrapped, as it would if
+        ``instructor`` stopped wrapping the exception that ends its loop, must be classified into the
+        right category, never flattened to ``UNKNOWN``, never escape unhandled.
         """
         worker = _make_worker(mocker)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]

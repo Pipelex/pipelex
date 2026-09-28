@@ -65,6 +65,22 @@ class TestConceptProviderInjection:
         assert stub.is_compatible.called
         assert stub.get_native_concept.called
 
+    def test_resolve_input_kind_answers_anything_without_resolving_a_class(self, mocker: MockerFixture) -> None:
+        """`native.Anything` has no class to resolve, so its arm is chosen from the concept alone.
+
+        The stub fails on any class resolution and any compatibility question, so an implementation
+        that walked the ordered natives, or asked for `AnythingContent`, would raise here.
+        """
+        library = get_concept_library()
+        anything_concept = library.get_native_concept(native_concept=NativeConceptCode.ANYTHING)
+
+        stub = mocker.Mock(spec=ConceptProviderAbstract)
+        stub.get_structure_class.side_effect = AssertionError("no structure class may be resolved for native.Anything")
+        stub.is_compatible.side_effect = AssertionError("no compatibility question is needed for native.Anything")
+
+        assert InputShaper.resolve_input_kind(anything_concept, concept_provider=stub) is InputKind.ANYTHING
+        assert not stub.get_structure_class.called
+
     def test_building_a_value_resolves_the_structure_class_through_the_injected_provider(self, mocker: MockerFixture) -> None:
         """Content building takes the class from the provider, not from the ambient class registry.
 

@@ -73,7 +73,7 @@ registrar.add_storage_provider(method="azure", factory=_make_azure_storage_provi
 
 The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
 
-- **Import-light.** The plugin module must import no backend SDK at module load. Registering the built-in `s3`/`gcp` factories pulls in neither `aioboto3` nor `google-cloud-storage` — the SDK guard lives *inside* the provider's I/O methods (`_get_session` / `_get_bucket`), not its `__init__`. Selecting `s3` therefore *constructs* an `S3StorageProvider` even with the extra absent; the guard fires only on the first actual load/store.
+- **Import-light.** The plugin module must import no backend SDK at module load. Registering the built-in `s3`/`gcp` factories pulls in neither `aiobotocore` nor `google-cloud-storage` — the SDK guard lives *inside* the provider's I/O methods (`_get_session` / `_get_bucket`), not its `__init__`. Selecting `s3` therefore *constructs* an `S3StorageProvider` even with the extra absent; the guard fires only on the first actual load/store.
 - **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
 
 ---

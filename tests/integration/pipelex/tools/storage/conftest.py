@@ -31,7 +31,7 @@ def storage_method(request: pytest.FixtureRequest) -> StorageMethodLiteral:
 
 @pytest.fixture
 def s3_mock(mocker: MockerFixture) -> dict[str, Any]:
-    """Mock aioboto3 for S3 tests.
+    """Mock aiobotocore for S3 tests.
 
     Creates a mock that simulates S3 behavior using an in-memory dict.
     """
@@ -84,10 +84,10 @@ def s3_mock(mocker: MockerFixture) -> dict[str, Any]:
 
     # Create mock session
     mock_session = mocker.MagicMock()
-    mock_session.client = mocker.MagicMock(return_value=mock_client_context)
+    mock_session.create_client = mocker.MagicMock(return_value=mock_client_context)
 
-    # Patch aioboto3.Session
-    mocker.patch("aioboto3.Session", return_value=mock_session)
+    # Patch the session factory the provider imports lazily
+    mocker.patch("aiobotocore.session.get_session", return_value=mock_session)
 
     return {
         "session": mock_session,
@@ -155,7 +155,7 @@ def storage_provider(
         case "in_memory":
             return InMemoryStorageProvider()
         case "s3":
-            # Request the s3_mock fixture to set up aioboto3 mocks
+            # Request the s3_mock fixture to set up aiobotocore mocks
             request.getfixturevalue("s3_mock")
             return S3StorageProvider(
                 bucket_name=S3_TEST_BUCKET,

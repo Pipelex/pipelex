@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.context import _SUPPRESS_INSTRUMENTATION_KEY, attach, detach, set_value  # pyright: ignore[reportPrivateUsage]
-from opentelemetry.sdk._logs.export import InMemoryLogExporter, SimpleLogRecordProcessor
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter, SimpleLogRecordProcessor
 from opentelemetry.semconv._incubating.attributes import code_attributes
 from opentelemetry.semconv.attributes import exception_attributes
 
@@ -28,7 +28,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from opentelemetry.sdk._logs import LogData
+    from opentelemetry.sdk._logs import ReadableLogRecord
     from pytest_mock import MockerFixture
 
 
@@ -38,12 +38,18 @@ def _package_log_config(*, is_redaction_enabled: bool = True) -> LogConfig:
     return LogConfig.model_validate({**config_dict["runtime"]["log"], "redaction": redaction})
 
 
-def _own_logs(exporter: InMemoryLogExporter) -> list[LogData]:
+def _scope_name(log_data: ReadableLogRecord) -> str:
+    scope = log_data.instrumentation_scope
+    assert scope is not None
+    return scope.name
+
+
+def _own_logs(exporter: InMemoryLogRecordExporter) -> list[ReadableLogRecord]:
     """The records this module emitted, whatever else the process logged meanwhile."""
-    return [log_data for log_data in exporter.get_finished_logs() if log_data.instrumentation_scope.name == __name__]
+    return [log_data for log_data in exporter.get_finished_logs() if _scope_name(log_data) == __name__]
 
 
-def _attributes(log_data: LogData) -> dict[str, Any]:
+def _attributes(log_data: ReadableLogRecord) -> dict[str, Any]:
     attributes = log_data.log_record.attributes
     assert attributes is not None
     return dict(attributes)
@@ -51,12 +57,12 @@ def _attributes(log_data: LogData) -> dict[str, Any]:
 
 class TestOtlpLogSink:
     @pytest.fixture
-    def otlp_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, InMemoryLogExporter]]:
+    def otlp_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, InMemoryLogRecordExporter]]:
         # pytest's ``log_level`` option restores the root logger's level at every phase boundary, undoing the
         # level ``configure`` sets from inside a fixture; the module's own logger is enabled explicitly and
         # ``caplog`` restores it at teardown.
         caplog.set_level(logging.INFO, logger=__name__)
-        exporter = InMemoryLogExporter()
+        exporter = InMemoryLogRecordExporter()
         fresh = Log()
         fresh.configure(log_config=_package_log_config())
         fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
@@ -65,7 +71,9 @@ class TestOtlpLogSink:
         finally:
             fresh.reset()
 
-    def test_a_record_reaches_the_exporter_with_the_fields_and_the_context_as_attributes(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_a_record_reaches_the_exporter_with_the_fields_and_the_context_as_attributes(
+        self, otlp_log: tuple[Log, InMemoryLogRecordExporter]
+    ) -> None:
         fresh, exporter = otlp_log
         with fresh.context(request_id="r1", pipe_run_id="pr1"):
             fresh.info("scanned", fields={"files": 7, "ratio": 0.5, "tags": ["a", "b"], "meta": {"k": "v"}})
@@ -87,14 +95,14 @@ class TestOtlpLogSink:
         assert attributes[code_attributes.CODE_FUNCTION_NAME] == "test_a_record_reaches_the_exporter_with_the_fields_and_the_context_as_attributes"
         assert attributes[code_attributes.CODE_LINE_NUMBER] > 0
 
-    def test_structured_content_rides_as_json_text_in_the_data_attribute(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_structured_content_rides_as_json_text_in_the_data_attribute(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         fresh, exporter = otlp_log
         fresh.info({"key": "value", "nested": {"flag": True}}, title="Config")
 
         (log_data,) = _own_logs(exporter)
         assert _attributes(log_data)["data"] == '{"key": "value", "nested": {"flag": true}}'
 
-    def test_the_exception_lands_under_the_semantic_convention_keys(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_the_exception_lands_under_the_semantic_convention_keys(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         fresh, exporter = otlp_log
         try:
             msg = "boom"
@@ -111,7 +119,9 @@ class TestOtlpLogSink:
         assert "Traceback (most recent call last)" in attributes[exception_attributes.EXCEPTION_STACKTRACE]
         assert attributes[exception_attributes.EXCEPTION_STACKTRACE].rstrip().endswith("ValueError: boom")
 
-    def test_the_stacktrace_is_the_scrubbed_text_and_no_message_attribute_carries_the_secret(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_the_stacktrace_is_the_scrubbed_text_and_no_message_attribute_carries_the_secret(
+        self, otlp_log: tuple[Log, InMemoryLogRecordExporter]
+    ) -> None:
         """The message attribute would be ``str(exc_value)``, which no sink can scrub; the type and the stacktrace's last line carry what it said."""
         fresh, exporter = otlp_log
         try:
@@ -129,7 +139,7 @@ class TestOtlpLogSink:
     def test_an_exception_that_carries_no_traceback_still_exports_its_own_text(self, caplog: pytest.LogCaptureFixture) -> None:
         """``exc_text`` is the processor's rendering; with redaction off there is none and the stacktrace is the only place the text goes."""
         caplog.set_level(logging.INFO, logger=__name__)
-        exporter = InMemoryLogExporter()
+        exporter = InMemoryLogRecordExporter()
         fresh = Log()
         fresh.configure(log_config=_package_log_config(is_redaction_enabled=False))
         fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
@@ -144,7 +154,7 @@ class TestOtlpLogSink:
         finally:
             fresh.reset()
 
-    def test_the_semantic_convention_keys_are_reserved_with_or_without_an_exception(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_the_semantic_convention_keys_are_reserved_with_or_without_an_exception(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         """The sink writes these keys itself, so a field named like one is prefixed rather than overwritten.
 
         Reserved whether or not the record carries an exception, exactly as the json sink reserves its own
@@ -196,7 +206,7 @@ class TestOtlpLogSink:
     )
     def test_every_level_maps_onto_the_otel_severity_scale(
         self,
-        otlp_log: tuple[Log, InMemoryLogExporter],
+        otlp_log: tuple[Log, InMemoryLogRecordExporter],
         caplog: pytest.LogCaptureFixture,
         method_name: str,
         severity_text: str,
@@ -210,16 +220,16 @@ class TestOtlpLogSink:
         assert log_data.log_record.severity_text == severity_text
         assert log_data.log_record.severity_number is severity_number
 
-    def test_a_record_from_the_opentelemetry_sdk_itself_is_not_exported(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_a_record_from_the_opentelemetry_sdk_itself_is_not_exported(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         """An exporter's own failure line must not re-enter the pipeline that failed."""
         _, exporter = otlp_log
         logging.getLogger("opentelemetry.exporter.otlp").error("Failed to export logs batch")
         logging.getLogger("opentelemetry").warning("dropped")
 
-        scopes = {log_data.instrumentation_scope.name for log_data in exporter.get_finished_logs()}
+        scopes = {_scope_name(log_data) for log_data in exporter.get_finished_logs()}
         assert not any(scope == "opentelemetry" or scope.startswith("opentelemetry.") for scope in scopes)
 
-    def test_the_sdks_own_record_is_rejected_before_the_handler_lock_is_taken(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_the_sdks_own_record_is_rejected_before_the_handler_lock_is_taken(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         """At exit the stdlib's shutdown holds this lock while it flushes, and an exporting thread reporting its failure must not wait on it."""
         fresh, _ = otlp_log
         assert fresh.sink is not None
@@ -253,7 +263,9 @@ class TestOtlpLogSink:
             let_go.set()
             holder.join()
 
-    def test_a_record_emitted_during_an_export_is_rejected_whatever_its_logger_is_called(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_a_record_emitted_during_an_export_is_rejected_whatever_its_logger_is_called(
+        self, otlp_log: tuple[Log, InMemoryLogRecordExporter]
+    ) -> None:
         """The SDK sets a context value around ``exporter.export``; the transport logs under it, and the sink reads it. A private key, pinned here."""
         fresh, exporter = otlp_log
         token = attach(set_value(_SUPPRESS_INSTRUMENTATION_KEY, True))
@@ -264,12 +276,10 @@ class TestOtlpLogSink:
             detach(token)
         fresh.info("mine, after the export")
 
-        assert [
-            log_data.log_record.body for log_data in exporter.get_finished_logs() if log_data.instrumentation_scope.name.startswith("urllib3")
-        ] == []
+        assert [log_data.log_record.body for log_data in exporter.get_finished_logs() if _scope_name(log_data).startswith("urllib3")] == []
         assert [log_data.log_record.body for log_data in _own_logs(exporter)] == ["mine, after the export"]
 
-    def test_a_mixed_type_sequence_rides_as_json_text_rather_than_being_dropped(self, otlp_log: tuple[Log, InMemoryLogExporter]) -> None:
+    def test_a_mixed_type_sequence_rides_as_json_text_rather_than_being_dropped(self, otlp_log: tuple[Log, InMemoryLogRecordExporter]) -> None:
         """The SDK keeps a sequence of one scalar type, compared by type equality, and drops the rest to ``None``."""
         fresh, exporter = otlp_log
         fresh.info("sequences", fields={"mixed": [1, "foo"], "int_bool": [1, True], "homogeneous": ["a", "b"], "empty": []})
@@ -281,7 +291,7 @@ class TestOtlpLogSink:
         assert list(attributes["homogeneous"]) == ["a", "b"]
         assert list(attributes["empty"]) == []
 
-    def test_flush_hands_the_provider_a_deadline(self, otlp_log: tuple[Log, InMemoryLogExporter], mocker: MockerFixture) -> None:
+    def test_flush_hands_the_provider_a_deadline(self, otlp_log: tuple[Log, InMemoryLogRecordExporter], mocker: MockerFixture) -> None:
         fresh, _ = otlp_log
         sink = fresh.sink
         assert isinstance(sink, OtlpLogSink)
@@ -293,7 +303,7 @@ class TestOtlpLogSink:
 
     def test_the_same_sink_installed_again_after_a_reset_is_refused_rather_than_exporting_nothing(self) -> None:
         """The teardown shuts the provider and the processor down, which nothing starts again, so a second install must say so."""
-        exporter = InMemoryLogExporter()
+        exporter = InMemoryLogRecordExporter()
         sink = OtlpLogSink(processor=SimpleLogRecordProcessor(exporter))
         fresh = Log()
         fresh.configure(log_config=_package_log_config())

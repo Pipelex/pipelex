@@ -25,31 +25,36 @@ class DummySchema(BaseModel):
     text: str
 
 
-def wrap_in_instructor_retry(sdk_exc: Exception, *, include_failed_attempts: bool = True) -> InstructorRetryException:
-    """Build an ``InstructorRetryException`` as instructor's retry loop would.
+def wrap_in_instructor_retry(sdk_exc: Exception, *, earlier_parse_failures: list[Exception] | None = None) -> InstructorRetryException:
+    """Build an ``InstructorRetryException`` the way instructor's retry loop raises one around an SDK exception.
+
+    instructor raises it ``from`` the last exception its loop saw. pipelex's re-ask predicate never retries a
+    transport failure, so that last exception is the raw SDK exception, and it sits on ``__cause__``.
+    ``failed_attempts`` records only the attempts whose response failed to parse, so an SDK exception never
+    appears there.
 
     Args:
-        sdk_exc: The underlying SDK exception that should appear as the last
-            failed attempt.
-        include_failed_attempts: When ``True`` (default), populate
-            ``failed_attempts`` with a single :class:`FailedAttempt` wrapping
-            ``sdk_exc``. When ``False``, leave ``failed_attempts`` as ``None``
-            so the caller can install a tenacity ``RetryError`` on
-            ``__cause__`` to exercise the fallback unwrap path.
+        sdk_exc: The SDK exception the last attempt raised.
+        earlier_parse_failures: The parse failures of the attempts before it, oldest first, which instructor
+            re-asked before the SDK exception ended the loop.
 
     Returns:
-        An ``InstructorRetryException`` whose ``failed_attempts[-1].exception``
-        is ``sdk_exc`` (when ``include_failed_attempts`` is ``True``).
+        An ``InstructorRetryException`` chained from ``sdk_exc``.
     """
-    failed_attempts: list[FailedAttempt] | None = [FailedAttempt(attempt_number=1, exception=sdk_exc)] if include_failed_attempts else None
-    return InstructorRetryException(
+    failed_attempts = [
+        FailedAttempt(attempt_number=attempt_index + 1, exception=parse_failure)
+        for attempt_index, parse_failure in enumerate(earlier_parse_failures or [])
+    ]
+    wrapped = InstructorRetryException(
         str(sdk_exc),
         last_completion=None,
-        n_attempts=1,
+        n_attempts=len(failed_attempts) + 1,
         total_usage=0,
         create_kwargs={},
         failed_attempts=failed_attempts,
     )
+    wrapped.__cause__ = sdk_exc
+    return wrapped
 
 
 def make_llm_job(mocker: MockerFixture) -> Any:

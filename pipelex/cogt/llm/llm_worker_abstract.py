@@ -20,6 +20,7 @@ from pipelex.system.telemetry.current_span import pipelex_span_active
 from pipelex.system.telemetry.otel_constants import (
     GenAISpanAttr,
     LangfuseSpanAttr,
+    OTelAttributeValue,
     PipelexSpanAttr,
     SpanCategory,
     make_otel_gen_ai_output_type,
@@ -31,7 +32,6 @@ from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
-    from opentelemetry.util.types import AttributeValue
     from pydantic import BaseModel
 
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -141,7 +141,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Build all span attributes with FULL (non-redacted) values
         # PostHog exporters will apply redaction based on their TelemetryRedactionConfig
-        span_attributes: dict[str, AttributeValue] = {
+        span_attributes: dict[str, OTelAttributeValue] = {
             # GenAI standard attributes
             GenAISpanAttr.OPERATION_NAME: unit_job_id,
             GenAISpanAttr.OUTPUT_TYPE: make_otel_gen_ai_output_type(output_type=output_type).value,
@@ -227,6 +227,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             context=parent_ctx,
             attributes=span_attributes,
         )
+        # A tracer that records nothing, the no-op tracer `OTEL_SDK_DISABLED` hands out for one, gives back the
+        # parent it was handed rather than a span of its own; that is no span, exactly as with no tracer.
+        if span.get_span_context() == parent_span_context:
+            return None
 
         # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
         span_ctx = span.get_span_context()

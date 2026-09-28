@@ -48,12 +48,11 @@ class TestRequireSdk:
         """
 
         def fake_find_spec(name: str) -> object | None:
-            return None if name == "aioboto3" else object()
+            return None if name == "aiobotocore" else object()
 
         mocker.patch(f"{REGISTRY_MODULE}.importlib.util.find_spec", side_effect=fake_find_spec)
         with pytest.raises(MissingDependencyError) as exc_info:
-            require_sdk(spec=["boto3", "aioboto3"], extra="bedrock", msg="install it")
-        # boto3 is present, so only aioboto3 should be named (the trailing comma proves the old
-        # joined "boto3,aioboto3" form is gone — "boto3" alone is a substring of "aioboto3").
-        assert exc_info.value.dependency_name == "aioboto3"
+            require_sdk(spec=["boto3", "aiobotocore"], extra="bedrock", msg="install it")
+        # boto3 is present, so only aiobotocore should be named (no joined "boto3,aiobotocore" form).
+        assert exc_info.value.dependency_name == "aiobotocore"
         assert "boto3," not in str(exc_info.value)

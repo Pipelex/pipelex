@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pytest
 from opentelemetry import trace
-from opentelemetry.sdk._logs.export import InMemoryLogExporter, SimpleLogRecordProcessor
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter, SimpleLogRecordProcessor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -227,10 +227,10 @@ def _json_lines(buffer: io.StringIO, *, logger_name: str) -> dict[str, LineTrace
     }
 
 
-def _otlp_lines(exporter: InMemoryLogExporter, *, logger_name: str) -> dict[str, LineTrace]:
+def _otlp_lines(exporter: InMemoryLogRecordExporter, *, logger_name: str) -> dict[str, LineTrace]:
     lines: dict[str, LineTrace] = {}
     for log_data in exporter.get_finished_logs():
-        if log_data.instrumentation_scope.name != logger_name:
+        if log_data.instrumentation_scope is None or log_data.instrumentation_scope.name != logger_name:
             continue
         record = log_data.log_record
         trace_id = f"{record.trace_id:032x}" if record.trace_id else None
@@ -280,7 +280,7 @@ class TestLiveRunPipeCurrentSpan:
 
             read_lines_of = read_json_lines
         else:
-            exporter = InMemoryLogExporter()
+            exporter = InMemoryLogRecordExporter()
             fresh.install_sink(OtlpLogSink(processor=SimpleLogRecordProcessor(exporter)))
 
             def read_otlp_lines(logger_name: str) -> dict[str, LineTrace]:
@@ -416,7 +416,7 @@ class TestLiveRunPipeCurrentSpan:
         assert sunk.read_lines()["inside cancelled"].pipelex_span_id == _hex_span_id(pipe_span)
 
     async def test_a_no_op_tracer_leaves_the_callers_span_to_the_line(self, sunk: Sunk, mocker: MockerFixture) -> None:
-        """A no-op tracer, what the SDK hands out under ``OTEL_SDK_DISABLED``, starts spans naming no trace, which must not hide the caller's."""
+        """A no-op tracer, the one ``OTEL_SDK_DISABLED`` hands out, starts no span; the parent it gives back must not name the line."""
         mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=trace.NoOpTracer())
         caller_tracer = TracerProvider().get_tracer(__name__)
         pipe = _make_pipe(code="no_op")
