@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260927-086ea4
 ---
 
@@ -45,10 +45,12 @@ The instructor half of the first draft (reading `__cause__` first in `extract_un
     - Review round 1 (profile 3, cubic, Codex, code-review) changed two things in the design, both recorded there. Portkey's cloud also emits `model_not_allowed_error` for a user's own workspace behind the `portkey` backend, so the claim that only Pipelex-configured gateways emit it was corrected in the code comment, the error-model doc and D1, and the advice now says who settles a deck disagreement on each gateway. The hint to leave the pipe's model unset is now conditional, since the refused model may be the default. The round also removed the family counts from the doc and the test docstring. A finding that the `wip/` documents name private repositories and paths was refuted: the public repository's source and other campaign documents already do, and nothing named is a secret.
     - The real-loop module is `tests/unit/pipelex/providers/test_instructor_retry_shapes.py`. Beyond the design, it pins that a spent budget recovers the very `ValidationError` object instructor recorded last in `failed_attempts`.
     - Beyond D5, the "Behavior Summary" table of `docs/under-the-hood/error-model.md` made the same false claim as the unwrap section (a spent re-ask budget reading `UNKNOWN`, HTTP 500). It reads `CONTENT` / `CHANGE_INPUT`, HTTP 422, verified by rendering a recovered `ValidationError`, and the row now says so; a row for this refusal was added beside it.
-- [ ] Run `/rev`, then open the pull request with `Closes L-260927-086ea4`.
+- [x] Run `/rev`, then open the pull request with `Closes L-260927-086ea4`.
+    - Review converged at round 2, which fixed nothing. Its one confirmed finding, that STRICT disclosure drops every inference error's `user_action` (this refusal's included), was already true before this branch and covers the whole family, so it went to the ledger.
 
 ## Out of scope, with where it lives
 
 - Refusing a model the account cannot use at validation: `L-260927-2a587b` (`pipelex-server`). Resolving every model reference to a served handle: `L-260925-cfb6f3`.
 - The api-dev gateway's allow-list disagreeing with the remote config: `L-260923-2c7f6b` (`pipelex-remote-config`).
 - Usage accounting across re-asked attempts: `L-260927-24b43d`.
+- Keeping an inference error's authored `user_action` under STRICT disclosure, where it is dropped with the provider-bearing message: `L-260928-69b18f`.
