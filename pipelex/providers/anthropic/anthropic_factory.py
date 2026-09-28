@@ -9,6 +9,7 @@ from anthropic.types.document_block_param import DocumentBlockParam
 from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
 
+from pipelex import log
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -16,8 +17,11 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.model_handle import ModelHandle
+from pipelex.providers.anthropic.anthropic_bedrock_sigv4 import AsyncAnthropicBedrockSigV4
 from pipelex.providers.anthropic.anthropic_exceptions import AnthropicFactoryError
-from pipelex.tools.aws.aws_config import BedrockAccessVariant
+from pipelex.system.environment import get_optional_env
+from pipelex.tools.aws.aws_config import BEDROCK_TOKEN_VAR_NAME, BedrockAccessVariant
+from pipelex.tools.aws.exceptions import AwsCredentialsError
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
@@ -88,10 +92,28 @@ class AnthropicFactory:
                 aws_config = get_config().runtime.aws
                 match aws_config.bedrock_access_variant:
                     case BedrockAccessVariant.AWS_ACCESS:
-                        aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
-                        return AsyncAnthropicBedrock(
-                            aws_secret_key=aws_secret_access_key,
+                        # The configured variant wins over a Bedrock bearer token in the environment, which the SDK
+                        # would otherwise pick up and refuse beside the access keys: see AsyncAnthropicBedrockSigV4.
+                        is_bedrock_token_in_env = bool(get_optional_env(BEDROCK_TOKEN_VAR_NAME))
+                        try:
+                            aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
+                        except AwsCredentialsError as exc:
+                            if not is_bedrock_token_in_env:
+                                raise
+                            msg = (
+                                f"{exc} The environment sets {BEDROCK_TOKEN_VAR_NAME}, a Bedrock bearer token, which "
+                                f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" ignores: to authenticate with a '
+                                f'bearer token instead, set bedrock_access_variant = "{BedrockAccessVariant.BEDROCK_TOKEN}" in [runtime.aws].'
+                            )
+                            raise AwsCredentialsError(msg) from exc
+                        if is_bedrock_token_in_env:
+                            log.verbose(
+                                f"Ignoring {BEDROCK_TOKEN_VAR_NAME} from the environment: "
+                                f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" signs with the configured AWS access keys.'
+                            )
+                        return AsyncAnthropicBedrockSigV4(
                             aws_access_key=aws_access_key_id,
+                            aws_secret_key=aws_secret_access_key,
                             aws_region=aws_region,
                             max_retries=transport_max_retries,
                         )
