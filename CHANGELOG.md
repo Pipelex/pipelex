@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.69.0] - 2026-09-28
+
+### Highlights
+
+**`Anything` and `JSON` inputs take the values their names promise.** An `Anything` input now takes any JSON value under the `Anything` concept, a `JSON` input reads an object literally, and a value neither can read is refused with an error naming the input and its concept. Structured output moves to `instructor` 1.17, the `mistralai` extra to `mistralai` 2.x, and the Bedrock and S3 extras from `aioboto3` to `aiobotocore`, which renames the `bedrock_aioboto3` SDK handle that `pipelex migrate` now points out. Structured output on the `google` backend now accepts enum fields and sends the system prompt, the temperature and the token limit.
 
 ### Changed
 
