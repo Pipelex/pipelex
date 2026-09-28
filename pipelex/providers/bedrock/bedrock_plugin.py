@@ -57,6 +57,6 @@ class BedrockPlugin:
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_boto3", make_worker=_make_bedrock_worker)
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_aiobotocore", make_worker=_make_bedrock_worker)
+        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_aioboto", make_worker=_make_bedrock_worker)
         registrar.add_model_lister(sdk="bedrock", lister=_list_bedrock_models)
-        registrar.add_model_lister(sdk="bedrock_aiobotocore", lister=_list_bedrock_models)
+        registrar.add_model_lister(sdk="bedrock_aioboto", lister=_list_bedrock_models)

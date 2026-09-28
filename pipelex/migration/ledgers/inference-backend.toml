@@ -65,15 +65,16 @@ to_schema_version = 3
 introduced_in = "0.69.0"
 breaking = true
 safety = "unsafe"
-title = "Rename the bedrock_aioboto3 SDK handle to bedrock_aiobotocore, by hand"
+title = "Rename the bedrock_aioboto3 SDK handle to bedrock_aioboto, by hand"
 description = """
 Bedrock's async client now runs on `aiobotocore` directly rather than through `aioboto3`, which pinned \
 `boto3` to an old release, so the SDK handle that selects it is renamed from `bedrock_aioboto3` to \
-`bedrock_aiobotocore`. A backend file that still names the old handle keeps loading, but every call to \
-a model it defines fails, because no plugin registers that SDK any more.
+`bedrock_aioboto`, a name for the async client that no longer names the library it is built on. A backend \
+file that still names the old handle keeps loading, but every call to a model it defines fails, because no \
+plugin registers that SDK any more.
 """
 guidance = """
-Replace `sdk = "bedrock_aioboto3"` with `sdk = "bedrock_aiobotocore"` wherever the file sets it: in \
+Replace `sdk = "bedrock_aioboto3"` with `sdk = "bedrock_aioboto"` wherever the file sets it: in \
 `[defaults]`, which is where the Bedrock file we ship sets it, and in any model table that overrides it. \
 Nothing else changes, and the synchronous `bedrock_boto3` handle keeps its name.
 """
@@ -82,4 +83,4 @@ Nothing else changes, and the synchronous `bedrock_boto3` handle keeps its name.
 kind = "remap_value"
 table_path = ["*"]
 key = "sdk"
-mapping = { bedrock_aioboto3 = "bedrock_aiobotocore" }
+mapping = { bedrock_aioboto3 = "bedrock_aioboto" }

@@ -12,7 +12,7 @@ from pipelex.providers.bedrock.bedrock_message import BedrockContentItem, Bedroc
 
 class BedrockSdkVariant(StrEnum):
     BOTO3 = "bedrock_boto3"
-    AIOBOTOCORE = "bedrock_aiobotocore"
+    AIOBOTO = "bedrock_aioboto"
 
 
 class BedrockExtraField(StrEnum):
@@ -40,7 +40,7 @@ class BedrockFactory:
         bedrock_async_client: BedrockClientProtocol
         log.verbose(f"Using '{sdk_variant}' for BedrockClient")
         match sdk_variant:
-            case BedrockSdkVariant.AIOBOTOCORE:
+            case BedrockSdkVariant.AIOBOTO:
                 from pipelex.providers.bedrock.bedrock_client_aiobotocore import BedrockClientAiobotocore  # ruff: ignore[import-outside-top-level]
 
                 bedrock_async_client = BedrockClientAiobotocore(

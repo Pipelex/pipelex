@@ -213,7 +213,7 @@ class TestLLMWorkerFactory:
             pytest.param("bedrock_anthropic", ANTHROPIC_CLIENT, ANTHROPIC_WORKER, None, None, None, True, True, id="bedrock_anthropic"),
             pytest.param("mistral", MISTRAL_CLIENT, MISTRAL_WORKER, "mistral_factory", MistralFactory, None, False, False, id="mistral"),
             pytest.param("bedrock_boto3", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_boto3"),
-            pytest.param("bedrock_aiobotocore", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_aiobotocore"),
+            pytest.param("bedrock_aioboto", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_aioboto"),
             pytest.param("google", GOOGLE_CLIENT, GOOGLE_WORKER, None, None, None, False, False, id="google"),
         ],
     )
@@ -307,7 +307,7 @@ class TestLLMWorkerFactory:
             pytest.param("bedrock_anthropic", "anthropic", id="bedrock_anthropic"),
             pytest.param("mistral", "mistral", id="mistral"),
             pytest.param("bedrock_boto3", "bedrock", id="bedrock_boto3"),
-            pytest.param("bedrock_aiobotocore", "bedrock", id="bedrock_aiobotocore"),
+            pytest.param("bedrock_aioboto", "bedrock", id="bedrock_aioboto"),
             pytest.param("google", "google", id="google"),
         ],
     )

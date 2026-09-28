@@ -310,7 +310,7 @@ Temperature is passed normally to the Mistral API regardless of reasoning mode.
 
 ### Bedrock (aiobotocore native models)
 
-Bedrock native models using the `bedrock_aiobotocore` SDK do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
+Bedrock native models using the `bedrock_aioboto` SDK do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
 
 !!! note
     Claude models accessed through Bedrock use the `bedrock_anthropic` SDK variant and go through the Anthropic worker, which does support reasoning.

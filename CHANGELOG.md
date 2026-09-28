@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **`aiobotocore` replaces `aioboto3`, and the `bedrock_aioboto3` SDK handle is renamed `bedrock_aiobotocore` (Breaking)**: the `bedrock` and `s3` extras depend on `aiobotocore` 3.x instead of `aioboto3`, whose latest release pins `boto3` below 1.40.62, so both extras now take `boto3>=1.42.42`. **Migration:** a backend file that still sets `sdk = "bedrock_aioboto3"` keeps loading but fails on every call to its models, with an error that points at `pipelex migrate`, which names each such file under `inference-backend@3` without rewriting it, so replace the handle with `bedrock_aiobotocore` by hand.
+- **`aiobotocore` replaces `aioboto3`, and the `bedrock_aioboto3` SDK handle is renamed `bedrock_aioboto` (Breaking)**: the `bedrock` and `s3` extras depend on `aiobotocore` 3.x instead of `aioboto3`, whose latest release pins `boto3` below 1.40.62, so both extras now take `boto3>=1.42.42`. The new handle names the async Bedrock client rather than the library under it, so a later change of library will not rename it again. **Migration:** a backend file that still sets `sdk = "bedrock_aioboto3"` keeps loading but fails on every call to its models, with an error that points at `pipelex migrate`, which names each such file under `inference-backend@3` without rewriting it, so replace the handle with `bedrock_aioboto` by hand.
 - **`instructor` 1.17, and the `mistralai` extra on `mistralai` 2.x (Breaking)**: pipelex now requires `instructor>=1.17.0,<2.0.0`, and the `mistralai` extra takes `mistralai>=2.10.0`, whose client lives under `mistralai.client`, so a project that imports `mistralai` 1.x beside pipelex must move to 2.x with it.
 
 ### Fixed
