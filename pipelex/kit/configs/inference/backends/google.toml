@@ -23,7 +23,7 @@
 [defaults]
 model_type = "llm"
 sdk = "google"
-structure_method = "instructor/genai_tools"
+structure_method = "instructor/genai_structured_outputs" # Gemini's native JSON output: under genai_tools, instructor validates the function-call args strictly and rejects every enum value
 thinking_mode = "manual"
 
 ################################################################################
