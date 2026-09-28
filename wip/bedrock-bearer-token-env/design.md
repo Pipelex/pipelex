@@ -56,7 +56,7 @@ The cost is coupling to four public attributes of the SDK client (`api_key`, `aw
 
 ## Noticed, not in scope
 
-Three neighbouring gaps turned up while reading this code. None is the clash, and each would change behaviour someone may rely on, so they are recorded here rather than folded in:
+These neighbouring gaps turned up while reading this code. None is the clash, and closing any of them would change behaviour someone may rely on or belongs to a dependency bump, so they are recorded here rather than folded in:
 
 - **`bedrock_token` passes no region.** The SDK then infers one from `AWS_REGION`, the boto profile, or `us-east-1`, so under `api_key_method = "secret_provider"` a region stored with the secrets is ignored.
 - **`aws_access` passes no session token.** `get_aws_access_keys` reads neither `AWS_SESSION_TOKEN` nor its secret, so temporary STS credentials cannot sign a `bedrock_anthropic` request.
