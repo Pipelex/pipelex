@@ -237,7 +237,11 @@ class GatewayRoutingRefusal(StrEnum):
 
     Each member corresponds to one of the gateway's own error codes, which is the
     contract between the two repositories — the wording of a refusal is free to
-    change, the code is not.
+    change, the code is not. All but one are the gateway's ``pig-`` codes, at HTTP
+    400. ``MODEL_NOT_ALLOWED`` is keyed on the code of the Portkey substrate the
+    gateway is built on, which answers it at HTTP 412 from the middleware the
+    gateway vendors; Portkey's cloud, which ``pipelex_gateway`` points at by
+    default, answers it the same way.
     """
 
     #: ``pig-01`` at HTTP 400 — the request body names one that no integration
@@ -275,6 +279,15 @@ class GatewayRoutingRefusal(StrEnum):
     #: model named on a pipe it cannot serve: the message names the integration,
     #: the provider and the capability.
     UNSERVED_CAPABILITY = "unserved_capability"
+    #: ``model_not_allowed_error`` at HTTP 412 — an integration serves the model
+    #: but does not allow it for this caller. The substrate raises it in two
+    #: cases: the integration does not allow every model and does not list this
+    #: one, or it lists it as archived. The caller can pick another model; for
+    #: whoever operates the gateway, it means the model deck and the integration's
+    #: allow-list disagree. The gateway's message names only the backend's wire
+    #: id, which the method's author never wrote, so this is the one member whose
+    #: advice names the model handle (see ``_render_gateway_routing_refusal_detail``).
+    MODEL_NOT_ALLOWED = "model_not_allowed"
 
 
 # The gateway's routing-refusal codes, mapped to what the runtime does about them.
@@ -286,6 +299,15 @@ class GatewayRoutingRefusal(StrEnum):
 # ``GATEWAY``, plain ``httpx`` on the native routes reports ``GATEWAY`` too, and
 # Claude travels on the shared Anthropic driver — while ``pig-`` is the gateway's
 # own code namespace and no vendor emits into it.
+#
+# **``model_not_allowed_error`` is the one code outside that namespace**, and it is
+# matched on the code alone for a reason of its own: it is the Portkey substrate's
+# code, which only gateways Pipelex configures emit (Portkey's cloud, and the
+# middleware the manifold vendors from it), and no model vendor uses it. Both raise
+# sites answer 412, so checking the status too would add nothing. It arrives with
+# the code in ``type`` and ``code`` null, and every Extract hop recovers it from
+# there: the vendor-facing hops read ``type`` first, and the two Pipelex-service
+# hops fall back to it.
 #
 # **Two of the gateway's routing codes are deliberately absent**, and the omission
 # is the scope decision rather than an oversight:
@@ -320,6 +342,7 @@ _GATEWAY_ROUTING_REFUSAL_BY_CODE: dict[str, GatewayRoutingRefusal] = {
     "pig-02": GatewayRoutingRefusal.DISABLED_INTEGRATION,
     "pig-05": GatewayRoutingRefusal.WRONG_PROTOCOL,
     "pig-06": GatewayRoutingRefusal.UNSERVED_CAPABILITY,
+    "model_not_allowed_error": GatewayRoutingRefusal.MODEL_NOT_ALLOWED,
 }
 
 
@@ -436,8 +459,8 @@ class ProviderErrorMetadata(BaseModel):
         above do, and for the same reason: the gateway can refuse to route a
         request before any provider sees it, and the code is the only thing that
         says so. Without this the whole family falls through to the status ladder's
-        400 arm and a caller who named a model the deployment does not serve is
-        told to review their prompt.
+        4xx arms and a caller who named a model the deployment does not serve, or
+        may not use, is told to review their prompt.
 
         Disjoint from both other families by construction, so the Classify step may
         read the three in any order. Returns ``None`` for every other refusal,

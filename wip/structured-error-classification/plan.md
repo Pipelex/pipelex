@@ -21,7 +21,7 @@ The instructor half of the first draft (reading `__cause__` first in `extract_un
 
 ## Classify model_not_allowed and pin the instructor wrapper to the real loop
 
-- [ ] Write the failing tests first.
+- [x] Write the failing tests first.
     - Extend `tests/unit/pipelex/cogt/inference/test_gateway_routing_refusals.py`:
         - `model_not_allowed_error` maps to `MODEL_NOT_ALLOWED`;
         - it survives every Extract hop, each exception built through its SDK's own factory: the OpenAI hop through `_make_status_error_from_response(response)`, which takes no `request` argument, the Anthropic hop, the Portkey substrate, and the manifold's httpx hop;
@@ -30,17 +30,20 @@ The instructor half of the first draft (reading `__cause__` first in `extract_un
         - the HTTP status stays 500;
         - the advice survives the pipe boundary.
     - Add the real-loop module of design D4, for example `tests/unit/pipelex/providers/test_instructor_retry_shapes.py`. It drives `from_openai` and `from_anthropic` over `httpx.MockTransport` for the three shapes, and asserts that the recovery returns the exception that ended the loop and that the raised shape is the one `wrap_in_instructor_retry` builds. In the same module, drive the campaign's scenario end to end: the OpenAI completions worker's `_gen_object` over real instructor, the gateway answering 412 with the campaign's body, and the located failure report showing `error_domain: config`, `error_category: configuration` and `user_action.kind: change_model`.
-- [ ] Add `GatewayRoutingRefusal.MODEL_NOT_ALLOWED` and its map entry. Rewrite the enum docstring and the map comment per design D1: this member is keyed on the gateway substrate's code and arrives on 412, it has two raise sites (not in the allow-list, or archived), and no vendor collision is possible.
-- [ ] Add its arm to `_classify_gateway_routing_refusal`, with a comment tying it to `WRONG_PROTOCOL` and `UNSERVED_CAPABILITY` on why the flag stays unset.
-- [ ] Thread `model_handle` from `render_inference_error` through `_render_detail` into `_render_gateway_routing_refusal_detail`, and write this member's advice (design D2). The other members keep ignoring the handle. Update that function's docstring, which says the family names no model, to state this exception and its reason.
-- [ ] In `docs/under-the-hood/error-model.md`, add the row to the "When the model cannot be routed" table and a bullet on the unset flag and the handle in the advice. In the "`instructor` Unwrap" section, correct the sentence claiming a `pydantic.ValidationError` lands in `UNKNOWN` (design D5).
-- [ ] In `CHANGELOG.md` under Unreleased, add a Fixed entry: a gateway's `model_not_allowed_error` refusal now reads as a configuration error with a `change_model` action naming the model handle, instead of "review the prompt, parameters, and inputs", and the HTTP status is unchanged at 500. Correct the existing "A transport error inside a structured-output call is classified again" entry from "1.16 and later" to "1.15.3 and later" (design D5).
-- [ ] Add a note to `L-260927-24b43d` saying the lock moved from instructor 1.15.1 to 1.17.0 in `85729dfd3`, since that item's evidence cites 1.15.1 internals and needs re-reading at the new version.
-- [ ] Run `make agent-check`, then `make agent-test`.
+- [x] Add `GatewayRoutingRefusal.MODEL_NOT_ALLOWED` and its map entry. Rewrite the enum docstring and the map comment per design D1: this member is keyed on the gateway substrate's code and arrives on 412, it has two raise sites (not in the allow-list, or archived), and no vendor collision is possible.
+- [x] Add its arm to `_classify_gateway_routing_refusal`, with a comment tying it to `WRONG_PROTOCOL` and `UNSERVED_CAPABILITY` on why the flag stays unset.
+- [x] Thread `model_handle` from `render_inference_error` through `_render_detail` into `_render_gateway_routing_refusal_detail`, and write this member's advice (design D2). The other members keep ignoring the handle. Update that function's docstring, which says the family names no model, to state this exception and its reason.
+- [x] In `docs/under-the-hood/error-model.md`, add the row to the "When the model cannot be routed" table and a bullet on the unset flag and the handle in the advice. In the "`instructor` Unwrap" section, correct the sentence claiming a `pydantic.ValidationError` lands in `UNKNOWN` (design D5).
+- [x] In `CHANGELOG.md` under Unreleased, add a Fixed entry: a gateway's `model_not_allowed_error` refusal now reads as a configuration error with a `change_model` action naming the model handle, instead of "review the prompt, parameters, and inputs", and the HTTP status is unchanged at 500. Correct the existing "A transport error inside a structured-output call is classified again" entry from "1.16 and later" to "1.15.3 and later" (design D5).
+- [x] Add a note to `L-260927-24b43d` saying the lock moved from instructor 1.15.1 to 1.17.0 in `85729dfd3`, since that item's evidence cites 1.15.1 internals and needs re-reading at the new version.
+- [x] Run `make agent-check`, then `make agent-test`.
 
 ### Checkpoint
 
-- [ ] Record here the final wording of the advice and anything review changed in the design.
+- [x] Record here the final wording of the advice and anything review changed in the design.
+    - The advice reads: "The inference gateway does not allow the model '<handle>' for this account — pick another model, or leave the pipe's model unset to use the default. If your model deck lists it as available, the deck and the gateway's allow-list disagree: contact support." The design's draft said "for this access"; "account" is the word a caller recognizes.
+    - The real-loop module is `tests/unit/pipelex/providers/test_instructor_retry_shapes.py`. Beyond the design, it pins that a spent budget recovers the very `ValidationError` object instructor recorded last in `failed_attempts`.
+    - Beyond D5, the "Behavior Summary" table of `docs/under-the-hood/error-model.md` made the same false claim as the unwrap section (a spent re-ask budget reading `UNKNOWN`, HTTP 500). It reads `CONTENT` / `CHANGE_INPUT`, HTTP 422, verified by rendering a recovered `ValidationError`, and the row now says so; a row for this refusal was added beside it.
 - [ ] Run `/rev`, then open the pull request with `Closes L-260927-086ea4`.
 
 ## Out of scope, with where it lives

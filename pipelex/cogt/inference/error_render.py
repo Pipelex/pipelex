@@ -139,14 +139,19 @@ def _render_gateway_unresolved_reference_detail(*, reference: GatewayUnresolvedR
             )
 
 
-def _render_gateway_routing_refusal_detail(*, refusal: GatewayRoutingRefusal) -> str:
+def _render_gateway_routing_refusal_detail(*, refusal: GatewayRoutingRefusal, model_handle: str) -> str:
     """Produce the advice for a request the inference gateway refused to route.
 
-    Names no model, integration, protocol or capability, for the same reason
+    Names no integration, protocol or capability, for the same reason
     ``_render_gateway_limit_detail`` names no number: the gateway's own refusal
     message sits beside this detail and already states every specific. What this
     text adds is what the caller — or whoever operates the deployment — should
     *do*, which the message does not say.
+
+    It names no model either, with one exception: ``MODEL_NOT_ALLOWED``, whose
+    message names only the backend's wire id (``us.anthropic.claude-…``), which the
+    method's author never wrote. That member's advice names ``model_handle``, the
+    model the method asked for; every other member ignores it.
 
     Every member whose remedy could be a deck edit says "the model deck" out loud.
     The runtime picks the model, the protocol and the route from its own deck, so
@@ -187,9 +192,18 @@ def _render_gateway_routing_refusal_detail(*, refusal: GatewayRoutingRefusal) ->
                 "The model's integration does not serve that capability on the inference gateway — the error message names "
                 "the provider and what was asked of it. Pick a model whose provider serves it, or correct the model deck."
             )
+        case GatewayRoutingRefusal.MODEL_NOT_ALLOWED:
+            # The second sentence is for whoever operates the gateway: a deck that
+            # offers a model its gateway's allow-list refuses is their disagreement
+            # to settle, and no choice of the caller's causes it.
+            return (
+                f"The inference gateway does not allow the model '{model_handle}' for this account — pick another model, or "
+                "leave the pipe's model unset to use the default. If your model deck lists it as available, the deck and the "
+                "gateway's allow-list disagree: contact support."
+            )
 
 
-def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult) -> str:
+def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, model_handle: str) -> str:
     """Produce the free-form user-facing advice text for the classified error."""
     if classification.gateway_request_limit is not None:
         # Branches ahead of the action kind rather than inside it: the limit names
@@ -206,11 +220,11 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         # Same reason a third time, and here the action kind is too coarse for
         # every member rather than for some: ``CHANGE_MODEL`` renders "the
         # requested model was not found", which is right only for ``pig-01`` and
-        # false for ``pig-05`` and ``pig-06``, whose model exists and is served —
-        # and for ``pig-02``, whose model resolves but to an integration that is
-        # switched off. ``CONTACT_SUPPORT`` renders "the error could not be
-        # classified" for a refusal that named itself precisely.
-        return _render_gateway_routing_refusal_detail(refusal=classification.gateway_routing_refusal)
+        # false for ``pig-05``, ``pig-06`` and ``model_not_allowed_error``, whose
+        # model exists and is served — and for ``pig-02``, whose model resolves but
+        # to an integration that is switched off. ``CONTACT_SUPPORT`` renders "the
+        # error could not be classified" for a refusal that named itself precisely.
+        return _render_gateway_routing_refusal_detail(refusal=classification.gateway_routing_refusal, model_handle=model_handle)
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
             if metadata.retry_after_seconds is not None:
@@ -245,7 +259,8 @@ def render_inference_error(
         classification: The result of the Classify step.
         family: The worker family, selecting the concrete exception class.
         model_desc: Human-readable model description for the error message.
-        model_handle: The pipelex model handle, carried on ``*ModelNotFoundError``.
+        model_handle: The pipelex model handle, carried on ``*ModelNotFoundError`` and named by
+            the advice of a routing refusal whose own message names only the backend's id.
 
     Returns:
         A ``CogtError`` subclass instance carrying the category, structured
@@ -254,7 +269,7 @@ def render_inference_error(
     message = _format_message(metadata, model_desc=model_desc)
     user_action = UserAction(
         kind=classification.user_action_kind,
-        detail=_render_detail(metadata, classification=classification),
+        detail=_render_detail(metadata, classification=classification, model_handle=model_handle),
     )
     if classification.is_model_not_found:
         not_found_class = _NOT_FOUND_CLASSES[family]
