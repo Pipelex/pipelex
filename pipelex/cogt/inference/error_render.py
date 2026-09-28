@@ -151,7 +151,7 @@ def _render_gateway_routing_refusal_detail(*, refusal: GatewayRoutingRefusal, mo
     It names no model either, with one exception: ``MODEL_NOT_ALLOWED``, whose
     message names only the backend's wire id (``us.anthropic.claude-…``), which the
     method's author never wrote. That member's advice names ``model_handle``, the
-    model the method asked for; every other member ignores it.
+    handle the model deck resolved the pipe's model to; every other member ignores it.
 
     Every member whose remedy could be a deck edit says "the model deck" out loud.
     The runtime picks the model, the protocol and the route from its own deck, so
@@ -193,13 +193,18 @@ def _render_gateway_routing_refusal_detail(*, refusal: GatewayRoutingRefusal, mo
                 "the provider and what was asked of it. Pick a model whose provider serves it, or correct the model deck."
             )
         case GatewayRoutingRefusal.MODEL_NOT_ALLOWED:
-            # The second sentence is for whoever operates the gateway: a deck that
-            # offers a model its gateway's allow-list refuses is their disagreement
-            # to settle, and no choice of the caller's causes it.
+            # Both halves are conditional because the Render step cannot tell the
+            # cases apart. The handle may be one the pipe named or the deck's
+            # default, and leaving the model unset only helps in the first case. And
+            # the same code comes from the Pipelex gateway and from a caller's own
+            # Portkey workspace behind the ``portkey`` backend, which report the
+            # same provider: a deck that lists a model the allow-list refuses is
+            # Pipelex's to settle on the first and the caller's on the second.
             return (
-                f"The inference gateway does not allow the model '{model_handle}' for this account — pick another model, or "
-                "leave the pipe's model unset to use the default. If your model deck lists it as available, the deck and the "
-                "gateway's allow-list disagree: contact support."
+                f"The inference gateway does not allow the model '{model_handle}' for this account — pick another model for the "
+                "pipe; if the pipe named this one, leaving its model unset uses the default instead. If your model deck lists "
+                "it as available, the deck and the gateway's allow-list disagree: on the Pipelex gateway, contact support; on "
+                "a Portkey workspace of your own, allow the model in the integration that serves it."
             )
 
 

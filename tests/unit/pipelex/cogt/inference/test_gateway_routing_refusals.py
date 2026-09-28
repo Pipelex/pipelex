@@ -28,7 +28,7 @@ and the advice surviving the pipe layer's re-raise.
 
 **Every member is its own wire code here**, unlike the two families beside it.
 That is not an accident of the code space: grouping is by remedy in all three
-families, and each of these five names a different thing that has to change.
+families, and each of these names a different thing that has to change.
 
 **Only ``pig-01`` sets ``is_model_not_found``.** The flag is not a category — it
 selects the family's ``*ModelNotFoundError`` class, which ``pipe_operator.py``
@@ -42,7 +42,7 @@ model exists and an integration serves it, only not for this caller.
 **``model_not_allowed_error`` is the one member whose advice names the model.**
 The rest defer every specific to the gateway's own message, but that message names
 only the backend's wire id, which the method's author never wrote. So the advice
-names the model handle the method asked for.
+names the model handle the deck resolved the pipe's model to.
 
 **``pig-02`` is the family's ``CONTACT_SUPPORT`` arm.** A switched-off integration
 is the gateway operator's fact: nothing about the request causes it, none of the
@@ -155,7 +155,7 @@ def _fail_closed_refusal_body(message: str, code: str) -> dict[str, Any]:
 _UNKNOWN_MODEL_BODY = _fail_closed_refusal_body("No model found for the request", "pig-01")
 
 # The backend's id for the model, which is all the gateway's own message names, and
-# the handle the method asked for, which the method's author actually wrote.
+# the handle the deck resolved the method's model to, which is the deck's own name for it.
 _MODEL_NOT_ALLOWED_WIRE_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 _MODEL_NOT_ALLOWED_HANDLE = "claude-4.5-sonnet"
 
@@ -564,7 +564,7 @@ class TestEndToEnd:
         """The refusal a run on the hosted API received, through the hop an LLM call on the gateway takes.
 
         It used to read "review the prompt, parameters, and inputs". It now asks for
-        another model, names the one the method asked for, and stays the family's
+        another model, names it by its handle, and stays the family's
         failure class, since the model was found.
         """
         exc = _as_the_openai_sdk_raises_it(status_code=412, body=_MODEL_NOT_ALLOWED_BODY)
@@ -628,15 +628,30 @@ class TestRenderedAdvice:
         assert f"'{_MODEL_NOT_ALLOWED_HANDLE}'" in detail
         assert _MODEL_NOT_ALLOWED_WIRE_ID not in detail
         assert "pick another model" in detail
-        assert "leave the pipe's model unset" in detail
         assert "prompt" not in detail
 
-    def test_the_model_not_allowed_advice_names_the_deck_and_support_for_a_disagreement(self) -> None:
-        """A deck listing a model its gateway refuses is an operator's disagreement, not the caller's choice."""
+    def test_the_model_not_allowed_advice_offers_the_default_only_when_the_pipe_named_the_model(self) -> None:
+        """The Render step cannot tell a model the pipe named from the deck's default.
+
+        When the default is the refused model, an unconditional "leave the pipe's
+        model unset" would tell the caller to do what they already did.
+        """
+        detail = _rendered_detail(_envelope("model_not_allowed_error", status_code=412), model_handle=_MODEL_NOT_ALLOWED_HANDLE)
+
+        assert "if the pipe named this one, leaving its model unset uses the default" in detail
+
+    def test_the_model_not_allowed_advice_says_who_settles_a_deck_disagreement_on_either_gateway(self) -> None:
+        """The same code comes from the Pipelex gateway and from a user's own Portkey workspace.
+
+        Nothing on the wire tells them apart, so advice that only said "contact
+        support" would send the owner of a Portkey workspace to Pipelex for a
+        setting in their own dashboard.
+        """
         detail = _rendered_detail(_envelope("model_not_allowed_error", status_code=412), model_handle=_MODEL_NOT_ALLOWED_HANDLE)
 
         assert "model deck" in detail
-        assert "contact support" in detail.lower()
+        assert "on the Pipelex gateway, contact support" in detail
+        assert "on a Portkey workspace of your own, allow the model in the integration that serves it" in detail
 
     @pytest.mark.parametrize("code", [code for code in _EVERY_CODE if code != "model_not_allowed_error"])
     def test_every_other_member_leaves_the_handle_to_the_message(self, code: str) -> None:
