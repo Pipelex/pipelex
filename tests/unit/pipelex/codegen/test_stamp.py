@@ -125,6 +125,13 @@ class TestStamp:
         tampered = stamped.replace("# options: {}", f"# options: {options_value}")
         assert parse_stamped(tampered, comment_prefix="#") is None
 
+    def test_deeply_nested_options_are_not_a_stamp(self) -> None:
+        # A hosted load parses the stamp of every customer `.py` it scans, so a nesting deep enough to
+        # exhaust the JSON parser's stack must read as "no stamp", not escape as a RecursionError.
+        stamped = self._stamp("# a\nclass A:\n    pass\n", comment_prefix="#")
+        tampered = stamped.replace("# options: {}", "# options: " + "[" * 100_000)
+        assert parse_stamped(tampered, comment_prefix="#") is None
+
     def test_standard_options_json_still_parses(self) -> None:
         empty = parse_stamped(self._stamp("# a\n", comment_prefix="#"), comment_prefix="#")
         assert empty is not None

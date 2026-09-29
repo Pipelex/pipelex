@@ -7,12 +7,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
+from pipelex.codegen.stamp import apply_stamp
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 from pipelex.methods.structures_check import (
     STRUCTURES_REFUSAL_RULE,
     StructuredContentViolation,
     ensure_no_structured_content_in_library_sources,
     ensure_no_structured_content_python,
+    is_generated_structures_module,
     scan_structured_content_classes,
     scan_structured_content_sources,
     structured_content_class_names_in_source,
@@ -70,6 +73,19 @@ from some.other.module import OtherBase as SC
 class Helper(SC):
     pass
 """
+
+
+def _stamped(body: str, *, target: CodegenTarget) -> str:
+    return apply_stamp(
+        body,
+        crate_fingerprint="0" * 64,
+        engine_version="0.0.0-test",
+        kind=CodegenKind.TYPES,
+        target=target,
+        pipe_ref=None,
+        options={},
+        comment_prefix="#",
+    )
 
 
 class TestStructuresCheck:
@@ -160,10 +176,6 @@ class TestStructuresCheck:
         assert len(violations) == 1
         assert violations[0].relative_path == "structures/models.py"
 
-
-class TestStructuresCheckOverSources:
-    """The load-time entry points: the same walk, run over captured sources rather than a directory."""
-
     def test_source_walk_matches_the_directory_scan(self, tmp_path: Path) -> None:
         """Both refusals run one walk, so a directory and its captured sources yield the same violations."""
         modules = {
@@ -226,3 +238,29 @@ class TestStructuresCheckOverSources:
             )
 
         assert str(exc_info.value).count("structures/invoice.py") == 1
+
+    def test_generated_structures_module_is_not_a_violation(self, tmp_path: Path) -> None:
+        """The `python-structures` projection, left as generated, copies MTHDS concepts: neither scan flags it."""
+        generated = _stamped(STRUCTURES_MODULE, target=CodegenTarget.PYTHON_STRUCTURES)
+        structures_dir = tmp_path / "structures"
+        structures_dir.mkdir()
+        (structures_dir / "structures.py").write_text(generated, encoding="utf-8")
+
+        assert is_generated_structures_module(source=generated)
+        assert scan_structured_content_classes(package_dir=tmp_path) == []
+        assert scan_structured_content_sources(sources={"structures/structures.py": generated}) == []
+        ensure_no_structured_content_in_library_sources(sources_by_dir={tmp_path: {"structures/structures.py": generated}})
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            _stamped(STRUCTURES_MODULE, target=CodegenTarget.PYTHON_STRUCTURES) + "\n\nclass Extra(StructuredContent):\n    note: str\n",
+            _stamped(STRUCTURES_MODULE, target=CodegenTarget.PYTHON_PYDANTIC),
+            _stamped(STRUCTURES_MODULE, target=CodegenTarget.PYTHON_STRUCTURES).replace("# content_hash: ", "# content_hash: 0"),
+            STRUCTURES_MODULE,
+        ],
+        ids=["edited-below-the-stamp", "another-projection", "mismatched-hash", "unstamped"],
+    )
+    def test_only_an_unedited_structures_projection_is_exempt(self, source: str) -> None:
+        assert not is_generated_structures_module(source=source)
+        assert scan_structured_content_sources(sources={"structures/structures.py": source}) != []

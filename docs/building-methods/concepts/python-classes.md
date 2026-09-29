@@ -49,6 +49,8 @@ Classes inheriting from `StructuredContent` are automatically discovered and reg
 
     To run such a method on the hosted API, declare its types as MTHDS concepts with [inline structures](inline-structures.md). A PipeFunc can still return them: in the sandbox, Pipelex generates a `structures` module from the method's concepts, so the function imports the class it returns with `from structures import <domain>__<Concept>`.
 
+    The `structures` module that `pipelex build structures` writes into a bundle is a copy of those same concepts, so the hosted API accepts it as long as it is left as generated. It is not imported by the API either; edit it and it is refused like any hand-written class.
+
 ## With Custom Validation
 
 ```python

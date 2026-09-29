@@ -13,6 +13,12 @@ origin (an inline bundle, a stored method, a host directory), scans the sources 
 the sandbox before it keeps any of them (`ensure_no_structured_content_in_library_sources`). Both
 run the same walk over one source string, so the two refusals cannot drift apart.
 
+One file declaring such classes is not refused: the `python-structures` projection that
+`pipelex build structures` writes, left as generated. It is a copy of the method's own MTHDS
+concepts, which is exactly what the refusal asks for, and a hosted load imports it no more than any
+other file. Its stamp is not a signature, anyone can compute its hash, so the exemption is sound
+only because nothing it lets through is imported into the runner; a hand-edited copy is refused.
+
 The scan is alias-aware: a base written as `StructuredContent`, imported under another name
 (`from ... import StructuredContent as SC`), or reached as an attribute
 (`module.StructuredContent`, whatever the module was imported as) is caught. It remains a static
@@ -31,6 +37,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from pipelex.codegen.emitters.target import CodegenTarget
+from pipelex.codegen.stamp import compute_content_hash, parse_stamped
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 
 STRUCTURE_BASE_CLASS_NAME = "StructuredContent"
@@ -104,13 +112,35 @@ def structured_content_class_names_in_source(*, source: str, filename: str) -> l
     return _structured_content_class_names(tree=tree)
 
 
+def is_generated_structures_module(*, source: str) -> bool:
+    """Whether a source is the stamped `python-structures` projection, unedited below its stamp.
+
+    That projection is what `pipelex build structures` writes into a bundle: the method's own MTHDS
+    concepts rendered as `StructuredContent` classes. The stamp's hash proves only that the body was
+    not edited after stamping, not who stamped it, so this is never a trust decision: it spares an
+    author who generated their types a refusal whose remedy they already applied.
+    """
+    parsed = parse_stamped(source, comment_prefix="#")
+    if parsed is None:
+        return False
+    return parsed.stamp.target == CodegenTarget.PYTHON_STRUCTURES and parsed.stamp.content_hash == compute_content_hash(parsed.body)
+
+
+def _refused_class_names(*, source: str, filename: str) -> list[str]:
+    """The structure classes a source would be refused for: none for the generated projection, else the walk's."""
+    if is_generated_structures_module(source=source):
+        return []
+    return structured_content_class_names_in_source(source=source, filename=filename)
+
+
 def scan_structured_content_classes(*, package_dir: Path) -> list[StructuredContentViolation]:
     """AST-scan a package directory for `.py` files declaring `StructuredContent` subclasses.
 
     Alias-aware: bases reached through `from ... import StructuredContent as SC` or through
     an attribute access (`module.StructuredContent`) are caught alongside the literal name.
     Files that cannot be read or parsed are skipped: such a file cannot be imported either,
-    so it cannot smuggle a structure class into the process.
+    so it cannot smuggle a structure class into the process. The generated `python-structures`
+    projection, left as generated, is not a violation (`is_generated_structures_module`).
 
     Args:
         package_dir: The package directory to scan.
@@ -127,7 +157,7 @@ def scan_structured_content_classes(*, package_dir: Path) -> list[StructuredCont
             source = py_file.read_text(encoding="utf-8")
         except (OSError, ValueError):
             continue
-        class_names = structured_content_class_names_in_source(source=source, filename=str(py_file))
+        class_names = _refused_class_names(source=source, filename=str(py_file))
         if class_names:
             violations.append(StructuredContentViolation(relative_path=relative.as_posix(), class_names=class_names))
     return violations
@@ -137,7 +167,8 @@ def scan_structured_content_sources(*, sources: Mapping[str, str]) -> list[Struc
     """Scan captured Python sources, keyed by relative path, for `StructuredContent` subclasses.
 
     The sandbox-hosted loader calls this on the very mapping it would ship, so the bytes it refuses
-    are exactly the bytes that would travel, with no second read of the disk.
+    are exactly the bytes that would travel, with no second read of the disk. The generated
+    `python-structures` projection, left as generated, is not a violation (`is_generated_structures_module`).
 
     Args:
         sources: POSIX relative path to source text, as `FuncRegistryUtils.read_py_sources` returns it.
@@ -147,7 +178,7 @@ def scan_structured_content_sources(*, sources: Mapping[str, str]) -> list[Struc
     """
     violations: list[StructuredContentViolation] = []
     for relative_path in sorted(sources):
-        class_names = structured_content_class_names_in_source(source=sources[relative_path], filename=relative_path)
+        class_names = _refused_class_names(source=sources[relative_path], filename=relative_path)
         if class_names:
             violations.append(StructuredContentViolation(relative_path=relative_path, class_names=class_names))
     return violations
@@ -209,6 +240,7 @@ def ensure_no_structured_content_in_library_sources(*, sources_by_dir: Mapping[P
         f"This method declares Python structure classes ({details}), which would be imported into the runner's "
         f"own process. Refused: {STRUCTURES_REFUSAL_RULE}. Declare these types as MTHDS concepts with inline "
         f"structures; a PipeFunc can return them by importing the classes the sandbox generates from those "
-        f"concepts (`from structures import <domain>__<Concept>`)."
+        f"concepts (`from structures import <domain>__<Concept>`). A structures module generated by "
+        f"`pipelex build structures` is accepted as long as it is left as generated."
     )
     raise MethodStructuresRefusedError(msg)

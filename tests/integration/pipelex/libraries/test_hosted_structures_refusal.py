@@ -7,14 +7,21 @@ with `MethodStructuresRefusedError`, the error a fetched package already gets. E
 carries a module-level sentinel that writes a marker file, so a test can tell whether the file executed.
 """
 
+import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
+from pipelex.codegen.emission import write_stamped_projection
+from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
+from pipelex.codegen.emitters.types_emitter import emit_types
+from pipelex.codegen.stamp import apply_stamp
 from pipelex.core.concepts.exceptions import ConceptFactoryError
-from pipelex.interpreter_hub import get_concept_library, get_library_manager
+from pipelex.interpreter_hub import get_concept_library, get_library_manager, scoped_current_library
+from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 
 SENTINEL_LINE = 'open(r"{marker}", "w").write("ran")\n'
@@ -74,6 +81,17 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 
 """
 
+INLINE_STRUCTURE_MTHDS = """\
+domain = "hosted_generated"
+description = "A concept with an inline structure"
+
+[concept.Receipt]
+description = "A receipt"
+
+[concept.Receipt.structure]
+total = { type = "number", description = "The total", required = true }
+"""
+
 CLASS_BACKED_MTHDS = """\
 domain = "hosted_refusal"
 description = "A concept backed by a Python class"
@@ -99,8 +117,8 @@ def _is_imported(*, path: Path) -> bool:
     return False
 
 
-@pytest.mark.usefixtures("sandbox_hosted_mode")
 class TestHostedStructuresRefusal:
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_structure_file_is_refused_and_never_executed(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         library_dir = tmp_path / "bundle"
         structure_file = library_dir / "structures" / "invoice.py"
@@ -120,6 +138,7 @@ class TestHostedStructuresRefusal:
         # Refused before anything was kept: no crate carries the source.
         assert get_library_manager().get_crate(library_id=library_id) is None
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     @pytest.mark.parametrize(
         ("template", "class_name"),
         [
@@ -142,12 +161,13 @@ class TestHostedStructuresRefusal:
         _write_structure_file(path=py_file, template=template, class_name=class_name, marker=marker)
 
         library_id = load_empty_library()
-        with pytest.raises(MethodStructuresRefusedError, match=f"customer.py defines {class_name}"):
+        with pytest.raises(MethodStructuresRefusedError, match=re.escape(f"customer.py defines {class_name}")):
             get_library_manager().load_libraries(library_id=library_id, library_dirs=[library_dir])
 
         assert not marker.exists()
         assert not _is_imported(path=py_file)
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_dynamic_class_escapes_the_scan_but_never_executes(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         """A class built by `type(...)` escapes the static scan, so the load is not refused. It is not imported either:
         the file travels as source, its module-level code never runs here, and a concept naming the class finds none.
@@ -166,6 +186,7 @@ class TestHostedStructuresRefusal:
         assert not marker.exists(), "the dynamically built class's module-level code ran in the loading process"
         assert not _is_imported(path=py_file)
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_structure_file_under_an_excluded_dir_is_not_refused(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         """A file under an excluded directory is neither shipped nor imported, so it is not refused."""
         library_dir = tmp_path / "bundle"
@@ -179,6 +200,7 @@ class TestHostedStructuresRefusal:
         assert not marker.exists()
         assert not _is_imported(path=py_file)
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_one_refusal_lists_every_directory(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         dir_a = tmp_path / "a"
         dir_b = tmp_path / "b"
@@ -195,6 +217,7 @@ class TestHostedStructuresRefusal:
         assert "models/receipt.py defines HostedRefusalB" in message
         assert not marker.exists()
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_refusal_names_relative_paths_only(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         """On a host the library directory is a temporary one, which is not the caller's to read."""
         library_dir = tmp_path / "bundle"
@@ -212,8 +235,66 @@ class TestHostedStructuresRefusal:
         assert str(tmp_path.resolve()) not in message
         assert tmp_path.name not in message
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_generated_structures_module_is_accepted_and_never_executed(self, tmp_path: Path, load_empty_library: Callable[[], str]):
+        """The module `pipelex build structures` writes into a bundle copies the method's own MTHDS concepts, so a
+        hosted load accepts it as generated: it travels to the sandbox as source and is never imported here.
+        """
+        library_dir = tmp_path / "bundle"
+        library_dir.mkdir()
+        (library_dir / "receipt.mthds").write_text(INLINE_STRUCTURE_MTHDS, encoding="utf-8")
+        library_manager = get_library_manager()
+        generation_library_id, _ = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=generation_library_id):
+                library_manager.load_libraries(library_id=generation_library_id, library_dirs=[library_dir])
+                crate = library_manager.get_crate(library_id=generation_library_id)
+                assert crate is not None
+                normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+                write_stamped_projection(
+                    emit_types(normalized, target=CodegenTarget.PYTHON_STRUCTURES),
+                    output_dir=library_dir / "structures",
+                    crate_fingerprint=normalized.fingerprint,
+                    engine_version="0.0.0-test",
+                    kind=CodegenKind.TYPES,
+                    target=CodegenTarget.PYTHON_STRUCTURES,
+                )
+        finally:
+            library_manager.teardown(library_id=generation_library_id)
+        generated_file = library_dir / "structures" / "structures.py"
+        generated_source = generated_file.read_text(encoding="utf-8")
+        assert "(StructuredContent)" in generated_source
 
-class TestDirectModeStillImportsStructures:
+        library_id = load_empty_library()
+        library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
+
+        hosted_crate = library_manager.get_crate(library_id=library_id)
+        assert hosted_crate is not None
+        assert hosted_crate.python_sources.get("structures/structures.py") == generated_source
+        assert not _is_imported(path=generated_file)
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_edited_generated_structures_module_is_refused(self, tmp_path: Path, load_empty_library: Callable[[], str]):
+        """A generated module edited below its stamp may carry a hand-written class, so it is refused like one."""
+        library_dir = tmp_path / "bundle"
+        (library_dir / "structures").mkdir(parents=True)
+        body = STRUCTURE_FILE_PY.format(class_name="HostedRefusalEditedInvoice")
+        stamped = apply_stamp(
+            body,
+            crate_fingerprint="0" * 64,
+            engine_version="0.0.0-test",
+            kind=CodegenKind.TYPES,
+            target=CodegenTarget.PYTHON_STRUCTURES,
+            pipe_ref=None,
+            options={},
+            comment_prefix="#",
+        )
+        (library_dir / "structures" / "structures.py").write_text(stamped + "    extra: str = ''\n", encoding="utf-8")
+
+        library_id = load_empty_library()
+        with pytest.raises(MethodStructuresRefusedError, match=re.escape("structures/structures.py defines HostedRefusalEditedInvoice")):
+            get_library_manager().load_libraries(library_id=library_id, library_dirs=[library_dir])
+
     def test_direct_mode_imports_the_structure_class(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         """Structure classes stay an open-source and self-hosted feature: a direct-mode load imports the file and
         the concept resolves to its class.
