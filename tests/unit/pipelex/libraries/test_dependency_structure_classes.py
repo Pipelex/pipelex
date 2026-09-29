@@ -57,6 +57,25 @@ description = "The notes a search found"
 notes = { type = "list", item_type = "concept", item_concept_ref = "invented_notes.Note", description = "The notes found", required = true }
 """
 
+# `Note` holds a concept of the package's own dependency, which a dependency load never loads.
+DEP_WITH_ITS_OWN_DEPENDENCY_MTHDS = """\
+domain = "invented_notes"
+description = "An invented notes library that depends on another package"
+
+[concept.Note]
+description = "One invented note, citing a source from another package"
+
+[concept.Note.structure]
+title = { type = "text", description = "The note's title", required = true }
+source = { type = "concept", concept_ref = "github.com/invented/sources-lib/sources->invented_sources.Source", description = "Where it came from" }
+
+[concept.Tag]
+description = "A tag"
+
+[concept.Tag.structure]
+label = { type = "text", description = "The tag's label", required = true }
+"""
+
 
 def _get_library_manager() -> LibraryManager:
     """The hub's manager, whose libraries the class registry resolves against, so each test's classes die with its library."""
@@ -118,3 +137,22 @@ class TestDependencyStructureClasses:
                 )
         finally:
             library_manager.teardown(library_id=library_id)
+
+    def test_a_concept_naming_its_own_dependency_does_not_refuse_the_load(self, tmp_path: Path) -> None:
+        """A dependency's own dependencies are never loaded, so a concept naming one of theirs is left for first use, not refused."""
+        library_manager = _get_library_manager()
+        library_id, library = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=library_id):
+                library_manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+                    library=library,
+                    resolved_dep=_make_resolved_dep(tmp_path=tmp_path, mthds_content=DEP_WITH_ITS_OWN_DEPENDENCY_MTHDS),
+                    package_address=DEP_ADDRESS,
+                )
+                tag_concept = library.dependency_libraries[DEP_ALIAS].concept_library.get_required_concept(concept_ref="invented_notes.Tag")
+                tag_class = get_class_registry().get_required_base_model(name=tag_concept.structure_class_name)
+                tag = tag_class.model_validate({"label": "Invented tag"})
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert tag.model_dump() == {"label": "Invented tag"}

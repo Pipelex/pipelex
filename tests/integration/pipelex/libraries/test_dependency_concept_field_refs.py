@@ -1,7 +1,8 @@
 """A consumer's structure field typed by an installed method package's concept resolves to that package's class.
 
 The forward reference a consumer's generated class holds names the dependency's class, which the main path's
-concept stage used to leave out of its namespace, so the consumer's class loaded "not fully defined".
+concept stage used to leave out of its namespace, so the consumer's class loaded "not fully defined". A crate of the
+consumer's library carries no dependency, so a worker loading it cannot resolve that field, and must not refuse it.
 """
 
 from pathlib import Path
@@ -50,3 +51,25 @@ class TestDependencyConceptFieldRefs:
 
         assert digest.model_dump()["note"] == {"title": "Invented note one"}
         assert note_search.model_dump()["notes"] == [{"title": "Invented note one"}]
+
+    def test_a_crate_of_the_consumer_loads_without_its_dependency(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A worker loading the consumer's crate, which carries no dependency, loads it rather than refusing the field it cannot resolve."""
+        mocker.patch("pipelex.cli.installed_methods.GLOBAL_METHODS_DIR", tmp_path / "global-methods")
+        mocker.patch("pipelex.cli.installed_methods.PROJECT_METHODS_DIR", tmp_path / "project-methods")
+        mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=False)
+        consumer_bundle_file = _write_consumer_and_its_dependency(root=tmp_path)
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        worker_library_id, worker_library = library_manager.open_library()
+        try:
+            library_manager.load_libraries(library_id=library_id, library_file_paths=[consumer_bundle_file])
+            crate = library_manager.get_crate(library_id=library_id)
+            assert crate is not None
+
+            library_manager.load_from_crate(library_id=worker_library_id, crate=crate)
+
+            assert "invented_consumer.write_digest" in worker_library.pipe_library.get_pipes_dict()
+            assert not worker_library.dependency_libraries
+        finally:
+            library_manager.teardown(library_id=worker_library_id)
+            library_manager.teardown(library_id=library_id)
