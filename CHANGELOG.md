@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.70.0] - 2026-09-29
+
+### Highlights
+
+**This release hardens pipelex for running methods it did not write.** Every template now renders in Jinja's sandbox, a run with a read scope reads only under that scope and never the local disk, a URL fetch refuses private and metadata addresses, and a sandbox-hosted load no longer imports a method's Python into the loading process. Validation gets stricter too: PipeCompose, PipeSearch and PipeImgGen refuse an input their templates never read, and a concept whose field names a concept nobody declares is refused at load.
 
 ### Changed
 
