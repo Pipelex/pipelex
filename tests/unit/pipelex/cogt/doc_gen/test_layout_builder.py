@@ -93,6 +93,43 @@ class TestLayoutBuilder:
         assert isinstance(table, TableBlock)
         assert table.title == "Line items"
 
+    def test_a_list_input_of_images_prints_each_image(self) -> None:
+        photos = ListContent[ImageContent](
+            items=[ImageContent(url="pipelex-storage://s/front.png"), ImageContent(url="pipelex-storage://s/back.png", caption="Back")]
+        )
+        document = build_layout_document(title="Photos", named_contents=[("photos", photos)])
+
+        (section,) = document.blocks
+        assert isinstance(section, SectionBlock)
+        assert section.blocks == [
+            ImageBlock(url="pipelex-storage://s/front.png", caption="Photo 1"),
+            ImageBlock(url="pipelex-storage://s/back.png", caption="Back"),
+        ]
+        assert document.image_urls() == ["pipelex-storage://s/front.png", "pipelex-storage://s/back.png"]
+
+    def test_a_list_input_of_markdown_formats_each_text(self) -> None:
+        sections = ListContent[MarkdownContent](items=[MarkdownContent(text="# One"), MarkdownContent(text="**Two**")])
+        document = build_layout_document(title="Report", named_contents=[("sections", sections)])
+
+        (section,) = document.blocks
+        assert isinstance(section, SectionBlock)
+        first, second = section.blocks
+        assert isinstance(first, SectionBlock)
+        assert first.blocks == [MarkdownBlock(markdown="# One")]
+        assert isinstance(second, SectionBlock)
+        assert second.blocks == [MarkdownBlock(markdown="**Two**")]
+
+    def test_a_structure_field_listing_images_prints_them(self) -> None:
+        class _Inspection(StructuredContent):
+            site: str
+            photos: list[ImageContent]
+
+        inspection = _Inspection(site="Roof", photos=[ImageContent(url="pipelex-storage://s/a.png"), ImageContent(url="pipelex-storage://s/b.png")])
+        document = build_layout_document(title="Inspection", named_contents=[("inspection", inspection)])
+
+        assert not any(isinstance(block, TableBlock) for block in document.blocks)
+        assert document.image_urls() == ["pipelex-storage://s/a.png", "pipelex-storage://s/b.png"]
+
     def test_an_html_input_prints_its_visible_text(self) -> None:
         document = build_layout_document(
             title="Page", named_contents=[("page", HtmlContent(inner_html="<h1>Title</h1><script>alert(1)</script><p>Body <b>text</b>.</p>"))]

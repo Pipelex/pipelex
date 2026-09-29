@@ -37,6 +37,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
@@ -151,11 +152,16 @@ def _joined_scalars(items: list[Any]) -> str:
 
 
 def _flat_columns(items: list[Any]) -> list[LayoutColumn] | None:
-    """The table columns for a list of structures, or None when the list does not make a table."""
+    """The table columns for a list of structures, or None when the list does not make a table.
+
+    Only a structure a method declares makes a table. A native content such as an image or a Markdown text
+    has flat fields too, but they are how it is stored rather than what it shows, so a list of them lays
+    out item by item.
+    """
     if not items:
         return None
     first_item: object = items[0]
-    if not isinstance(first_item, StuffContent):
+    if not isinstance(first_item, StructuredContent):
         return None
     first_class = type(first_item)
     if not all(type(item) is first_class for item in items):
