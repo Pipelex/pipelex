@@ -49,6 +49,7 @@ from pipelex.libraries.library_utils import (
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
 from pipelex.methods.fetch_on_miss import resolve_address_based_method
+from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -495,29 +496,24 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Import modules and register in global registries
             # Import from user directories
-            is_sandbox_hosted = is_pipe_func_sandbox_hosted()
-            for library_dir in all_dirs:
-                # Only import files that contain StructuredContent subclasses (uses AST pre-check).
-                # Kept in hosted mode too: concepts declared as `structure = "ClassName"` resolve that
-                # class from the registry at load time, so the structure classes must be present. These
-                # are pydantic data classes, not the arbitrary PipeFunc bodies the hosted invariant guards.
-                ClassRegistryUtils.import_modules_in_folder(
-                    folder_path=library_dir,
-                    base_class_names=[StructuredContent.__name__],
-                    force_include_dirs=[Path(builder_pkg.__file__).parent],
-                )
-                if is_sandbox_hosted:
-                    # Sandbox-hosted mode: never import/register the customer's PipeFunc bodies in this
-                    # process. Capture every .py as source text (no import) so it can travel to the
-                    # sandbox, where it is registered and executed instead. No force-include here (unlike
-                    # the direct branch): the only force-included dir is pipelex's own builder package,
-                    # which must NOT travel in a customer crate — the sandbox has pipelex installed.
-                    # Accumulate across dirs, but
-                    # fail loud on a relpath collision: the sandbox writes sources flat by relpath, so two
-                    # dirs sharing a path would otherwise silently clobber one customer's code and run the
-                    # wrong PipeFunc body.
-                    captured_sources = self._library_sources.setdefault(library_id, {})
-                    for relpath, source in FuncRegistryUtils.read_py_sources(folder_path=library_dir).items():
+            if is_pipe_func_sandbox_hosted():
+                # Sandbox-hosted mode imports no Python from a library directory, whatever its origin (an
+                # inline bundle, a stored method, a host directory): importing a file runs its module-level
+                # code in this process. Every .py is captured as source text instead, to travel to the
+                # sandbox, where it is imported and executed. A structure class cannot travel that way: it
+                # would have to be imported here to back a concept, so the load is refused, naming each file
+                # and class, before any source is kept. The refusal is a static scan, which a dynamically
+                # built class escapes; such a file then travels as source and still never executes here.
+                sources_by_dir = {library_dir: FuncRegistryUtils.read_py_sources(folder_path=library_dir) for library_dir in all_dirs}
+                ensure_no_structured_content_in_library_sources(sources_by_dir=sources_by_dir)
+                # No force-include here (unlike the direct branch): the only force-included dir is pipelex's
+                # own builder package, which must NOT travel in a customer crate — the sandbox has pipelex
+                # installed. Accumulate across dirs, but fail loud on a relpath collision: the sandbox writes
+                # sources flat by relpath, so two dirs sharing a path would otherwise silently clobber one
+                # customer's code and run the wrong PipeFunc body.
+                captured_sources = self._library_sources.setdefault(library_id, {})
+                for dir_sources in sources_by_dir.values():
+                    for relpath, source in dir_sources.items():
                         if relpath in captured_sources and captured_sources[relpath] != source:
                             msg = (
                                 f"Duplicate PipeFunc source path '{relpath}' across library dirs while loading library "
@@ -526,9 +522,17 @@ class LibraryManager(LibraryManagerAbstract):
                             )
                             raise LibraryError(msg)
                         captured_sources[relpath] = source
-                else:
-                    # Local/direct mode (unchanged): import files that contain @pipe_func decorated
-                    # functions (uses AST pre-check) and register them in the process-global func_registry.
+            else:
+                for library_dir in all_dirs:
+                    # Only import files that contain StructuredContent subclasses (uses AST pre-check), so
+                    # concepts declared as `structure = "ClassName"` resolve that class from the registry.
+                    ClassRegistryUtils.import_modules_in_folder(
+                        folder_path=library_dir,
+                        base_class_names=[StructuredContent.__name__],
+                        force_include_dirs=[Path(builder_pkg.__file__).parent],
+                    )
+                    # Import files that contain @pipe_func decorated functions (uses AST pre-check) and
+                    # register them in the process-global func_registry.
                     FuncRegistryUtils.register_funcs_in_folder(
                         folder_path=library_dir,
                         force_include_dirs=[Path(builder_pkg.__file__).parent],

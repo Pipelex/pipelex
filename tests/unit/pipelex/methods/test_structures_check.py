@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 import pytest
@@ -9,8 +10,12 @@ import pytest
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 from pipelex.methods.structures_check import (
     STRUCTURES_REFUSAL_RULE,
+    StructuredContentViolation,
+    ensure_no_structured_content_in_library_sources,
     ensure_no_structured_content_python,
     scan_structured_content_classes,
+    scan_structured_content_sources,
+    structured_content_class_names_in_source,
 )
 
 if TYPE_CHECKING:
@@ -154,3 +159,70 @@ class TestStructuresCheck:
 
         assert len(violations) == 1
         assert violations[0].relative_path == "structures/models.py"
+
+
+class TestStructuresCheckOverSources:
+    """The load-time entry points: the same walk, run over captured sources rather than a directory."""
+
+    def test_source_walk_matches_the_directory_scan(self, tmp_path: Path) -> None:
+        """Both refusals run one walk, so a directory and its captured sources yield the same violations."""
+        modules = {
+            "structures/invoice.py": STRUCTURES_MODULE,
+            "aliased.py": ALIASED_IMPORT_MODULE,
+            "attribute_base.py": ATTRIBUTE_BASE_MODULE,
+            "funcs.py": PIPE_FUNC_MODULE,
+            "unrelated.py": UNRELATED_ALIAS_MODULE,
+        }
+        for relative_path, source in modules.items():
+            file_path = tmp_path / PurePosixPath(relative_path)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(source, encoding="utf-8")
+
+        assert scan_structured_content_sources(sources=modules) == scan_structured_content_classes(package_dir=tmp_path)
+
+    def test_unparseable_source_declares_nothing(self) -> None:
+        assert structured_content_class_names_in_source(source="def broken(:\n", filename="broken.py") == []
+        assert structured_content_class_names_in_source(source="x = 1\0\n", filename="nul.py") == []
+
+    def test_sources_are_reported_in_path_order(self) -> None:
+        violations = scan_structured_content_sources(sources={"z.py": STRUCTURES_MODULE, "a.py": ALIASED_IMPORT_MODULE})
+
+        assert violations == [
+            StructuredContentViolation(relative_path="a.py", class_names=["Invoice"]),
+            StructuredContentViolation(relative_path="z.py", class_names=["Invoice", "LineItem"]),
+        ]
+
+    def test_pipe_func_only_sources_load(self, tmp_path: Path) -> None:
+        ensure_no_structured_content_in_library_sources(sources_by_dir={tmp_path: {"funcs.py": PIPE_FUNC_MODULE, "helper.py": PLAIN_MODULE}})
+
+    def test_library_refusal_names_files_rule_and_route(self, tmp_path: Path) -> None:
+        """The load-time message names each file by its relative path, the rule, and the MTHDS route for a PipeFunc."""
+        dir_a = tmp_path / "a"
+        dir_b = tmp_path / "b"
+
+        with pytest.raises(MethodStructuresRefusedError) as exc_info:
+            ensure_no_structured_content_in_library_sources(
+                sources_by_dir={
+                    dir_a: {"structures/invoice.py": STRUCTURES_MODULE, "funcs.py": PIPE_FUNC_MODULE},
+                    dir_b: {"models/receipt.py": ALIASED_IMPORT_MODULE},
+                }
+            )
+
+        message = str(exc_info.value)
+        assert "structures/invoice.py defines Invoice, LineItem; models/receipt.py defines Invoice" in message
+        assert STRUCTURES_REFUSAL_RULE in message
+        assert "MTHDS concepts with inline structures" in message
+        assert "from structures import <domain>__<Concept>" in message
+        assert "funcs.py" not in message
+        assert str(tmp_path) not in message
+
+    def test_the_same_file_in_two_directories_is_listed_once(self, tmp_path: Path) -> None:
+        with pytest.raises(MethodStructuresRefusedError) as exc_info:
+            ensure_no_structured_content_in_library_sources(
+                sources_by_dir={
+                    tmp_path / "a": {"structures/invoice.py": STRUCTURES_MODULE},
+                    tmp_path / "b": {"structures/invoice.py": STRUCTURES_MODULE},
+                }
+            )
+
+        assert str(exc_info.value).count("structures/invoice.py") == 1
