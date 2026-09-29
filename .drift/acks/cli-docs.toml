@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:765de3b76ea67aa0b78b067280e6ed1beadf1219fe064414061b6734ca8c7564"
+digest = "sha256:c6dad185bafd093de8ccfc4083426af035c8e8e738c7412e9ecbc387ba3e6955"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-27T14:03:58Z"
-rationale = "Round 2 review fixes: the API refusal paragraph and the agent CLI guide now say error_type is the local cause_type on a failed run, a 404 points at MTHDS_BASE_URL, another 4xx asks for a change, and only a 429 is inferred retryable"
+reviewed_at = "2026-09-29T11:38:40Z"
+rationale = "The fetched-method structures warning now gives the shared remedy; docs/tools/cli/run-by-address.md updated to state the same route, agent CLI CLAUDE.md does not describe this warning"
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -130,6 +130,6 @@ rationale = "Round 2 review fixes: the API refusal paragraph and the agent CLI g
 "pipelex/cli/error_handlers.py" = "blob:4b97a9c89d9b2532f0a9d1406baad130fc4d56f7"
 "pipelex/cli/exceptions.py" = "blob:1d51c3a53ddd3f6cf8de566fa2ade3fa75ab7a3a"
 "pipelex/cli/installed_methods.py" = "blob:09197f47baf8d7251d28d148a0544b4a23ee7365"
-"pipelex/cli/method_resolver.py" = "blob:1230dde5f89ac28bbdcbcbbd0c1d485c71803caf"
+"pipelex/cli/method_resolver.py" = "blob:afaf77b2d8b6a3467d6ab1f355b1ee78a71eafa7"
 "pipelex/cli/readiness.py" = "blob:6d185324ed0784663e1dc78d1194a28312c54798"
 "pipelex/cli/version_report.py" = "blob:f4a2311bb629bd77196ea2f6b031c166db0d362a"

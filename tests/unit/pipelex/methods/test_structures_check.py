@@ -11,6 +11,7 @@ from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.stamp import apply_stamp
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 from pipelex.methods.structures_check import (
+    STRUCTURES_REFUSAL_REMEDY,
     STRUCTURES_REFUSAL_RULE,
     StructuredContentViolation,
     ensure_no_structured_content_in_library_sources,
@@ -110,7 +111,7 @@ class TestStructuresCheck:
         ensure_no_structured_content_python(package_dir=tmp_path, package_address="github.com/acme/funcs-only")
 
     def test_refusal_names_the_rule(self, tmp_path: Path) -> None:
-        """The refusal error names the rule and the offending classes."""
+        """The refusal error names the rule, the offending classes and the same route as the load-time refusal."""
         (tmp_path / "structures.py").write_text(STRUCTURES_MODULE, encoding="utf-8")
 
         with pytest.raises(MethodStructuresRefusedError) as exc_info:
@@ -120,7 +121,8 @@ class TestStructuresCheck:
         assert STRUCTURES_REFUSAL_RULE in message
         assert "github.com/acme/bad-package" in message
         assert "Invoice" in message
-        assert "MTHDS concepts" in message
+        assert "would be imported into the runner's own process" in message
+        assert STRUCTURES_REFUSAL_REMEDY in message
 
     def test_from_import_alias_is_detected(self, tmp_path: Path) -> None:
         """`from ... import StructuredContent as SC` does not bypass the refusal."""
@@ -235,7 +237,7 @@ class TestStructuresCheck:
         message = str(exc_info.value)
         assert "structures/invoice.py defines Invoice, LineItem; models/receipt.py defines Invoice" in message
         assert STRUCTURES_REFUSAL_RULE in message
-        assert "MTHDS concepts with inline structures" in message
+        assert STRUCTURES_REFUSAL_REMEDY in message
         assert "from structures import <domain>__<Concept>" in message
         assert "funcs.py" not in message
         assert str(tmp_path) not in message

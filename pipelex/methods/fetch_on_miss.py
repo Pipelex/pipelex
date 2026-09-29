@@ -26,6 +26,7 @@ from pipelex.methods.exceptions import (
 from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import MethodRef, looks_like_method_ref, parse_method_ref
 from pipelex.methods.structures_check import (
+    STRUCTURES_REFUSAL_REMEDY,
     STRUCTURES_REFUSAL_RULE,
     describe_structured_content_violations,
     scan_structured_content_classes,
@@ -139,8 +140,7 @@ def resolve_address_based_method(
             details = describe_structured_content_violations(violations=violations)
             log.warning(
                 f"Method '{fetched.full_address}' declares Python structure classes ({details}). It runs locally, but "
-                f"{STRUCTURES_REFUSAL_RULE} — hosted execution would refuse it. Express the types as MTHDS concepts "
-                f"to keep the method hosted-runnable."
+                f"{STRUCTURES_REFUSAL_RULE} — hosted execution would refuse it. {STRUCTURES_REFUSAL_REMEDY}"
             )
 
         name = fetched.manifest.name or fetched.package_dir.name
