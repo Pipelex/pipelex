@@ -328,7 +328,6 @@ UnknownSecretsMethodError | Unknown secrets method | https://docs.pipelex.com/la
 UnknownStorageMethodError | Unknown storage method | https://docs.pipelex.com/latest/errors/unknown-storage-method-error/
 UnknownVarPrefixError | Unknown var prefix | https://docs.pipelex.com/latest/errors/unknown-var-prefix-error/
 UnsafeSchemaError | Unsafe schema | https://docs.pipelex.com/latest/errors/unsafe-schema-error/
-UnusedInputError | Unused input | https://docs.pipelex.com/latest/errors/unused-input-error/
 UriReadRefusedError | Read outside the run's scope refused | https://docs.pipelex.com/latest/errors/uri-read-refused-error/
 ValidateBundleError | Validate bundle | https://docs.pipelex.com/latest/errors/validate-bundle-error/
 VarFallbackPatternError | Var fallback pattern | https://docs.pipelex.com/latest/errors/var-fallback-pattern-error/

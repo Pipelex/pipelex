@@ -4296,10 +4296,6 @@ rationale = "Query accessor keyed by the variable path; context stays keyword."
 param = "template_source"
 rationale = "Verb-object: analyzes the template source; context stays keyword."
 
-["pipelex/pipe_operators/shared/template_image_analyzer.py::TemplateImageAnalyzer.validate_unused_inputs"]
-param = "template_sources"
-rationale = "Verb-object: validates the template sources; context stays keyword."
-
 ["pipelex/pipe_operators/structure/pipe_structure.py::PipeStructure._format_error_location"]
 param = "pipe_run_params"
 rationale = "Derivation from the run params; single operand."
