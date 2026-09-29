@@ -2,9 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`read_scope` is a required run parameter (Breaking)**: `RunMetadata`, `pipeline_run_setup`, `prepare_pipe_job`, `PipelexKernel.make`, `shape_inputs`, `InputShaper.shape`, `WorkingMemoryFactory.make_from_pipeline_inputs`, `StuffFactory.make_stuff_from_stuff_content_or_data`, `normalize_data_urls_to_storage` and the runtime bridge's `PipelexPipeRunInput` take a `read_scope` with no default: a host serving several tenants passes the tenant's prefix, which must contain the run's `storage_scope`, and `None` states that the run is unscoped. `PipelexMTHDSProtocol` defaults it to `None`, which is the truth on a laptop.
+- **Dry-run mocks of images and documents carry readable URLs**: a mocked `ImageContent` carries one of `inference.dry_run.image_urls` and a mocked `DocumentContent` a blank one-page PDF as a `data:` URL, where both carried a random string that reads as a local path; and a model nested two levels or more inside a mocked structure now gets the same field providers as a shallower one.
+
 ### Fixed
 
 - **A generated object's storage key names its own format**: the extension of a key under `generated/` follows the whole MIME type the object is stored under, so a fetched `image/svg+xml` is stored as `.svg`, and a type with no extension of its own gets `.bin`, where both used to get `.jpg`. The MIME type's parameters and case no longer change the extension.
+
+### Security
+
+- **A scoped run reads only under its read scope, and never the local disk**: on a run with a read scope, a `pipelex-storage://` key is read only when it lies under that scope, compared segment by segment, and a bare path or a `file://` URI is never read, whichever value carries it — an input, a `PipeCompose` construct that assembles a URL from text, a model's structured output. Every content-generation leaf checks the URLs it will read before the dry-run branch, and the input seam checks a CSV input and every file it would upload or sign; a refused read raises `UriReadRefusedError`, answered as a 422, which names where the URL sat without quoting it. A run whose read scope is `None` reads as before.
 
 ## [v0.69.0] - 2026-09-28
 

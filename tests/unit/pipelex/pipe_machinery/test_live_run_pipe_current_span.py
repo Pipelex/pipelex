@@ -195,7 +195,7 @@ def _make_pipe(*, code: str, nested: CurrentSpanPipe | None = None, fails: bool 
 def _traced_metadata() -> JobMetadata:
     """What a submission builds when the runtime traces: the run's identifiers and its derived trace."""
     return JobMetadata(
-        run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", pipeline_run_id="plr-span"),
+        run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", read_scope=None, pipeline_run_id="plr-span"),
         otel_context=RUN_OTEL_CONTEXT,
     )
 

@@ -18,6 +18,7 @@ class TestPipelexKernelRunExtras:
     def test_supplied_extras_land_on_the_runs_metadata(self) -> None:
         kernel = PipelexKernel.make(
             storage_scope="test/scope",
+            read_scope=None,
             run_mode=PipeRunMode.DRY,
             user_id="test-user",
             extras={"organization": "org_acme"},
@@ -27,14 +28,14 @@ class TestPipelexKernelRunExtras:
 
     def test_omitting_them_leaves_an_empty_mapping(self) -> None:
         """Every existing caller omits the field; an omission is an empty facet, not an error."""
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+        kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
 
         assert kernel.job_metadata.run_metadata.extras == {}
 
     def test_two_kernels_do_not_share_one_default_mapping(self) -> None:
         """A mutable default shared between runs would leak one host's extras into another's."""
-        first = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
-        second = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+        first = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
+        second = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
 
         first.job_metadata.run_metadata.extras["organization"] = "org_acme"
 
@@ -45,6 +46,7 @@ class TestPipelexKernelRunExtras:
         with pytest.raises(ValueError, match="extras"):
             PipelexKernel.make(
                 storage_scope="test/scope",
+                read_scope=None,
                 run_mode=PipeRunMode.DRY,
                 user_id="test-user",
                 extras={"Organization": "org_acme"},

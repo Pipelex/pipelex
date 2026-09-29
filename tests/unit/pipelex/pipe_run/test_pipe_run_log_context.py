@@ -45,7 +45,7 @@ class TestPipeRunLogContext:
         mock_router.run = mocker.AsyncMock(side_effect=observe)
         mock_job = mocker.MagicMock()
         mock_job.job_metadata = JobMetadata(
-            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-ctx", storage_scope="test/scope", request_id="req-ctx"),
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-ctx", storage_scope="test/scope", read_scope=None, request_id="req-ctx"),
             pipe_run_id="pr-ctx",
         )
 
@@ -72,7 +72,9 @@ class TestPipeRunLogContext:
         mock_router = mocker.AsyncMock()
         mock_router.run = mocker.AsyncMock(side_effect=observe)
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-only", storage_scope="test/scope"))
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-only", storage_scope="test/scope", read_scope=None)
+        )
 
         await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job)
 
@@ -83,7 +85,9 @@ class TestPipeRunLogContext:
         mock_router = mocker.AsyncMock()
         mock_router.run = mocker.AsyncMock(side_effect=RuntimeError("router blew up"))
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-fail", storage_scope="test/scope"))
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-fail", storage_scope="test/scope", read_scope=None)
+        )
 
         with pytest.raises(RuntimeError):
             await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job)

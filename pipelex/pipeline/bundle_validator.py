@@ -481,6 +481,8 @@ class BundleValidator:
                 # prefix for every run. If `dry-run-no-storage` ever appears as
                 # an S3 prefix, a dry run stored something and that is the bug.
                 storage_scope=DRY_RUN_STORAGE_SCOPE,
+                # A validation sweep runs on mock inputs and reads nothing a caller named, so it is unscoped.
+                read_scope=None,
             )
             await self._pipe_run.run(pipe_job)
         except (PipelexError, ValidationError, FactoryException) as exc:

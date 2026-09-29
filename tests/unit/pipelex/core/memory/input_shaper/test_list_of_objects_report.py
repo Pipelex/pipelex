@@ -60,11 +60,11 @@ class TestListOfObjectsReport:
         records_input: dict[str, Any] = {"records": LIST_OF_OBJECTS}
 
         if isinstance(expected, StuffContent):
-            working_memory = InputShaper.shape(records_input, input_specs=input_specs, concept_provider=get_concept_library())
+            working_memory = InputShaper.shape(records_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
             stuff = working_memory.root["records"]
             assert stuff.concept.concept_ref == concept_ref
             assert stuff.content == expected
             return
 
         with pytest.raises(expected, match="Input 'records'"):
-            InputShaper.shape(records_input, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape(records_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)

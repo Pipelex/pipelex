@@ -491,6 +491,9 @@ class ShapingGate:
                 concept_provider=get_concept_library(),
                 input_specs=pipe.inputs,
                 search_scope=pipe.domain_code,
+                # No run is behind this round trip, and a table reference is never read: the
+                # corpus writes no local file under a template's URLs.
+                read_scope=None,
             )
         except Exception as exc:  # ruff: ignore[blind-except]
             # (2) Unbounded surface: the shaper's explicit arm hands values straight to pydantic on

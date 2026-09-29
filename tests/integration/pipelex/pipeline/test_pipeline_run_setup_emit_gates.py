@@ -81,6 +81,7 @@ class TestPipelineRunSetupEmitGates:
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=_config(generate_graph=False, generate_usage=True),
             mthds_contents=[_GATE_MTHDS],
@@ -105,6 +106,7 @@ class TestPipelineRunSetupEmitGates:
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=_config(generate_graph=True, generate_usage=False),
             mthds_contents=[_GATE_MTHDS],
@@ -141,6 +143,7 @@ class TestTheLocalScopeIsPerRun:
         for _ in range(2):
             pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
                 storage_scope=LOCAL_STORAGE_SCOPE,
+                read_scope=None,
                 user_id=LOCAL_USER_ID,
                 execution_config=_config(generate_graph=False, generate_usage=False),
                 mthds_contents=[_GATE_MTHDS],
@@ -169,6 +172,7 @@ class TestTheLocalScopeIsPerRun:
         """
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
             storage_scope="org_a/mt_b/run_c",
+            read_scope=None,
             user_id="test-user",
             execution_config=_config(generate_graph=False, generate_usage=False),
             mthds_contents=[_GATE_MTHDS],

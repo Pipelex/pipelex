@@ -516,7 +516,11 @@ class PipeAbstract(ABC, BaseModel):
 
         # Validate external resources (URLs, file paths) referenced by input contents.
         # Skipped in dry-run mode because inputs are mock-generated with fake URLs.
-        if not pipe_run_params.run_mode.is_dry:
+        # Skipped on a run with a read scope too: the only thing this checks is that a local path
+        # exists, and such a run reads no local path at all, which the leaves refuse before any IO.
+        # Checking first would stat the host's disk on the method's say-so, and a missing path failing
+        # here while an existing one is refused later would tell the caller which files exist.
+        if not pipe_run_params.run_mode.is_dry and job_metadata.run_metadata.read_scope is None:
             for named_stuff_spec in self.needed_inputs().named_stuff_specs:
                 variable_name = named_stuff_spec.variable_name
                 stuff = working_memory.get_optional_stuff(variable_name)

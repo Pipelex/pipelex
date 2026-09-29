@@ -37,6 +37,7 @@ class TestStuffFactoryEmptyList:
             stuff_content_or_data={"concept": concept_ref, "content": []},
             concept_provider=get_concept_library(),
             name="pics",
+            read_scope=None,
         )
 
         pretty_print(result, title=f"empty list under {concept_ref}")
@@ -54,6 +55,7 @@ class TestStuffFactoryEmptyList:
             stuff_content_or_data={"concept": "native.Image", "content": []},
             concept_provider=get_concept_library(),
             name="pics",
+            read_scope=None,
         )
 
         content = cast("ListContent[StuffContent]", result.content)
@@ -72,6 +74,7 @@ class TestStuffFactoryEmptyList:
                 stuff_content_or_data=ListContent[StuffContent](items=[]),
                 concept_provider=get_concept_library(),
                 name="pics",
+                read_scope=None,
             )
 
     def test_non_empty_envelope_list_is_unaffected(self) -> None:
@@ -80,6 +83,7 @@ class TestStuffFactoryEmptyList:
             stuff_content_or_data={"concept": "native.Text", "content": ["a", "b"]},
             concept_provider=get_concept_library(),
             name="notes",
+            read_scope=None,
         )
 
         assert result.concept.concept_ref == "native.Text"

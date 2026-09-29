@@ -130,6 +130,7 @@ class TestPipelineRunIdResubmission:
         with pytest.raises(PipeNotFoundError):
             await pipeline_run_setup(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 execution_config=_dry_mock_config(),
                 mthds_contents=[_RESUBMISSION_MTHDS],
@@ -143,6 +144,7 @@ class TestPipelineRunIdResubmission:
         # PipelineManagerAlreadyExistsError).
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_RESUBMISSION_MTHDS],
@@ -198,6 +200,7 @@ class TestPipelineRunIdResubmission:
         with pytest.raises(RuntimeError, match=prepare_failure_msg):
             await pipeline_run_setup(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 execution_config=graph_config,
                 mthds_contents=[_RESUBMISSION_MTHDS],
@@ -218,6 +221,7 @@ class TestPipelineRunIdResubmission:
         mocker.stop(teardown_mock)
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_RESUBMISSION_MTHDS],

@@ -2,12 +2,12 @@ import re
 from contextlib import AbstractContextManager
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.system.run_extras import validate_run_extras
-from pipelex.system.storage_scope import validate_storage_scope
+from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.log.log_context import LogContext, bind_log_context
@@ -135,6 +135,20 @@ class RunMetadata(BaseModel):
     # `DRY_RUN_STORAGE_SCOPE`.
     storage_scope: str
 
+    # The prefix every storage key this run reads must lie under, and the
+    # statement that it reads nothing from the local disk. Opaque like the
+    # storage scope, which must lie under it, and supplied by the host — see
+    # `pipelex.system.storage_scope` for why it is not derived from the storage
+    # scope, and `pipelex.tools.uri.uri_read_scope` for the check.
+    #
+    # REQUIRED, with no default, for the storage scope's reason: a default on a
+    # tenancy field is how a missing value becomes a present-looking one. Here
+    # the present-looking value would be `None`, which reads everything, so a
+    # host that forgot the field would open every key without a word. `None` is
+    # the explicit statement that the run is unscoped: a local run, or a server
+    # with a single tenant.
+    read_scope: str | None
+
     # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
     # HTTP request enters Pipelex). Rides here so it crosses the Temporal
     # serialization boundary — every activity / workflow can correlate logs and
@@ -175,6 +189,20 @@ class RunMetadata(BaseModel):
         request data after this point.
         """
         return validate_storage_scope(value=value)
+
+    @field_validator("read_scope")
+    @classmethod
+    def _validate_read_scope(cls, value: str | None) -> str | None:
+        """Refuse a read scope that is not a path-safe prefix, at construction."""
+        if value is None:
+            return None
+        return validate_read_scope(value=value)
+
+    @model_validator(mode="after")
+    def _validate_storage_scope_within_read_scope(self) -> Self:
+        """Refuse a run that could not read what it writes, at construction rather than at its first read."""
+        validate_storage_scope_within_read_scope(storage_scope=self.storage_scope, read_scope=self.read_scope)
+        return self
 
     @field_validator("request_id")
     @classmethod

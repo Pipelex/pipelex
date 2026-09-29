@@ -127,7 +127,7 @@ class TestInputShaperErrors:
         input_specs = build_input_specs([("my_input", concept_ref, multiplicity)])
 
         with pytest.raises(expected_exception, match=error_match) as exc_info:
-            InputShaper.shape({"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape({"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         # D4 mandates the rendered expected-shape template appears in every shaping-error message.
         assert "Expected shape:" in str(exc_info.value), f"Missing rendered shape for {test_name}"
@@ -137,7 +137,7 @@ class TestInputShaperErrors:
         input_specs = build_input_specs([("question", "native.Text", None)])
 
         with pytest.raises(UnknownInputNameError, match="not declared") as exc_info:
-            InputShaper.shape({"quesion": "typo"}, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape({"quesion": "typo"}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         message = str(exc_info.value)
         assert "'question'" in message, "Unknown-name error should list the declared inputs"

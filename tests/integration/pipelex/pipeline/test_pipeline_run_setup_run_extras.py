@@ -53,6 +53,7 @@ class TestPipelineRunSetupRunExtras:
         )
         pipe_job, _, _ = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=execution_config,
             mthds_contents=[_MINIMAL_MTHDS],
@@ -68,6 +69,7 @@ class TestPipelineRunSetupRunExtras:
         )
         pipe_job, _, _ = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=execution_config,
             mthds_contents=[_MINIMAL_MTHDS],
@@ -83,6 +85,7 @@ class TestPipelineRunSetupRunExtras:
         with pytest.raises(ValueError, match="extras"):
             await pipeline_run_setup(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 execution_config=execution_config,
                 mthds_contents=[_MINIMAL_MTHDS],
@@ -112,6 +115,7 @@ class TestPipelineRunSetupRunExtras:
         with pytest.raises(ValueError, match="extras"):
             await pipeline_run_setup(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 execution_config=execution_config,
                 mthds_contents=[_MINIMAL_MTHDS],

@@ -349,6 +349,7 @@ class TestValidateBundleLoadRefusals:
         with pytest.raises(ValidateBundleError) as raised:
             await pipeline_run_setup(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 execution_config=execution_config,
                 mthds_contents=[_llm_bundle(model_line='model       = "gpt-5.1"')],

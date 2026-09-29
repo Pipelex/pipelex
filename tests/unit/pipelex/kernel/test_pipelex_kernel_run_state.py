@@ -62,22 +62,26 @@ class TestPipelexKernelRunState:
         """
         trace_context = _trace_context()
 
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=trace_context)
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=trace_context
+        )
 
         assert kernel.job_metadata.run_metadata.pipeline_run_id == _GRAPH_ID
         assert kernel.job_metadata.trace_context == trace_context
 
     def test_without_a_trace_context_the_run_mints_its_own_id_and_traces_nothing(self) -> None:
         """The default stays what it was: a fresh run id, and no context for the leaf to emit against."""
-        first = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
-        second = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+        first = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
+        second = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
 
         assert first.job_metadata.trace_context is None
         assert first.job_metadata.run_metadata.pipeline_run_id != second.job_metadata.run_metadata.pipeline_run_id
 
     def test_a_request_id_rides_the_run_metadata(self) -> None:
         """The field a hosted deployment filters its logs on, carried like `user_id` and `storage_scope`."""
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", request_id="req-kernel")
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", request_id="req-kernel"
+        )
 
         assert kernel.job_metadata.run_metadata.request_id == "req-kernel"
         assert kernel.make_step_metadata().run_metadata.request_id == "req-kernel"
@@ -85,11 +89,13 @@ class TestPipelexKernelRunState:
     def test_a_malformed_request_id_is_refused_by_the_run_metadata(self) -> None:
         """The validation is `RunMetadata`'s own, so `make` refuses exactly what the pipeline entry points refuse."""
         with pytest.raises(ValidationError):
-            PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", request_id="forged\nline")
+            PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", request_id="forged\nline")
 
     def test_a_supplied_pipeline_run_id_becomes_the_runs_identity(self) -> None:
         """A host inside a replay-based executor mints the id from its own replay-safe source and hands it over."""
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="plr-host")
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="plr-host"
+        )
 
         assert kernel.job_metadata.run_metadata.pipeline_run_id == "plr-host"
         assert kernel.job_metadata.trace_context is None
@@ -97,6 +103,7 @@ class TestPipelexKernelRunState:
     def test_a_trace_context_and_an_equal_pipeline_run_id_are_one_identity(self) -> None:
         kernel = PipelexKernel.make(
             storage_scope="test/scope",
+            read_scope=None,
             run_mode=PipeRunMode.DRY,
             user_id="test-user",
             trace_context=_trace_context(),
@@ -110,6 +117,7 @@ class TestPipelexKernelRunState:
         with pytest.raises(ValueError, match="plr-elsewhere"):
             PipelexKernel.make(
                 storage_scope="test/scope",
+                read_scope=None,
                 run_mode=PipeRunMode.DRY,
                 user_id="test-user",
                 trace_context=_trace_context(),
@@ -119,10 +127,10 @@ class TestPipelexKernelRunState:
     def test_an_empty_pipeline_run_id_is_refused(self) -> None:
         """An empty id is a caller's bug, and minting one in its place would hide it from a replaying host."""
         with pytest.raises(ValueError, match="empty pipeline_run_id"):
-            PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="")
+            PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="")
 
     def test_with_neither_the_run_id_is_a_fresh_uuid4(self) -> None:
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+        kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
 
         assert UUID(kernel.job_metadata.run_metadata.pipeline_run_id).version == 4
 
@@ -130,6 +138,7 @@ class TestPipelexKernelRunState:
         """The host's binding: the run's two identifiers, and no `pipe_run_id`, which each step binds for itself."""
         kernel = PipelexKernel.make(
             storage_scope="test/scope",
+            read_scope=None,
             run_mode=PipeRunMode.DRY,
             user_id="test-user",
             request_id="req-kernel",
@@ -157,6 +166,7 @@ class TestPipelexKernelRunState:
         step_ids = iter(["step-0"])
         kernel = PipelexKernel.make(
             storage_scope="test/scope",
+            read_scope=None,
             run_mode=PipeRunMode.DRY,
             user_id="test-user",
             request_id="req-kernel",
@@ -177,7 +187,9 @@ class TestPipelexKernelRunState:
 
     def test_each_step_inherits_the_trace_context_and_carries_its_own_run_id(self) -> None:
         """The per-step copy: same trace context (so every step attributes to it), distinct pipe_run_id."""
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=_trace_context())
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=_trace_context()
+        )
 
         first_step = kernel.make_step_metadata()
         second_step = kernel.make_step_metadata()
@@ -195,7 +207,7 @@ class TestPipelexKernelRunState:
         Anything that attributes work by `pipe_code` — log correlation, usage accounting, the
         per-step labelling a distributed backend derives — sees an anonymous step without this.
         """
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+        kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
 
         assert kernel.make_step_metadata(pipe_code="answer_question").pipe_code == "answer_question"
 
@@ -207,7 +219,7 @@ class TestPipelexKernelRunState:
         key must be omitted, not passed as None — so this constructs a run that HAS a run-level
         `pipe_code`, which no caller in the tree does today.
         """
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+        kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
         kernel.job_metadata.pipe_code = "set_at_run_level"
 
         assert kernel.make_step_metadata().pipe_code == "set_at_run_level"
@@ -227,12 +239,14 @@ class TestPipelexKernelRunState:
             minted.append(f"step-{len(minted)}")
             return minted[-1]
 
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", step_id_source=_source)
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", step_id_source=_source
+        )
 
         assert kernel.make_step_metadata().pipe_run_id == "step-0"
         assert kernel.make_step_metadata().pipe_run_id == "step-1"
 
-        default_kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
+        default_kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
         first_default = default_kernel.make_step_metadata().pipe_run_id
         assert first_default is not None
         assert UUID(first_default).version == 4
@@ -240,7 +254,7 @@ class TestPipelexKernelRunState:
 
     def test_mock_usage_rides_the_execution_mode_contract(self) -> None:
         """The DRY sub-flag lands on the carrier every cogt leaf reads off its assignment."""
-        kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", is_mock_usage=True)
+        kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", is_mock_usage=True)
 
         assert kernel.cogt_run_params.run_mode.is_dry
         assert kernel.cogt_run_params.is_mock_usage

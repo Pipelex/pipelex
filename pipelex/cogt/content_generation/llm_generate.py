@@ -10,12 +10,14 @@ from pipelex.cogt.content_generation.dry_mock import (
     dry_llm_gen_text,
 )
 from pipelex.cogt.content_generation.object_class_resolution import resolve_object_class
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_utils import dump_prompt, dump_response_from_text_gen
 from pipelex.runtime_hub import get_llm_worker
 
 
 async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
+    authorize_assignment_reads(job_metadata=llm_assignment.job_metadata, uri_references=llm_assignment.referenced_uris())
     if llm_assignment.cogt_run_params.run_mode.is_dry:
         return dry_llm_gen_text(llm_assignment)
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
@@ -38,6 +40,7 @@ async def llm_gen_object(object_assignment: ObjectAssignment, *, object_class: t
     class from the assignment's JSON schema instead — see :mod:`.object_class_resolution`.
     """
     llm_assignment = object_assignment.llm_assignment_for_object
+    authorize_assignment_reads(job_metadata=llm_assignment.job_metadata, uri_references=object_assignment.referenced_uris())
     if object_assignment.cogt_run_params.run_mode.is_dry:
         return dry_llm_gen_object(object_assignment, object_class=object_class)
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
@@ -63,6 +66,7 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment, *, object_cla
     item class from the assignment's JSON schema instead — see :mod:`.object_class_resolution`.
     """
     llm_assignment = object_assignment.llm_assignment_for_object
+    authorize_assignment_reads(job_metadata=llm_assignment.job_metadata, uri_references=object_assignment.referenced_uris())
     if object_assignment.cogt_run_params.run_mode.is_dry:
         return dry_llm_gen_object_list(object_assignment, object_class=object_class)
     log.verbose(f"llm_gen_object_list to generate a list of '{object_assignment.object_class_name}'")

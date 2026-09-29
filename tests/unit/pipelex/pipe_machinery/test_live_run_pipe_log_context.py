@@ -147,7 +147,9 @@ def _live_params() -> PipeRunParams:
 
 def _seam_shaped_metadata() -> JobMetadata:
     """What a submission builds: the run's identifiers, and no pipe_run_id yet."""
-    return JobMetadata(run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", pipeline_run_id="plr-live", request_id="req-live"))
+    return JobMetadata(
+        run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", read_scope=None, pipeline_run_id="plr-live", request_id="req-live")
+    )
 
 
 def _own_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:

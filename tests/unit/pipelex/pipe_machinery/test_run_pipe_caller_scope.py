@@ -42,6 +42,7 @@ def _job_metadata() -> JobMetadata:
     return JobMetadata(
         run_metadata=RunMetadata(
             storage_scope="tenant/run-1",
+            read_scope=None,
             user_id="caller-7",
             pipeline_run_id="run-1",
             extras={"organization": "org_caller"},

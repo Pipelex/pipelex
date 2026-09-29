@@ -9,6 +9,7 @@ Temporal workflow boundary — only URL-bearing ``ImageContent`` references are 
 from pipelex.cogt.content_generation.assignment_models import RenderPageViewsAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_render_page_views
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -22,8 +23,10 @@ async def render_page_views_and_store(
     """Render PDF pages as images, store them, and return lightweight ImageContent references.
 
     The DRY branch sits here, above both the pypdfium2 rendering and the store step, so a dry run
-    performs no rendering and no storage IO (eng review D10).
+    performs no rendering and no storage IO (eng review D10). The read scope is authorized above it,
+    so a dry run refuses what a live one would.
     """
+    authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
     if render_assignment.cogt_run_params.run_mode.is_dry:
         return dry_render_page_views(render_assignment)
     # Deferred import: avoid pulling the pdf rendering SDK at module-load time

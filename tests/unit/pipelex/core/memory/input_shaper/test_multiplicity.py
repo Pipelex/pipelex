@@ -143,7 +143,9 @@ class TestInputShaperMultiplicity:
         log.info(f"Testing multiplicity case: {test_name}")
         input_specs = build_input_specs([("my_input", concept_ref, multiplicity)])
 
-        working_memory = InputShaper.shape({"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape(
+            {"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None
+        )
 
         stuff = working_memory.root["my_input"]
         pretty_print(stuff, title=f"Result for {test_name}")

@@ -135,6 +135,7 @@ class InputShaper:
         concept_provider: ConceptProviderAbstract,
         input_specs: InputStuffSpecs,
         search_scope: str | None = None,
+        read_scope: str | None,
         inputs_base_dir: Path | None = None,
     ) -> WorkingMemory:
         """Shape every provided input against its declared ``StuffSpec`` and return a WorkingMemory.
@@ -152,6 +153,9 @@ class InputShaper:
                 CLI). ``None`` (in-process / inline-JSON callers) leaves relative paths untouched
                 (the CWD contract). Only bare strings in the file-ish and CSV arms are resolved; the
                 ``{"url": ...}`` dict form is owned by the CLI's url-key walk.
+            read_scope: The run's read scope, which a table read while shaping must satisfy: on a
+                scoped run a CSV input, which is always a local file, is refused. ``None`` for an
+                unscoped run. See :mod:`pipelex.tools.uri.uri_read_scope`.
 
         Raises:
             UnknownInputNameError: a provided name is not declared (D8).
@@ -167,6 +171,7 @@ class InputShaper:
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
                 search_scope=search_scope,
+                read_scope=read_scope,
                 inputs_base_dir=inputs_base_dir,
             )
             working_memory.add_new_stuff(name=variable_name, stuff=stuff)
@@ -190,6 +195,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
         search_scope: str | None,
+        read_scope: str | None,
         inputs_base_dir: Path | None,
     ) -> Stuff:
         declared_concept = stuff_spec.concept
@@ -204,6 +210,7 @@ class InputShaper:
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
                 search_scope=search_scope,
+                read_scope=read_scope,
             )
 
         # (D9) A top-level null is never a value — absence is expressed by omitting the key.
@@ -226,6 +233,7 @@ class InputShaper:
                         concept_provider=concept_provider,
                         name=variable_name,
                         search_scope=search_scope,
+                        read_scope=read_scope,
                     )
                 except StuffFactoryError as exc:
                     # (R8) The factory's refusal names neither the input nor its declared concept, so it
@@ -267,6 +275,7 @@ class InputShaper:
                     input_kind=input_kind,
                     variable_name=variable_name,
                     search_scope=search_scope,
+                    read_scope=read_scope,
                     inputs_base_dir=inputs_base_dir,
                     is_raw_data=False,
                 )
@@ -330,6 +339,7 @@ class InputShaper:
         input_kind: InputKind,
         variable_name: str,
         search_scope: str | None,
+        read_scope: str | None,
         inputs_base_dir: Path | None,
         is_raw_data: bool,
     ) -> StuffContent:
@@ -346,7 +356,12 @@ class InputShaper:
         # concept, tried BEFORE element-wise shaping so the bare string is not misread as one item.
         if is_list and input_kind.is_structured:
             csv_list_content = cls._try_shape_csv(
-                value, concept_provider=concept_provider, stuff_spec=stuff_spec, variable_name=variable_name, inputs_base_dir=inputs_base_dir
+                value,
+                concept_provider=concept_provider,
+                stuff_spec=stuff_spec,
+                variable_name=variable_name,
+                inputs_base_dir=inputs_base_dir,
+                read_scope=read_scope,
             )
             if csv_list_content is not None:
                 if fixed_count is not None and len(csv_list_content.items) != fixed_count:
@@ -368,6 +383,7 @@ class InputShaper:
                 variable_name=variable_name,
                 fixed_count=fixed_count,
                 search_scope=search_scope,
+                read_scope=read_scope,
                 inputs_base_dir=inputs_base_dir,
                 is_raw_data=is_raw_data,
             )
@@ -387,6 +403,7 @@ class InputShaper:
             stuff_spec=stuff_spec,
             variable_name=variable_name,
             search_scope=search_scope,
+            read_scope=read_scope,
             inputs_base_dir=inputs_base_dir,
         )
 
@@ -399,6 +416,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
         inputs_base_dir: Path | None,
+        read_scope: str | None,
     ) -> ListContent[StuffContent] | None:
         """Detect and read a table reference for a declared structured list input (D11).
 
@@ -420,7 +438,9 @@ class InputShaper:
         else:
             return None
         url = cls._resolve_local_path(url, inputs_base_dir=inputs_base_dir)
-        return StuffFactory.try_make_csv_list_content(stuff_spec.concept, concept_provider=concept_provider, content={"url": url}, name=variable_name)
+        return StuffFactory.try_make_csv_list_content(
+            stuff_spec.concept, concept_provider=concept_provider, content={"url": url}, name=variable_name, read_scope=read_scope
+        )
 
     @classmethod
     def _resolve_local_path(cls, url: str, *, inputs_base_dir: Path | None) -> str:
@@ -443,6 +463,7 @@ class InputShaper:
         variable_name: str,
         fixed_count: int | None,
         search_scope: str | None,
+        read_scope: str | None,
         inputs_base_dir: Path | None,
         is_raw_data: bool,
     ) -> ListContent[StuffContent]:
@@ -481,6 +502,7 @@ class InputShaper:
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
                 search_scope=search_scope,
+                read_scope=read_scope,
                 inputs_base_dir=inputs_base_dir,
             )
             for item_value in item_values
@@ -497,6 +519,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
         search_scope: str | None,
+        read_scope: str | None,
         inputs_base_dir: Path | None,
     ) -> StuffContent:
         """Build one item's ``StuffContent`` from a value, dispatched on the declared kind (D5).
@@ -521,7 +544,11 @@ class InputShaper:
             )
         if isinstance(value, StuffContent):
             built = StuffFactory.make_stuff_from_stuff_content_or_data(
-                stuff_content_or_data=value, concept_provider=concept_provider, name=variable_name, search_scope=search_scope
+                stuff_content_or_data=value,
+                concept_provider=concept_provider,
+                name=variable_name,
+                search_scope=search_scope,
+                read_scope=read_scope,
             )
             if not concept_provider.is_compatible(tested_concept=built.concept, wanted_concept=concept):
                 raise ExplicitConceptIncompatibleError.make(
@@ -767,6 +794,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
         search_scope: str | None,
+        read_scope: str | None,
     ) -> Stuff:
         """Build an explicit form bottom-up, then compat-check the built concept against declared (D6).
 
@@ -786,6 +814,7 @@ class InputShaper:
             stuff_spec=stuff_spec,
             variable_name=variable_name,
             search_scope=search_scope,
+            read_scope=read_scope,
         )
         if structureless_envelope_stuff is not None:
             return structureless_envelope_stuff
@@ -801,6 +830,7 @@ class InputShaper:
                     stuff_spec=stuff_spec,
                     variable_name=variable_name,
                     search_scope=search_scope,
+                    read_scope=read_scope,
                     inputs_base_dir=None,
                 )
 
@@ -809,6 +839,7 @@ class InputShaper:
             concept_provider=concept_provider,
             name=variable_name,
             search_scope=search_scope,
+            read_scope=read_scope,
         )
         if not concept_provider.is_compatible(tested_concept=stuff.concept, wanted_concept=declared_concept):
             raise ExplicitConceptIncompatibleError.make(
@@ -833,6 +864,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
         search_scope: str | None,
+        read_scope: str | None,
     ) -> Stuff | None:
         """Shape an envelope naming a structureless concept, or return ``None`` for every other explicit form (R5).
 
@@ -886,6 +918,7 @@ class InputShaper:
             input_kind=InputKind.ANYTHING,
             variable_name=variable_name,
             search_scope=search_scope,
+            read_scope=read_scope,
             inputs_base_dir=None,
             is_raw_data=True,
         )
