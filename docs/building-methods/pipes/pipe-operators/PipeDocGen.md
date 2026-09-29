@@ -18,11 +18,12 @@ The step runs in two stages:
 With no template, the step lays its inputs out by itself, which is called the auto-layout:
 
 - the scalar fields of a structure, such as a number, a date or a short text, make a grid of labels and values, labelled from the fields' titles;
-- a list of flat structures makes a table, whose header row repeats on every page;
+- a list of structures the method declares, whose fields are all flat, makes a table, whose header row repeats on every page;
 - a nested structure makes a section with a heading;
 - a `Text` input prints as paragraphs, and a [`Markdown`](../../concepts/native-concepts.md) input prints formatted, with its headings, emphasis, lists, tables, code blocks and links;
 - an `Html` input prints as its text with the tags removed, since the auto-layout does not interpret HTML;
-- an `Image` prints as a picture, with its caption.
+- an `Image` prints as a picture, with its caption;
+- a list of images, of `Markdown` texts or of other native values prints item by item, each as it would print alone.
 
 A single input is the document itself: an invoice's fields fill the page. Several inputs each get a section, in the order the step declares them. Every page carries the document's title in a running header and "Page N of M" in its footer, on A4 portrait, in a font bundled with Pipelex so that a PDF looks the same on every machine.
 
