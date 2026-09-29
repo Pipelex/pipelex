@@ -6,13 +6,23 @@ never cross a workflow boundary: only the URL-bearing ``DocumentContent`` is ret
 looked up in the document renderer registry by the composition's format and source, and it runs in a worker
 thread, since engines are synchronous; a file its document names, such as an image, it reads back through the
 ``RenderResources`` it is handed, under the run's read scope.
+
+Engines run on a thread pool of their own rather than the event loop's default executor, because an engine's
+thread waits while the loop reads a file for it, and that read may itself need a default-executor thread (a
+local file read, a DNS lookup, a cloud storage call). Were the engines on the default executor, as many
+concurrent prints as it has threads would hold every one of them, and each read would wait behind them until
+it timed out.
 """
 
 import asyncio
+import contextvars
+import functools
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_render_document
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
@@ -27,6 +37,9 @@ from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 
 # How long an engine may wait for one file it reads, such as an image fetched over https.
 _RESOURCE_LOAD_TIMEOUT_SECONDS = 120
+# How many documents print at once; more wait their turn. A print is CPU-bound apart from its reads.
+_MAX_CONCURRENT_PRINTS = 4
+_PRINT_EXECUTOR = ThreadPoolExecutor(max_workers=_MAX_CONCURRENT_PRINTS, thread_name_prefix="pipelex-doc-gen")
 
 
 class RunRenderResources(RenderResources):
@@ -52,7 +65,13 @@ class RunRenderResources(RenderResources):
             msg = "An engine reads its resources from the worker thread it prints in, never from the event loop's own thread."
             raise RuntimeError(msg)
         future = asyncio.run_coroutine_threadsafe(self._load(uri=uri, position=position), self._loop)
-        return future.result(timeout=_RESOURCE_LOAD_TIMEOUT_SECONDS)
+        try:
+            return future.result(timeout=_RESOURCE_LOAD_TIMEOUT_SECONDS)
+        except TimeoutError as exc:
+            # Stop the read too, which would otherwise go on running on the loop after the print has failed.
+            future.cancel()
+            msg = f"Reading {position} took longer than {_RESOURCE_LOAD_TIMEOUT_SECONDS} seconds."
+            raise DocGenRenderError(msg) from exc
 
 
 async def render_document_and_store(
@@ -68,7 +87,7 @@ async def render_document_and_store(
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
         DocGenEngineMissingError: no installed engine prints the composition's format from its source.
-        DocGenRenderError: the engine could not print it.
+        DocGenRenderError: the engine could not print it, or failed in a way it did not report.
     """
     authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
     if render_assignment.cogt_run_params.run_mode.is_dry:
@@ -85,9 +104,16 @@ async def render_document_and_store(
         read_scope=render_assignment.job_metadata.run_metadata.read_scope,
         loop=asyncio.get_running_loop(),
     )
+    # The context is carried into the thread, as `asyncio.to_thread` would, so the engine logs under the run.
+    print_call = functools.partial(contextvars.copy_context().run, renderer.render, job=render_job, resources=resources)
     try:
-        rendered = await asyncio.to_thread(renderer.render, job=render_job, resources=resources)
-    except ValueError as exc:
+        rendered = await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, print_call)
+    except PipelexError:
+        # Already classified: a refused read, or a failure the engine reported as a `DocGenRenderError`.
+        raise
+    except Exception as exc:
+        # Dynamic plugin dispatch: an engine is plugin code whose exceptions cannot be enumerated, and anything
+        # else it raises is a failure to print this document.
         msg = f"The {composition.format} engine could not print '{composition.filename}': {exc}"
         raise DocGenRenderError(msg) from exc
     return await generated_content_factory.make_document_content(

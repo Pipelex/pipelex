@@ -1,14 +1,40 @@
+import threading
+
 import pytest
+from typing_extensions import override
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenSource
+from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderJob, RenderResources
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngine, StubEngines
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
+
+
+class _ThreadRecordingEngine(StubEngine):
+    """A stub engine that remembers the name of the thread it printed on."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.thread_names: list[str] = []
+
+    @override
+    def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:
+        self.thread_names.append(threading.current_thread().name)
+        return super().render(job=job, resources=resources)
+
+
+class _BrokenEngine(StubEngine):
+    """A stub engine that fails the way third-party code can, with an exception nobody declared."""
+
+    @override
+    def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:  # ruff: ignore[unused-method-argument]
+        msg = "font cache is corrupt"
+        raise RuntimeError(msg)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -44,6 +70,31 @@ class TestPipeDocGenRun:
 
         document = result.pipe_output.main_stuff_as(content_type=DocumentContent)
         assert document.filename == "invoice-INV-7.pdf"
+
+    async def test_an_engine_prints_on_the_document_pool_not_the_default_executor(self, stub_engines: StubEngines) -> None:
+        """An engine waits on the loop while it reads a file, and reads need the default executor, so engines never hold it."""
+        engine = _ThreadRecordingEngine()
+        stub_engines.engine = engine
+        await PipelexMTHDSProtocol().execute(
+            mthds_contents=[PipeDocGenTestData.bundle(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)],
+            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+        )
+
+        (thread_name,) = engine.thread_names
+        assert thread_name.startswith("pipelex-doc-gen")
+
+    async def test_an_undeclared_engine_failure_is_a_render_error(self, stub_engines: StubEngines) -> None:
+        """Whatever an engine raises beyond a Pipelex error fails the step as a failure to print, naming the file."""
+        stub_engines.engine = _BrokenEngine()
+        with pytest.raises(PipelineExecutionError) as exc_info:
+            await PipelexMTHDSProtocol().execute(
+                mthds_contents=[PipeDocGenTestData.bundle(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)],
+                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            )
+
+        message = str(exc_info.value)
+        assert "could not print 'invoice-INV-2026-0142.pdf'" in message
+        assert "font cache is corrupt" in message
 
     async def test_an_html_template_is_rendered_before_the_engine_prints_it(self, stub_engines: StubEngines) -> None:
         """Sigils and the `markdown` filter work in the template, and the engine gets the composed HTML."""
