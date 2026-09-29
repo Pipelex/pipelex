@@ -1,4 +1,6 @@
-from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def is_variable_satisfied_by_inputs(variable_path: str, *, input_names: set[str]) -> bool:
@@ -51,6 +53,48 @@ def is_input_used_by_variables(input_name: str, *, variable_paths: set[str]) -> 
         if var_path.startswith(input_name + "."):
             return True
     return False
+
+
+def check_inputs_match_variables(*, declared_inputs: set[str], variable_paths: set[str], reader: str) -> None:
+    """Refuse a variable the templates read that no input declares, then a declared input no template reads.
+
+    The rule shared by every operator that reads its inputs through templates: PipeLLM, PipeCompose,
+    PipeSearch and PipeImgGen. ``variable_paths`` are the full dotted paths the operator's templates read,
+    already rid of the operator's special names, and ``reader`` names the fields that read them, for the
+    message ("prompt or system_prompt", "template"). Matching is by dotted path, so a dotted input name
+    such as ``page.page_view`` counts as read by the path it names.
+
+    Raises:
+        PipeValidationError: ``MISSING_INPUT_VARIABLE`` with the undeclared root names, or
+            ``EXTRANEOUS_INPUT_VARIABLE`` with the unread input names, each sorted.
+    """
+    missing_names = sorted(
+        {
+            get_root_from_dotted_path(variable_path)
+            for variable_path in variable_paths
+            if not is_variable_satisfied_by_inputs(variable_path, input_names=declared_inputs)
+        }
+    )
+    if missing_names:
+        quoted_names = _quoted_names(names=missing_names)
+        if len(missing_names) == 1:
+            msg = f"Variable {quoted_names} is read by the {reader} but not declared in `inputs`. Declare it in `inputs`, or stop reading it."
+        else:
+            msg = f"Variables {quoted_names} are read by the {reader} but not declared in `inputs`. Declare them in `inputs`, or stop reading them."
+        raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE, variable_names=missing_names)
+
+    unread_names = sorted(input_name for input_name in declared_inputs if not is_input_used_by_variables(input_name, variable_paths=variable_paths))
+    if unread_names:
+        quoted_names = _quoted_names(names=unread_names)
+        if len(unread_names) == 1:
+            msg = f"Input {quoted_names} is declared but never read by the {reader}. Reference it in the {reader}, or remove it from `inputs`."
+        else:
+            msg = f"Inputs {quoted_names} are declared but never read by the {reader}. Reference them in the {reader}, or remove them from `inputs`."
+        raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, variable_names=unread_names)
+
+
+def _quoted_names(*, names: list[str]) -> str:
+    return ", ".join(f"'{name}'" for name in names)
 
 
 def is_valid_input_name(input_name: str) -> bool:

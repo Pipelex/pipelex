@@ -254,15 +254,28 @@ class ConstructBlueprint(BaseModel):
         return templates
 
     def get_required_variables(self) -> set[str]:
-        """Extract all variable names/paths required to compose this construct.
+        """Extract the root names of every variable this construct reads from working memory.
 
-        This includes:
-        - All 'from' paths (variable references)
-        - All variables used in templates (base names only, e.g., 'deal' from 'deal.amount')
-        - Variables from nested constructs (recursively)
+        For example, 'deal' for both `from = "deal.amount"` and a template reading `$deal.customer_name`.
 
         Returns:
-            Set of variable names/paths needed from working memory
+            Set of root variable names needed from working memory
+        """
+        return {get_root_from_dotted_path(variable_path) for variable_path in self.get_required_variable_paths()}
+
+    def get_required_variable_paths(self) -> set[str]:
+        """Extract the full dotted path of every variable this construct reads from working memory.
+
+        This includes:
+        - All 'from' paths, as written
+        - All variable paths read by templates, internal and special names excluded
+        - The paths read by nested constructs (recursively)
+
+        The input check matches these paths against the declared inputs, so that a dotted input name
+        (`page.page_view`) counts as read by the path it names.
+
+        Returns:
+            Set of full dotted variable paths read from working memory
         """
         required: set[str] = set()
 
@@ -270,9 +283,7 @@ class ConstructBlueprint(BaseModel):
             match field_blueprint.method:
                 case ConstructFieldMethod.FROM_VAR:
                     if field_blueprint.from_path:
-                        # Also only the base variable name for input validation
-                        base_var = get_root_from_dotted_path(field_blueprint.from_path)
-                        required.add(base_var)
+                        required.add(field_blueprint.from_path)
 
                 case ConstructFieldMethod.TEMPLATE:
                     if field_blueprint.template:
@@ -286,16 +297,15 @@ class ConstructBlueprint(BaseModel):
                         except Jinja2DetectVariablesError as exc:
                             msg = f"Error detecting required variables in construct template: {exc}"
                             raise ValueError(msg) from exc
-                        # Extract root names and filter out internal variables (same approach as template mode)
+                        # Filter out internal and special variables by their root (same approach as template mode)
                         for var in template_vars:
                             root_var = get_root_from_dotted_path(var)
                             if not root_var.startswith("_") and root_var != "place_holder":
-                                required.add(root_var)
+                                required.add(var)
 
                 case ConstructFieldMethod.NESTED:
                     if field_blueprint.nested:
-                        nested_vars = field_blueprint.nested.get_required_variables()
-                        required.update(nested_vars)
+                        required.update(field_blueprint.nested.get_required_variable_paths())
 
                 case ConstructFieldMethod.FIXED:
                     # Fixed values don't require any variables

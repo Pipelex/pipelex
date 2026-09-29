@@ -3992,10 +3992,6 @@ rationale = "Single-operand transformation of the code; the rest is context."
 param = "loc"
 rationale = "Verb-object: categorizes the error at the loc; context stays keyword."
 
-["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_input_validation_error"]
-param = "message"
-rationale = "Verb-object: categorizes the error message; context stays keyword."
-
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_syntax_validation_error"]
 param = "message"
 rationale = "Verb-object: categorizes the error message; context stays keyword."
@@ -4003,10 +3999,6 @@ rationale = "Verb-object: categorizes the error message; context stays keyword."
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_typeless_pipe_error"]
 param = "message"
 rationale = "Verb-object: categorizes the message; the rest is context."
-
-["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_variable_names_from_message"]
-param = "message"
-rationale = "Verb-object: extracts from the message; single operand."
 
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_invalid_pipe_code_syntax_error"]
 param = "error"

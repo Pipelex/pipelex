@@ -8,6 +8,7 @@ from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_machinery.validation import check_inputs_match_variables
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -59,18 +60,6 @@ class PipeSearchBlueprint(PipeBlueprint):
             template_category=template_category,
             template_source=preprocessed_template,
         )
-        required_variables: set[str] = set()
-        for path in full_paths:
-            root = get_root_from_dotted_path(path)
-            if not root.startswith("_"):
-                required_variables.add(root)
-
-        missing_variables: set[str] = required_variables - declared_inputs
-
-        if missing_variables:
-            missing_vars_str = ", ".join(sorted(missing_variables))
-            msg = (
-                f"Missing input variable(s) in prompt template: {missing_vars_str}. "
-                "These variables are used in the prompt but not declared in inputs."
-            )
-            raise ValueError(msg)
+        # Names starting with an underscore are internal and never count as read inputs
+        variable_paths = {path for path in full_paths if not get_root_from_dotted_path(path).startswith("_")}
+        check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="prompt")

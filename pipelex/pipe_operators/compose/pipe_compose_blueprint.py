@@ -8,6 +8,7 @@ from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_machinery.validation import check_inputs_match_variables
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
@@ -120,34 +121,31 @@ class PipeComposeBlueprint(PipeBlueprint):
             template_category=self.template_category,
             template_source=preprocessed_template,
         )
-        required_variables: set[str] = set()
+        # Internal names (starting with an underscore) and the special `place_holder` never count as read inputs
+        variable_paths: set[str] = set()
         for path in full_paths:
             root = get_root_from_dotted_path(path)
             if not root.startswith("_") and root != "place_holder":
-                required_variables.add(root)
-        for required_variable_name in required_variables:
-            if required_variable_name not in self.input_names:
-                msg = f"Required variable '{required_variable_name}' is not in the inputs of PipeCompose."
-                raise ValueError(msg)
+                variable_paths.add(path)
+        check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="template")
 
     def _validate_construct_inputs(self):
         """Validate inputs for construct mode.
 
-        The construct blueprint may reference variables from working memory.
-        We validate that the root variable names (before any dots) are declared in inputs.
-        For example, 'deal.customer_name' requires 'deal' to be in inputs.
+        The construct reads variables from working memory through its `from` paths and its field
+        templates, nested constructs included. Every path read must be satisfied by a declared input
+        ('deal.customer_name' by 'deal'), and every declared input must be read by one of them.
         """
         construct_bp = self.construct_blueprint
         if construct_bp is None:
             return
 
-        required_variables = construct_bp.get_required_variables()
-
-        for required_variable in required_variables:
-            root_variable_name = get_root_from_dotted_path(required_variable)
-            if root_variable_name not in self.input_names:
-                msg = f"Required variable '{root_variable_name}' from construct is not in the inputs of PipeCompose for field '{required_variable}'."
-                raise ValueError(msg)
+        declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
+        check_inputs_match_variables(
+            declared_inputs=declared_inputs,
+            variable_paths=construct_bp.get_required_variable_paths(),
+            reader="construct",
+        )
 
     @override
     def validate_output(self):
