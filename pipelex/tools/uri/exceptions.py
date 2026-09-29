@@ -15,7 +15,7 @@ class UriReadRefusalReason(StrEnum):
             case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
                 return "it names a stored file this run may not read"
             case UriReadRefusalReason.LOCAL_PATH:
-                return "it names a file on the server's own disk, which a hosted run never reads"
+                return "it names a file on the server's own disk, or a URL in a scheme this runtime does not read, and a hosted run reads neither"
 
 
 class UriReadRefusedError(SecurityError):

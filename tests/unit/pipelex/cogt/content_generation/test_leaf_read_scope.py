@@ -30,6 +30,8 @@ from pipelex.cogt.content_generation.img_gen_generate import (
 )
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
 from pipelex.cogt.content_generation.render_generate import render_page_views_and_store
+from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured, search_gen_structured_object
+from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.document.prompt_document import PromptDocumentUri
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -164,6 +166,23 @@ DRY_LEAVES: list[tuple[str, LeafCall, str]] = [
     ("render_page_views_and_store", _call_render_and_store, IN_SCOPE_DOCUMENT),
 ]
 
+# The leaves whose assignments read no URL today. They call the gate all the same, so a URL field
+# added to their assignment, and declared as the coverage test requires, is authorized too.
+READ_FREE_LEAVES: list[tuple[str, str, Callable[[Any], Awaitable[Any]]]] = [
+    ("templating_gen_text", "pipelex.cogt.content_generation.templating_generate", templating_gen_text),
+    ("search_gen_sourced_answer", "pipelex.cogt.content_generation.search_generate", search_gen_sourced_answer),
+    ("search_gen_structured", "pipelex.cogt.content_generation.search_generate", search_gen_structured),
+    (
+        "search_gen_structured_object",
+        "pipelex.cogt.content_generation.search_generate",
+        lambda assignment: search_gen_structured_object(assignment, output_class=Summary),
+    ),
+]
+
+
+class _GateCalledError(Exception):
+    """Raised by the patched gate, to prove it ran before anything else in the leaf."""
+
 
 @pytest.fixture
 def no_workers(mocker: MockerFixture) -> dict[str, Any]:
@@ -238,6 +257,16 @@ class TestLeafReadScope:
         with pytest.raises(UriReadRefusedError):
             await extract_gen_pages(extract_assignment=_extract_assignment(run_mode=PipeRunMode.LIVE, document_uri=FOREIGN_KEY))
         no_workers["extract"].assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("leaf_name", "module_path", "call_leaf"), READ_FREE_LEAVES)
+    async def test_a_read_free_leaf_calls_the_gate_first(
+        self, mocker: MockerFixture, leaf_name: str, module_path: str, call_leaf: Callable[[Any], Awaitable[Any]]
+    ) -> None:
+        mocker.patch(f"{module_path}.authorize_assignment_reads", side_effect=_GateCalledError)
+        with pytest.raises(_GateCalledError):
+            await call_leaf(mocker.MagicMock())
+        del leaf_name
 
     @pytest.mark.asyncio
     async def test_an_unscoped_dry_run_passes_a_foreign_key_and_a_local_path(self, mocker: MockerFixture) -> None:
