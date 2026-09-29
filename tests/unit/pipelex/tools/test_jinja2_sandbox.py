@@ -87,6 +87,14 @@ def _make_context(*, registry: ImageRegistry | None = None, calls: list[str] | N
             name="combo",
             concept_code=NativeConceptCode.COMPOSITE,
         ),
+        # Parts named like pydantic attributes resolve to the parts, never to the attributes.
+        "clash": _make_artefact(
+            content=CompositeContent.model_validate(
+                {"model_extra": TextContent(text="E"), "model_dump": TextContent(text="D"), "_hidden": TextContent(text="H")}
+            ),
+            name="clash",
+            concept_code=NativeConceptCode.COMPOSITE,
+        ),
         "impostor": _Impostor(calls=calls),
         "spy": spy,
         "created_at": datetime(2026, 1, 2, 3, 4, 5),
@@ -149,6 +157,13 @@ class TestTemplateSandbox:
             ("dunder_by_bracket_on_plain_dict", "{{ record['__class__'] }}"),
             ("private_part_of_a_composite_by_dot", "{{ combo._hidden }}"),
             ("private_part_of_a_composite_by_bracket", "{{ combo['_hidden'] }}"),
+            ("private_part_through_a_part_named_model_extra", "{{ clash.model_extra['_hidden'] }}"),
+            # markupsafe calls a value's `__html__`, and `dictsort` and `xmlattr` call its `items`, outside the call check.
+            ("callable_in_namespace_for_escape", "{{ namespace(__html__=photos[0].model_dump_json) | e }}"),
+            ("callable_set_on_namespace", "{% set ns = namespace() %}{% set ns.__html__ = photos[0].model_dump_json %}{{ ns | striptags }}"),
+            ("callable_in_namespace_for_dictsort", "{{ namespace(items=photos[0].model_copy) | dictsort | join }}"),
+            ("callable_in_namespace_for_wordwrap", "{{ namespace(splitlines=photos[0].model_dump_json) | wordwrap }}"),
+            ("render_methods_in_namespace", _NAMESPACE_WITH_RENDER_METHODS + "{{ ns | tag }}"),
         ],
     )
     @pytest.mark.asyncio(loop_scope="class")
@@ -203,11 +218,11 @@ class TestTemplateSandbox:
 
     @pytest.mark.parametrize(
         "template_source",
-        ["{{ impostor | with_images }}", _NAMESPACE_WITH_RENDER_METHODS + "{{ ns | with_images }}"],
+        ["{{ impostor | with_images }}"],
     )
     @pytest.mark.asyncio(loop_scope="class")
     async def test_with_images_never_calls_a_method_held_as_data(self, template_source: str) -> None:
-        """The filter calls a rendering method only when the value's class defines it: a template can build a namespace, never a class."""
+        """The filter calls a rendering method only when the value's class defines it, which no template can build."""
         calls: list[str] = []
         with pytest.raises(Jinja2TemplateRenderError, match="does not implement the ImageRenderable protocol"):
             await _render(template_source, context=_make_context(calls=calls))
@@ -219,8 +234,6 @@ class TestTemplateSandbox:
             "{{ [impostor] | with_images }}",
             "{{ impostor | tag }}",
             "{{ impostor | format }}",
-            _NAMESPACE_WITH_RENDER_METHODS + "{{ ns | tag }}",
-            _NAMESPACE_WITH_RENDER_METHODS + "{{ ns | format }}",
         ],
     )
     @pytest.mark.asyncio(loop_scope="class")
@@ -286,6 +299,19 @@ class TestTemplateSandbox:
             ("private_keys_of_a_plain_dict_by_bracket", "{{ keyed['_id'] }}|{{ keyed['__typename'] }}", "abc123|User"),
             ("set_methods", "{{ tags.intersection(['a']) | list | join }}|{{ tags.issuperset(['a']) }}", "a|True"),
             ("list_input_items", "{{ photos[0].url }}|{{ photos | length }}", "https://example.com/photo.png|1"),
+            (
+                "namespace_holds_data",
+                (
+                    "{% set ns = namespace(n=1, s='a', c=cycler('x')) %}{% set ns.u = nowhere %}"
+                    "{{ ns.n }}{{ ns.s }}{{ ns.c.next() }}{{ ns.u is defined }}"
+                ),
+                "1axFalse",
+            ),
+            (
+                "composite_part_named_like_a_pydantic_attribute",
+                "{{ clash.model_extra.text }}|{{ clash.model_dump.text }}|{{ clash['model_extra'].text }}|{{ clash.get('model_dump').text }}",
+                "E|D|E|D",
+            ),
             (
                 "composite_parts",
                 "{{ combo.summary.text }}|{{ combo['title'].text }}|{{ combo.get('summary').text }}|{{ 'title' in combo }}|{{ '_hidden' in combo }}",

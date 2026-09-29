@@ -54,14 +54,19 @@ class BaseStuffArtefactField(StrEnum):
 _METADATA_FIELD_NAMES = frozenset(field.value for field in BaseStuffArtefactField)
 
 
-def _content_field_names(*, content: StuffContent) -> list[str]:
-    """The content fields a template reads: the declared ones, then the public extra fields of a model that allows extras.
+def _public_extra_fields(*, content: StuffContent) -> dict[str, Any]:
+    """The public extra fields of a model that allows extras, which is where `CompositeContent` holds its parts.
 
-    `CompositeContent` holds its parts as extra fields, so reading the declared fields alone would leave every part out.
+    They are read from `model_extra` and never with getattr, so a part named like a pydantic attribute
+    (`model_dump`, `model_extra`) resolves to the part and not to the attribute.
     """
-    field_names: list[str] = list(type(content).model_fields)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-    field_names.extend(name for name in content.model_extra or {} if not name.startswith("_"))
-    return field_names
+    return {name: value for name, value in (content.model_extra or {}).items() if not name.startswith("_")}
+
+
+def _content_field_names(*, content: StuffContent) -> list[str]:
+    """The content fields a template reads: the declared ones, then the public extra fields."""
+    declared_names: list[str] = list(type(content).model_fields)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+    return [*declared_names, *_public_extra_fields(content=content)]
 
 
 def _get_template_value(*, stuff: Stuff, key: str) -> Any:
@@ -71,8 +76,11 @@ def _get_template_value(*, stuff: Stuff, key: str) -> Any:
     anything else (the wrapped Stuff, the artefact's own methods) raises KeyError.
     """
     content = stuff.content
-    if key in _content_field_names(content=content):
+    if key in type(content).model_fields:
         return getattr(content, key)
+    extra_fields = _public_extra_fields(content=content)
+    if key in extra_fields:
+        return extra_fields[key]
     match key:
         case BaseStuffArtefactField.STUFF_NAME:
             return stuff.stuff_name

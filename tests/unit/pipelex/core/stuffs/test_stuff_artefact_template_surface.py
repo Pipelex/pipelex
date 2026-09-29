@@ -81,6 +81,18 @@ class TestStuffArtefactTemplateSurface:
         assert "summary" in artefact
         assert list(artefact.iter_keys())[:2] == ["summary", "title"]
 
+    def test_composite_part_named_like_a_pydantic_attribute_is_the_part(self) -> None:
+        artefact = StuffArtefact(
+            Stuff(
+                stuff_code="clash_code",
+                stuff_name="clash",
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.COMPOSITE),
+                content=CompositeContent.model_validate({"model_extra": TextContent(text="E"), "model_dump": TextContent(text="D")}),
+            )
+        )
+        assert artefact["model_extra"] == TextContent(text="E")
+        assert artefact.get("model_dump") == TextContent(text="D")
+
     def test_private_composite_part_is_not_a_field(self) -> None:
         artefact = _make_composite_artefact()
         assert "_hidden" not in artefact

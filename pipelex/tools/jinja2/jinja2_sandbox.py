@@ -28,7 +28,10 @@ forge content, such as an image pointing at another organisation's storage key.
 Filters and tests are not calls in this sense: they are Pipelex's or Jinja's own code, registered by
 the environment, and Jinja invokes them directly. That makes every filter trusted code with one
 obligation: **a filter never calls a callable it was handed**, since that callable came from the
-template's values and the policy above never vetted it.
+template's values and the policy above never vetted it. Jinja's own filters and markupsafe do look a
+few names up on a value and call them, `__html__` when escaping and `items` in `dictsort` and
+`xmlattr`, and a `namespace()` answers any name with whatever the template stored under it. So the
+environment's `namespace` holds data only: storing a callable in one is refused.
 
 Pipelex's own templates (the stuff viewer, the graph pages, the Mermaid pages) render under the same
 policy, with no trusted variant: a trust switch is one more thing a later caller could flip on a
@@ -75,8 +78,38 @@ _PLAIN_VALUE_TYPES: tuple[type, ...] = (
     frozenset,
 )
 
-# The callables the environment itself puts in a template's globals (`range` is the sandbox's capped one).
-_JINJA_GLOBAL_CALLABLES: tuple[Callable[..., Any], ...] = (safe_range, dict, generate_lorem_ipsum, Cycler, Joiner, Namespace)
+
+def _refuse_callable_in_namespace(*, name: str, value: object) -> None:
+    # An undefined value is callable only so that calling it fails as an undefined value: storing it is harmless.
+    if callable(value) and not isinstance(value, Undefined):
+        msg = f"A template may not store {_describe_callable(obj=value)} in a namespace, as '{name}': a namespace holds data only."
+        raise SecurityError(msg)
+
+
+class DataNamespace(Namespace):
+    """Jinja's `namespace()`, refusing to hold a callable.
+
+    A namespace answers any attribute name with what the template stored under it, and markupsafe and some
+    of Jinja's filters look a name up on a value and call it: `__html__` when escaping (`e`, `safe`,
+    `striptags`, HTML autoescaping) and `items` in `dictsort` and `xmlattr`. A callable stored in a
+    namespace would be called there without passing the sandbox's call check.
+    """
+
+    def __init__(self, /, *args: Any, **kwargs: Any) -> None:
+        values: dict[str, Any] = dict(*args, **kwargs)
+        for name, value in values.items():
+            _refuse_callable_in_namespace(name=name, value=value)
+        super().__init__(values)
+
+    @override
+    def __setitem__(self, name: str, value: Any) -> None:
+        _refuse_callable_in_namespace(name=name, value=value)
+        super().__setitem__(name, value)
+
+
+# The callables the environment itself puts in a template's globals (`range` is the sandbox's capped one,
+# `namespace` the data-only one).
+_JINJA_GLOBAL_CALLABLES: tuple[Callable[..., Any], ...] = (safe_range, dict, generate_lorem_ipsum, Cycler, Joiner, DataNamespace)
 
 # Instances of Jinja's runtime a template calls directly: `macro()`, `caller()`, a recursive `loop()`,
 # `self.block()` and `super()`, `joiner()`. Calling an undefined value is allowed so that it keeps
@@ -194,6 +227,10 @@ def _describe_callable(*, obj: object) -> str:
 
 class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
     """The Jinja2 environment every Pipelex template renders under. The module docstring states its policy."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.globals["namespace"] = DataNamespace
 
     @override
     def is_safe_attribute(self, obj: Any, attr: str, value: Any) -> bool:

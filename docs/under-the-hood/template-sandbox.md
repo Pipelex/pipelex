@@ -31,6 +31,7 @@ Pipelex therefore renders every template, its own included, under one policy: **
 | Call a method of anything that is not a plain value | `{{ pages[0].model_dump() }}`, `{{ photos[0].model_copy() }}` |
 | Call a class method, even through an instance | `{{ issued_at.now() }}` |
 | Change a list, a dict or a set | `{{ items.append(x) }}`, `{{ record.update(other) }}`, `{{ tags.intersection_update(other) }}` |
+| Store a callable in a `namespace()` | `{% set ns.f = name.upper %}`, `namespace(items=doc.get)` |
 | Include or extend another template | `{% include 'header.html' %}` |
 
 A method template renders without a template loader, so `{% include %}`, `{% extends %}` and `{% import %}` find nothing to load.
@@ -57,6 +58,8 @@ A type declares its template surface as a `__template_surface__` class attribute
 The sandbox refuses a bracketed name before trying `obj[name]`. Jinja only checks a bracketed name when the item lookup fails, so an object whose `__getitem__` answered any key would otherwise hand over what the dot spelling could not. A plain `dict` is the exception, because its items are data: a key it holds is returned, and a key it does not hold falls back to an attribute read, which the underscore rule refuses.
 
 Filters are not calls in this sense: they are Pipelex's or Jinja's own code, registered by the environment. That makes each filter trusted code with one obligation: **a filter never calls a callable it was handed**, since that callable came from the template's values and the policy never vetted it. So `with_images`, `format` and `tag` call a value's rendering method only when the value's class defines it, and they check that on the type (`pipelex/tools/jinja2/renderable_dispatch.py`). A runtime-checkable Protocol alone would not do: on Python 3.11 it accepts a `namespace()` holding a callable of the template's choosing.
+
+Jinja's own filters and markupsafe keep that obligation only for values whose attributes the template cannot choose: they look `__html__` up on a value when escaping, and `items` in `dictsort` and `xmlattr`, and call what they find. A `namespace()` answers any name with whatever the template stored under it, so the environment's `namespace` holds data only, and storing a callable in one, at construction or with `{% set ns.x = … %}`, is refused.
 
 ## Paths outside templates
 

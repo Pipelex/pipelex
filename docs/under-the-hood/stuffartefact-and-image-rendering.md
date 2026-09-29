@@ -67,7 +67,7 @@ flowchart TB
 
     subgraph FILTER["with_images Filter"]
         direction TB
-        CHECK["isinstance(value, ImageRenderable)?"]
+        CHECK["ImageRenderable, defined by its class?"]
         CALL["value.render_with_images(registry=registry, text_format=text_format)"]
         CHECK --> CALL
     end
@@ -171,7 +171,7 @@ class ImageRenderable(Protocol):
 
 - **Avoids circular imports**: `tools/jinja2/` can check types from `core/stuffs/` without importing them
 - **Duck typing**: No inheritance required—any matching method signature works
-- **Runtime checking**: `isinstance(value, ImageRenderable)` works at runtime
+- **Runtime checking**: `isinstance(value, ImageRenderable)` works at runtime, and the filters add `type_implements(value=value, protocol=ImageRenderable)`, which reads the members from the class, since on Python 3.11 the `isinstance` check alone accepts an instance merely holding the method
 
 ---
 
@@ -285,8 +285,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
     # 3. Get text format: no fallback, a render without a templating style fails loudly
     text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
 
-    # 4. Protocol-based rendering
-    if isinstance(value, ImageRenderable):
+    # 4. Protocol-based rendering, licensed by the value's class, never by an attribute the instance holds
+    if isinstance(value, ImageRenderable) and type_implements(value=value, protocol=ImageRenderable):
         return value.render_with_images(registry=registry, text_format=text_format)
 
     # 5. Handle plain sequences
