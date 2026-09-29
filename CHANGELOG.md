@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A generated object's storage key names its own format**: the extension of a key under `generated/` follows the whole MIME type the object is stored under, so a fetched `image/svg+xml` is stored as `.svg`, and a type with no extension of its own gets `.bin`, where both used to get `.jpg`. The MIME type's parameters and case no longer change the extension.
+
 ## [v0.69.0] - 2026-09-28
 
 ### Highlights

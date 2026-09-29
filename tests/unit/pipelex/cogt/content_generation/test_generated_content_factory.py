@@ -63,6 +63,46 @@ class TestGeneratedContentFactoryStoredObject:
         assert image_content.url == "pipelex-storage://stored-uri"
 
 
+class TestGeneratedContentFactoryStorageKey:
+    """The key builder on its own, whatever its caller passes.
+
+    `make_image_content` only ever hands it an image type today, because
+    `GeneratedImageRawDetails` refuses a declared type outside the formats the runtime
+    produces and a fetched type that is not `image/*` is dropped. The builder's promise
+    does not lean on that: the extension follows the whole media type for any caller,
+    and a type with no extension of its own gets `bin` rather than another format's.
+    """
+
+    @pytest.mark.parametrize(
+        ("mime_type", "expected_extension"),
+        [
+            pytest.param("image/png", "png", id="produced-format"),
+            pytest.param("image/png; charset=binary", "png", id="parameters-do-not-change-the-extension"),
+            pytest.param("IMAGE/PNG", "png", id="case-does-not-change-the-extension"),
+            pytest.param("application/pdf", "pdf", id="non-image-type-takes-its-own-extension"),
+            pytest.param("text/plain", "txt", id="text-type-takes-its-own-extension"),
+            pytest.param("application/octet-stream", "bin", id="opaque-bytes-are-bin"),
+            pytest.param("application/x-unheard-of", "bin", id="unknown-non-image-type-claims-no-format"),
+        ],
+    )
+    def test_the_extension_follows_the_whole_media_type(
+        self,
+        mocker: MockerFixture,
+        mime_type: str,
+        expected_extension: str,
+    ):
+        factory = GeneratedContentFactory(storage_provider=mocker.MagicMock(spec=StorageProviderAbstract))
+
+        storage_key = factory._build_storage_key(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+            storage_scope="test/scope",
+            data=FAKE_IMAGE_BYTES,
+            mime_type=mime_type,
+        )
+
+        assert storage_key.startswith("test/scope/generated/")
+        assert storage_key.endswith(f".{expected_extension}")
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestGeneratedContentFactoryFetchedRemoteImage:
     """The fetched-remote path, where nothing has declared a media type yet.
@@ -84,6 +124,10 @@ class TestGeneratedContentFactoryFetchedRemoteImage:
             pytest.param(None, None, "image/png", "png", "image/png", id="served-type-settles-an-undeclared-image"),
             pytest.param(None, "jpeg", "image/png", "png", "image/png", id="served-type-beats-requested-format"),
             pytest.param(None, None, "image/gif", "gif", "image/gif", id="served-type-we-do-not-generate-is-still-stored"),
+            pytest.param(None, None, "image/svg+xml", "svg", "image/svg+xml", id="non-token-subtype-takes-its-registered-extension"),
+            pytest.param(None, None, "image/jxl", "jxl", "image/jxl", id="unregistered-token-subtype-names-itself"),
+            pytest.param(None, None, "image/x-icon", "bin", "image/x-icon", id="unregistered-non-token-subtype-claims-no-format"),
+            pytest.param(None, None, "image/jpg", "jpg", "image/jpg", id="nonstandard-jpg-alias-keeps-the-jpg-extension"),
             pytest.param(None, None, "application/octet-stream", "jpg", "image/jpeg", id="non-image-served-type-is-dropped"),
             pytest.param(None, None, "text/html", "jpg", "image/jpeg", id="error-page-dressed-as-a-200-is-dropped"),
             pytest.param(None, None, None, "jpg", "image/jpeg", id="silent-server-falls-back-to-default"),
