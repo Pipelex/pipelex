@@ -95,7 +95,9 @@ def _install_probe(mocker: MockerFixture, *, ops_module: str) -> ContentGenerato
 
 
 def _kernel_and_step() -> tuple[PipelexKernel, JobMetadata]:
-    kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="kernel-log-context", request_id=REQUEST_ID)
+    kernel = PipelexKernel.make(
+        storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="kernel-log-context", request_id=REQUEST_ID
+    )
     return kernel, kernel.make_step_metadata()
 
 

@@ -30,7 +30,12 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
-from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, validate_storage_scope
+from pipelex.system.storage_scope import (
+    LOCAL_STORAGE_SCOPE,
+    validate_read_scope,
+    validate_storage_scope,
+    validate_storage_scope_within_read_scope,
+)
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -58,6 +63,7 @@ async def pipeline_run_setup(
     is_mock_usage: bool = False,
     user_id: str,
     storage_scope: str,
+    read_scope: str | None,
     extras: dict[str, str] | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
@@ -126,6 +132,14 @@ async def pipeline_run_setup(
         Opaque prefix under which every byte this run writes must land. REQUIRED,
         validated at ``JobMetadata`` construction. See
         :mod:`pipelex.system.storage_scope`.
+    read_scope:
+        Opaque prefix every storage key this run reads must lie under, which also
+        forbids the run any read from the local disk. REQUIRED, and ``None`` is
+        the explicit statement that the run is unscoped: a local run, or a server
+        with a single tenant. A set read scope must contain ``storage_scope``, so
+        a host that passes one also passes its own storage scope rather than the
+        local sentinel. See :mod:`pipelex.system.storage_scope` and
+        :mod:`pipelex.tools.uri.uri_read_scope`.
     extras:
         Opaque, host-supplied mapping of labels about this run — the hosted
         platform sends its organization, a single-user deployment sends nothing.
@@ -212,6 +226,22 @@ async def pipeline_run_setup(
     # gate sees. `LOCAL_STORAGE_SCOPE` passes this gate unharmed — it is itself
     # a valid one-segment scope — so the sentinel is not disturbed.
     storage_scope = validate_storage_scope(value=storage_scope)
+
+    # And the read scope beside it, with its relation to the storage scope, still
+    # above everything this function causes. A run with a read scope reads only
+    # under it, and it reads its own outputs back, so its storage scope must lie
+    # under it. The local sentinel is refused outright beside a read scope rather
+    # than checked after the swap below: it becomes the run id, which lies under
+    # no host's prefix, and a host that scopes reads scopes writes too.
+    if read_scope is not None:
+        read_scope = validate_read_scope(value=read_scope)
+        if storage_scope == LOCAL_STORAGE_SCOPE:
+            msg = (
+                "A run with a read_scope must pass its own storage_scope: the local storage scope becomes the run id, "
+                "which lies under no read_scope, and the run could not read what it writes."
+            )
+            raise ValueError(msg)
+        validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
 
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
@@ -377,6 +407,7 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             storage_scope=storage_scope,
+            read_scope=read_scope,
             extras=extras,
             inputs=inputs,
             search_scope=search_scope,

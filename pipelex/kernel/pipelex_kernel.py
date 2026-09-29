@@ -93,6 +93,7 @@ class PipelexKernel:
         run_mode: PipeRunMode = PipeRunMode.LIVE,
         user_id: str,
         storage_scope: str,
+        read_scope: str | None,
         request_id: str | None = None,
         pipeline_run_id: str | None = None,
         extras: dict[str, str] | None = None,
@@ -135,6 +136,13 @@ class PipelexKernel:
         source and passes the value; unlike a step id, it is minted once per run, so a value is
         enough where ``step_id_source`` needs a callable.
 
+        ``read_scope`` bounds what the run may read, beside ``storage_scope``, which must lie under
+        it: every storage key a step reads lies under it, and no step reads the local disk. It is
+        required, for the storage scope's reason — this tier is the direct programmatic entry point a
+        multi-tenant host embeds, and a default here would open every key to a host that forgot it —
+        and ``None`` is the explicit statement that the run is unscoped. See
+        :mod:`pipelex.tools.uri.uri_read_scope`.
+
         ``extras`` is the opaque, host-supplied mapping of labels about this run, carried beside
         ``user_id`` and ``storage_scope``. This tier is the direct programmatic entry
         point, so a multi-tenant host embedding the kernel needs the same seam the pipeline entry
@@ -155,6 +163,7 @@ class PipelexKernel:
                 run_metadata=RunMetadata(
                     user_id=user_id,
                     storage_scope=storage_scope,
+                    read_scope=read_scope,
                     pipeline_run_id=cls._resolve_pipeline_run_id(trace_context=trace_context, pipeline_run_id=pipeline_run_id),
                     request_id=request_id,
                     extras=extras or {},

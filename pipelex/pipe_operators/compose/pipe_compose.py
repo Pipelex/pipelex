@@ -18,7 +18,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
 from pipelex.kernel.compose_ops import run_compose_template
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template, lint_template_private_names
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
@@ -103,10 +103,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     def validate_inputs_static(self):
-        # Guard-lint (D7): every template reference to a declared-optional input must be guarded.
-        # Construct mode composes structured fields, not authored templates — nothing to lint there.
+        # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
         if self.template is not None:
-            lint_optional_input_guards(
+            lint_authored_template(
                 pipe_code=self.code,
                 domain_code=self.domain_code,
                 inputs=self.inputs,
@@ -114,6 +113,17 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 template_category=self.category,
                 template_label="template",
             )
+        # A construct's template fields render too, so the private-name lint covers them as well.
+        # The guard-lint does not run on construct templates.
+        if self.construct_blueprint is not None:
+            for field_path, field_template in self.construct_blueprint.field_templates():
+                lint_template_private_names(
+                    pipe_code=self.code,
+                    domain_code=self.domain_code,
+                    template_source=field_template,
+                    template_category=TemplateCategory.BASIC,
+                    template_label=f"construct field '{field_path}'",
+                )
 
     @override
     def validate_inputs_with_library(self):

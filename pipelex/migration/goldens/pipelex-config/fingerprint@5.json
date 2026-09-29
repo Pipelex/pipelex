@@ -1249,6 +1249,17 @@
       "default": "console",
       "open_node": false
     },
+    "runtime.network": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.network.is_fetch_ssrf_guard_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
     "runtime.observer": {
       "value_type": "table",
       "required": true,

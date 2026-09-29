@@ -32,6 +32,7 @@ def _run_metadata(*, user_id: str = "user-42", extras: dict[str, str] | None = N
         user_id=user_id,
         pipeline_run_id="run-1",
         storage_scope="tenant/run-1",
+        read_scope=None,
         extras=extras or {},
     )
 

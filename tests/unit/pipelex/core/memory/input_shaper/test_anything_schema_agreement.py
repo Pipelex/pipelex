@@ -51,7 +51,7 @@ class TestAnythingSchemaAgreement:
         # The `types-jsonschema` overloads of `is_valid` carry an `Unknown` arm.
         schema_admits = jsonschema.Draft202012Validator(json_schema).is_valid(provided_value)  # pyright: ignore[reportUnknownMemberType]
         try:
-            InputShaper.shape({"payload": provided_value}, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape({"payload": provided_value}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
             shaper_takes = True
         except InputShapingError:
             shaper_takes = False

@@ -34,7 +34,7 @@ class TestInputShaperAnythingEnvelopes:
         input_specs = build_input_specs([("payload", "native.Anything", None)])
         provided = {"concept": anything_spelling, "content": content}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
@@ -44,7 +44,7 @@ class TestInputShaperAnythingEnvelopes:
         input_specs = build_input_specs([("payload", "native.Anything", True)])
         provided: dict[str, Any] = {"concept": "native.Anything", "content": [1, "a"]}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
@@ -56,7 +56,7 @@ class TestInputShaperAnythingEnvelopes:
         provided: dict[str, Any] = {"concept": "native.Anything", "content": [1, "a"]}
 
         with pytest.raises(ListWhereSingularError, match="declares a single"):
-            InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
     @pytest.mark.parametrize(
         ("provided", "expected_concept_ref", "expected_content"),
@@ -73,7 +73,7 @@ class TestInputShaperAnythingEnvelopes:
         """R2 and D6: every concept satisfies `Anything`, and the explicit, more specific concept wins."""
         input_specs = build_input_specs([("payload", "native.Anything", None)])
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == expected_concept_ref
@@ -83,7 +83,11 @@ class TestInputShaperAnythingEnvelopes:
         input_specs = build_input_specs([("payload", "native.Anything", None)])
 
         working_memory = InputShaper.shape(
-            {"payload": Question(text="Why?")}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
+            {"payload": Question(text="Why?")},
+            input_specs=input_specs,
+            search_scope="shaper_test",
+            concept_provider=get_concept_library(),
+            read_scope=None,
         )
 
         stuff = working_memory.root["payload"]
@@ -95,7 +99,7 @@ class TestInputShaperAnythingEnvelopes:
         input_specs = build_input_specs([("payload", "native.Anything", True)])
         provided: list[StuffContent] = [TextContent(text="a"), NumberContent(number=1)]
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
@@ -106,7 +110,7 @@ class TestInputShaperAnythingEnvelopes:
         input_specs = build_input_specs([("payload", "native.Anything", True)])
         prebuilt: ListContent[StuffContent] = ListContent(items=[TextContent(text="a"), NumberContent(number=1)])
 
-        working_memory = InputShaper.shape({"payload": prebuilt}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": prebuilt}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
@@ -117,14 +121,14 @@ class TestInputShaperAnythingEnvelopes:
         prebuilt: ListContent[StuffContent] = ListContent(items=[TextContent(text="a"), NumberContent(number=1)])
 
         with pytest.raises(ListWhereSingularError, match="declares a single"):
-            InputShaper.shape({"payload": prebuilt}, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape({"payload": prebuilt}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
     def test_nested_envelope_escape_holds_an_envelope_shaped_object(self) -> None:
         """An object keyed exactly `concept` and `content` travels as raw data inside an `Anything` envelope."""
         input_specs = build_input_specs([("payload", "native.Anything", None)])
         provided = {"concept": "native.Anything", "content": {"concept": "x", "content": "y"}}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
@@ -136,7 +140,7 @@ class TestInputShaperAnythingEnvelopes:
         envelope_shaped_item = {"concept": "Image", "content": {"url": "photo.jpg"}}
         provided: dict[str, Any] = {"concept": "native.Anything", "content": [envelope_shaped_item, "caption"]}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
@@ -147,7 +151,7 @@ class TestInputShaperAnythingEnvelopes:
         input_specs = build_input_specs([("payload", "native.Dynamic", None)])
         provided = {"concept": "native.Anything", "content": {"a": 1}}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"
@@ -160,12 +164,14 @@ class TestInputShaperAnythingEnvelopes:
 
         for multiplicity in (True, 2):
             input_specs = build_input_specs([("payload", "native.Anything", multiplicity)])
-            working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+            working_memory = InputShaper.shape(
+                {"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None
+            )
             assert working_memory.root["payload"].content == prebuilt
 
         single_specs = build_input_specs([("payload", "native.Anything", None)])
         with pytest.raises(ListWhereSingularError):
-            InputShaper.shape({"payload": provided}, input_specs=single_specs, concept_provider=get_concept_library())
+            InputShaper.shape({"payload": provided}, input_specs=single_specs, concept_provider=get_concept_library(), read_scope=None)
 
     def test_a_prebuilt_list_as_a_list_item_is_refused(self) -> None:
         """An item of a plural slot that is itself a list is refused, whether it is a bare array or a `ListContent`."""
@@ -173,14 +179,14 @@ class TestInputShaperAnythingEnvelopes:
         provided: list[ListContent[TextContent]] = [ListContent(items=[TextContent(text="a"), TextContent(text="b")])]
 
         with pytest.raises(WrongScalarKindError, match="a single value, not a list"):
-            InputShaper.shape({"items": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape({"items": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
     def test_anything_envelope_at_a_dynamic_slot_takes_its_multiplicity_from_its_content(self) -> None:
         """At a `Dynamic` slot the signature cannot say list or single, so the content does, as for every other envelope."""
         input_specs = build_input_specs([("payload", "native.Dynamic", None)])
         provided = {"concept": "native.Anything", "content": [1, 2]}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.Anything"

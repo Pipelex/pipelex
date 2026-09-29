@@ -72,6 +72,7 @@ async def _dry_run_main_pipe(*, library_id: str) -> str:
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False, mock_inputs=True)
     pipe_job = await prepare_pipe_job(
         storage_scope="test/scope",
+        read_scope=None,
         user_id="pytest",
         pipe=pipe,
         library_id=library_id,

@@ -43,6 +43,7 @@ class TestCallerIdentity:
             user_id="user-42",
             pipeline_run_id="run-1",
             storage_scope="tenant/run-1",
+            read_scope=None,
             extras={"organization": "org_acme"},
         )
 

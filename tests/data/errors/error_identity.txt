@@ -138,6 +138,7 @@ Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/ji
 Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
 Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/
 Jinja2TemplateRenderError | Jinja 2 template render | https://docs.pipelex.com/latest/errors/jinja2-template-render-error/
+Jinja2TemplateSecurityError | Jinja 2 template security | https://docs.pipelex.com/latest/errors/jinja2-template-security-error/
 Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/
 JobMetadataError | Job metadata | https://docs.pipelex.com/latest/errors/job-metadata-error/
 JsonTypeError | Json type | https://docs.pipelex.com/latest/errors/json-type-error/
@@ -327,7 +328,7 @@ UnknownSecretsMethodError | Unknown secrets method | https://docs.pipelex.com/la
 UnknownStorageMethodError | Unknown storage method | https://docs.pipelex.com/latest/errors/unknown-storage-method-error/
 UnknownVarPrefixError | Unknown var prefix | https://docs.pipelex.com/latest/errors/unknown-var-prefix-error/
 UnsafeSchemaError | Unsafe schema | https://docs.pipelex.com/latest/errors/unsafe-schema-error/
-UnusedInputError | Unused input | https://docs.pipelex.com/latest/errors/unused-input-error/
+UriReadRefusedError | Read outside the run's scope refused | https://docs.pipelex.com/latest/errors/uri-read-refused-error/
 ValidateBundleError | Validate bundle | https://docs.pipelex.com/latest/errors/validate-bundle-error/
 VarFallbackPatternError | Var fallback pattern | https://docs.pipelex.com/latest/errors/var-fallback-pattern-error/
 VarNotFoundError | Var not found | https://docs.pipelex.com/latest/errors/var-not-found-error/

@@ -15,7 +15,7 @@ from pipelex.tools.log.log_context import LogContext, get_log_context
 
 def _job_metadata(*, request_id: str | None = None, pipe_run_id: str | None = None) -> JobMetadata:
     return JobMetadata(
-        run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", pipeline_run_id="plr-job", request_id=request_id),
+        run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", read_scope=None, pipeline_run_id="plr-job", request_id=request_id),
         pipe_run_id=pipe_run_id,
     )
 

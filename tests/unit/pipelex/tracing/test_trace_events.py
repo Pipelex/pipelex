@@ -69,7 +69,7 @@ class _Shared:
     @staticmethod
     def make_job_metadata() -> JobMetadata:
         return JobMetadata(
-            run_metadata=RunMetadata(storage_scope="test/scope", user_id="user_test", pipeline_run_id=_Shared.PIPELINE_RUN_ID),
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user_test", pipeline_run_id=_Shared.PIPELINE_RUN_ID),
             pipe_code="test_pipe",
             unit_job_id=UnitJobId.LLM_GEN_TEXT,
             job_category=JobCategory.LLM_JOB,

@@ -3812,10 +3812,6 @@ rationale = "Verb-object: loads the dependency library object; context stays key
 param = "library_id"
 rationale = "Verb-object: pops and tears down the library named by the id; single operand."
 
-["pipelex/libraries/library_manager.py::LibraryManager._rebuild_models_with_forward_refs"]
-param = "concepts"
-rationale = "Verb-object: rebuilds the given concepts' models; single operand."
-
 ["pipelex/libraries/library_manager.py::LibraryManager._remove_concepts_from_blueprint"]
 param = "blueprint"
 rationale = "Verb-object: strips concepts from the blueprint; single operand."
@@ -3992,10 +3988,6 @@ rationale = "Single-operand transformation of the code; the rest is context."
 param = "loc"
 rationale = "Verb-object: categorizes the error at the loc; context stays keyword."
 
-["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_input_validation_error"]
-param = "message"
-rationale = "Verb-object: categorizes the error message; context stays keyword."
-
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_syntax_validation_error"]
 param = "message"
 rationale = "Verb-object: categorizes the error message; context stays keyword."
@@ -4003,10 +3995,6 @@ rationale = "Verb-object: categorizes the error message; context stays keyword."
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_typeless_pipe_error"]
 param = "message"
 rationale = "Verb-object: categorizes the message; the rest is context."
-
-["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_variable_names_from_message"]
-param = "message"
-rationale = "Verb-object: extracts from the message; single operand."
 
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_invalid_pipe_code_syntax_error"]
 param = "error"
@@ -4303,10 +4291,6 @@ rationale = "Query accessor keyed by the variable path; context stays keyword."
 ["pipelex/pipe_operators/shared/template_image_analyzer.py::TemplateImageAnalyzer.analyze_template_for_images"]
 param = "template_source"
 rationale = "Verb-object: analyzes the template source; context stays keyword."
-
-["pipelex/pipe_operators/shared/template_image_analyzer.py::TemplateImageAnalyzer.validate_unused_inputs"]
-param = "template_sources"
-rationale = "Verb-object: validates the template sources; context stays keyword."
 
 ["pipelex/pipe_operators/structure/pipe_structure.py::PipeStructure._format_error_location"]
 param = "pipe_run_params"
@@ -6044,18 +6028,6 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
 
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_declarations_from_body"]
-param = "body"
-rationale = "Extracts/derives from the body; single operand."
-
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_full_variable_paths"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_variable_references"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
@@ -6083,6 +6055,10 @@ rationale = "Predicate on the key; single operand."
 ["pipelex/tools/jinja2/jinja2_with_images_filter.py::_render_sequence_with_images"]
 param = "sequence"
 rationale = "Jinja op on the sequence; single operand (context keyword-only)."
+
+["pipelex/tools/jinja2/template_surface.py::get_template_surface"]
+param = "obj"
+rationale = "Reads as get the template surface of this value; the value is the single obvious operand."
 
 ["pipelex/tools/log/log.py::Log._should_ignore"]
 param = "problem_id"
@@ -6247,10 +6223,6 @@ rationale = "Factory from source: builds the result from the base64_data; single
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_bytes"]
 param = "raw_bytes"
 rationale = "Factory from source: builds the result from the raw_bytes; single operand."
-
-["pipelex/tools/misc/base64_utils.py::make_base64_url_from_http_url"]
-param = "url"
-rationale = "Factory from source: builds the result from the url; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_path"]
 param = "path"
@@ -7048,6 +7020,14 @@ rationale = "Predicate on the obj; single operand."
 param = "obj"
 rationale = "Predicate on the obj; single operand."
 
+["pipelex/tools/uri/uri_base64.py::make_base64_url_from_any_uri"]
+param = "uri"
+rationale = "Factory from source: builds the result from the uri; single operand."
+
+["pipelex/tools/uri/uri_base64.py::make_base64_url_from_http_url"]
+param = "url"
+rationale = "Factory from source: builds the result from the url; single operand."
+
 ["pipelex/tools/uri/uri_resolver.py::_resolve_base64_data_url"]
 param = "uri"
 rationale = "Parses/reads the uri; single operand."
@@ -7067,10 +7047,6 @@ rationale = "Extracts/derives from the uri; single operand."
 ["pipelex/tools/uri/uri_resolver.py::is_relative_local_path"]
 param = "uri"
 rationale = "Predicate on the uri; single operand."
-
-["pipelex/tools/uri/uri_resolver.py::make_base64_url_from_any_uri"]
-param = "uri"
-rationale = "Factory from source: builds the result from the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::resolve_local_path_reference"]
 param = "uri"

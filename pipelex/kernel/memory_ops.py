@@ -36,6 +36,7 @@ def shape_inputs(
     input_specs: InputStuffSpecs,
     search_scope: str | None = None,
     inputs_base_dir: Path | None = None,
+    read_scope: str | None,
 ) -> WorkingMemory:
     """Interpret a caller's raw inputs against their declared specs and return the memory to run on.
 
@@ -52,9 +53,14 @@ def shape_inputs(
     A malformed input is rejected here with a typed, locator-bearing error rather than coerced — this
     is the boundary where a caller's raw values stop being raw, so it is the right place to refuse.
 
+    `read_scope` is the run's read scope, required for the reason `PipelexKernel.make` requires it:
+    shaping reads a table given as a CSV input, which is a local file, and a run with a read scope
+    reads nothing from the local disk. `None` is the explicit statement that the run is unscoped.
+
     Raises:
         UnknownInputNameError: a provided name is not declared in `input_specs` (D8).
         InputShapingError subclasses: a provided value cannot be shaped to its declared concept (D4).
+        UriReadRefusedError: a table input names a local file on a run with a read scope.
     """
     return InputShaper.shape(
         inputs,
@@ -62,6 +68,7 @@ def shape_inputs(
         input_specs=input_specs,
         search_scope=search_scope,
         inputs_base_dir=inputs_base_dir,
+        read_scope=read_scope,
     )
 
 

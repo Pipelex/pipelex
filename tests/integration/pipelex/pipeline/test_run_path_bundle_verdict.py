@@ -146,6 +146,7 @@ async def _validate_verdict(*, bundle: str) -> ValidateBundleError:
 async def _run_setup(**kwargs: Any) -> None:
     await pipeline_run_setup(
         storage_scope="test/scope",
+        read_scope=None,
         user_id="test-user",
         execution_config=_execution_config(),
         pipe_run_mode=PipeRunMode.DRY,

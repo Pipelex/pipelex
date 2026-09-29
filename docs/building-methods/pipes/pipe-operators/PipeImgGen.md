@@ -17,6 +17,8 @@ The variables you declare in `inputs` are **injected into that template** at run
 
 The pipe can be configured to generate a single image or a list of images. Its only concept constraints are that declared image inputs must be `Image`-compatible and the `output` must be `Image`-compatible.
 
+Every input the pipe declares must be read by the `prompt` or the `negative_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither template reads as `extraneous_input_variable`, naming the input: an image declared in `inputs` but never referenced in the prompt is never passed to the generator, so reference it in the prompt, or remove it from `inputs`. An undeclared variable is refused as `missing_input_variable`.
+
 ## Configuration
 
 `PipeImgGen` is configured in your pipeline's `.mthds` file.

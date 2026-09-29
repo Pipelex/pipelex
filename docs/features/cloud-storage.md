@@ -36,3 +36,5 @@ A deployment whose egress rules allow S3 by hostname must allow `*.s3.<region>.a
 Storage is configured in `pipelex.toml` under `[runtime.storage]`. Set `method` to `local`, `in_memory`, `s3`, or `gcp`, then provide provider-specific settings such as `bucket_name`, `region`, or `project_id` in the matching subsection.
 
 For AWS configuration, see [AWS Configuration](../configuration/config-technical/aws-config.md).
+
+When an image-generation provider returns a URL rather than bytes and `is_fetch_remote_content_enabled` is on, Pipelex downloads the image into storage. That download, like every download of a URL a value carries, goes through the SSRF guard, which refuses private and metadata addresses; see [Network Configuration](../configuration/config-technical/network-config.md).

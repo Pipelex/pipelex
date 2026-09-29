@@ -161,6 +161,10 @@ Installing the distribution makes the method selectable (`runtime.storage.method
 
 Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
 
+### A provider is not the tenant boundary
+
+A provider reads any key it is handed with the process's own credentials, and it should: it has no notion of whose run asked. On a host serving several tenants, what bounds a run's reads is the **read scope** the host passes with the run, which the content-generation leaves and the input seam check before they call a provider. A key outside that prefix, and any local path, is refused there, so a provider never sees it. A self-hosted deployment serving one tenant passes no read scope and reads as before. See [Distributed Content Generation](distributed-content-generation.md#what-a-leaf-may-read-the-read-scope) for the rule and where it runs.
+
 ---
 
 ## Related

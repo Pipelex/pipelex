@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.interpreter_hub import get_concept_library, get_library_manager
+from pipelex.libraries.exceptions import LibraryLoadingError
 
 
 class TestConceptToConceptReferences:
@@ -455,3 +456,111 @@ amount = { type = "number", description = "Invoice amount" }
 
             assert customer_concept is not None
             assert invoice_concept is not None
+
+    def test_reference_into_an_earlier_load_batch(self, load_empty_library: Callable[[], str]):
+        """A concept loaded in a second batch, holding a list of a concept from the first batch, is fully defined."""
+        notes_mthds = """
+domain = "invented_notes"
+description = "The first batch"
+
+[concept.Note]
+description = "One invented note"
+
+[concept.Note.structure]
+title = { type = "text", description = "The note's title", required = true }
+"""
+
+        search_mthds = """
+domain = "invented_search"
+description = "The second batch, into the same library"
+
+[concept.NoteSearch]
+description = "The notes a search found"
+
+[concept.NoteSearch.structure]
+notes = { type = "list", item_type = "concept", item_concept_ref = "invented_notes.Note", description = "The notes found", required = true }
+"""
+
+        with tempfile.TemporaryDirectory() as notes_dir, tempfile.TemporaryDirectory() as search_dir:
+            (Path(notes_dir) / "notes.mthds").write_text(notes_mthds, encoding="utf-8")
+            (Path(search_dir) / "search.mthds").write_text(search_mthds, encoding="utf-8")
+
+            library_id = load_empty_library()
+            library_manager = get_library_manager()
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(notes_dir)])
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(search_dir)])
+
+            note_search_concept = get_concept_library().get_required_concept("invented_search.NoteSearch")
+            note_search_class = get_concept_library().get_structure_class(concept=note_search_concept)
+
+            note_search = note_search_class.model_validate({"notes": [{"title": "Invented note one"}]})
+            assert note_search.model_dump()["notes"] == [{"title": "Invented note one"}]
+
+    def test_reference_to_a_concept_no_bundle_declares_is_refused(self, load_empty_library: Callable[[], str]):
+        """A field naming a concept that no loaded bundle declares refuses the load, naming the concept and the missing class.
+
+        `NoteDigest` only holds `NoteSearch`, whose class cannot be built, so the refusal names `NoteSearch` alone, and
+        `NoteSearch`'s optional field naming `Query`, which is declared, is not named either.
+        """
+        mthds_content = """
+domain = "invented_search"
+description = "A concept holding notes from a domain nothing declares"
+
+[concept.NoteSearch]
+description = "The notes a search found"
+
+[concept.NoteSearch.structure]
+notes = { type = "list", item_type = "concept", item_concept_ref = "invented_elsewhere.Note", description = "The notes found", required = true }
+query = { type = "concept", concept_ref = "invented_search.Query", description = "The query searched for" }
+
+[concept.Query]
+description = "A search query"
+
+[concept.Query.structure]
+text = { type = "text", description = "The query's text", required = true }
+
+[concept.NoteDigest]
+description = "A digest of a search"
+
+[concept.NoteDigest.structure]
+search = { type = "concept", concept_ref = "invented_search.NoteSearch", description = "The search digested" }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            (Path(tmp_dir) / "search.mthds").write_text(mthds_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            library_manager = get_library_manager()
+
+            with pytest.raises(LibraryLoadingError) as exc_info:
+                library_manager.load_libraries(library_id=library_id, library_dirs=[Path(tmp_dir)])
+
+            message = str(exc_info.value)
+            assert "invented_search.NoteSearch" in message
+            assert "invented_elsewhere__Note" in message
+            assert "invented_search.NoteDigest" not in message
+            assert "invented_search__Query" not in message
+
+    def test_field_typed_anything_holds_any_value(self, load_empty_library: Callable[[], str]):
+        """`native.Anything` has no content class, so a field typed by it is spelled `Any`, not a reference nothing resolves."""
+        mthds_content = """
+domain = "invented_box"
+description = "A box holding anything"
+
+[concept.Holder]
+description = "A box holding one value of any kind"
+
+[concept.Holder.structure]
+payload = { type = "concept", concept_ref = "native.Anything", description = "The value held", required = true }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            (Path(tmp_dir) / "box.mthds").write_text(mthds_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            get_library_manager().load_libraries(library_id=library_id, library_dirs=[Path(tmp_dir)])
+
+            holder_concept = get_concept_library().get_required_concept("invented_box.Holder")
+            holder_class = get_concept_library().get_structure_class(concept=holder_concept)
+            holder = holder_class.model_validate({"payload": {"invented_key": [1, 2]}})
+            assert holder.model_dump()["payload"] == {"invented_key": [1, 2]}

@@ -39,7 +39,7 @@ from pipelex.providers.manifold.manifold_native_client import ManifoldNativeClie
 from pipelex.providers.manifold.manifold_schemas import ManifoldExtractInput, ManifoldExtractParams, ManifoldExtractRequest
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
+from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri
 
 if TYPE_CHECKING:
     from pipelex.cogt.extract.extract_job import ExtractJob

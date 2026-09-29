@@ -35,7 +35,7 @@ def _memory_with_content(content: NormalizableContent) -> WorkingMemory:
 
 
 async def _normalized_content(content: NormalizableContent) -> Any:
-    memory = await normalize_data_urls_to_storage(_memory_with_content(content), storage_scope="test/scope")
+    memory = await normalize_data_urls_to_storage(_memory_with_content(content), storage_scope="test/scope", read_scope=None)
     return memory.get_stuff("visual").content
 
 

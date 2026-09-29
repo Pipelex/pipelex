@@ -39,7 +39,11 @@ class MethodPackageSymlinkError(MethodRefError):
 
 
 class MethodStructuresRefusedError(MethodRefError):
-    """The fetched package declares in-process Python structure classes, which hosted execution refuses."""
+    """The method declares Python structure classes, which hosted execution refuses to import into its own process.
+
+    Raised for a fetched package before it is installed, and for any sandbox-hosted library load,
+    whatever the content's origin: an inline bundle, a stored method or a host directory.
+    """
 
 
 class MethodInstallError(MethodRefError):

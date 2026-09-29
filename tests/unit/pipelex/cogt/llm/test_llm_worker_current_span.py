@@ -116,7 +116,7 @@ def _make_worker(*, fails: bool = False) -> _RecordingLLMWorker:
 def _make_llm_job() -> LLMJob:
     """A job run under a pipe whose span the metadata names as the parent."""
     job_metadata = JobMetadata(
-        run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-llm", storage_scope="test/scope"),
+        run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-llm", storage_scope="test/scope", read_scope=None),
         pipe_code="some_pipe",
         otel_context=OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID),
     )

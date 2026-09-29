@@ -12,7 +12,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.kernel.search_ops import resolve_search_setting, run_search
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
@@ -53,8 +53,8 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             with self.locating_model_choice(field_name="model"):
                 check_search_choice_with_deck(search_choice=self.search_choice)
 
-        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
-        lint_optional_input_guards(
+        # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
+        lint_authored_template(
             pipe_code=self.code,
             domain_code=self.domain_code,
             inputs=self.inputs,

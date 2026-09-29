@@ -103,7 +103,7 @@ class TestTsZodWireAgreement:
             classes[concept.structure_class_name] = registry.get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
             classes[code] = classes[concept.structure_class_name]
         # A concept reference is generated as a quoted forward ref, so the classes need the same rebuild
-        # against a shared namespace the library manager performs on load (`_rebuild_models_with_forward_refs`).
+        # against a shared namespace the library manager performs on load (`_rebuild_structure_classes`).
         for structure_class in dict.fromkeys(classes.values()):
             structure_class.model_rebuild(_types_namespace=classes)
 

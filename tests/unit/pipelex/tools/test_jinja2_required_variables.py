@@ -199,6 +199,55 @@ Best regards,
         ),
     ]
 
+    # A path stops at a subscript, a call or a filter, and the read before it still counts
+    CHAINED_ACCESS: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("attribute_after_subscript", "{{ items[0].text }}", {"items"}),
+        ("attribute_after_subscript_on_a_path", "{{ a.items[0].name }}", {"a.items"}),
+        ("attribute_after_key", "{{ record['meta'].title }}", {"record"}),
+        ("attribute_after_call", "{{ a.get('k').x }}", {"a.get"}),
+        ("attribute_after_filter", "{{ (items|first).text }}", {"items"}),
+        ("attribute_after_subscript_on_a_loop_variable", "{% for row in rows %}{{ row[0].text }}{% endfor %}", {"rows"}),
+    ]
+
+    # A `set` declares its name from that statement on, so what it reads, and a read before it, are required
+    ASSIGNMENT_ORDER: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("self_referential_set", "{% set topic = topic|trim %}{{ topic }}", {"topic"}),
+        ("read_before_set", "{{ note }}{% set note = 'x' %}{{ note }}", {"note"}),
+        ("read_after_set", "{% set note = 'x' %}{{ note }}", set()),
+        ("read_after_block_set", "{% set note %}{{ body }}{% endset %}{{ note }}", {"body"}),
+        ("macro_reads_a_later_set", "{{ x }}{% macro m() %}[{{ g }}]{% endmacro %}{% set g = 'y' %}{{ m() }}", {"x"}),
+    ]
+
+    # Names Jinja provides, and the scope a loop opens, are never inputs
+    SCOPES: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("namespace_idiom", "{% set ns = namespace(found=false) %}{{ ns.found }}", set()),
+        ("global_followed_by_attribute", "{{ dict(a=1).a }}", set()),
+        ("global_called_on_an_input", "{{ range(count) }}", {"count"}),
+        ("macro_internal_names", "{% macro m() %}{{ caller().strip() }}{{ varargs }}{{ kwargs }}{% endmacro %}", set()),
+        ("loop_target_shadows_its_iterable", "{% for item in item %}{{ item }}{% endfor %}", {"item"}),
+        ("else_branch_reads_outside_the_loop", "{% for x in xs %}{{ x }}{% else %}{{ x }}{% endfor %}", {"xs", "x"}),
+        ("loop_filter_reads_inside_the_loop", "{% for x in xs if x.ok %}{{ x }}{% endfor %}", {"xs"}),
+    ]
+
+    # A Jinja global is Jinja's only where it is called; any other read of its name reads the input that shadows it
+    GLOBAL_NAMES_AS_INPUTS: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("bare_global_name", "Summarize the price {{ range }}", {"range"}),
+        ("attribute_on_a_global_name", "{{ namespace.name }}", {"namespace.name"}),
+        ("filtered_global_name", "{{ dict|upper }}", {"dict"}),
+        ("global_name_read_and_called", "{{ range }}{% for i in range(3) %}{{ i }}{% endfor %}", {"range"}),
+    ]
+
+    # The reference walk shares the required-variables walk's scopes, so both see the same names read
+    REFERENCE_SCOPES: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("self_referential_set", "{% set image = image %}{{ image }}", {"image"}),
+        ("read_before_set", "{{ image }}{% set image = 'x' %}{{ image }}", {"image"}),
+        ("loop_target_shadows_its_iterable", "{% for images in images %}{{ images }}{% endfor %}", {"images"}),
+        ("else_branch_reads_outside_the_loop", "{% for x in xs %}{{ x }}{% else %}{{ x|upper }}{% endfor %}", {"xs", "x"}),
+        ("macro_internal_names", "{% macro m() %}{{ caller() }}{{ varargs }}{% endmacro %}", set()),
+        ("global_called_on_an_input", "{{ range(count) }}", {"count"}),
+        ("bare_global_name", "{{ range }}", {"range"}),
+    ]
+
     TEMPLATE_CATEGORIES: ClassVar[list[TemplateCategory]] = [
         TemplateCategory.BASIC,
         TemplateCategory.LLM_PROMPT,
@@ -544,6 +593,74 @@ class TestDetectJinja2Variables:
         )
         assert result == {"user.profile.name", "config.value"}
 
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.CHAINED_ACCESS,
+    )
+    def test_chained_access(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """An attribute on a subscript, a call or a filter keeps the read of the path it starts from."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.ASSIGNMENT_ORDER,
+    )
+    def test_assignment_order(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """A top-level `set` hides its name only from the statements after it."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.SCOPES,
+    )
+    def test_scopes(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """Jinja's globals, a macro's internal names and a loop's own names are not required variables."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.GLOBAL_NAMES_AS_INPUTS,
+    )
+    def test_global_names_as_inputs(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """A read of a Jinja global's name that does not call it reads the input of that name, which shadows the global."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
 
 class TestDetectJinja2VariableReferences:
     """Tests for detect_jinja2_variable_references function that tracks filters."""
@@ -687,3 +804,34 @@ class TestDetectJinja2VariableReferences:
         )
 
         assert result == []
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_paths"),
+        TestData.REFERENCE_SCOPES,
+    )
+    def test_scopes_match_required_variables(
+        self,
+        topic: str,
+        template_source: str,
+        expected_paths: set[str],
+    ) -> None:
+        """The references follow the same scopes as the required variables, so an input the check sees read is found here too."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert {reference.path for reference in result} == expected_paths, f"Failed for topic: {topic}"
+        required = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert required == expected_paths, f"Failed for topic: {topic}"
+
+    def test_loop_references_keep_source_order(self) -> None:
+        """A loop's body is walked before its `else` branch, so references, and the images they attach, keep the template's order."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{% for x in xs %}{{ body_image }}{{ a|tag }}{% else %}{{ else_image }}{{ a|with_images }}{% endfor %}",
+        )
+        assert [reference.path for reference in result] == ["xs", "body_image", "a", "else_image"]
+        assert result[2].filters == ["tag", "with_images"]

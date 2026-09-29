@@ -65,6 +65,7 @@ class TestOptionalMethodInputs:
 
         pipe_job = await prepare_pipe_job(
             storage_scope="test/scope",
+            read_scope=None,
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,
@@ -96,6 +97,7 @@ class TestOptionalMethodInputs:
 
         pipe_job = await prepare_pipe_job(
             storage_scope="test/scope",
+            read_scope=None,
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,
@@ -130,6 +132,7 @@ class TestOptionalMethodInputs:
 
         pipe_job = await prepare_pipe_job(
             storage_scope="test/scope",
+            read_scope=None,
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,
@@ -177,6 +180,7 @@ class TestOptionalMethodInputs:
 
         pipe_job = await prepare_pipe_job(
             storage_scope="test/scope",
+            read_scope=None,
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,

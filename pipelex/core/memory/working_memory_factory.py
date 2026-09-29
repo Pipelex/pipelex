@@ -77,6 +77,7 @@ class WorkingMemoryFactory(BaseModel):
         input_specs: InputStuffSpecs | None = None,
         search_scope: str | None = None,
         inputs_base_dir: Path | None = None,
+        read_scope: str | None,
     ) -> WorkingMemory:
         """Create a WorkingMemory from a pipeline inputs dictionary.
 
@@ -99,6 +100,8 @@ class WorkingMemoryFactory(BaseModel):
                 the inputs file's parent when inputs were file-loaded by a CLI. ``None`` for API/SDK
                 and in-process callers (they pass absolute urls / storage uris). Only consulted by
                 the shaper's file-ish / CSV arms.
+            read_scope: The run's read scope, which a table read while shaping must satisfy;
+                ``None`` for an unscoped run. See :mod:`pipelex.tools.uri.uri_read_scope`.
 
         Returns:
             WorkingMemory object reconstructed from the implicit format
@@ -111,6 +114,7 @@ class WorkingMemoryFactory(BaseModel):
                 input_specs=input_specs,
                 search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
+                read_scope=read_scope,
             )
 
         working_memory = cls.make_empty()
@@ -121,6 +125,7 @@ class WorkingMemoryFactory(BaseModel):
                 stuff_content_or_data=stuff_content_or_data,
                 concept_provider=concept_provider,
                 search_scope=search_scope,
+                read_scope=read_scope,
             )
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
         return working_memory

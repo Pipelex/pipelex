@@ -93,12 +93,14 @@ type = "PipeLLM"
 description = "Extract features from text"
 inputs = { description = "ProductDescription" }
 output = "ProductFeatures"
+prompt = "Extract the product features from this description:\n@description"
 
 [pipe.analyze_sentiment]
 type = "PipeLLM"
 description = "Analyze sentiment of text"
 inputs = { description = "ProductDescription" }
 output = "ProductSentiment"
+prompt = "Analyze the sentiment of this product description:\n@description"
 
 # The PipeParallel definition
 [pipe.analyze_product_in_parallel]
@@ -122,7 +124,7 @@ How this works:
 5.  A new structured object of type `ProductAnalysis` is created and populated with the results, like `{"features": ..., "sentiment": ...}`. This object becomes the main output of the `analyze_product_in_parallel` pipe.
 6.  Because `add_each_output` is `true`, `features` and `sentiment` are also available individually in the working memory for downstream pipes.
 
-If you don't want to declare a `ProductAnalysis` concept, set `output = "Composite"` instead: the combined object then holds the same `{"features": ..., "sentiment": ...}` shape as an untyped composition.
+If you don't want to declare a `ProductAnalysis` concept, set `output = "Composite"` instead: the combined object then holds the same `{"features": ..., "sentiment": ...}` shape as an untyped composition. A later template reads each part by name, as it would read a field: `{{ analysis.features }}`.
 
 ## Related Documentation
 

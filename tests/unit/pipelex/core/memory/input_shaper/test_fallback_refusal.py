@@ -34,7 +34,7 @@ class TestInputShaperFallbackRefusal:
         records_input: dict[str, Any] = {"records": [{"a": 1}, {"b": 2}]}
 
         with pytest.raises(StructureValidationError) as exc_info:
-            InputShaper.shape(records_input, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape(records_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         error = exc_info.value
         message = str(error)
@@ -58,7 +58,7 @@ class TestInputShaperFallbackRefusal:
         payload_input: dict[str, Any] = {"payload": 3}
 
         with pytest.raises(StructureValidationError, match=r"Input 'payload' could not be built as 'native\.Dynamic'") as exc_info:
-            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         assert "a number (3)" in str(exc_info.value)
         assert isinstance(exc_info.value.__cause__, StuffFactoryError)
@@ -79,7 +79,7 @@ class TestInputShaperFallbackRefusal:
         payload_input: dict[str, Any] = {"payload": provided_value}
 
         with pytest.raises(StructureValidationError, match="with no reading for this one") as exc_info:
-            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         user_action = exc_info.value.user_action
         assert user_action is not None
@@ -107,7 +107,7 @@ class TestInputShaperFallbackRefusal:
         payload_input: dict[str, Any] = {"payload": provided_value}
 
         with pytest.raises(StructureValidationError, match=r"Input 'payload' could not be built as") as exc_info:
-            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library())
+            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         message = str(exc_info.value)
         assert factory_reason in message
