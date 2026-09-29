@@ -23,7 +23,7 @@ StuffArtefact wraps Stuff → delegates to StuffContent → Protocol enables tra
 ```
 
 !!! info "Protocol over Inheritance"
-    ImageRenderable uses duck typing. Any class with a `render_with_images()` method satisfies the protocol—no base class required.
+    ImageRenderable uses duck typing. Any class that defines a `render_with_images()` method satisfies the protocol, with no base class required. The filters check the class rather than the instance, so a value that merely holds such a method as an attribute is never rendered through it.
 
 ---
 
@@ -33,6 +33,7 @@ StuffArtefact wraps Stuff → delegates to StuffContent → Protocol enables tra
 |---------|--------|
 | `{{ doc.title }}` | Content field value |
 | `{{ doc.pages }}` | Nested content (list, struct, etc.) |
+| `{{ combo.summary }}` | A named part of a `Composite` output |
 | `{{ doc._stuff_name }}` | Metadata: variable name |
 | `{{ doc._content_class }}` | Metadata: content class name |
 | `{{ doc._concept_code }}` | Metadata: concept code |
@@ -118,7 +119,7 @@ def __getattribute__(self, key: str) -> Any:
         return object.__getattribute__(self, key)
 ```
 
-`_get_template_value` is the whole of what a string key resolves to: a content field, else one of the four metadata fields, else `KeyError`.
+`_get_template_value` is the whole of what a string key resolves to: a content field (a declared field, or a public extra field such as a `Composite`'s named parts), else one of the four metadata fields, else `KeyError`.
 
 !!! warning "Content Field Priority"
     Content fields shadow StuffArtefact methods. If your content has a field named `items`, accessing `artefact.items` returns the field value, not the iteration method. Use `artefact.iter_items()` for explicit dict-like iteration.

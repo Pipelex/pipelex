@@ -10,6 +10,7 @@ from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.tools.jinja2.jinja2_filters import require_templating_style_value
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.renderable_dispatch import type_implements
 from pipelex.tools.templating.text_format import TextFormat
 
 
@@ -57,8 +58,9 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
     # Get text format from context — no fallback, same as the tag and format filters
     text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
 
-    # Protocol-based rendering
-    if isinstance(value, ImageRenderable):
+    # Protocol-based rendering, licensed by the value's type: a template can build a namespace holding a
+    # `render_with_images` callable, which passes the isinstance check on Python 3.11.
+    if isinstance(value, ImageRenderable) and type_implements(value=value, protocol=ImageRenderable):
         return value.render_with_images(registry=registry, text_format=text_format)
 
     # Handle plain lists/tuples (structural types that may contain ImageRenderable items)
@@ -93,7 +95,7 @@ def _render_sequence_with_images(
     """
     parts: list[str] = []
     for item in sequence:
-        if isinstance(item, ImageRenderable):
+        if isinstance(item, ImageRenderable) and type_implements(value=item, protocol=ImageRenderable):
             rendered = item.render_with_images(registry=registry, text_format=text_format)
         else:
             rendered = str(item)

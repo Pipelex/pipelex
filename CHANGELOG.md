@@ -6,6 +6,8 @@
 
 - **A generated object's storage key names its own format**: the extension of a key under `generated/` follows the whole MIME type the object is stored under, so a fetched `image/svg+xml` is stored as `.svg`, and a type with no extension of its own gets `.bin`, where both used to get `.jpg`. The MIME type's parameters and case no longer change the extension.
 - **An include in a method template is a render error**: `{% include %}`, `{% extends %}` and `{% import %}` in a template rendered without a loader raise `Jinja2TemplateRenderError`, where they leaked Jinja's own `TemplateNotFound`.
+- **A template reads a `Composite`'s parts by name**: `{{ combo.summary }}`, `{{ combo['summary'] }}` and `combo.get('summary')` resolve the named parts of a `Composite` output, and `iter_keys` lists them; they used to render empty, and only the raw `_content`, now refused, reached them. A part whose name starts with an underscore stays unreadable.
+- **A template's arithmetic error is a render error**: a division by zero, or a `range` longer than the sandbox's cap, raises `Jinja2TemplateRenderError` where the raw Python exception escaped, which validation reported as an internal error rather than as the method's.
 
 ### Security
 

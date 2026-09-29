@@ -106,7 +106,7 @@ def _make_non_type_error_msg(
     template_source: str,
     *,
     error_label: str,
-    error: Jinja2StuffError | TemplateSyntaxError | UndefinedError | TemplateNotFound | Jinja2ContextError,
+    error: Jinja2StuffError | TemplateSyntaxError | UndefinedError | TemplateNotFound | Jinja2ContextError | ArithmeticError,
 ) -> str:
     return f"Jinja2 render — {error_label}: '{error}', template_source:\n{template_source}"
 
@@ -131,6 +131,10 @@ def _render_template_sync(template_source: str, *, template: _Jinja2Template, te
         raise Jinja2TemplateRenderError(msg) from exc
     except Jinja2ContextError as exc:
         msg = _make_non_type_error_msg(template_source=template_source, error_label="context error", error=exc)
+        raise Jinja2TemplateRenderError(msg) from exc
+    except ArithmeticError as exc:
+        # The template's own arithmetic, the sandbox's range cap included: `range` raises OverflowError past it.
+        msg = _make_non_type_error_msg(template_source=template_source, error_label="arithmetic error", error=exc)
         raise Jinja2TemplateRenderError(msg) from exc
     except TypeError as exc:
         msg = _make_type_error_msg(template_source=template_source, templating_context=templating_context, type_error=exc)
@@ -158,6 +162,10 @@ async def _render_template_async(template_source: str, *, template: _Jinja2Templ
         raise Jinja2TemplateRenderError(msg) from exc
     except Jinja2ContextError as exc:
         msg = _make_non_type_error_msg(template_source=template_source, error_label="context error", error=exc)
+        raise Jinja2TemplateRenderError(msg) from exc
+    except ArithmeticError as exc:
+        # The template's own arithmetic, the sandbox's range cap included: `range` raises OverflowError past it.
+        msg = _make_non_type_error_msg(template_source=template_source, error_label="arithmetic error", error=exc)
         raise Jinja2TemplateRenderError(msg) from exc
     except TypeError as exc:
         msg = _make_type_error_msg(template_source=template_source, templating_context=templating_context, type_error=exc)

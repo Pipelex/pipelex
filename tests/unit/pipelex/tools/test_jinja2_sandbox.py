@@ -12,6 +12,7 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -37,6 +38,20 @@ class _Mood(StrEnum):
         return self.value.upper()
 
 
+class _Impostor:
+    """Holds every rendering method as an instance attribute, which passes a runtime-checkable Protocol check on any Python."""
+
+    def __init__(self, *, calls: list[str]) -> None:
+        def record(**kwargs: Any) -> str:
+            calls.append(f"impostor {sorted(kwargs)}")
+            return "called"
+
+        self.render_with_images = record
+        self.rendered_for_template_async = record
+        self.render_for_tag_async = record
+        self.default_tag_name = "impostor"
+
+
 def _make_artefact(*, content: StuffContent, name: str, concept_code: NativeConceptCode) -> StuffArtefact:
     return StuffArtefact(
         Stuff(
@@ -48,7 +63,13 @@ def _make_artefact(*, content: StuffContent, name: str, concept_code: NativeConc
     )
 
 
-def _make_context(*, registry: ImageRegistry | None = None) -> dict[str, Any]:
+def _make_context(*, registry: ImageRegistry | None = None, calls: list[str] | None = None) -> dict[str, Any]:
+    calls = calls if calls is not None else []
+
+    def spy(**kwargs: Any) -> str:
+        calls.append(f"spy {sorted(kwargs)}")
+        return "called"
+
     return {
         "note": _make_artefact(content=TextContent(text="hello"), name="note", concept_code=NativeConceptCode.TEXT),
         "photo": _make_artefact(content=ImageContent(url="https://example.com/photo.png"), name="photo", concept_code=NativeConceptCode.IMAGE),
@@ -58,6 +79,16 @@ def _make_context(*, registry: ImageRegistry | None = None) -> dict[str, Any]:
             name="photos",
             concept_code=NativeConceptCode.IMAGE,
         ),
+        # A PipeParallel's combined output: its parts are extra fields of the content model.
+        "combo": _make_artefact(
+            content=CompositeContent.model_validate(
+                {"summary": TextContent(text="S"), "title": TextContent(text="T"), "_hidden": TextContent(text="H")}
+            ),
+            name="combo",
+            concept_code=NativeConceptCode.COMPOSITE,
+        ),
+        "impostor": _Impostor(calls=calls),
+        "spy": spy,
         "created_at": datetime(2026, 1, 2, 3, 4, 5),
         "record": {"a": 1, "b": 2},
         "keyed": {"_id": "abc123", "__typename": "User"},
@@ -76,8 +107,21 @@ async def _render(template_source: str, *, context: dict[str, Any] | None = None
     )
 
 
-@pytest.mark.asyncio(loop_scope="class")
-class TestTemplateSandboxRefusals:
+# The methods of each mutable plain type that leave the value unchanged, so that together with the
+# sandbox's own list of mutating methods they classify every public method the type has.
+_NON_MUTATING_METHOD_NAMES: dict[type, frozenset[str]] = {
+    list: frozenset({"copy", "count", "index"}),
+    dict: frozenset({"copy", "fromkeys", "get", "items", "keys", "values"}),
+    set: frozenset({"copy", "difference", "intersection", "isdisjoint", "issubset", "issuperset", "symmetric_difference", "union"}),
+}
+
+# Templates handing a filter a value that holds a rendering method as data rather than defining it in its class.
+_NAMESPACE_WITH_RENDER_METHODS = (
+    "{% set ns = namespace(render_with_images=spy, rendered_for_template_async=spy, render_for_tag_async=spy, default_tag_name='ns') %}"
+)
+
+
+class TestTemplateSandbox:
     @pytest.mark.parametrize(
         ("topic", "template_source"),
         [
@@ -103,14 +147,18 @@ class TestTemplateSandboxRefusals:
             ("private_name_on_plain_dict", "{{ record._secret }}"),
             ("private_key_by_dot_on_plain_dict", "{{ keyed._id }}"),
             ("dunder_by_bracket_on_plain_dict", "{{ record['__class__'] }}"),
+            ("private_part_of_a_composite_by_dot", "{{ combo._hidden }}"),
+            ("private_part_of_a_composite_by_bracket", "{{ combo['_hidden'] }}"),
         ],
     )
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_refused(self, topic: str, template_source: str) -> None:
         with pytest.raises(Jinja2TemplateSecurityError) as exc_info:
             await _render(template_source)
         # The message names what was refused, never the template source.
         assert template_source not in str(exc_info.value), topic
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_forged_image_never_reaches_the_registry(self) -> None:
         """The attack the stock sandbox let through: a template forging an image pointing at a foreign storage key."""
         registry = ImageRegistry()
@@ -119,36 +167,83 @@ class TestTemplateSandboxRefusals:
             await _render(template_source, context=_make_context(registry=registry))
         assert registry.images == []
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_refusal_names_the_attribute_and_the_type(self) -> None:
         with pytest.raises(Jinja2TemplateSecurityError, match=r"may not read '_stuff' on a 'StuffArtefact' value"):
             await _render("{{ note._stuff }}")
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_refusal_names_the_callable_and_the_type(self) -> None:
         with pytest.raises(Jinja2TemplateSecurityError, match=r"may not call the method 'model_copy' of a 'ImageContent' value"):
             await _render("{{ photos[0].model_copy() }}")
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_refused_mutation_leaves_the_value_unchanged(self) -> None:
         context = _make_context()
         with pytest.raises(Jinja2TemplateSecurityError):
             await _render("{{ tags.intersection_update(['a']) }}", context=context)
         assert context["tags"] == {"a", "b"}
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_wrapped_stuff_is_not_readable(self) -> None:
         """An artefact exposes its content's fields and its metadata, never the Stuff it wraps."""
         with pytest.raises(Jinja2TemplateRenderError, match="undefined error"):
             await _render("{{ note.stuff.content }}")
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_method_template_cannot_include(self) -> None:
         """A method template renders without a loader, so it cannot reach Pipelex's registered templates."""
         with pytest.raises(Jinja2TemplateRenderError, match="template not found"):
             await _render("{% include 'stuff_viewer.html.jinja2' %}")
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_calling_an_undefined_name_stays_an_undefined_error(self) -> None:
         with pytest.raises(Jinja2TemplateRenderError, match="undefined error"):
             await _render("{{ nowhere() }}")
 
+    @pytest.mark.parametrize(
+        "template_source",
+        ["{{ impostor | with_images }}", _NAMESPACE_WITH_RENDER_METHODS + "{{ ns | with_images }}"],
+    )
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_with_images_never_calls_a_method_held_as_data(self, template_source: str) -> None:
+        """The filter calls a rendering method only when the value's class defines it: a template can build a namespace, never a class."""
+        calls: list[str] = []
+        with pytest.raises(Jinja2TemplateRenderError, match="does not implement the ImageRenderable protocol"):
+            await _render(template_source, context=_make_context(calls=calls))
+        assert calls == []
 
-class TestTemplateSandboxSyncRender:
+    @pytest.mark.parametrize(
+        "template_source",
+        [
+            "{{ [impostor] | with_images }}",
+            "{{ impostor | tag }}",
+            "{{ impostor | format }}",
+            _NAMESPACE_WITH_RENDER_METHODS + "{{ ns | tag }}",
+            _NAMESPACE_WITH_RENDER_METHODS + "{{ ns | format }}",
+        ],
+    )
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_filters_render_a_value_holding_methods_as_data_without_calling_them(self, template_source: str) -> None:
+        calls: list[str] = []
+        rendered = await _render(template_source, context=_make_context(calls=calls))
+        assert calls == []
+        assert "called" not in rendered
+
+    @pytest.mark.parametrize(
+        "template_source",
+        [
+            pytest.param("{{ range(200000) | length }}", id="range_past_the_sandbox_cap"),
+            pytest.param("{{ 1 / 0 }}", id="division_by_zero"),
+        ],
+    )
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_arithmetic_error_is_a_render_error(self, template_source: str) -> None:
+        with pytest.raises(Jinja2TemplateRenderError, match="arithmetic error"):
+            await _render(template_source)
+        with pytest.raises(Jinja2TemplateRenderError, match="arithmetic error"):
+            render_jinja2_sync(template_source=template_source, template_category=TemplateCategory.BASIC, templating_context=_make_context())
+
     def test_sync_render_refuses_too(self) -> None:
         with pytest.raises(Jinja2TemplateSecurityError):
             render_jinja2_sync(
@@ -165,9 +260,6 @@ class TestTemplateSandboxSyncRender:
         )
         assert rendered == "note: hello"
 
-
-@pytest.mark.asyncio(loop_scope="class")
-class TestTemplateSandboxLegitimateShapes:
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected"),
         [
@@ -194,6 +286,16 @@ class TestTemplateSandboxLegitimateShapes:
             ("private_keys_of_a_plain_dict_by_bracket", "{{ keyed['_id'] }}|{{ keyed['__typename'] }}", "abc123|User"),
             ("set_methods", "{{ tags.intersection(['a']) | list | join }}|{{ tags.issuperset(['a']) }}", "a|True"),
             ("list_input_items", "{{ photos[0].url }}|{{ photos | length }}", "https://example.com/photo.png|1"),
+            (
+                "composite_parts",
+                "{{ combo.summary.text }}|{{ combo['title'].text }}|{{ combo.get('summary').text }}|{{ 'title' in combo }}|{{ '_hidden' in combo }}",
+                "S|T|S|True|False",
+            ),
+            (
+                "composite_keys",
+                "{{ combo.iter_keys() | list | join(',') }}",
+                "summary,title,_stuff_name,_content_class,_concept_code,_stuff_code",
+            ),
             ("string_methods", "{{ 'abc'.upper() }}|{{ 'a,b'.split(',') | join('-') }}|{{ ', '.join(['x', 'y']) }}", "ABC|a-b|x, y"),
             ("plain_method_on_plain_subclass", "{{ mood.upper() }}", "CALM"),
             ("loop_helpers", "{% for i in [1, 2, 3] %}{{ loop.cycle('o', 'e') }}{% endfor %}", "oeo"),
@@ -213,14 +315,17 @@ class TestTemplateSandboxLegitimateShapes:
             ),
         ],
     )
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_renders(self, topic: str, template_source: str, expected: str) -> None:
         rendered = await _render(template_source)
         assert rendered == expected, topic
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_iter_items_yields_fields_and_metadata_without_the_raw_content(self) -> None:
         rendered = await _render("{% for key, value in note.iter_items() %}{{ key }}={{ value }};{% endfor %}")
         assert rendered == "text=hello;_stuff_name=note;_content_class=TextContent;_concept_code=Text;_stuff_code=note_code;"
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_html_template_formats_markup_through_the_escaping_formatter(self) -> None:
         rendered = await render_jinja2_async(
             template_source="{{ ('<b>{0}</b>' | safe).format('<i>') }}",
@@ -229,19 +334,8 @@ class TestTemplateSandboxLegitimateShapes:
         )
         assert rendered == "<b>&lt;i&gt;</b>"
 
-
-# The methods of each mutable plain type that leave the value unchanged, so that together with the
-# sandbox's own list of mutating methods they classify every public method the type has.
-_NON_MUTATING_METHOD_NAMES: dict[type, frozenset[str]] = {
-    list: frozenset({"copy", "count", "index"}),
-    dict: frozenset({"copy", "fromkeys", "get", "items", "keys", "values"}),
-    set: frozenset({"copy", "difference", "intersection", "isdisjoint", "issubset", "issuperset", "symmetric_difference", "union"}),
-}
-
-
-class TestMutatingMethodList:
     @pytest.mark.parametrize("plain_type", [list, dict, set])
-    def test_every_public_method_is_classified(self, plain_type: type) -> None:
+    def test_every_mutable_type_method_is_classified(self, plain_type: type) -> None:
         """A method a later Python adds fails here until someone decides whether it mutates."""
         public_names = {name for name in dir(plain_type) if not name.startswith("_")}
         mutating = _MUTATING_METHOD_NAMES[plain_type]

@@ -13,7 +13,7 @@ Pipelex therefore renders every template, its own included, under one policy: **
 
 | A template may | For example |
 |---|---|
-| Read the public fields of an input, with a dot or with brackets | `{{ invoice.total }}`, `{{ invoice['total'] }}` |
+| Read the public fields of an input, with a dot or with brackets, the named parts of a `Composite` included | `{{ invoice.total }}`, `{{ invoice['total'] }}`, `{{ combo.summary }}` |
 | Read an input's metadata fields | `{{ invoice._stuff_name }}`, `{{ invoice._content_class }}`, `{{ invoice._concept_code }}`, `{{ invoice._stuff_code }}` |
 | Read any key of a plain dict with brackets, underscore keys included | `{{ record['_id'] }}`, `{{ record['__typename'] }}` |
 | Call the dict-like accessors of an input | `{{ invoice.get('total') }}`, `{% for key, value in invoice.iter_items() %}` |
@@ -56,15 +56,15 @@ A type declares its template surface as a `__template_surface__` class attribute
 
 The sandbox refuses a bracketed name before trying `obj[name]`. Jinja only checks a bracketed name when the item lookup fails, so an object whose `__getitem__` answered any key would otherwise hand over what the dot spelling could not. A plain `dict` is the exception, because its items are data: a key it holds is returned, and a key it does not hold falls back to an attribute read, which the underscore rule refuses.
 
+Filters are not calls in this sense: they are Pipelex's or Jinja's own code, registered by the environment. That makes each filter trusted code with one obligation: **a filter never calls a callable it was handed**, since that callable came from the template's values and the policy never vetted it. So `with_images`, `format` and `tag` call a value's rendering method only when the value's class defines it, and they check that on the type (`pipelex/tools/jinja2/renderable_dispatch.py`). A runtime-checkable Protocol alone would not do: on Python 3.11 it accepts a `namespace()` holding a callable of the template's choosing.
+
 ## Paths outside templates
 
 A method also writes dotted paths that are not templates: a PipeCompose construct field's `from` and its `list_to_dict_keyed_by`, a PipeBatch's list, and the image and document references of a prompt. The runtime walks these with `getattr`, so the same rule applies to them: a segment starting with an underscore is refused. A construct's `from` path and `list_to_dict_keyed_by` are refused when the bundle is validated, and every path is refused again when it is walked.
 
-Filters are not calls in this sense: they are Pipelex's or Jinja's own code, registered by the environment. That makes each filter trusted code with one obligation: **a filter never calls a callable it was handed**, since that callable came from the template's values and the policy never vetted it.
-
 ## What the sandbox does not cover
 
-- **Resource use.** The sandbox limits what a template can reach, not what it can spend. Jinja caps `range`, but not exponentiation, string repetition, nested loops or output size.
+- **Resource use.** The sandbox limits what a template can reach, not what it can spend. Jinja caps `range`, and a longer range fails the render with `Jinja2TemplateRenderError`, but nothing caps exponentiation, string repetition, nested loops or output size.
 - **The URLs values carry.** A template cannot forge content under this policy, but a value can still carry a URL, and reading it is the storage layer's decision, not the template's.
 
 ## Related

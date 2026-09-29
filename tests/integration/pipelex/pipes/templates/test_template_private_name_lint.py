@@ -197,9 +197,7 @@ class TestTemplatePrivateNameLint:
             )
         _assert_private_name_error(exc_info.value, pipe_code="private_name_img_gen", refused_name="_stuff", template_label="negative_prompt")
 
-
-@pytest.mark.asyncio(loop_scope="class")
-class TestTemplatePrivateNameLintOnConstruct:
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_construct_field_template_is_linted(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
@@ -210,6 +208,7 @@ class TestTemplatePrivateNameLintOnConstruct:
         ]
         assert "construct field 'filed_under'" in (items[0].message or "")
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_construct_from_path_with_a_private_segment_is_rejected(self, load_empty_library: Callable[[], None]):
         """A `from` path is walked with getattr at run time: a dunder segment would copy the process environment."""
         load_empty_library()

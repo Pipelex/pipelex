@@ -31,6 +31,7 @@ from pipelex.tools.templating.text_format import TextFormat
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff import Stuff
+    from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.tools.jinja2.image_registry import ImageRegistry
 
 
@@ -53,6 +54,16 @@ class BaseStuffArtefactField(StrEnum):
 _METADATA_FIELD_NAMES = frozenset(field.value for field in BaseStuffArtefactField)
 
 
+def _content_field_names(*, content: StuffContent) -> list[str]:
+    """The content fields a template reads: the declared ones, then the public extra fields of a model that allows extras.
+
+    `CompositeContent` holds its parts as extra fields, so reading the declared fields alone would leave every part out.
+    """
+    field_names: list[str] = list(type(content).model_fields)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+    field_names.extend(name for name in content.model_extra or {} if not name.startswith("_"))
+    return field_names
+
+
 def _get_template_value(*, stuff: Stuff, key: str) -> Any:
     """Return what a template reads under `key`: a content field, else a metadata field.
 
@@ -60,8 +71,7 @@ def _get_template_value(*, stuff: Stuff, key: str) -> Any:
     anything else (the wrapped Stuff, the artefact's own methods) raises KeyError.
     """
     content = stuff.content
-    content_fields = type(content).model_fields  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-    if key in content_fields:
+    if key in _content_field_names(content=content):
         return getattr(content, key)
     match key:
         case BaseStuffArtefactField.STUFF_NAME:
@@ -238,10 +248,8 @@ class StuffArtefact:
         Returns:
             True if the key is accessible, False otherwise.
         """
-        content_fields = type(self._stuff.content).model_fields  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-
         # Check content fields
-        if key in content_fields:
+        if key in _content_field_names(content=self._stuff.content):
             return True
 
         # Check metadata fields
@@ -311,7 +319,7 @@ class StuffArtefact:
             Field names from content, followed by metadata field names.
         """
         # Content fields (use self._stuff since it's in _PASSTHROUGH_ATTRS)
-        yield from type(self._stuff.content).model_fields  # pyright: ignore[reportUnknownMemberType]
+        yield from _content_field_names(content=self._stuff.content)
         # Metadata fields
         for field in BaseStuffArtefactField:
             yield field.value

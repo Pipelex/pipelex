@@ -7,6 +7,7 @@ from jinja2.runtime import Context, Undefined
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.renderable_dispatch import type_implements
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
 from pipelex.tools.jinja2.text_format_renderable import TextFormatRenderable
 from pipelex.tools.templating.templating_style import TagStyle
@@ -62,8 +63,8 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | st
     else:
         applied_text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
 
-    # Protocol-based rendering
-    if isinstance(value, TextFormatRenderable):
+    # Protocol-based rendering, licensed by the value's type (see renderable_dispatch.py)
+    if isinstance(value, TextFormatRenderable) and type_implements(value=value, protocol=TextFormatRenderable):
         return await value.rendered_for_template_async(text_format=applied_text_format)
     if isinstance(value, StrEnum):
         return value.value
@@ -97,7 +98,7 @@ async def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
             msg = f"Cannot use tag filter on undefined value with tag_name '{tag_name}'"
         raise Jinja2ContextError(msg)
 
-    # Protocol-based rendering
+    # Protocol-based rendering, licensed by the value's type (see renderable_dispatch.py)
     rendered_value: str
     final_tag_name: str | None = tag_name
 
@@ -111,13 +112,13 @@ async def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
             rendered_value = placeholder
             # For registered images, use tag_name if provided, otherwise no default
             # (the placeholder already identifies the image)
-        elif isinstance(value, TagRenderable):
+        elif isinstance(value, TagRenderable) and type_implements(value=value, protocol=TagRenderable):
             rendered_value = await value.render_for_tag_async()
             if final_tag_name is None:
                 final_tag_name = value.default_tag_name
         else:
             rendered_value = str(value)
-    elif isinstance(value, TagRenderable):
+    elif isinstance(value, TagRenderable) and type_implements(value=value, protocol=TagRenderable):
         rendered_value = await value.render_for_tag_async()
         if final_tag_name is None:
             final_tag_name = value.default_tag_name

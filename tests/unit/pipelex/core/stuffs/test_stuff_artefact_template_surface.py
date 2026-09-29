@@ -4,10 +4,11 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact, unwrap_stuff_artefact
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.tools.jinja2.template_surface import TemplateSurface, get_template_surface
+from pipelex.tools.jinja2.template_surface import get_template_surface
 
 
 def _make_artefact() -> StuffArtefact:
@@ -17,6 +18,19 @@ def _make_artefact() -> StuffArtefact:
             stuff_name="note",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text="hello"),
+        )
+    )
+
+
+def _make_composite_artefact() -> StuffArtefact:
+    return StuffArtefact(
+        Stuff(
+            stuff_code="combo_code",
+            stuff_name="combo",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.COMPOSITE),
+            content=CompositeContent.model_validate(
+                {"summary": TextContent(text="S"), "title": TextContent(text="T"), "_hidden": TextContent(text="H")}
+            ),
         )
     )
 
@@ -59,9 +73,17 @@ class TestStuffArtefactTemplateSurface:
         artefact = _make_artefact()
         assert unwrap_stuff_artefact(artefact=artefact).content == TextContent(text="hello")
 
+    def test_composite_parts_are_fields(self) -> None:
+        """A Composite holds its parts as extra fields of the model: they resolve like declared fields."""
+        artefact = _make_composite_artefact()
+        assert artefact["summary"] == TextContent(text="S")
+        assert artefact.get("title") == TextContent(text="T")
+        assert "summary" in artefact
+        assert list(artefact.iter_keys())[:2] == ["summary", "title"]
 
-class TestTemplateSurfaceDeclaration:
-    @pytest.mark.parametrize("name", ["__class__", "stuff_name"])
-    def test_private_names_are_single_underscore_names(self, name: str) -> None:
-        with pytest.raises(ValueError, match="single underscore"):
-            TemplateSurface(callable_names=frozenset(), private_names=frozenset({name}))
+    def test_private_composite_part_is_not_a_field(self) -> None:
+        artefact = _make_composite_artefact()
+        assert "_hidden" not in artefact
+        assert "_hidden" not in list(artefact.iter_keys())
+        with pytest.raises(KeyError):
+            _ = artefact["_hidden"]
