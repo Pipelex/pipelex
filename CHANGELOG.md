@@ -18,6 +18,7 @@
 - **An include in a method template is a render error**: `{% include %}`, `{% extends %}` and `{% import %}` in a template rendered without a loader raise `Jinja2TemplateRenderError`, where they leaked Jinja's own `TemplateNotFound`.
 - **A template reads a `Composite`'s parts by name**: `{{ combo.summary }}`, `{{ combo['summary'] }}` and `combo.get('summary')` resolve the named parts of a `Composite` output, and `iter_keys` lists them; they used to render empty, and only the raw `_content`, now refused, reached them. Like any private name, a part whose name starts with an underscore is refused when a template reads it on an input.
 - **A template's arithmetic error is a render error**: a division by zero, or a `range` longer than the sandbox's cap, raises `Jinja2TemplateRenderError` where the raw Python exception escaped, which validation reported as an internal error rather than as the method's.
+- **Docling extracts documents that have no pages**: an HTML, Markdown, CSV or AsciiDoc document given to Docling comes back as one page holding the whole document, where it came back with no pages and no text.
 
 ### Security
 

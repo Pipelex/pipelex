@@ -1,8 +1,10 @@
 import asyncio
 import base64
+import re
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import urlparse
 
 import aiofiles
 from typing_extensions import override
@@ -21,7 +23,14 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.docling.docling_factory import DoclingFactory
 from pipelex.providers.docling.docling_sdk import DoclingSdk
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
+from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, mime_type_to_extension
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
+from pipelex.tools.uri.resolved_uri import ResolvedHttpUrl
+from pipelex.tools.uri.uri_resolver import resolve_uri
+
+# An extension taken from a URL's path names a temp file, so only a plain one is kept.
+_PLAIN_SUFFIX_PATTERN = re.compile(r"\.[A-Za-z0-9]{1,16}")
 
 
 class DoclingExtractWorker(ExtractWorkerAbstract):
@@ -63,38 +72,41 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
     async def _extract_from_source(self, source_uri: str) -> ExtractOutput:
         """Extract text from any supported URI type (file path, http(s) URL, pipelex-storage://, or base64 data URL).
 
-        An http(s) URL is downloaded by the runtime's fetch helper, never handed to Docling:
-        Docling would fetch it in this process with its own client, following redirects to any
-        address, where the helper refuses private destinations on every hop.
+        An http(s) URL is downloaded by the runtime's fetch helper, never handed to Docling.
+        Docling's own client checks each host with a single DNS lookup before connecting, which
+        a record that changes in between defeats, and it does not follow the runtime's
+        `is_fetch_ssrf_guard_enabled` switch. The helper vets the address it actually connects
+        to, on every redirect hop.
         """
-        prepared = await prepare_file_from_uri(
-            uri=source_uri,
-            keep_http_url=False,
-            keep_local_path=True,
-        )
-
         docling_source: str
         temp_path: Path | None = None
 
-        match prepared:
-            case PreparedFileHttpUrl():
-                # This shouldn't happen since we use keep_http_url=False
-                msg = f"Unexpected PreparedFileHttpUrl for URI: {source_uri}"
-                raise TypeError(msg)
-            case PreparedFileLocalPath():
-                docling_source = prepared.path
-            case PreparedFileBase64():
-                # Docling needs a file path, so write base64 data to temp file
-                suffix = f".{prepared.file_type.extension}" if prepared.file_type.extension else ".pdf"
-                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
-                    temp_path = Path(temp_file.name)
-                try:
-                    async with aiofiles.open(temp_path, "wb") as file:
-                        await file.write(base64.b64decode(prepared.base64_data))
+        resolved_uri = resolve_uri(source_uri)
+        if isinstance(resolved_uri, ResolvedHttpUrl):
+            raw_bytes, media_type = await fetch_file_and_content_type_from_url_httpx(resolved_uri.url)
+            temp_path = await self._write_temp_file(
+                data=raw_bytes,
+                suffix=self._suffix_for_downloaded_url(url=resolved_uri.url, media_type=media_type),
+            )
+            docling_source = str(temp_path)
+        else:
+            prepared = await prepare_file_from_uri(
+                uri=source_uri,
+                keep_http_url=False,
+                keep_local_path=True,
+            )
+            match prepared:
+                case PreparedFileHttpUrl():
+                    # This shouldn't happen: http(s) URLs are downloaded above
+                    msg = f"Unexpected PreparedFileHttpUrl for URI: {source_uri}"
+                    raise TypeError(msg)
+                case PreparedFileLocalPath():
+                    docling_source = prepared.path
+                case PreparedFileBase64():
+                    # Docling needs a file path, so write base64 data to temp file
+                    suffix = f".{prepared.file_type.extension}" if prepared.file_type.extension else ".pdf"
+                    temp_path = await self._write_temp_file(data=base64.b64decode(prepared.base64_data), suffix=suffix)
                     docling_source = str(temp_path)
-                except BaseException:
-                    temp_path.unlink(missing_ok=True)
-                    raise
 
         try:
             # Run synchronous Docling conversion in a thread pool to avoid blocking
@@ -117,3 +129,35 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         finally:
             if temp_path:
                 temp_path.unlink(missing_ok=True)
+
+    @classmethod
+    def _suffix_for_downloaded_url(cls, *, url: str, media_type: str | None) -> str:
+        """Pick the extension a downloaded file is written under, so Docling can tell its format.
+
+        Docling reads a file's format from its bytes first, which settles every binary format.
+        A text format (HTML, Markdown, CSV) says nothing in its bytes, so Docling falls back on
+        the extension: the URL path's own, as Docling used when it fetched URLs itself, else
+        the one the server's declared content type implies. With neither, the file gets none,
+        and Docling sniffs the content for HTML and CSV before reading it as plain text.
+        """
+        url_suffix = PurePosixPath(urlparse(url).path).suffix
+        if _PLAIN_SUFFIX_PATTERN.fullmatch(url_suffix):
+            return url_suffix
+        if media_type:
+            extension = mime_type_to_extension(media_type)
+            if extension != UNKNOWN_FILE_TYPE:
+                return f".{extension}"
+        return ""
+
+    @classmethod
+    async def _write_temp_file(cls, *, data: bytes, suffix: str) -> Path:
+        """Write `data` to a new temp file named with `suffix`, which the caller deletes."""
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+            temp_path = Path(temp_file.name)
+        try:
+            async with aiofiles.open(temp_path, "wb") as file:
+                await file.write(data)
+        except BaseException:
+            temp_path.unlink(missing_ok=True)
+            raise
+        return temp_path
