@@ -28,6 +28,8 @@ Template mode supports two syntax variants:
 
 The Jinja2 template has access to all the "stuffs" currently in the working memory. You can access them by the names they were given in previous pipeline steps. For example, if a previous step produced an output named `user_profile`, you can access its attributes in the template like `{{ user_profile.name }}` or `{{ user_profile.email }}`.
 
+A template reads data and calls methods of plain values, and nothing else: it can read fields, call `isoformat()` on a date or `upper()` on a string, and apply any filter, but it cannot call methods of Pipelex objects or read names starting with an underscore, other than an input's metadata fields such as `_stuff_name`. This applies to every template a method contains, PipeLLM prompts and PipeCondition expressions included. The [Template Sandbox](../../../under-the-hood/template-sandbox.md) page lists what is allowed and how a refusal is reported.
+
 ### Template Mode Configuration
 
 | Parameter       | Type              | Description                                                                 | Required |

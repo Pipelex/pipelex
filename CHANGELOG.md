@@ -5,6 +5,11 @@
 ### Fixed
 
 - **A generated object's storage key names its own format**: the extension of a key under `generated/` follows the whole MIME type the object is stored under, so a fetched `image/svg+xml` is stored as `.svg`, and a type with no extension of its own gets `.bin`, where both used to get `.jpg`. The MIME type's parameters and case no longer change the extension.
+- **An include in a method template is a render error**: `{% include %}`, `{% extends %}` and `{% import %}` in a template rendered without a loader raise `Jinja2TemplateRenderError`, where they leaked Jinja's own `TemplateNotFound`.
+
+### Security
+
+- **Every template renders in a sandbox (Breaking)**: prompts, compose and construct templates, image and search prompts and condition expressions may read data and call methods of plain values (strings, numbers, dates, containers) only, so a template that reaches for a Python internal, calls a method of a Pipelex or pydantic object, or reads a name starting with an underscore other than an input's `_stuff_name`, `_content_class`, `_concept_code` and `_stuff_code` raises `Jinja2TemplateSecurityError` instead of rendering, and validation refuses the visible cases with the new `template_private_name` error. `_content` is no longer readable on an input, and bracket access and `get` on an input resolve only its content fields and metadata fields.
 
 ## [v0.69.0] - 2026-09-28
 

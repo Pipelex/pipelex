@@ -71,6 +71,11 @@ class PipeValidationErrorType(StrEnum):
     OPTIONAL_INPUT_UNGUARDED = "optional_input_unguarded"
     OPTIONAL_BRANCH_REQUIRED_FIELD = "optional_branch_required_field"
 
+    # A template reads a name starting with an underscore that is not one of an input's declared
+    # metadata fields (`_stuff_name`, `_content_class`, `_concept_code`, `_stuff_code`). The template
+    # sandbox refuses such a read at render time; the load-time lint names the pipe and the template.
+    TEMPLATE_PRIVATE_NAME = "template_private_name"
+
     # Advisory-only (rides the validation report's `warnings` array, never raised as an error):
     # a `!` (force) input whose slot is guaranteed present in every analyzed flow — the
     # assertion can never fire.
@@ -122,6 +127,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
@@ -153,6 +159,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
@@ -191,6 +198,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
@@ -224,6 +232,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
@@ -260,6 +269,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
@@ -293,6 +303,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS

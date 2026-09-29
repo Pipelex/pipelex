@@ -220,6 +220,28 @@ class ConstructBlueprint(BaseModel):
         """Return list of all top-level field names."""
         return list(self.fields.keys())
 
+    def field_templates(self) -> list[tuple[str, str]]:
+        """Return every template of this construct, nested constructs included, with its dotted field path.
+
+        Returns:
+            (field_path, template) pairs, in field order, a nested construct's fields after its own path.
+        """
+        templates: list[tuple[str, str]] = []
+        for field_name, field_blueprint in self.fields.items():
+            match field_blueprint.method:
+                case ConstructFieldMethod.TEMPLATE:
+                    if field_blueprint.template:
+                        templates.append((field_name, field_blueprint.template))
+                case ConstructFieldMethod.NESTED:
+                    if field_blueprint.nested:
+                        templates.extend(
+                            (f"{field_name}.{nested_path}", nested_template)
+                            for nested_path, nested_template in field_blueprint.nested.field_templates()
+                        )
+                case ConstructFieldMethod.FROM_VAR | ConstructFieldMethod.FIXED:
+                    pass
+        return templates
+
     def get_required_variables(self) -> set[str]:
         """Extract all variable names/paths required to compose this construct.
 

@@ -5,6 +5,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from tests.cases.documents import DocumentTestCases
@@ -35,11 +36,11 @@ class TestWorkingMemoryGenerateContext:
         # Verify artefact structure
         artefact = context["sample_text"]
         assert isinstance(artefact, StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in artefact
-        assert isinstance(artefact[BaseStuffArtefactField.CONTENT], TextContent)
+        assert BaseStuffArtefactField.CONTENT_CLASS in artefact
+        assert isinstance(artefact.stuff.content, TextContent)
 
         # Verify actual content value
-        assert artefact[BaseStuffArtefactField.CONTENT].text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert artefact.stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
 
         # Verify MAIN_STUFF_NAME points to the same artefact
         assert context[MAIN_STUFF_NAME] is context["sample_text"]
@@ -56,10 +57,10 @@ class TestWorkingMemoryGenerateContext:
         # Verify artefact structure
         artefact = context["document_file"]
         assert isinstance(artefact, StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in artefact
+        assert BaseStuffArtefactField.CONTENT_CLASS in artefact
 
         # Verify actual content value
-        assert artefact[BaseStuffArtefactField.CONTENT].url == DocumentTestCases.PDF_FILE_URL_1
+        assert artefact.stuff.as_document.url == DocumentTestCases.PDF_FILE_URL_1
 
         # Verify MAIN_STUFF_NAME points to the same artefact
         assert context[MAIN_STUFF_NAME] is context["document_file"]
@@ -76,11 +77,11 @@ class TestWorkingMemoryGenerateContext:
         # Verify artefact structure
         artefact = context["sample_image"]
         assert isinstance(artefact, StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in artefact
-        assert isinstance(artefact[BaseStuffArtefactField.CONTENT], ImageContent)
+        assert BaseStuffArtefactField.CONTENT_CLASS in artefact
+        assert isinstance(artefact.stuff.content, ImageContent)
 
         # Verify actual content value
-        assert artefact[BaseStuffArtefactField.CONTENT].url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
+        assert artefact.stuff.content.url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
 
         # Verify MAIN_STUFF_NAME points to the same artefact
         assert context[MAIN_STUFF_NAME] is context["sample_image"]
@@ -101,17 +102,17 @@ class TestWorkingMemoryGenerateContext:
         assert isinstance(context["question"], StuffArtefact)
         assert isinstance(context["document"], StuffArtefact)
         assert isinstance(context["diagram"], StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in context["question"]
-        assert BaseStuffArtefactField.CONTENT in context["document"]
-        assert BaseStuffArtefactField.CONTENT in context["diagram"]
+        assert BaseStuffArtefactField.CONTENT_CLASS in context["question"]
+        assert BaseStuffArtefactField.CONTENT_CLASS in context["document"]
+        assert BaseStuffArtefactField.CONTENT_CLASS in context["diagram"]
 
         # Verify actual content values
-        assert isinstance(context["question"][BaseStuffArtefactField.CONTENT], TextContent)
-        assert context["question"][BaseStuffArtefactField.CONTENT].text == "What are the aerodynamic features?"
-        assert isinstance(context["document"][BaseStuffArtefactField.CONTENT], TextContent)
-        assert context["document"][BaseStuffArtefactField.CONTENT].text == TestWorkingMemoryData.SAMPLE_TEXT
-        assert isinstance(context["diagram"][BaseStuffArtefactField.CONTENT], ImageContent)
-        assert context["diagram"][BaseStuffArtefactField.CONTENT].url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
+        assert isinstance(context["question"].stuff.content, TextContent)
+        assert context["question"].stuff.content.text == "What are the aerodynamic features?"
+        assert isinstance(context["document"].stuff.content, TextContent)
+        assert context["document"].stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert isinstance(context["diagram"].stuff.content, ImageContent)
+        assert context["diagram"].stuff.content.url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
 
         # Verify MAIN_STUFF_NAME points to document (main_name="document" in fixture)
         assert context[MAIN_STUFF_NAME] is context["document"]
@@ -130,10 +131,10 @@ class TestWorkingMemoryGenerateContext:
         assert MAIN_STUFF_NAME in context
 
         # Verify actual content values
-        assert isinstance(context["primary_text"][BaseStuffArtefactField.CONTENT], TextContent)
-        assert context["primary_text"][BaseStuffArtefactField.CONTENT].text == "Primary content"
-        assert isinstance(context["secondary_text"][BaseStuffArtefactField.CONTENT], TextContent)
-        assert context["secondary_text"][BaseStuffArtefactField.CONTENT].text == "Secondary content"
+        assert isinstance(context["primary_text"].stuff.content, TextContent)
+        assert context["primary_text"].stuff.content.text == "Primary content"
+        assert isinstance(context["secondary_text"].stuff.content, TextContent)
+        assert context["secondary_text"].stuff.content.text == "Secondary content"
 
         # Verify aliases point to the same artefact objects (using 'is')
         assert context["main_text"] is context["primary_text"]
@@ -152,11 +153,11 @@ class TestWorkingMemoryGenerateContext:
         # Verify artefact structure
         artefact = context["mixed_list"]
         assert isinstance(artefact, StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in artefact
-        assert isinstance(artefact[BaseStuffArtefactField.CONTENT], ListContent)
+        assert BaseStuffArtefactField.CONTENT_CLASS in artefact
+        assert isinstance(artefact.stuff.content, ListContent)
 
         # Verify actual list content values
-        list_content = artefact[BaseStuffArtefactField.CONTENT]
+        list_content = artefact.stuff.as_list_of_fixed_content_type(item_type=StuffContent)
         assert len(list_content.items) == 3
         assert isinstance(list_content.items[0], TextContent)
         assert list_content.items[0].text == "The quick brown fox jumps over the lazy dog"
@@ -177,11 +178,11 @@ class TestWorkingMemoryGenerateContext:
         # Verify artefact structure
         artefact = context["project_overview"]
         assert isinstance(artefact, StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in artefact
-        assert isinstance(artefact[BaseStuffArtefactField.CONTENT], TextAndImagesContent)
+        assert BaseStuffArtefactField.CONTENT_CLASS in artefact
+        assert isinstance(artefact.stuff.content, TextAndImagesContent)
 
         # Verify actual content values
-        content = artefact[BaseStuffArtefactField.CONTENT]
+        content = artefact.stuff.content
         assert content.text is not None
         assert content.text.text == "Project overview with diagrams"
         assert content.images is not None
@@ -201,11 +202,11 @@ class TestWorkingMemoryGenerateContext:
         # Verify artefact structure
         artefact = context["test_report"]
         assert isinstance(artefact, StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in artefact
-        assert isinstance(artefact[BaseStuffArtefactField.CONTENT], HtmlContent)
+        assert BaseStuffArtefactField.CONTENT_CLASS in artefact
+        assert isinstance(artefact.stuff.content, HtmlContent)
 
         # Verify actual content values
-        content = artefact[BaseStuffArtefactField.CONTENT]
+        content = artefact.stuff.content
         assert content.inner_html == "<h1>Test Report</h1><p>This is a <strong>test</strong> report.</p><ul><li>Item 1</li><li>Item 2</li></ul>"
         assert content.css_class == "report-content"
 
@@ -221,11 +222,11 @@ class TestWorkingMemoryGenerateContext:
         # Verify artefact structure
         artefact = context["pi_value"]
         assert isinstance(artefact, StuffArtefact)
-        assert BaseStuffArtefactField.CONTENT in artefact
-        assert isinstance(artefact[BaseStuffArtefactField.CONTENT], NumberContent)
+        assert BaseStuffArtefactField.CONTENT_CLASS in artefact
+        assert isinstance(artefact.stuff.content, NumberContent)
 
         # Verify actual content value
-        assert artefact[BaseStuffArtefactField.CONTENT].number == 3.14159
+        assert artefact.stuff.content.number == 3.14159
 
     def test_generate_context_artefact_independence(self, multiple_stuff_memory: WorkingMemory):
         """Test that each stuff generates independent artefacts."""

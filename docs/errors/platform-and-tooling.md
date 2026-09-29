@@ -34,6 +34,7 @@ own page. Classes are grouped by subsystem.
 - [`Jinja2DetectVariablesError`](jinja2-detect-variables-error.md) — Jinja 2 detect variables
 - [`Jinja2StuffError`](jinja2-stuff-error.md) — Jinja 2 stuff
 - [`Jinja2TemplateRenderError`](jinja2-template-render-error.md) — Jinja 2 template render
+- [`Jinja2TemplateSecurityError`](jinja2-template-security-error.md) — Jinja 2 template security
 - [`Jinja2TemplateSyntaxError`](jinja2-template-syntax-error.md) — Jinja 2 template syntax
 - [`JsonTypeError`](json-type-error.md) — Json type
 - [`ModuleFileError`](module-file-error.md) — Module file

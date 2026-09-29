@@ -1,0 +1,17 @@
+domain      = "clinic_intake"
+description = "Write the intake summary a doctor reads before seeing a patient, naming the triage note it came from"
+main_pipe   = "summarize_intake"
+
+[concept]
+TriageNote    = "The note a nurse wrote at triage"
+IntakeSummary = "The summary a doctor reads before seeing a patient"
+
+[pipe.summarize_intake]
+type = "PipeLLM"
+description = "Summarize the triage note for the doctor"
+inputs = { triage_note = "TriageNote" }
+output = "IntakeSummary"
+prompt = """
+Summarize this triage note for the doctor: $triage_note
+Name the note by its record code: {{ triage_note._stuff.stuff_code }}.
+"""

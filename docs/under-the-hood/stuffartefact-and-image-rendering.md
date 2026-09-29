@@ -36,8 +36,11 @@ StuffArtefact wraps Stuff → delegates to StuffContent → Protocol enables tra
 | `{{ doc._stuff_name }}` | Metadata: variable name |
 | `{{ doc._content_class }}` | Metadata: content class name |
 | `{{ doc._concept_code }}` | Metadata: concept code |
+| `{{ doc._stuff_code }}` | Metadata: stuff code |
 | `{{ doc \| with_images }}` | Text with `[Image N]` tokens |
 | `{{ doc \| tag }}` | Tagged output (no images) |
+
+These are the only underscore names a template may read on an input. Templates render under the [Template Sandbox](template-sandbox.md), which refuses the wrapped `Stuff` (`_stuff`), the raw content object, and every other private name.
 
 ---
 
@@ -107,27 +110,15 @@ def __getattribute__(self, key: str) -> Any:
     if key in _PASSTHROUGH_ATTRS or key.startswith("__"):
         return object.__getattribute__(self, key)
 
-    # 2. Content fields (highest priority for templates)
-    content_fields = type(content).model_fields
-    if key in content_fields:
-        return getattr(content, key)
-
-    # 3. Metadata accessors
-    match key:
-        case "_stuff_name":
-            return stuff.stuff_name
-        case "_content_class":
-            return content.__class__.__name__
-        case "_concept_code":
-            return stuff.concept.code
-        case "_stuff_code":
-            return stuff.stuff_code
-        case "_content":
-            return content
-
-    # 4. Fallback to normal lookup
-    return object.__getattribute__(self, key)
+    # 2. Content fields, then 3. metadata fields (_stuff_name, _content_class, _concept_code, _stuff_code)
+    try:
+        return _get_template_value(stuff=stuff, key=key)
+    except KeyError:
+        # 4. Fallback to normal lookup
+        return object.__getattribute__(self, key)
 ```
+
+`_get_template_value` is the whole of what a string key resolves to: a content field, else one of the four metadata fields, else `KeyError`.
 
 !!! warning "Content Field Priority"
     Content fields shadow StuffArtefact methods. If your content has a field named `items`, accessing `artefact.items` returns the field value, not the iteration method. Use `artefact.iter_items()` for explicit dict-like iteration.
@@ -138,12 +129,14 @@ StuffArtefact supports bracket notation and iteration:
 
 | Method | Purpose |
 |--------|---------|
-| `artefact["field"]` | Bracket access (via `__getitem__`) |
-| `artefact.get("field", default=...)` | Safe access with default |
+| `artefact["field"]` | Bracket access (via `__getitem__`): a content field or a metadata field only |
+| `artefact.get("field", default=...)` | Safe access with default, resolving the same keys as brackets |
 | `"field" in artefact` | Membership test |
 | `artefact.iter_keys()` | Iterate field names |
 | `artefact.iter_items()` | Iterate (key, value) pairs |
 | `artefact.iter_values()` | Iterate values |
+
+Bracket access and `get` never resolve to the artefact's own attributes, such as the wrapped `Stuff` or a method. The accessors above and the four metadata fields are what `StuffArtefact` declares as its template surface: the only methods a template may call on it and the only underscore names it may read.
 
 ---
 
@@ -288,8 +281,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
     if registry is None:
         registry = ImageRegistry()
 
-    # 3. Get text format
-    text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
+    # 3. Get text format: no fallback, a render without a templating style fails loudly
+    text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
 
     # 4. Protocol-based rendering
     if isinstance(value, ImageRenderable):
@@ -322,6 +315,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 | `{{ x["field"] }}` | Bracket access |
 | `{{ x._stuff_name }}` | Variable name metadata |
 | `{{ x._content_class }}` | Content class name |
+| `{{ x._concept_code }}` | Concept code |
+| `{{ x._stuff_code }}` | Stuff code |
 | `{{ x \| with_images }}` | Extract images as tokens |
 | `{{ x \| with_images \| tag }}` | Extract then wrap in tags |
 

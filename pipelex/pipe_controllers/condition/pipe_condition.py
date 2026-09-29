@@ -16,7 +16,7 @@ from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_requ
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
@@ -110,9 +110,9 @@ class PipeCondition(PipeController):
 
     @override
     def validate_inputs_static(self):
-        # Guard-lint (D7): a declared-optional input referenced unguarded in the expression
-        # would evaluate over an undefined variable when the value is absent.
-        lint_optional_input_guards(
+        # Template lints: no private names, and no declared-optional input referenced unguarded in
+        # the expression, which would evaluate over an undefined variable when the value is absent (D7).
+        lint_authored_template(
             pipe_code=self.code,
             domain_code=self.domain_code,
             inputs=self.inputs,

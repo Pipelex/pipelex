@@ -1,16 +1,59 @@
-"""Shared template guard-lint (optionals design D7), applied by every pipe that renders
-authored templates over its inputs (PipeLLM prompts, PipeCompose templates, PipeCondition
-expressions): each reference to a declared-optional (`?`) input must be guarded, otherwise
-validation fails with `OPTIONAL_INPUT_UNGUARDED` and the precise fix.
+"""Shared template lints, applied by every pipe that renders authored templates over its inputs
+(PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts,
+PipeCondition expressions):
+
+- the guard-lint (optionals design D7): each reference to a declared-optional (`?`) input must be
+  guarded, otherwise validation fails with `OPTIONAL_INPUT_UNGUARDED` and the precise fix;
+- the private-name lint: a template may not read a name starting with an underscore, other than the
+  metadata fields of an input, otherwise validation fails with `TEMPLATE_PRIVATE_NAME`. The template
+  sandbox refuses the same reads at render time; this lint turns the visible ones into a located error.
 """
 
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_optional_guards import detect_unguarded_optional_references
+from pipelex.tools.jinja2.jinja2_private_names import detect_private_name_references
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.validation_error_types import PipeValidationErrorType
+
+
+def lint_authored_template(
+    *,
+    pipe_code: str,
+    domain_code: str | None,
+    inputs: InputStuffSpecs,
+    template_source: str,
+    template_category: TemplateCategory,
+    template_label: str,
+) -> None:
+    """Run every template lint over one authored template of a pipe: private names, then optional guards.
+
+    Args:
+        pipe_code: The pipe being validated (for the error).
+        domain_code: The pipe's domain (for the error).
+        inputs: The pipe's declared inputs.
+        template_source: The authored template source.
+        template_category: The template's category (LLM_PROMPT, EXPRESSION, ...).
+        template_label: Which template this is, for the message.
+    """
+    lint_template_private_names(
+        pipe_code=pipe_code,
+        domain_code=domain_code,
+        template_source=template_source,
+        template_category=template_category,
+        template_label=template_label,
+    )
+    lint_optional_input_guards(
+        pipe_code=pipe_code,
+        domain_code=domain_code,
+        inputs=inputs,
+        template_source=template_source,
+        template_category=template_category,
+        template_label=template_label,
+    )
 
 
 def lint_optional_input_guards(
@@ -71,4 +114,54 @@ def lint_optional_input_guards(
         pipe_code=pipe_code,
         variable_names=[finding.variable_name],
         explanation=f"Unguarded reference '{finding.path}' to optional input '{finding.variable_name}' in the {template_label}.",
+    )
+
+
+def lint_template_private_names(
+    *,
+    pipe_code: str,
+    domain_code: str | None,
+    template_source: str,
+    template_category: TemplateCategory,
+    template_label: str,
+) -> None:
+    """Raise `TEMPLATE_PRIVATE_NAME` when the template reads a name starting with an underscore that
+    is not one of the metadata fields an input declares (`_stuff_name`, `_content_class`, ...).
+
+    The template is given in authored form, like the guard-lint's. Only names written in the
+    template are seen here; the template sandbox refuses the rest at render time.
+
+    Args:
+        pipe_code: The pipe being validated (for the error).
+        domain_code: The pipe's domain (for the error).
+        template_source: The authored template source.
+        template_category: The template's category (LLM_PROMPT, EXPRESSION, ...).
+        template_label: Which template this is, for the message ("prompt", "system_prompt",
+            "template", "expression", "construct field 'x'").
+    """
+    allowed_private_names = StuffArtefact.__template_surface__.private_names
+    try:
+        refused_names = detect_private_name_references(
+            template_category=template_category,
+            template_source=rewrite_template_sigils(template_source),
+            allowed_private_names=allowed_private_names,
+        )
+    except Jinja2DetectVariablesError:
+        # An unparseable template is not this lint's concern, for the reason the guard-lint gives.
+        return
+    if not refused_names:
+        return
+    refused_name = refused_names[0]
+    allowed_list = ", ".join(f"'{name}'" for name in sorted(allowed_private_names))
+    msg = (
+        f"In the {template_label} of pipe '{pipe_code}', the template reads '{refused_name}', a name starting with an underscore. "
+        f"Templates read the public fields of their inputs; the only underscore names they may read are an input's metadata fields: "
+        f"{allowed_list}."
+    )
+    raise PipeValidationError(
+        message=msg,
+        error_type=PipeValidationErrorType.TEMPLATE_PRIVATE_NAME,
+        domain_code=domain_code,
+        pipe_code=pipe_code,
+        explanation=f"The {template_label} reads the private name '{refused_name}'.",
     )
