@@ -1,5 +1,7 @@
 import pytest
 
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import refusal_report
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
@@ -53,3 +55,19 @@ class TestPipeDocGenLoadRefusals:
         report = await refusal_report(step_fields='format = "pdf"\ntemplate = "{% set buyer = invoice %}<h1>{{ buyer.custmer }}</h1>"')
         assert "custmer" in report
         assert "could not render its template" in report
+
+    @pytest.mark.parametrize(
+        "filename",
+        ["invoice-{{ reference }}", "invoice-$reference"],
+        ids=["jinja2", "sigil"],
+    )
+    async def test_a_filename_reading_an_optional_input_unguarded_is_refused(self, filename: str) -> None:
+        """The filename renders strictly, so an optional input it reads without a guard would fail every run that leaves it out."""
+        bundle = PipeDocGenTestData.bundle(step_fields=f'format = "pdf"\nfilename = "{filename}"').replace(
+            'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", reference = "Text?" }'
+        )
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[bundle])
+        report = str(exc_info.value.to_error_report().model_dump())
+        assert "reference" in report
+        assert "filename" in report

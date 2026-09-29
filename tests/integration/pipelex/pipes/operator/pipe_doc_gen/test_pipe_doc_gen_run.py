@@ -31,6 +31,20 @@ class TestPipeDocGenRun:
         stored = await load_bytes_from_any_uri(document.url, storage_provider=get_storage_provider())
         assert stored.startswith(b"%PDF-stub ")
 
+    @pytest.mark.usefixtures("stub_engines")
+    async def test_a_sigil_in_the_filename_prints_the_input(self) -> None:
+        """`$reference` in the filename prints a Text input's text, as it does in a template."""
+        bundle = PipeDocGenTestData.bundle(step_fields='format = "pdf"\nfilename = "invoice-$reference"').replace(
+            'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", reference = "Text" }'
+        )
+        result = await PipelexMTHDSProtocol().execute(
+            mthds_contents=[bundle],
+            inputs={**PipeDocGenTestData.INVOICE_INPUTS, "reference": "INV-7"},
+        )
+
+        document = result.pipe_output.main_stuff_as(content_type=DocumentContent)
+        assert document.filename == "invoice-INV-7.pdf"
+
     async def test_an_html_template_is_rendered_before_the_engine_prints_it(self, stub_engines: StubEngines) -> None:
         """Sigils and the `markdown` filter work in the template, and the engine gets the composed HTML."""
         template = "<h1>$invoice.number</h1><div>{{ invoice.notes | markdown }}</div>"

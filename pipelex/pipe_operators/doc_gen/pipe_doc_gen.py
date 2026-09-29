@@ -24,7 +24,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.pipe_machinery.template_guard_lint import lint_authored_template, lint_template_private_names
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateCheckError, PipeDocGenUndefinedValueError
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -95,7 +95,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
     @override
     def validate_inputs_static(self):
-        # The same template lints as PipeCompose: no private names, and every reference to a declared-optional input guarded.
+        # The same template lints as PipeCompose: no private names, and every reference to a declared-optional input
+        # guarded. The filename gets both too, since it renders as strictly as the template does.
         if self.template is not None:
             lint_authored_template(
                 pipe_code=self.code,
@@ -106,9 +107,10 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 template_label=f"template file '{self.template_file}'" if self.template_file is not None else "template",
             )
         if self.filename is not None:
-            lint_template_private_names(
+            lint_authored_template(
                 pipe_code=self.code,
                 domain_code=self.domain_code,
+                inputs=self.inputs,
                 template_source=self.filename,
                 template_category=TemplateCategory.BASIC,
                 template_label="filename",
@@ -191,7 +193,14 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         context = build_compose_context(memory=working_memory, runtime_params=pipe_run_params.params)
         rendered_filename = self.code
         if self.filename is not None:
-            rendered_filename = await self._render(template=self.filename, category=TemplateCategory.BASIC, context=context, label="filename")
+            # A `$name` sigil in the filename expands to the `format` filter, which prints under the render's templating style.
+            rendered_filename = await self._render(
+                template=self.filename,
+                category=TemplateCategory.BASIC,
+                context=context,
+                label="filename",
+                templating_style=resolve_templating_style(authored=None),
+            )
         filename = safe_filename(rendered=rendered_filename, fallback=self.code, suffix=self.doc_gen_format.suffix)
         named_contents = self._named_contents(working_memory)
         title = self._title(named_contents)
