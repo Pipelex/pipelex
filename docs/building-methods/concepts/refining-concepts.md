@@ -39,6 +39,7 @@ type = "PipeLLM"
 description = "Extract key terms from a contract"
 inputs = { contract = "Contract" }  # Clear what type of document is expected
 output = "ContractTerms"
+prompt = "Extract the key terms from this contract:\n@contract"
 ```
 
 ### 3. Domain-Specific Methods
