@@ -99,8 +99,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
                 raw_bytes, media_type = await fetch_file_and_content_type_from_url_httpx(download_url)
                 named_after = download_url
             case ResolvedPipelexStorage():
-                raw_bytes = await get_storage_provider().load(uri=resolved_uri.storage_uri)
-                media_type = None
+                raw_bytes, media_type = await get_storage_provider().load_with_metadata(uri=resolved_uri.storage_uri)
                 named_after = resolved_uri.storage_uri
             case ResolvedBase64DataUrl():
                 raw_bytes = base64.b64decode(resolved_uri.base64_data)
@@ -152,9 +151,10 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         Docling reads a file's format from its bytes first, which settles every binary format.
         A text format (HTML, Markdown, CSV) says nothing in its bytes, so Docling falls back on
         the extension, and refuses one it does not know. So the extension is one Docling knows:
-        the one the source's URL or storage key ends with, as Docling used when it fetched URLs
-        itself, else the one the declared media type implies. With neither, the file gets none,
-        and Docling recognizes HTML and CSV from the content and refuses anything else.
+        the one the source's URL or storage key ends with, else the one the declared media type
+        implies. With neither, the file gets none, and Docling recognizes HTML and CSV from the
+        content and refuses anything else. When Docling fetched URLs itself it also read a
+        `Content-Disposition` filename, which the fetch helper does not return.
         """
         docling_extensions = cls._docling_extensions()
         if named_after:

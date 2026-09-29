@@ -16,6 +16,7 @@ from pipelex.cogt.exceptions import ExtractJobFailureError
 from pipelex.providers.docling.docling_extract_worker import DoclingExtractWorker
 from pipelex.providers.docling.docling_sdk import DoclingSdk
 from pipelex.tools.network.exceptions import SsrfBlockedError
+from pipelex.tools.storage.storage_provider_abstract import StoredData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -125,6 +126,7 @@ class TestDoclingWorkerUrlFetch:
             ("https://example.com/stock.csv", "text/plain", CSV_BYTES, "bolt"),
             ("https://example.com/readme.md", "text/plain", MARKDOWN_BYTES, "markdown"),
             ("pipelex-storage://scope/assets/abc123.md", None, MARKDOWN_BYTES, "markdown"),
+            ("pipelex-storage://scope/assets/abc123", "text/markdown", MARKDOWN_BYTES, "markdown"),
             (_data_url(mime_type="text/csv", body=CSV_BYTES), None, CSV_BYTES, "bolt"),
             (_data_url(mime_type="text/markdown", body=MARKDOWN_BYTES), None, MARKDOWN_BYTES, "markdown"),
         ],
@@ -141,7 +143,7 @@ class TestDoclingWorkerUrlFetch:
         worker = _make_worker(mocker, docling_sdk=real_docling_sdk)
         mocker.patch(FETCH_TARGET, new_callable=mocker.AsyncMock, return_value=(body, media_type))
         storage_provider = mocker.MagicMock()
-        storage_provider.load = mocker.AsyncMock(return_value=body)
+        storage_provider.load_with_metadata = mocker.AsyncMock(return_value=StoredData(data=body, mime_type=media_type))
         mocker.patch(f"{WORKER_MODULE}.get_storage_provider", return_value=storage_provider)
 
         extract_output = await worker._extract_from_source(source_uri=source_uri)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
