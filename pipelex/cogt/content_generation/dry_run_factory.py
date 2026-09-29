@@ -137,11 +137,24 @@ class DryRunFactory:
         image inside a structure a dry model call returned. An https URL or a data URL is read by
         nobody's leave, so it is what a mock carries.
         """
-        if issubclass(object_class, ImageContent):
+        if cls._is_file_class(object_class=object_class, file_class=ImageContent):
             return {"url": Use(cls.generate_mock_image_url)}
-        if issubclass(object_class, DocumentContent):
+        if cls._is_file_class(object_class=object_class, file_class=DocumentContent):
             return {"url": Use(cls.generate_mock_document_url)}
         return {}
+
+    @classmethod
+    def _is_file_class(cls, *, object_class: type[BaseModel], file_class: type[BaseModel]) -> bool:
+        """Whether a class is the file class, a subclass of it, or a copy of it rebuilt from a JSON schema.
+
+        A worker that runs a dry model call out of process gets no class, only the output's JSON
+        schema, and rebuilds the classes from it: the nested file class it builds is no subclass of
+        the real one, but it keeps the real one's name, which the schema carries as the definition's
+        title, and its ``url`` field.
+        """
+        if issubclass(object_class, file_class):
+            return True
+        return object_class.__name__ == file_class.__name__ and "url" in object_class.model_fields
 
     @classmethod
     def _get_examples_from_field(cls, field_info: FieldInfo) -> list[Any] | None:

@@ -116,8 +116,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         is_mock_usage: bool = False,
         # A local run has exactly one user and no tenancy, so these say "local"
         # rather than being derived from each other or defaulted deep in the
-        # call stack. A multi-tenant host passes its own; it cannot reach these
-        # by omission, because `pipeline_run_setup` requires both explicitly.
+        # call stack. `pipeline_run_setup` requires both, but this protocol
+        # always forwards its own, so a multi-tenant host building it must pass
+        # its own identity here, and its read scope below.
         user_id: str = LOCAL_USER_ID,
         storage_scope: str = LOCAL_STORAGE_SCOPE,
         # Unscoped reads, which is the truth on a laptop: the run may read any

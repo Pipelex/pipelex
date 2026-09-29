@@ -9,7 +9,9 @@ import base64
 import pypdfium2
 from pydantic import BaseModel
 
+from pipelex.cogt.content_generation.dry_mock import build_mock_object
 from pipelex.cogt.content_generation.dry_run_factory import MOCK_DOCUMENT_DATA_URL, DryRunFactory
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -52,6 +54,19 @@ class TestDryRunFactoryFileUrls:
         assert all(attachment.url == MOCK_DOCUMENT_DATA_URL for attachment in dossier.attachments)
         for image in dossier.page.images or []:
             assert image.url in get_config().inference.dry_run.image_urls
+
+    def test_classes_rebuilt_from_a_json_schema_are_mocked_the_same_way(self) -> None:
+        # A worker running a dry model call out of process rebuilds the output class from its schema,
+        # and the nested file classes it builds are no subclasses of the real ones.
+        rebuilt_class = SchemaToModelFactory.make_from_json_schema(schema=Dossier.model_json_schema(), class_name="Dossier")
+        rebuilt_image_class = rebuilt_class.model_fields["cover"].annotation
+        assert isinstance(rebuilt_image_class, type)
+        assert not issubclass(rebuilt_image_class, ImageContent)
+
+        dossier = Dossier.model_validate(build_mock_object(rebuilt_class).model_dump(mode="json"))
+        assert dossier.cover.url in get_config().inference.dry_run.image_urls
+        assert all(attachment.url == MOCK_DOCUMENT_DATA_URL for attachment in dossier.attachments)
+        authorize_uri_read(uri=dossier.cover.url, read_scope="org_abc", position="a mocked image")
 
     def test_a_scoped_run_reads_every_mocked_file_url(self) -> None:
         image_content = DryRunFactory.make_dry_run_factory(ImageContent).build(factory_use_construct=True)
