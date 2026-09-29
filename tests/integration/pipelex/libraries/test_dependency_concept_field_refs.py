@@ -13,12 +13,12 @@ from pipelex.interpreter_hub import get_concept_library, get_library_manager, sc
 from tests.integration.pipelex.libraries.test_data import InstalledNotesPackageTestData
 
 
-def _write_consumer_and_its_dependency(*, root: Path) -> Path:
+def _write_consumer_and_its_dependency(*, root: Path, dep_bundle: str = InstalledNotesPackageTestData.DEP_BUNDLE) -> Path:
     """Install the notes package under `.mthds/methods/` beside the consumer's bundle, and return the consumer's bundle file."""
     dep_dir = root / ".mthds" / "methods" / InstalledNotesPackageTestData.METHOD_NAME
     dep_dir.mkdir(parents=True)
     (dep_dir / "METHODS.toml").write_text(InstalledNotesPackageTestData.DEP_MANIFEST, encoding="utf-8")
-    (dep_dir / "invented_notes.mthds").write_text(InstalledNotesPackageTestData.DEP_BUNDLE, encoding="utf-8")
+    (dep_dir / "invented_notes.mthds").write_text(dep_bundle, encoding="utf-8")
     consumer_bundle_file = root / "invented_consumer.mthds"
     consumer_bundle_file.write_text(InstalledNotesPackageTestData.CONSUMER_BUNDLE, encoding="utf-8")
     return consumer_bundle_file
@@ -51,6 +51,31 @@ class TestDependencyConceptFieldRefs:
 
         assert digest.model_dump()["note"] == {"title": "Invented note one"}
         assert note_search.model_dump()["notes"] == [{"title": "Invented note one"}]
+
+    def test_a_gap_in_the_dependency_s_own_dependencies_does_not_refuse_the_consumer(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The dependency's `Note` names a package the dependency's load never loads: the consumer's `Digest`, which holds
+        that `Note`, inherits the gap and is left for first use rather than refusing the consumer's load.
+        """
+        mocker.patch("pipelex.cli.installed_methods.GLOBAL_METHODS_DIR", tmp_path / "global-methods")
+        mocker.patch("pipelex.cli.installed_methods.PROJECT_METHODS_DIR", tmp_path / "project-methods")
+        mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=False)
+        consumer_bundle_file = _write_consumer_and_its_dependency(
+            root=tmp_path, dep_bundle=InstalledNotesPackageTestData.DEP_BUNDLE_NAMING_ITS_OWN_DEPENDENCY
+        )
+        library_manager = get_library_manager()
+        library_id, library = library_manager.open_library()
+        try:
+            library_manager.load_libraries(library_id=library_id, library_file_paths=[consumer_bundle_file])
+
+            with scoped_current_library(library_id=library_id):
+                concept_library = get_concept_library()
+                digest_class = concept_library.get_structure_class(concept=concept_library.get_required_concept("invented_consumer.Digest"))
+            pipe_codes = set(library.pipe_library.get_pipes_dict())
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert "invented_consumer.write_digest" in pipe_codes
+        assert not digest_class.__pydantic_complete__
 
     def test_a_crate_of_the_consumer_loads_without_its_dependency(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A worker loading the consumer's crate, which carries no dependency, loads it rather than refusing the field it cannot resolve."""

@@ -125,11 +125,12 @@ class TestDependencyStructureClasses:
         assert "notes" in schema["properties"]
 
     def test_concepts_forming_a_cycle_are_refused(self, tmp_path: Path) -> None:
-        """A dependency whose concepts form a cycle is refused with the message the main path gives."""
+        """A dependency whose concepts form a cycle is refused with the message the main path gives, naming the package's bundle."""
         library_manager = _get_library_manager()
         library_id, library = library_manager.open_library()
+        cycle_refusal = r"Cycle detected in concept references: .* \(declared in 'github\.com/invented/notes-lib/notes\.mthds'\)"
         try:
-            with scoped_current_library(library_id=library_id), pytest.raises(LibraryLoadingError, match=r"Cycle detected in concept references"):
+            with scoped_current_library(library_id=library_id), pytest.raises(LibraryLoadingError, match=cycle_refusal):
                 library_manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                     library=library,
                     resolved_dep=_make_resolved_dep(tmp_path=tmp_path, mthds_content=DEP_CYCLIC_NOTES_MTHDS),

@@ -274,6 +274,8 @@ Two things refuse the load rather than failing later, when the concept is first 
 - **A cycle between concepts**, such as `A` holding a `B` that holds an `A`, including a concept that holds itself.
 - **A field naming a concept that cannot be found**, because no bundle the concept can see declares it. A concept declared only by a bundle loaded afterwards cannot be found either.
 
+A method package's own dependencies are never loaded, so a concept in the package that names one of their concepts is not refused. It fails when first used, and so does any concept holding it.
+
 ## Choice Fields (Enums)
 
 For fields that should only accept specific values, use the `choices` property. When using `choices`, you don't need to specify a `type`.

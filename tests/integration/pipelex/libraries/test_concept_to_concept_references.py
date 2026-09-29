@@ -497,7 +497,11 @@ notes = { type = "list", item_type = "concept", item_concept_ref = "invented_not
             assert note_search.model_dump()["notes"] == [{"title": "Invented note one"}]
 
     def test_reference_to_a_concept_no_bundle_declares_is_refused(self, load_empty_library: Callable[[], str]):
-        """A field naming a concept that no loaded bundle declares refuses the load, naming the concept and the missing class."""
+        """A field naming a concept that no loaded bundle declares refuses the load, naming the concept and the missing class.
+
+        `NoteDigest` only holds `NoteSearch`, whose class cannot be built, so the refusal names `NoteSearch` alone, and
+        `NoteSearch`'s optional field naming `Query`, which is declared, is not named either.
+        """
         mthds_content = """
 domain = "invented_search"
 description = "A concept holding notes from a domain nothing declares"
@@ -507,6 +511,19 @@ description = "The notes a search found"
 
 [concept.NoteSearch.structure]
 notes = { type = "list", item_type = "concept", item_concept_ref = "invented_elsewhere.Note", description = "The notes found", required = true }
+query = { type = "concept", concept_ref = "invented_search.Query", description = "The query searched for" }
+
+[concept.Query]
+description = "A search query"
+
+[concept.Query.structure]
+text = { type = "text", description = "The query's text", required = true }
+
+[concept.NoteDigest]
+description = "A digest of a search"
+
+[concept.NoteDigest.structure]
+search = { type = "concept", concept_ref = "invented_search.NoteSearch", description = "The search digested" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -521,3 +538,5 @@ notes = { type = "list", item_type = "concept", item_concept_ref = "invented_els
             message = str(exc_info.value)
             assert "invented_search.NoteSearch" in message
             assert "invented_elsewhere__Note" in message
+            assert "invented_search.NoteDigest" not in message
+            assert "invented_search__Query" not in message

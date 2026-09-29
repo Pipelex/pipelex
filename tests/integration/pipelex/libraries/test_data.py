@@ -41,8 +41,34 @@ output      = "NoteSearch"
 prompt      = "Find the notes about $query."
 """
 
-    #: The consumer's `Digest` has a field typed by the dependency's `Note`. Its sequence steps into the dependency's
-    #: pipe, which is what makes the loader discover the package: a concept ref alone does not (L-260929-9c8eac).
+    #: The same package, whose `Note` also names a concept of the package's own dependency, which is never loaded.
+    DEP_BUNDLE_NAMING_ITS_OWN_DEPENDENCY: ClassVar[str] = """domain      = "invented_notes"
+description = "An invented notes library that depends on another package"
+
+[concept.Note]
+description = "One invented note, citing a source from another package"
+
+[concept.Note.structure]
+title  = { type = "text", description = "The note's title", required = true }
+source = { type = "concept", concept_ref = "github.com/invented/sources-lib/sources->invented_sources.Source", description = "Where it came from" }
+
+[concept.NoteSearch]
+description = "The notes a search found"
+
+[concept.NoteSearch.structure]
+notes = { type = "list", item_type = "concept", item_concept_ref = "invented_notes.Note", description = "The notes found", required = true }
+
+[pipe.find_notes]
+type        = "PipeLLM"
+description = "Find the notes about a query"
+inputs      = { query = "Text" }
+output      = "NoteSearch"
+prompt      = "Find the notes about $query."
+"""
+
+    #: The consumer's `Digest` has a field typed by the dependency's `Note`, and a field with choices, whose strings name
+    #: no class. Its sequence steps into the dependency's pipe, which is what makes the loader discover the package: a
+    #: concept ref alone does not (L-260929-9c8eac).
     CONSUMER_BUNDLE: ClassVar[str] = """domain      = "invented_consumer"
 description = "A consumer of the invented notes library"
 
@@ -52,6 +78,7 @@ description = "A digest built around one note"
 [concept.Digest.structure]
 note    = { type = "concept", concept_ref = "github.com/invented/notes-lib/notes->invented_notes.Note", description = "The note", required = true }
 summary = { type = "text", description = "What the note says", required = true }
+tone    = { choices = ["brief", "detailed"], description = "How long the digest runs" }
 
 [pipe.digest_notes]
 type        = "PipeSequence"

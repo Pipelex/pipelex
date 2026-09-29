@@ -3,7 +3,7 @@ from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ForwardRef, Literal, get_args, get_origin
 
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
@@ -11,7 +11,7 @@ from mthds.package.dependency_resolver import ResolvedDependency, determine_expo
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
-from pydantic import BaseModel, PydanticUndefinedAnnotation, PydanticUserError, ValidationError
+from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
@@ -128,6 +128,23 @@ def _dependency_entries_first(*, concepts_by_key: "Mapping[str, Concept]") -> li
     dependency_entries = [concept for key, concept in concepts_by_key.items() if QualifiedRef.has_cross_package_prefix(key)]
     own_entries = [concept for key, concept in concepts_by_key.items() if not QualifiedRef.has_cross_package_prefix(key)]
     return [*dependency_entries, *own_entries]
+
+
+def _forward_refs_missing_from(*, annotation: object, namespace: "Mapping[str, type]") -> list[str]:
+    """The structure class names an annotation holds as forward references that the namespace lacks.
+
+    The generator spells a field typed by a concept as a quoted name, `"domain__Code"`, or `"domain__Code | None"` for
+    an optional one, alone or inside a `list[...]` or a `dict[...]`. A rebuild that fails leaves those names as they
+    were written, a `ForwardRef` or a plain string, so a name is missing when the namespace has no entry for it.
+    """
+    if isinstance(annotation, ForwardRef):
+        annotation = annotation.__forward_arg__
+    if isinstance(annotation, str):
+        names = [name.strip() for name in annotation.split("|")]
+        return [name for name in names if name != "None" and name not in namespace]
+    if get_origin(annotation) is Literal:
+        return []
+    return [name for arg in get_args(annotation) for name in _forward_refs_missing_from(annotation=arg, namespace=namespace)]
 
 
 def _authored_model_field(*, step_role: StepRole) -> str:
@@ -1483,7 +1500,7 @@ class LibraryManager(LibraryManagerAbstract):
             concept_sources=concept_sources,
             refuses_unresolved_structures=refuses_unresolved_structures,
         )
-        self._detect_concept_cycles(loaded_concepts)
+        self._detect_concept_cycles(loaded_concepts, concept_sources=concept_sources)
 
     def _rebuild_structure_classes(
         self,
@@ -1507,11 +1524,15 @@ class LibraryManager(LibraryManagerAbstract):
         dependencies. A dependency concept and a main-package concept with the same `domain.Code` share that key, and
         the main package's class is the one a reference resolves to. That clash is L-260929-0584cc's.
 
-        A generated class still incomplete after its rebuild refuses the load, when the caller asks for it, instead of
-        loading and failing at first use. Only generated classes are checked, and a generated class is recognised by
-        its name: the concept factory names every class it generates `make_qualified_structure_class_name(domain,
-        code)`, while a class registered from Python for a concept keeps its own name. Such a class, like a native one,
-        is left to its own module's resolution: its rebuild failing is only logged, as before.
+        A generated class whose own fields name a class the namespace lacks refuses the load, when the caller asks for
+        it, instead of loading and failing at first use. A class whose own fields all resolve can still be incomplete,
+        because pydantic builds a held class that is incomplete inline, and the held class is the one to blame: the
+        load of a dependency's class or of a Python class chose not to refuse it, so the holder is left for first use
+        too, and a generated class of this batch is refused on its own. Only generated classes are checked, and a
+        generated class is recognised by its name: the concept factory names every class it generates
+        `make_qualified_structure_class_name(domain, code)`, while a class registered from Python for a concept keeps
+        its own name. Such a class, like a native one, is left to its own module's resolution: its rebuild failing is
+        only logged, as before.
         """
         class_registry = get_class_registry()
         namespace: dict[str, type] = {}
@@ -1538,20 +1559,26 @@ class LibraryManager(LibraryManagerAbstract):
             is_generated = concept.structure_class_name == make_qualified_structure_class_name(
                 domain_code=concept.domain_code, concept_code=concept.code
             )
-            if not (is_generated and refuses_unresolved_structures):
+            missing_names = sorted(
+                {
+                    name
+                    for field_info in structure_class.model_fields.values()
+                    for name in _forward_refs_missing_from(annotation=field_info.annotation, namespace=namespace)
+                }
+            )
+            if not (is_generated and refuses_unresolved_structures and missing_names):
                 log.debug(f"The structure class of {concept.concept_ref} stays incomplete, and will fail at first use: {rebuild_error}")
                 continue
             source = concept_sources.get(concept.concept_ref)
             where = f" (declared in '{source}')" if source else ""
-            if isinstance(rebuild_error, PydanticUndefinedAnnotation):
-                reason = (
-                    f"it needs the structure class '{rebuild_error.name}', directly or through a concept it holds, and no concept it can see has it."
-                )
-            elif rebuild_error is not None:
-                reason = f"{rebuild_error}."
-            else:
-                reason = "a structure class it needs, directly or through a concept it holds, belongs to no concept it can see."
-            refusals.append(f"Concept '{concept.concept_ref}'{where} cannot be built: {reason}")
+            quoted_names = ", ".join(f"'{name}'" for name in missing_names)
+            refusals.append(
+                f"Concept '{concept.concept_ref}'{where} cannot be built: its structure names the class {quoted_names}, "
+                "and no concept it can see has it."
+                if len(missing_names) == 1
+                else f"Concept '{concept.concept_ref}'{where} cannot be built: its structure names the classes {quoted_names}, "
+                "and no concept it can see has them."
+            )
 
         if refusals:
             refusals.append(
@@ -1560,7 +1587,7 @@ class LibraryManager(LibraryManagerAbstract):
             )
             raise LibraryLoadingError(" ".join(refusals))
 
-    def _detect_concept_cycles(self, concepts: list["Concept"]) -> None:
+    def _detect_concept_cycles(self, concepts: list["Concept"], *, concept_sources: "Mapping[str, str]") -> None:
         """Detect cycles in concept references and raise an error if found.
 
         Cycles like A -> B -> A are forbidden because they create infinite recursion
@@ -1569,6 +1596,8 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             concepts: List of concepts to check for cycles
+            concept_sources: concept_ref -> the bundle that declared it, which the refusal names, since a method
+                package's refs carry no address and would not say which package the cycle is in
         """
         # TODO: Refactor to inspect ConceptStructureBlueprint directly (concept_ref and item_concept_ref fields)
         # instead of the generated Python types. This would be more direct and wouldn't depend on how types
@@ -1632,7 +1661,9 @@ class LibraryManager(LibraryManagerAbstract):
                 cycle_start = path.index(concept_ref)
                 cycle = [*path[cycle_start:], concept_ref]
                 cycle_str = " -> ".join(cycle)
-                msg = f"Cycle detected in concept references: {cycle_str}"
+                source = concept_sources.get(concept_ref)
+                where = f" (declared in '{source}')" if source else ""
+                msg = f"Cycle detected in concept references: {cycle_str}{where}"
                 raise LibraryLoadingError(msg)
 
             # Find the concept by ref
