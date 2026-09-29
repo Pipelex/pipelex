@@ -119,6 +119,7 @@ class TestConceptProviderInjection:
             {"note": "shaped through the provider"},
             concept_provider=stub,
             input_specs=InputStuffSpecs(root={"note": StuffSpec(concept=note_concept)}),
+            read_scope=None,
         )
 
         stuff = memory.get_stuff(name="note")

@@ -52,7 +52,7 @@ from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
-from pipelex.system.storage_scope import validate_storage_scope
+from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
@@ -197,6 +197,7 @@ async def prepare_pipe_job(
     pipeline_run_id: str,
     user_id: str,
     storage_scope: str,
+    read_scope: str | None,
     extras: dict[str, str] | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     search_scope: str | None = None,
@@ -226,6 +227,11 @@ async def prepare_pipe_job(
     submitter exercises the real distribution machinery at zero spend. The flag is resolved by
     ``PipeRunParamsFactory.make_run_params`` (the single writer of ``run_mode``), so it covers
     every entry point that builds run params, not just this one.
+
+    ``read_scope`` bounds what the run may read (see :mod:`pipelex.tools.uri.uri_read_scope`). It is
+    required, ``None`` for an unscoped run, and it rides the job metadata to every leaf. Here it also
+    gates the two reads the input seam makes itself: a CSV input read while shaping, and a local file
+    uploaded by the normalization, which on a scoped run is refused instead, naming the input.
     """
     # Validate the scope HERE, before anything composes a storage key from it.
     #
@@ -238,6 +244,13 @@ async def prepare_pipe_job(
     #
     # This is deliberately not a "second gate": it is the FIRST one on this path.
     storage_scope = validate_storage_scope(value=storage_scope)
+
+    # The read scope too, and its relation to the storage scope, for the same
+    # reason: the shaping and the normalization below read on its authority,
+    # and `RunMetadata` is only built after them.
+    if read_scope is not None:
+        read_scope = validate_read_scope(value=read_scope)
+    validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
 
     # And the extras beside it, for the same reason: `RunMetadata` is built at
     # the bottom of this function, below the data-url normalization that writes
@@ -264,6 +277,7 @@ async def prepare_pipe_job(
                 input_specs=pipe.inputs,
                 search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
+                read_scope=read_scope,
             )
 
     # If mock inputs is enabled, generate mock data for missing required inputs.
@@ -317,12 +331,13 @@ async def prepare_pipe_job(
 
     # Normalize data URLs to pipelex-storage:// URIs, and give every image and document input a public_url, if configured.
     if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
-        working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope)
+        working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope, read_scope=read_scope)
 
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(
             user_id=user_id,
             storage_scope=storage_scope,
+            read_scope=read_scope,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
             # Already normalized to a mapping and validated at the top of this

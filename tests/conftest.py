@@ -198,4 +198,4 @@ def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     random_code: str = shortuuid.uuid()[:5]
     pipeline_run_id: str = f"{test_id}-{random_code}"
 
-    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="pytest", pipeline_run_id=pipeline_run_id))
+    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="pytest", pipeline_run_id=pipeline_run_id))

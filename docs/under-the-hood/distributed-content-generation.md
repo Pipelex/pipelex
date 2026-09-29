@@ -169,6 +169,14 @@ What gets stored vs. what crosses the boundary, by content type:
 
 Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
 
+### What a leaf may read: the read scope
+
+A reference is only as safe as whoever reads it. A value can carry any URL its method chose — a `PipeCompose` construct that assembles one from plain text, a model's structured output, a function's result — and the next leaf reads it: a `pipelex-storage://` key with the process's own storage credentials, or a bare path or `file://` URI from the worker's disk. On a host serving many tenants that is a read of another tenant's file, so `RunMetadata` carries a second host-supplied prefix beside `storage_scope`: the **read scope**.
+
+On a run whose read scope is set, a storage key is read only when it lies under the read scope, compared segment by segment, with no empty, `.` or `..` segment; a local path is never read; `https://` and `data:` URLs are untouched. The storage scope must lie under the read scope, since a run reads its own outputs back, and a mismatch is refused when the metadata is built. A run whose read scope is `None` (a laptop, a single-tenant server) reads exactly as before.
+
+The check runs in the leaves, because both orchestration modes call the same leaves and every read of a value's URL happens while one of them handles an assignment. Each assignment declares the URLs it will read through `referenced_uris()` — the prompt's images and documents given by URI, an image generation's input images, the image or document to extract, the document to render as page views — and the leaf authorizes them as its first statement, before the dry-run branch and before any worker is built. A dry run therefore refuses the same method a live run would, and the check performs no IO. The input seam applies the same rule to what it reads itself: a table given as a CSV input, and a file the normalization would upload or link. A refused read raises `UriReadRefusedError`, a caller-facing input error answered as a 422, which names where the URL sat and never quotes it. A unit test walks every assignment model's fields for URL-shaped ones, so a new assignment or a new field that carries a URL fails until its `referenced_uris()` declares it.
+
 ---
 
 ## Kajson class resolution

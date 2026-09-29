@@ -24,6 +24,7 @@ from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_c
 from pipelex.tools.tabular.exceptions import CsvError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
+from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
@@ -143,9 +144,10 @@ class StuffFactory:
         content: dict[str, Any],
         name: str | None,
         code: str | None,
+        read_scope: str | None,
     ) -> Stuff | None:
         """Wrap :meth:`try_make_csv_list_content` into a ``Stuff`` (Case 2.5 envelope path)."""
-        list_content = cls.try_make_csv_list_content(concept, concept_provider=concept_provider, content=content, name=name)
+        list_content = cls.try_make_csv_list_content(concept, concept_provider=concept_provider, content=content, name=name, read_scope=read_scope)
         if list_content is None:
             return None
         return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
@@ -158,6 +160,7 @@ class StuffFactory:
         concept_provider: ConceptProviderAbstract,
         content: dict[str, Any],
         name: str | None,
+        read_scope: str | None,
     ) -> ListContent[StuffContent] | None:
         """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` input reference.
 
@@ -177,6 +180,9 @@ class StuffFactory:
 
         v1 reads LOCAL paths only: a tabular-suffixed remote ``url`` (``http(s)``/``s3``/``gs``/
         ``pipelex-storage``) is rejected with a clear ``CsvError`` rather than opened as a local path.
+        And a local path is read only when ``read_scope`` allows it: a run with a read scope reads
+        nothing from the local disk (see :mod:`pipelex.tools.uri.uri_read_scope`), so there a table
+        input is refused before it is opened.
         (A base64 data URL carries no file suffix, so it is never detected as tabular and simply
         falls through to ordinary record handling.)
         """
@@ -242,6 +248,11 @@ class StuffFactory:
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
             raise CsvError(msg) from exc
+        authorize_uri_read(
+            uri=url,
+            read_scope=read_scope,
+            position=f"the table given for input '{name}'" if name is not None else "a table given as an input",
+        )
         return list_content_from_csv(Path(resolved.path), row_model=row_model)
 
     @classmethod
@@ -273,8 +284,12 @@ class StuffFactory:
         name: str | None = None,
         code: str | None = None,
         search_scope: str | None = None,
+        read_scope: str | None,
     ) -> Stuff:
         """Create a Stuff from StuffContentOrData covering all pipeline inputs cases.
+
+        ``read_scope`` is the run's read scope, which a table read from a ``{"url": "...csv"}``
+        content (Case 2.5) must satisfy; ``None`` for an unscoped run.
 
         Case 1: Direct content (no 'concept' key)
             1.1: str → TextContent with Text concept
@@ -598,7 +613,9 @@ class StuffFactory:
         if isinstance(content, dict):
             content_dict = cast("dict[str, Any]", content)
             # CSV input: a {"url": "...csv"} under a structured row concept loads as ListContent[row-concept].
-            csv_stuff = cls._try_make_csv_list_stuff(concept=concept, concept_provider=concept_provider, content=content_dict, name=name, code=code)
+            csv_stuff = cls._try_make_csv_list_stuff(
+                concept=concept, concept_provider=concept_provider, content=content_dict, name=name, code=code, read_scope=read_scope
+            )
             if csv_stuff is not None:
                 return csv_stuff
 

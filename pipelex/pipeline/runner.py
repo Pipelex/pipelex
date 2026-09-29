@@ -120,6 +120,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # by omission, because `pipeline_run_setup` requires both explicitly.
         user_id: str = LOCAL_USER_ID,
         storage_scope: str = LOCAL_STORAGE_SCOPE,
+        # Unscoped reads, which is the truth on a laptop: the run may read any
+        # stored key and any local file. A host that serves more than one tenant
+        # passes its own prefix, beside its own storage scope.
+        read_scope: str | None = None,
         # Opaque labels the host attaches to every run this protocol starts.
         # No local default: a laptop belongs to no organization, and inventing
         # a label here would put every such run into one shared entity.
@@ -140,6 +144,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.is_mock_usage = is_mock_usage
         self.user_id = user_id
         self.storage_scope = storage_scope
+        self.read_scope = read_scope
         self.extras = extras
         self.execution_config = execution_config
         self._pipe_run = pipe_run
@@ -265,6 +270,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 is_mock_usage=self.is_mock_usage,
                 user_id=self.user_id,
                 storage_scope=self.storage_scope,
+                read_scope=self.read_scope,
                 extras=self.extras,
                 inputs_base_dir=self.inputs_base_dir,
                 library_dirs_are_callers=self.library_dirs_are_callers,

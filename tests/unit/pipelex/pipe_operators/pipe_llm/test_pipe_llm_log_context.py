@@ -90,7 +90,9 @@ class TestPipeLLMLogContext:
         spy = KernelCallSpy()
         mocker.patch("pipelex.pipe_operators.llm.pipe_llm.run_llm_text", new=spy)
         job_metadata = JobMetadata(
-            run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", pipeline_run_id=PIPELINE_RUN_ID, request_id=REQUEST_ID),
+            run_metadata=RunMetadata(
+                user_id="pytest", storage_scope="test/scope", read_scope=None, pipeline_run_id=PIPELINE_RUN_ID, request_id=REQUEST_ID
+            ),
         )
         expected = LogContext(request_id=REQUEST_ID, pipeline_run_id=PIPELINE_RUN_ID, pipe_run_id=MINTED_PIPE_RUN_ID)
 

@@ -171,6 +171,8 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str, caller
                 # prefix for every run. If `dry-run-no-storage` ever appears as
                 # an S3 prefix, a dry run stored something and that is the bug.
                 storage_scope=DRY_RUN_STORAGE_SCOPE,
+                # A dry run on mock inputs reads nothing a caller named, so it is unscoped.
+                read_scope=None,
                 trace_context=trace_context,
             )
             # PipeRun.run's finally closes the tracer by pipeline_run_id and assembles the

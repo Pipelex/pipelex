@@ -74,6 +74,7 @@ class TestKeylessBootForcedDry:
             )
             pipe_job = await prepare_pipe_job(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 pipe=pipe,
                 library_id=library_id,
@@ -97,7 +98,7 @@ class TestKeylessBootForcedDry:
             self._boot_keyless()
             assert is_dry_run_forced()
 
-            kernel = PipelexKernel.make(storage_scope="test/scope", user_id="test-user")
+            kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, user_id="test-user")
 
             assert kernel.cogt_run_params.run_mode.is_dry
         finally:
@@ -115,7 +116,7 @@ class TestKeylessBootForcedDry:
             assert is_dry_run_forced()
 
             with pytest.raises(ValueError, match="is_mock_usage"):
-                PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
+                PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
         finally:
             Pipelex.teardown_if_needed()
 

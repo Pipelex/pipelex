@@ -52,6 +52,7 @@ own page. Classes are grouped by subsystem.
 - [`StorageS3Error`](storage-s3-error.md) — S3 storage error
 - [`TomlError`](toml-error.md) — TOML parse error
 - [`UnknownVarPrefixError`](unknown-var-prefix-error.md) — Unknown var prefix
+- [`UriReadRefusedError`](uri-read-refused-error.md) — Read outside the run's scope refused
 - [`VarFallbackPatternError`](var-fallback-pattern-error.md) — Var fallback pattern
 - [`VarNotFoundError`](var-not-found-error.md) — Var not found
 

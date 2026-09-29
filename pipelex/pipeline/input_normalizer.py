@@ -26,13 +26,14 @@ from pipelex.tools.misc.http_utils import validate_http_url_syntax
 from pipelex.tools.storage.exceptions import StorageInvalidUriError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedPipelexStorage
+from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 # Type alias for content types that can have their URLs normalized
 NormalizableContent = ImageContent | DocumentContent
 
 
-async def normalize_data_urls_to_storage(working_memory: WorkingMemory, *, storage_scope: str) -> WorkingMemory:
+async def normalize_data_urls_to_storage(working_memory: WorkingMemory, *, storage_scope: str, read_scope: str | None) -> WorkingMemory:
     """Convert data URLs and local files in ImageContent and DocumentContent to pipelex-storage:// URIs, and fill their public_url.
 
     Scans all stuffs in working memory and for any ImageContent or DocumentContent with
@@ -55,15 +56,27 @@ async def normalize_data_urls_to_storage(working_memory: WorkingMemory, *, stora
             under `{storage_scope}/assets/`, inside the run's own namespace —
             they used to go to a flat top-level `normalized/` prefix shared by
             every run of every tenant.
+        read_scope: The run's read scope. On a scoped run every url is authorized
+            before it is read or linked: a local path is refused instead of
+            being uploaded or kept for a later reader, and a storage reference
+            outside the scope is refused instead of being signed, since a signed
+            link is a read. The refusal names the input. ``None`` for an unscoped
+            run. See :mod:`pipelex.tools.uri.uri_read_scope`.
 
     Returns:
         The same WorkingMemory instance with normalized URLs.
+
+    Raises:
+        UriReadRefusedError: an input's url is a local path, or a storage reference outside the
+            read scope, on a run with a read scope.
     """
     storage = get_storage_provider()
 
-    for stuff in working_memory.root.values():
+    for input_name, stuff in working_memory.root.items():
         content = stuff.content
-        normalized_content, changed = await _normalize_value(value=content, storage=storage, storage_scope=storage_scope)
+        normalized_content, changed = await _normalize_value(
+            value=content, storage=storage, storage_scope=storage_scope, read_scope=read_scope, input_name=input_name
+        )
         if changed:
             stuff.content = normalized_content
 
@@ -75,6 +88,8 @@ async def _normalize_value(
     *,
     storage: StorageProviderAbstract,
     storage_scope: str,
+    read_scope: str | None,
+    input_name: str,
 ) -> tuple[Any, bool]:
     """Recursively normalize a value, converting data URLs in ImageContent/DocumentContent to storage URIs.
 
@@ -83,26 +98,44 @@ async def _normalize_value(
         storage: The storage provider to use.
         storage_scope: The run's opaque storage prefix; normalized bytes land
             under `{storage_scope}/assets/`.
+        read_scope: The run's read scope, which every url must satisfy before it is read or linked.
+        input_name: The input the value belongs to, named in a refusal.
 
     Returns:
         A tuple of (normalized_value, has_changed).
     """
     # Handle ImageContent and DocumentContent
     if isinstance(value, (ImageContent, DocumentContent)):
-        normalized = await _normalize_url_content(content=value, storage=storage, storage_scope=storage_scope)
+        normalized = await _normalize_url_content(
+            content=value, storage=storage, storage_scope=storage_scope, read_scope=read_scope, input_name=input_name
+        )
         return normalized, normalized is not value
 
     # Handle StructuredContent (recursively process all fields)
     if isinstance(value, StructuredContent):
-        return await _normalize_structured_content(structured_content=value, storage=storage, storage_scope=storage_scope)
+        return await _normalize_structured_content(
+            structured_content=value, storage=storage, storage_scope=storage_scope, read_scope=read_scope, input_name=input_name
+        )
 
     # Handle ListContent
     if isinstance(value, ListContent):
-        return await _normalize_list_content(list_content=value, storage=storage, storage_scope=storage_scope)  # pyright: ignore[reportUnknownArgumentType]
+        return await _normalize_list_content(
+            list_content=value,  # pyright: ignore[reportUnknownArgumentType]
+            storage=storage,
+            storage_scope=storage_scope,
+            read_scope=read_scope,
+            input_name=input_name,
+        )
 
     # Handle plain lists (might contain ImageContent, DocumentContent, or StructuredContent)
     if isinstance(value, list):
-        return await _normalize_list(items=value, storage=storage, storage_scope=storage_scope)  # pyright: ignore[reportUnknownArgumentType]
+        return await _normalize_list(
+            items=value,  # pyright: ignore[reportUnknownArgumentType]
+            storage=storage,
+            storage_scope=storage_scope,
+            read_scope=read_scope,
+            input_name=input_name,
+        )
 
     # Other types don't need normalization
     return value, False
@@ -113,6 +146,8 @@ async def _normalize_structured_content(
     *,
     storage: StorageProviderAbstract,
     storage_scope: str,
+    read_scope: str | None,
+    input_name: str,
 ) -> tuple[StructuredContent, bool]:
     """Normalize a StructuredContent by recursively processing all its fields.
 
@@ -121,6 +156,8 @@ async def _normalize_structured_content(
         storage: The storage provider to use.
         storage_scope: The run's opaque storage prefix; normalized bytes land
             under `{storage_scope}/assets/`.
+        read_scope: The run's read scope, which every url must satisfy before it is read or linked.
+        input_name: The input the value belongs to, named in a refusal.
 
     Returns:
         A tuple of (normalized_content, has_changed).
@@ -129,7 +166,9 @@ async def _normalize_structured_content(
     has_changes = False
 
     for field_name, field_value in structured_content:
-        normalized_value, changed = await _normalize_value(value=field_value, storage=storage, storage_scope=storage_scope)
+        normalized_value, changed = await _normalize_value(
+            value=field_value, storage=storage, storage_scope=storage_scope, read_scope=read_scope, input_name=input_name
+        )
         if changed:
             updates[field_name] = normalized_value
             has_changes = True
@@ -147,6 +186,8 @@ async def _normalize_list_content(
     *,
     storage: StorageProviderAbstract,
     storage_scope: str,
+    read_scope: str | None,
+    input_name: str,
 ) -> tuple[ListContent[Any], bool]:
     """Normalize a ListContent by processing all its items.
 
@@ -155,6 +196,8 @@ async def _normalize_list_content(
         storage: The storage provider to use.
         storage_scope: The run's opaque storage prefix; normalized bytes land
             under `{storage_scope}/assets/`.
+        read_scope: The run's read scope, which every url must satisfy before it is read or linked.
+        input_name: The input the value belongs to, named in a refusal.
 
     Returns:
         A tuple of (normalized_list_content, has_changed).
@@ -163,7 +206,9 @@ async def _normalize_list_content(
     if not raw_items:
         return list_content, False
 
-    normalized_items, has_changes = await _normalize_list(items=raw_items, storage=storage, storage_scope=storage_scope)  # pyright: ignore[reportUnknownArgumentType]
+    normalized_items, has_changes = await _normalize_list(
+        items=raw_items, storage=storage, storage_scope=storage_scope, read_scope=read_scope, input_name=input_name
+    )  # pyright: ignore[reportUnknownArgumentType]
 
     if not has_changes:
         return list_content, False
@@ -184,6 +229,8 @@ async def _normalize_list(
     *,
     storage: StorageProviderAbstract,
     storage_scope: str,
+    read_scope: str | None,
+    input_name: str,
 ) -> tuple[list[Any], bool]:
     """Normalize a list by processing all its items.
 
@@ -192,6 +239,8 @@ async def _normalize_list(
         storage: The storage provider to use.
         storage_scope: The run's opaque storage prefix; normalized bytes land
             under `{storage_scope}/assets/`.
+        read_scope: The run's read scope, which every url must satisfy before it is read or linked.
+        input_name: The input the value belongs to, named in a refusal.
 
     Returns:
         A tuple of (normalized_items, has_changed).
@@ -200,7 +249,9 @@ async def _normalize_list(
     has_changes = False
 
     for item in items:
-        normalized_item, changed = await _normalize_value(value=item, storage=storage, storage_scope=storage_scope)
+        normalized_item, changed = await _normalize_value(
+            value=item, storage=storage, storage_scope=storage_scope, read_scope=read_scope, input_name=input_name
+        )
         normalized_items.append(normalized_item)
         if changed:
             has_changes = True
@@ -213,6 +264,8 @@ async def _normalize_url_content(
     *,
     storage: StorageProviderAbstract,
     storage_scope: str,
+    read_scope: str | None,
+    input_name: str,
 ) -> NormalizableContent:
     """Normalize ImageContent or DocumentContent to a storage reference and give it a public_url.
 
@@ -229,6 +282,8 @@ async def _normalize_url_content(
         storage: The storage provider to use.
         storage_scope: The run's opaque storage prefix; normalized bytes land
             under `{storage_scope}/assets/`.
+        read_scope: The run's read scope, which every url must satisfy before it is read or linked.
+        input_name: The input the value belongs to, named in a refusal.
 
     Returns:
         The original content if no normalization needed, or a new instance
@@ -239,10 +294,18 @@ async def _normalize_url_content(
         PipelineInputUrlInvalidError: If an http(s) url does not parse as one.
         PipelineInputContentError: If a local path cannot be read, or the storage
             provider refuses a pipelex-storage:// reference as a key.
+        UriReadRefusedError: If the url is a local path, or a storage reference outside
+            the read scope, on a run with a read scope.
     """
     if not content.url.strip():
         msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
         raise PipelineInputUrlMissingError(msg)
+
+    # Before anything reads or links the url. A signed link is a read by whoever holds it, so a
+    # foreign storage reference is refused here rather than signed; a local path is refused rather
+    # than uploaded, or kept for the prompt preparation to read later, which is what happens to it
+    # when local uploads are off.
+    authorize_uri_read(uri=content.url, read_scope=read_scope, position=f"the file given for input '{input_name}'")
 
     resolved_uri = resolve_uri(content.url)
 

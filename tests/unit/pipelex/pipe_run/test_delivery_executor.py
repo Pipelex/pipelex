@@ -353,7 +353,9 @@ class TestDeliveryExecutor:
         mock_output.tokens_usages = [
             LLMTokensUsage(
                 model_type="llm",
-                job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="plr-usage")),
+                job_metadata=JobMetadata(
+                    run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="test-user", pipeline_run_id="plr-usage")
+                ),
                 inference_model_name="test-model",
                 inference_model_id="test-model-id",
                 nb_tokens_by_category={TokenCategory.INPUT: 15, TokenCategory.OUTPUT: 4},

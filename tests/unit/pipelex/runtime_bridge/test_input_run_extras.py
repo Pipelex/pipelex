@@ -21,6 +21,7 @@ from pipelex.system.run_extras import RUN_EXTRAS_MAX_ENTRIES
 def _payload(extras: dict[str, str]) -> PipelexPipeRunInput:
     return PipelexPipeRunInput(
         storage_scope="org_a/mt_b/run_c",
+        read_scope=None,
         user_id="test-user",
         pipe_code="some_pipe",
         extras=extras,
@@ -34,7 +35,7 @@ class TestTheWireRefusesMalformedRunExtras:
         `user_id` and `storage_scope` are required here because a missing one
         used to be invented; a missing label invents nothing, so it defaults.
         """
-        payload = PipelexPipeRunInput(storage_scope="org_a/mt_b/run_c", user_id="test-user", pipe_code="some_pipe")
+        payload = PipelexPipeRunInput(storage_scope="org_a/mt_b/run_c", read_scope=None, user_id="test-user", pipe_code="some_pipe")
         assert payload.extras == {}
 
     @pytest.mark.parametrize(

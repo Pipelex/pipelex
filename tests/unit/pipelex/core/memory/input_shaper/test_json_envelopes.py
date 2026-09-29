@@ -12,7 +12,7 @@ class TestInputShaperJSONEnvelopes:
         input_specs = build_input_specs([("payload", "native.JSON", None)])
         provided = {"concept": "native.JSON", "content": {"json_obj": {"a": 1}}}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.JSON"
@@ -24,7 +24,7 @@ class TestInputShaperJSONEnvelopes:
         envelope_shaped_object = {"concept": "Image", "content": {"url": "photo.jpg"}}
         provided: dict[str, Any] = {"concept": "native.JSON", "content": [{"json_obj": envelope_shaped_object}, {"json_obj": {"b": 2}}]}
 
-        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["payload"]
         assert stuff.concept.concept_ref == "native.JSON"
