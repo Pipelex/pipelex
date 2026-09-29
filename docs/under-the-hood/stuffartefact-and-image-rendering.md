@@ -40,7 +40,7 @@ StuffArtefact wraps Stuff → delegates to StuffContent → Protocol enables tra
 | `{{ doc \| with_images }}` | Text with `[Image N]` tokens |
 | `{{ doc \| tag }}` | Tagged output (no images) |
 
-These are the only underscore names a template may read on an input. Templates render under the [Template Sandbox](template-sandbox.md), which refuses the wrapped `Stuff` (`_stuff`), the raw content object, and every other private name.
+These are the only underscore names a template may read on an input. Templates render under the [Template Sandbox](template-sandbox.md), which refuses every other private name. The wrapped `Stuff` is not an attribute of the artefact at all: Python code reaches it through `unwrap_stuff_artefact(artefact=...)`.
 
 ---
 

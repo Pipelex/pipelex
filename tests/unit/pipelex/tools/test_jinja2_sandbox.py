@@ -13,6 +13,7 @@ import pytest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -21,6 +22,7 @@ from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError, Jinja2Tem
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
+from pipelex.tools.jinja2.jinja2_sandbox import _MUTATING_METHOD_NAMES  # pyright: ignore[reportPrivateUsage]
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
@@ -50,8 +52,16 @@ def _make_context(*, registry: ImageRegistry | None = None) -> dict[str, Any]:
     return {
         "note": _make_artefact(content=TextContent(text="hello"), name="note", concept_code=NativeConceptCode.TEXT),
         "photo": _make_artefact(content=ImageContent(url="https://example.com/photo.png"), name="photo", concept_code=NativeConceptCode.IMAGE),
+        # A list input hands a template its items, which are content objects: the route to a pydantic method.
+        "photos": _make_artefact(
+            content=ListContent[ImageContent](items=[ImageContent(url="https://example.com/photo.png")]),
+            name="photos",
+            concept_code=NativeConceptCode.IMAGE,
+        ),
         "created_at": datetime(2026, 1, 2, 3, 4, 5),
         "record": {"a": 1, "b": 2},
+        "keyed": {"_id": "abc123", "__typename": "User"},
+        "tags": {"a", "b"},
         "mood": _Mood.CALM,
         Jinja2ContextKey.IMAGE_REGISTRY: registry or ImageRegistry(),
     }
@@ -78,18 +88,21 @@ class TestTemplateSandboxRefusals:
             ("raw_content_by_dot", "{{ note._content }}"),
             ("raw_stuff_by_dot", "{{ note._stuff }}"),
             ("raw_stuff_by_attr_filter", "{{ note | attr('_stuff') }}"),
-            ("pydantic_constructor", "{{ photo.stuff.content.model_validate({'url': 'pipelex-storage://org-b/x.png'}) }}"),
-            ("pydantic_copy", "{{ photo.stuff.content.model_copy() }}"),
-            ("stuff_method", "{{ note.stuff.model_dump() }}"),
+            ("pydantic_constructor", "{{ photos[0].model_validate({'url': 'pipelex-storage://org-b/x.png'}) }}"),
+            ("pydantic_copy", "{{ photos[0].model_copy() }}"),
+            ("pydantic_dump", "{{ photos[0].model_dump() }}"),
             ("artefact_undeclared_method", "{{ note.render_for_tag_async() }}"),
             ("class_method_through_instance", "{{ created_at.now() }}"),
             ("mutating_list_method", "{% set items = [1] %}{{ items.append(2) }}"),
             ("mutating_dict_method", "{{ record.update({'c': 3}) }}"),
+            ("mutating_set_method_jinja_misses", "{{ tags.intersection_update(['a']) }}"),
             ("format_string_dunder", "{{ '{0.__class__}'.format(note) }}"),
             ("format_string_private_attribute", "{{ '{0._stuff}'.format(note) }}"),
             ("format_string_private_item", "{{ '{0[_stuff]}'.format(note) }}"),
             ("subclass_method_on_plain_value", "{{ mood.shout() }}"),
             ("private_name_on_plain_dict", "{{ record._secret }}"),
+            ("private_key_by_dot_on_plain_dict", "{{ keyed._id }}"),
+            ("dunder_by_bracket_on_plain_dict", "{{ record['__class__'] }}"),
         ],
     )
     async def test_refused(self, topic: str, template_source: str) -> None:
@@ -101,7 +114,7 @@ class TestTemplateSandboxRefusals:
     async def test_forged_image_never_reaches_the_registry(self) -> None:
         """The attack the stock sandbox let through: a template forging an image pointing at a foreign storage key."""
         registry = ImageRegistry()
-        template_source = "{{ photo.stuff.content.model_validate({'url': 'pipelex-storage:/' ~ '/org-b/x.png'}) | with_images }}"
+        template_source = "{{ photos[0].model_validate({'url': 'pipelex-storage:/' ~ '/org-b/x.png'}) | with_images }}"
         with pytest.raises(Jinja2TemplateSecurityError):
             await _render(template_source, context=_make_context(registry=registry))
         assert registry.images == []
@@ -112,7 +125,18 @@ class TestTemplateSandboxRefusals:
 
     async def test_refusal_names_the_callable_and_the_type(self) -> None:
         with pytest.raises(Jinja2TemplateSecurityError, match=r"may not call the method 'model_copy' of a 'ImageContent' value"):
-            await _render("{{ photo.stuff.content.model_copy() }}")
+            await _render("{{ photos[0].model_copy() }}")
+
+    async def test_refused_mutation_leaves_the_value_unchanged(self) -> None:
+        context = _make_context()
+        with pytest.raises(Jinja2TemplateSecurityError):
+            await _render("{{ tags.intersection_update(['a']) }}", context=context)
+        assert context["tags"] == {"a", "b"}
+
+    async def test_wrapped_stuff_is_not_readable(self) -> None:
+        """An artefact exposes its content's fields and its metadata, never the Stuff it wraps."""
+        with pytest.raises(Jinja2TemplateRenderError, match="undefined error"):
+            await _render("{{ note.stuff.content }}")
 
     async def test_method_template_cannot_include(self) -> None:
         """A method template renders without a loader, so it cannot reach Pipelex's registered templates."""
@@ -167,6 +191,9 @@ class TestTemplateSandboxLegitimateShapes:
                 "2026-01-02T03:04:05|2026|739618",
             ),
             ("dict_methods", "{{ record.get('a') }}|{{ record.items() | list | length }}|{{ record.keys() | list | join(',') }}", "1|2|a,b"),
+            ("private_keys_of_a_plain_dict_by_bracket", "{{ keyed['_id'] }}|{{ keyed['__typename'] }}", "abc123|User"),
+            ("set_methods", "{{ tags.intersection(['a']) | list | join }}|{{ tags.issuperset(['a']) }}", "a|True"),
+            ("list_input_items", "{{ photos[0].url }}|{{ photos | length }}", "https://example.com/photo.png|1"),
             ("string_methods", "{{ 'abc'.upper() }}|{{ 'a,b'.split(',') | join('-') }}|{{ ', '.join(['x', 'y']) }}", "ABC|a-b|x, y"),
             ("plain_method_on_plain_subclass", "{{ mood.upper() }}", "CALM"),
             ("loop_helpers", "{% for i in [1, 2, 3] %}{{ loop.cycle('o', 'e') }}{% endfor %}", "oeo"),
@@ -201,3 +228,23 @@ class TestTemplateSandboxLegitimateShapes:
             templating_context={},
         )
         assert rendered == "<b>&lt;i&gt;</b>"
+
+
+# The methods of each mutable plain type that leave the value unchanged, so that together with the
+# sandbox's own list of mutating methods they classify every public method the type has.
+_NON_MUTATING_METHOD_NAMES: dict[type, frozenset[str]] = {
+    list: frozenset({"copy", "count", "index"}),
+    dict: frozenset({"copy", "fromkeys", "get", "items", "keys", "values"}),
+    set: frozenset({"copy", "difference", "intersection", "isdisjoint", "issubset", "issuperset", "symmetric_difference", "union"}),
+}
+
+
+class TestMutatingMethodList:
+    @pytest.mark.parametrize("plain_type", [list, dict, set])
+    def test_every_public_method_is_classified(self, plain_type: type) -> None:
+        """A method a later Python adds fails here until someone decides whether it mutates."""
+        public_names = {name for name in dir(plain_type) if not name.startswith("_")}
+        mutating = _MUTATING_METHOD_NAMES[plain_type]
+        non_mutating = _NON_MUTATING_METHOD_NAMES[plain_type]
+        assert not mutating & non_mutating
+        assert public_names == mutating | non_mutating

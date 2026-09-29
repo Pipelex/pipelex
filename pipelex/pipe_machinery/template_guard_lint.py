@@ -4,9 +4,10 @@ PipeCondition expressions):
 
 - the guard-lint (optionals design D7): each reference to a declared-optional (`?`) input must be
   guarded, otherwise validation fails with `OPTIONAL_INPUT_UNGUARDED` and the precise fix;
-- the private-name lint: a template may not read a name starting with an underscore, other than the
-  metadata fields of an input, otherwise validation fails with `TEMPLATE_PRIVATE_NAME`. The template
-  sandbox refuses the same reads at render time; this lint turns the visible ones into a located error.
+- the private-name lint: a template may not read, with a dot, a name starting with an underscore,
+  other than the metadata fields of an input, otherwise validation fails with `TEMPLATE_PRIVATE_NAME`.
+  The template sandbox refuses the same reads at render time; this lint turns the visible ones into a
+  located error.
 """
 
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
@@ -125,11 +126,12 @@ def lint_template_private_names(
     template_category: TemplateCategory,
     template_label: str,
 ) -> None:
-    """Raise `TEMPLATE_PRIVATE_NAME` when the template reads a name starting with an underscore that
-    is not one of the metadata fields an input declares (`_stuff_name`, `_content_class`, ...).
+    """Raise `TEMPLATE_PRIVATE_NAME` when the template reads, with a dot, a name starting with an
+    underscore that is not one of the metadata fields an input declares (`_stuff_name`, `_content_class`, ...).
 
-    The template is given in authored form, like the guard-lint's. Only names written in the
-    template are seen here; the template sandbox refuses the rest at render time.
+    The template is given in authored form, like the guard-lint's. Only dot reads written in the
+    template are seen here: a bracketed key may be a plain dict's data, which only the render can tell,
+    and the template sandbox refuses the rest at render time.
 
     Args:
         pipe_code: The pipe being validated (for the error).
@@ -155,8 +157,8 @@ def lint_template_private_names(
     allowed_list = ", ".join(f"'{name}'" for name in sorted(allowed_private_names))
     msg = (
         f"In the {template_label} of pipe '{pipe_code}', the template reads '{refused_name}', a name starting with an underscore. "
-        f"Templates read the public fields of their inputs; the only underscore names they may read are an input's metadata fields: "
-        f"{allowed_list}."
+        f"Templates read the public fields of their inputs; the only underscore names a dot may read are an input's metadata fields: "
+        f"{allowed_list}. A key of a plain dict is read with brackets: record['_id']."
     )
     raise PipeValidationError(
         message=msg,

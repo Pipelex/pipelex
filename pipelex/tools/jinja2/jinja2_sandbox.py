@@ -12,13 +12,15 @@ forge content, such as an image pointing at another organisation's storage key.
 - **Reading.** A template reads public attributes and items. A name starting with an underscore is
   refused, with a dot or with brackets, unless the value's type declares it in its template surface
   (`template_surface.py`), which is how `StuffArtefact` keeps its documented metadata fields readable.
-  Jinja's own refusals (a function's globals, a frame, a class's `mro`, a method that mutates a list,
-  a dict or a set) stay in force.
+  The one exception is a key of a plain `dict` read with brackets (`record['_id']`): a dict's items
+  are data, and a key it does not hold falls back to an attribute read, which the rule above refuses.
+  Jinja's own refusals (a function's globals, a frame, a class's `mro`) stay in force.
 - **Calling.** A template calls Jinja's own runtime (macros, `caller`, `loop`, `cycler`, `joiner`,
   block references and the environment's globals), methods bound to an instance of a plain value type
   (`str`, numbers, dates and times, and the built-in containers), `str.format` through the sandbox's
   safe formatter, and the methods a type declares in its template surface. Everything else is
-  refused: pydantic methods, `Stuff` and content methods, classes, free functions and class methods.
+  refused: pydantic methods, `Stuff` and content methods, classes, free functions and class methods,
+  and every method that changes a list, a dict or a set in place.
 - **Refusing.** A refusal raises `jinja2.exceptions.SecurityError` at the point of access, which the
   render functions turn into `Jinja2TemplateSecurityError`. Jinja's stock sandbox returns an undefined
   value that prints as nothing, which would send a prompt with a hole in it.
@@ -44,7 +46,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from jinja2.exceptions import SecurityError
 from jinja2.runtime import BlockReference, Context, LoopContext, Macro, Undefined
-from jinja2.sandbox import ImmutableSandboxedEnvironment, modifies_known_mutable, safe_range
+from jinja2.sandbox import ImmutableSandboxedEnvironment, safe_range
 from jinja2.utils import Cycler, Joiner, Namespace, generate_lorem_ipsum
 from markupsafe import Markup
 from typing_extensions import override
@@ -84,6 +86,15 @@ _JINJA_CALLABLE_INSTANCE_TYPES: tuple[type, ...] = (Macro, LoopContext, BlockRef
 # Instances of Jinja's runtime whose methods a template calls: `loop.cycle()`, `loop.changed()`,
 # `cycler.next()`, `cycler.reset()`.
 _JINJA_METHOD_OWNER_TYPES: tuple[type, ...] = (LoopContext, Cycler, BlockReference)
+
+# The methods that change a mutable plain value in place, listed here rather than taken from Jinja's
+# `modifies_known_mutable`, whose list misses `set.intersection_update`. The test suite checks this list
+# against every public method of each type, so a method a later Python adds cannot slip through.
+_MUTATING_METHOD_NAMES: dict[type, frozenset[str]] = {
+    list: frozenset({"append", "clear", "extend", "insert", "pop", "remove", "reverse", "sort"}),
+    dict: frozenset({"clear", "pop", "popitem", "setdefault", "update"}),
+    set: frozenset({"add", "clear", "difference_update", "discard", "intersection_update", "pop", "remove", "symmetric_difference_update", "update"}),
+}
 
 _MISSING = object()
 
@@ -145,7 +156,7 @@ def _is_plain_value_method(*, obj: object) -> bool:
     if isinstance(bound_to, str) and name in {"format", "format_map"}:
         # Only the sandbox's own wrapper formats a string: the raw method would resolve `{0.__class__}`.
         return False
-    if modifies_known_mutable(bound_to, name):
+    if name in _MUTATING_METHOD_NAMES.get(plain_type, frozenset()):
         return False
     plain_member = inspect.getattr_static(plain_type, name, _MISSING)
     return plain_member is not _MISSING and inspect.getattr_static(type(bound_to), name, _MISSING) is plain_member
@@ -213,9 +224,12 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
     def getitem(self, obj: Any, argument: Any) -> Any:
         # Jinja tries `obj[argument]` first and checks the name only when that fails, so an object whose
         # `__getitem__` answers any key would hand over what a dot could not: refuse the name up front.
+        # A plain dict is the exception: its items are data, and a key it does not hold falls back to
+        # an attribute read, which `is_safe_attribute` refuses for every underscore name.
         if (
             isinstance(argument, str)
             and _is_private_name(name=argument)
+            and type(obj) is not dict
             and not isinstance(obj, Undefined)
             and not _declares_private_name(obj=obj, name=argument)
         ):

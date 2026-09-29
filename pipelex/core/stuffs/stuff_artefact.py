@@ -91,7 +91,6 @@ _PASSTHROUGH_ATTRS = frozenset(
         "render_with_images",
         # Methods that must remain accessible (TextFormatRenderable protocol)
         "rendered_for_template_async",
-        "stuff",
         # Dict-like methods for template iteration
         "iter_keys",
         "iter_items",
@@ -411,19 +410,6 @@ class StuffArtefact:
             raise TypeError(msg)
         return content.render_with_images(registry=registry, text_format=text_format)
 
-    # -------------------------------------------------------------------------
-    # Access to underlying Stuff
-    # -------------------------------------------------------------------------
-
-    @property
-    def stuff(self) -> Stuff:
-        """Access the underlying Stuff object.
-
-        Returns:
-            The wrapped Stuff object.
-        """
-        return self._stuff  # type: ignore[no-any-return]
-
     @override
     def __str__(self) -> str:
         """Return plain text content for string conversion."""
@@ -434,3 +420,13 @@ class StuffArtefact:
     def __repr__(self) -> str:
         """Return string representation."""
         return f"StuffArtefact({self._stuff.stuff_name or 'unnamed'})"
+
+
+def unwrap_stuff_artefact(*, artefact: StuffArtefact) -> Stuff:
+    """Return the Stuff an artefact wraps, for Python code.
+
+    This is a function rather than a property on purpose: every public attribute of an artefact is
+    readable from a template, and the wrapped Stuff, with its raw content object, is not template data.
+    """
+    # The one read of the slot from outside the class, which is the point: the class exposes no accessor.
+    return artefact._stuff  # type: ignore[no-any-return]  # ruff: ignore[private-member-access]

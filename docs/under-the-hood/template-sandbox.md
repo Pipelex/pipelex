@@ -15,6 +15,7 @@ Pipelex therefore renders every template, its own included, under one policy: **
 |---|---|
 | Read the public fields of an input, with a dot or with brackets | `{{ invoice.total }}`, `{{ invoice['total'] }}` |
 | Read an input's metadata fields | `{{ invoice._stuff_name }}`, `{{ invoice._content_class }}`, `{{ invoice._concept_code }}`, `{{ invoice._stuff_code }}` |
+| Read any key of a plain dict with brackets, underscore keys included | `{{ record['_id'] }}`, `{{ record['__typename'] }}` |
 | Call the dict-like accessors of an input | `{{ invoice.get('total') }}`, `{% for key, value in invoice.iter_items() %}` |
 | Call methods of strings, numbers, dates and times, lists, tuples, dicts and sets | `{{ issued_at.isoformat() }}`, `{{ name.upper() }}`, `{{ record.get('a') }}` |
 | Format a string, including with replacement fields | `{{ '{0} items'.format(count) }}` |
@@ -25,19 +26,20 @@ Pipelex therefore renders every template, its own included, under one policy: **
 
 | A template may not | For example |
 |---|---|
-| Read a name starting with an underscore, other than the metadata fields above | `{{ doc._stuff }}`, `{{ doc['_content'] }}`, `{{ doc.__class__ }}` |
-| Call a method of anything that is not a plain value | `{{ doc.stuff.model_dump() }}`, `{{ photo.stuff.content.model_copy() }}` |
+| Read a name starting with an underscore, other than the metadata fields and a plain dict's keys above | `{{ doc._stuff }}`, `{{ doc['_content'] }}`, `{{ doc.__class__ }}`, `{{ record._id }}` |
+| Read the `Stuff` an input wraps | `{{ doc.stuff }}` is undefined |
+| Call a method of anything that is not a plain value | `{{ pages[0].model_dump() }}`, `{{ photos[0].model_copy() }}` |
 | Call a class method, even through an instance | `{{ issued_at.now() }}` |
-| Change a list, a dict or a set | `{{ items.append(x) }}`, `{{ record.update(other) }}` |
+| Change a list, a dict or a set | `{{ items.append(x) }}`, `{{ record.update(other) }}`, `{{ tags.intersection_update(other) }}` |
 | Include or extend another template | `{% include 'header.html' %}` |
 
 A method template renders without a template loader, so `{% include %}`, `{% extends %}` and `{% import %}` find nothing to load.
 
 ## How a refusal shows up
 
-Most refusals are visible in the template itself, and validation reports them before anything runs: a template that reads an undeclared underscore name fails with the `template_private_name` validation error, which names the pipe and the template (`prompt`, `system_prompt`, `template`, `expression`, or `construct field '<path>'`).
+Many refusals are visible in the template itself, and validation reports them before anything runs: a template that reads an undeclared underscore name with a dot fails with the `template_private_name` validation error, which names the pipe and the template (`prompt`, `system_prompt`, `template`, `expression`, or `construct field '<path>'`).
 
-What validation cannot see, because it depends on the values at run time (a method call, or a name computed while rendering), is refused where it happens: the render raises [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md), whose message names the refused attribute or callable and the type it was reached on. A refusal never renders as an empty string, so a prompt is never sent with a hole in it.
+What validation cannot see, because it depends on the values at run time (a method call, a name computed while rendering, or a bracketed key, which is legitimate on a plain dict), is refused where it happens: the render raises [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md), whose message names the refused attribute or callable and the type it was reached on. A refusal never renders as an empty string, so a prompt is never sent with a hole in it.
 
 ## How it is built
 
@@ -46,13 +48,17 @@ Every environment comes from one factory, `make_jinja2_env_from_loader` in `pipe
 Jinja's stock sandbox refuses internals, but not public methods, and every pydantic model has public constructors. Under the stock sandbox a template could call `model_validate` on a content object and forge an image pointing at a storage key of its choosing. The Pipelex policy closes that by allowing calls by kind rather than by name:
 
 - **Jinja's own runtime**: macros, `caller`, `loop`, `cycler`, `joiner`, block references, and the environment's globals.
-- **Methods a plain value type defines**, bound to an instance of that type. A subclass of a plain type (a `StrEnum` member is a `str`) cannot add or override a callable method, and a class method is refused because it is bound to the class.
+- **Methods a plain value type defines**, bound to an instance of that type. A subclass of a plain type (a `StrEnum` member is a `str`) cannot add or override a callable method, and a class method is refused because it is bound to the class. A method that changes a list, a dict or a set in place is refused by a list Pipelex keeps itself, since Jinja's own misses `set.intersection_update`.
 - **The sandbox's own `str.format` wrapper**, which resolves replacement fields through the same attribute and item checks. The raw `str.format` stays refused.
 - **The methods a type declares as its template surface** (`pipelex/tools/jinja2/template_surface.py`).
 
-A type declares its template surface as a `__template_surface__` class attribute: the methods a template may call on an instance and the underscore names it may read. The sandbox reads the declaration from the type, never from the instance. `StuffArtefact`, the adapter every input is wrapped in, declares `get`, `iter_keys`, `iter_items` and `iter_values`, and its four metadata fields. It does not declare the wrapped `Stuff` or its raw content object, and its bracket access and `get` resolve a key to a content field or a metadata field only.
+A type declares its template surface as a `__template_surface__` class attribute: the methods a template may call on an instance and the underscore names it may read. The sandbox reads the declaration from the type, never from the instance. `StuffArtefact`, the adapter every input is wrapped in, declares `get`, `iter_keys`, `iter_items` and `iter_values`, and its four metadata fields. The `Stuff` it wraps is not one of its attributes at all: Python code reaches it through `unwrap_stuff_artefact`, and its bracket access and `get` resolve a key to a content field or a metadata field only.
 
-The sandbox refuses a bracketed name before trying `obj[name]`. Jinja only checks a bracketed name when the item lookup fails, so an object whose `__getitem__` answered any key would otherwise hand over what the dot spelling could not.
+The sandbox refuses a bracketed name before trying `obj[name]`. Jinja only checks a bracketed name when the item lookup fails, so an object whose `__getitem__` answered any key would otherwise hand over what the dot spelling could not. A plain `dict` is the exception, because its items are data: a key it holds is returned, and a key it does not hold falls back to an attribute read, which the underscore rule refuses.
+
+## Paths outside templates
+
+A method also writes dotted paths that are not templates: a PipeCompose construct field's `from` and its `list_to_dict_keyed_by`, a PipeBatch's list, and the image and document references of a prompt. The runtime walks these with `getattr`, so the same rule applies to them: a segment starting with an underscore is refused. A construct's `from` path and `list_to_dict_keyed_by` are refused when the bundle is validated, and every path is refused again when it is walked.
 
 Filters are not calls in this sense: they are Pipelex's or Jinja's own code, registered by the environment. That makes each filter trusted code with one obligation: **a filter never calls a callable it was handed**, since that callable came from the template's values and the policy never vetted it.
 

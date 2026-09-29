@@ -22,11 +22,11 @@ class TestDetectPrivateNameReferences:
         ("topic", "template_source", "expected"),
         [
             ("dot", "{{ doc._stuff }}", ["_stuff"]),
-            ("bracket", "{{ doc['_content'] }}", ["_content"]),
+            ("bracket_is_left_to_the_render", "{{ doc['_content'] }} {{ record['_id'] }}", []),
             ("dunder_chain_in_evaluation_order", "{{ cycler.__init__.__globals__ }}", ["__init__", "__globals__"]),
             ("inside_a_block", "{% if doc %}{% for x in doc.items %}{{ x._secret }}{% endfor %}{% endif %}", ["_secret"]),
             ("repeated_once", "{{ doc._stuff }} {{ other._stuff }}", ["_stuff"]),
-            ("allowed_metadata", "{{ doc._stuff_name }} {{ doc['_content_class'] }}", []),
+            ("allowed_metadata", "{{ doc._stuff_name }} {{ doc._content_class }}", []),
             ("public_names", "{{ doc.title }} {{ doc['title'] }} {{ doc.get('x') }}", []),
             ("dynamic_key_is_invisible", "{% set key = '_stuff' %}{{ doc[key] }}", []),
             ("underscore_variable_name_is_not_an_attribute", "{{ _internal }}", []),

@@ -5,7 +5,7 @@ import pytest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact
+from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact, unwrap_stuff_artefact
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.template_surface import TemplateSurface, get_template_surface
 
@@ -50,9 +50,14 @@ class TestStuffArtefactTemplateSurface:
         assert "_content" not in artefact
         assert "_content" not in list(artefact.iter_keys())
 
-    def test_python_code_keeps_the_wrapped_stuff(self) -> None:
+    def test_wrapped_stuff_is_not_an_attribute(self) -> None:
         artefact = _make_artefact()
-        assert artefact.stuff.content == TextContent(text="hello")
+        assert not hasattr(artefact, "stuff")
+        assert "stuff" not in artefact
+
+    def test_python_code_unwraps_the_stuff(self) -> None:
+        artefact = _make_artefact()
+        assert unwrap_stuff_artefact(artefact=artefact).content == TextContent(text="hello")
 
 
 class TestTemplateSurfaceDeclaration:

@@ -1,4 +1,4 @@
-"""Protocol for types that declare what a template may do with them beyond reading public data.
+"""The template surface: what a type declares a template may do with its instances beyond reading public data.
 
 Templates render under `PipelexTemplateEnvironment`, whose policy lets a template read public data
 and call methods of plain values (strings, numbers, dates, containers) and nothing else. A type
@@ -17,8 +17,9 @@ template protocols (`TagRenderable`, `ImageRenderable`) follow.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, ClassVar, Protocol
+from typing import Any
+
+from pydantic.dataclasses import dataclass
 
 TEMPLATE_SURFACE_ATTRIBUTE = "__template_surface__"
 
@@ -41,12 +42,6 @@ class TemplateSurface:
             if not name.startswith("_") or name.startswith("__"):
                 msg = f"A template surface's private names start with a single underscore, and '{name}' does not."
                 raise ValueError(msg)
-
-
-class TemplateSurfaceDeclaring(Protocol):
-    """A type that declares its template surface as a class attribute."""
-
-    __template_surface__: ClassVar[TemplateSurface]
 
 
 def get_template_surface(obj: object) -> TemplateSurface | None:

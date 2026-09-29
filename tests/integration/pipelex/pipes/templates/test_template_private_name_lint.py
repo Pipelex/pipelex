@@ -48,6 +48,32 @@ output = "FiledReceipt"
 filed_under = { template = "{{ receipt._stuff.stuff_name }}" }
 """
 
+_CONSTRUCT_FROM_DUNDER_MTHDS = """
+domain = "test_construct_from_private_segment"
+main_pipe = "copy_the_environment"
+
+[concept.Note]
+description = "A note"
+
+[concept.Note.structure]
+body = { type = "text", description = "The body", required = true }
+
+[concept.Copied]
+description = "Whatever a path reached"
+
+[concept.Copied.structure]
+data = { type = "dict", key_type = "text", value_type = "text", description = "Anything", required = true }
+
+[pipe.copy_the_environment]
+type = "PipeCompose"
+description = "Walk from an input into the process environment"
+inputs = { note = "Note" }
+output = "Copied"
+
+[pipe.copy_the_environment.construct]
+data = { from = "note.__class__.__init__.__globals__.sys.modules.os.environ" }
+"""
+
 
 def _make_pipe_llm(*, prompt: str, system_prompt: str | None = None) -> PipeLLM:
     return PipeFactory[PipeLLM].make_from_blueprint(
@@ -78,7 +104,7 @@ class TestTemplatePrivateNameLint:
         ("topic", "prompt", "refused_name"),
         [
             ("raw_stuff_by_dot", "Summarise {{ contract._stuff }}", "_stuff"),
-            ("raw_content_by_bracket", "Summarise {{ contract['_content'] }}", "_content"),
+            ("raw_content_by_dot", "Summarise {{ contract._content }}", "_content"),
             ("dunder_chain", "{{ contract.__class__.__mro__ }} $contract", "__class__"),
         ],
     )
@@ -95,10 +121,16 @@ class TestTemplatePrivateNameLint:
             _make_pipe_llm(prompt="Summarise $contract", system_prompt="You know {{ contract._stuff }}")
         _assert_private_name_error(exc_info.value, pipe_code="private_name_llm", refused_name="_stuff", template_label="system_prompt")
 
+    def test_bracketed_key_is_left_to_the_render(self, load_empty_library: Callable[[], None]):
+        """A bracketed key may be a plain dict's data (`record['_id']`), which only the render can tell."""
+        load_empty_library()
+        pipe_llm = _make_pipe_llm(prompt="Summarise {{ contract['_id'] }} $contract")
+        assert pipe_llm.code == "private_name_llm"
+
     def test_metadata_fields_are_accepted(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         pipe_llm = _make_pipe_llm(
-            prompt="{{ contract._stuff_name }} {{ contract['_content_class'] }} {{ contract._concept_code }} {{ contract._stuff_code }} $contract",
+            prompt="{{ contract._stuff_name }} {{ contract._content_class }} {{ contract._concept_code }} {{ contract._stuff_code }} $contract",
         )
         assert pipe_llm.code == "private_name_llm"
 
@@ -177,3 +209,12 @@ class TestTemplatePrivateNameLintOnConstruct:
             (ValidationErrorCategory.PIPE_VALIDATION, PipeValidationErrorType.TEMPLATE_PRIVATE_NAME)
         ]
         assert "construct field 'filed_under'" in (items[0].message or "")
+
+    async def test_construct_from_path_with_a_private_segment_is_rejected(self, load_empty_library: Callable[[], None]):
+        """A `from` path is walked with getattr at run time: a dunder segment would copy the process environment."""
+        load_empty_library()
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[_CONSTRUCT_FROM_DUNDER_MTHDS])
+        items = exc_info.value.to_error_report().validation_errors or []
+        assert len(items) == 1
+        assert "reads '__class__', a name starting with an underscore" in (items[0].message or "")
