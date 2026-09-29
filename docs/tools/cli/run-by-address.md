@@ -56,7 +56,7 @@ What decides whether Python in a method is acceptable is **where it would execut
 
 - `.mthds` content is data — always fine.
 - **PipeFunc `.py`** is supported: on hosted deployments it executes in a network-blocked sandbox, never in the runner's process.
-- **Python structure classes** (`StructuredContent` subclasses) are imported into the runner's own process, so *hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python*. A fetched method declaring structure classes runs locally, but the CLI prints a hosted-parity warning: express the types as MTHDS concepts (inline structures) to keep the method hosted-runnable.
+- **Python structure classes** (`StructuredContent` subclasses) would have to be imported into the runner's own process to back a concept, so *hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python*. A fetched method declaring structure classes runs locally, but the CLI prints a hosted-parity warning with the route: declare the types as MTHDS concepts with inline structures, and have a PipeFunc import the classes the sandbox generates from them (`from structures import <domain>__<Concept>`). The module `pipelex build structures` writes is accepted as long as it is left as generated.
 
 ## Bounds
 
