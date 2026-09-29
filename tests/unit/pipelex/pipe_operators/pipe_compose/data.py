@@ -258,6 +258,10 @@ class PipeComposeInputCheckTestCases:
             {"description": "d", "inputs": {"topic": "Text"}, "output": "Text", "template": "{% set topic = topic|trim %}About {{ topic }}"},
         ),
         (
+            "input_named_like_a_jinja_global",
+            {"description": "d", "inputs": {"namespace": "Text"}, "output": "Text", "template": "List the pods in $namespace"},
+        ),
+        (
             "construct_attribute_after_subscript",
             {"description": "d", "inputs": {"items": "Text[]"}, "output": "Summary", "construct": {"first": {"template": "{{ items[0].text }}"}}},
         ),

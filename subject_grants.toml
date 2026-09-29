@@ -6032,18 +6032,6 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
 
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_declarations_from_body"]
-param = "body"
-rationale = "Extracts/derives from the body; single operand."
-
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_full_variable_paths"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_variable_references"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
 rationale = "Extracts/derives from the node; single operand."

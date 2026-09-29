@@ -175,6 +175,16 @@ class TestPipeLLMBlueprint:
         )
         assert set(blueprint.input_names) == {"items"}
 
+    def test_validate_inputs_correct_with_input_named_like_a_jinja_global(self):
+        """An input named like a Jinja global shadows it, so reading the name reads the input."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"range": "native.Text"},
+            output="native.Text",
+            prompt="Summarize the price range: $range",
+        )
+        assert set(blueprint.input_names) == {"range"}
+
     def test_validate_inputs_ignores_internal_variables(self):
         """Test that internal variables (starting with _) are ignored."""
         blueprint = PipeLLMBlueprint(

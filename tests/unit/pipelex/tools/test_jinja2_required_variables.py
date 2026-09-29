@@ -229,6 +229,25 @@ Best regards,
         ("loop_filter_reads_inside_the_loop", "{% for x in xs if x.ok %}{{ x }}{% endfor %}", {"xs"}),
     ]
 
+    # A Jinja global is Jinja's only where it is called; any other read of its name reads the input that shadows it
+    GLOBAL_NAMES_AS_INPUTS: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("bare_global_name", "Summarize the price {{ range }}", {"range"}),
+        ("attribute_on_a_global_name", "{{ namespace.name }}", {"namespace.name"}),
+        ("filtered_global_name", "{{ dict|upper }}", {"dict"}),
+        ("global_name_read_and_called", "{{ range }}{% for i in range(3) %}{{ i }}{% endfor %}", {"range"}),
+    ]
+
+    # The reference walk shares the required-variables walk's scopes, so both see the same names read
+    REFERENCE_SCOPES: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("self_referential_set", "{% set image = image %}{{ image }}", {"image"}),
+        ("read_before_set", "{{ image }}{% set image = 'x' %}{{ image }}", {"image"}),
+        ("loop_target_shadows_its_iterable", "{% for images in images %}{{ images }}{% endfor %}", {"images"}),
+        ("else_branch_reads_outside_the_loop", "{% for x in xs %}{{ x }}{% else %}{{ x|upper }}{% endfor %}", {"xs", "x"}),
+        ("macro_internal_names", "{% macro m() %}{{ caller() }}{{ varargs }}{% endmacro %}", set()),
+        ("global_called_on_an_input", "{{ range(count) }}", {"count"}),
+        ("bare_global_name", "{{ range }}", {"range"}),
+    ]
+
     TEMPLATE_CATEGORIES: ClassVar[list[TemplateCategory]] = [
         TemplateCategory.BASIC,
         TemplateCategory.LLM_PROMPT,
@@ -625,6 +644,23 @@ class TestDetectJinja2Variables:
         )
         assert result == expected_variables, f"Failed for topic: {topic}"
 
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.GLOBAL_NAMES_AS_INPUTS,
+    )
+    def test_global_names_as_inputs(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """A read of a Jinja global's name that does not call it reads the input of that name, which shadows the global."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
 
 class TestDetectJinja2VariableReferences:
     """Tests for detect_jinja2_variable_references function that tracks filters."""
@@ -768,3 +804,34 @@ class TestDetectJinja2VariableReferences:
         )
 
         assert result == []
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_paths"),
+        TestData.REFERENCE_SCOPES,
+    )
+    def test_scopes_match_required_variables(
+        self,
+        topic: str,
+        template_source: str,
+        expected_paths: set[str],
+    ) -> None:
+        """The references follow the same scopes as the required variables, so an input the check sees read is found here too."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert {reference.path for reference in result} == expected_paths, f"Failed for topic: {topic}"
+        required = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert required == expected_paths, f"Failed for topic: {topic}"
+
+    def test_loop_references_keep_source_order(self) -> None:
+        """A loop's body is walked before its `else` branch, so references, and the images they attach, keep the template's order."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{% for x in xs %}{{ body_image }}{{ a|tag }}{% else %}{{ else_image }}{{ a|with_images }}{% endfor %}",
+        )
+        assert [reference.path for reference in result] == ["xs", "body_image", "a", "else_image"]
+        assert result[2].filters == ["tag", "with_images"]

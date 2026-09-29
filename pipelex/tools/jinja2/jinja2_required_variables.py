@@ -1,4 +1,5 @@
 from dataclasses import field
+from typing import Protocol
 
 from jinja2 import nodes
 from jinja2.exceptions import (
@@ -17,7 +18,7 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 class VariableReference:
     """Represents a variable reference in a Jinja2 template with its applied filters.
 
-    Mutated in place: ``_collect_variable_references`` does ``.filters.append(...)``
+    Mutated in place: ``detect_jinja2_variable_references`` extends ``.filters``
     on re-seen variables, so this is intentionally NOT frozen.
 
     Attributes:
@@ -47,22 +48,6 @@ def _build_full_path(node: nodes.Node) -> str | None:
     return None
 
 
-def _collect_declarations_from_body(body: list[nodes.Node]) -> set[str]:
-    """Pre-scan a list of nodes to collect all declarations made at this scope level.
-
-    This handles {% set %} and {% macro %} declarations that should be visible
-    to all subsequent nodes in the same scope.
-    """
-    declarations: set[str] = set()
-    for node in body:
-        if isinstance(node, nodes.Assign):
-            if isinstance(node.target, nodes.Name):
-                declarations.add(node.target.name)
-        elif isinstance(node, nodes.Macro):
-            declarations.add(node.name)
-    return declarations
-
-
 def _set_target_name(*, statement: nodes.Node) -> str | None:
     """The name a `{% set %}` or a `{% set %}…{% endset %}` block assigns, when it assigns a plain name."""
     if isinstance(statement, (nodes.Assign, nodes.AssignBlock)) and isinstance(statement.target, nodes.Name):
@@ -70,17 +55,26 @@ def _set_target_name(*, statement: nodes.Node) -> str | None:
     return None
 
 
-def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_names: set[str]) -> None:
-    """Recursively walk the AST and collect full variable paths.
+class _ReadHandler(Protocol):
+    """Deals with a node that may read a variable, given the names declared where it stands.
 
-    This function collects only the FULL (leaf) paths for each variable access chain.
-    For example, `{{ foo.bar.baz }}` will only return `foo.bar.baz`, not intermediate
-    paths like `foo.bar` or `foo`.
+    Returns True when it has dealt with the node, which is then not walked into.
+    """
+
+    def __call__(self, *, node: nodes.Node, declared_names: set[str]) -> bool: ...
+
+
+def _walk_reads(*, node: nodes.Node, declared_names: set[str], global_names: set[str], handle_read: _ReadHandler) -> None:
+    """Walk a template's AST in Jinja's scopes, handing every node that may read a variable to ``handle_read``.
+
+    Both detectors below walk through here, so the names they treat as declared cannot drift apart: the required
+    variables the input check compares with the inputs, and the references that attach images and documents.
 
     Args:
         node: The current AST node
-        paths: Set to collect discovered paths
-        declared_names: Set of locally declared names (loop variables, macro params, etc.)
+        declared_names: The names declared where the node stands (a `set` before it, a loop target, a macro argument)
+        global_names: The environment's globals (`range`, `namespace`, `dict`...)
+        handle_read: What to do with a node that may read a variable
     """
     if isinstance(node, nodes.Template):
         # A macro's name is never an input, and a macro body, which runs when the macro is called, sees every
@@ -90,7 +84,7 @@ def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_
         scope_declared = declared_names | {statement.name for statement in node.body if isinstance(statement, nodes.Macro)}
         for statement in node.body:
             statement_declared = scope_declared | top_level_set_names if isinstance(statement, nodes.Macro) else scope_declared
-            _collect_full_variable_paths(statement, paths=paths, declared_names=statement_declared)
+            _walk_reads(node=statement, declared_names=statement_declared, global_names=global_names, handle_read=handle_read)
             if (name := _set_target_name(statement=statement)) is not None:
                 scope_declared.add(name)
         return
@@ -103,49 +97,38 @@ def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_
             loop_declared.add(node.target.name)
         elif isinstance(node.target, nodes.Tuple):
             loop_declared.update(item.name for item in node.target.items if isinstance(item, nodes.Name))
-        _collect_full_variable_paths(node.iter, paths=paths, declared_names=declared_names)
-        for statement in node.else_:
-            _collect_full_variable_paths(statement, paths=paths, declared_names=declared_names)
-        for loop_node in [*node.body, *([node.test] if node.test is not None else [])]:
-            _collect_full_variable_paths(loop_node, paths=paths, declared_names=loop_declared)
+        # Walked in source order, which is the order the image references are attached in
+        scoped_nodes = [
+            (node.iter, declared_names),
+            *((statement, loop_declared) for statement in node.body),
+            *((statement, declared_names) for statement in node.else_),
+            *([(node.test, loop_declared)] if node.test is not None else []),
+        ]
+        for scoped_node, scope_declared_names in scoped_nodes:
+            _walk_reads(node=scoped_node, declared_names=scope_declared_names, global_names=global_names, handle_read=handle_read)
         return
-
-    # Track locally declared variables that apply to this node's children
-    local_declared: set[str] = set()
 
     if isinstance(node, nodes.Macro):
         # Macro parameters, and the names Jinja provides inside a macro body, are locally declared
-        local_declared.update(arg.name for arg in node.args)
-        local_declared.update(("caller", "varargs", "kwargs"))
-
-    # Merge local declarations
-    new_declared = declared_names | local_declared
+        declared_names = declared_names | {arg.name for arg in node.args} | {"caller", "varargs", "kwargs"}
 
     if isinstance(node, nodes.Name) and node.ctx != "load":
         # The target of a `set` or a `for` is written, not read
         return
 
-    if isinstance(node, nodes.Getattr) and _build_full_path(node) is None:
-        # An attribute on a subscript, a call or a filter (`items[0].text`) reads the path its chain starts from
-        _collect_full_variable_paths(node.node, paths=paths, declared_names=new_declared)
+    if isinstance(node, nodes.Call) and isinstance(node.node, nodes.Name) and node.node.name in global_names:
+        # A call to a Jinja global (`range(count)`, `namespace()`) reads only its arguments. Any other read of the
+        # name (`{{ range }}`, `range.low`) reads the input of that name, which shadows the global when rendered
+        for child in node.iter_child_nodes():
+            if child is not node.node:
+                _walk_reads(node=child, declared_names=declared_names, global_names=global_names, handle_read=handle_read)
         return
 
-    # Check if this is a Name or Getattr node that represents a variable access
-    # We only add the path and DON'T recurse into Name/Getattr children to avoid
-    # adding intermediate paths (e.g., for `foo.bar`, we only want `foo.bar`, not also `foo`)
-    if isinstance(node, (nodes.Name, nodes.Getattr)):
-        full_path = _build_full_path(node)
-        if full_path:
-            root_name = get_root_from_dotted_path(full_path)
-            # Only add if the root is not a declared local variable
-            if root_name not in new_declared:
-                paths.add(full_path)
-        # Don't recurse into Name/Getattr children - we've captured the full path
+    if handle_read(node=node, declared_names=declared_names):
         return
 
-    # Recurse into child nodes (only for non-Name/Getattr nodes)
     for child in node.iter_child_nodes():
-        _collect_full_variable_paths(child, paths=paths, declared_names=new_declared)
+        _walk_reads(node=child, declared_names=declared_names, global_names=global_names, handle_read=handle_read)
 
 
 def detect_jinja2_required_variables(
@@ -186,8 +169,20 @@ def detect_jinja2_required_variables(
         raise Jinja2DetectVariablesError(msg) from undef_error
 
     paths: set[str] = set()
-    # The environment's globals (`range`, `namespace`, `dict`...) come from Jinja, never from the inputs
-    _collect_full_variable_paths(parsed_ast, paths=paths, declared_names=set(jinja2_env.globals))
+
+    def collect_full_path(*, node: nodes.Node, declared_names: set[str]) -> bool:
+        # Only the full path of an access chain is collected: `{{ foo.bar.baz }}` gives `foo.bar.baz`, not `foo.bar` or `foo`
+        if not isinstance(node, (nodes.Name, nodes.Getattr)):
+            return False
+        full_path = _build_full_path(node)
+        if full_path is None:
+            # An attribute on a subscript, a call or a filter (`items[0].text`) reads the path its chain starts from
+            return False
+        if get_root_from_dotted_path(full_path) not in declared_names:
+            paths.add(full_path)
+        return True
+
+    _walk_reads(node=parsed_ast, declared_names=set(), global_names=set(jinja2_env.globals), handle_read=collect_full_path)
     return paths
 
 
@@ -211,76 +206,6 @@ def _extract_filters_and_variable(node: nodes.Node) -> tuple[list[str], nodes.No
         current_node = current_node.node
 
     return filters, current_node
-
-
-def _collect_variable_references(
-    node: nodes.Node,
-    *,
-    references: dict[str, VariableReference],
-    declared_names: set[str],
-) -> None:
-    """Recursively walk the AST and collect variable references with their filters.
-
-    This function collects VariableReference objects containing the full path
-    and any filters applied to each variable. If the same variable is referenced
-    multiple times with different filters, all filters are combined.
-
-    Args:
-        node: The current AST node
-        references: Dict to collect discovered references (path -> VariableReference)
-        declared_names: Set of locally declared names (loop variables, macro params, etc.)
-    """
-    local_declared: set[str] = set()
-
-    if isinstance(node, nodes.Template):
-        local_declared.update(_collect_declarations_from_body(node.body))
-
-    if isinstance(node, nodes.For):
-        if isinstance(node.target, nodes.Name):
-            local_declared.add(node.target.name)
-        elif isinstance(node.target, nodes.Tuple):
-            for item in node.target.items:
-                if isinstance(item, nodes.Name):
-                    local_declared.add(item.name)
-        local_declared.add("loop")
-
-    if isinstance(node, nodes.Macro):
-        local_declared.update(arg.name for arg in node.args)
-
-    new_declared = declared_names | local_declared
-
-    # Handle Filter nodes - extract filters and find the base variable
-    if isinstance(node, nodes.Filter):
-        filters, base_node = _extract_filters_and_variable(node)
-        if base_node is None:
-            return
-        full_path = _build_full_path(base_node)
-        if full_path:
-            root_name = get_root_from_dotted_path(full_path)
-            if root_name not in new_declared:
-                if full_path in references:
-                    # Extend existing filters (avoid duplicates)
-                    for filter_name in filters:
-                        if filter_name not in references[full_path].filters:
-                            references[full_path].filters.append(filter_name)
-                else:
-                    references[full_path] = VariableReference(path=full_path, filters=filters)
-        # Don't recurse into the Filter chain - we've already processed it
-        return
-
-    # Handle plain Name or Getattr nodes (no filter applied)
-    if isinstance(node, (nodes.Name, nodes.Getattr)):
-        full_path = _build_full_path(node)
-        if full_path:
-            root_name = get_root_from_dotted_path(full_path)
-            if root_name not in new_declared:
-                if full_path not in references:
-                    references[full_path] = VariableReference(path=full_path, filters=[])
-        return
-
-    # Recurse into child nodes
-    for child in node.iter_child_nodes():
-        _collect_variable_references(child, references=references, declared_names=new_declared)
 
 
 def detect_jinja2_variable_references(
@@ -322,5 +247,27 @@ def detect_jinja2_variable_references(
         raise Jinja2DetectVariablesError(msg) from undef_error
 
     references: dict[str, VariableReference] = {}
-    _collect_variable_references(parsed_ast, references=references, declared_names=set())
+
+    def collect_reference(*, node: nodes.Node, declared_names: set[str]) -> bool:
+        # A filter chain is taken whole, with its filter names; a chain or a path that stops at a subscript or a
+        # call (`items[0].image`) gives no reference, since no image or document can be resolved from it
+        if isinstance(node, nodes.Filter):
+            filters, base_node = _extract_filters_and_variable(node)
+        elif isinstance(node, (nodes.Name, nodes.Getattr)):
+            filters, base_node = [], node
+        else:
+            return False
+        full_path = _build_full_path(base_node) if base_node is not None else None
+        if full_path is None or get_root_from_dotted_path(full_path) in declared_names:
+            return True
+        if full_path in references:
+            # The same variable referenced several times combines its filters
+            for filter_name in filters:
+                if filter_name not in references[full_path].filters:
+                    references[full_path].filters.append(filter_name)
+        else:
+            references[full_path] = VariableReference(path=full_path, filters=filters)
+        return True
+
+    _walk_reads(node=parsed_ast, declared_names=set(), global_names=set(jinja2_env.globals), handle_read=collect_reference)
     return list(references.values())

@@ -327,12 +327,14 @@ output = "Page[]"
 type = "PipeLLM"
 inputs = { invoice = "Invoice" }
 output = "InvoiceData"
+prompt = "Extract the invoice data:\n@invoice"
 
 # This pipe accepts Contract (and any concept that refines Contract)
 [pipe.process_contract]
 type = "PipeLLM"
 inputs = { contract = "Contract" }
 output = "ContractData"
+prompt = "Extract the contract data:\n@contract"
 ```
 
 In this setup:
