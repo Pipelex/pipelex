@@ -141,6 +141,30 @@ class TestPipeLLMBlueprint:
         )
         assert set(blueprint.input_names) == {"page", "page.page_view"}
 
+    def test_validate_inputs_incorrect_lone_dotted_input_name(self):
+        """A dotted input name alone does not supply the stuff its path is read from: the root must be declared."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"page.page_view": "native.Image"},
+                "output": "native.Text",
+                "prompt": "Describe:\n@page.page_view",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
+        assert error.variable_names == ["page"]
+
+    def test_validate_inputs_correct_with_attribute_after_subscript(self):
+        """An input read only through a subscript followed by an attribute counts as read."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"items": "native.Text[]"},
+            output="native.Text",
+            prompt="Summarize {{ items[0].text }}",
+        )
+        assert set(blueprint.input_names) == {"items"}
+
     def test_validate_inputs_ignores_internal_variables(self):
         """Test that internal variables (starting with _) are ignored."""
         blueprint = PipeLLMBlueprint(

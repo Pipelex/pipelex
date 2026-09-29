@@ -31,10 +31,19 @@ class PipeSearchInputCheckTestCases:
         ["other"],
     )
 
+    # A dotted input name alone does not supply the stuff its path is read from: the root must be declared
+    REFUSED_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "lone_dotted_input",
+        {"description": "d", "inputs": {"company.name": "Text"}, "output": "SearchResult", "prompt": "News on $company.name"},
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        ["company"],
+    )
+
     REFUSED_CASES: ClassVar[list[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]]] = [
         REFUSED_ONE_UNREAD,
         REFUSED_TWO_UNREAD,
         REFUSED_UNDECLARED,
+        REFUSED_LONE_DOTTED_INPUT,
     ]
 
     ACCEPTED_CASES: ClassVar[list[tuple[str, dict[str, Any]]]] = [
@@ -49,5 +58,13 @@ class PipeSearchInputCheckTestCases:
                 "output": "SearchResult",
                 "prompt": "News on $topic{% if region %} in {{ region }}{% endif %}",
             },
+        ),
+        (
+            "attribute_after_filter",
+            {"description": "d", "inputs": {"items": "Text[]"}, "output": "SearchResult", "prompt": "News on {{ (items|first).text }}"},
+        ),
+        (
+            "self_referential_set",
+            {"description": "d", "inputs": {"topic": "Text"}, "output": "SearchResult", "prompt": "{% set topic = topic|trim %}News on {{ topic }}"},
         ),
     ]

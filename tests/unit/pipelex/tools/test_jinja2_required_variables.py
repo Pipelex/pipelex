@@ -199,6 +199,24 @@ Best regards,
         ),
     ]
 
+    # A path stops at a subscript, a call or a filter, and the read before it still counts
+    CHAINED_ACCESS: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("attribute_after_subscript", "{{ items[0].text }}", {"items"}),
+        ("attribute_after_subscript_on_a_path", "{{ a.items[0].name }}", {"a.items"}),
+        ("attribute_after_key", "{{ record['meta'].title }}", {"record"}),
+        ("attribute_after_call", "{{ a.get('k').x }}", {"a.get"}),
+        ("attribute_after_filter", "{{ (items|first).text }}", {"items"}),
+        ("attribute_after_subscript_on_a_loop_variable", "{% for row in rows %}{{ row[0].text }}{% endfor %}", {"rows"}),
+    ]
+
+    # A `set` declares its name from that statement on, so what it reads, and a read before it, are required
+    ASSIGNMENT_ORDER: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("self_referential_set", "{% set topic = topic|trim %}{{ topic }}", {"topic"}),
+        ("read_before_set", "{{ note }}{% set note = 'x' %}{{ note }}", {"note"}),
+        ("read_after_set", "{% set note = 'x' %}{{ note }}", set()),
+        ("read_after_block_set", "{% set note %}{{ body }}{% endset %}{{ note }}", {"body"}),
+    ]
+
     TEMPLATE_CATEGORIES: ClassVar[list[TemplateCategory]] = [
         TemplateCategory.BASIC,
         TemplateCategory.LLM_PROMPT,
@@ -543,6 +561,40 @@ class TestDetectJinja2Variables:
             template_source=template_source,
         )
         assert result == {"user.profile.name", "config.value"}
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.CHAINED_ACCESS,
+    )
+    def test_chained_access(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """An attribute on a subscript, a call or a filter keeps the read of the path it starts from."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.ASSIGNMENT_ORDER,
+    )
+    def test_assignment_order(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """A top-level `set` hides its name only from the statements after it."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
 
 
 class TestDetectJinja2VariableReferences:

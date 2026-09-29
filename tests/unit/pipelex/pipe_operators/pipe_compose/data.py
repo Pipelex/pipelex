@@ -185,6 +185,21 @@ class PipeComposeInputCheckTestCases:
         ["place"],
     )
 
+    # A dotted input name alone does not supply the stuff its path is read from: the root must be declared
+    REFUSED_TEMPLATE_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "template_lone_dotted_input",
+        {"description": "d", "inputs": {"deal.amount": "Number"}, "output": "Text", "template": "Worth $deal.amount"},
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        ["deal"],
+    )
+
+    REFUSED_CONSTRUCT_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_lone_dotted_input",
+        {"description": "d", "inputs": {"page.page_view": "Image"}, "output": "Summary", "construct": {"view": {"from": "page.page_view"}}},
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        ["page"],
+    )
+
     REFUSED_CASES: ClassVar[list[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]]] = [
         REFUSED_TEMPLATE_ONE_UNREAD,
         REFUSED_TEMPLATE_TWO_UNREAD,
@@ -194,6 +209,8 @@ class PipeComposeInputCheckTestCases:
         REFUSED_CONSTRUCT_TWO_UNREAD,
         REFUSED_CONSTRUCT_UNDECLARED_FROM,
         REFUSED_CONSTRUCT_UNDECLARED_NESTED_TEMPLATE,
+        REFUSED_TEMPLATE_LONE_DOTTED_INPUT,
+        REFUSED_CONSTRUCT_LONE_DOTTED_INPUT,
     ]
 
     ACCEPTED_CASES: ClassVar[list[tuple[str, dict[str, Any]]]] = [
@@ -231,5 +248,17 @@ class PipeComposeInputCheckTestCases:
                 "output": "Summary",
                 "construct": {"view": {"from": "page.page_view"}, "text": {"from": "page.text_and_images"}},
             },
+        ),
+        (
+            "attribute_after_subscript",
+            {"description": "d", "inputs": {"items": "Text[]"}, "output": "Text", "template": "First: {{ items[0].text }}"},
+        ),
+        (
+            "self_referential_set",
+            {"description": "d", "inputs": {"topic": "Text"}, "output": "Text", "template": "{% set topic = topic|trim %}About {{ topic }}"},
+        ),
+        (
+            "construct_attribute_after_subscript",
+            {"description": "d", "inputs": {"items": "Text[]"}, "output": "Summary", "construct": {"first": {"template": "{{ items[0].text }}"}}},
         ),
     ]

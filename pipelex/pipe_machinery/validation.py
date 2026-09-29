@@ -61,20 +61,16 @@ def check_inputs_match_variables(*, declared_inputs: set[str], variable_paths: s
     The rule shared by every operator that reads its inputs through templates: PipeLLM, PipeCompose,
     PipeSearch and PipeImgGen. ``variable_paths`` are the full dotted paths the operator's templates read,
     already rid of the operator's special names, and ``reader`` names the fields that read them, for the
-    message ("prompt or system_prompt", "template"). Matching is by dotted path, so a dotted input name
-    such as ``page.page_view`` counts as read by the path it names.
+    message ("prompt or system_prompt", "template"). A variable is declared when its root is: the root is the
+    stuff the pipe receives, and a dotted input name such as ``page.page_view`` alone does not supply it. A
+    dotted input name counts as read by the path it names, so ``page`` and ``page.page_view`` are both read
+    by ``page.page_view``.
 
     Raises:
         PipeValidationError: ``MISSING_INPUT_VARIABLE`` with the undeclared root names, or
             ``EXTRANEOUS_INPUT_VARIABLE`` with the unread input names, each sorted.
     """
-    missing_names = sorted(
-        {
-            get_root_from_dotted_path(variable_path)
-            for variable_path in variable_paths
-            if not is_variable_satisfied_by_inputs(variable_path, input_names=declared_inputs)
-        }
-    )
+    missing_names = sorted({get_root_from_dotted_path(variable_path) for variable_path in variable_paths} - declared_inputs)
     if missing_names:
         quoted_names = _quoted_names(names=missing_names)
         if len(missing_names) == 1:

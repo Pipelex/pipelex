@@ -75,12 +75,18 @@ def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_
         paths: Set to collect discovered paths
         declared_names: Set of locally declared names (loop variables, macro params, etc.)
     """
+    if isinstance(node, nodes.Template):
+        # Macros are visible to the whole template, but a `set` declares its name only from its own statement on:
+        # `{% set topic = topic|trim %}` reads the incoming `topic`, and so does a read placed before the `set`
+        scope_declared = declared_names | {statement.name for statement in node.body if isinstance(statement, nodes.Macro)}
+        for statement in node.body:
+            _collect_full_variable_paths(statement, paths=paths, declared_names=scope_declared)
+            if isinstance(statement, (nodes.Assign, nodes.AssignBlock)) and isinstance(statement.target, nodes.Name):
+                scope_declared.add(statement.target.name)
+        return
+
     # Track locally declared variables that apply to this node's children
     local_declared: set[str] = set()
-
-    # For Template nodes, pre-scan body to find all declarations at this scope
-    if isinstance(node, nodes.Template):
-        local_declared.update(_collect_declarations_from_body(node.body))
 
     if isinstance(node, nodes.For):
         # Loop variable is locally declared
@@ -99,6 +105,15 @@ def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_
 
     # Merge local declarations
     new_declared = declared_names | local_declared
+
+    if isinstance(node, nodes.Name) and node.ctx != "load":
+        # The target of a `set` or a `for` is written, not read
+        return
+
+    if isinstance(node, nodes.Getattr) and _build_full_path(node) is None:
+        # An attribute on a subscript, a call or a filter (`items[0].text`) reads the path its chain starts from
+        _collect_full_variable_paths(node.node, paths=paths, declared_names=new_declared)
+        return
 
     # Check if this is a Name or Getattr node that represents a variable access
     # We only add the path and DON'T recurse into Name/Getattr children to avoid

@@ -161,12 +161,21 @@ class PipeImgGenInputCheckTestCases:
         ["avoid"],
     )
 
+    # A dotted input name alone does not supply the stuff its path is read from: the root must be declared
+    REFUSED_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "lone_dotted_input",
+        {"description": "d", "inputs": {"scene.subject": "Text"}, "output": "Image", "prompt": "Sketch of $scene.subject"},
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        ["scene"],
+    )
+
     REFUSED_CASES: ClassVar[list[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]]] = [
         REFUSED_ONE_UNREAD,
         REFUSED_TWO_UNREAD,
         REFUSED_UNREAD_IMAGE,
         REFUSED_UNDECLARED,
         REFUSED_UNDECLARED_IN_NEGATIVE_PROMPT,
+        REFUSED_LONE_DOTTED_INPUT,
     ]
 
     ACCEPTED_CASES: ClassVar[list[tuple[str, dict[str, Any]]]] = [
@@ -181,6 +190,20 @@ class PipeImgGenInputCheckTestCases:
                 "output": "Image",
                 "prompt": "Sketch of $topic",
                 "negative_prompt": "No $avoid",
+            },
+        ),
+        (
+            "attribute_after_key",
+            {"description": "d", "inputs": {"record": "Record"}, "output": "Image", "prompt": "Sketch of {{ record['meta'].title }}"},
+        ),
+        (
+            "self_referential_set_in_negative_prompt",
+            {
+                "description": "d",
+                "inputs": {"topic": "Text", "avoid": "Text"},
+                "output": "Image",
+                "prompt": "Sketch of $topic",
+                "negative_prompt": "{% set avoid = avoid|trim %}No {{ avoid }}",
             },
         ),
     ]

@@ -272,7 +272,7 @@ class ConstructBlueprint(BaseModel):
         - The paths read by nested constructs (recursively)
 
         The input check matches these paths against the declared inputs, so that a dotted input name
-        (`page.page_view`) counts as read by the path it names.
+        (`page.page_view`), declared next to its root `page`, counts as read by the path it names.
 
         Returns:
             Set of full dotted variable paths read from working memory
