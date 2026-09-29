@@ -1,5 +1,5 @@
 from pipelex.base_exceptions import ErrorDomain, PipelexError
-from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, is_printed_by_open_pipelex
 
 # The package whose engines print what open Pipelex does not: a PDF from a template, Excel, Word and PowerPoint.
 DOC_GEN_PLUGIN_PACKAGE = "pipelex-doc-gen"
@@ -23,7 +23,7 @@ class DocGenEngineMissingError(PipelexError):
         self.source = source
         self.pipe_code = pipe_code
         step = f"PipeDocGen '{pipe_code}'" if pipe_code else "A PipeDocGen step"
-        if doc_gen_format == DocGenFormat.PDF and source == DocGenSource.LAYOUT:
+        if is_printed_by_open_pipelex(doc_gen_format=doc_gen_format, source=source):
             where = "Open Pipelex prints it with its built-in engine, which this runtime has disabled."
         else:
             where = f"The engines for it come with the Pipelex document generation plugin, {DOC_GEN_PLUGIN_PACKAGE}, which is not installed here."

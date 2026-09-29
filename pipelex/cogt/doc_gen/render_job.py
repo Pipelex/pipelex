@@ -41,13 +41,18 @@ class RenderJob(BaseModel):
         description="The step's inputs as plain data, by input name: what a template file is filled with",
     )
 
+    def _carries_payload_of(self, *, source: DocGenSource) -> bool:
+        match source:
+            case DocGenSource.LAYOUT:
+                return self.layout is not None
+            case DocGenSource.HTML:
+                return self.html is not None
+            case DocGenSource.TEMPLATE_FILE:
+                return self.template is not None
+
     @model_validator(mode="after")
     def validate_payload(self) -> Self:
-        payloads = {
-            DocGenSource.LAYOUT: self.layout is not None,
-            DocGenSource.HTML: self.html is not None,
-            DocGenSource.TEMPLATE_FILE: self.template is not None,
-        }
+        payloads = {source: self._carries_payload_of(source=source) for source in DocGenSource}
         if not payloads[self.source]:
             msg = f"A render job {self.source.desc} carries its payload: the '{self.source}' one is missing."
             raise ValueError(msg)

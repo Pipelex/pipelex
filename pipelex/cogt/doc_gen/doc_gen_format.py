@@ -106,3 +106,16 @@ class DocGenSource(StrEnum):
         if doc_gen_format.is_template_html:
             return DocGenSource.HTML
         return DocGenSource.TEMPLATE_FILE
+
+
+def is_printed_by_open_pipelex(*, doc_gen_format: DocGenFormat, source: DocGenSource) -> bool:
+    """Whether open Pipelex's built-in engine prints this format from this source: only a `pdf` without a template."""
+    match doc_gen_format:
+        case DocGenFormat.PDF:
+            match source:
+                case DocGenSource.LAYOUT:
+                    return True
+                case DocGenSource.HTML | DocGenSource.TEMPLATE_FILE:
+                    return False
+        case DocGenFormat.XLSX | DocGenFormat.DOCX | DocGenFormat.PPTX:
+            return False
