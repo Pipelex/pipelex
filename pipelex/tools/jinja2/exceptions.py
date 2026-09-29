@@ -1,3 +1,4 @@
+from pipelex.base_exceptions import ErrorDomain
 from pipelex.system.exceptions import ToolError
 
 
@@ -22,6 +23,17 @@ class Jinja2TemplateSecurityError(ToolError):
     # so that the classification of render-time template failures can tell a refusal from the rest,
     # although for now both are classified alike: runtime domain, message not caller-facing.
     pass
+
+
+class Jinja2TemplateBudgetError(ToolError):
+    # A render tried to spend more than its budget (`jinja2_render_budget.py`): its template repeated,
+    # padded, joined, looped or recursed past what one render may allocate or compute. The template is
+    # the caller's own, and a Pipelex template can only get there on data too large to display, which
+    # is still the caller's input, so it is the caller's to fix. The message names the operation and
+    # its size, never the template source or a value.
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+    _declared_title = "Template render budget exceeded"
 
 
 class Jinja2StuffError(ToolError):

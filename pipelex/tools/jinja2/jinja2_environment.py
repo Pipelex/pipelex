@@ -1,4 +1,6 @@
 import inspect
+from collections.abc import Callable
+from typing import Any
 
 from jinja2 import BaseLoader
 
@@ -12,8 +14,13 @@ def make_jinja2_env_from_loader(
     template_category: TemplateCategory,
     loader: BaseLoader,
     enable_async: bool = True,
+    finalize: Callable[..., Any] | None = None,
 ) -> PipelexTemplateEnvironment:
-    """Build the environment for one template category. Every template renders sandboxed (`jinja2_sandbox.py`)."""
+    """Build the environment for one template category. Every template renders sandboxed (`jinja2_sandbox.py`).
+
+    A `finalize` is handed to the environment here, which wraps it to charge what is printed to the
+    render's budget.
+    """
     autoescape: bool
     trim_blocks: bool
     lstrip_blocks: bool
@@ -53,6 +60,7 @@ def make_jinja2_env_from_loader(
         autoescape=autoescape,
         trim_blocks=trim_blocks,
         lstrip_blocks=lstrip_blocks,
+        finalize=finalize,
     )
 
 
@@ -84,12 +92,14 @@ def make_jinja2_env_without_loader(
     template_category: TemplateCategory,
     *,
     enable_async: bool = True,
+    finalize: Callable[..., Any] | None = None,
 ) -> PipelexTemplateEnvironment:
     loader = BaseLoader()
     jinja2_env = make_jinja2_env_from_loader(
         template_category=template_category,
         loader=loader,
         enable_async=enable_async,
+        finalize=finalize,
     )
 
     _register_filters(jinja2_env, template_category=template_category, enable_async=enable_async)
@@ -100,6 +110,7 @@ def make_jinja2_env_from_registry(
     template_category: TemplateCategory,
     *,
     enable_async: bool = True,
+    finalize: Callable[..., Any] | None = None,
 ) -> PipelexTemplateEnvironment:
     """Create Environment with DictLoader from pre-loaded registry.
 
@@ -110,6 +121,7 @@ def make_jinja2_env_from_registry(
     Args:
         template_category: The category of templates being rendered.
         enable_async: Whether to enable async mode for the environment.
+        finalize: The caller's own finalize, if any, applied to every printed value.
 
     Returns:
         A Jinja2 Environment with DictLoader and appropriate filters.
@@ -119,6 +131,7 @@ def make_jinja2_env_from_registry(
         template_category=template_category,
         loader=loader,
         enable_async=enable_async,
+        finalize=finalize,
     )
 
     _register_filters(jinja2_env, template_category=template_category, enable_async=enable_async)

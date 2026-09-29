@@ -12,6 +12,7 @@ from jinja2.exceptions import (
 from pipelex.tools.jinja2.exceptions import (
     Jinja2ContextError,
     Jinja2StuffError,
+    Jinja2TemplateBudgetError,
     Jinja2TemplateRenderError,
     Jinja2TemplateSecurityError,
 )
@@ -20,6 +21,7 @@ from pipelex.tools.jinja2.jinja2_environment import (
     make_jinja2_env_without_loader,
 )
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.jinja2_render_budget import RenderBudgetExceededError
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -49,15 +51,14 @@ def _compile_jinja2_template(
         jinja2_env = make_jinja2_env_from_registry(
             template_category=template_category,
             enable_async=enable_async,
+            finalize=finalize,
         )
     else:
         jinja2_env = make_jinja2_env_without_loader(
             template_category=template_category,
             enable_async=enable_async,
+            finalize=finalize,
         )
-
-    if finalize is not None:
-        jinja2_env.finalize = finalize
 
     try:
         return jinja2_env.from_string(template_source)
@@ -102,6 +103,16 @@ def _make_security_error_msg(*, security_error: SecurityError) -> str:
     return f"Jinja2 render — refused by the template sandbox: {security_error}"
 
 
+# A template nesting macro calls or recursive loops deep enough reaches Python's recursion limit before
+# its budget, which is the same overspending by another name.
+_RECURSION_MSG = "Jinja2 render — refused by the render budget: the template nests calls deeper than Python allows."
+
+
+def _make_budget_error_msg(*, budget_error: RenderBudgetExceededError) -> str:
+    # Like a refusal, the message names the operation and its size, never the template source or a value.
+    return f"Jinja2 render — refused by the render budget: {budget_error}"
+
+
 def _make_non_type_error_msg(
     template_source: str,
     *,
@@ -116,6 +127,10 @@ def _render_template_sync(template_source: str, *, template: _Jinja2Template, te
         generated_text: str = template.render(**templating_context)
     except SecurityError as exc:
         raise Jinja2TemplateSecurityError(_make_security_error_msg(security_error=exc)) from exc
+    except RenderBudgetExceededError as exc:
+        raise Jinja2TemplateBudgetError(_make_budget_error_msg(budget_error=exc)) from exc
+    except RecursionError as exc:
+        raise Jinja2TemplateBudgetError(_RECURSION_MSG) from exc
     except Jinja2StuffError as exc:
         msg = _make_non_type_error_msg(template_source=template_source, error_label="stuff error", error=exc)
         raise Jinja2TemplateRenderError(msg) from exc
@@ -147,6 +162,10 @@ async def _render_template_async(template_source: str, *, template: _Jinja2Templ
         generated_text: str = await template.render_async(**templating_context)
     except SecurityError as exc:
         raise Jinja2TemplateSecurityError(_make_security_error_msg(security_error=exc)) from exc
+    except RenderBudgetExceededError as exc:
+        raise Jinja2TemplateBudgetError(_make_budget_error_msg(budget_error=exc)) from exc
+    except RecursionError as exc:
+        raise Jinja2TemplateBudgetError(_RECURSION_MSG) from exc
     except Jinja2StuffError as exc:
         msg = _make_non_type_error_msg(template_source=template_source, error_label="stuff error", error=exc)
         raise Jinja2TemplateRenderError(msg) from exc

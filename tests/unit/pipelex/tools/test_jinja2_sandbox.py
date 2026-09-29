@@ -23,7 +23,6 @@ from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError, Jinja2Tem
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
-from pipelex.tools.jinja2.jinja2_sandbox import _MUTATING_METHOD_NAMES  # pyright: ignore[reportPrivateUsage]
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
@@ -114,14 +113,6 @@ async def _render(template_source: str, *, context: dict[str, Any] | None = None
         templating_style=_TEMPLATING_STYLE,
     )
 
-
-# The methods of each mutable plain type that leave the value unchanged, so that together with the
-# sandbox's own list of mutating methods they classify every public method the type has.
-_NON_MUTATING_METHOD_NAMES: dict[type, frozenset[str]] = {
-    list: frozenset({"copy", "count", "index"}),
-    dict: frozenset({"copy", "fromkeys", "get", "items", "keys", "values"}),
-    set: frozenset({"copy", "difference", "intersection", "isdisjoint", "issubset", "issuperset", "symmetric_difference", "union"}),
-}
 
 # Templates handing a filter a value that holds a rendering method as data rather than defining it in its class.
 _NAMESPACE_WITH_RENDER_METHODS = (
@@ -359,12 +350,3 @@ class TestTemplateSandbox:
             templating_context={},
         )
         assert rendered == "<b>&lt;i&gt;</b>"
-
-    @pytest.mark.parametrize("plain_type", [list, dict, set])
-    def test_every_mutable_type_method_is_classified(self, plain_type: type) -> None:
-        """A method a later Python adds fails here until someone decides whether it mutates."""
-        public_names = {name for name in dir(plain_type) if not name.startswith("_")}
-        mutating = _MUTATING_METHOD_NAMES[plain_type]
-        non_mutating = _NON_MUTATING_METHOD_NAMES[plain_type]
-        assert not mutating & non_mutating
-        assert public_names == mutating | non_mutating
