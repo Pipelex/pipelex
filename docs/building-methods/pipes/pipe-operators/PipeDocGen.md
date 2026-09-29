@@ -112,7 +112,7 @@ A `pdf` step's `template`, or its `.html` `template_file`, is rendered with exac
 
 An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
 
-A template file is found beside the bundle, so it works for a bundle loaded from a directory. A bundle loaded from a string, as the hosted API does, cannot name one: the step is refused at load. An inline `template` works on every load path.
+A template file is found beside the bundle, so it works for a bundle loaded from a directory, a dependency package's included. A bundle loaded from a string, as the hosted API does, cannot name one: the step is refused at load. An inline `template` works on every load path.
 
 ## Running and iterating
 

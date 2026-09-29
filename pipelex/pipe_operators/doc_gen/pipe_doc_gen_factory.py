@@ -86,7 +86,11 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
 
     @classmethod
     def _resolve_template_file(cls, *, pipe_code: str, template_file: str, source: str | None) -> Path:
-        """The template file's path, beside the bundle and inside its directory, checked to exist."""
+        """The template file's path, beside the bundle and inside its directory, checked to exist.
+
+        The messages name the template file as the method does and never the host's path to it: the bundle a
+        refusal is located in already says which one, and a dependency's install path is not the caller's to read.
+        """
         bundle_dir = bundle_dir_of_source(source)
         if bundle_dir is None:
             msg = (
@@ -97,10 +101,10 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             raise PipeDocGenFactoryError(msg)
         resolved_path = (bundle_dir / template_file).resolve()
         if not resolved_path.is_relative_to(bundle_dir):
-            msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which is outside its bundle's directory '{bundle_dir}'."
+            msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which is outside its bundle's directory."
             raise PipeDocGenFactoryError(msg)
         if not resolved_path.is_file():
-            msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which does not exist at '{resolved_path}'."
+            msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which does not exist beside its bundle."
             raise PipeDocGenFactoryError(msg)
         return resolved_path
 

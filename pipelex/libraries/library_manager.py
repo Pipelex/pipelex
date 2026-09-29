@@ -1191,15 +1191,17 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Parse dependency blueprints
         dep_blueprints: list[PipelexBundleBlueprint] = []
+        # Where each bundle is on this host, by its caller-facing source, for the pipes that read a file beside it.
+        bundle_files_by_source: dict[str, Path] = {}
         for mthds_path in resolved_dep.mthds_files:
             try:
                 blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
-                blueprint.source = _dependency_bundle_source(
-                    package_address=package_address, package_root=resolved_dep.package_root, mthds_path=mthds_path
-                )
             except (FileNotFoundError, MthdsParserError) as exc:
                 log.warning(f"Could not parse dependency '{alias}' bundle '{mthds_path}': {exc}")
                 continue
+            bundle_source = _dependency_bundle_source(package_address=package_address, package_root=resolved_dep.package_root, mthds_path=mthds_path)
+            blueprint.source = bundle_source
+            bundle_files_by_source[bundle_source] = mthds_path
             dep_blueprints.append(blueprint)
 
         if not dep_blueprints:
@@ -1323,8 +1325,12 @@ class LibraryManager(LibraryManagerAbstract):
                 if has_exports and pipe_code not in all_exported:
                     continue
                 dependency_source = crate.source_map.get(pipe_ref)
-                if dependency_source is not None and pipe_blueprint.source is None:
-                    pipe_blueprint = pipe_blueprint.model_copy(update={"source": dependency_source})
+                # A pipe that reads a file beside its bundle (a PipeDocGen `template_file`) finds it from the
+                # bundle's file on this host, which its blueprint carries into the factory and no further. The
+                # package's address stays the source every refusal names, since the host's path is not the caller's.
+                bundle_file = bundle_files_by_source.get(dependency_source) if dependency_source is not None else None
+                if bundle_file is not None and pipe_blueprint.source is None:
+                    pipe_blueprint = pipe_blueprint.model_copy(update={"source": str(bundle_file)})
                 try:
                     # The same location the main load path attaches, so a dependency pipe's refusal
                     # names the dependency's own file.
