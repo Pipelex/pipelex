@@ -22,12 +22,16 @@ from pipelex.cogt.content_generation.assignment_models import (
     ImgGenAssignment,
     LLMAssignment,
     ObjectAssignment,
+    RenderDocumentAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
     SearchObjectAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.doc_gen.layout_tree import ImageBlock, LayoutDocument, SectionBlock
 from pipelex.cogt.document.prompt_document import PromptDocumentUri
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -53,6 +57,8 @@ URL_FIELD_INVENTORY: dict[type[BaseModel], set[str]] = {
     TemplatingAssignment: set(),
     ExtractAssignment: {"extract_input.image_uri", "extract_input.document_uri"},
     RenderPageViewsAssignment: {"document_uri"},
+    # A section's blocks hold blocks again: the walk names the images inside one section and stops where a section would enclose itself.
+    RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url"},
     SearchAssignment: set(),
     SearchObjectAssignment: set(),
 }
@@ -76,16 +82,18 @@ def _concrete_types(annotation: Any) -> list[Any]:
     return found
 
 
-def _url_field_paths(model_class: type[BaseModel], *, prefix: str = "") -> set[str]:
+def _url_field_paths(model_class: type[BaseModel], *, prefix: str = "", enclosing: frozenset[type] | None = None) -> set[str]:
+    """The dotted paths of the URL-shaped fields under a model, not walking again into a model that encloses itself."""
     paths: set[str] = set()
+    enclosing = (enclosing or frozenset()) | {model_class}
     for field_name, field_info in model_class.model_fields.items():
         if field_name in NON_PAYLOAD_FIELDS:
             continue
         for concrete_type in _concrete_types(field_info.annotation):
             if concrete_type is str and URL_FIELD_NAME.search(field_name):
                 paths.add(f"{prefix}{field_name}")
-            elif inspect.isclass(concrete_type) and issubclass(concrete_type, BaseModel):
-                paths |= _url_field_paths(concrete_type, prefix=f"{prefix}{field_name}.")
+            elif inspect.isclass(concrete_type) and issubclass(concrete_type, BaseModel) and concrete_type not in enclosing:
+                paths |= _url_field_paths(concrete_type, prefix=f"{prefix}{field_name}.", enclosing=enclosing)
     return paths
 
 
@@ -163,6 +171,26 @@ URL_BEARING_SAMPLES: dict[type[BaseModel], tuple[_DeclaresReads, set[str]]] = {
             page_views_dpi=72,
         ),
         {"pipelex-storage://s/doc.pdf"},
+    ),
+    RenderDocumentAssignment: (
+        RenderDocumentAssignment(
+            job_metadata=_job_metadata(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            composition=DocumentComposition(
+                format=DocGenFormat.PDF,
+                source=DocGenSource.LAYOUT,
+                filename="report.pdf",
+                title="Report",
+                layout=LayoutDocument(
+                    title="Report",
+                    blocks=[
+                        ImageBlock(url="pipelex-storage://s/cover.png"),
+                        SectionBlock(title="Figures", level=1, blocks=[ImageBlock(url="pipelex-storage://s/figure.png")]),
+                    ],
+                ),
+            ),
+        ),
+        {"pipelex-storage://s/cover.png", "pipelex-storage://s/figure.png"},
     ),
 }
 

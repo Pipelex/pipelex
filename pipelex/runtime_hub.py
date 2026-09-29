@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
     from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
+    from pipelex.plugins.document_renderer_registry import DocumentRendererRegistry
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
     from pipelex.plugins.model_lister_registry import ModelListerRegistry
     from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
@@ -119,6 +120,7 @@ class RuntimeHub:
         self._bundle_validator_registry: BundleValidatorRegistry | None = None
         self._storage_provider_registry: StorageProviderRegistry | None = None
         self._secrets_provider_registry: SecretsProviderRegistry | None = None
+        self._document_renderer_registry: DocumentRendererRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
@@ -293,6 +295,9 @@ class RuntimeHub:
     def set_secrets_provider_registry(self, secrets_provider_registry: "SecretsProviderRegistry"):
         self._secrets_provider_registry = secrets_provider_registry
 
+    def set_document_renderer_registry(self, document_renderer_registry: "DocumentRendererRegistry"):
+        self._document_renderer_registry = document_renderer_registry
+
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
 
@@ -439,6 +444,12 @@ class RuntimeHub:
             raise RuntimeError(msg)
         return self._secrets_provider_registry
 
+    def get_document_renderer_registry(self) -> "DocumentRendererRegistry":
+        if self._document_renderer_registry is None:
+            msg = "DocumentRendererRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._document_renderer_registry
+
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
 
@@ -553,6 +564,10 @@ def get_bundle_validator_registry() -> "BundleValidatorRegistry":
 
 def get_storage_provider_registry() -> "StorageProviderRegistry":
     return get_runtime_hub().get_storage_provider_registry()
+
+
+def get_document_renderer_registry() -> "DocumentRendererRegistry":
+    return get_runtime_hub().get_document_renderer_registry()
 
 
 def get_secrets_provider_registry() -> "SecretsProviderRegistry":

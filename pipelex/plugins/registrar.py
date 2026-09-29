@@ -5,9 +5,13 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import ErrorReport
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.template_check import TemplateCheckerProtocol
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
+from pipelex.plugins.document_renderer_registry import DocumentRendererEntry, DocumentRendererKey, MakeDocumentRendererFn
 from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
+    DuplicateDocumentRendererError,
     DuplicateHttpErrorMapperError,
     DuplicateInferenceBackendError,
     DuplicateLogSinkError,
@@ -162,6 +166,7 @@ class PluginRegistrar:
         self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
         self.log_sinks: dict[str, LogSinkFactoryFn] = {}
         self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
+        self.document_renderers: dict[DocumentRendererKey, DocumentRendererEntry] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -177,6 +182,7 @@ class PluginRegistrar:
         self._secrets_provider_sources: dict[str, str] = {}
         self._log_sink_sources: dict[str, str] = {}
         self._pipe_func_executor_sources: dict[str, str] = {}
+        self._document_renderer_sources: dict[DocumentRendererKey, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -329,6 +335,39 @@ class PluginRegistrar:
             contribution=f"pipe_func executor {mode}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicatePipeFuncExecutorError(
                 mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_document_renderer(
+        self,
+        *,
+        doc_gen_format: DocGenFormat,
+        source: DocGenSource,
+        engine: str,
+        make_renderer: MakeDocumentRendererFn,
+        check_template: TemplateCheckerProtocol | None = None,
+    ) -> None:
+        """Contribute a document engine: what prints `doc_gen_format` from `source` for a `PipeDocGen` step.
+
+        The built-in ``ReportlabDocGenPlugin`` prints a ``pdf`` from the layout tree; the Pipelex document
+        generation plugin registers the rest from outside. Engines are keyed by format, source and ``engine``
+        name, so two engines may print the same format from the same source, and ``runtime.doc_gen.engines``
+        then chooses one. ``make_renderer`` is invoked once per process, the first time a document is printed
+        with the engine, never here — so it may import the engine's library while ``register`` stays
+        import-light. ``check_template``, for an engine that fills a template file, is called by the dry run on
+        every step it would print (``pipelex.cogt.doc_gen.template_check``). The render job and the template
+        check request are plain data, and they are the whole contract (``pipelex.cogt.doc_gen.render_job``).
+        Fail-loud on a duplicate engine name for a format and a source, naming both plugins.
+        """
+        key = DocumentRendererKey(doc_gen_format=doc_gen_format, source=source, engine=engine)
+        self._add(
+            store=self.document_renderers,
+            sources=self._document_renderer_sources,
+            key=key,
+            value=DocumentRendererEntry(engine=engine, make_renderer=make_renderer, check_template=check_template, source_plugin=self._active.name),
+            contribution=f"document engine {engine} for {doc_gen_format} from {source}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateDocumentRendererError(
+                doc_gen_format=doc_gen_format, source=source, engine=engine, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )
 

@@ -6,6 +6,7 @@ from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.config import get_config
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -111,6 +112,27 @@ class GeneratedContentFactory:
         if media_type and media_type.startswith("image/"):
             return raw_bytes, media_type
         return raw_bytes, None
+
+    async def make_document_content(
+        self,
+        *,
+        storage_scope: str,
+        data: bytes,
+        mime_type: str,
+        filename: str,
+    ) -> DocumentContent:
+        """Store a produced file's bytes and return the `DocumentContent` that points at them.
+
+        The key is `{storage_scope}/generated/{hash}/{filename}`: the hash keeps two different files with the
+        same name apart, and ending in the human filename means every backend's URL, and so every download, is
+        called `invoice-INV-2026-0142.pdf` rather than a hash. The caller owns the filename's safety: it must be
+        one path segment.
+        """
+        hash_digest = hashlib.sha256(data).hexdigest()[:16]
+        storage_key = f"{storage_scope}/{GENERATED_CONTENT_LEAF}/{hash_digest}/{filename}"
+        url = await self.storage_provider.store(data=data, key=storage_key, content_type=mime_type)
+        public_url = await self.storage_provider.public_url(uri=url)
+        return DocumentContent(url=url, public_url=public_url, mime_type=mime_type, filename=filename)
 
     async def make_image_content(
         self,

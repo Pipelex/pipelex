@@ -3,13 +3,16 @@ from typing import Any
 
 from jinja2 import pass_context
 from jinja2.runtime import Context, Undefined
+from markupsafe import Markup
 
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
+from pipelex.tools.jinja2.html_renderable import HtmlRenderable
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.renderable_dispatch import type_implements
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
 from pipelex.tools.jinja2.text_format_renderable import TextFormatRenderable
+from pipelex.tools.markdown.markdown_parser import render_markdown_as_html
 from pipelex.tools.templating.templating_style import TagStyle
 from pipelex.tools.templating.text_format import TextFormat
 
@@ -17,7 +20,7 @@ from pipelex.tools.templating.text_format import TextFormat
 # Jinja2 filters
 ########################################################################################
 
-ALLOWED_FILTERS = ["tag", "format", "default", "escape_script_tag", "with_images"]
+ALLOWED_FILTERS = ["tag", "format", "default", "escape_script_tag", "with_images", "markdown"]
 
 
 def require_templating_style_value(*, context: Context, jinja2_context_key: Jinja2ContextKey) -> str:
@@ -50,18 +53,35 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | st
         if placeholder is not None:
             return placeholder
 
-    applied_text_format: TextFormat
+    named_text_format: TextFormat | None
     if text_format:
         # A template can name its own format — `{{ x | format("markdown") }}` — and Jinja2 hands the
         # argument over as a raw string, so both that and a `TextFormat` member normalise here. An
         # unknown name is a template error, reported as one rather than as a bare `ValueError`.
         try:
-            applied_text_format = TextFormat(text_format)
+            named_text_format = TextFormat(text_format)
         except ValueError as exc:
             msg = f"Invalid text format: '{text_format}'"
             raise Jinja2ContextError(msg) from exc
     else:
-        applied_text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
+        named_text_format = None
+
+    # In an HTML template, a value that knows its own HTML (a Markdown stuff) prints as that HTML unless the
+    # template names another format, so `$report` prints what `{{ report }}` prints. The result is inserted
+    # unescaped, so the value's class must define `__html__`, which a template cannot forge, and the value must
+    # answer it: a `StuffArtefact`'s class defines it for every stuff, and only a content that knows its HTML
+    # answers it. `isinstance` cannot ask the second question, since from Python 3.12 it reads a protocol's
+    # members off the class too.
+    if context.eval_ctx.autoescape and type_implements(value=value, protocol=HtmlRenderable) and hasattr(value, "__html__"):
+        match named_text_format:
+            case None | TextFormat.HTML:
+                return Markup(value)  # ruff: ignore[unsafe-markup-use] - Markup inserts the __html__ the value's class vouches for
+            case TextFormat.PLAIN | TextFormat.MARKDOWN | TextFormat.JSON:
+                pass
+
+    applied_text_format = named_text_format or TextFormat(
+        require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT)
+    )
 
     # Protocol-based rendering, licensed by the value's type (see renderable_dispatch.py)
     if isinstance(value, TextFormatRenderable) and type_implements(value=value, protocol=TextFormatRenderable):
@@ -179,3 +199,18 @@ def escape_script_tag(value: Any) -> Any:
     if not isinstance(value, str):
         return value
     return value.replace("<", "\\u003c")
+
+
+def markdown_to_html(value: Any) -> Markup:
+    """Render a Markdown text as HTML: the `markdown` filter of HTML templates.
+
+    It is for Markdown held in a plain text field, such as an invoice's notes; a `Markdown` stuff renders as
+    HTML by itself. A text stuff renders its text, anything else its string form, and an undefined or None
+    value nothing. The parser is Pipelex's one Markdown parser (`markdown_parser.py`): raw HTML in the source
+    is escaped rather than passed through, and only URLs with a scheme become links, so the markup is marked
+    safe.
+    """
+    if isinstance(value, Undefined) or value is None:
+        return Markup("")
+    source_text = value if isinstance(value, str) else str(value)
+    return Markup(render_markdown_as_html(source_text))  # ruff: ignore[unsafe-markup-use] - raw HTML in the source is escaped by the parser

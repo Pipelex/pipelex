@@ -24,6 +24,11 @@ if TYPE_CHECKING:
 # ``add_log_sink`` — a third config-selected, process-global registry (``runtime.log.sink`` picks the
 # factory at boot) — joined the menu under v4 without a bump: a menu addition breaks no plugin that
 # targets v4, and a bump would have made every installed plugin re-declare ``targets_api`` for nothing.
+#
+# ``add_document_renderer`` — the document engines a ``PipeDocGen`` step prints with, keyed by format and
+# source, with an optional template checker — joined the menu under v4 on the same reasoning. Its render job
+# and template check request (``pipelex.cogt.doc_gen``) are plain data and part of the contract: a breaking
+# change to either is a bump.
 PLUGIN_API_VERSION: int = 4
 
 

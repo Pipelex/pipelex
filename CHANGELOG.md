@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`PipeDocGen` generates a document file**: a new operator turns its inputs into a stored `Document`, named by its `filename` expression and ending in the suffix its `format` sets. A `pdf` without a template is printed by a built-in engine on ReportLab from the auto-layout of the inputs: a structure's fields in a grid, a list of flat structures as a table with its header on every page, a `Markdown` input formatted, and every page with a running title and page numbers, in a bundled font. It calls no model. A step no installed engine prints, a `pdf` with an HTML `template` or `template_file` and any `xlsx`, `docx` or `pptx` step, is refused when the method loads, with an error naming the Pipelex document generation plugin. A template's field paths are checked against the inputs' concepts at load, loop variables included, and its templates and filename render strictly, so a missing value fails the dry run instead of printing as empty text. `pipelex run` copies the file into the run's results folder and prints its path.
+- **Document engines are plugins**: `PluginRegistrar.add_document_renderer` registers an engine per format and source, built once per process on first use, and optionally a template checker that the dry run calls on a step's template file. An engine receives a `RenderJob` of plain data and reads the files its document names through `RenderResources`, under the run's read scope. `[runtime.doc_gen] engines` chooses between two engines installed for the same format and source, and a runtime that disables the built-in `reportlab` plugin in `[runtime.plugins] disabled` refuses every `PipeDocGen` step it cannot print at load.
+- **The `markdown` template filter**: an HTML template turns Markdown held in a text field into HTML with `{{ order.notes | markdown }}`. Raw HTML in the source is shown as text, and only URLs with a scheme become links.
+- **The `Markdown` native concept**: `Markdown` refines `Text` and holds a text written in Markdown, which a `PipeLLM` with `output = "Markdown"` writes as free text and a `Markdown` input takes as a string or as `{"concept": "Markdown", "content": "…"}`; Pipelex defines it ahead of the MTHDS standard. A `Markdown` value is accepted wherever a `Text` is, while a `Text`, or any concept refining `Text`, is refused where a `Markdown` is required. `pipelex run --save-main-stuff` saves it verbatim as `main_stuff.md`, an HTML template prints `{{ report }}` and `$report` as HTML with raw HTML escaped, and `Stuff.as_markdown` and `PipeOutput.main_stuff_as_markdown` read it from Python.
+
+### Changed
+
+- **`Markdown` is a reserved native concept code (Breaking)**: a bundle declaring its own concept named `Markdown` is refused with `native_concept_redeclaration`; rename it, or use the native.
+- **A string under a concept refining `Text` keeps the concept's class**: a bare string or a `{"concept": …, "content": "…"}` envelope for such a concept now holds the concept's own content class where it held a plain `TextContent`, as the `YesNo`, `Date` and `Time` envelopes already did.
+- **`markdown-it-py` replaces `markdown` in the dependencies**: the `markdown` package, which pipelex no longer imported, is dropped, and `markdown-it-py` with its `linkify` extra renders the Markdown of `PipeDocGen`, the `markdown` filter and the `Markdown` concept.
+
 ## [v0.70.0] - 2026-09-29
 
 ### Highlights

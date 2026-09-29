@@ -19,6 +19,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -561,6 +562,11 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def main_stuff_as_html(self) -> HtmlContent:
         """Get main stuff content as HtmlContent if applicable."""
         return self.get_stuff_as_html(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_markdown(self) -> MarkdownContent:
+        """Get main stuff content as MarkdownContent if applicable."""
+        return self.main_stuff_as(content_type=MarkdownContent)
 
     @property
     def main_stuff_as_mermaid(self) -> MermaidContent:

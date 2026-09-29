@@ -13,6 +13,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
+from pipelex.cli.commands.run._main_stuff_file import save_main_stuff_file
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_dedicated_failure_panel,
@@ -311,6 +312,7 @@ async def _execute_run(
     # Save main_stuff files if enabled. An absent main output saves the explicit absence
     # artifact (json + md, no interactive viewer — nothing to view), never value renders.
     saved_main_stuff_formats: list[str] = []
+    saved_main_stuff_file: Path | None = None
     if save_main_stuff and output_path:
         if isinstance(main_resolved, AbsenceRecord):
             absence_json_path = output_path / "main_stuff.json"
@@ -347,6 +349,14 @@ async def _execute_run(
             main_stuff_viewer_path.write_text(main_stuff_viewer, encoding="utf-8")
             log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
             saved_main_stuff_formats.append("html_viewer")
+
+            # A Document or Image main output also lands as the file itself, under its own name. A dry run
+            # produced a placeholder, not a file, so there is nothing to copy.
+            if not dry_run:
+                try:
+                    saved_main_stuff_file = await save_main_stuff_file(content=main_stuff.content, output_dir=output_path)
+                except (PipelexError, OSError, ValueError) as file_exc:
+                    typer.secho(f"Could not copy the main output's file into {output_path}: {file_exc}", fg=typer.colors.YELLOW, err=True)
 
     # Save working memory to JSON if enabled
     working_memory_output_path: str | None = None
@@ -441,6 +451,8 @@ async def _execute_run(
             console.print(f"    [green]✓[/green] graphs: {', '.join(saved_graphs)}")
         if saved_main_stuff_formats:
             console.print(f"    [green]✓[/green] main_stuff: {', '.join(saved_main_stuff_formats)}")
+        if saved_main_stuff_file:
+            console.print(f"    [green]✓[/green] file: [bold magenta]{saved_main_stuff_file}[/bold magenta]")
         if working_memory_output_path:
             if Path(working_memory_output_path).is_relative_to(output_path):
                 console.print("    [green]✓[/green] working_memory.json")

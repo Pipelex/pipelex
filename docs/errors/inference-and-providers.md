@@ -14,6 +14,8 @@ own page. Classes are grouped by subsystem.
 
 - [`CogtError`](cogt-error.md) — AI inference failed
 - [`CostRegistryError`](cost-registry-error.md) — Cost registry
+- [`DocGenEngineMissingError`](doc-gen-engine-missing-error.md) — Doc gen engine missing
+- [`DocGenRenderError`](doc-gen-render-error.md) — Doc gen render
 - [`DryRunMockBuildError`](dry-run-mock-build-error.md) — Dry run mock build
 - [`DryRunObjectFidelityError`](dry-run-object-fidelity-error.md) — Dry run object fidelity
 - [`ExtractCapabilityError`](extract-capability-error.md) — Extract capability
@@ -117,7 +119,9 @@ own page. Classes are grouped by subsystem.
 
 - [`BrokenPluginError`](broken-plugin-error.md) — Broken plugin
 - [`CoreUnconditionalPluginDisabledError`](core-unconditional-plugin-disabled-error.md) — Core unconditional plugin disabled
+- [`DocumentEngineChoiceError`](document-engine-choice-error.md) — Document engine choice
 - [`DuplicateBundleValidatorError`](duplicate-bundle-validator-error.md) — Duplicate bundle validator
+- [`DuplicateDocumentRendererError`](duplicate-document-renderer-error.md) — Duplicate document renderer
 - [`DuplicateHttpErrorMapperError`](duplicate-http-error-mapper-error.md) — Duplicate http error mapper
 - [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
 - [`DuplicateLogSinkError`](duplicate-log-sink-error.md) — Duplicate log sink

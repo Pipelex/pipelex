@@ -17,6 +17,7 @@ from pipelex.builder.operations.pipe_ops import parse_pipe_spec
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.builder.pipe.pipe_doc_gen_spec import PipeDocGenSpec
 from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
@@ -93,6 +94,15 @@ def _add_type_specific_fields(*, pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDo
     elif isinstance(pipe_spec, PipeStructureSpec):
         if pipe_spec.model:
             pipe_table.add("model", pipe_spec.model)
+
+    elif isinstance(pipe_spec, PipeDocGenSpec):
+        pipe_table.add("format", str(pipe_spec.format))
+        if pipe_spec.template is not None:
+            pipe_table.add("template", format_toml_string(pipe_spec.template))
+        if pipe_spec.template_file is not None:
+            pipe_table.add("template_file", pipe_spec.template_file)
+        if pipe_spec.filename is not None:
+            pipe_table.add("filename", pipe_spec.filename)
 
     elif isinstance(pipe_spec, PipeComposeSpec):
         if pipe_spec.construct_spec is not None:

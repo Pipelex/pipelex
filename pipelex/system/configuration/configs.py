@@ -4,6 +4,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, field_validator, model_validator
 
 from pipelex.cogt.config_cogt import InferenceConfig
+from pipelex.cogt.doc_gen.doc_gen_config import DocGenConfig
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.methods.methods_config import MethodsConfig
@@ -180,11 +181,13 @@ class RuntimeConfig(ConfigModel):
 
     The machinery present at execution time whatever is loaded, per
     ``docs/contribute/hub-layering.md``: storage, secrets, logging, cloud credentials,
-    reporting, tracing, observation, outbound network posture, and the plugin system's own denylist.
+    reporting, tracing, observation, outbound network posture, the plugin system's own denylist, and which
+    document engine prints what.
     """
 
     storage: StorageConfig
     network: NetworkConfig
+    doc_gen: DocGenConfig
     secrets: SecretsProviderConfig
     log: LogConfig
     aws: AwsConfig

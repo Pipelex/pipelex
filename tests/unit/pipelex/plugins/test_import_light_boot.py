@@ -37,6 +37,9 @@ _GUARD_SCRIPT = textwrap.dedent(
         # its factory, so registering the sinks must not load them.
         "opentelemetry.sdk",
         "opentelemetry.exporter",
+        # Nor ReportLab: the built-in ``reportlab`` document engine defers it into its factory, so a
+        # process that never prints a document never imports it.
+        "reportlab",
     )
 
     class _Blocker(importlib.abc.MetaPathFinder):

@@ -15,6 +15,7 @@ from pipelex.core.stuffs.exceptions import StuffContentTypeError, StuffContentVa
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
@@ -246,6 +247,11 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     def as_html(self) -> HtmlContent:
         """Get content as HtmlContent if applicable."""
         return self.content_as(content_type=HtmlContent)
+
+    @property
+    def as_markdown(self) -> MarkdownContent:
+        """Get content as MarkdownContent if applicable."""
+        return self.content_as(content_type=MarkdownContent)
 
     @property
     def as_mermaid(self) -> MermaidContent:

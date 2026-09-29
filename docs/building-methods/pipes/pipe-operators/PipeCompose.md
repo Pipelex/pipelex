@@ -109,6 +109,8 @@ template = """
 """
 ```
 
+**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through, and only URLs with a scheme, such as `https://example.com`, become links, so a file name like `README.md` stays text. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template.
+
 ## Construct Mode
 
 Construct mode builds structured objects by mapping fields from inputs. Use this when you need to assemble a complex output concept from multiple inputs without using an LLM.

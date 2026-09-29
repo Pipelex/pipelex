@@ -694,6 +694,10 @@ class LibraryManager(LibraryManagerAbstract):
                 concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
                 source = crate.source_map.get(pipe_ref)
+                # A pipe that reads a file beside its bundle (a PipeDocGen `template_file`) resolves it
+                # against the bundle's own file, which the crate knows and the pipe's blueprint does not.
+                if source is not None and pipe_blueprint.source is None:
+                    pipe_blueprint = pipe_blueprint.model_copy(update={"source": source})
                 with _locating_pipe_build_refusals(
                     pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
                 ):
@@ -1318,13 +1322,16 @@ class LibraryManager(LibraryManagerAbstract):
                 # If manifest has exports, only load exported pipes
                 if has_exports and pipe_code not in all_exported:
                     continue
+                dependency_source = crate.source_map.get(pipe_ref)
+                if dependency_source is not None and pipe_blueprint.source is None:
+                    pipe_blueprint = pipe_blueprint.model_copy(update={"source": dependency_source})
                 try:
                     # The same location the main load path attaches, so a dependency pipe's refusal
                     # names the dependency's own file.
                     with _locating_pipe_build_refusals(
                         pipe_code=pipe_code,
                         domain_code=domain_code,
-                        source=crate.source_map.get(pipe_ref),
+                        source=dependency_source,
                         elaboration=crate.elaboration_metadata.get(pipe_ref),
                     ):
                         pipe = PipeFactory[PipeAbstract].make_from_blueprint(
