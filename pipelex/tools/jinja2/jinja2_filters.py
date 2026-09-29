@@ -207,9 +207,10 @@ def markdown_to_html(value: Any) -> Markup:
     It is for Markdown held in a plain text field, such as an invoice's notes; a `Markdown` stuff renders as
     HTML by itself. A text stuff renders its text, anything else its string form, and None nothing. An
     undefined value prints the way the template prints one anywhere else: nothing in a lenient template, and a
-    render error in a strict one, which is how a misspelled field reached through an alias still fails. The parser is Pipelex's one Markdown parser (`markdown_parser.py`): raw HTML in the source
-    is escaped rather than passed through, and only URLs with a scheme become links, so the markup is marked
-    safe.
+    render error in a strict one, which is how a misspelled field reached through an alias still fails.
+
+    The parser is Pipelex's one Markdown parser (`markdown_parser.py`): raw HTML in the source is escaped
+    rather than passed through, and only URLs with a scheme become links, so the markup is marked safe.
     """
     if value is None:
         return Markup("")

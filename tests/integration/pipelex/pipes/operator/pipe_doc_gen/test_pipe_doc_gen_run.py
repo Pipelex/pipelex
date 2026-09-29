@@ -32,7 +32,7 @@ class _BrokenEngine(StubEngine):
     """A stub engine that fails the way third-party code can, with an exception nobody declared."""
 
     @override
-    def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:  # ruff: ignore[unused-method-argument]
+    def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:
         msg = "font cache is corrupt"
         raise RuntimeError(msg)
 

@@ -16,7 +16,6 @@ it timed out.
 
 import asyncio
 import contextvars
-import functools
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,7 +27,7 @@ from pipelex.cogt.content_generation.dry_mock import dry_render_document
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError, DocGenRenderError
-from pipelex.cogt.doc_gen.render_job import RenderResources
+from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderResources
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.runtime_hub import get_document_renderer_registry
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -105,9 +104,13 @@ async def render_document_and_store(
         loop=asyncio.get_running_loop(),
     )
     # The context is carried into the thread, as `asyncio.to_thread` would, so the engine logs under the run.
-    print_call = functools.partial(contextvars.copy_context().run, renderer.render, job=render_job, resources=resources)
+    run_context = contextvars.copy_context()
+
+    def _print() -> RenderedDocument:
+        return run_context.run(renderer.render, job=render_job, resources=resources)
+
     try:
-        rendered = await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, print_call)
+        rendered = await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, _print)
     except PipelexError:
         # Already classified: a refused read, or a failure the engine reported as a `DocGenRenderError`.
         raise

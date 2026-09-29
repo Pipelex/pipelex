@@ -25,7 +25,9 @@ class TestRunRenderResources:
 
         mocker.patch.object(doc_gen_generate, "_RESOURCE_LOAD_TIMEOUT_SECONDS", 0.05)
         mocker.patch.object(doc_gen_generate, "load_bytes_from_any_uri", _never_answers)
-        resources = RunRenderResources(storage_provider=mocker.MagicMock(spec=StorageProviderAbstract), read_scope=None, loop=asyncio.get_running_loop())
+        resources = RunRenderResources(
+            storage_provider=mocker.MagicMock(spec=StorageProviderAbstract), read_scope=None, loop=asyncio.get_running_loop()
+        )
 
         with pytest.raises(DocGenRenderError, match="image 1 of the document"):
             await asyncio.to_thread(resources.load, uri="https://example.com/photo.png", position="image 1 of the document")
