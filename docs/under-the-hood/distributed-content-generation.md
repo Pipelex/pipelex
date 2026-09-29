@@ -150,6 +150,8 @@ async def generate_and_store_images(img_gen_assignment):
     )
 ```
 
+Each object is stored under `{storage_scope}/generated/<filename>`, the filename rendered from the storage method's `uri_format` (`{hash}.{extension}` by default). The extension follows the MIME type the object is stored under, so the key and the stored content type always agree: `jpg` for `image/jpeg`, `svg` for `image/svg+xml`, and `bin` for a type with no extension of its own.
+
 !!! info "What crosses the boundary"
     `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, paired `width`/`height`, and `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
 
