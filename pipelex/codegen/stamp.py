@@ -235,6 +235,9 @@ def _parse_options(options_raw: str) -> dict[str, str] | None:
         loaded = json.loads(options_raw, parse_constant=_reject_json_constant)
     except ValueError:  # JSONDecodeError is a subclass, so this one clause covers malformed JSON too
         return None
+    except RecursionError:
+        # A deeply nested value exhausts the parser's stack: not a stamp this module could have written.
+        return None
     if not isinstance(loaded, dict):
         return None
     typed = cast("dict[str, object]", loaded)

@@ -7,7 +7,7 @@ description: "Reference for the `MethodStructuresRefusedError` Pipelex error cla
 
 # Method structures refused
 
-The fetched package declares in-process Python structure classes, which hosted execution refuses.
+The method declares Python structure classes, which hosted execution refuses to import into its own process.
 
 | Field | Value |
 |---|---|

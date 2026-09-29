@@ -44,6 +44,13 @@ Classes inheriting from `StructuredContent` are automatically discovered and reg
     
     **Best practice:** Keep your `StructuredContent` classes in dedicated modules (e.g., `*_struct.py` files) with minimal module-level code, or ensure module-level code is safe to execute during discovery.
 
+!!! warning "Not available on the hosted API"
+    Python structure classes are an open-source and self-hosted feature. Using one means importing its module, and the hosted API never imports a method's Python into its own process. It refuses any method whose Python declares a `StructuredContent` subclass, whether the method was sent inline, saved to the catalog or fetched by address. The refusal is a [`MethodStructuresRefusedError`](../../errors/method-structures-refused-error.md) naming each file and class. Python that only holds PipeFuncs is accepted, because PipeFuncs run in an isolated sandbox.
+
+    To run such a method on the hosted API, declare its types as MTHDS concepts with [inline structures](inline-structures.md). A PipeFunc can still return them: in the sandbox, Pipelex generates a `structures` module from the method's concepts, so the function imports the class it returns with `from structures import <domain>__<Concept>`.
+
+    The `structures` module that `pipelex build structures` writes into a bundle is a copy of those same concepts, so the hosted API accepts it as long as it is left as generated. The API neither imports it nor sends it to the sandbox, which generates its own from the concepts with domain-qualified class names, so a PipeFunc imports them as shown above. Edit the file and it is refused like any hand-written class.
+
 ## With Custom Validation
 
 ```python
