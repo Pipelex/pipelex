@@ -25,8 +25,9 @@ class SsrfBlockedError(SecurityError):
     carried); the caller fixes it by providing a public URL.
     ``_authors_caller_facing_message`` lets the message survive STRICT
     disclosure — it deliberately names only the requested hostname, never the
-    resolved private IP, so it cannot confirm internal network topology to a
-    probing client.
+    resolved private IP, so it never reveals an internal address to a probing
+    client. That a name resolves to a private address at all stays observable,
+    since the refusal is told apart from a host that cannot be reached.
     """
 
     error_domain = ErrorDomain.INPUT

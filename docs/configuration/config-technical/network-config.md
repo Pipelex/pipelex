@@ -30,6 +30,7 @@ A URL passed to a provider as a URL, for a model that fetches images itself, is 
 Keep the guard on unless your deployment needs one of these:
 
 - **Documents on a private network.** A self-hosted deployment inside a company network may exist precisely to read documents from an intranet host, which resolves to a private address.
+- **An image-generation server on your own machine or network.** A self-hosted model server that answers with a link to the image on `localhost` or a private address has that link refused when Pipelex downloads the image, which it does while `[runtime.storage] is_fetch_remote_content_enabled` is on.
 - **Egress through an HTTP proxy.** The guard connects directly and ignores `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`: through a proxy, the proxy makes the connection, and the guard would only ever see the proxy's own address. If a proxy is your only way out, remote downloads fail until the guard is off.
 
 Turning it off restores a plain HTTP client, which honours the proxy variables and follows redirects without checking where they lead:
