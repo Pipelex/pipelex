@@ -11,7 +11,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_machinery.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
+from pipelex.pipe_machinery.validation import check_inputs_match_variables
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -110,30 +110,12 @@ class PipeLLMBlueprint(PipeBlueprint):
             var for var in required_variable_paths if not var.startswith("_") and get_root_from_dotted_path(var) != "place_holder"
         }
 
-        # Find variables used in prompts but not satisfied by any input
-        missing_inputs = {
-            var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, input_names=declared_inputs)
-        }
-
-        # Find inputs declared but not used by any variable path
-        unused_inputs = {
-            input_name for input_name in declared_inputs if not is_input_used_by_variables(input_name, variable_paths=filtered_variable_paths)
-        }
-
-        if missing_inputs:
-            missing_vars_str = ", ".join(sorted(missing_inputs))
-            msg = (
-                f"Missing input variable(s): {missing_vars_str}. These variables are used in the prompt or system_prompt but not declared in inputs."
-            )
-            raise ValueError(msg)
-
-        if unused_inputs:
-            unused_vars_str = ", ".join(sorted(unused_inputs))
-            msg = (
-                f"Unused input variable(s): '{unused_vars_str}'. "
-                "These variables are declared in inputs but not referenced in the prompt or system_prompt."
-            )
-            raise ValueError(msg)
+        check_inputs_match_variables(
+            declared_inputs=declared_inputs,
+            variable_paths=filtered_variable_paths,
+            reader="prompt or system_prompt",
+            dotted_input_supplies_its_path=True,
+        )
 
     @override
     def validate_output(self):

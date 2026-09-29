@@ -122,7 +122,7 @@ description = "Process invoice documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this invoice document...
+Process this invoice document, classified as $classification...
 """
 
 [pipe.process_receipt]
@@ -131,7 +131,7 @@ description = "Process receipt documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this receipt document...
+Process this receipt document, classified as $classification...
 """
 
 [pipe.process_unknown]
@@ -140,7 +140,7 @@ description = "Handle unknown document types"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this unknown document type...
+Process this document of unknown type, classified as $classification...
 """
 ```
 

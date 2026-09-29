@@ -18,6 +18,8 @@ For structured outputs, you have two options:
 
 If you already have text from elsewhere (a PDF extraction, a search result, an upstream pipe), call [`PipeStructure`](./PipeStructure.md) directly — there's no need to wrap a `PipeLLM` around it.
 
+Every input the pipe declares must be read by `prompt` or `system_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither prompt reads as `extraneous_input_variable`, naming the input, so you either reference it in a prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+
 ## Working with Images (Vision Language Models)
 
 `PipeLLM` supports Vision Language Models (VLMs) that can process both text and images. To use images in your prompts:

@@ -85,7 +85,6 @@ own page. Classes are grouped by subsystem.
 - [`StructuredContentComposerTypeError`](structured-content-composer-type-error.md) — Structured content composer type
 - [`StructuredContentComposerValidationError`](structured-content-composer-validation-error.md) — Structured content composer validation
 - [`StructuredContentComposerValueError`](structured-content-composer-value-error.md) — Structured content composer value
-- [`UnusedInputError`](unused-input-error.md) — Unused input
 - [`WithImagesFilterError`](with-images-filter-error.md) — With images filter
 
 ## Pipe controllers
