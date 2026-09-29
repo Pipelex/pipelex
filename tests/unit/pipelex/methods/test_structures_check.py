@@ -196,6 +196,18 @@ class TestStructuresCheck:
         assert structured_content_class_names_in_source(source="def broken(:\n", filename="broken.py") == []
         assert structured_content_class_names_in_source(source="x = 1\0\n", filename="nul.py") == []
 
+    @pytest.mark.parametrize(
+        "source",
+        [
+            pytest.param("x = a" + ".a" * 200_000 + "\n", id="attribute_chain_exhausts_recursion"),
+            pytest.param("x = " + "-" * 200_000 + "1\n", id="unary_run_overflows_parser_stack"),
+        ],
+    )
+    def test_source_too_deep_to_parse_declares_nothing(self, source: str) -> None:
+        # Every sandbox-hosted load scans every customer `.py`, so a source that exhausts the parser
+        # must read as declaring nothing, not escape the load as a RecursionError or MemoryError.
+        assert structured_content_class_names_in_source(source=source, filename="deep.py") == []
+
     def test_sources_are_reported_in_path_order(self) -> None:
         violations = scan_structured_content_sources(sources={"z.py": STRUCTURES_MODULE, "a.py": ALIASED_IMPORT_MODULE})
 

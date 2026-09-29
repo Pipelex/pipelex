@@ -12,7 +12,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.interpreter_hub import get_library_manager, scoped_current_library, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_operators.func import direct_pipe_func_executor
-from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
+from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor, bundle_import_dirs
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
@@ -101,6 +101,15 @@ class TestDirectExecutorWorkdir:
 
         stale_entries = [entry for entry in sys.path if Path(entry).is_relative_to(workdir)]
         assert stale_entries == []
+
+    def test_import_dirs_search_the_root_first_then_sorted_subdirs(self, tmp_path: Path):
+        """A module name two bundle directories share resolves to the same file in every process, root first."""
+        for relpath in ("zeta/structures.py", "alpha/helpers.py", "funcs.py", "alpha/deep/more.py", "notes/readme.txt"):
+            file_path = tmp_path / relpath
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text("x = 1\n", encoding="utf-8")
+
+        assert bundle_import_dirs(workdir=tmp_path) == [tmp_path, tmp_path / "alpha", tmp_path / "alpha" / "deep", tmp_path / "zeta"]
 
     @pytest.mark.asyncio
     async def test_transported_run_generates_concept_structures(self):

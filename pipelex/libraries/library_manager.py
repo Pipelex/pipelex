@@ -49,7 +49,7 @@ from pipelex.libraries.library_utils import (
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
 from pipelex.methods.fetch_on_miss import resolve_address_based_method
-from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources
+from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, is_generated_structures_module
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -514,6 +514,11 @@ class LibraryManager(LibraryManagerAbstract):
                 captured_sources = self._library_sources.setdefault(library_id, {})
                 for dir_sources in sources_by_dir.values():
                     for relpath, source in dir_sources.items():
+                        if is_generated_structures_module(source=source):
+                            # The refusal accepted it as a copy of the method's own concepts, and the sandbox
+                            # generates its own from those concepts, qualified. Shipping this one too would give
+                            # the sandbox two `structures` modules, and a PipeFunc's import would reach either.
+                            continue
                         if relpath in captured_sources and captured_sources[relpath] != source:
                             msg = (
                                 f"Duplicate PipeFunc source path '{relpath}' across library dirs while loading library "

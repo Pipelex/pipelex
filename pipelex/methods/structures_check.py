@@ -15,9 +15,10 @@ run the same walk over one source string, so the two refusals cannot drift apart
 
 One file declaring such classes is not refused: the `python-structures` projection that
 `pipelex build structures` writes, left as generated. It is a copy of the method's own MTHDS
-concepts, which is exactly what the refusal asks for, and a hosted load imports it no more than any
-other file. Its stamp is not a signature, anyone can compute its hash, so the exemption is sound
-only because nothing it lets through is imported into the runner; a hand-edited copy is refused.
+concepts, which is exactly what the refusal asks for. A hosted load imports it no more than any other
+file, and does not ship it either, since the sandbox generates its own from the same concepts. Its
+stamp is not a signature, anyone can compute its hash, so the exemption is sound only because
+nothing it lets through is imported into the runner; a hand-edited copy is refused.
 
 The scan is alias-aware: a base written as `StructuredContent`, imported under another name
 (`from ... import StructuredContent as SC`), or reached as an attribute
@@ -26,9 +27,10 @@ pre-check, and honestly so: dynamic tricks (rebinding through assignments, metac
 `type(...)` calls) are out of its scope. Its job is that straightforward declarations and
 straightforward aliasing cannot defeat the refusal. On a sandbox-hosted load that is enough,
 because the loader imports none of the customer's Python: a file that escapes the scan travels to
-the sandbox as source and never executes in the runner. A subclass of a caught class in the same
-package is covered transitively, because the file declaring the base is itself refused and the
-refusal applies to the whole package or load.
+the sandbox as source and never executes in the runner. A subclass of a class declared elsewhere
+escapes it the same way, whether its base comes from the exempt generated module or from Pipelex
+itself: it is never imported here, so a concept naming it fails to resolve its structure class
+instead of getting this refusal.
 """
 
 import ast
@@ -37,7 +39,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.codegen.emitters.target import CodegenTarget
 from pipelex.codegen.stamp import compute_content_hash, parse_stamped
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 
@@ -96,7 +97,8 @@ def structured_content_class_names_in_source(*, source: str, filename: str) -> l
     This is the one walk both refusals run, over the text itself, so the fetch-time scan of a
     directory and the load-time scan of captured sources cannot drift apart. A source that does not
     parse declares nothing: it cannot be imported either, so it cannot smuggle a structure class
-    into the process.
+    into the process. That includes a source nested deeply enough to exhaust the parser, which
+    Python's own import rejects the same way.
 
     Args:
         source: The Python source text.
@@ -108,6 +110,10 @@ def structured_content_class_names_in_source(*, source: str, filename: str) -> l
     try:
         tree = ast.parse(source, filename=filename)
     except (SyntaxError, ValueError):
+        return []
+    except (RecursionError, MemoryError):
+        # A deep attribute chain exhausts the AST builder's recursion, a deep run of unary operators
+        # overflows the parser's stack ("Parser stack overflowed"): too complex to import, like a syntax error.
         return []
     return _structured_content_class_names(tree=tree)
 
@@ -123,7 +129,7 @@ def is_generated_structures_module(*, source: str) -> bool:
     parsed = parse_stamped(source, comment_prefix="#")
     if parsed is None:
         return False
-    return parsed.stamp.target == CodegenTarget.PYTHON_STRUCTURES and parsed.stamp.content_hash == compute_content_hash(parsed.body)
+    return parsed.stamp.target.is_python_structures and parsed.stamp.content_hash == compute_content_hash(parsed.body)
 
 
 def _refused_class_names(*, source: str, filename: str) -> list[str]:

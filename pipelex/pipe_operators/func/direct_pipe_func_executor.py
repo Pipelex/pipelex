@@ -28,6 +28,23 @@ from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 _TRANSPORTED_LIBRARY_ID = "pipe_func_transported_lib"
 
 
+def bundle_import_dirs(*, workdir: Path) -> list[Path]:
+    """The directories a materialized bundle's modules import from, in `sys.path` search order.
+
+    The bundle root comes first and the subdirectories holding a `.py` file follow in sorted order, so a
+    module name that two of them share resolves to the same file in every process. In particular, the
+    `structures` module generated at the root wins over any `structures.py` a subdirectory ships.
+
+    Args:
+        workdir: The directory the bundle's sources were materialized into.
+
+    Returns:
+        The root followed by its source subdirectories, each listed once.
+    """
+    subdirs = {py_file.parent for py_file in workdir.rglob("*.py")} - {workdir}
+    return [workdir, *sorted(subdirs)]
+
+
 class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
     """The ``direct`` execution mode: resolve the function from the process-global registry and run it here.
 
@@ -128,9 +145,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # workdir (resolves `from funcs.helpers import ...`) and every subdirectory holding a .py file
         # (resolves the sibling-relative `from helpers import ...`); the caller's finally prunes these
         # entries once the import phase is over, so they never outlive the run.
-        source_dirs = {workdir} | {py_file.parent for py_file in workdir.rglob("*.py")}
-        for source_dir in source_dirs:
-            sys.path.insert(0, str(source_dir))
+        sys.path[0:0] = [str(source_dir) for source_dir in bundle_import_dirs(workdir=workdir)]
 
         # Register the customer's structure classes and @pipe_func functions from their real source,
         # before rehydration seeds a per-run registry from the global one and before the function lookup.

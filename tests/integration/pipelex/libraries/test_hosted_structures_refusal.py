@@ -236,9 +236,10 @@ class TestHostedStructuresRefusal:
         assert tmp_path.name not in message
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
-    def test_generated_structures_module_is_accepted_and_never_executed(self, tmp_path: Path, load_empty_library: Callable[[], str]):
+    def test_generated_structures_module_is_accepted_and_not_shipped(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         """The module `pipelex build structures` writes into a bundle copies the method's own MTHDS concepts, so a
-        hosted load accepts it as generated: it travels to the sandbox as source and is never imported here.
+        hosted load accepts it as generated. It is never imported here, and it does not travel either: the sandbox
+        generates its own from the same concepts, and two `structures` modules there would shadow each other.
         """
         library_dir = tmp_path / "bundle"
         library_dir.mkdir()
@@ -264,13 +265,16 @@ class TestHostedStructuresRefusal:
         generated_file = library_dir / "structures" / "structures.py"
         generated_source = generated_file.read_text(encoding="utf-8")
         assert "(StructuredContent)" in generated_source
+        helper_source = "GREETING = 'hello'\n"
+        (library_dir / "helpers.py").write_text(helper_source, encoding="utf-8")
 
         library_id = load_empty_library()
         library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
 
         hosted_crate = library_manager.get_crate(library_id=library_id)
         assert hosted_crate is not None
-        assert hosted_crate.python_sources.get("structures/structures.py") == generated_source
+        assert "structures/structures.py" not in hosted_crate.python_sources
+        assert hosted_crate.python_sources.get("helpers.py") == helper_source
         assert not _is_imported(path=generated_file)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
