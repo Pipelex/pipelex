@@ -11,7 +11,7 @@ from mthds.package.dependency_resolver import ResolvedDependency, determine_expo
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
-from pydantic import BaseModel, PydanticUserError, ValidationError
+from pydantic import BaseModel, PydanticUndefinedAnnotation, ValidationError
 from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
@@ -21,6 +21,7 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.helpers import make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
@@ -60,7 +61,7 @@ from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
 
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.domains.domain import Domain
@@ -585,11 +586,13 @@ class LibraryManager(LibraryManagerAbstract):
             all_concepts = self._load_concepts_from_crate(crate.concepts)
             library.concept_library.add_concepts(concepts=all_concepts)
 
-            # Resolve forward references in dynamically generated structure classes
-            self._rebuild_models_with_forward_refs(all_concepts)
-
-            # Detect cycles in concept references (A -> B -> A is forbidden)
-            self._detect_concept_cycles(all_concepts)
+            # A main-package concept's forward references may name any concept the library holds: this batch's,
+            # an earlier batch's, or a loaded dependency's aliased entry.
+            self._run_concept_stage(
+                loaded_concepts=all_concepts,
+                visible_concepts=list(library.concept_library.root.values()),
+                concept_sources=crate.source_map,
+            )
 
             # Precompute domain -> concept local codes mapping. VESTIGIAL on this path — see the note
             # on the qualification pass below: every io ref reaching PipeFactory is dotted, and the
@@ -719,7 +722,7 @@ class LibraryManager(LibraryManagerAbstract):
         Concepts that refine other concepts are loaded after their base concepts,
         ensuring the base class is always registered before the refining class.
         Forward references between concepts (for structure fields) are resolved
-        later by _rebuild_models_with_forward_refs().
+        later by _run_concept_stage().
 
         Args:
             blueprints: List of parsed MTHDS blueprints to load
@@ -1170,9 +1173,12 @@ class LibraryManager(LibraryManagerAbstract):
             all_domains.append(domain)
         child_library.domain_library.add_domains(domains=all_domains)
 
-        # Load concepts into child library
+        # Load concepts into child library. A dependency's forward references may name its own concepts and
+        # nothing else: it cannot name its consumer, its own dependencies are not loaded, and a wider namespace would
+        # let a reference to a domain it does not declare bind silently to a consumer's class of that name.
         dep_concepts = self._load_concepts_from_blueprints(dep_blueprints)
         child_library.concept_library.add_concepts(concepts=dep_concepts)
+        self._run_concept_stage(loaded_concepts=dep_concepts, visible_concepts=dep_concepts, concept_sources=crate.source_map)
 
         # Collect main_pipes for auto-export
         main_pipes: set[str] = set()
@@ -1408,36 +1414,96 @@ class LibraryManager(LibraryManagerAbstract):
         for blueprint in blueprints:
             self._remove_from_blueprint(library_id=library_id, blueprint=blueprint)
 
-    def _rebuild_models_with_forward_refs(self, concepts: list["Concept"]) -> None:
-        """Rebuild Pydantic models to resolve forward references.
+    def _run_concept_stage(
+        self,
+        *,
+        loaded_concepts: list["Concept"],
+        visible_concepts: "Iterable[Concept]",
+        concept_sources: "Mapping[str, str]",
+    ) -> None:
+        """The steps that follow adding a batch of concepts to a library, shared by both load paths.
 
-        When dynamically generated classes have forward references (e.g., `customer: "Customer"`),
-        Python's get_type_hints() cannot resolve them because the referenced classes are not
-        in any accessible namespace. This method builds a namespace with all structure classes
-        and calls model_rebuild() to resolve the forward references.
+        `load_from_crate` and `_load_single_dependency` both call this, and nothing else does: the dependency
+        loader once hand-copied these steps and dropped two of them, so a dependency's forward references were
+        never resolved and its concept cycles never checked. The order is load-bearing. The cycle check reads the
+        resolved field annotations, and an unresolved forward reference has no `__name__`, which is how an
+        unrebuilt reference hides from it, so the rebuild and its refusal come first.
 
         Args:
-            concepts: List of concepts that were just loaded
+            loaded_concepts: The concepts this batch loaded, whose structure classes are rebuilt and checked
+            visible_concepts: Every concept those classes' forward references may name, the loaded ones included
+            concept_sources: concept_ref -> the bundle that declared it, for the refusal's message
         """
-        # Build namespace with all structure class names
-        namespace: dict[str, type] = {}
-        class_registry = get_class_registry()
+        self._rebuild_structure_classes(loaded_concepts=loaded_concepts, visible_concepts=visible_concepts, concept_sources=concept_sources)
+        self._detect_concept_cycles(loaded_concepts)
 
-        for concept in concepts:
-            structure_class = class_registry.get_class(name=concept.structure_class_name)
-            if structure_class is not None:
+    def _rebuild_structure_classes(
+        self,
+        *,
+        loaded_concepts: list["Concept"],
+        visible_concepts: "Iterable[Concept]",
+        concept_sources: "Mapping[str, str]",
+    ) -> None:
+        """Resolve the forward references of the loaded concepts' structure classes, and refuse any left unresolved.
+
+        A generated structure class names another concept's class as a forward reference (`"invented_notes__Note"`),
+        which pydantic resolves only when the class is rebuilt against a namespace holding that name. The namespace
+        holds the structure class of every visible concept, keyed by its class name, plus the loaded concepts' classes
+        keyed by their bare concept code too: the generator emits a bare code only for a ref with no domain, and a bare
+        code is ambiguous across domains, so that key must not widen with the rest.
+
+        The classes are looked up in the library's class registry, which keys generated classes by `domain__Code`
+        alone. When a dependency concept and a main-package concept share that name, both resolve to the one class the
+        registry holds, the main package's, which registered last. That clash is L-260929-0584cc's.
+
+        A generated class still incomplete after its rebuild refuses the load, instead of loading and failing at first
+        use. Only generated classes are checked, and a generated class is recognised by its name: the concept factory
+        names every class it generates `make_qualified_structure_class_name(domain, code)`, while a class registered from
+        Python for a concept keeps its own name. Such a class, like a native one, is left to its own module's resolution:
+        its rebuild failing is only logged, as before.
+        """
+        class_registry = get_class_registry()
+        namespace: dict[str, type] = {}
+        for concept in visible_concepts:
+            if structure_class := class_registry.get_class(name=concept.structure_class_name):
                 namespace[concept.structure_class_name] = structure_class
-                # Also add by concept code in case the forward ref uses the code
+        for concept in loaded_concepts:
+            if structure_class := class_registry.get_class(name=concept.structure_class_name):
+                namespace[concept.structure_class_name] = structure_class
                 namespace[concept.code] = structure_class
 
-        # Rebuild each model with the shared namespace
-        for concept in concepts:
+        refusals: list[str] = []
+        for concept in loaded_concepts:
             structure_class = class_registry.get_class(name=concept.structure_class_name)
-            if structure_class is not None and issubclass(structure_class, BaseModel):
-                try:
-                    structure_class.model_rebuild(_types_namespace=namespace)
-                except (NameError, PydanticUserError) as exc:
-                    log.debug(f"Could not rebuild model for {concept.concept_ref}: {exc}")
+            if structure_class is None or not issubclass(structure_class, BaseModel):
+                continue
+            is_generated = concept.structure_class_name == make_qualified_structure_class_name(
+                domain_code=concept.domain_code, concept_code=concept.code
+            )
+            missing_class_name: str | None = None
+            try:
+                structure_class.model_rebuild(_types_namespace=namespace)
+            except PydanticUndefinedAnnotation as exc:
+                if not is_generated:
+                    log.debug(f"Could not rebuild the structure class of {concept.concept_ref}: {exc}")
+                    continue
+                missing_class_name = exc.name
+            if not is_generated or structure_class.__pydantic_complete__:
+                continue
+            source = concept_sources.get(concept.concept_ref)
+            where = f" (declared in '{source}')" if source else ""
+            missing = f"the structure class '{missing_class_name}'" if missing_class_name else "one of the structure classes it names"
+            refusals.append(
+                f"Concept '{concept.concept_ref}'{where} has a structure field naming a concept that cannot be found: "
+                f"no concept it can see has {missing}."
+            )
+
+        if refusals:
+            refusals.append(
+                "A field may name a concept declared by a bundle already loaded or by a method package the bundle depends on "
+                "(`address->domain.Concept`)."
+            )
+            raise LibraryLoadingError(" ".join(refusals))
 
     def _detect_concept_cycles(self, concepts: list["Concept"]) -> None:
         """Detect cycles in concept references and raise an error if found.

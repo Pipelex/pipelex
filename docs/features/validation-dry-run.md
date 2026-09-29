@@ -16,7 +16,7 @@ Pipelex provides multiple layers of validation to catch issues before they cost 
 Check pipeline syntax, structure, and compatibility without execution:
 
 - **Syntax validation** — Catch MTHDS language errors via plxt linting
-- **Structure validation** — Resolve pipe and concept references in the loaded library, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
+- **Structure validation** — Resolve pipe and concept references in the loaded library, refuse concepts whose structures form a cycle or whose fields name a concept that cannot be found, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
 - **Input validation** — Ensure required inputs are provided and correctly typed, and that every variable a step reads is bound by the time that step runs
 
 A pipe that references a sub-pipe from a package that isn't loaded is reported as **skipped** rather than validated, so a passing run is not proof that every cross-package dependency resolves.
