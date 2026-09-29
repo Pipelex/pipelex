@@ -2042,8 +2042,9 @@ Pipelex provides multiple layers of validation to catch issues before they cost 
 Check pipeline syntax, structure, and compatibility without execution:
 
 - **Syntax validation** — Catch MTHDS language errors via plxt linting
-- **Structure validation** — Resolve pipe and concept references in the loaded library, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
+- **Structure validation** — Resolve pipe and concept references in the loaded library, refuse concepts whose structures form a cycle or whose fields name a concept that cannot be found, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
 - **Input validation** — Ensure required inputs are provided and correctly typed, and that every variable a step reads is bound by the time that step runs
+- **Declared inputs are read** — For `PipeLLM`, `PipeCompose`, `PipeSearch` and `PipeImgGen`, every variable a template reads must be declared in `inputs` (`missing_input_variable`), and every declared input must be read by one of the pipe's templates (`extraneous_input_variable`): the prompt and system prompt of a `PipeLLM`, the template or the construct of a `PipeCompose`, the prompt of a `PipeSearch`, the prompt and negative prompt of a `PipeImgGen`. An unread input is refused on the pipe that declares it, before any controller above it is asked to supply it
 
 A pipe that references a sub-pipe from a package that isn't loaded is reported as **skipped** rather than validated, so a passing run is not proof that every cross-package dependency resolves.
 
@@ -2149,6 +2150,8 @@ A deployment whose egress rules allow S3 by hostname must allow `*.s3.<region>.a
 Storage is configured in `pipelex.toml` under `[runtime.storage]`. Set `method` to `local`, `in_memory`, `s3`, or `gcp`, then provide provider-specific settings such as `bucket_name`, `region`, or `project_id` in the matching subsection.
 
 For AWS configuration, see [AWS Configuration](../configuration/config-technical/aws-config.md).
+
+When an image-generation provider returns a URL rather than bytes and `is_fetch_remote_content_enabled` is on, Pipelex downloads the image into storage. That download, like every download of a URL a value carries, goes through the SSRF guard, which refuses private and metadata addresses; see [Network Configuration](../configuration/config-technical/network-config.md).
 
 
 ## Cost Tracking & Reporting
@@ -3293,6 +3296,15 @@ lead = { type = "concept", concept_ref = "myapp.Employee", description = "Team l
 
 Pipelex automatically handles concept dependencies. You can define concepts in any order—Pipelex loads them in the correct sequence based on their relationships.
 
+A field may name a concept declared in the same bundle, in another bundle loaded into the same library (in the same load or an earlier one), or in a method package the bundle depends on, written with the package's address: `concept_ref = "github.com/acme/crm-methods/crm->crm.Customer"`. A method package is loaded when one of the bundle's pipes references it, so a field alone does not bring a package in. A concept in a method package sees only that package's own concepts.
+
+Two things refuse the load rather than failing later, when the concept is first used:
+
+- **A cycle between concepts**, such as `A` holding a `B` that holds an `A`, including a concept that holds itself.
+- **A field naming a concept that cannot be found**, because no bundle the concept can see declares it. A concept declared only by a bundle loaded afterwards cannot be found either.
+
+A method package's own dependencies are never loaded, so a concept in the package that names one of their concepts is not refused. It fails when first used, and so does any concept holding it.
+
 ## Choice Fields (Enums)
 
 For fields that should only accept specific values, use the `choices` property. When using `choices`, you don't need to specify a `type`.
@@ -3429,6 +3441,13 @@ Classes inheriting from `StructuredContent` are automatically discovered and reg
     When Pipelex discovers `StructuredContent` classes, it imports the module containing them. **Any code at the module level (outside functions/classes) will be executed during import.** This can have unintended side effects.
     
     **Best practice:** Keep your `StructuredContent` classes in dedicated modules (e.g., `*_struct.py` files) with minimal module-level code, or ensure module-level code is safe to execute during discovery.
+
+!!! warning "Not available on the hosted API"
+    Python structure classes are an open-source and self-hosted feature. Using one means importing its module, and the hosted API never imports a method's Python into its own process. It refuses any method whose Python declares a `StructuredContent` subclass, whether the method was sent inline, saved to the catalog or fetched by address. The refusal is a [`MethodStructuresRefusedError`](../../errors/method-structures-refused-error.md) naming each file and class. Python that only holds PipeFuncs is accepted, because PipeFuncs run in an isolated sandbox.
+
+    To run such a method on the hosted API, declare its types as MTHDS concepts with [inline structures](inline-structures.md). A PipeFunc can still return them: in the sandbox, Pipelex generates a `structures` module from the method's concepts, so the function imports the class it returns with `from structures import <domain>__<Concept>`.
+
+    The `structures` module that `pipelex build structures` writes into a bundle is a copy of those same concepts, so the hosted API accepts it as long as it is left as generated. The API neither imports it nor sends it to the sandbox, which generates its own from the concepts with domain-qualified class names, so a PipeFunc imports them as shown above. Edit the file and it is refused like any hand-written class.
 
 ## With Custom Validation
 
@@ -4186,6 +4205,7 @@ type = "PipeLLM"
 description = "Extract key terms from a contract"
 inputs = { contract = "Contract" }  # Clear what type of document is expected
 output = "ContractTerms"
+prompt = "Extract the key terms from this contract:\n@contract"
 ```
 
 ### 3. Domain-Specific Methods
@@ -4473,12 +4493,14 @@ output = "Page[]"
 type = "PipeLLM"
 inputs = { invoice = "Invoice" }
 output = "InvoiceData"
+prompt = "Extract the invoice data:\n@invoice"
 
 # This pipe accepts Contract (and any concept that refines Contract)
 [pipe.process_contract]
 type = "PipeLLM"
 inputs = { contract = "Contract" }
 output = "ContractData"
+prompt = "Extract the contract data:\n@contract"
 ```
 
 In this setup:
@@ -5173,7 +5195,7 @@ A few behaviors worth knowing:
 
 - **Installed wins.** Once a method is installed, it is used as-is — including when a reference pins a different `@<tag>` than what is installed (a warning tells you so). Remove the installed directory to re-fetch.
 - **A miss that cannot be bridged is a loud diagnostic, never a silent pass**: fetch disabled, an unfetchable address, or a failed fetch each raise an error naming the address and the remedy.
-- **Hosted parity warning.** A fetched method declaring Python structure classes runs locally but triggers the same warning as a direct CLI fetch: hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python. On a sandbox-hosted deployment the fetch refuses such a package outright, with the same rule-naming error.
+- **Hosted parity warning.** A fetched method declaring Python structure classes runs locally but triggers the same warning as a direct CLI fetch: hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python. On a sandbox-hosted deployment the fetch refuses such a package outright, with the same rule-naming error. The refusal is not specific to fetching: a sandbox-hosted deployment refuses every method whose Python declares structure classes, however it arrived (see [Python classes](concepts/python-classes.md)).
 
 To **disable network fetches at load time**, set the switch in your `pipelex.toml` (or use the environment variable, which takes precedence):
 
@@ -6784,6 +6806,8 @@ For structured outputs, you have two options:
 
 If you already have text from elsewhere (a PDF extraction, a search result, an upstream pipe), call [`PipeStructure`](./PipeStructure.md) directly — there's no need to wrap a `PipeLLM` around it.
 
+Every input the pipe declares must be read by `prompt` or `system_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither prompt reads as `extraneous_input_variable`, naming the input, so you either reference it in a prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+
 ## Working with Images (Vision Language Models)
 
 `PipeLLM` supports Vision Language Models (VLMs) that can process both text and images. To use images in your prompts:
@@ -7467,6 +7491,8 @@ The variables you declare in `inputs` are **injected into that template** at run
 
 The pipe can be configured to generate a single image or a list of images. Its only concept constraints are that declared image inputs must be `Image`-compatible and the `output` must be `Image`-compatible.
 
+Every input the pipe declares must be read by the `prompt` or the `negative_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither template reads as `extraneous_input_variable`, naming the input: an image declared in `inputs` but never referenced in the prompt is never passed to the generator, so reference it in the prompt, or remove it from `inputs`. An undeclared variable is refused as `missing_input_variable`.
+
 ## Configuration
 
 `PipeImgGen` is configured in your pipeline's `.mthds` file.
@@ -7678,6 +7704,8 @@ The output is a `SearchResult` (or a concept that refines it), which contains:
 -   `answer`: The synthesized answer text from the search
 -   `sources`: A list of sources, each with a `title`, `url`, and optional `snippet`
 
+Every input the pipe declares must be read by the `prompt`, and every variable the prompt reads must be declared in `inputs`. Validation refuses an input the prompt never reads as `extraneous_input_variable`, naming the input, so you either reference it in the prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+
 ## Configuration
 
 `PipeSearch` is configured in your pipeline's `.mthds` file.
@@ -7804,6 +7832,8 @@ Template mode supports two syntax variants:
 
 The Jinja2 template has access to all the "stuffs" currently in the working memory. You can access them by the names they were given in previous pipeline steps. For example, if a previous step produced an output named `user_profile`, you can access its attributes in the template like `{{ user_profile.name }}` or `{{ user_profile.email }}`.
 
+A template reads data and calls methods of plain values, and nothing else: it can read fields, call `isoformat()` on a date or `upper()` on a string, and apply any filter, but it cannot call methods of Pipelex objects or read names starting with an underscore, other than an input's metadata fields such as `_stuff_name`. This applies to every template a method contains, PipeLLM prompts and PipeCondition expressions included. The [Template Sandbox](../../../under-the-hood/template-sandbox.md) page lists what is allowed and how a refusal is reported.
+
 ### Template Mode Configuration
 
 | Parameter       | Type              | Description                                                                 | Required |
@@ -7813,6 +7843,8 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 | `inputs`        | table             | Input variables needed for the template                                     | No       |
 | `output`        | string            | The concept for the output                                                  | Yes      |
 | `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
+
+Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
 
 *Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
 
@@ -7905,6 +7937,8 @@ Instead of rendering a template, construct mode creates a structured object by s
 
 *Either `template` or `construct` must be provided, but not both.
 
+The input rule of template mode applies to a construct too: what reads the inputs is every `from` path and every field template, nested constructs included. A declared input none of them reads is refused as `extraneous_input_variable`, and a path whose input is not declared as `missing_input_variable`.
+
 ### Construct Field Methods
 
 Each field in the `[pipe.name.construct]` section can use one of these methods:
@@ -7931,6 +7965,8 @@ products_by_sku = { from = "products", list_to_dict_keyed_by = "sku" }
 ```
 
 The referenced value must be a list, and every item must carry the key attribute with a string value — otherwise the composer raises an error.
+
+A `from` path and a `list_to_dict_keyed_by` name read public fields only: validation refuses a segment starting with an underscore, such as `{ from = "order._stuff" }`, for the reason the [Template Sandbox](../../../under-the-hood/template-sandbox.md) gives.
 
 ### Copying Whole Inputs Into Native Fields
 
@@ -8271,12 +8307,14 @@ type = "PipeLLM"
 description = "Summarize text"
 inputs = { extracted_text = "Page[]" }
 output = "Text"
+prompt = "Summarize this text:\n@extracted_text"
 
 [pipe.translate_to_french]
 type = "PipeLLM"
 description = "Translate text to French"
 inputs = { english_summary = "Text" }
 output = "Text"
+prompt = "Translate this summary to French:\n@english_summary"
 
 
 [pipe.image_to_french_summary]
@@ -8391,12 +8429,14 @@ type = "PipeLLM"
 description = "Extract features from text"
 inputs = { description = "ProductDescription" }
 output = "ProductFeatures"
+prompt = "Extract the product features from this description:\n@description"
 
 [pipe.analyze_sentiment]
 type = "PipeLLM"
 description = "Analyze sentiment of text"
 inputs = { description = "ProductDescription" }
 output = "ProductSentiment"
+prompt = "Analyze the sentiment of this product description:\n@description"
 
 # The PipeParallel definition
 [pipe.analyze_product_in_parallel]
@@ -8420,7 +8460,7 @@ How this works:
 5.  A new structured object of type `ProductAnalysis` is created and populated with the results, like `{"features": ..., "sentiment": ...}`. This object becomes the main output of the `analyze_product_in_parallel` pipe.
 6.  Because `add_each_output` is `true`, `features` and `sentiment` are also available individually in the working memory for downstream pipes.
 
-If you don't want to declare a `ProductAnalysis` concept, set `output = "Composite"` instead: the combined object then holds the same `{"features": ..., "sentiment": ...}` shape as an untyped composition.
+If you don't want to declare a `ProductAnalysis` concept, set `output = "Composite"` instead: the combined object then holds the same `{"features": ..., "sentiment": ...}` shape as an untyped composition. A later template reads each part by name, as it would read a field: `{{ analysis.features }}`.
 
 ## Related Documentation
 
@@ -8640,7 +8680,7 @@ description = "Process invoice documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this invoice document...
+Process this invoice document, classified as $classification...
 """
 
 [pipe.process_receipt]
@@ -8649,7 +8689,7 @@ description = "Process receipt documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this receipt document...
+Process this receipt document, classified as $classification...
 """
 
 [pipe.process_unknown]
@@ -8658,7 +8698,7 @@ description = "Handle unknown document types"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this unknown document type...
+Process this document of unknown type, classified as $classification...
 """
 ```
 
@@ -10152,7 +10192,7 @@ What decides whether Python in a method is acceptable is **where it would execut
 
 - `.mthds` content is data — always fine.
 - **PipeFunc `.py`** is supported: on hosted deployments it executes in a network-blocked sandbox, never in the runner's process.
-- **Python structure classes** (`StructuredContent` subclasses) are imported into the runner's own process, so *hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python*. A fetched method declaring structure classes runs locally, but the CLI prints a hosted-parity warning: express the types as MTHDS concepts (inline structures) to keep the method hosted-runnable.
+- **Python structure classes** (`StructuredContent` subclasses) would have to be imported into the runner's own process to back a concept, so *hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python*. A fetched method declaring structure classes runs locally, but the CLI prints a hosted-parity warning with the route: declare the types as MTHDS concepts with inline structures, and have a PipeFunc import the classes the sandbox generates from them (`from structures import <domain>__<Concept>`). The module `pipelex build structures` writes is accepted as long as it is left as generated.
 
 ## Bounds
 
@@ -11339,7 +11379,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 The configuration is organized into four main sections, which mirror the layers of the runtime:
 
-1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, reporting, tracing, observation, and the plugin denylist
+1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, outbound network posture, reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[kit]` - settings for the `pipelex-dev` kit tooling
@@ -13959,6 +13999,54 @@ pipelex show pipe YOUR_PIPE_CODE
 - [Packages](../../building-methods/packages.md) - Organizing methods into packages
 
 
+## Network
+
+# Network Configuration
+
+Configuration section: `[runtime.network]`
+
+## Overview
+
+A method's values can carry `http://` and `https://` URLs: an image input, a PDF to extract, a document a model reads, a file an image-generation provider hands back. When a model or an extractor needs the bytes rather than the link, Pipelex downloads them itself, following redirects. Since a method, a model's structured output or a function can produce any URL, the download is guarded: Pipelex refuses to connect to any destination that is not a public internet address.
+
+```toml
+[runtime.network]
+is_fetch_ssrf_guard_enabled = true
+```
+
+The value above is the default.
+
+## What the guard refuses
+
+With `is_fetch_ssrf_guard_enabled = true`, every download of a value's URL is checked when the connection opens, on the first request and on every redirect hop to a new host. The host is resolved, and the connection is refused when the name is `localhost` or a cloud metadata alias, or when any address it resolves to is not globally routable: private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback, link-local (including the `169.254.169.254` metadata endpoint), carrier-grade NAT, multicast, reserved and unspecified addresses, in IPv4 and IPv6. Pipelex then connects to the address it checked, so a DNS record that changes between the check and the connection cannot slip through.
+
+A refusal raises [`SsrfBlockedError`](../../errors/ssrf-blocked-error.md) and fails the pipe that needed the bytes. It is not treated as a failed download: where Pipelex would otherwise keep a generated image's remote URL after a download error, a refused URL fails the pipe instead. The error message names the host that was requested and never the address it resolved to.
+
+A URL passed to a provider as a URL, for a model that fetches images itself, is not downloaded by Pipelex and is not checked by this guard.
+
+## When to turn it off
+
+Keep the guard on unless your deployment needs one of these:
+
+- **Documents on a private network.** A self-hosted deployment inside a company network may exist precisely to read documents from an intranet host, which resolves to a private address.
+- **An image-generation server on your own machine or network.** A self-hosted model server that answers with a link to the image on `localhost` or a private address has that link refused when Pipelex downloads the image, which it does while `[runtime.storage] is_fetch_remote_content_enabled` is on.
+- **Egress through an HTTP proxy.** The guard connects directly and ignores `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`: through a proxy, the proxy makes the connection, and the guard would only ever see the proxy's own address. If a proxy is your only way out, remote downloads fail until the guard is off.
+
+Turning it off restores a plain HTTP client, which honours the proxy variables and follows redirects without checking where they lead:
+
+```toml
+[runtime.network]
+is_fetch_ssrf_guard_enabled = false
+```
+
+Do not turn it off on a server that runs methods from people you do not trust with your network.
+
+## What the switch does not cover
+
+- **Webhook delivery** is always guarded, whatever this switch says: a run's callback URL on a private address is refused.
+- **Local paths and storage keys** (`pipelex-storage://`) are not network fetches; what a run may read from them is governed by the run's read scope, described in [Distributed content generation](../../under-the-hood/distributed-content-generation.md#what-a-leaf-may-read-the-read-scope).
+
+
 ## plxt (Formatter & Linter)
 
 # plxt (Formatter & Linter)
@@ -14961,6 +15049,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Reasoning Controls** - How reasoning effort/budget flows to each provider's SDK
 - **Error Model** - How errors are classified, carried across every layer, and reported to humans, agents, and HTTP APIs
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
+- **Template Sandbox** - What a method's templates may read and call, and how everything else is refused
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Init CLI Flows** - How `pipelex init` sets up the configuration directory
@@ -14986,6 +15075,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
 - [:material-brain: Reasoning Controls](./reasoning-controls.md){ .md-button }
 - [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md){ .md-button }
+- [:material-shield-lock: Template Sandbox](./template-sandbox.md){ .md-button }
 - [:material-test-tube: Test Profile Configuration](./test-profile-configuration.md){ .md-button }
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
@@ -15208,12 +15298,14 @@ from pipelex.runtime_boot import RuntimeBoot
 from pipelex.kernel.pipelex_kernel import PipelexKernel
 
 RuntimeBoot.make()
-kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service")
+kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", read_scope=None)
 ```
 
 That boot stands up the model deck, the content generator, the class registry, the reporting delegate and the plugin registries — the machinery inference needs. It does **not** stand up the library manager, the pipe router or the pipeline manager, because a kernel caller has no method to load.
 
 **`user_id` and `storage_scope` are both required, with no default.** `user_id` is who the run is attributed to; `storage_scope` is the opaque prefix every byte the run writes lands under, composed by *you* from whatever your tenancy model is (`"<org>/<run>"`, `"<customer>/<job>"`, or a flat name for a single-tenant service). The kernel composes its own leaves onto it and never parses it, so it never learns what a tenant is: `assets/` for what you supplied, `generated/` for what the run produced, `results/` for the delivered envelope, and `payloads/` for transport spill. It is validated at construction — one to three path-safe segments — because the value becomes a storage key prefix and a `..` in it would escape the namespace. Neither field defaults, deliberately: a missing identity used to fall back to the tracing placeholder `"anonymous"`, which then became the key prefix, pointing every unauthenticated run at one shared namespace.
+
+**`read_scope` is required too, and `None` is a value you pass, not a default.** It bounds what the run may read: every `pipelex-storage://` key a step reads must lie under it, compared segment by segment, and no step reads a bare path or a `file://` URI from the local disk. `https://` and `data:` URLs are untouched. A value can carry any URL its method or its model chose, so the check runs where values are read, in every content-generation leaf before the dry-run branch, and `shape_inputs` applies it to a table given as a CSV input, which is always a local file. The storage scope must lie under the read scope, since a run reads its own outputs back, and a mismatch is refused at construction. A multi-tenant host passes its tenant's prefix (the hosted platform passes the organization id); `None` is the explicit statement that the run is unscoped, which is the truth for a single-tenant service or a laptop. It has no default for the storage scope's reason: a host that forgot it would run unscoped, and an unscoped run reads every key the process's credentials reach. A refused read raises `UriReadRefusedError`, a caller-facing input error that names where the URL sat and never quotes it.
 
 `needs_inference=False` boots keyless (no credentials, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `PipelexKernel.make` applies that rule through the same `runtime_hub.resolve_run_mode_for_boot` the pipe tier uses — a second copy of the rule at a second factory is how the two would drift apart.
 
@@ -15290,7 +15382,7 @@ Every kernel function is **fully keyword-only**, with zero entries in `subject_g
 - **`extract_main_content_as_list` / `extract_named_content_as_list`** — the same typed read for a call that produced several objects. A multiple-output call stores one `ListContent`, which the single-content reads cannot narrow: the bare item class raises, and `ListContent[item_type]` is rejected by design. These verify every item against `item_type`, so the list comes back typed all the way down.
 
 ```python
-memory = shape_inputs(inputs={"topic": "kernels"}, concept_provider=provider, input_specs=specs)
+memory = shape_inputs(inputs={"topic": "kernels"}, concept_provider=provider, input_specs=specs, read_scope=None)
 result = await kernel.llm_object(memory=memory, output_class=Summary, concept=summary_concept, model=model, user="Summarize $topic", result="summary")
 summary = extract_main_content(memory=result.memory, content_type=Summary)
 ```
@@ -15310,7 +15402,7 @@ summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary
 
 `PipelexKernel` holds run-scoped identity, plus the one seam that identity needs:
 
-- **`job_metadata`** — the run-level metadata. **The two halves are now separate types, and a caller reading a field off this object must know which half it is in.** `JobMetadata.run_metadata` holds what is constant for the whole run — `user_id`, `pipeline_run_id`, `storage_scope`, `request_id`, `extras` — and the rest of `JobMetadata` holds what changes per step (`pipe_code`, `pipe_run_id`, `otel_context`). So it is `kernel.job_metadata.run_metadata.pipeline_run_id`, not `kernel.job_metadata.pipeline_run_id`; there is deliberately no read-through accessor, so one fact has one spelling. `user_id`, `storage_scope`, `request_id` and `extras` are supplied by the host at `PipelexKernel.make(...)` — the last of them opaque, so a multi-tenant host can attribute a kernel-driven run to its own entities without the runtime learning what they are. `request_id` is the inbound request the run serves, validated by `RunMetadata` exactly as on the pipeline entry points, and it is what a hosted deployment filters its logs on. The distinction this bullet already drew informally — run-level metadata, per-step copy — is what the split makes explicit, and it is why the per-step copy can carry the run half through untouched. It is not what a step runs under: every call mints a per-step copy through `make_step_metadata()`, carrying a fresh `pipe_run_id` and inheriting the trace context, so trace and usage attribution stay per-step. This mirrors the interpreter's pass-down-a-modified-copy pattern. `make_step_metadata(pipe_code=…)` names the pipe the step is running — mirroring what the interpreter stamps on its live and dry paths — so log correlation, usage accounting, and the per-step labelling a distributed backend derives see a named step. When no `pipe_code` is supplied the key is omitted from the update rather than passed as `None`, so a run-level `pipe_code` is never silently erased; the direct-call façade (`llm_text`/`llm_object`) stays deliberately anonymous, because the caller ran no pipe.
+- **`job_metadata`** — the run-level metadata. **The two halves are now separate types, and a caller reading a field off this object must know which half it is in.** `JobMetadata.run_metadata` holds what is constant for the whole run — `user_id`, `pipeline_run_id`, `storage_scope`, `read_scope`, `request_id`, `extras` — and the rest of `JobMetadata` holds what changes per step (`pipe_code`, `pipe_run_id`, `otel_context`). So it is `kernel.job_metadata.run_metadata.pipeline_run_id`, not `kernel.job_metadata.pipeline_run_id`; there is deliberately no read-through accessor, so one fact has one spelling. `user_id`, `storage_scope`, `read_scope`, `request_id` and `extras` are supplied by the host at `PipelexKernel.make(...)` — the last of them opaque, so a multi-tenant host can attribute a kernel-driven run to its own entities without the runtime learning what they are. `request_id` is the inbound request the run serves, validated by `RunMetadata` exactly as on the pipeline entry points, and it is what a hosted deployment filters its logs on. The distinction this bullet already drew informally — run-level metadata, per-step copy — is what the split makes explicit, and it is why the per-step copy can carry the run half through untouched. It is not what a step runs under: every call mints a per-step copy through `make_step_metadata()`, carrying a fresh `pipe_run_id` and inheriting the trace context, so trace and usage attribution stay per-step. This mirrors the interpreter's pass-down-a-modified-copy pattern. `make_step_metadata(pipe_code=…)` names the pipe the step is running — mirroring what the interpreter stamps on its live and dry paths — so log correlation, usage accounting, and the per-step labelling a distributed backend derives see a named step. When no `pipe_code` is supplied the key is omitted from the update rather than passed as `None`, so a run-level `pipe_code` is never silently erased; the direct-call façade (`llm_text`/`llm_object`) stays deliberately anonymous, because the caller ran no pipe.
 - **`cogt_run_params`** — the execution-mode contract (`run_mode`, and the DRY-only `is_mock_usage` sub-flag) that every cogt leaf reads off the assignment it is handed.
 - **`step_id_source`** — where each step's `pipe_run_id` comes from, defaulting to a fresh `uuid4`, which is what every in-process run wants. It exists for a kernel hosted inside a replay-based executor, where ids minted from a non-replay-safe source take different values each re-execution; such a host injects its own replay-safe source via `PipelexKernel.make(step_id_source=…)`. It is a seam, not state — the kernel never inspects what it returns.
 - **The run's own id** follows the same rule, once per run rather than once per step. `make` takes it from a `trace_context`'s `graph_id` when one is given, else from `pipeline_run_id=…`, else from a fresh `uuid4`. **A host inside a replay-based executor must pass one of the two**, because the `uuid4` default re-mints on every replay and the replayed run would then name itself differently from the run it replays. Such a host mints the id from its own replay-safe source (a workflow's deterministic random, or its workflow id) and passes the value; a value is enough here where the step id needs a callable, because the run id is minted exactly once.
@@ -15331,7 +15423,7 @@ event_log = InMemoryEventLog()
 trace_context = TraceContext(graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True)
 get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, workflow_id="direct", pipeline_run_id=run_id)
 try:
-    kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", trace_context=trace_context)
+    kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", read_scope=None, trace_context=trace_context)
     ...
     tokens_usages = UsageAggregator.aggregate(event_log.read_events(run_id))
 finally:
@@ -15352,7 +15444,7 @@ A record emitted inside a `log.context` block carries the run's identifiers — 
 - **The host binds the run.** `PipelexKernel.log_context()` binds `request_id` and `pipeline_run_id` and no step, and a host wraps its run in it. The kernel cannot do this for the host, for the reason it cannot own the usage lifecycle: a kernel call has no run boundary to hang the binding on. Inside the host's block, each step's binding merges over the run's for the length of the call, so a line the host emits between two calls names the run, and a line emitted during one names the step as well.
 
 ```python
-kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", request_id=request_id, pipeline_run_id=run_id)
+kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", read_scope=None, request_id=request_id, pipeline_run_id=run_id)
 with kernel.log_context():
     result = await kernel.llm_text(memory=memory, user="Summarize $topic", result="summary")
 ```
@@ -15944,7 +16036,11 @@ class DryRunFactory:
 | `IGNORE` | Sets field to `Ignore()` | None/default | `default_value`, `structure` fields |
 | `DICT_SNAKE_KEY_PASCAL_VALUE` | `generate_dict_snake_key_pascal_value()` | `{mock_abcd: MockCdef}` | `inputs` dict in PipeSpec |
 | `DICT_SINGLE_EXTRACT_INPUT` | `generate_dict_single_extract_input()` | `{mock_abcd: "Image"}` | `inputs` dict in PipeExtract |
+| Image URL | `generate_mock_image_url()` | one of `inference.dry_run.image_urls` | `url` of an `ImageContent`, at any depth |
+| Document URL | `generate_mock_document_url()` | `data:application/pdf;base64,…` (a blank one-page PDF) | `url` of a `DocumentContent`, at any depth |
 | Random string | Polyfactory default | `uygNjiAuDMOtZEyibgHw` | All other string fields |
+
+A mocked image or document never carries a random string as its `url`, because `resolve_uri` takes a random string for a local path. A run with a read scope refuses to read a local path, and it checks before the dry-run branch, so a dry run on such a run would otherwise refuse its own mocks: a mocked input, or an image inside a structure a dry model call returned. An `https://` URL and a `data:` URL are read on nobody's leave, so they are what a mock carries. The providers are keyed on the class (`ImageContent`, `DocumentContent` and their subclasses), not on a field annotation, so they apply wherever such a class is nested. They also recognise a copy of either class rebuilt from a JSON schema, by its name and its `url` field: a worker running a dry model call out of process gets only the output's schema, and the nested file classes it rebuilds are no subclasses of the real ones.
 
 ---
 
@@ -17835,7 +17931,7 @@ StuffArtefact wraps Stuff → delegates to StuffContent → Protocol enables tra
 ```
 
 !!! info "Protocol over Inheritance"
-    ImageRenderable uses duck typing. Any class with a `render_with_images()` method satisfies the protocol—no base class required.
+    ImageRenderable uses duck typing. Any class that defines a `render_with_images()` method satisfies the protocol, with no base class required. The filters check the class rather than the instance, so a value that merely holds such a method as an attribute is never rendered through it.
 
 ---
 
@@ -17845,11 +17941,15 @@ StuffArtefact wraps Stuff → delegates to StuffContent → Protocol enables tra
 |---------|--------|
 | `{{ doc.title }}` | Content field value |
 | `{{ doc.pages }}` | Nested content (list, struct, etc.) |
+| `{{ combo.summary }}` | A named part of a `Composite` output |
 | `{{ doc._stuff_name }}` | Metadata: variable name |
 | `{{ doc._content_class }}` | Metadata: content class name |
 | `{{ doc._concept_code }}` | Metadata: concept code |
+| `{{ doc._stuff_code }}` | Metadata: stuff code |
 | `{{ doc \| with_images }}` | Text with `[Image N]` tokens |
 | `{{ doc \| tag }}` | Tagged output (no images) |
+
+These are the only underscore names a template may read on an input. Templates render under the [Template Sandbox](template-sandbox.md), which refuses every other private name. The wrapped `Stuff` is not an attribute of the artefact at all: Python code reaches it through `unwrap_stuff_artefact(artefact=...)`.
 
 ---
 
@@ -17875,7 +17975,7 @@ flowchart TB
 
     subgraph FILTER["with_images Filter"]
         direction TB
-        CHECK["isinstance(value, ImageRenderable)?"]
+        CHECK["ImageRenderable, defined by its class?"]
         CALL["value.render_with_images(registry=registry, text_format=text_format)"]
         CHECK --> CALL
     end
@@ -17919,27 +18019,15 @@ def __getattribute__(self, key: str) -> Any:
     if key in _PASSTHROUGH_ATTRS or key.startswith("__"):
         return object.__getattribute__(self, key)
 
-    # 2. Content fields (highest priority for templates)
-    content_fields = type(content).model_fields
-    if key in content_fields:
-        return getattr(content, key)
-
-    # 3. Metadata accessors
-    match key:
-        case "_stuff_name":
-            return stuff.stuff_name
-        case "_content_class":
-            return content.__class__.__name__
-        case "_concept_code":
-            return stuff.concept.code
-        case "_stuff_code":
-            return stuff.stuff_code
-        case "_content":
-            return content
-
-    # 4. Fallback to normal lookup
-    return object.__getattribute__(self, key)
+    # 2. Content fields, then 3. metadata fields (_stuff_name, _content_class, _concept_code, _stuff_code)
+    try:
+        return _get_template_value(stuff=stuff, key=key)
+    except KeyError:
+        # 4. Fallback to normal lookup
+        return object.__getattribute__(self, key)
 ```
+
+`_get_template_value` is the whole of what a string key resolves to: a content field (a declared field, or a public extra field such as a `Composite`'s named parts), else one of the four metadata fields, else `KeyError`.
 
 !!! warning "Content Field Priority"
     Content fields shadow StuffArtefact methods. If your content has a field named `items`, accessing `artefact.items` returns the field value, not the iteration method. Use `artefact.iter_items()` for explicit dict-like iteration.
@@ -17950,12 +18038,14 @@ StuffArtefact supports bracket notation and iteration:
 
 | Method | Purpose |
 |--------|---------|
-| `artefact["field"]` | Bracket access (via `__getitem__`) |
-| `artefact.get("field", default=...)` | Safe access with default |
+| `artefact["field"]` | Bracket access (via `__getitem__`): a content field or a metadata field only |
+| `artefact.get("field", default=...)` | Safe access with default, resolving the same keys as brackets |
 | `"field" in artefact` | Membership test |
 | `artefact.iter_keys()` | Iterate field names |
 | `artefact.iter_items()` | Iterate (key, value) pairs |
 | `artefact.iter_values()` | Iterate values |
+
+Bracket access and `get` never resolve to the artefact's own attributes, such as the wrapped `Stuff` or a method. The accessors above and the four metadata fields are what `StuffArtefact` declares as its template surface: the only methods a template may call on it and the only underscore names it may read.
 
 ---
 
@@ -17989,7 +18079,7 @@ class ImageRenderable(Protocol):
 
 - **Avoids circular imports**: `tools/jinja2/` can check types from `core/stuffs/` without importing them
 - **Duck typing**: No inheritance required—any matching method signature works
-- **Runtime checking**: `isinstance(value, ImageRenderable)` works at runtime
+- **Runtime checking**: `isinstance(value, ImageRenderable)` works at runtime, and the filters add `type_implements(value=value, protocol=ImageRenderable)`, which reads the members from the class, since on Python 3.11 the `isinstance` check alone accepts an instance merely holding the method
 
 ---
 
@@ -18100,11 +18190,11 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
     if registry is None:
         registry = ImageRegistry()
 
-    # 3. Get text format
-    text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
+    # 3. Get text format: no fallback, a render without a templating style fails loudly
+    text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
 
-    # 4. Protocol-based rendering
-    if isinstance(value, ImageRenderable):
+    # 4. Protocol-based rendering, licensed by the value's class, never by an attribute the instance holds
+    if isinstance(value, ImageRenderable) and type_implements(value=value, protocol=ImageRenderable):
         return value.render_with_images(registry=registry, text_format=text_format)
 
     # 5. Handle plain sequences
@@ -18134,6 +18224,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 | `{{ x["field"] }}` | Bracket access |
 | `{{ x._stuff_name }}` | Variable name metadata |
 | `{{ x._content_class }}` | Content class name |
+| `{{ x._concept_code }}` | Concept code |
+| `{{ x._stuff_code }}` | Stuff code |
 | `{{ x \| with_images }}` | Extract images as tokens |
 | `{{ x \| with_images \| tag }}` | Extract then wrap in tags |
 
@@ -18160,6 +18252,81 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button .md-button--primary }
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button }
+
+
+## Template Sandbox
+
+# Template Sandbox
+
+A method's templates are code. PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts, and PipeCondition expressions are all Jinja2 templates, and they render inside the process that runs the method. When that process is shared, as it is on a hosted runner, a template must not be able to reach anything but the data it was given.
+
+Pipelex therefore renders every template, its own included, under one policy: **a template reads data and calls methods of plain values, and nothing else.**
+
+## What a template may do
+
+| A template may | For example |
+|---|---|
+| Read the public fields of an input, with a dot or with brackets, the named parts of a `Composite` included | `{{ invoice.total }}`, `{{ invoice['total'] }}`, `{{ combo.summary }}` |
+| Read an input's metadata fields | `{{ invoice._stuff_name }}`, `{{ invoice._content_class }}`, `{{ invoice._concept_code }}`, `{{ invoice._stuff_code }}` |
+| Read any key of a plain dict with brackets, underscore keys included | `{{ record['_id'] }}`, `{{ record['__typename'] }}` |
+| Call the dict-like accessors of an input | `{{ invoice.get('total') }}`, `{% for key, value in invoice.iter_items() %}` |
+| Call methods of strings, numbers, dates and times, lists, tuples, dicts and sets | `{{ issued_at.isoformat() }}`, `{{ name.upper() }}`, `{{ record.get('a') }}` |
+| Format a string, including with replacement fields | `{{ '{0} items'.format(count) }}` |
+| Use Jinja's own constructs and globals | macros and `caller()`, `loop.cycle()`, `namespace()`, `cycler()`, `joiner()`, `range()`, `dict()` |
+| Apply any filter | `{{ doc \| tag }}`, `{{ doc \| format }}`, `{{ page \| with_images }}`, `{{ items \| length }}` |
+
+## What a template may not do
+
+| A template may not | For example |
+|---|---|
+| Read a name starting with an underscore, other than the metadata fields and a plain dict's keys above | `{{ doc._stuff }}`, `{{ doc['_content'] }}`, `{{ doc.__class__ }}`, `{{ record._id }}` |
+| Read the `Stuff` an input wraps | `{{ doc.stuff }}` is undefined |
+| Call a method of anything that is not a plain value | `{{ pages[0].model_dump() }}`, `{{ photos[0].model_copy() }}` |
+| Call a class method, even through an instance | `{{ issued_at.now() }}` |
+| Change a list, a dict or a set | `{{ items.append(x) }}`, `{{ record.update(other) }}`, `{{ tags.intersection_update(other) }}` |
+| Store a callable in a `namespace()` | `{% set ns.f = name.upper %}`, `namespace(items=doc.get)` |
+| Include or extend another template | `{% include 'header.html' %}` |
+
+A method template renders without a template loader, so `{% include %}`, `{% extends %}` and `{% import %}` find nothing to load.
+
+## How a refusal shows up
+
+Many refusals are visible in the template itself, and validation reports them before anything runs: a template that reads an undeclared underscore name with a dot fails with the `template_private_name` validation error, which names the pipe and the template (`prompt`, `system_prompt`, `template`, `expression`, or `construct field '<path>'`).
+
+What validation cannot see, because it depends on the values at run time (a method call, a name computed while rendering, or a bracketed key, which is legitimate on a plain dict), is refused where it happens: the render raises [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md), whose message names the refused attribute or callable and the type it was reached on. A refusal never renders as an empty string, so a prompt is never sent with a hole in it.
+
+## How it is built
+
+Every environment comes from one factory, `make_jinja2_env_from_loader` in `pipelex/tools/jinja2/jinja2_environment.py`, and that factory builds a `PipelexTemplateEnvironment` (`pipelex/tools/jinja2/jinja2_sandbox.py`), a subclass of Jinja's `ImmutableSandboxedEnvironment`. Rendering, parsing and compiling all go through it, including the condition pipe's compile at load and the load-time template walkers.
+
+Jinja's stock sandbox refuses internals, but not public methods, and every pydantic model has public constructors. Under the stock sandbox a template could call `model_validate` on a content object and forge an image pointing at a storage key of its choosing. The Pipelex policy closes that by allowing calls by kind rather than by name:
+
+- **Jinja's own runtime**: macros, `caller`, `loop`, `cycler`, `joiner`, block references, and the environment's globals.
+- **Methods a plain value type defines**, bound to an instance of that type. A subclass of a plain type (a `StrEnum` member is a `str`) cannot add or override a callable method, and a class method is refused because it is bound to the class. A method that changes a list, a dict or a set in place is refused by a list Pipelex keeps itself, since Jinja's own misses `set.intersection_update`.
+- **The sandbox's own `str.format` wrapper**, which resolves replacement fields through the same attribute and item checks. The raw `str.format` stays refused.
+- **The methods a type declares as its template surface** (`pipelex/tools/jinja2/template_surface.py`).
+
+A type declares its template surface as a `__template_surface__` class attribute: the methods a template may call on an instance and the underscore names it may read. The sandbox reads the declaration from the type, never from the instance. `StuffArtefact`, the adapter every input is wrapped in, declares `get`, `iter_keys`, `iter_items` and `iter_values`, and its four metadata fields. The `Stuff` it wraps is not one of its attributes at all: Python code reaches it through `unwrap_stuff_artefact`, and its bracket access and `get` resolve a key to a content field or a metadata field only.
+
+The sandbox refuses a bracketed name before trying `obj[name]`. Jinja only checks a bracketed name when the item lookup fails, so an object whose `__getitem__` answered any key would otherwise hand over what the dot spelling could not. A plain `dict` is the exception, because its items are data: a key it holds is returned, and a key it does not hold falls back to an attribute read, which the underscore rule refuses.
+
+Filters are not calls in this sense: they are Pipelex's or Jinja's own code, registered by the environment. That makes each filter trusted code with one obligation: **a filter never calls a callable it was handed**, since that callable came from the template's values and the policy never vetted it. So `with_images`, `format` and `tag` call a value's rendering method only when the value's class defines it, and they check that on the type (`pipelex/tools/jinja2/renderable_dispatch.py`). A runtime-checkable Protocol alone would not do: on Python 3.11 it accepts a `namespace()` holding a callable of the template's choosing.
+
+Jinja's own filters and markupsafe keep that obligation only for values whose attributes the template cannot choose: they look `__html__` up on a value when escaping, and `items` in `dictsort` and `xmlattr`, and call what they find. A `namespace()` answers any name with whatever the template stored under it, so the environment's `namespace` holds data only, and storing a callable in one, at construction or with `{% set ns.x = … %}`, is refused.
+
+## Paths outside templates
+
+A method also writes dotted paths that are not templates: a PipeCompose construct field's `from` and its `list_to_dict_keyed_by`, a PipeBatch's list, and the image and document references of a prompt. The runtime walks these with `getattr`, so the same rule applies to them: a segment starting with an underscore is refused. A construct's `from` path and `list_to_dict_keyed_by` are refused when the bundle is validated, and every path is refused again when it is walked.
+
+## What the sandbox does not cover
+
+- **Resource use.** The sandbox limits what a template can reach, not what it can spend. Jinja caps `range`, and a longer range fails the render with `Jinja2TemplateRenderError`, but nothing caps exponentiation, string repetition, nested loops or output size.
+- **The URLs values carry.** A template cannot forge content under this policy, but a value can still carry a URL, and reading it is the storage layer's decision, not the template's.
+
+## Related
+
+- [StuffArtefact & Image Rendering](stuffartefact-and-image-rendering.md): how inputs reach templates, and how images are extracted from them.
+- [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md): the error a refusal raises at render time.
 
 
 ## Test Profile Configuration
@@ -20320,6 +20487,10 @@ Installing the distribution makes the method selectable (`runtime.storage.method
 
 Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
 
+### A provider is not the tenant boundary
+
+A provider reads any key it is handed with the process's own credentials, and it should: it has no notion of whose run asked. On a host serving several tenants, what bounds a run's reads is the **read scope** the host passes with the run, which the content-generation leaves and the input seam check before they call a provider. A key outside that prefix, and any local path, is refused there, so a provider never sees it. A self-hosted deployment serving one tenant passes no read scope and reads as before. See [Distributed Content Generation](distributed-content-generation.md#what-a-leaf-may-read-the-read-scope) for the rule and where it runs.
+
 ---
 
 ## Related
@@ -21430,7 +21601,9 @@ Sending a pipe run to a separate worker process introduces three challenges that
 
 The submitter builds a `LibraryCrate` from its loaded library (`pipelex/libraries/library_crate_factory.py`) and attaches it to the `PipeJob`. On the worker, the job's entry point loads the crate into a scoped library, registering the bundle's dynamic concept classes, so `get_required_pipe()` resolves every pipe at every level of nesting. Because a distributed run can fan out into nested jobs (a controller's child pipes), every nested job carries the same crate; loading is idempotent via the fingerprint, so re-receiving a crate already loaded on a worker is a no-op.
 
-A load ends by validating the whole library (`Library.validate_library`), which checks every pipe against the concepts and pipes it depends on. That check is pure — it raises or returns, and leaves nothing behind that a run later reads — and the crate a worker receives was built from a library the submitter already loaded and validated. So a worker running the same pipelex version as its submitter can call `load_from_crate(library_id=…, crate=…, is_crate_prevalidated=True)`, which skips that final validation and nothing else: fingerprint idempotency, domain and concept loading with the registration of the dynamic classes, the concept-cycle check, pipe construction with each pipe's static validation, and source tracking all still run. The precondition belongs to the host: pass it only where submitter and worker ship on the same pipelex, as a deployment that builds them from one lockfile does. A crate from anywhere else keeps the default, validating load.
+A load ends by validating the whole library (`Library.validate_library`), which checks every pipe against the concepts and pipes it depends on. That check is pure — it raises or returns, and leaves nothing behind that a run later reads — and the crate a worker receives was built from a library the submitter already loaded and validated. So a worker running the same pipelex version as its submitter can call `load_from_crate(library_id=…, crate=…, is_crate_prevalidated=True)`, which skips that final validation and nothing else: fingerprint idempotency, domain and concept loading with the registration of the dynamic classes, the resolution of their references to one another, the concept-cycle check, pipe construction with each pipe's static validation, and source tracking all still run. The precondition belongs to the host: pass it only where submitter and worker ship on the same pipelex, as a deployment that builds them from one lockfile does. A crate from anywhere else keeps the default, validating load.
+
+A crate carries no method package the library depends on, so a structure field typed by a dependency's concept cannot be resolved on the worker. A crate load therefore never refuses a structure class it could not complete, whichever the flag: the refusal of a field naming a concept that cannot be found belongs to the load from bundles, which resolves the dependencies first, and the submitter's library went through it. Such a class fails only if a run on the worker uses it, as would the dependency's own pipes, which the crate does not carry either.
 
 ---
 
@@ -21663,6 +21836,8 @@ async def generate_and_store_images(img_gen_assignment):
     )
 ```
 
+Each object is stored under `{storage_scope}/generated/<filename>`, the filename rendered from the storage method's `uri_format` (`{hash}.{extension}` by default). The extension follows the MIME type the object is stored under, so the key and the stored content type always agree: `jpg` for `image/jpeg`, `svg` for `image/svg+xml`, and `bin` for a type with no extension of its own.
+
 !!! info "What crosses the boundary"
     `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, paired `width`/`height`, and `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
 
@@ -21679,6 +21854,16 @@ What gets stored vs. what crosses the boundary, by content type:
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
 
 Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
+
+### What a leaf may read: the read scope
+
+A reference is only as safe as whoever reads it. A value can carry any URL its method chose — a `PipeCompose` construct that assembles one from plain text, a model's structured output, a function's result — and the next leaf reads it: a `pipelex-storage://` key with the process's own storage credentials, or a bare path or `file://` URI from the worker's disk. On a host serving many tenants that is a read of another tenant's file, so `RunMetadata` carries a second host-supplied prefix beside `storage_scope`: the **read scope**.
+
+On a run whose read scope is set, a storage key is read only when it lies under the read scope, compared segment by segment, with no empty, `.` or `..` segment; a local path is never read; `https://` and `data:` URLs are untouched. The storage scope must lie under the read scope, since a run reads its own outputs back, and a mismatch is refused when the metadata is built. A run whose read scope is `None` (a laptop, a single-tenant server) reads exactly as before.
+
+The check runs in the leaves, because both orchestration modes call the same leaves and every read of a value's URL happens while one of them handles an assignment. Each assignment declares the URLs it will read through `referenced_uris()` — the prompt's images and documents given by URI, an image generation's input images, the image or document to extract, the document to render as page views — and the leaf authorizes them as its first statement, before the dry-run branch and before any worker is built. A dry run therefore refuses the same method a live run would, and the check performs no IO. The input seam applies the same rule to what it reads itself: a table given as a CSV input, and a file the normalization would upload or link. A refused read raises `UriReadRefusedError`, a caller-facing input error answered as a 422, which names where the URL sat and never quotes it. A unit test walks every assignment model's fields for URL-shaped ones, so a new assignment or a new field that carries a URL fails until its `referenced_uris()` declares it.
+
+The read scope leaves `https://` URLs alone because they are not the process's to scope: they are fetched over the network, and the network fetch has its own guard. Every leaf that needs the bytes behind a URL — prompt images and documents for a provider that does not take URLs, the document an extractor reads, the PDF rendered as page views, a generated image a provider returned as a link — goes through one fetch helper, and that helper connects through `SsrfGuardedTransport` unless `[runtime.network] is_fetch_ssrf_guard_enabled` is off. The transport resolves the host when each connection opens, on the first request and on every redirect hop to a new origin, refuses a name that resolves to any private, loopback, link-local or metadata address, and dials the address it vetted. A refusal raises `SsrfBlockedError`, a security error that no leaf's download fallback absorbs, so the pipe fails. The guard connects directly and ignores `HTTP(S)_PROXY`; a deployment whose egress goes through a proxy, or that reads documents from an intranet host, turns the switch off, as the [network configuration](../configuration/config-technical/network-config.md) explains. Checking in the fetch helper rather than in input normalization is deliberate: a construct, a structured output or a function result can produce a URL as easily as an input can.
 
 ---
 
