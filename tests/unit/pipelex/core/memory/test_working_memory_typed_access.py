@@ -161,6 +161,12 @@ class TestWorkingMemoryTypedAccess:
 
         assert "sample_page.nonexistent_field" in str(exc_info.value)
 
+    @pytest.mark.parametrize("name", ["sample_page.__class__", "sample_page.text_and_images.__class__.__init__", "sample_page._private"])
+    def test_private_attribute_path_is_refused(self, nested_content_memory: WorkingMemory, name: str):
+        """The path is walked with attrgetter, so a segment starting with an underscore would reach Python internals."""
+        with pytest.raises(WorkingMemoryStuffAttributeNotFoundError, match="starts with an underscore"):
+            nested_content_memory.get_typed_object_or_attribute(name)
+
     def test_nested_attribute_deep_not_found(self, nested_content_memory: WorkingMemory):
         """Test that accessing non-existent deeply nested attribute raises error."""
         with pytest.raises(WorkingMemoryStuffAttributeNotFoundError) as exc_info:

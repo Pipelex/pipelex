@@ -138,6 +138,7 @@ Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/ji
 Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
 Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/
 Jinja2TemplateRenderError | Jinja 2 template render | https://docs.pipelex.com/latest/errors/jinja2-template-render-error/
+Jinja2TemplateSecurityError | Jinja 2 template security | https://docs.pipelex.com/latest/errors/jinja2-template-security-error/
 Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/
 JobMetadataError | Job metadata | https://docs.pipelex.com/latest/errors/job-metadata-error/
 JsonTypeError | Json type | https://docs.pipelex.com/latest/errors/json-type-error/

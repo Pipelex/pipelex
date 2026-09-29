@@ -29,7 +29,7 @@ from pipelex.kernel.llm_ops import (
     run_llm_text,
 )
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_machinery.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -102,14 +102,14 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     explanation=f"Variable '{variable_path}' is used in prompt/system_prompt but not declared in inputs.",
                 )
 
-        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
         for template_blueprint, template_label in [
             (self.llm_prompt_spec.prompt_blueprint, "prompt"),
             (self.llm_prompt_spec.system_prompt_blueprint, "system_prompt"),
         ]:
             if template_blueprint is None:
                 continue
-            lint_optional_input_guards(
+            lint_authored_template(
                 pipe_code=self.code,
                 domain_code=self.domain_code,
                 inputs=self.inputs,

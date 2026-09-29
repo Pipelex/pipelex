@@ -1,7 +1,8 @@
 import inspect
 
-from jinja2 import BaseLoader, Environment
+from jinja2 import BaseLoader
 
+from pipelex.tools.jinja2.jinja2_sandbox import PipelexTemplateEnvironment
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
@@ -11,7 +12,8 @@ def make_jinja2_env_from_loader(
     template_category: TemplateCategory,
     loader: BaseLoader,
     enable_async: bool = True,
-) -> Environment:
+) -> PipelexTemplateEnvironment:
+    """Build the environment for one template category. Every template renders sandboxed (`jinja2_sandbox.py`)."""
     autoescape: bool
     trim_blocks: bool
     lstrip_blocks: bool
@@ -45,7 +47,7 @@ def make_jinja2_env_from_loader(
             trim_blocks = False
             lstrip_blocks = False
 
-    return Environment(
+    return PipelexTemplateEnvironment(
         loader=loader,
         enable_async=enable_async,
         autoescape=autoescape,
@@ -55,7 +57,7 @@ def make_jinja2_env_from_loader(
 
 
 def _register_filters(
-    jinja2_env: Environment,
+    jinja2_env: PipelexTemplateEnvironment,
     *,
     template_category: TemplateCategory,
     enable_async: bool,
@@ -82,7 +84,7 @@ def make_jinja2_env_without_loader(
     template_category: TemplateCategory,
     *,
     enable_async: bool = True,
-) -> Environment:
+) -> PipelexTemplateEnvironment:
     loader = BaseLoader()
     jinja2_env = make_jinja2_env_from_loader(
         template_category=template_category,
@@ -98,7 +100,7 @@ def make_jinja2_env_from_registry(
     template_category: TemplateCategory,
     *,
     enable_async: bool = True,
-) -> Environment:
+) -> PipelexTemplateEnvironment:
     """Create Environment with DictLoader from pre-loaded registry.
 
     This function creates a Jinja2 Environment backed by the TemplateRegistry,

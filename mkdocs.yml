@@ -343,6 +343,7 @@ plugins:
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"
         - under-the-hood/reasoning-controls.md: "Reasoning Controls"
         - under-the-hood/stuffartefact-and-image-rendering.md: "StuffArtefact & Image Rendering"
+        - under-the-hood/template-sandbox.md: "Template Sandbox"
         - under-the-hood/test-profile-configuration.md: "Test Profile Configuration"
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
@@ -578,6 +579,7 @@ nav:
       - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
       - Reasoning Controls: under-the-hood/reasoning-controls.md
       - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
+      - Template Sandbox: under-the-hood/template-sandbox.md
       - Test Profile Configuration: under-the-hood/test-profile-configuration.md
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md

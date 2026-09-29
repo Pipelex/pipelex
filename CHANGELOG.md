@@ -10,6 +10,14 @@
 ### Fixed
 
 - **A generated object's storage key names its own format**: the extension of a key under `generated/` follows the whole MIME type the object is stored under, so a fetched `image/svg+xml` is stored as `.svg`, and a type with no extension of its own gets `.bin`, where both used to get `.jpg`. The MIME type's parameters and case no longer change the extension.
+- **An include in a method template is a render error**: `{% include %}`, `{% extends %}` and `{% import %}` in a template rendered without a loader raise `Jinja2TemplateRenderError`, where they leaked Jinja's own `TemplateNotFound`.
+- **A template reads a `Composite`'s parts by name**: `{{ combo.summary }}`, `{{ combo['summary'] }}` and `combo.get('summary')` resolve the named parts of a `Composite` output, and `iter_keys` lists them; they used to render empty, and only the raw `_content`, now refused, reached them. Like any private name, a part whose name starts with an underscore is refused when a template reads it on an input.
+- **A template's arithmetic error is a render error**: a division by zero, or a `range` longer than the sandbox's cap, raises `Jinja2TemplateRenderError` where the raw Python exception escaped, which validation reported as an internal error rather than as the method's.
+
+### Security
+
+- **Every template renders in a sandbox (Breaking)**: prompts, compose and construct templates, image and search prompts and condition expressions may read data and call methods of plain values (strings, numbers, dates, containers) only, so a template that reaches for a Python internal, calls a method of a Pipelex or pydantic object, or reads a name starting with an underscore other than an input's `_stuff_name`, `_content_class`, `_concept_code` and `_stuff_code` raises `Jinja2TemplateSecurityError` instead of rendering, and validation refuses the visible cases with the new `template_private_name` error. `_content` and the `stuff` property are no longer readable on an input, and bracket access and `get` on an input resolve only its content fields and metadata fields; a plain dict's keys stay readable with brackets, `record['_id']` included, and a `namespace()` holds data only, refusing a callable. The `jinja2` floor rises to 3.1.6, the release carrying Jinja's own sandbox fix for the `attr` filter.
+- **Dotted paths refuse underscore segments**: a PipeCompose construct `from` path such as `note.__class__.__init__.__globals__.sys.modules.os.environ` walked into Python internals with plain `getattr` and could copy the process environment into a method's output. A `from` path or `list_to_dict_keyed_by` name with a segment starting with an underscore is now refused at validation, and every dotted path the runtime walks, batch lists and prompt image references included, refuses one.
 
 ### Security
 

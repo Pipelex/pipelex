@@ -6084,6 +6084,10 @@ rationale = "Predicate on the key; single operand."
 param = "sequence"
 rationale = "Jinja op on the sequence; single operand (context keyword-only)."
 
+["pipelex/tools/jinja2/template_surface.py::get_template_surface"]
+param = "obj"
+rationale = "Reads as get the template surface of this value; the value is the single obvious operand."
+
 ["pipelex/tools/log/log.py::Log._should_ignore"]
 param = "problem_id"
 rationale = "Predicate on the problem id; single operand."

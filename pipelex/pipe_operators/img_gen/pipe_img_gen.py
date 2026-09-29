@@ -22,7 +22,7 @@ from pipelex.interpreter_hub import get_concept_library, get_native_concept
 from pipelex.kernel.exceptions import PromptContentError
 from pipelex.kernel.img_gen_ops import build_img_gen_job_params, resolve_img_gen_setting, run_img_gen
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError, PipeImgGenRunError
 from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -69,14 +69,14 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
             self._validate_param_support_against_model_rules()
 
-        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
         for template_blueprint, template_label in [
             (self.img_gen_prompt_blueprint.prompt_blueprint, "prompt"),
             (self.img_gen_prompt_blueprint.negative_prompt_blueprint, "negative_prompt"),
         ]:
             if template_blueprint is None:
                 continue
-            lint_optional_input_guards(
+            lint_authored_template(
                 pipe_code=self.code,
                 domain_code=self.domain_code,
                 inputs=self.inputs,
