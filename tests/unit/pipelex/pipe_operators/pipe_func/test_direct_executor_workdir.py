@@ -50,6 +50,19 @@ async def greet_it(working_memory: WorkingMemory) -> greet_demo__Greeting:
 """
 
 
+# A PipeFunc file, so the transported run imports it by path, which puts its resolved directory on sys.path.
+_SYMLINK_PROBE_FUNC = """\
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+@pipe_func(name="symlink_probe_func")
+async def symlink_probe_func(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="probe")
+"""
+
+
 class TestDirectExecutorWorkdir:
     @pytest.mark.asyncio
     async def test_transported_run_cleans_up_workdir_on_failure(self, tmp_path: Path, mocker: MockerFixture):
@@ -100,6 +113,36 @@ class TestDirectExecutorWorkdir:
                 get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         stale_entries = [entry for entry in sys.path if Path(entry).is_relative_to(workdir)]
+        assert stale_entries == []
+
+    @pytest.mark.asyncio
+    async def test_transported_run_restores_sys_path_under_a_symlinked_temp_dir(self, tmp_path: Path, mocker: MockerFixture):
+        """Importing a file puts its resolved directory on sys.path, so a temp dir reached through a symlink
+        (`/var` on macOS) must still leave no entry behind.
+        """
+        real_workdir = tmp_path / "real_workdir"
+        real_workdir.mkdir()
+        linked_workdir = tmp_path / "linked_workdir"
+        linked_workdir.symlink_to(real_workdir, target_is_directory=True)
+        mocker.patch("tempfile.mkdtemp", return_value=str(linked_workdir))
+
+        request = PipeFuncExecutionRequest(
+            crate=LibraryCrate(python_sources={"funcs/probe.py": _SYMLINK_PROBE_FUNC}),
+            working_memory_raw={},
+            pipe_code="missing_pipe",
+            function_name="missing_func",
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user", pipeline_run_id="run")),
+            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
+        )
+
+        with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+            try:
+                with pytest.raises((PipelexError, ValidationError)):
+                    await DirectPipeFuncExecutor().run_pipe_func_transported(request=request)
+            finally:
+                get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+
+        stale_entries = [entry for entry in sys.path if Path(entry).is_relative_to(real_workdir) or Path(entry).is_relative_to(linked_workdir)]
         assert stale_entries == []
 
     def test_import_dirs_search_the_root_first_then_sorted_subdirs(self, tmp_path: Path):

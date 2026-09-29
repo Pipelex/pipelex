@@ -93,7 +93,10 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         isolation boundary. The output rides back wrapped in a working memory so it round-trips with its
         concept (and thus its dynamic-class identity), rebound against the receiver's registry.
         """
-        workdir = Path(tempfile.mkdtemp(prefix="pipelex_pipe_func_"))
+        # Resolved, because importing a file puts its resolved directory on sys.path: under a symlinked
+        # temp dir (`/var` is `/private/var` on macOS) those entries would jump ahead of the bundle's
+        # import order and escape the prune below.
+        workdir = Path(tempfile.mkdtemp(prefix="pipelex_pipe_func_")).resolve()
         try:
             return await self._run_transported_from_workdir(request=request, workdir=workdir)
         finally:
