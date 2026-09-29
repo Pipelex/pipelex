@@ -141,15 +141,25 @@ class TestPipeLLMBlueprint:
         )
         assert set(blueprint.input_names) == {"page", "page.page_view"}
 
-    def test_validate_inputs_incorrect_lone_dotted_input_name(self):
-        """A dotted input name alone does not supply the stuff its path is read from: the root must be declared."""
+    def test_validate_inputs_correct_with_lone_dotted_input_name(self):
+        """PipeLLM resolves a dotted input name as that attribute of the stuff, so it needs no root input beside it."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"page.page_view": "native.Image"},
+            output="native.Text",
+            prompt="Describe $page.page_view",
+        )
+        assert set(blueprint.input_names) == {"page.page_view"}
+
+    def test_validate_inputs_incorrect_read_beside_lone_dotted_input_name(self):
+        """A dotted input name supplies its own path only, not the other attributes of its root."""
         error = refused_input_error(
             blueprint_class=PipeLLMBlueprint,
             blueprint_kwargs={
                 "description": "lorem ipsum",
                 "inputs": {"page.page_view": "native.Image"},
                 "output": "native.Text",
-                "prompt": "Describe:\n@page.page_view",
+                "prompt": "Describe $page.page_view in the light of $page.title",
             },
         )
         assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE

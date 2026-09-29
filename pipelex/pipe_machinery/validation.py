@@ -55,22 +55,37 @@ def is_input_used_by_variables(input_name: str, *, variable_paths: set[str]) -> 
     return False
 
 
-def check_inputs_match_variables(*, declared_inputs: set[str], variable_paths: set[str], reader: str) -> None:
+def check_inputs_match_variables(
+    *,
+    declared_inputs: set[str],
+    variable_paths: set[str],
+    reader: str,
+    dotted_input_supplies_its_path: bool,
+) -> None:
     """Refuse a variable the templates read that no input declares, then a declared input no template reads.
 
     The rule shared by every operator that reads its inputs through templates: PipeLLM, PipeCompose,
     PipeSearch and PipeImgGen. ``variable_paths`` are the full dotted paths the operator's templates read,
     already rid of the operator's special names, and ``reader`` names the fields that read them, for the
-    message ("prompt or system_prompt", "template"). A variable is declared when its root is: the root is the
-    stuff the pipe receives, and a dotted input name such as ``page.page_view`` alone does not supply it. A
-    dotted input name counts as read by the path it names, so ``page`` and ``page.page_view`` are both read
-    by ``page.page_view``.
+    message ("prompt or system_prompt", "template").
+
+    ``dotted_input_supplies_its_path`` follows how the operator's pipe resolves a dotted input name such as
+    ``page.page_view``. PipeLLM resolves it as that attribute of the stuff in working memory, so the input alone
+    satisfies a read of its path. PipeCompose, PipeSearch and PipeImgGen read their inputs by their root, as
+    their library validation does, so every read needs its root declared. Either way, a dotted input name
+    counts as read by the path it names.
 
     Raises:
         PipeValidationError: ``MISSING_INPUT_VARIABLE`` with the undeclared root names, or
             ``EXTRANEOUS_INPUT_VARIABLE`` with the unread input names, each sorted.
     """
-    missing_names = sorted({get_root_from_dotted_path(variable_path) for variable_path in variable_paths} - declared_inputs)
+    if dotted_input_supplies_its_path:
+        unsatisfied_paths = {
+            variable_path for variable_path in variable_paths if not is_variable_satisfied_by_inputs(variable_path, input_names=declared_inputs)
+        }
+    else:
+        unsatisfied_paths = {variable_path for variable_path in variable_paths if get_root_from_dotted_path(variable_path) not in declared_inputs}
+    missing_names = sorted({get_root_from_dotted_path(variable_path) for variable_path in unsatisfied_paths})
     if missing_names:
         quoted_names = _quoted_names(names=missing_names)
         if len(missing_names) == 1:

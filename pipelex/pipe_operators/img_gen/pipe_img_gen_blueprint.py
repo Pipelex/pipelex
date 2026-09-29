@@ -56,7 +56,12 @@ class PipeImgGenBlueprint(PipeBlueprint):
             variable_paths.update(
                 self._read_variable_paths(template_source=template_source, template_label=template_label, declared_inputs=declared_inputs)
             )
-        check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="prompt or negative_prompt")
+        check_inputs_match_variables(
+            declared_inputs=declared_inputs,
+            variable_paths=variable_paths,
+            reader="prompt or negative_prompt",
+            dotted_input_supplies_its_path=False,
+        )
 
     @classmethod
     def _read_variable_paths(cls, *, template_source: str, template_label: str, declared_inputs: set[str]) -> set[str]:

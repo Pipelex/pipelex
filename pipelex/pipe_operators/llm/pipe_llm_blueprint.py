@@ -110,7 +110,12 @@ class PipeLLMBlueprint(PipeBlueprint):
             var for var in required_variable_paths if not var.startswith("_") and get_root_from_dotted_path(var) != "place_holder"
         }
 
-        check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=filtered_variable_paths, reader="prompt or system_prompt")
+        check_inputs_match_variables(
+            declared_inputs=declared_inputs,
+            variable_paths=filtered_variable_paths,
+            reader="prompt or system_prompt",
+            dotted_input_supplies_its_path=True,
+        )
 
     @override
     def validate_output(self):
