@@ -104,9 +104,7 @@ class TestAuthorizeUriRead:
         assert "the input 'photo'" in strict["message"]
         assert "/etc/passwd" not in strict["message"]
 
-
-class TestAuthorizeUriReads:
-    def test_refuses_the_first_reference_the_scope_does_not_allow(self) -> None:
+    def test_the_list_form_refuses_the_first_reference_the_scope_does_not_allow(self) -> None:
         uri_references = [
             UriReference(uri="pipelex-storage://org_abc/assets/ok.png", position="image 1 of the prompt"),
             UriReference(uri="pipelex-storage://org_other/assets/secret.png", position="image 2 of the prompt"),
@@ -116,5 +114,5 @@ class TestAuthorizeUriReads:
             authorize_uri_reads(uri_references=uri_references, read_scope=READ_SCOPE)
         assert "image 2 of the prompt" in str(exc_info.value)
 
-    def test_an_empty_list_reads_nothing_and_passes(self) -> None:
+    def test_the_list_form_reads_nothing_from_an_empty_list(self) -> None:
         authorize_uri_reads(uri_references=[], read_scope=READ_SCOPE)

@@ -102,7 +102,7 @@ def _protocol(*, read_scope: str | None) -> PipelexMTHDSProtocol:
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestConstructRoute:
+class TestReadScopeRoutes:
     @pytest.mark.parametrize(
         ("forged_url", "reason"),
         [
@@ -128,13 +128,10 @@ class TestConstructRoute:
         assert result.pipe_output.main_stuff_as_str.startswith("DRY RUN:")
 
     @pytest.mark.parametrize("forged_url", ["pipelex-storage://org_other/mt_y/run_9/assets/secret.png", "/etc/passwd"])
-    async def test_an_unscoped_run_is_unchanged(self, forged_url: str) -> None:
+    async def test_an_unscoped_run_shows_the_forged_image(self, forged_url: str) -> None:
         result = await _protocol(read_scope=None).execute(mthds_contents=[_FORGED_PHOTO_MTHDS], inputs={"where": forged_url})
         assert result.pipe_output.main_stuff_as_str.startswith("DRY RUN:")
 
-
-@pytest.mark.asyncio(loop_scope="class")
-class TestBareStringInputRoute:
     async def test_a_scoped_run_refuses_a_local_path_input_naming_it(self) -> None:
         with pytest.raises(UriReadRefusedError) as exc_info:
             await _protocol(read_scope=READ_SCOPE).execute(mthds_contents=[_DESCRIBE_IMAGE_MTHDS], inputs={"photo": "/etc/passwd"})
@@ -142,9 +139,6 @@ class TestBareStringInputRoute:
         assert "input 'photo'" in exc_info.value.message
         assert "/etc/passwd" not in exc_info.value.message
 
-
-@pytest.mark.asyncio(loop_scope="class")
-class TestPipelineRunSetupScopeGate:
     @pytest.mark.parametrize(
         ("storage_scope", "match"),
         [

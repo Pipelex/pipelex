@@ -176,7 +176,7 @@ def no_workers(mocker: MockerFixture) -> dict[str, Any]:
     }
 
 
-class TestLeavesAuthorizeBeforeTheDryBranch:
+class TestLeafReadScope:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(("leaf_name", "call_leaf", "in_scope_uri"), DRY_LEAVES)
     async def test_a_scoped_dry_run_refuses_a_foreign_key(
@@ -221,8 +221,6 @@ class TestLeavesAuthorizeBeforeTheDryBranch:
         for worker_name, worker_spy in no_workers.items():
             assert not worker_spy.called, f"{leaf_name} built a {worker_name} worker before refusing"
 
-
-class TestRawLeavesAuthorizeToo:
     @pytest.mark.asyncio
     async def test_img_gen_single_image_refuses_a_foreign_key(self, no_workers: dict[str, Any]) -> None:
         with pytest.raises(UriReadRefusedError):
@@ -241,8 +239,6 @@ class TestRawLeavesAuthorizeToo:
             await extract_gen_pages(extract_assignment=_extract_assignment(run_mode=PipeRunMode.LIVE, document_uri=FOREIGN_KEY))
         no_workers["extract"].assert_not_called()
 
-
-class TestAnUnscopedRunIsUnchanged:
     @pytest.mark.asyncio
     async def test_an_unscoped_dry_run_passes_a_foreign_key_and_a_local_path(self, mocker: MockerFixture) -> None:
         mocker.patch("pipelex.cogt.content_generation.dry_mock.get_report_delegate", return_value=mocker.MagicMock())
