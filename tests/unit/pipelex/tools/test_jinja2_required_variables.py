@@ -215,6 +215,18 @@ Best regards,
         ("read_before_set", "{{ note }}{% set note = 'x' %}{{ note }}", {"note"}),
         ("read_after_set", "{% set note = 'x' %}{{ note }}", set()),
         ("read_after_block_set", "{% set note %}{{ body }}{% endset %}{{ note }}", {"body"}),
+        ("macro_reads_a_later_set", "{{ x }}{% macro m() %}[{{ g }}]{% endmacro %}{% set g = 'y' %}{{ m() }}", {"x"}),
+    ]
+
+    # Names Jinja provides, and the scope a loop opens, are never inputs
+    SCOPES: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("namespace_idiom", "{% set ns = namespace(found=false) %}{{ ns.found }}", set()),
+        ("global_followed_by_attribute", "{{ dict(a=1).a }}", set()),
+        ("global_called_on_an_input", "{{ range(count) }}", {"count"}),
+        ("macro_internal_names", "{% macro m() %}{{ caller().strip() }}{{ varargs }}{{ kwargs }}{% endmacro %}", set()),
+        ("loop_target_shadows_its_iterable", "{% for item in item %}{{ item }}{% endfor %}", {"item"}),
+        ("else_branch_reads_outside_the_loop", "{% for x in xs %}{{ x }}{% else %}{{ x }}{% endfor %}", {"xs", "x"}),
+        ("loop_filter_reads_inside_the_loop", "{% for x in xs if x.ok %}{{ x }}{% endfor %}", {"xs"}),
     ]
 
     TEMPLATE_CATEGORIES: ClassVar[list[TemplateCategory]] = [
@@ -590,6 +602,23 @@ class TestDetectJinja2Variables:
         expected_variables: set[str],
     ):
         """A top-level `set` hides its name only from the statements after it."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.SCOPES,
+    )
+    def test_scopes(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """Jinja's globals, a macro's internal names and a loop's own names are not required variables."""
         result = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,

@@ -69,11 +69,11 @@ def check_inputs_match_variables(
     already rid of the operator's special names, and ``reader`` names the fields that read them, for the
     message ("prompt or system_prompt", "template").
 
-    ``dotted_input_supplies_its_path`` follows how the operator's pipe resolves a dotted input name such as
-    ``page.page_view``. PipeLLM resolves it as that attribute of the stuff in working memory, so the input alone
-    satisfies a read of its path. PipeCompose, PipeSearch and PipeImgGen read their inputs by their root, as
-    their library validation does, so every read needs its root declared. Either way, a dotted input name
-    counts as read by the path it names.
+    ``dotted_input_supplies_its_path`` keeps each operator's own rule for a dotted input name such as
+    ``page.page_view`` declared without its root. PipeLLM takes it as supplying the path it names, a shape its
+    tests run; PipeCompose, PipeSearch and PipeImgGen have always required every read's root to be declared.
+    Whether the four should agree is a language question this check leaves open. Either way, a dotted input
+    name counts as read by the path it names.
 
     Raises:
         PipeValidationError: ``MISSING_INPUT_VARIABLE`` with the undeclared root names, or

@@ -63,6 +63,13 @@ def _collect_declarations_from_body(body: list[nodes.Node]) -> set[str]:
     return declarations
 
 
+def _set_target_name(*, statement: nodes.Node) -> str | None:
+    """The name a `{% set %}` or a `{% set %}…{% endset %}` block assigns, when it assigns a plain name."""
+    if isinstance(statement, (nodes.Assign, nodes.AssignBlock)) and isinstance(statement.target, nodes.Name):
+        return statement.target.name
+    return None
+
+
 def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_names: set[str]) -> None:
     """Recursively walk the AST and collect full variable paths.
 
@@ -76,32 +83,40 @@ def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_
         declared_names: Set of locally declared names (loop variables, macro params, etc.)
     """
     if isinstance(node, nodes.Template):
-        # Macros are visible to the whole template, but a `set` declares its name only from its own statement on:
+        # A macro's name is never an input, and a macro body, which runs when the macro is called, sees every
+        # top-level `set`. Elsewhere a `set` declares its name only from its own statement on:
         # `{% set topic = topic|trim %}` reads the incoming `topic`, and so does a read placed before the `set`
+        top_level_set_names = {name for statement in node.body if (name := _set_target_name(statement=statement)) is not None}
         scope_declared = declared_names | {statement.name for statement in node.body if isinstance(statement, nodes.Macro)}
         for statement in node.body:
-            _collect_full_variable_paths(statement, paths=paths, declared_names=scope_declared)
-            if isinstance(statement, (nodes.Assign, nodes.AssignBlock)) and isinstance(statement.target, nodes.Name):
-                scope_declared.add(statement.target.name)
+            statement_declared = scope_declared | top_level_set_names if isinstance(statement, nodes.Macro) else scope_declared
+            _collect_full_variable_paths(statement, paths=paths, declared_names=statement_declared)
+            if (name := _set_target_name(statement=statement)) is not None:
+                scope_declared.add(name)
+        return
+
+    if isinstance(node, nodes.For):
+        # The iterable and the `else` branch are read outside the loop, the body and the loop filter inside it,
+        # where the loop target and the special `loop` variable are declared
+        loop_declared = declared_names | {"loop"}
+        if isinstance(node.target, nodes.Name):
+            loop_declared.add(node.target.name)
+        elif isinstance(node.target, nodes.Tuple):
+            loop_declared.update(item.name for item in node.target.items if isinstance(item, nodes.Name))
+        _collect_full_variable_paths(node.iter, paths=paths, declared_names=declared_names)
+        for statement in node.else_:
+            _collect_full_variable_paths(statement, paths=paths, declared_names=declared_names)
+        for loop_node in [*node.body, *([node.test] if node.test is not None else [])]:
+            _collect_full_variable_paths(loop_node, paths=paths, declared_names=loop_declared)
         return
 
     # Track locally declared variables that apply to this node's children
     local_declared: set[str] = set()
 
-    if isinstance(node, nodes.For):
-        # Loop variable is locally declared
-        if isinstance(node.target, nodes.Name):
-            local_declared.add(node.target.name)
-        elif isinstance(node.target, nodes.Tuple):
-            for item in node.target.items:
-                if isinstance(item, nodes.Name):
-                    local_declared.add(item.name)
-        # The special 'loop' variable is available inside for loops
-        local_declared.add("loop")
-
     if isinstance(node, nodes.Macro):
-        # Macro parameters are locally declared (within the macro body)
+        # Macro parameters, and the names Jinja provides inside a macro body, are locally declared
         local_declared.update(arg.name for arg in node.args)
+        local_declared.update(("caller", "varargs", "kwargs"))
 
     # Merge local declarations
     new_declared = declared_names | local_declared
@@ -171,7 +186,8 @@ def detect_jinja2_required_variables(
         raise Jinja2DetectVariablesError(msg) from undef_error
 
     paths: set[str] = set()
-    _collect_full_variable_paths(parsed_ast, paths=paths, declared_names=set())
+    # The environment's globals (`range`, `namespace`, `dict`...) come from Jinja, never from the inputs
+    _collect_full_variable_paths(parsed_ast, paths=paths, declared_names=set(jinja2_env.globals))
     return paths
 
 
