@@ -28,6 +28,7 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
+from pipelex.tools.misc.string_utils import find_private_path_segment
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
@@ -316,6 +317,12 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         """
         # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
+            # The path is walked with `attrgetter`, which follows any name: refuse the private ones.
+            if private_segment := find_private_path_segment(path=name):
+                raise WorkingMemoryStuffAttributeNotFoundError(
+                    variable_name=name,
+                    message=f"Attribute path '{name}' reads '{private_segment}', which starts with an underscore: a path reads public fields only",
+                )
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]
             attr_path_str = parts[1]  # Keep the rest as a dot-separated string

@@ -158,6 +158,8 @@ products_by_sku = { from = "products", list_to_dict_keyed_by = "sku" }
 
 The referenced value must be a list, and every item must carry the key attribute with a string value — otherwise the composer raises an error.
 
+A `from` path and a `list_to_dict_keyed_by` name read public fields only: validation refuses a segment starting with an underscore, such as `{ from = "order._stuff" }`, for the reason the [Template Sandbox](../../../under-the-hood/template-sandbox.md) gives.
+
 ### Copying Whole Inputs Into Native Fields
 
 The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, `Time`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
