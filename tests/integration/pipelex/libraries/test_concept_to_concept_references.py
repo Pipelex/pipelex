@@ -540,3 +540,27 @@ search = { type = "concept", concept_ref = "invented_search.NoteSearch", descrip
             assert "invented_elsewhere__Note" in message
             assert "invented_search.NoteDigest" not in message
             assert "invented_search__Query" not in message
+
+    def test_field_typed_anything_holds_any_value(self, load_empty_library: Callable[[], str]):
+        """`native.Anything` has no content class, so a field typed by it is spelled `Any`, not a reference nothing resolves."""
+        mthds_content = """
+domain = "invented_box"
+description = "A box holding anything"
+
+[concept.Holder]
+description = "A box holding one value of any kind"
+
+[concept.Holder.structure]
+payload = { type = "concept", concept_ref = "native.Anything", description = "The value held", required = true }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            (Path(tmp_dir) / "box.mthds").write_text(mthds_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            get_library_manager().load_libraries(library_id=library_id, library_dirs=[Path(tmp_dir)])
+
+            holder_concept = get_concept_library().get_required_concept("invented_box.Holder")
+            holder_class = get_concept_library().get_structure_class(concept=holder_concept)
+            holder = holder_class.model_validate({"payload": {"invented_key": [1, 2]}})
+            assert holder.model_dump()["payload"] == {"invented_key": [1, 2]}
