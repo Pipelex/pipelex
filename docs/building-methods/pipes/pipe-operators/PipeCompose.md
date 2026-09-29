@@ -40,6 +40,8 @@ A template reads data and calls methods of plain values, and nothing else: it ca
 | `output`        | string            | The concept for the output                                                  | Yes      |
 | `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
 
+Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+
 *Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
 
 | Sub-field          | Type   | Description                                                                      | Required |
@@ -130,6 +132,8 @@ Instead of rendering a template, construct mode creates a structured object by s
 | `construct`   | section| Field mappings (see below)                                | Yes*     |
 
 *Either `template` or `construct` must be provided, but not both.
+
+The input rule of template mode applies to a construct too: what reads the inputs is every `from` path and every field template, nested constructs included. A declared input none of them reads is refused as `extraneous_input_variable`, and a path whose input is not declared as `missing_input_variable`.
 
 ### Construct Field Methods
 

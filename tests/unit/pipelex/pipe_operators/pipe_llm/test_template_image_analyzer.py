@@ -6,7 +6,7 @@ from typing import Callable
 import pytest
 
 from pipelex.kernel.prompt_references import ImageReferenceKind
-from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
+from pipelex.pipe_operators.shared.exceptions import WithImagesFilterError
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
 
 
@@ -270,47 +270,3 @@ class TestTemplateImageAnalyzer:
                 input_specs={"dynamic_in": "Dynamic"},
                 domain_code="test_pipes",
             )
-
-
-class TestValidateUnusedInputs:
-    """Tests for TemplateImageAnalyzer.validate_unused_inputs()."""
-
-    def test_all_inputs_used_passes(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """Test that validation passes when all inputs are used."""
-        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
-
-        # Should not raise
-        TemplateImageAnalyzer.validate_unused_inputs(
-            template_sources=["Process $name and $age"],
-            input_specs={"name": "Text", "age": "Text"},
-        )
-
-    def test_unused_input_raises(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """Test that unused input raises error."""
-        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
-
-        with pytest.raises(UnusedInputError, match="unused_var"):
-            TemplateImageAnalyzer.validate_unused_inputs(
-                template_sources=["Process $name"],
-                input_specs={"name": "Text", "unused_var": "Text"},
-            )
-
-    def test_input_used_in_second_template_passes(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """Test that input used in any template passes validation."""
-        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
-
-        # name in first, age in second - both should pass
-        TemplateImageAnalyzer.validate_unused_inputs(
-            template_sources=["Hello $name", "You are $age years old"],
-            input_specs={"name": "Text", "age": "Text"},
-        )
-
-    def test_nested_path_counts_as_used(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """Test that nested path usage counts the root variable as used."""
-        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
-
-        # page.page_view should count page as used
-        TemplateImageAnalyzer.validate_unused_inputs(
-            template_sources=["Look at $page.page_view"],
-            input_specs={"page": "Page"},
-        )
