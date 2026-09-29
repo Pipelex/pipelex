@@ -61,10 +61,15 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         return await self._extract_from_source(source_uri=source_uri)
 
     async def _extract_from_source(self, source_uri: str) -> ExtractOutput:
-        """Extract text from any supported URI type (file path, http(s) URL, pipelex-storage://, or base64 data URL)."""
+        """Extract text from any supported URI type (file path, http(s) URL, pipelex-storage://, or base64 data URL).
+
+        An http(s) URL is downloaded by the runtime's fetch helper, never handed to Docling:
+        Docling would fetch it in this process with its own client, following redirects to any
+        address, where the helper refuses private destinations on every hop.
+        """
         prepared = await prepare_file_from_uri(
             uri=source_uri,
-            keep_http_url=True,
+            keep_http_url=False,
             keep_local_path=True,
         )
 
@@ -73,7 +78,9 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
 
         match prepared:
             case PreparedFileHttpUrl():
-                docling_source = prepared.url
+                # This shouldn't happen since we use keep_http_url=False
+                msg = f"Unexpected PreparedFileHttpUrl for URI: {source_uri}"
+                raise TypeError(msg)
             case PreparedFileLocalPath():
                 docling_source = prepared.path
             case PreparedFileBase64():

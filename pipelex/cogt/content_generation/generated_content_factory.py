@@ -192,10 +192,11 @@ class GeneratedContentFactory:
         public_url: str | None
         if is_remote_url and get_config().runtime.storage.is_fetch_remote_content_enabled:
             try:
-                # `RemoteFileFetchError` is the ONLY exception this can raise: the fetch
-                # helper converts every httpx failure into it. Catching the httpx classes
-                # here, as this used to, caught nothing — a 404 or a timeout on a remote
-                # image escaped and failed the whole pipe instead of degrading to the URL.
+                # The fetch helper converts every httpx failure into `RemoteFileFetchError`,
+                # so a 404 or a timeout on a remote image degrades to keeping the URL.
+                # `SsrfBlockedError` is left to fail the pipe on purpose: a provider URL that
+                # resolves to a private address is not a flaky download, and keeping it as
+                # the public URL would hand it on to whoever follows it.
                 actual_bytes, fetched_mime_type = await self._fetch_remote_content(url=url)
             except RemoteFileFetchError as exc:
                 log.warning(f"Failed to fetch a remote image: {exc}")

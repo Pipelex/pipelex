@@ -6224,10 +6224,6 @@ rationale = "Factory from source: builds the result from the base64_data; single
 param = "raw_bytes"
 rationale = "Factory from source: builds the result from the raw_bytes; single operand."
 
-["pipelex/tools/misc/base64_utils.py::make_base64_url_from_http_url"]
-param = "url"
-rationale = "Factory from source: builds the result from the url; single operand."
-
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_path"]
 param = "path"
 rationale = "Factory from source: builds the result from the path; single operand."
@@ -7024,6 +7020,14 @@ rationale = "Predicate on the obj; single operand."
 param = "obj"
 rationale = "Predicate on the obj; single operand."
 
+["pipelex/tools/uri/uri_base64.py::make_base64_url_from_any_uri"]
+param = "uri"
+rationale = "Factory from source: builds the result from the uri; single operand."
+
+["pipelex/tools/uri/uri_base64.py::make_base64_url_from_http_url"]
+param = "url"
+rationale = "Factory from source: builds the result from the url; single operand."
+
 ["pipelex/tools/uri/uri_resolver.py::_resolve_base64_data_url"]
 param = "uri"
 rationale = "Parses/reads the uri; single operand."
@@ -7043,10 +7047,6 @@ rationale = "Extracts/derives from the uri; single operand."
 ["pipelex/tools/uri/uri_resolver.py::is_relative_local_path"]
 param = "uri"
 rationale = "Predicate on the uri; single operand."
-
-["pipelex/tools/uri/uri_resolver.py::make_base64_url_from_any_uri"]
-param = "uri"
-rationale = "Factory from source: builds the result from the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::resolve_local_path_reference"]
 param = "uri"
