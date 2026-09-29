@@ -28,8 +28,14 @@ triggers = [
   "pipelex/system/telemetry/telemetry_config.py",
   "pipelex/cogt/config_cogt.py",
   "pipelex/cogt/img_gen/img_gen_job_components.py",
+  "pipelex/graph/graph_config.py",
+  "pipelex/language/mthds_config.py",
+  "pipelex/methods/methods_config.py",
   "pipelex/tools/aws/aws_config.py",
   "pipelex/tools/log/log_config.py",
+  "pipelex/tools/network/network_config.py",
+  "pipelex/tools/secrets/secrets_config.py",
+  "pipelex/tools/storage/storage_config.py",
   "pipelex/pipelex.toml",
 ]
 # Three kinds of target, not one. The docs are the user-facing prose. The ledgers are where a

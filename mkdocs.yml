@@ -315,6 +315,7 @@ plugins:
         - configuration/config-technical/inference-config.md: "Inference Configuration"
         - configuration/config-technical/inference-backend-config.md: "LLM Providers & Models Configuration"
         - configuration/config-technical/library-config.md: "Library Configuration"
+        - configuration/config-technical/network-config.md: "Network Configuration"
         - tools/plxt.md: "plxt (Formatter & Linter)"
         - tools/logging.md: "Logging"
         - analytics/data-extraction.md: "Observer Data Extraction"
@@ -555,6 +556,7 @@ nav:
         - Inference: configuration/config-technical/inference-config.md
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
+        - Network: configuration/config-technical/network-config.md
   - Advanced:
     - Advanced Customizations:
       - Overview: advanced/index.md

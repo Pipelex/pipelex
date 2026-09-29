@@ -6,7 +6,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
-from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
+from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri
 from tests.cases import ImageTestCases
 
 
@@ -94,7 +94,7 @@ class TestMakeBase64UrlFromUriAsync:
 
         # Mock the HTTP fetch to return PNG bytes
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             return_value=png_bytes,
         )
 
@@ -113,7 +113,7 @@ class TestMakeBase64UrlFromUriAsync:
 
         # Mock the HTTP fetch to return JPEG bytes
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             return_value=jpeg_bytes,
         )
 
@@ -127,7 +127,7 @@ class TestMakeBase64UrlFromUriAsync:
     async def test_http_url_propagates_network_errors(self, mocker: MockerFixture) -> None:
         """Test that HTTP network errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="404 Not Found",
                 request=httpx.Request("GET", "https://example.com/not-found.png"),

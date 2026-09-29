@@ -25,7 +25,7 @@ from pipelex.providers.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.providers.gateway.gateway_search_schemas import GatewayFetchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_storage_provider
-from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
+from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri
 
 
 class GatewayExtractWorker(ExtractWorkerAbstract):
