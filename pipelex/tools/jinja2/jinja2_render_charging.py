@@ -24,10 +24,11 @@ import operator
 from typing import TYPE_CHECKING, Any, Final, cast
 
 from jinja2 import pass_context
-from jinja2.runtime import Context, LoopContext, markup_join, str_join
-from jinja2.sandbox import safe_range
+from jinja2.runtime import Context, LoopContext, Macro, markup_join, str_join
+from jinja2.sandbox import SandboxedEscapeFormatter, SandboxedFormatter, safe_range
 from jinja2.utils import generate_lorem_ipsum
 from markupsafe import Markup, escape
+from typing_extensions import override
 
 from pipelex.tools.jinja2.jinja2_render_budget import (
     CALL_UNITS,
@@ -40,6 +41,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
     charged_iterable,
     check_int_result,
     compare_weight,
+    is_data_object,
     produced_size,
     refuse_int_result,
     size_of,
@@ -55,9 +57,9 @@ from pipelex.tools.jinja2.jinja2_render_costs import (
     OperationCost,
     comparison_units,
     escaped_text_size,
+    format_field_units,
     lipsum_units,
     percent_format_units,
-    str_format_units,
 )
 
 if TYPE_CHECKING:
@@ -133,23 +135,72 @@ def _finish(*, budget: RenderBudget, result: Any, operation: str | Callable[[], 
 ########################################################################################
 
 
+_FORMATTING: Final = "formatting a replacement field"
+
+
+class _ChargedFormatter(SandboxedFormatter):
+    """The sandbox's formatter, charging every replacement field it formats.
+
+    A field is formatted with its spec already resolved, so a width taken from an argument (`{:{w}}`)
+    or from a mapping is read as the number it is, and the value is whatever the field's name led to
+    (`{0.text}`), after the sandbox's own checks.
+    """
+
+    def __init__(self, environment: Environment, *, budget: RenderBudget, escaping: bool, **kwargs: Any) -> None:
+        super().__init__(environment, **kwargs)
+        self._budget = budget
+        self._escaping = escaping
+        self._text_sizes: dict[int, int] = {}
+
+    @override
+    def format_field(self, value: Any, format_spec: str) -> Any:
+        budget = self._budget
+        estimate = format_field_units(value=value, spec=format_spec, limit=budget.remaining, escaping=self._escaping, memo=self._text_sizes)
+        budget.afford(units=STEP_UNITS + estimate, operation=_FORMATTING)
+        text = super().format_field(value, format_spec)
+        budget.charge(units=STEP_UNITS + size_of(text), operation=_FORMATTING)
+        return text
+
+
+class _ChargedEscapeFormatter(_ChargedFormatter, SandboxedEscapeFormatter):
+    """The charged formatter of a markup format string, which escapes what it inserts."""
+
+
 class SandboxedStrFormat:
     """The `str.format` or `str.format_map` of a string, routed through the sandbox's safe formatter.
 
-    Jinja builds this wrapper when a template reads `format` on a string, so that the replacement
+    Jinja builds its own wrapper when a template reads `format` on a string, so that the replacement
     fields of the format string (`{0.name}`, `{0[key]}`) go through the environment's own attribute
-    and item checks. Wrapping it in a type of its own lets the call policy recognise it by type, while
-    the raw `str.format` stays refused, and keeps the format string at hand for the budget's estimate.
+    and item checks. Wrapping that in a type of its own lets the call policy recognise it by type,
+    while the raw `str.format` stays refused, and lets a template's call format through a formatter
+    that charges every field it formats (`format_charged`).
     """
 
-    __slots__ = ("_format", "template")
+    __slots__ = ("_environment", "_format", "_is_format_map", "template")
 
-    def __init__(self, *, format_function: Callable[..., str], template: str) -> None:
+    def __init__(self, *, format_function: Callable[..., str], environment: Environment, template: str, is_format_map: bool) -> None:
         self._format = format_function
+        self._environment = environment
+        self._is_format_map = is_format_map
         self.template = template
 
     def __call__(self, *args: Any, **kwargs: Any) -> str:
         return self._format(*args, **kwargs)
+
+    def format_charged(self, *, args: tuple[Any, ...], kwargs: dict[str, Any], budget: RenderBudget) -> str:
+        """Format as `__call__` does, charging every replacement field to `budget` as it is formatted."""
+        if self._is_format_map:
+            if kwargs or len(args) != 1:
+                # Jinja's own wrapper raises the error Python's `format_map` would.
+                return self._format(*args, **kwargs)
+            mapping: Any = args[0]
+            args, kwargs = (), mapping
+        formatter: _ChargedFormatter
+        if isinstance(self.template, Markup):
+            formatter = _ChargedEscapeFormatter(self._environment, budget=budget, escaping=True, escape=self.template.escape)
+        else:
+            formatter = _ChargedFormatter(self._environment, budget=budget, escaping=False)
+        return type(self.template)(formatter.vformat(self.template, args, kwargs))
 
 
 def _plain_method_cost(*, obj: Any) -> tuple[Any, OperationCost] | None:
@@ -166,13 +217,25 @@ def _plain_method_cost(*, obj: Any) -> tuple[Any, OperationCost] | None:
     return None
 
 
+def _call_inputs_units(*, obj: Any, plain_method: tuple[Any, OperationCost] | None, args: tuple[Any, ...], kwargs: dict[str, Any]) -> int:
+    """What a call is charged for its inputs, before it runs."""
+    if plain_method is not None:
+        bound_value, cost = plain_method
+        return _inputs_units(values=(bound_value, *args) if cost.reads_value else args, keywords=kwargs, step=CALL_UNITS)
+    if isinstance(obj, (Macro, SandboxedStrFormat)):
+        # A macro takes its arguments by reference, and its body is charged step by step; a format
+        # string is charged field by field.
+        return CALL_UNITS
+    return _inputs_units(values=args, keywords=kwargs, step=CALL_UNITS)
+
+
 def charged_call(*, context: Context, obj: Any, args: tuple[Any, ...], kwargs: dict[str, Any], operation: Callable[[], str]) -> Any:
     """Make a call the sandbox has allowed, charging it to the render's budget."""
     budget = render_budget_of(context)
     plain_method = _plain_method_cost(obj=obj)
     bound_value: Any = plain_method[0] if plain_method is not None else None
     cost = plain_method[1] if plain_method is not None else LINEAR
-    budget.charge(units=_inputs_units(values=(bound_value, *args) if plain_method else args, keywords=kwargs, step=CALL_UNITS), operation=operation)
+    budget.charge(units=_call_inputs_units(obj=obj, plain_method=plain_method, args=args, kwargs=kwargs), operation=operation)
     if any(type(argument) not in EAGER_TYPES for argument in args):
         args = tuple(charged_if_lazy(value=argument, budget=budget) for argument in args)
     if kwargs:
@@ -181,10 +244,8 @@ def charged_call(*, context: Context, obj: Any, args: tuple[Any, ...], kwargs: d
         args = (list(args[0]), *args[1:])
     estimate = 0
     if isinstance(obj, SandboxedStrFormat):
-        estimate = str_format_units(
-            template=obj.template, args=args, kwargs=kwargs, limit=budget.remaining, escaping=isinstance(obj.template, Markup)
-        )
-    elif cost.estimate is not None:
+        return _finish(budget=budget, result=obj.format_charged(args=args, kwargs=kwargs, budget=budget), operation=operation)
+    if cost.estimate is not None:
         estimate = cost.estimate(inputs=CostInputs(value=bound_value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=False))
     elif obj is generate_lorem_ipsum:
         estimate = lipsum_units(inputs=CostInputs(value=None, args=args, kwargs=kwargs, limit=budget.remaining, escaping=False))
@@ -197,7 +258,8 @@ def charged_call(*, context: Context, obj: Any, args: tuple[Any, ...], kwargs: d
         # iterable through the rewrite, so the elements are charged here.
         args = (charged_iterable(iterable=args[0], budget=budget), *args[1:])
     budget.afford(units=estimate, operation=operation)
-    return _finish(budget=budget, result=context.call(obj, *args, **kwargs), operation=operation)
+    result = context.call(obj, *args, **kwargs)
+    return _finish(budget=budget, result=result, operation=operation) if cost.reads_value else result
 
 
 ########################################################################################
@@ -210,10 +272,10 @@ _OPERATOR_DESCRIPTIONS: Final[dict[str, str]] = {operator: f"the operator '{oper
 
 def _repeat_units(*, sequence: Any, times: Any) -> int | None:
     """The size of `sequence * times`, or None when that is not a repetition."""
-    if isinstance(times, bool) or not isinstance(times, int) or not isinstance(sequence, (str, list, tuple)):
+    if isinstance(times, bool) or not isinstance(times, int) or not isinstance(sequence, (str, bytes, bytearray, list, tuple)):
         return None
     count: int = max(times, 0)
-    per_element = 1 if isinstance(sequence, str) else 8 + 64
+    per_element = 1 if isinstance(sequence, (str, bytes, bytearray)) else 8 + 64
     return len(cast("Sized", sequence)) * count * per_element
 
 
@@ -312,16 +374,22 @@ def charged_filter(*, name: str, function: Callable[..., Any]) -> Callable[..., 
     operation = f"the filter '{name}'"
 
     def apply(*, context: Context, budget: RenderBudget, value: Any, args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+        escaping = bool(context.eval_ctx.autoescape)
+        if cost.work is not None:
+            inputs = CostInputs(value=value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=escaping)
+            budget.charge(units=cost.work(inputs=inputs), operation=operation)
         if cost.estimate is not None:
-            inputs = CostInputs(value=value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=bool(context.eval_ctx.autoescape))
+            inputs = CostInputs(value=value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=escaping)
             budget.afford(units=cost.estimate(inputs=inputs), operation=operation)
         result = function(*_first_argument(pass_arg=pass_arg, context=context), value, *args, **kwargs)
+        if not cost.reads_value:
+            return result
         return _finish(budget=budget, result=result, operation=operation, produces_int=produces_int)
 
     @pass_context
     def charged(context: Context, value: Any, *args: Any, **kwargs: Any) -> Any:
         budget = render_budget_of(context)
-        budget.charge(units=_inputs_units(values=(value, *args), keywords=kwargs), operation=operation)
+        budget.charge(units=_inputs_units(values=(value, *args) if cost.reads_value else args, keywords=kwargs), operation=operation)
         value = charged_if_lazy(value=value, budget=budget)
         if cost.materializes and type(value) not in EAGER_TYPES:
             if hasattr(value, "__aiter__"):
@@ -349,7 +417,8 @@ def charged_test(*, name: str, function: Callable[..., Any]) -> Callable[..., An
     @pass_context
     def charged(context: Context, value: Any, *args: Any, **kwargs: Any) -> Any:
         budget = render_budget_of(context)
-        units = _inputs_units(values=(value, *args), keywords=kwargs)
+        # A test reads its value only when it compares it or scans its text, both charged below.
+        units = _inputs_units(values=args, keywords=kwargs)
         if cost.comparison is not None and args:
             units += comparison_units(operator=cost.comparison, left=value, right=args[0], limit=budget.remaining)
         elif cost.scans_text and isinstance(value, str):
@@ -403,9 +472,11 @@ def make_charged_finalize(*, inner: Callable[..., Any] | None) -> Callable[..., 
             value = inner(*_first_argument(pass_arg=inner_pass_arg, context=context), value)
         budget = render_budget_of(context)
         autoescape = context.eval_ctx.autoescape
-        if autoescape:
+        # An object of the run's data is not estimated: its estimate would convert it, which printing it
+        # does once anyway, and it is charged once converted.
+        if autoescape and not is_data_object(value=value):
             budget.afford(units=STEP_UNITS + escaped_text_size(value, limit=budget.remaining), operation=_PRINTING)
-        elif type(value) is not str:
+        elif type(value) is not str and not is_data_object(value=value):
             budget.afford(units=STEP_UNITS + text_size(value, limit=budget.remaining), operation=_PRINTING)
         text: Any = escape(value) if autoescape else value if isinstance(value, str) else str(value)
         budget.charge(units=STEP_UNITS + size_of(text), operation=_PRINTING)

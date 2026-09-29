@@ -30,9 +30,10 @@ from collections.abc import AsyncIterator, Iterator, Sized
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeVar, cast
 
 from jinja2.exceptions import TemplateError
-from jinja2.runtime import Undefined
+from jinja2.runtime import LoopContext, Undefined
 from jinja2.utils import Namespace
 from markupsafe import Markup
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, Callable, Collection, Iterable
@@ -161,8 +162,12 @@ def produced_size(value: Any) -> int:
 
 
 def is_lazy(value: object) -> bool:
-    """Whether `value` produces its elements as it is iterated: an iterator, a generator, an async one."""
-    if type(value) in EAGER_TYPES:
+    """Whether `value` produces its elements as it is iterated: an iterator, a generator, an async one.
+
+    An undefined value and a loop's `loop` are neither, though Jinja gives the first an `__aiter__` and
+    the second a `__next__`: wrapped, they would stop behaving as what they are.
+    """
+    if type(value) in EAGER_TYPES or isinstance(value, (Undefined, LoopContext)):
         return False
     return hasattr(value, "__aiter__") or (hasattr(value, "__next__") and hasattr(value, "__iter__"))
 
@@ -227,8 +232,13 @@ class ChargedAsyncIterator(Generic[_ElementT]):
         return element
 
 
-def charged_iterable(*, iterable: Any, budget: RenderBudget) -> ChargedIterator[Any] | ChargedAsyncIterator[Any]:
-    """Wrap `iterable` so that drawing from it is charged, keeping it async when it is async."""
+def charged_iterable(*, iterable: Any, budget: RenderBudget) -> ChargedIterator[Any] | ChargedAsyncIterator[Any] | Undefined:
+    """Wrap `iterable` so that drawing from it is charged, keeping it async when it is async.
+
+    An undefined value is handed back as it is: it iterates as empty, or fails as Jinja would have it fail.
+    """
+    if isinstance(iterable, Undefined):
+        return iterable
     if hasattr(iterable, "__aiter__"):
         return ChargedAsyncIterator(iterable=iterable, budget=budget)
     if isinstance(iterable, Sized):
@@ -267,7 +277,14 @@ def _dict_children(*, value: dict[Any, Any]) -> Iterator[object]:
     yield from value.values()
 
 
-def _walk(*, root: object, leaf_units: Callable[[object], int], container_units: Callable[[object], int], limit: int) -> int:
+def _walk(
+    *,
+    root: object,
+    leaf_units: Callable[[object], int],
+    container_units: Callable[[object], int],
+    limit: int,
+    children: Callable[..., Iterator[object] | None] = _children,
+) -> int:
     """Add up a value's units over the containers under it, without recursing and stopping past `limit`.
 
     Each container is totalled once and its total counted at every reference to it, so a list holding
@@ -277,7 +294,7 @@ def _walk(*, root: object, leaf_units: Callable[[object], int], container_units:
     """
     totals: dict[int, int] = {}
     in_progress: set[int] = set()
-    root_children = _children(value=root)
+    root_children = children(value=root)
     if root_children is None:
         return leaf_units(root)
     # Each frame is the container, the elements left to visit, and the running total.
@@ -306,7 +323,7 @@ def _walk(*, root: object, leaf_units: Callable[[object], int], container_units:
         elif child_id in in_progress:
             frame[2] += ELEMENT_UNITS
         else:
-            grandchildren = _children(value=child)
+            grandchildren = children(value=child)
             if grandchildren is None:
                 units = leaf_units(child)
                 totals[child_id] = units
@@ -383,13 +400,33 @@ def json_string_length(text: str) -> int:
     return 2 + len(text) + text.count('"') + text.count("\\") + 5 * (controls + html_sensitive) + 11 * non_ascii
 
 
-def text_size(value: Any, *, limit: int) -> int:
-    """Estimate the length of `str(value)` without building it, stopping once past `limit`.
+def is_data_object(*, value: object) -> bool:
+    """Whether `value` is an object of the run's data: neither text, a number, nothing, an undefined value
+    nor a container a template can build.
+    """
+    return not isinstance(value, (str, int, float, type(None), Undefined, *_CONTAINER_TYPES))
+
+
+def _data_text_size(*, value: object, memo: dict[int, int] | None) -> int:
+    # An object of the run's data is converted to count its text: that is the conversion the
+    # operation being estimated makes, and the object's text is the run's, not the template's. The
+    # memo converts an object repeated a thousand times once.
+    if memo is None:
+        return len(str(value))
+    known = memo.get(id(value))
+    if known is None:
+        known = len(str(value))
+        memo[id(value)] = known
+    return known
+
+
+def text_size(value: Any, *, limit: int, memo: dict[int, int] | None = None) -> int:
+    """Estimate the length of `str(value)`, stopping once past `limit`.
 
     A string's length is exact. A container prints the `repr` of its elements, so it is walked (see
     `_walk`), and an element that is neither a string, a number nor a container counts the length of
-    its own `repr`, taken once. Any other object at the top level counts nothing: its text comes from
-    the run's data rather than from the template, and it is charged once converted.
+    its own `repr`, taken once. An object of the run's data at the top level is converted, once per
+    `memo` (see `_data_text_size`).
     """
     if isinstance(value, str):
         return len(value)
@@ -402,17 +439,23 @@ def text_size(value: Any, *, limit: int) -> int:
     if isinstance(value, float):
         return 24
     if not isinstance(value, _CONTAINER_TYPES):
-        return 0
+        return _data_text_size(value=cast("object", value), memo=memo)
     return _walk(root=cast("object", value), leaf_units=_repr_leaf_size, container_units=_repr_container_size, limit=limit)
 
 
+def _compare_children(*, value: object) -> Iterator[object] | None:
+    # Two pydantic models are equal when their fields are, so a model is walked like a dict of its fields.
+    if isinstance(value, BaseModel):
+        return iter(vars(value).values())
+    return _children(value=value)
+
+
 def _compare_leaf_units(value: Any) -> int:
-    if isinstance(value, (str, bytes)):
-        return len(value)
-    if isinstance(value, (bool, int, float)) or value is None or isinstance(value, Undefined):
-        return 8
-    # Comparing two objects of the run's data compares their fields, which costs about what printing them does.
-    return len(repr(value))
+    if isinstance(value, (str, bytes, bytearray)):
+        return len(cast("Sized", value))
+    # A number, nothing, an undefined value, or an object whose equality is its own: a step. An
+    # object's `repr` is never taken, since the comparison would not take it.
+    return 8
 
 
 def _compare_container_units(value: Any) -> int:
@@ -420,6 +463,8 @@ def _compare_container_units(value: Any) -> int:
         return 8
     if isinstance(value, (list, tuple, dict, set, frozenset)):
         return 8 * len(cast("Sized", value))
+    if isinstance(value, BaseModel):
+        return 8 * len(vars(value))
     return 0
 
 
@@ -428,6 +473,7 @@ def compare_weight(value: Any, *, limit: int) -> int:
 
     A string costs its length, since two strings of the same length are compared character by
     character; a container costs a reference per element plus the weight of each element, counted at
-    every reference, since comparing two containers compares their elements in turn.
+    every reference, since comparing two containers compares their elements in turn. A pydantic model
+    is a container of its fields.
     """
-    return _walk(root=value, leaf_units=_compare_leaf_units, container_units=_compare_container_units, limit=limit)
+    return _walk(root=value, leaf_units=_compare_leaf_units, container_units=_compare_container_units, limit=limit, children=_compare_children)

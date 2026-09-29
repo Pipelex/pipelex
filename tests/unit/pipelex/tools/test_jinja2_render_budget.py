@@ -1,8 +1,8 @@
 """The render budget: every render spends from one budget, and an operation that would overdraw it is refused.
 
 The refusals are checked at sizes that would take seconds, gigabytes or both without the budget, so a
-hook that stops charging makes its test hang or run out of memory rather than pass: the timeout on
-each class turns that into a failure. The renders that must keep working are checked against Jinja's
+hook that stops charging makes its test hang or run out of memory rather than pass: the class's
+timeout turns that into a failure. The renders that must keep working are checked against Jinja's
 stock sandbox, which renders the same text with no budget at all.
 """
 
@@ -21,10 +21,13 @@ import pytest
 from jinja2 import DictLoader
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from markupsafe import Markup
+from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateBudgetError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, RenderBudgetExceededError
 from pipelex.tools.jinja2.jinja2_render_charging import CHARGED_MARK, INTERNAL_FILTERS
 from pipelex.tools.jinja2.jinja2_render_costs import FILTER_COSTS, PLAIN_VALUE_METHOD_COSTS, REFUSED_PLAIN_VALUE_METHODS, TEST_COSTS
@@ -82,8 +85,11 @@ _AMPLIFIERS = [
     pytest.param("{{ '%.1000000000f' % 1.0 }}", id="percent_precision"),
     pytest.param("{{ '%*d' % (1000000000, 1) }}", id="percent_star_width"),
     pytest.param("{{ '%1000000000d' | format(1) }}", id="format_filter_width"),
+    pytest.param("{{ ['%1000000000s'] | format('x') | length }}", id="format_filter_on_a_list"),
     pytest.param("{{ '{:>1000000000}'.format(1) }}", id="str_format_width"),
     pytest.param("{{ '{:>{w}}'.format(1, w=1000000000) }}", id="str_format_nested_width"),
+    pytest.param("{{ '{:>{w}}'.format(1, w='1000000000') }}", id="str_format_nested_text_width"),
+    pytest.param("{{ '{a:>{w}}'.format_map({'a': 1, 'w': 1000000000}) }}", id="format_map_width"),
     pytest.param("{{ '{:.1000000000f}'.format(1.0) }}", id="str_format_precision"),
     pytest.param("{{ 'x'.ljust(1000000000) }}", id="ljust"),
     pytest.param("{{ 'x'.rjust(1000000000) }}", id="rjust"),
@@ -103,6 +109,7 @@ _AMPLIFIERS = [
     pytest.param("{{ ('x ' * 1000000) | wordwrap(1, wrapstring='y' * 10000) }}", id="wordwrap_wrapstring"),
     pytest.param("{{ ('x' * 1000000) | wordwrap(1) }}", id="wordwrap_long_word"),
     pytest.param("{{ ('x' * 100000) | replace('', 'y' * 100000) }}", id="replace_filter"),
+    pytest.param("{{ (range(1000) | list) | replace('', 'y' * 200000) | length }}", id="replace_filter_on_a_list"),
     pytest.param("{{ [1] | batch(1000000000, 'x') | list | length }}", id="batch_padding"),
     pytest.param("{{ [1] | slice(1000000000) | list | length }}", id="slice_count"),
     pytest.param("{{ range(100000) | join('x' * 100000) }}", id="join_filter"),
@@ -181,6 +188,41 @@ _REPEATED_STEPS = [
     pytest.param("{% for i in range(10000) %}{% set t = i is odd %}{% endfor %}", id="test_calls_in_loop"),
 ]
 
+
+def _text_content(text: str) -> TextContent:
+    return TextContent(text=text)
+
+
+# Single steps that repeat an object of the run's data, whose text only converting it tells: each is
+# refused before it allocates what the repetition asks, a few hundred megabytes.
+_DATA_AMPLIFIERS = [
+    pytest.param("{{ ([doc] * 20000) | join | length }}", id="join"),
+    pytest.param("{{ (('%(a)s' * 20000) % {'a': doc}) | length }}", id="percent"),
+    pytest.param("{{ ('{0.text}' * 20000).format(doc) | length }}", id="str_format_field"),
+    pytest.param("{{ ('{a}' * 20000).format_map({'a': doc}) | length }}", id="format_map"),
+    pytest.param("{{ links | urlize(target='t' * 2000) | length }}", id="urlize"),
+    pytest.param("{{ (blob * 200000000) | length }}", id="bytes_repetition"),
+]
+
+# Ordering filters over long strings that share a prefix: few elements, each comparison scans them all.
+_ORDERINGS = [
+    pytest.param("{{ items | sort | length }}", id="sort"),
+    pytest.param("{{ items | min | length }}", id="min"),
+    pytest.param("{{ items | max(case_sensitive=true) | length }}", id="max"),
+    pytest.param("{{ keyed | dictsort | length }}", id="dictsort"),
+    pytest.param("{{ rows | groupby('k', case_sensitive=true) | list | length }}", id="groupby"),
+]
+
+# Operations that read a fixed part of a large value, repeated: each would overdraw the default budget
+# if it were charged the whole value.
+_FIXED_READS = [
+    pytest.param("{% for i in range(100) %}{{ doc | length }}{{ doc | first }}{{ doc | last }}{% endfor %}", id="length_first_last"),
+    pytest.param("{% for i in range(100) %}{{ lookup.get('k5') }}{{ lookup.keys() | length }}{% endfor %}", id="dict_get_and_keys"),
+    pytest.param("{% for i in range(100) %}{% if doc is defined and doc is string %}y{% endif %}{% endfor %}", id="tests"),
+    pytest.param("{% macro m(x) %}.{% endmacro %}{% for i in range(100) %}{{ m(doc) }}{% endfor %}", id="macro_argument"),
+    pytest.param("{% for i in range(100) %}{{ doc.startswith('x') }}{{ doc | default('d') | length }}{% endfor %}", id="startswith_and_default"),
+]
+
 # Templates that must render exactly as Jinja's stock sandbox renders them.
 _UNCHANGED = [
     pytest.param("{{ 1 < 2 < 3 }}|{{ 3 > 2 > 2 }}|{{ 1 == 1.0 }}|{{ 'a' != 'b' }}", id="comparisons"),
@@ -243,11 +285,38 @@ _UNCHANGED = [
     pytest.param(
         "{{ (1).bit_length() }}|{{ 1.5.is_integer() }}|{{ {'a': 1}.get('a') }}|{{ [1, 2].index(2) }}|{{ (1, 2).count(1) }}", id="plain_methods"
     ),
+    pytest.param(
+        "{{ nope | default('d') }}|{{ nope | length }}|{{ '-'.join(nope) }}|{{ 'a' in nope }}|{% for x in nope %}x{% else %}empty{% endfor %}",
+        id="undefined_values",
+    ),
+    pytest.param("{% macro m(v) %}{{ v is defined }}{% endmacro %}{{ m(nope) }}", id="undefined_macro_argument"),
+    pytest.param(
+        "{% macro show(l) %}[{{ l.index }}/{{ l.length }}]{% endmacro %}{% for i in range(3) %}{{ show(loop) }}{% endfor %}",
+        id="loop_passed_to_a_macro",
+    ),
+    pytest.param("{{ '{:>{w}}|{a}'.format('x', w='3', a=[1]) }}|{{ '{a:>{w}}'.format_map({'a': 'y', 'w': 2}) }}", id="format_fields"),
+    pytest.param(
+        "{{ ['b', 'A', 'a'] | sort | join }}|{{ [{'k': 'b'}, {'k': 'a'}] | sort(attribute='k') | map(attribute='k') | join }}"
+        "|{{ ['b', 'A'] | min }}|{{ {'b': 1, 'A': 2} | dictsort(by='value') }}",
+        id="orderings",
+    ),
 ]
 
 
+_STYLE = TemplatingStyle(tag_style=TagStyle.XML, text_format=TextFormat.PLAIN)
+
+
+class _Opaque:
+    """An object of the run's data whose `repr` fails, as nothing a template does should call it."""
+
+    @override
+    def __repr__(self) -> str:
+        msg = "repr taken"
+        raise RuntimeError(msg)
+
+
 @pytest.mark.timeout(60)
-class TestRenderBudgetRefuses:
+class TestRenderBudget:
     @pytest.mark.parametrize("template_source", _AMPLIFIERS)
     @pytest.mark.parametrize("is_async", [False, True])
     def test_single_step_refused_before_it_runs(self, template_source: str, is_async: bool) -> None:
@@ -260,6 +329,37 @@ class TestRenderBudgetRefuses:
     def test_repeated_steps_overdraw(self, template_source: str, is_async: bool) -> None:
         with pytest.raises(RenderBudgetExceededError):
             _render(template_source, budget=_SMALL_BUDGET, is_async=is_async)
+
+    @pytest.mark.parametrize("template_source", _DATA_AMPLIFIERS)
+    def test_repeated_data_is_refused_before_it_is_built(self, template_source: str) -> None:
+        context: dict[str, Any] = {
+            "doc": _text_content("x" * 10_000),
+            "links": _text_content("a.com " * 10_000),
+            "blob": b"x",
+        }
+        template = PipelexTemplateEnvironment(render_budget_units=_SMALL_BUDGET).from_string(template_source)
+        assert _refused_render_peak_bytes(lambda: template.render(**context)) < 4 * _SMALL_BUDGET
+
+    def test_rendering_with_images_is_estimated_item_by_item(self) -> None:
+        template = make_jinja2_env_without_loader(TemplateCategory.LLM_PROMPT, enable_async=False).from_string(
+            "{{ ([doc] * 30000) | with_images | length }}"
+        )
+        context: dict[str, Any] = {"doc": _text_content("x" * 10_000), Jinja2ContextKey.TEXT_FORMAT: TextFormat.PLAIN}
+        assert _refused_render_peak_bytes(lambda: template.render(**context)) < DEFAULT_RENDER_BUDGET_UNITS
+
+    @pytest.mark.parametrize("template_source", _ORDERINGS)
+    def test_ordering_is_charged_for_its_comparisons(self, template_source: str) -> None:
+        items = ["x" * 100_000 + str(index) for index in range(100)]
+        context: dict[str, Any] = {"items": items, "keyed": dict.fromkeys(items, 1), "rows": [{"k": item} for item in items]}
+        with pytest.raises(RenderBudgetExceededError):
+            _render(template_source, budget=_SMALL_BUDGET, **context)
+
+    def test_comparing_models_weighs_their_fields(self) -> None:
+        # Two equal texts of distinct strings, compared character by character; their models' `repr` is short.
+        left = _text_content("x" * 2_000_000)
+        right = _text_content("".join(["x" * 1_000_000, "x" * 1_000_000]))
+        with pytest.raises(RenderBudgetExceededError):
+            _render("{{ left == right }}", budget=_SMALL_BUDGET, left=left, right=right)
 
     @pytest.mark.parametrize("template_source", ["{{ big }}", "{{ ('' | safe) ~ big }}"])
     def test_escaped_text_is_estimated_before_it_is_escaped(self, template_source: str) -> None:
@@ -302,11 +402,6 @@ class TestRenderBudgetRefuses:
             _render(template_source)
         assert "secret-marker" not in str(exc_info.value)
 
-
-@pytest.mark.timeout(60)
-class TestRenderBudgetErrors:
-    _STYLE = TemplatingStyle(tag_style=TagStyle.XML, text_format=TextFormat.PLAIN)
-
     def test_sync_render_raises_the_budget_error(self) -> None:
         with pytest.raises(Jinja2TemplateBudgetError, match="refused by the render budget"):
             render_jinja2_sync(template_source="{{ 'x' * (10 ** 9) }}", template_category=TemplateCategory.BASIC, templating_context={})
@@ -318,7 +413,7 @@ class TestRenderBudgetErrors:
                 template_source="{{ 'x' * (10 ** 9) }}",
                 template_category=TemplateCategory.LLM_PROMPT,
                 templating_context={},
-                templating_style=self._STYLE,
+                templating_style=_STYLE,
             )
 
     @pytest.mark.asyncio
@@ -328,7 +423,7 @@ class TestRenderBudgetErrors:
                 template_source="{% macro f(n) %}{{ f(n + 1) }}{% endmacro %}{{ f(0) }}",
                 template_category=TemplateCategory.LLM_PROMPT,
                 templating_context={},
-                templating_style=self._STYLE,
+                templating_style=_STYLE,
             )
 
     def test_budget_error_is_the_caller_s_and_caller_facing(self) -> None:
@@ -336,9 +431,6 @@ class TestRenderBudgetErrors:
         assert report.error_domain == ErrorDomain.INPUT
         assert report.caller_facing_message
 
-
-@pytest.mark.timeout(60)
-class TestRenderBudgetKeepsRendering:
     @pytest.mark.parametrize("template_source", _UNCHANGED)
     @pytest.mark.parametrize("autoescape", [False, True])
     @pytest.mark.parametrize("is_async", [False, True])
@@ -347,6 +439,17 @@ class TestRenderBudgetKeepsRendering:
         assert _render(template_source, autoescape=autoescape, is_async=is_async, **context) == _render_stock(
             template_source, autoescape=autoescape, is_async=is_async, **context
         )
+
+    @pytest.mark.parametrize("template_source", _FIXED_READS)
+    def test_reading_part_of_a_large_value_stays_cheap(self, template_source: str) -> None:
+        context: dict[str, Any] = {"doc": "x" * 2_000_000, "lookup": {f"k{index}": index for index in range(100_000)}}
+        assert _render(template_source, **context) == _render_stock(template_source, **context)
+
+    @pytest.mark.parametrize("is_async", [False, True])
+    def test_comparing_objects_never_takes_their_repr(self, is_async: bool) -> None:
+        template_source = "{{ obj == obj }}|{{ obj in [obj] }}|{{ obj != 1 }}"
+        context: dict[str, Any] = {"obj": _Opaque()}
+        assert _render(template_source, is_async=is_async, **context) == _render_stock(template_source, is_async=is_async, **context)
 
     def test_each_render_gets_its_own_budget(self) -> None:
         env = PipelexTemplateEnvironment(render_budget_units=_SMALL_BUDGET)
@@ -373,8 +476,6 @@ class TestRenderBudgetKeepsRendering:
         with pytest.raises(RuntimeError, match="takes its finalize at construction"):
             env.from_string("{{ 1 }}")
 
-
-class TestRenderBudgetCoverage:
     def test_every_jinja_filter_and_test_is_classified(self) -> None:
         filters = cast("dict[str, Callable[..., Any]]", jinja2.filters.FILTERS)
         tests = cast("dict[str, Callable[..., Any]]", jinja2.tests.TESTS)

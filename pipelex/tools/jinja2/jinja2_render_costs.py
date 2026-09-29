@@ -11,17 +11,17 @@ check the tables against everything the running versions offer.
 
 from __future__ import annotations
 
+import math
 import re
-import string
 from collections.abc import Collection, Mapping, Sized
-from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Final, Protocol, cast
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, Protocol, cast
 
 import jinja2.filters
 import jinja2.tests
 from markupsafe import Markup
+from pydantic import BaseModel
 
 from pipelex.tools.jinja2.jinja2_filters import escape_script_tag, tag, text_format
 from pipelex.tools.jinja2.jinja2_render_budget import (
@@ -30,6 +30,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
     STEP_UNITS,
     compare_weight,
     escaped_length,
+    is_data_object,
     json_string_length,
     text_size,
 )
@@ -39,8 +40,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
 
-@dataclass(frozen=True)
-class CostInputs:
+class CostInputs(NamedTuple):
     """What an estimate reads: the operation's inputs and what is left of the budget.
 
     `value` is the value the operation applies to: a filter's input, or the value a method is bound
@@ -67,21 +67,32 @@ class CostEstimate(Protocol):
     def __call__(self, *, inputs: CostInputs) -> int: ...
 
 
-@dataclass(frozen=True)
-class OperationCost:
-    """How the budget treats one method, filter or test beyond charging its inputs and its result.
+class OperationCost(NamedTuple):
+    """How the budget treats one method or filter beyond charging its inputs and its result.
 
     - `estimate`: the size of the result, checked before the operation runs.
+    - `work`: what the operation spends beyond reading its inputs, such as the comparisons of a sort,
+      charged before it runs.
     - `materializes`: a lazy input (a filter's value, a method's first argument) is drawn into a list
-      first, so that the estimate can count it.
+      first, so that the estimates can count it.
+    - `reads_value`: whether the operation reads the whole of its value (a filter's input, the value a
+      method is bound to), which is then charged by its size, like its result. One that does not, such
+      as `len` or `dict.get`, reads a fixed part of its value and returns a reference into it or a small
+      value, so it is charged a step and its arguments only.
     """
 
     estimate: CostEstimate | None = None
+    work: CostEstimate | None = None
     materializes: bool = False
+    reads_value: bool = True
 
 
 # Charged by its inputs and its result only.
 LINEAR: Final = OperationCost()
+
+# Charged a step and its arguments: it reads a fixed part of its value, whatever the value's size, and
+# returns a reference into it or a small value.
+CONSTANT: Final = OperationCost(reads_value=False)
 
 
 def _length(*, value: Any) -> int:
@@ -111,6 +122,7 @@ def percent_format_units(*, template: str, arguments: Any, limit: int, escaping:
     mapping: Mapping[Any, Any] = cast("Mapping[Any, Any]", arguments) if isinstance(arguments, Mapping) else {}
     total = len(template)
     position = 0
+    memo: dict[int, int] = {}
     for spec in _PERCENT_SPEC.finditer(template):
         if spec["conversion"] == "%":
             continue
@@ -126,7 +138,7 @@ def percent_format_units(*, template: str, arguments: Any, limit: int, escaping:
         else:
             argument = positional[position] if position < len(positional) else None
             position += 1
-        total += factor * text_size(argument, limit=limit)
+        total += factor * text_size(argument, limit=limit, memo=memo)
         if total > limit:
             return total
     return total
@@ -135,45 +147,17 @@ def percent_format_units(*, template: str, arguments: Any, limit: int, escaping:
 _SPEC_NUMBER: Final = re.compile(r"\d+")
 
 
-def str_format_units(*, template: str, args: tuple[Any, ...], kwargs: dict[str, Any], limit: int, escaping: bool) -> int:
-    """Estimate the result of `template.format(*args, **kwargs)`.
+def format_field_units(*, value: Any, spec: str, limit: int, escaping: bool, memo: dict[int, int]) -> int:
+    """Estimate `format(value, spec)`, one replacement field of `str.format` with its spec already resolved.
 
-    Every replacement field counts the text of the argument it names, every number in its spec (a
-    width or a precision), and, when the spec takes a width from an argument (`{:{w}}`), the largest
-    integer argument; a date's spec is a `strftime` format, which counts a multiple of its length.
+    It counts the value's text, every number in the spec (a width or a precision), and a multiple of
+    the spec's length, which a date's spec takes as a `strftime` format.
     """
-    factor = ESCAPE_FACTOR if escaping else 1
-    integers = [abs(argument) for argument in (*args, *kwargs.values()) if isinstance(argument, int)]
-    largest_integer = max(integers, default=0)
-    total = 0
-    auto_index = 0
-    try:
-        fields = list(string.Formatter().parse(template))
-    except ValueError:
-        # A malformed format string fails when it is formatted, before it allocates anything.
-        return len(template)
-    for literal, field_name, spec, _conversion in fields:
-        total += len(literal)
-        if field_name is None:
-            continue
-        root = field_name.split(".", 1)[0].split("[", 1)[0]
-        argument: Any = None
-        if not root:
-            argument = args[auto_index] if auto_index < len(args) else None
-            auto_index += 1
-        elif root.isdigit():
-            index = int(root) if len(root) < 6 else len(args)
-            argument = args[index] if index < len(args) else None
-        else:
-            argument = kwargs.get(root)
-        total += factor * text_size(argument, limit=limit)
-        if spec:
-            total += sum(_digits_value(digits=number, limit=limit) for number in _SPEC_NUMBER.findall(spec))
-            total += largest_integer * spec.count("{")
-            total += 32 * len(spec)
-        if total > limit:
-            return total
-    return total
+    total = text_size(value, limit=limit, memo=memo)
+    if spec:
+        total += sum(_digits_value(digits=number, limit=limit) for number in _SPEC_NUMBER.findall(spec))
+        total += 32 * len(spec)
+    return total * (ESCAPE_FACTOR if escaping else 1)
 
 
 ########################################################################################
@@ -204,26 +188,50 @@ def _expanded_tabs(*, inputs: CostInputs) -> int:
     return len(inputs.value) + inputs.value.count("\t") * max(tab_size, 0)
 
 
-def _replacement_units(*, text: str, old: Any, new: Any, count: Any, escaping: bool) -> int:
-    if not isinstance(old, str) or not isinstance(new, str):
-        return len(text)
-    # An empty `old` matches between every two characters.
-    occurrences = text.count(old) if old else len(text) + 1
+def _replacement_units(*, text: str, old: str, new: str, count: Any, escaping: bool) -> int:
+    """Estimate `text.replace(old, new, count)`, where escaping can grow the text and the replacement sixfold."""
+    if escaping:
+        text_length = escaped_length(text)
+        # The escaped text can hold `old` where the text does not, so every place it could fit counts.
+        occurrences = text_length // len(old) + 1 if old else text_length + 1
+        new_length = ESCAPE_FACTOR * len(new)
+    else:
+        text_length = len(text)
+        # An empty `old` matches between every two characters.
+        occurrences = text.count(old) if old else text_length + 1
+        new_length = len(new)
     if isinstance(count, int) and count >= 0:
         occurrences = min(occurrences, count)
-    return len(text) + occurrences * len(new) * (ESCAPE_FACTOR if escaping else 1)
+    return text_length + occurrences * new_length
 
 
 def _replaced(*, inputs: CostInputs) -> int:
-    if not isinstance(inputs.value, str):
+    old = inputs.arg(index=0, name="old")
+    new = inputs.arg(index=1, name="new")
+    if not isinstance(inputs.value, str) or not isinstance(old, str) or not isinstance(new, str):
+        # `str.replace` takes strings only, and fails on anything else before it allocates.
         return _length(value=inputs.value)
     return _replacement_units(
         text=inputs.value,
-        old=inputs.arg(index=0, name="old"),
-        new=inputs.arg(index=1, name="new"),
+        old=old,
+        new=new,
         count=inputs.arg(index=2, name="count", default=-1),
-        escaping=inputs.escaping or isinstance(inputs.value, Markup),
+        escaping=isinstance(inputs.value, Markup),
     )
+
+
+def _value_text(*, value: Any, limit: int) -> str | None:
+    """The text a filter converts `value` to, or None when that text would be longer than `limit`.
+
+    A filter that converts its value (`str(value)`) and then works on the text is estimated on the
+    text: converting first costs what the filter's own conversion would, and is refused when a
+    container's text would already be too long.
+    """
+    if isinstance(value, str):
+        return value
+    if not is_data_object(value=value) and text_size(value, limit=limit) > limit:
+        return None
+    return str(value)
 
 
 def _joined_units(*, items: Any, separator: str, limit: int, escaping: bool) -> int:
@@ -236,8 +244,9 @@ def _joined_units(*, items: Any, separator: str, limit: int, escaping: bool) -> 
     total = count * (len(separator) * factor + ELEMENT_UNITS)
     if isinstance(collection, str):
         return total + count * factor
+    memo: dict[int, int] = {}
     for item in collection:
-        total += factor * text_size(item, limit=limit)
+        total += factor * text_size(item, limit=limit, memo=memo)
         if total > limit:
             return total
     return total
@@ -316,13 +325,13 @@ _STR_METHOD_COSTS: Final[dict[str, OperationCost]] = {
     "casefold": LINEAR,
     "center": OperationCost(estimate=_padded_width),
     "count": LINEAR,
-    "endswith": LINEAR,
+    "endswith": CONSTANT,
     "expandtabs": OperationCost(estimate=_expanded_tabs),
     "find": LINEAR,
     "index": LINEAR,
     "isalnum": LINEAR,
     "isalpha": LINEAR,
-    "isascii": LINEAR,
+    "isascii": CONSTANT,
     "isdecimal": LINEAR,
     "isdigit": LINEAR,
     "isidentifier": LINEAR,
@@ -348,7 +357,7 @@ _STR_METHOD_COSTS: Final[dict[str, OperationCost]] = {
     "rstrip": LINEAR,
     "split": OperationCost(estimate=_split_pieces),
     "splitlines": OperationCost(estimate=_split_lines),
-    "startswith": LINEAR,
+    "startswith": CONSTANT,
     "strip": LINEAR,
     "swapcase": LINEAR,
     "title": LINEAR,
@@ -460,7 +469,7 @@ PLAIN_VALUE_METHOD_COSTS: Final[dict[type, dict[str, OperationCost]]] = {
     timedelta: {"total_seconds": LINEAR},
     list: dict.fromkeys(("copy", "count", "index"), LINEAR),
     tuple: dict.fromkeys(("count", "index"), LINEAR),
-    dict: dict.fromkeys(("copy", "get", "items", "keys", "values"), LINEAR),
+    dict: {"copy": LINEAR, **dict.fromkeys(("get", "items", "keys", "values"), CONSTANT)},
     set: _FROZENSET_METHOD_COSTS,
     frozenset: _FROZENSET_METHOD_COSTS,
 }
@@ -630,14 +639,14 @@ def _wrapped(*, inputs: CostInputs) -> int:
 
 
 def _replaced_filter(*, inputs: CostInputs) -> int:
-    text = inputs.value if isinstance(inputs.value, str) else ""
-    return text_size(inputs.value, limit=inputs.limit) + _replacement_units(
-        text=text,
-        old=inputs.arg(index=0, name="old"),
-        new=inputs.arg(index=1, name="new"),
-        count=inputs.arg(index=2, name="count"),
-        escaping=inputs.escaping,
-    )
+    # The filter converts its value, `old` and `new` to text before it replaces.
+    text = _value_text(value=inputs.value, limit=inputs.limit)
+    old = _value_text(value=inputs.arg(index=0, name="old"), limit=inputs.limit)
+    new = _value_text(value=inputs.arg(index=1, name="new"), limit=inputs.limit)
+    if text is None or old is None or new is None:
+        return inputs.limit + 1
+    count = inputs.arg(index=2, name="count")
+    return len(text) + _replacement_units(text=text, old=old, new=new, count=count, escaping=inputs.escaping or isinstance(inputs.value, Markup))
 
 
 def _joined_filter(*, inputs: CostInputs) -> int:
@@ -646,7 +655,10 @@ def _joined_filter(*, inputs: CostInputs) -> int:
 
 
 def _formatted_filter(*, inputs: CostInputs) -> int:
-    template = inputs.value if isinstance(inputs.value, str) else ""
+    # The filter converts its value to text, which is the format string.
+    template = _value_text(value=inputs.value, limit=inputs.limit)
+    if template is None:
+        return inputs.limit + 1
     return percent_format_units(template=template, arguments=inputs.kwargs or inputs.args, limit=inputs.limit, escaping=inputs.escaping)
 
 
@@ -692,38 +704,167 @@ def _counted_words(*, inputs: CostInputs) -> int:
     return text + ELEMENT_UNITS * (text // 2 + 1)
 
 
+def _attribute_of(*, value: Any, attribute: Any) -> Any:
+    """What `value.attribute` holds, read without running any code: a dict's item, a list's element or a
+    pydantic model's field, down a dotted path. Anything else stands for itself, which weighs at least
+    as much as any attribute of it.
+    """
+    current: object = value
+    for part in str(attribute).split("."):
+        key: object = int(part) if part.isdigit() else part
+        found: object = _MISSING
+        if isinstance(current, dict):
+            found = cast("dict[object, object]", current).get(key, _MISSING)
+        elif isinstance(current, (list, tuple)) and isinstance(key, int):
+            sequence = cast("Sequence[object]", current)
+            found = sequence[key] if key < len(sequence) else _MISSING
+        elif isinstance(current, BaseModel):
+            found = vars(current).get(part, _MISSING)
+        if found is _MISSING:
+            return cast("object", current)
+        current = found
+    return current
+
+
+_MISSING: Final = object()
+
+
+def _ordering_units(*, items: Any, attribute: Any, case_sensitive: Any, comparisons: Callable[..., int], limit: int) -> int:
+    """What ordering `items` costs: `comparisons(n)` comparisons, each weighing the heaviest key.
+
+    Keys that are not compared case-sensitively are lowered first, one copy each.
+    """
+    if not isinstance(items, Collection):
+        return STEP_UNITS
+    collection = cast("Collection[Any]", items)
+    count = len(collection)
+    heaviest = 0
+    lowered = 0
+    weights: dict[int, int] = {}
+    for item in collection:
+        key = item if attribute is None else _attribute_of(value=item, attribute=attribute)
+        weight = weights.get(id(key))
+        if weight is None:
+            weight = compare_weight(key, limit=limit)
+            weights[id(key)] = weight
+        heaviest = max(heaviest, weight)
+        if not case_sensitive and isinstance(key, str):
+            lowered += len(key)
+        if heaviest > limit or lowered > limit:
+            return limit + 1
+    return ELEMENT_UNITS * count + comparisons(count=count) * heaviest + lowered
+
+
+def _sorting_comparisons(*, count: int) -> int:
+    return count * math.ceil(math.log2(count)) if count > 1 else 0
+
+
+def _scanning_comparisons(*, count: int) -> int:
+    return count
+
+
+def _grouping_comparisons(*, count: int) -> int:
+    # A sort by the key, then one comparison per item to find where each group ends.
+    return _sorting_comparisons(count=count) + count
+
+
+def _sorting_work(*, inputs: CostInputs) -> int:
+    # `sort(reverse, case_sensitive, attribute)`
+    return _ordering_units(
+        items=inputs.value,
+        attribute=inputs.arg(index=2, name="attribute"),
+        case_sensitive=inputs.arg(index=1, name="case_sensitive", default=False),
+        comparisons=_sorting_comparisons,
+        limit=inputs.limit,
+    )
+
+
+def _dict_sorting_work(*, inputs: CostInputs) -> int:
+    # `dictsort(case_sensitive, by, reverse)`: the items are sorted by their key or by their value.
+    value = inputs.value
+    if not isinstance(value, Mapping):
+        return STEP_UNITS
+    mapping = cast("Mapping[Any, Any]", value)
+    by = inputs.arg(index=1, name="by", default="key")
+    return _ordering_units(
+        items=list(mapping.values()) if by == "value" else list(mapping.keys()),
+        attribute=None,
+        case_sensitive=inputs.arg(index=0, name="case_sensitive", default=False),
+        comparisons=_sorting_comparisons,
+        limit=inputs.limit,
+    )
+
+
+def _grouping_work(*, inputs: CostInputs) -> int:
+    # `groupby(attribute, default, case_sensitive)`: a sort by the attribute, then one comparison per item.
+    return _ordering_units(
+        items=inputs.value,
+        attribute=inputs.arg(index=0, name="attribute"),
+        case_sensitive=inputs.arg(index=2, name="case_sensitive", default=False),
+        comparisons=_grouping_comparisons,
+        limit=inputs.limit,
+    )
+
+
+def _extremum_work(*, inputs: CostInputs) -> int:
+    # `min(case_sensitive, attribute)` and `max`: one comparison per item.
+    return _ordering_units(
+        items=inputs.value,
+        attribute=inputs.arg(index=1, name="attribute"),
+        case_sensitive=inputs.arg(index=0, name="case_sensitive", default=False),
+        comparisons=_scanning_comparisons,
+        limit=inputs.limit,
+    )
+
+
+def _rendered_with_images(*, inputs: CostInputs) -> int:
+    # A list renders each of its items and joins them, so an item repeated a thousand times renders a
+    # thousand times; a single value renders its own data once, and is charged once rendered.
+    value = inputs.value
+    if not isinstance(value, (list, tuple)):
+        return 0
+    memo: dict[int, int] = {}
+    total = 0
+    for item in cast("Sequence[Any]", value):
+        total += ELEMENT_UNITS + text_size(item, limit=inputs.limit, memo=memo)
+        if total > inputs.limit:
+            return total
+    return total
+
+
 _FILTERS: Final = cast("dict[str, Callable[..., Any]]", jinja2.filters.FILTERS)
 
 # The cost of every filter the environment can register, keyed by the filter function itself: Pipelex
 # registers its own `format` under the name Jinja's has.
 FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     _FILTERS["abs"]: LINEAR,
-    _FILTERS["attr"]: LINEAR,
+    _FILTERS["attr"]: CONSTANT,
     _FILTERS["batch"]: OperationCost(estimate=_batched),
     _FILTERS["capitalize"]: LINEAR,
     _FILTERS["center"]: OperationCost(estimate=_centered),
-    _FILTERS["count"]: LINEAR,
-    _FILTERS["default"]: LINEAR,
-    _FILTERS["dictsort"]: OperationCost(estimate=_materialized),
+    # `count` is `length`, and `len` reads no element.
+    _FILTERS["count"]: CONSTANT,
+    _FILTERS["default"]: CONSTANT,
+    _FILTERS["dictsort"]: OperationCost(estimate=_materialized, work=_dict_sorting_work),
     _FILTERS["escape"]: OperationCost(estimate=_escaped_text),
     _FILTERS["filesizeformat"]: LINEAR,
-    _FILTERS["first"]: LINEAR,
+    _FILTERS["first"]: CONSTANT,
     _FILTERS["float"]: LINEAR,
     _FILTERS["forceescape"]: OperationCost(estimate=_escaped_text),
     _FILTERS["format"]: OperationCost(estimate=_formatted_filter),
-    _FILTERS["groupby"]: OperationCost(estimate=_materialized),
+    _FILTERS["groupby"]: OperationCost(estimate=_materialized, work=_grouping_work, materializes=True),
     _FILTERS["indent"]: OperationCost(estimate=_indented),
     _FILTERS["int"]: LINEAR,
     _FILTERS["items"]: LINEAR,
     _FILTERS["join"]: OperationCost(estimate=_joined_filter, materializes=True),
-    _FILTERS["last"]: LINEAR,
+    _FILTERS["last"]: CONSTANT,
     _FILTERS["list"]: OperationCost(estimate=_materialized),
     _FILTERS["lower"]: LINEAR,
     _FILTERS["map"]: LINEAR,
-    _FILTERS["max"]: LINEAR,
-    _FILTERS["min"]: LINEAR,
+    _FILTERS["max"]: OperationCost(work=_extremum_work, materializes=True),
+    _FILTERS["min"]: OperationCost(work=_extremum_work, materializes=True),
     _FILTERS["pprint"]: OperationCost(estimate=_pprint),
-    _FILTERS["random"]: LINEAR,
+    _FILTERS["random"]: CONSTANT,
     _FILTERS["reject"]: LINEAR,
     _FILTERS["rejectattr"]: LINEAR,
     _FILTERS["replace"]: OperationCost(estimate=_replaced_filter),
@@ -733,7 +874,7 @@ FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     _FILTERS["select"]: LINEAR,
     _FILTERS["selectattr"]: LINEAR,
     _FILTERS["slice"]: OperationCost(estimate=_sliced),
-    _FILTERS["sort"]: OperationCost(estimate=_materialized),
+    _FILTERS["sort"]: OperationCost(estimate=_materialized, work=_sorting_work, materializes=True),
     _FILTERS["string"]: OperationCost(estimate=_text),
     _FILTERS["striptags"]: OperationCost(estimate=_stripped_tags),
     _FILTERS["sum"]: OperationCost(estimate=_summed, materializes=True),
@@ -751,7 +892,7 @@ FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     text_format: LINEAR,
     tag: LINEAR,
     escape_script_tag: OperationCost(estimate=_script_tag_escaped),
-    with_images: LINEAR,
+    with_images: OperationCost(estimate=_rendered_with_images),
 }
 
 # The filters whose result is template arithmetic, capped like an operator's.
@@ -763,8 +904,7 @@ INTEGER_FILTERS: Final[frozenset[Callable[..., Any]]] = frozenset({_FILTERS["int
 ########################################################################################
 
 
-@dataclass(frozen=True)
-class TestCost:
+class TestCost(NamedTuple):
     """How the budget treats a test: a comparison is charged like the operator it spells."""
 
     comparison: str | None = None

@@ -305,7 +305,9 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
         format_function = super().wrap_str_format(value)
         if format_function is None:
             return None
-        return SandboxedStrFormat(format_function=format_function, template=value.__self__)
+        return SandboxedStrFormat(
+            format_function=format_function, environment=self, template=value.__self__, is_format_map=value.__name__ == "format_map"
+        )
 
     @override
     def call(self, context: Context, obj: Any, /, *args: Any, **kwargs: Any) -> Any:
