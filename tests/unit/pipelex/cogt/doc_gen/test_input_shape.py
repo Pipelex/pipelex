@@ -71,6 +71,13 @@ class TestInputShape:
         assert shape.item is not None
         assert shape.item.kind == InputShapeKind.STRUCTURE
 
+    def test_an_input_without_a_content_class_has_an_undeclared_shape(self) -> None:
+        assert shape_of_input(content_class=None, is_list=False).kind == InputShapeKind.ANY
+        list_shape = shape_of_input(content_class=None, is_list=True)
+        assert list_shape.kind == InputShapeKind.LIST
+        assert list_shape.item is not None
+        assert list_shape.item.kind == InputShapeKind.ANY
+
     def test_a_shape_round_trips_through_json(self) -> None:
         shape = shape_of_class(_Invoice)
         assert InputShape.model_validate_json(shape.model_dump_json()) == shape

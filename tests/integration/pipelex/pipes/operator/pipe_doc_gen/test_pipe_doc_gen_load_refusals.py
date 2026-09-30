@@ -86,6 +86,19 @@ class TestPipeDocGenLoadRefusals:
         assert expected in report
 
     @pytest.mark.usefixtures("stub_engines")
+    async def test_a_field_read_on_an_anything_input_is_left_to_the_dry_run(self) -> None:
+        """An `Anything` input declares no fields for the load check to follow, so a field read on it is checked when the template renders."""
+        bundle = PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate = "<h1>{{ invoice.number }} {{ thing.title }}</h1>"').replace(
+            'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", thing = "Anything" }'
+        )
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[bundle])
+        report = str(exc_info.value.to_error_report().model_dump())
+        assert "could not render its template" in report
+        assert "title" in report
+        assert "AnythingContent" not in report
+
+    @pytest.mark.usefixtures("stub_engines")
     async def test_a_misspelling_the_load_check_cannot_follow_fails_at_the_dry_run(self) -> None:
         """A field read through a `set` alias escapes the load check, and the strict undefined names it at the dry run."""
         report = await refusal_report(step_fields='format = "pdf"\ntemplate = "{% set buyer = invoice %}<h1>{{ buyer.custmer }}</h1>"')

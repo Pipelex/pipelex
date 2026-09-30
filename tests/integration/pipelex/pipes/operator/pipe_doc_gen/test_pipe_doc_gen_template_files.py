@@ -2,10 +2,12 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "invoice.docx"'
 
@@ -49,6 +51,23 @@ class TestPipeDocGenTemplateFiles:
         assert set(request.inputs["invoice"].fields) == {"number", "customer", "notes", "line_items"}
         assert request.data is not None
         assert set(request.data) == {"invoice"}
+
+    async def test_an_anything_input_reaches_the_checker_with_an_undeclared_shape(self, tmp_path: Path, stub_engines: StubEngines) -> None:
+        """An `Anything` input has no content class to describe, so the checker is told its shape is not declared."""
+        (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
+        bundle_path = tmp_path / "invoice.mthds"
+        bundle_path.write_text(
+            PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP).replace(
+                'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", thing = "Anything" }'
+            ),
+            encoding="utf-8",
+        )
+
+        await validate_bundle(mthds_file_path=bundle_path)
+
+        (request,) = stub_engines.check_requests
+        assert request.inputs["thing"].kind == InputShapeKind.ANY
+        assert request.inputs["invoice"].kind == InputShapeKind.STRUCTURE
 
     async def test_warnings_alone_pass_and_print_nothing(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """A warning is logged, not raised, and the dry run prints nothing."""

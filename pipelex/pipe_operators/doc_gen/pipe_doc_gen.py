@@ -268,8 +268,10 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     def _input_shapes(self) -> dict[str, InputShape]:
         shapes: dict[str, InputShape] = {}
         for input_name, stuff_spec in self.inputs.root.items():
-            content_class = get_class_registry().get_required_subclass(name=stuff_spec.concept.structure_class_name, base_class=StuffContent)
-            shapes[input_name] = shape_of_input(content_class=content_class, is_list=bool(stuff_spec.multiplicity))
+            content_class: type[StuffContent] | None = None
+            if stuff_spec.concept.declares_a_structure_class:
+                content_class = get_class_registry().get_required_subclass(name=stuff_spec.concept.structure_class_name, base_class=StuffContent)
+            shapes[input_name] = shape_of_input(content_class=content_class, is_list=stuff_spec.is_multiple())
         return shapes
 
     async def check_template_file(self, *, working_memory: WorkingMemory) -> None:

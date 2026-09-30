@@ -159,9 +159,12 @@ def _scalar_kind(annotation: type) -> InputShapeKind:
     return InputShapeKind.ANY
 
 
-def shape_of_input(*, content_class: type[BaseModel], is_list: bool) -> InputShape:
-    """The plain-data shape of one declared input: its content class's, or a list of it for a list input."""
-    shape = shape_of_class(content_class)
+def shape_of_input(*, content_class: type[BaseModel] | None, is_list: bool) -> InputShape:
+    """The plain-data shape of one declared input: its content class's, or a list of it for a list input.
+
+    An input whose concept declares no content class, `Anything`, has a shape that is not declared.
+    """
+    shape = shape_of_class(content_class) if content_class is not None else _leaf(InputShapeKind.ANY)
     if is_list:
         return InputShape(kind=InputShapeKind.LIST, item=shape)
     return shape

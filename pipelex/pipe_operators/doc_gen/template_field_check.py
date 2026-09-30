@@ -84,9 +84,12 @@ def _check_path(*, path: TemplateFieldPath, inputs: InputStuffSpecs, pipe_code: 
     stuff_spec = inputs.root.get(path.root)
     if stuff_spec is None or not path.segments:
         return
+    if not stuff_spec.concept.declares_a_structure_class:
+        # An `Anything` input declares no fields to check a path against; the strict undefined catches a bad read at the dry run.
+        return
     content_class = get_class_registry().get_required_subclass(name=stuff_spec.concept.structure_class_name, base_class=StuffContent)
     first_segment = path.segments[0]
-    if stuff_spec.multiplicity:
+    if stuff_spec.is_multiple():
         # A list input iterates over its items, and otherwise reads as the list stuff itself.
         if first_segment == LIST_ITEM_SEGMENT:
             start: Any = list[content_class]  # type: ignore[valid-type]
