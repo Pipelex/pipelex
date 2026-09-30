@@ -82,7 +82,7 @@ MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, 
     ),
     # A top-level list of bare date objects (e.g. a TOML `deadlines = [2026-01-01, 2026-02-02]` array
     # the loader leaves untouched) shapes element-wise into ListContent[DateContent] under a declared
-    # Date-refining `[]` input — the case `case1-bare-date-arm-gap.md` deferred, now closed by the shaper.
+    # Date-refining `[]` input — a shape the bottom-up factory has no arm for, which the shaper builds.
     (
         "variable-list-of-date-objects",
         "shaper_test.Deadline",

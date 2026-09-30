@@ -62,6 +62,7 @@
       "value_type": "enum",
       "required": false,
       "enum_members": [
+        "doc_gen",
         "img_gen",
         "llm",
         "search",

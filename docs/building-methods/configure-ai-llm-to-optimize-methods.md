@@ -114,6 +114,7 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
 - `2_img_gen_deck.toml`: Image generation configuration
 - `3_extract_deck.toml`: Document extraction configuration
 - `4_search_deck.toml`: Search configuration
+- `5_doc_gen_deck.toml`: The document engines `PipeDocGen` prints with, by format and source
 - `x_custom_extract_deck.toml`: Custom extraction waterfalls/overrides (loaded last)
 - `x_custom_llm_deck.toml`: Custom LLM waterfalls/overrides (loaded last)
 
@@ -133,6 +134,7 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
         ├── 2_img_gen_deck.toml        # Image generation config
         ├── 3_extract_deck.toml        # Document extraction config
         ├── 4_search_deck.toml         # Search config
+        ├── 5_doc_gen_deck.toml        # Document engines, by format and source
         ├── x_custom_extract_deck.toml # Custom extraction waterfalls/overrides
         └── x_custom_llm_deck.toml     # Custom LLM waterfalls/overrides
 ```

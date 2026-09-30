@@ -24,6 +24,8 @@ class TestStyleContextStrictness:
     def _make_context(self, mocker: MockerFixture, *, context_dict: dict[str, Any]) -> Any:
         context = mocker.MagicMock(spec=Context)
         context.get = lambda key, default=None: context_dict.get(key, default)  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
+        # Jinja2 sets `eval_ctx` on the instance, so the class spec lacks it; a real render context always has one.
+        context.eval_ctx = mocker.MagicMock(autoescape=False)
         return context
 
     def test_tag_style_missing_raises(self, mocker: MockerFixture) -> None:

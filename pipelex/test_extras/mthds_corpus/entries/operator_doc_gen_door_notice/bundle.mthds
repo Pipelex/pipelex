@@ -1,0 +1,23 @@
+domain      = "shop_notices"
+description = "Printing the notice a shop tapes to its door"
+main_pipe   = "print_notice"
+
+[concept.OpeningNotice]
+description = "What a shop wants passers-by to know about its opening hours"
+
+[concept.OpeningNotice.structure]
+shop_name = { type = "text", description = "The name painted above the shop's door", required = true }
+weekdays  = { type = "text", description = "The opening hours from Monday to Friday", required = true }
+weekend   = { type = "text", description = "The opening hours on Saturday and Sunday", required = true }
+
+[concept.PrintedNotice]
+description = "The notice laid out as a page to print and tape to the door"
+refines     = "Document"
+
+[pipe.print_notice]
+type        = "PipeDocGen"
+description = "Lays the opening hours out as a page to print"
+inputs      = { notice = "OpeningNotice" }
+output      = "PrintedNotice"
+format      = "pdf"
+filename    = "notice-{{ notice.shop_name }}"

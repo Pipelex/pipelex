@@ -44,16 +44,19 @@ def _compile_jinja2_template(
     use_registry: bool = False,
     enable_async: bool = True,
     finalize: Callable[[Any], Any] | None = None,
+    is_undefined_strict: bool = False,
 ) -> _Jinja2Template:
     if use_registry:
         jinja2_env = make_jinja2_env_from_registry(
             template_category=template_category,
             enable_async=enable_async,
+            is_undefined_strict=is_undefined_strict,
         )
     else:
         jinja2_env = make_jinja2_env_without_loader(
             template_category=template_category,
             enable_async=enable_async,
+            is_undefined_strict=is_undefined_strict,
         )
 
     if finalize is not None:
@@ -206,12 +209,14 @@ async def render_jinja2_async(
     templating_style: TemplatingStyle | None = None,
     use_registry: bool = False,
     finalize: Callable[[Any], Any] | None = None,
+    is_undefined_strict: bool = False,
 ) -> str:
     template = _compile_jinja2_template(
         template_source=template_source,
         template_category=template_category,
         use_registry=use_registry,
         finalize=finalize,
+        is_undefined_strict=is_undefined_strict,
     )
     prepared_templating_context = _prepare_templating_context(
         templating_context=templating_context,

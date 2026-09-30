@@ -12,7 +12,6 @@ from pipelex.core.memory.exceptions import (
 )
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import OpeningTime, Question, ShaperInvoice, ShaperWeird, build_input_specs
@@ -40,9 +39,10 @@ class TestInputShaperExplicitForms:
 
         stuff = working_memory.root["answer"]
         pretty_print(stuff, title="envelope refining wins")
-        # The declared lower bound is native.Text, but the caller volunteered the more specific Question.
+        # The declared lower bound is native.Text, but the caller volunteered the more specific Question,
+        # whose own class holds the text, as the Time envelope below keeps its refining class.
         assert stuff.concept.concept_ref == "shaper_test.Question"
-        assert stuff.content == TextContent(text="What are the fees?")
+        assert stuff.content == Question(text="What are the fees?")
 
     @pytest.mark.parametrize(
         ("concept_ref", "expected_type"),

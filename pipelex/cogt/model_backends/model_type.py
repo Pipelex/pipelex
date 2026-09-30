@@ -6,6 +6,7 @@ class ModelType(StrEnum):
     TEXT_EXTRACTOR = "text_extractor"
     IMG_GEN = "img_gen"
     SEARCH = "search"
+    DOC_GEN = "doc_gen"
 
     @property
     def indefinite_description(self) -> str:
@@ -19,3 +20,5 @@ class ModelType(StrEnum):
                 return "an image-generation model"
             case ModelType.SEARCH:
                 return "a search model"
+            case ModelType.DOC_GEN:
+                return "a document-generation engine"

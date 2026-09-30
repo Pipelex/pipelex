@@ -263,10 +263,10 @@ class ConceptSpec(StructuredContent):
         default=None,
         description=(
             "If applicable: the native concept this concept extends "
-            "(Text, Html, Image, Document, Number, Page, TextAndImages, JSON, Anything, Dynamic) "
+            "(Text, Markdown, Html, Image, Document, Number, Page, TextAndImages, JSON, Anything, Dynamic) "
             "in PascalCase format. Cannot be used together with 'structure'."
         ),
-        examples=["Text", "Html", "Image", "Document", "Number", "Page", "TextAndImages", "JSON"],
+        examples=["Text", "Markdown", "Html", "Image", "Document", "Number", "Page", "TextAndImages", "JSON"],
     )
 
     @field_validator("concept_code", mode="before")

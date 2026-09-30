@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 from typing_extensions import override
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
@@ -156,6 +158,22 @@ class RenderPageViewsAssignment(BaseModel):
     def referenced_uris(self) -> list[UriReference]:
         """The URL the leaf reads for this assignment: the document whose pages it renders."""
         return [UriReference(uri=self.document_uri, position="the document to render as page views")]
+
+
+class RenderDocumentAssignment(BaseModel):
+    """Serializable unit for a single document print: the composed document and the engine that prints it.
+
+    ``doc_gen_setting.model`` is the resolved handle of the ``doc_gen`` model, which is also the routing key.
+    """
+
+    job_metadata: JobMetadata
+    cogt_run_params: CogtRunParams
+    composition: DocumentComposition
+    doc_gen_setting: DocGenSetting
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment: the images the composed document names."""
+        return self.composition.referenced_uris()
 
 
 class SearchAssignment(BaseModel):

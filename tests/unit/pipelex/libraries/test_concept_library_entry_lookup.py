@@ -1,7 +1,7 @@
 """The concept entry affordance: how a human-supplied concept string resolves.
 
-Mirrors the pipe-side entry affordance deliberately without sharing code with it (see
-wip/pipe-refs/entry-affordance-share-vs-duplicate.md). The rows only discriminate against the
+Mirrors the pipe-side entry affordance deliberately without sharing code with it (natives and the
+scope preference have no pipe-side equivalent). The rows only discriminate against the
 old crate-wide rule when a sibling domain declares the same code — a single-domain fixture
 passes under either rule — so most cases here build the two-domain `alpha`/`beta` fixture.
 """

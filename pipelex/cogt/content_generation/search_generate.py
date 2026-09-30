@@ -5,7 +5,7 @@ serializable ``SearchAssignment`` / ``SearchObjectAssignment``, rebuild the ``Se
 worker from the model handle, and run it. The direct ``ContentGenerator`` calls them inline; the Temporal
 ``act_search_*`` activity calls them inside an activity so the result is recorded in workflow history and
 any failure is converted to a terminal ``ApplicationError`` (instead of running inline on the workflow
-loop, which left search failures hanging the submitter — see ``wip/`` brief).
+loop, which left search failures hanging the submitter).
 
 The structured search has two entry points rather than one nullable parameter, because its two arms
 genuinely return different things: in-process the caller's class travels down and an instance of it

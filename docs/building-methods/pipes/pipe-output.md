@@ -164,6 +164,14 @@ verdict = pipe_output.main_stuff_as_yes_no.yes_no  # a bool
 
 This works only if the main_stuff is (or refines) a `YesNoContent` concept.
 
+**`main_stuff_as_markdown`** - Returns `MarkdownContent` object:
+
+```python
+report = pipe_output.main_stuff_as_markdown.text  # the Markdown source
+```
+
+This works only if the main_stuff is (or refines) a `MarkdownContent` concept.
+
 **`main_stuff_as_html`** - Returns `HtmlContent` object:
 
 ```python

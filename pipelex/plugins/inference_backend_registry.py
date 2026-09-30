@@ -13,6 +13,7 @@ class InferenceFamily(StrEnum):
     IMG_GEN = "img_gen"
     EXTRACT = "extract"
     SEARCH = "search"
+    DOC_GEN = "doc_gen"
 
 
 # The uniform inference-backend factory. A backend plugin registers one of these
@@ -78,6 +79,15 @@ class InferenceBackendRegistry:
 
     def has(self, *, family: InferenceFamily, sdk: str) -> bool:
         return (family, sdk) in self._backends
+
+    def with_family(self, *, family: InferenceFamily, backends: dict[str, MakeWorkerFn]) -> "InferenceBackendRegistry":
+        """A copy whose backends of one family are exactly `backends`, keyed by sdk, the other families' kept as they are.
+
+        What a test uses to stand stub workers in for a family, or to remove it, without rebooting the runtime.
+        """
+        kept = {key: make_worker for key, make_worker in self._backends.items() if key[0] != family}
+        kept.update({(family, sdk): make_worker for sdk, make_worker in backends.items()})
+        return InferenceBackendRegistry(kept)
 
     @property
     def keys(self) -> list[tuple[InferenceFamily, str]]:

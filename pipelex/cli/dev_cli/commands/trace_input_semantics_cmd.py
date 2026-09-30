@@ -161,7 +161,7 @@ def _capture_hop2(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path)
                 captures[concept_ref] = None
                 continue
             # `.py.txt` on purpose: these are evidence artifacts, not code — a bare `.py`
-            # extension would drag them into the repo's linters when captured under wip/.
+            # extension would drag them into the repo's linters when the output directory is inside the repository.
             relative_path = f"{HOP2_DIR_NAME}/{concept_ref}.py.txt"
             source_path = output_dir / relative_path
             source_path.parent.mkdir(parents=True, exist_ok=True)
