@@ -1,0 +1,552 @@
+docs/contribute/generate-projection-corpus.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 46,60
+docs/errors/duplicate-doc-gen-default-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+docs/under-the-hood/writing-an-inference-plugin.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 127-128
+.claude/skills/drift-review/SKILL.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 9-11,16,47,56-57,63,65,67-69,71,73,79
+pipelex/builder/concept/concept_spec.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 266,269
+.pipelex/inference/deck/5_doc_gen_deck.toml
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-41
+pipelex/cli/commands/update_cmd.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1,3-7,16,26,28-29,38-45,53,59,69-85,89-96,108-111,114,121,127-144,154,178-190,196,203,219
+pipelex/cogt/content_generation/assignment_models.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 7-8,163-176
+  s_f3c7cb8c321b75::t_be753c23e8bf82 177-178
+pipelex/cogt/content_generation/search_generate.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 8
+pipelex/cogt/doc_gen/plain_data.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-77
+docs/errors/pipe-doc-gen-template-check-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+docs/configuration/config-technical/inference-backend-config.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 75,82,90,477-478,598-611,756
+pipelex/cli/commands/doctor_cmd.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 35,42-49,91,688-690,714-716,736,870,872-873,906,955,1021-1032,1073-1103,1105,1109,1111-1113,1215-1232,1241,1389-1399,1407,1434,1527,1546-1548,1562,1586-1589,1650,1654
+docs/under-the-hood/input-form-descriptor.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 3,37,41
+pipelex/cli/_cli.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 213,220,225,227
+pipelex/cogt/models/model_deck_loader.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1,13-21,23-24
+pipelex/cogt/models/model_manager_abstract.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 8,29,32-37
+pipelex/cogt/doc_gen/doc_gen_setting.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-24
+pipelex/cogt/models/model_suggestion.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 51-52,63-64,75-76
+docs/building-methods/concepts/define_your_concepts.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 150
+pipelex/cli/commands/run/_run_core.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 10,17,59,317,355-364,371,452,454,459-460,463,465,468
+docs/errors/doc-gen-model-capability-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+pipelex/cogt/model_backends/backend_library.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 16,18,23,33,351-352,404-405,410-412,429,451-452,494-495,516-517,654-709
+  s_f3c7cb8c321b75::t_5d4fd5fe67056e 710
+pipelex/cogt/content_generation/dry_mock.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 50,412-419
+  s_f3c7cb8c321b75::t_f1a708a8945a98 420-421
+pipelex/cogt/doc_gen/template_check.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-57
+docs/errors/pipe-doc-gen-run-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+docs/contribute/mthds-test-corpus.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 3,5,32,101,109-121,151-157
+  s_f3c7cb8c321b75::t_b327fb264cc296 158
+docs/contribute/trace-input-semantics.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 31
+docs/building-methods/pipes/pipe-operators/PipeCompose.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 112-113
+docs/under-the-hood/document-engine-plugins.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-152
+pipelex/builder/operations/pipe_ops.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 19,251-260
+  s_f3c7cb8c321b75::t_e69d4ce3e789f0 261
+docs/under-the-hood/error-model.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 351,388
+docs/under-the-hood/inference-backend-plugins.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 32,60,68-70
+pipelex/cli/commands/run/_main_stuff_file.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-79
+pipelex/cli/dev_cli/commands/drift/drift_cmd.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 20,24,29,138,245-251,313-320
+pipelex/cogt/content_generation/doc_gen_generate.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-139
+.drift/acks/config-docs.toml
+  s_f3c7cb8c321b75::t_16edfa448d0c11 2,4-5,16,26
+pipelex/cli/agent_cli/commands/init_cmd.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 23,145
+docs/building-methods/configure-ai-llm-to-optimize-methods.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 117,137
+CLAUDE.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 9
+docs/contribute/hub-layering.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 134
+docs/building-methods/pipes/pipe-output.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 167-174
+docs/errors/inference-and-providers.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 17-20,66,126,129
+mkdocs.yml
+  s_f3c7cb8c321b75::t_16edfa448d0c11 281,358,498,597
+CHANGELOG.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 7-10,13-17
+  s_f3c7cb8c321b75::t_c46226962c3fb2 18,569,1165,1494
+docs/features/cli.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 20
+docs/contribute/drift-contracts.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 25,39,43,62,69,73
+docs/tools/cli/update.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 2,7,14,30-31,34-39,41,51,53,55,57-59,67,70,78,84,93,95-96,102,106-107
+pipelex/cogt/content_generation/generated_content_factory.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 9,116-135
+  s_f3c7cb8c321b75::t_b7b83987f9251d 136
+drift.toml
+  s_f3c7cb8c321b75::t_16edfa448d0c11 5-8
+.pipelex/inference/deck/.kit_manifest.json
+  s_f3c7cb8c321b75::t_16edfa448d0c11 6-7
+.pipelex/inference/backends/.kit_manifest.json
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-6
+pipelex/cogt/model_backends/model_spec_keys.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 29-30,52-53
+pipelex/cogt/model_backends/model_type.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 9,23-24
+pipelex/cogt/models/model_manager.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 3,8-9,28,75,86,90,100-105,113-118,127-148,238-245,478-482
+docs/building-methods/pipes/pipe-operators/index.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 25,38,98-107
+  s_f3c7cb8c321b75::t_768c521bfe2e45 108
+pipelex/builder/pipe/pipe_spec_map.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 4,27
+docs/errors/pipe-doc-gen-factory-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+docs/errors/plugin-model-declaration-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+docs/tools/cli/run.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 217
+docs/errors/authoring-and-language.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 76-79
+docs/features/concepts.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 20
+docs/errors/doc-gen-engine-missing-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+pipelex/builder/pipe/pipe_spec_union.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 8,27
+pipelex/cogt/content_generation/content_generator_protocol.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 7-8,15,134-143
+  s_f3c7cb8c321b75::t_358dfe1d54aeb3 144
+pipelex/cogt/doc_gen/exceptions.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-130
+pipelex/cogt/exceptions.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 352-360,513-526
+  s_f3c7cb8c321b75::t_2eb5a38b89870b 527-528
+pipelex/cogt/doc_gen/doc_gen_engine.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-161
+docs/building-methods/pipes/pipe-operators/PipeDocGen.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-142
+docs/errors/pipe-doc-gen-undefined-value-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+docs/tools/cli/index.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 27
+pipelex/cli/commands/init/command.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 30,378-380
+pipelex/cogt/doc_gen/document_composition.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-82
+pipelex/cogt/doc_gen/input_shape.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-190
+docs/building-methods/concepts/native-concepts.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 29,90-133
+  s_f3c7cb8c321b75::t_4e7215468d288b 134
+.pipelex/inference/backends/internal.toml
+  s_f3c7cb8c321b75::t_16edfa448d0c11 12-15,49-67
+  s_f3c7cb8c321b75::t_3e46bc8e09282d 68
+docs/under-the-hood/secrets-provider-plugins.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 114,125
+pipelex/cogt/doc_gen/layout_builder.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-327
+docs/tools/cli/init.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 65-66
+pipelex/cli/dev_cli/commands/drift/core.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 162-187
+pipelex/cogt/models/deck_manifest.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1,3-6,9,12-17,29,35-59,63,91,129-142,156-158,160-162,166-168,171-173,177-180,182-189,192-193,195-196,201,214-216,218,292-293,298-300
+pipelex/cli/dev_cli/commands/trace_input_semantics_cmd.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 164
+pipelex/cogt/doc_gen/doc_gen_worker_abstract.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-50
+.gitattributes
+  s_f3c7cb8c321b75::t_16edfa448d0c11 9-10
+docs/get-started/configure-ai-providers.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 161
+docs/errors/doc-gen-render-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+Makefile
+  s_f3c7cb8c321b75::t_16edfa448d0c11 424
+pipelex/builder/pipe/pipe_doc_gen_spec.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-95
+pipelex/cogt/content_generation/content_generator.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 11,18,27-28,36,246-261,264
+  s_f3c7cb8c321b75::t_8043379811b02a 262-263,265-266
+pipelex/cogt/doc_gen/doc_gen_worker_factory.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-30
+pipelex/cogt/doc_gen/render_job.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-96
+.drift/acks/hub-layering-convention.toml
+  s_f3c7cb8c321b75::t_16edfa448d0c11 4-5
+pipelex/cogt/doc_gen/layout_tree.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-102
+.drift/acks/cli-docs.toml
+  s_f3c7cb8c321b75::t_16edfa448d0c11 2,4-5,9,28,38,85,94,114-115,122
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 20,98-107
+  s_f3c7cb8c321b75::t_36868c7155b1b2 108
+docs/migration-ledger.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 508,530,694
+docs/under-the-hood/storage-provider-plugins.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 116,127
+pipelex/cogt/models/model_deck_check.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 5,230-286,289
+  s_f3c7cb8c321b75::t_3e44eee26a5071 287-288,290-291
+pipelex/cogt/doc_gen/doc_gen_format.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-151
+docs/errors/doc-gen-handle-not-found-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-19
+docs/errors/duplicate-internal-model-error.md
+  s_f3c7cb8c321b75::t_16edfa448d0c11 1-21
+pipelex/cogt/models/model_deck.py
+  s_f3c7cb8c321b75::t_16edfa448d0c11 7-8,10,79-94,100-102,142-147,159-160,246-259,265,501-553,680-690,758-773,999-1000,1019-1021,1024
+pipelex/cogt/templating/template_rendering.py
+  s_f3c7cb8c321b75::t_7add6776b85f03 17,27
+pipelex/core/concepts/concept.py
+  s_f3c7cb8c321b75::t_d4585ae7c07fc4 159-162
+pipelex/core/concepts/concept_factory.py
+  s_f3c7cb8c321b75::t_2ed23cf4ae7f08 125-134
+pipelex/core/concepts/native/concept_native.py
+  s_f3c7cb8c321b75::t_d149ca3daef8af 14,27,55,71-132,153-154,221,261,287
+pipelex/core/concepts/native/pinned_blueprints.py
+  s_f3c7cb8c321b75::t_a1566ddabef8ad 8-11,53-54,93-99
+pipelex/core/memory/input_shaper.py
+  s_f3c7cb8c321b75::t_07c6378d976a10 16-18,939
+pipelex/core/memory/working_memory.py
+  s_f3c7cb8c321b75::t_105630da7397ef 22,566-570
+pipelex/core/pipes/pipe_output.py
+  s_f3c7cb8c321b75::t_f7ef388e6f6f0b 12,143-147
+pipelex/core/registry_models.py
+  s_f3c7cb8c321b75::t_4ab190b9019150 11,38
+pipelex/core/stuffs/markdown_content.py
+  s_f3c7cb8c321b75::t_14cc130632e747 1,3-4,7-39,41-45,47,49-51
+pipelex/core/stuffs/stuff.py
+  s_f3c7cb8c321b75::t_a307f9df0e2727 18,251-255
+pipelex/core/stuffs/stuff_artefact.py
+  s_f3c7cb8c321b75::t_c5b10dfda3949a 18-23,29,34,36,105-120,176,199-209
+pipelex/core/stuffs/stuff_content_factory.py
+  s_f3c7cb8c321b75::t_2720e11fb576d1 25-28
+pipelex/core/stuffs/stuff_factory.py
+  s_f3c7cb8c321b75::t_f3c3809e5fb216 115-128,320-321,326,549,685
+pipelex/kit/agent_rules/commands.md
+  s_f3c7cb8c321b75::t_75d387eaf07fc5 7
+pipelex/kit/configs/inference/backends/.kit_manifest.json
+  s_f3c7cb8c321b75::t_dcd60675966013 2-3,5
+pipelex/kit/configs/inference/backends/internal.toml
+  s_f3c7cb8c321b75::t_b1ce0f9633240b 12-15,49-68
+pipelex/kit/configs/inference/deck/.kit_manifest.json
+  s_f3c7cb8c321b75::t_fdd52eebb0dd49 6-7
+pipelex/kit/configs/inference/deck/5_doc_gen_deck.toml
+  s_f3c7cb8c321b75::t_ab3676efb3277c 1-41
+pipelex/kit/deck_variants/README.md
+  s_f3c7cb8c321b75::t_93d25f01b73ff4 3
+pipelex/kit/deck_variants/multi_provider/5_doc_gen_deck.toml
+  s_f3c7cb8c321b75::t_76bc0d131f84c7 1-41
+pipelex/libraries/concept/concept_library.py
+  s_f3c7cb8c321b75::t_3d89be5bf6f06e 123-136,213-215
+pipelex/libraries/library_manager.py
+  s_f3c7cb8c321b75::t_a777d14b9374f4 697-700,1194-1195,1202-1204,1327-1333,1340
+pipelex/libraries/pipe/pipe_library.py
+  s_f3c7cb8c321b75::t_0b73368c8a38fd 73,76
+pipelex/migration/fingerprint.py
+  s_f3c7cb8c321b75::t_bc43e74f706efe 482
+pipelex/migration/goldens/inference-backend/fingerprint@3.json
+  s_f3c7cb8c321b75::t_d6f09fba5a2e71 65
+pipelex/mthds_parsing/pipelex_bundle_blueprint.py
+  s_f3c7cb8c321b75::t_f87f21d1038341 22,65
+pipelex/pipe_controllers/condition/pipe_condition.py
+  s_f3c7cb8c321b75::t_125d32339aefcb 134-135,312
+pipelex/pipe_machinery/pipe_blueprint.py
+  s_f3c7cb8c321b75::t_5b74615fd35546 135,163-164
+pipelex/pipe_machinery/registry_models.py
+  s_f3c7cb8c321b75::t_a51da4dd2cb608 15-16,52,63
+pipelex/pipe_machinery/rendering/output_renderer.py
+  s_f3c7cb8c321b75::t_fafa1d1b48a857 119
+pipelex/pipe_operators/doc_gen/exceptions.py
+  s_f3c7cb8c321b75::t_7423b02f6c72c2 1-44
+pipelex/pipe_operators/doc_gen/pipe_doc_gen.py
+  s_f3c7cb8c321b75::t_cf795d840de2b7 1-393
+pipelex/pipe_operators/doc_gen/pipe_doc_gen_blueprint.py
+  s_f3c7cb8c321b75::t_80bbe919c70ba6 1,3-4,6-16,19-20,22-40,43-44,46-55,57-58,60-64,66-90,92-127
+pipelex/pipe_operators/doc_gen/pipe_doc_gen_factory.py
+  s_f3c7cb8c321b75::t_57e95c88b312aa 1-2,4,6-14,17-18,20-28,31-52,54-66,68-80,82-84,86-104,106-122
+pipelex/pipe_operators/doc_gen/template_field_check.py
+  s_f3c7cb8c321b75::t_50f17bfeb9996f 1-135
+pipelex/pipeline/hint_warnings.py
+  s_f3c7cb8c321b75::t_788b22384074b0 63-68,72,247-251,272-274
+pipelex/pipeline/input_form.py
+  s_f3c7cb8c321b75::t_62f0762ee9b9b1 395-396,787,791-792
+pipelex/pipeline/vacuous_presence_warnings.py
+  s_f3c7cb8c321b75::t_edb0193bdcd7e3 10,24
+pipelex/plugins/contract.py
+  s_f3c7cb8c321b75::t_89794199529917 17,27-35,43-44,53-55
+pipelex/plugins/exceptions.py
+  s_f3c7cb8c321b75::t_bed6847f0397f5 145-172
+pipelex/plugins/inference_backend_registry.py
+  s_f3c7cb8c321b75::t_cf3487fafde279 16,83-91
+pipelex/plugins/plugin_model_declarations.py
+  s_f3c7cb8c321b75::t_7f03fbde9bad1f 1,3-9,11,13,15,18-19,21-23,25,27-28,31-32,34,36-39,41-66
+pipelex/plugins/registrar.py
+  s_f3c7cb8c321b75::t_e20a1baa82013f 1-2,9,13,16,32,170-172,188-189,322-367,450-467
+pipelex/providers/builtins.py
+  s_f3c7cb8c321b75::t_42011fd94f3162 20,58
+pipelex/providers/reportlab/fonts/open-sans/OFL.txt
+  s_f3c7cb8c321b75::t_1321b9181af638 1,3-5,7-12,14-21,23-26,28-29,31-32,34-37,39-40,42-46,48-49,51-56,58-61,63-88
+pipelex/providers/reportlab/fonts/roboto-mono/OFL.txt
+  s_f3c7cb8c321b75::t_fd6eb3f125a578 1,3-5,8-10,12-17,19-26,28-31,33-34,36-37,39-42,44-45,47-93
+pipelex/providers/reportlab/markdown_flowables.py
+  s_f3c7cb8c321b75::t_01ca7aa59c57d7 1-280
+pipelex/providers/reportlab/pdf_elements.py
+  s_f3c7cb8c321b75::t_6c5316259f99c1 1-177,180-186,188-314,316-377
+pipelex/providers/reportlab/reportlab_pdf_renderer.py
+  s_f3c7cb8c321b75::t_a46c754cff216b 1-451
+pipelex/providers/reportlab/reportlab_plugin.py
+  s_f3c7cb8c321b75::t_2161d4c1096080 1-35
+pipelex/runtime_boot.py
+  s_f3c7cb8c321b75::t_9683315f0f3ebe 659-665,670
+pipelex/system/configuration/config_loader.py
+  s_f3c7cb8c321b75::t_21c4418f230032 313-314,316,318
+pipelex/system/registries/class_registry_access.py
+  s_f3c7cb8c321b75::t_4d2fe0021ceff9 42-44
+pipelex/test_extras/mthds_corpus/entries/native_markdown_inspection_report/bundle.mthds
+  s_f3c7cb8c321b75::t_b8dc1888b8b5d4 1-3,5-13,15-21,23-24,26-32,34-35
+pipelex/test_extras/mthds_corpus/entries/native_markdown_inspection_report/entry.toml
+  s_f3c7cb8c321b75::t_cc7739ba6d4bf6 1-10
+pipelex/test_extras/mthds_corpus/entries/native_markdown_inspection_report/inputs.json
+  s_f3c7cb8c321b75::t_eb9f7f49721f7b 2-5,7
+pipelex/test_extras/mthds_corpus/entries/operator_doc_gen_door_notice/bundle.mthds
+  s_f3c7cb8c321b75::t_44f05a6b8415c8 1-23
+pipelex/test_extras/mthds_corpus/entries/operator_doc_gen_door_notice/entry.toml
+  s_f3c7cb8c321b75::t_dd97afc4b57a5a 1-10
+pipelex/test_extras/mthds_corpus/entries/operator_doc_gen_door_notice/inputs.json
+  s_f3c7cb8c321b75::t_735a77f25340cd 2-7,9
+pipelex/test_extras/mthds_corpus/vocabulary.toml
+  s_f3c7cb8c321b75::t_2e087ecbf52b12 23-25,87-89
+pipelex/tools/jinja2/html_renderable.py
+  s_f3c7cb8c321b75::t_00124c4822f12a 1,3-8,10-11,13-14,16,18,21-23,25-31
+pipelex/tools/jinja2/jinja2_environment.py
+  s_f3c7cb8c321b75::t_79eda84671b77c 7,16,18-22,56-64,102,109,120,131,141
+pipelex/tools/jinja2/jinja2_field_paths.py
+  s_f3c7cb8c321b75::t_f7af94070ff87c 1-149
+pipelex/tools/jinja2/jinja2_filters.py
+  s_f3c7cb8c321b75::t_daa31dacc0f1c4 6,9,15,23,56,62,67-84,202-219
+pipelex/tools/jinja2/jinja2_models.py
+  s_f3c7cb8c321b75::t_ef8915e106aae6 9
+pipelex/tools/jinja2/jinja2_rendering.py
+  s_f3c7cb8c321b75::t_33c741d2e4cc4e 47,53,59,212,219
+pipelex/tools/jinja2/jinja2_undefined.py
+  s_f3c7cb8c321b75::t_ebbe2ba9cec3d0 1-25
+pipelex/tools/jinja2/template_category.py
+  s_f3c7cb8c321b75::t_40732a4f15b6fa 5,29-36
+pipelex/tools/markdown/markdown_parser.py
+  s_f3c7cb8c321b75::t_ac762eaa3c1fe1 1,3-4,6-11,13,15,18-27,30-33
+pipelex/tools/secrets/secrets_config.py
+  s_f3c7cb8c321b75::t_852e495592c78d 14
+pipelex/tools/uri/uri_bytes.py
+  s_f3c7cb8c321b75::t_c69af87061ebab 1,3-6,9-55
+pyproject.toml
+  s_f3c7cb8c321b75::t_7c5c48c2671ea0 33,51
+subject_grants.toml
+  s_f3c7cb8c321b75::t_ab2354a64897f0 435-438,448-449,1287-1290,1339-1342,1551-1606,2163-2166,2172-2173,2176-2177,2180-2181,2211-2214,4327-4350,5443-5446,6051-6058,6063-6066,6251-6254,7147-7150
+tests/data/errors/error_identity.txt
+  s_f3c7cb8c321b75::t_e828100909ba7e 57-60,74,77,225-228,278
+tests/e2e/pipelex/pipes/markdown/test_markdown_dry_run.py
+  s_f3c7cb8c321b75::t_89901d38f80fe6 1-40
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/README.md
+  s_f3c7cb8c321b75::t_a9ffb648a54145 1,3,5,7,9-13,15-18,20,22,24,26-29,31,33-36,38,40-43,45-52,54-59,61
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/invoice/brief_inputs.json
+  s_f3c7cb8c321b75::t_86a389faf0dc09 1-8
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/invoice/inputs.json
+  s_f3c7cb8c321b75::t_0c9bd5768051c9 2-10,12-13,15-18,21-25,27-30,33-37,39-42,45-49,51-54,57-61,63-66,69-73,75-78,81-85,87-90,93-97,99-102,105-109,111-114,117-121,123-126,129-133,135-138,141-145,147-150,153-157,159-162,165-169,171-174,177-181,183-186,189-193,195-198,201-205,207-210,213-217,219-222,225-229,231-234,237-361,363-366,369-372,375-376,378-379
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/invoice/invoice.mthds
+  s_f3c7cb8c321b75::t_76c3403d042b6a 1-3,5-6,8-12,14-15,17-19,21-22,24-32,34-36,38-40,42-50,52-59,61,63-64,66-68,70-76
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/report/inputs.json
+  s_f3c7cb8c321b75::t_4244f92a120ecc 1-8
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/report/render_inputs.json
+  s_f3c7cb8c321b75::t_ec8c6b1aba8f73 2-6,8
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/report/report.mthds
+  s_f3c7cb8c321b75::t_4397bc2cce1877 1-39
+tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen/test_pipe_doc_gen_playground.py
+  s_f3c7cb8c321b75::t_12971fd1a5f6e5 1-64
+tests/integration/pipelex/cli/test_advisory_warning_channels.py
+  s_f3c7cb8c321b75::t_467619f4e50748 14
+tests/integration/pipelex/cogt/test_doc_gen_models.py
+  s_f3c7cb8c321b75::t_9a9ef0b939b20c 1-51
+tests/integration/pipelex/cogt/test_setup_inference_workers.py
+  s_f3c7cb8c321b75::t_a1151aaab4b35a 1,20-24
+tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py
+  s_f3c7cb8c321b75::t_6d5c1978755949 159-160
+tests/integration/pipelex/pipes/controller/pipe_condition/test_pipe_condition_continue_delivery.py
+  s_f3c7cb8c321b75::t_c9b669bd3209ca 1
+tests/integration/pipelex/pipes/operator/pipe_doc_gen/conftest.py
+  s_f3c7cb8c321b75::t_e78563d579692a 1-65
+tests/integration/pipelex/pipes/operator/pipe_doc_gen/doc_gen_helpers.py
+  s_f3c7cb8c321b75::t_9a40caad8b5b46 1-171
+tests/integration/pipelex/pipes/operator/pipe_doc_gen/test_data.py
+  s_f3c7cb8c321b75::t_c213481f349c4d 1,4-5,7,9-12,14-15,17-19,21-22,24-28,30-32,34-40,42-52,54-63,65-69
+tests/integration/pipelex/pipes/operator/pipe_doc_gen/test_pipe_doc_gen_dependency_template_file.py
+  s_f3c7cb8c321b75::t_728a613c0fd876 3,6,8-9,11,13-62
+tests/integration/pipelex/pipes/operator/pipe_doc_gen/test_pipe_doc_gen_load_refusals.py
+  s_f3c7cb8c321b75::t_319c86d7b87d2b 1-122
+tests/integration/pipelex/pipes/operator/pipe_doc_gen/test_pipe_doc_gen_run.py
+  s_f3c7cb8c321b75::t_31cc1284b51294 1-151
+tests/integration/pipelex/pipes/operator/pipe_doc_gen/test_pipe_doc_gen_template_files.py
+  s_f3c7cb8c321b75::t_551f61f2a34342 1-92
+tests/integration/pipelex/pipes/operator/pipe_llm/test_pipe_llm_markdown_output_path.py
+  s_f3c7cb8c321b75::t_554245412d4f2e 1-59
+tests/integration/pipelex/pipes/optionals/test_optional_guard_lint.py
+  s_f3c7cb8c321b75::t_ff4864ab718ea6 116
+tests/unit/pipelex/builder/operations/test_pipe_spec_to_toml.py
+  s_f3c7cb8c321b75::t_c7183992791017 205-234
+tests/unit/pipelex/cli/commands/run/test_main_stuff_file.py
+  s_f3c7cb8c321b75::t_a04a8f74743800 1,3,5-6,8-10,12-48,50-52,54,56
+tests/unit/pipelex/cli/dev/test_drift_ack_cmd.py
+  s_f3c7cb8c321b75::t_7fa74fef65ed79 12,55,57,65,74,83,91-119,129,134,143,149,155,163,171,179,190,198,207,218
+tests/unit/pipelex/cli/dev/test_drift_plan_cmd.py
+  s_f3c7cb8c321b75::t_d3ba095abee9fe 72,76-77
+tests/unit/pipelex/cli/test_doctor_cmd.py
+  s_f3c7cb8c321b75::t_25dcd652986371 88-95,114,157-164
+tests/unit/pipelex/cli/test_doctor_deck_sync.py
+  s_f3c7cb8c321b75::t_1b354e329c934e 39,56,77,93
+tests/unit/pipelex/cli/test_doctor_display_report.py
+  s_f3c7cb8c321b75::t_929eb3a856958b 67-69
+tests/unit/pipelex/cli/test_doctor_fix_mode.py
+  s_f3c7cb8c321b75::t_f4ec2171849216 60,207-221
+tests/unit/pipelex/cli/test_doctor_internal_backend_sync.py
+  s_f3c7cb8c321b75::t_cb21cf391948cf 1-123
+tests/unit/pipelex/cli/test_pipe_cmd.py
+  s_f3c7cb8c321b75::t_e67790df844f97 117-133
+tests/unit/pipelex/cli/test_update_cmd.py
+  s_f3c7cb8c321b75::t_44c37411973812 31-37,49-52,59,66-67,71-92,99,121,136,154,169,189,214,230-281
+tests/unit/pipelex/codegen/test_projection_agrees_with_runtime_base.py
+  s_f3c7cb8c321b75::t_72e43ee8fec02c 19
+tests/unit/pipelex/cogt/content_generation/test_assignment_read_coverage.py
+  s_f3c7cb8c321b75::t_d3fde50a0fde57 25,32-35,61-62,86-87,89,96-97,176-196
+tests/unit/pipelex/cogt/content_generation/test_doc_gen_render_resources.py
+  s_f3c7cb8c321b75::t_be49e2919a0a95 1,3-4,6-9,11-34
+tests/unit/pipelex/cogt/doc_gen/test_doc_gen_format.py
+  s_f3c7cb8c321b75::t_d1526898849ccb 1-51
+tests/unit/pipelex/cogt/doc_gen/test_document_composition.py
+  s_f3c7cb8c321b75::t_aa0b57d7679245 1,3-4,6-8,11-32,34,36-41,43-47,49-60,62,64-66,68-70,72-81
+tests/unit/pipelex/cogt/doc_gen/test_input_shape.py
+  s_f3c7cb8c321b75::t_1ebf5cb9cb2112 1-8,10,12-118
+tests/unit/pipelex/cogt/doc_gen/test_layout_builder.py
+  s_f3c7cb8c321b75::t_0249b8278adc4b 1-183
+tests/unit/pipelex/cogt/doc_gen/test_layout_builder_helpers.py
+  s_f3c7cb8c321b75::t_d2ca9bae9328d8 1-15
+tests/unit/pipelex/cogt/doc_gen/test_plain_data.py
+  s_f3c7cb8c321b75::t_4bcc36a3f0c64e 1-2,4-8,13-35,37-40
+tests/unit/pipelex/cogt/doc_gen/test_render_job.py
+  s_f3c7cb8c321b75::t_819675833b0d3e 1-58
+tests/unit/pipelex/cogt/models/test_deck_manifest.py
+  s_f3c7cb8c321b75::t_a2fd385c8b4f5b 13,16,22,50,94,107,124,128,135,146,148,158,164,175,180,191,194,212,215,225,227,239,252,281,306-339
+tests/unit/pipelex/cogt/models/test_enforce_gateway_model_membership.py
+  s_f3c7cb8c321b75::t_3dc02ae7cdeab2 295-313
+tests/unit/pipelex/cogt/models/test_inference_config_overrides_end_to_end.py
+  s_f3c7cb8c321b75::t_f9ad5660bb6a27 20,55
+tests/unit/pipelex/cogt/models/test_model_deck_references.py
+  s_f3c7cb8c321b75::t_a3ab9c13de3fd9 11,118,181-182,191,225,259,292
+tests/unit/pipelex/cogt/models/test_plugin_model_merge.py
+  s_f3c7cb8c321b75::t_db3288aae9adec 1-173
+tests/unit/pipelex/core/concepts/concept_factory/test_markdown_refinement.py
+  s_f3c7cb8c321b75::t_3b997e0efbdd8d 1-89
+tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py
+  s_f3c7cb8c321b75::t_175a0d3406d990 60-63,118,122,137
+tests/unit/pipelex/core/memory/input_shaper/test_anything_schema_agreement.py
+  s_f3c7cb8c321b75::t_8216bbf6f45d31 16
+tests/unit/pipelex/core/memory/input_shaper/test_explicit_forms.py
+  s_f3c7cb8c321b75::t_b6663c07b4686e 42-43,45
+tests/unit/pipelex/core/memory/input_shaper/test_markdown_inputs.py
+  s_f3c7cb8c321b75::t_fe173f733f0737 1,3,5-12,14,17-22,24-35,37,39-42,44-47,49,51-53,55-59,61-62,64-86
+tests/unit/pipelex/core/memory/input_shaper/test_multiplicity.py
+  s_f3c7cb8c321b75::t_2b673816cdf019 85
+tests/unit/pipelex/core/stuffs/markdown_content/test_data.py
+  s_f3c7cb8c321b75::t_a09f03618f6d55 1-30
+tests/unit/pipelex/core/stuffs/markdown_content/test_markdown_content_renders.py
+  s_f3c7cb8c321b75::t_9ed186ed5e2c46 1-58
+tests/unit/pipelex/core/stuffs/test_stuff_artefact_markdown_html.py
+  s_f3c7cb8c321b75::t_c80cc21f18ca3c 1-2,4-20,22-27,30-32,35-41,44-45,48-49,52-164
+tests/unit/pipelex/kit/test_deck_variants.py
+  s_f3c7cb8c321b75::t_ff0de4fa510a74 21-25,27,36,41,70,116-137,139,142-144,146,153,178,184,198,215,222-230
+tests/unit/pipelex/language/test_mthds_schema.py
+  s_f3c7cb8c321b75::t_6eb226dfa238ec 28
+tests/unit/pipelex/libraries/test_concept_library_entry_lookup.py
+  s_f3c7cb8c321b75::t_4e12a86ccb8c22 3-4
+tests/unit/pipelex/migration/test_surface_directories.py
+  s_f3c7cb8c321b75::t_64e6b364d114e5 26
+tests/unit/pipelex/pipe_operators/pipe_doc_gen/test_pipe_doc_gen_blueprint.py
+  s_f3c7cb8c321b75::t_2ecef2916d4c88 1,3-4,6-7,10-13,16-48
+tests/unit/pipelex/pipe_operators/pipe_doc_gen/test_safe_filename.py
+  s_f3c7cb8c321b75::t_e7251b93e77394 1-19
+tests/unit/pipelex/pipeline/test_markdown_input_form_and_hints.py
+  s_f3c7cb8c321b75::t_57547f8351b564 1,3-8,10-15,17-43
+tests/unit/pipelex/pipeline/test_vacuous_presence_warnings.py
+  s_f3c7cb8c321b75::t_ef962fbde5f736 3,149
+tests/unit/pipelex/plugins/test_import_light_boot.py
+  s_f3c7cb8c321b75::t_2ab3653330407a 40-42
+tests/unit/pipelex/plugins/test_plugin_model_declarations.py
+  s_f3c7cb8c321b75::t_b5034dcb60d7f2 1,3-7,9,11-12,14,16-21,23-24,26-33,36-38,41-44,46,48-49,51-139
+tests/unit/pipelex/providers/reportlab/conftest.py
+  s_f3c7cb8c321b75::t_289c14c26398b0 1-9
+tests/unit/pipelex/providers/reportlab/reportlab_test_helpers.py
+  s_f3c7cb8c321b75::t_8ec304b3e2e852 1-5,7-10,12-18,20-21,24-26,29-30,32-34,36-135
+tests/unit/pipelex/providers/reportlab/test_data.py
+  s_f3c7cb8c321b75::t_a95c8ec8765915 1-105
+tests/unit/pipelex/providers/reportlab/test_markdown_flowables.py
+  s_f3c7cb8c321b75::t_22580e2fd4d5e8 1-127
+tests/unit/pipelex/providers/reportlab/test_pdf_elements.py
+  s_f3c7cb8c321b75::t_0e4b7591530e33 1-4,6-21,24-30,32-40,42-52,54-55,57-59,61-64,66-69,71-73,75-84
+tests/unit/pipelex/providers/reportlab/test_reportlab_pdf_renderer.py
+  s_f3c7cb8c321b75::t_7a3825a1bce715 1-197
+tests/unit/pipelex/providers/reportlab/test_reportlab_plugin.py
+  s_f3c7cb8c321b75::t_5377d1582c37f8 1-84
+tests/unit/pipelex/tools/markdown/test_markdown_parser.py
+  s_f3c7cb8c321b75::t_bb7efeec6efeec 1-14
+tests/unit/pipelex/tools/test_jinja2_field_paths.py
+  s_f3c7cb8c321b75::t_edab1de28f5c9e 1,3-5,8-10,13-15,17-50
+tests/unit/pipelex/tools/test_jinja2_markdown_filter.py
+  s_f3c7cb8c321b75::t_19f9a8265b622d 1-36
+tests/unit/pipelex/tools/test_jinja2_optional_guards.py
+  s_f3c7cb8c321b75::t_8f6f98f4a73bbd 100
+tests/unit/pipelex/tools/test_jinja2_strict_undefined.py
+  s_f3c7cb8c321b75::t_83f113d8dd6594 1-30
+tests/unit/pipelex/tools/test_jinja2_style_context_strictness.py
+  s_f3c7cb8c321b75::t_44c11a863345be 27-28
+tests/unit/repo/test_docs_cite_nothing_private.py
+  s_f3c7cb8c321b75::t_06a78c655a22ee 1-87
+uv.lock
+  s_f3c7cb8c321b75::t_97403ebc77d453 2126-2134,2280-2284,3473,3624
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a0e87243939a3769ee3160bf05568263500d2d1a",
+  "prompts": {},
+  "sessions": {
+    "s_f3c7cb8c321b75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2ef0cfe4-b474-4a78-ba43-f9225122039d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
