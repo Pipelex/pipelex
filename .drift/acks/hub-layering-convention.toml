@@ -1,8 +1,8 @@
 contract = "hub-layering-convention"
 digest = "sha256:75768fa677bc8550119a8b20ce80c22e5edfa1040eee6b32fe574f7ae2019435"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-17T17:57:19Z"
-rationale = "The runtime hub no longer imports Rich at module level. Its console accessor builds the Rich console lazily after checking that the cli extra is installed, and the console print target now stores the stream instead of building a console. No accessor was added, moved or removed and no layer placement changed, so the partition table in the hub-layering doc, which lists get_console as the console accessor, is still accurate. The new Rich import guard reuses the import graph of the hub-layering guard without changing it, and the rich-imports contribute doc says so."
+reviewed_at = "2026-09-30T00:36:45Z"
+rationale = "The document renderer registry is removed from the runtime hub again, since document engines register as inference backends of the doc_gen family, so runtime_hub.py and docs/contribute/hub-layering.md are both back to dev's state. No layer placement changed."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"

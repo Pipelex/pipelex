@@ -18,8 +18,13 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.cogt.models.deck_manifest import kit_deck_dir, list_managed_kit_files
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
+from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
+from pipelex.cogt.models.deck_manifest import KitManagedArea, kit_deck_dir, list_managed_kit_files
 from pipelex.cogt.models.model_deck import (
+    DocGenDeckBlueprint,
     ExtractDeckBlueprint,
     ImgGenDeckBlueprint,
     LLMDeckBlueprint,
@@ -28,11 +33,12 @@ from pipelex.cogt.models.model_deck import (
 )
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
+from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.kit.paths import get_kit_configs_dir, get_kit_deck_variants_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 # A vocabulary coordinate: the model family, then the kind of name within it.
-DeckFamilyBlueprint = LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint
+DeckFamilyBlueprint = LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint | DocGenDeckBlueprint
 VocabularyKey = tuple[str, str]
 Vocabulary = dict[VocabularyKey, set[str]]
 PermittedDrops = Mapping[VocabularyKey, frozenset[str]]
@@ -61,6 +67,7 @@ def extract_vocabulary(blueprint: ModelDeckBlueprint) -> Vocabulary:
         "extract": blueprint.extract,
         "img_gen": blueprint.img_gen,
         "search": blueprint.search,
+        "doc_gen": blueprint.doc_gen,
     }
     vocabulary: Vocabulary = {}
     for family, family_blueprint in family_blueprints.items():
@@ -106,20 +113,44 @@ def list_declared_backend_handles() -> set[str]:
     return handles
 
 
+def list_choice_default_references(blueprint: ModelDeckBlueprint) -> list[str]:
+    """The reference each family's default choice names: a setting's model, or the reference the deck wrote."""
+    choices: list[LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | DocGenModelChoice] = [
+        blueprint.llm.choice_defaults.for_text,
+        blueprint.llm.choice_defaults.for_object,
+        blueprint.extract.choice_default,
+        blueprint.img_gen.choice_default,
+        blueprint.search.choice_default,
+        *blueprint.doc_gen.choice_defaults.values(),
+    ]
+    references: list[str] = []
+    for choice in choices:
+        match choice:
+            case LLMSetting() | ExtractSetting() | ImgGenSetting() | SearchSetting() | DocGenSetting():
+                references.append(choice.model)
+            case ModelReference():
+                references.append(choice.raw)
+            case str():
+                references.append(choice)
+    return references
+
+
 def extract_model_handles(blueprint: ModelDeckBlueprint) -> set[str]:
-    """Every concrete handle a deck names, from its alias targets, its waterfall entries and its presets' models.
+    """Every concrete handle a deck names, from its alias targets, its waterfall entries, its presets' models and its default choices.
 
     A reference naming an alias, a preset or a waterfall carries no handle of its own: it resolves
-    through one of the three collections this function reads directly. A waterfall's own entries do
-    carry handles, which is why they are read here and not only through whatever names the waterfall.
+    through one of the collections this function reads directly. A waterfall's own entries do
+    carry handles, which is why they are read here and not only through whatever names the waterfall,
+    and so does a default choice that names a model directly.
     """
-    family_blueprints: list[DeckFamilyBlueprint] = [blueprint.llm, blueprint.extract, blueprint.img_gen, blueprint.search]
+    family_blueprints: list[DeckFamilyBlueprint] = [blueprint.llm, blueprint.extract, blueprint.img_gen, blueprint.search, blueprint.doc_gen]
     references: list[str] = []
     for family_blueprint in family_blueprints:
         references.extend(family_blueprint.aliases.values())
         for waterfall_entries in family_blueprint.waterfalls.values():
             references.extend(waterfall_entries)
         references.extend(setting.model for setting in family_blueprint.presets.values())
+    references.extend(list_choice_default_references(blueprint))
     handles: set[str] = set()
     for reference in references:
         parsed = ModelReference.parse(reference)
@@ -144,13 +175,13 @@ class TestDeckVariants:
     @pytest.mark.parametrize("variant_dir", list_variant_dirs(), ids=lambda path: path.name)
     def test_variant_ships_the_same_deck_files(self, variant_dir: Path):
         variant_filenames = {entry.name for entry in variant_dir.iterdir() if entry.is_file() and entry.suffix == ".toml"}
-        assert variant_filenames == set(list_managed_kit_files()), (
+        assert variant_filenames == set(list_managed_kit_files(area=KitManagedArea.DECK)), (
             f"Variant '{variant_dir.name}' does not hold the same numbered deck files as the kit's shipped deck"
         )
 
     @pytest.mark.parametrize("variant_dir", list_variant_dirs(), ids=lambda path: path.name)
     def test_variant_matches_the_shipped_vocabulary(self, variant_dir: Path):
-        managed_filenames = list(list_managed_kit_files())
+        managed_filenames = list(list_managed_kit_files(area=KitManagedArea.DECK))
         shipped_blueprint = load_deck_from_dir(kit_deck_dir(), filenames=managed_filenames)
         variant_blueprint = load_deck_from_dir(variant_dir, filenames=managed_filenames)
 
@@ -164,7 +195,7 @@ class TestDeckVariants:
     @pytest.mark.parametrize("variant_dir", list_variant_dirs(), ids=lambda path: path.name)
     def test_variant_only_handles_are_still_declared_by_a_backend(self, variant_dir: Path):
         """Name parity says nothing about a handle that was retired from the backends underneath it."""
-        managed_filenames = list(list_managed_kit_files())
+        managed_filenames = list(list_managed_kit_files(area=KitManagedArea.DECK))
         shipped_handles = extract_model_handles(load_deck_from_dir(kit_deck_dir(), filenames=managed_filenames))
         variant_handles = extract_model_handles(load_deck_from_dir(variant_dir, filenames=managed_filenames))
 
@@ -181,12 +212,21 @@ class TestDeckVariants:
         No deck declares a waterfall today, so nothing else in this module would notice the
         collector skipping them, and the guard would go quietly blind the moment one does.
         """
-        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files()))
+        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
         probe_handle = "handle-named-only-by-a-waterfall"
         assert probe_handle not in extract_model_handles(blueprint)
 
         blueprint.llm.waterfalls["waterfall-parity-probe"] = [probe_handle]
         assert probe_handle in extract_model_handles(blueprint), "A handle named inside a waterfall escaped the handle collection"
+
+    def test_handle_collection_reads_default_choices(self):
+        """A handle a deck names only as a family's default choice must still reach the retirement check above."""
+        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
+        probe_handle = "handle-named-only-by-a-default"
+        assert probe_handle not in extract_model_handles(blueprint)
+
+        blueprint.doc_gen.choice_defaults["xlsx.layout"] = ModelReference.parse(probe_handle)
+        assert probe_handle in extract_model_handles(blueprint), "A handle named as a default choice escaped the handle collection"
 
     def test_comparator_reports_a_preset_the_variant_is_missing(self):
         differences = compare_vocabularies(

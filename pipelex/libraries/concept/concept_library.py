@@ -120,11 +120,20 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             # make: the declaration tier's silence is the whole answer.
             return False
 
-        return are_structure_classes_compatible(
-            class_1=self.get_structure_class(concept=tested_concept),
-            class_2=self.get_structure_class(concept=wanted_concept),
-            strict=strict,
-        )
+        tested_class = self.get_structure_class(concept=tested_concept)
+        wanted_class = self.get_structure_class(concept=wanted_concept)
+        if self._is_native_refining_a_native(concept=wanted_concept):
+            # `native.Markdown` refines `native.Text` and its class has Text's shape by construction, so
+            # shape says nothing about being one: only its lineage does. A plain Text, or any text concept,
+            # is refused where a Markdown is wanted; a concept refining Markdown, at any depth, is accepted.
+            return issubclass(tested_class, wanted_class)
+        return are_structure_classes_compatible(class_1=tested_class, class_2=wanted_class, strict=strict)
+
+    @staticmethod
+    def _is_native_refining_a_native(*, concept: Concept) -> bool:
+        if not Concept.is_native_concept(concept=concept):
+            return False
+        return NativeConceptCode(concept.code).refined_native is not None
 
     @override
     def get_structure_class(self, *, concept: Concept) -> type[StuffContent]:

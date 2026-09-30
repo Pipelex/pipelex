@@ -292,3 +292,22 @@ class TestAWaterfallSpansBackends:
 
         assert refused.value.model_name == MANIFOLD_HANDLE
         assert refused.value.backend_name == PipelexBackend.MANIFOLD
+
+
+class TestDocumentEnginesAreNotGatewayModels:
+    """A document engine is software on the host, a `doc_gen` model no managed service serves.
+
+    The kit's deck points `pdf.layout` at `reportlab-pdf`, which the default route sends to the gateway on an
+    installation whose `internal.toml` predates it or whose internal backend is disabled. Such a step is refused at
+    load, naming the engine and the fix; the boot must not fail on it, blaming a gateway that was never asked.
+    """
+
+    def test_a_doc_gen_default_whose_engine_is_undeclared_does_not_fail_the_boot(self) -> None:
+        manager = _make_manager()
+        manager.model_deck = manager.get_model_deck().model_copy(update={"doc_gen_choice_defaults": {"pdf.layout": "reportlab-pdf"}})
+
+        _enforce(
+            manager,
+            gateway_specs=_specs(*EVERY_DEFAULT_ROUTED_HANDLE),
+            manifold_specs=_specs(),
+        )

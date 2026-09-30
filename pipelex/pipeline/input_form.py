@@ -392,7 +392,8 @@ class InputFormDeriver:
         node_ref = concept_ref or native_code.concept_ref
         text = description or pinned.description
         match native_code:
-            case NativeConceptCode.TEXT:
+            case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
+                # A Markdown input is prose too: its source is typed as text, and only the views format it.
                 return ProseField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
             case NativeConceptCode.NUMBER:
                 return NumberField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, integer=False)

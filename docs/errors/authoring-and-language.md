@@ -73,6 +73,10 @@ own page. Classes are grouped by subsystem.
 - [`ConstructFieldBlueprintValueError`](construct-field-blueprint-value-error.md) — Construct field blueprint value
 - [`PipeComposeError`](pipe-compose-error.md) — Pipe compose
 - [`PipeComposeFactoryError`](pipe-compose-factory-error.md) — Pipe compose factory
+- [`PipeDocGenFactoryError`](pipe-doc-gen-factory-error.md) — Pipe doc gen factory
+- [`PipeDocGenRunError`](pipe-doc-gen-run-error.md) — Pipe doc gen run
+- [`PipeDocGenTemplateCheckError`](pipe-doc-gen-template-check-error.md) — Pipe doc gen template check
+- [`PipeDocGenUndefinedValueError`](pipe-doc-gen-undefined-value-error.md) — Pipe doc gen undefined value
 - [`PipeExtractFactoryError`](pipe-extract-factory-error.md) — Pipe extract factory
 - [`PipeFuncExecutionError`](pipe-func-execution-error.md) — Pipe func execution
 - [`PipeFuncTransportError`](pipe-func-transport-error.md) — Pipe func transport

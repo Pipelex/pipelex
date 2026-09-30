@@ -5,8 +5,10 @@ descriptions — in `mthds/docs/spec/native-concepts.md`. This module is the run
 pinned set: crate materialization looks definitions up here instead of reflecting over the runtime
 content classes, so two independent implementations byte-agree on materialized natives (and
 therefore on crate fingerprints). Any edit here is a standard change and must land in the spec
-page first; the consistency test in `tests/unit/pipelex/codegen/` proves each runtime content
-class still matches its pinned blueprint, so the two can never drift silently — and
+page first, except for a native Pipelex defines ahead of the standard
+(`NativeConceptCode.is_pinned_by_the_standard` is False for it), whose blueprint is Pipelex's own
+until the page defines it in exactly these words; the consistency test in `tests/unit/pipelex/codegen/`
+proves each runtime content class still matches its pinned blueprint, so the two can never drift silently — and
 `tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py` holds this set to the
 standard's page itself, read live from the sibling `mthds/` checkout (the `MTHDS standard
 conformance` CI workflow runs it against a fresh checkout on every pull request), so the day the
@@ -48,6 +50,8 @@ def _pinned_description(native_code: NativeConceptCode) -> str:
             return "A dynamic concept"
         case NativeConceptCode.TEXT:
             return "A text"
+        case NativeConceptCode.MARKDOWN:
+            return "A text written in Markdown"
         case NativeConceptCode.IMAGE:
             return "An image"
         case NativeConceptCode.DOCUMENT:
@@ -85,6 +89,13 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
         case NativeConceptCode.TEXT:
             return {
                 "text": _text_field(description="The text", required=True),
+            }
+        case NativeConceptCode.MARKDOWN:
+            # Text's one field, holding the Markdown source. A blueprint states `structure` or `refines`,
+            # never both, so the refinement of `Text` lives on the runtime concept (`ConceptFactory`), not here.
+            # Pipelex defines Markdown ahead of the standard, so this is not yet a copy of the standard's page.
+            return {
+                "text": _text_field(description="The text, written in Markdown", required=True),
             }
         case NativeConceptCode.IMAGE:
             return {
