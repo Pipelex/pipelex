@@ -1,4 +1,4 @@
-"""Unit tests for `api.bundle` — method-bundle materialization and its ingest guards.
+"""Unit tests for `pipelex_api.bundle` — method-bundle materialization and its ingest guards.
 
 Covers both transport forms (`bundle_b64` zip and the `files` map), their
 equivalence, and every guard: both-forms/empty rejection, path traversal
@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from api.bundle import materialized_bundle, parse_bundle
-from api.errors import ApiError
+from pipelex_api.bundle import materialized_bundle, parse_bundle
+from pipelex_api.errors import ApiError
 
 _MAIN_MTHDS = """\
 domain = "b"
@@ -127,7 +127,7 @@ class TestBundleMaterialize:
         assert exc.value.document["error_type"] == "InvalidBundle"
 
     def test_file_count_ceiling(self, mocker: MockerFixture):
-        mocker.patch("api.bundle.MAX_BUNDLE_FILES", 2)
+        mocker.patch("pipelex_api.bundle.MAX_BUNDLE_FILES", 2)
         files = {f"file_{index}.py": "x" for index in range(3)}
         with pytest.raises(ApiError) as exc, materialized_bundle(bundle_b64=None, files=files):
             pass
@@ -135,7 +135,7 @@ class TestBundleMaterialize:
         assert exc.value.document["error_type"] == "PayloadTooLarge"
 
     def test_total_size_ceiling_files(self, mocker: MockerFixture):
-        mocker.patch("api.bundle.MAX_BUNDLE_TOTAL_BYTES", 64)
+        mocker.patch("pipelex_api.bundle.MAX_BUNDLE_TOTAL_BYTES", 64)
         with pytest.raises(ApiError) as exc, materialized_bundle(bundle_b64=None, files={"big.py": "x" * 128}):
             pass
         assert exc.value.status_code == 413
@@ -144,7 +144,7 @@ class TestBundleMaterialize:
     def test_zip_bomb_bounded_by_total_size(self, mocker: MockerFixture):
         # A highly compressible entry that decompresses well past the (patched) ceiling must be
         # refused by the bounded read, not silently expanded into memory.
-        mocker.patch("api.bundle.MAX_BUNDLE_TOTAL_BYTES", 1024)
+        mocker.patch("pipelex_api.bundle.MAX_BUNDLE_TOTAL_BYTES", 1024)
         bomb = _zip_b64({"bomb.txt": "A" * (1024 * 64)})
         with pytest.raises(ApiError) as exc, materialized_bundle(bundle_b64=bomb, files=None):
             pass
@@ -173,7 +173,7 @@ class TestBundleMaterialize:
 
     def test_oversized_base64_rejected_before_decode(self, mocker: MockerFixture):
         # The cheap length check on the still-encoded string fires before any b64decode.
-        mocker.patch("api.bundle._MAX_BUNDLE_B64_CHARS", 16)
+        mocker.patch("pipelex_api.bundle._MAX_BUNDLE_B64_CHARS", 16)
         decode_spy = mocker.spy(base64, "b64decode")
         with pytest.raises(ApiError) as exc, materialized_bundle(bundle_b64="A" * 64, files=None):
             pass

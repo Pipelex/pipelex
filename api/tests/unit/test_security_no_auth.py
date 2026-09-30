@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.security import ForwardedIdentityHeader, RequestUser, get_request_user, no_auth
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.security import ForwardedIdentityHeader, RequestUser, get_request_user, no_auth
 from tests.unit._constants import RoutePath
 
 USER_ID = "11111111-1111-4111-1111-111111111111"
@@ -29,7 +29,7 @@ def _build_client() -> TestClient:
 class TestNoAuthForwardedHeaders:
     def test_header_ignored_by_default(self, mocker: MockerFixture):
         """No TRUST_FORWARDED_IDENTITY_HEADERS env → X-User-Id is not trusted."""
-        mocker.patch("api.security.get_optional_env", return_value=None)
+        mocker.patch("pipelex_api.security.get_optional_env", return_value=None)
         client = _build_client()
         headers: dict[str, str] = {ForwardedIdentityHeader.USER_ID: USER_ID}
         response = client.get(RoutePath.WHOAMI, headers=headers)
@@ -37,7 +37,7 @@ class TestNoAuthForwardedHeaders:
         assert response.json() == {"user_id": None}
 
     def test_header_ignored_when_flag_not_true(self, mocker: MockerFixture):
-        mocker.patch("api.security.get_optional_env", return_value="false")
+        mocker.patch("pipelex_api.security.get_optional_env", return_value="false")
         client = _build_client()
         headers: dict[str, str] = {ForwardedIdentityHeader.USER_ID: USER_ID}
         response = client.get(RoutePath.WHOAMI, headers=headers)
@@ -46,7 +46,7 @@ class TestNoAuthForwardedHeaders:
 
     def test_user_id_honored_when_flag_true(self, mocker: MockerFixture):
         """With the trust flag enabled, the runner reads X-User-Id and only that."""
-        mocker.patch("api.security.get_optional_env", return_value="true")
+        mocker.patch("pipelex_api.security.get_optional_env", return_value="true")
         client = _build_client()
         # Extra X-User-* headers are noise — the runner ignores them by design.
         headers: dict[str, str] = {
@@ -74,7 +74,7 @@ class TestNoAuthForwardedHeaders:
         There is no `anonymous` sentinel any more: an empty header and an absent
         one are the same failure, and both are 401.
         """
-        mocker.patch("api.security.get_optional_env", return_value="true")
+        mocker.patch("pipelex_api.security.get_optional_env", return_value="true")
         client = _build_client()
         headers: dict[str, str] = {} if user_id is None else {ForwardedIdentityHeader.USER_ID: user_id}
         response = client.get(RoutePath.WHOAMI, headers=headers)
@@ -89,7 +89,7 @@ class TestNoAuthForwardedHeaders:
         forwarded path. A proxy that genuinely wants to forward it is asserting
         an identity, which is what this flag means.
         """
-        mocker.patch("api.security.get_optional_env", return_value="true")
+        mocker.patch("pipelex_api.security.get_optional_env", return_value="true")
         client = _build_client()
         headers: dict[str, str] = {ForwardedIdentityHeader.USER_ID: SINGLE_TENANT_USER_ID}
         response = client.get(RoutePath.WHOAMI, headers=headers)
@@ -120,7 +120,7 @@ class TestNoAuthForwardedHeaders:
         downgrade to a shared owner and scope the caller's outputs into someone
         else's namespace.
         """
-        mocker.patch("api.security.get_optional_env", return_value="true")
+        mocker.patch("pipelex_api.security.get_optional_env", return_value="true")
         client = _build_client()
         headers: dict[str, str] = {ForwardedIdentityHeader.USER_ID: unsafe_user_id}
         response = client.get(RoutePath.WHOAMI, headers=headers)
@@ -143,7 +143,7 @@ class TestNoAuthForwardedHeaders:
         authenticated id); the runner only requires path-safety, so a non-UUID
         but safe id (incl. the `user_<uuid>` prefixed scheme) is used as-is.
         """
-        mocker.patch("api.security.get_optional_env", return_value="true")
+        mocker.patch("pipelex_api.security.get_optional_env", return_value="true")
         client = _build_client()
         headers: dict[str, str] = {ForwardedIdentityHeader.USER_ID: opaque_user_id}
         response = client.get(RoutePath.WHOAMI, headers=headers)

@@ -16,8 +16,8 @@ from pipelex.codegen.stamp import comment_prefix_for, parse_stamped
 from pipelex.interpreter_hub import get_library_manager
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, VALID_MTHDS
 
 
@@ -138,7 +138,7 @@ class TestCodegenRoute:
         open_spy = mocker.spy(library_manager, "open_library")
         teardown_spy = mocker.spy(library_manager, "teardown")
         mocker.patch(
-            "api.routes.pipelex.codegen.emit_types",
+            "pipelex_api.routes.pipelex.codegen.emit_types",
             side_effect=RuntimeError("synthetic emission failure"),
         )
 

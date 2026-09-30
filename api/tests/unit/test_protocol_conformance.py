@@ -39,10 +39,10 @@ from pipelex.pipeline.pipeline_response import RunState
 from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck
 from typing_extensions import override
 
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
-from api.routes.version import router as version_router
-from api.security import verify_api_key
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
+from pipelex_api.routes.version import router as version_router
+from pipelex_api.security import verify_api_key
 from tests.unit._constants import VALID_MTHDS
 
 if TYPE_CHECKING:
@@ -91,14 +91,15 @@ def _build_protocol_client(mocker: MockerFixture) -> TestClient:
     }
     fake_runner = mocker.MagicMock()
     fake_runner.execute = mocker.AsyncMock(return_value=fake_execute_response)
-    mocker.patch("api.routes.pipelex.pipeline.ApiRunner", return_value=fake_runner)
+    mocker.patch("pipelex_api.routes.pipelex.pipeline.ApiRunner", return_value=fake_runner)
     return TestClient(app)
 
 
 class TestProtocolConformance:
     def test_production_app_serves_protocol_paths_under_v1_only(self):
         """The production app mounts every protocol route under `/v1` — no `/api/v1`, no aliases."""
-        from api.main import fastapi_app  # noqa: PLC0415 — imported in-test so a bad env var fails THIS test, not collection of the whole module
+        # Imported in-test so a bad env var fails THIS test, not collection of the whole module.
+        from pipelex_api.main import fastapi_app  # noqa: PLC0415
 
         served_paths = {route.path for route in fastapi_app.routes if isinstance(route, APIRoute)}
         for protocol_path in PROTOCOL_PATHS:
@@ -109,7 +110,7 @@ class TestProtocolConformance:
     def test_version_is_public_and_protocol_shaped(self):
         """`GET /v1/version` answers WITHOUT credentials even when every other route requires auth."""
         app = FastAPI(redirect_slashes=False)
-        # Mirror `api.main` wiring under AUTH_MODE=api_key: version mounts
+        # Mirror `pipelex_api.main` wiring under AUTH_MODE=api_key: version mounts
         # outside the auth dependency, everything else inside it.
         app.include_router(version_router, prefix="/v1")
         app.include_router(api_router, prefix="/v1", dependencies=[Depends(verify_api_key)])
@@ -160,7 +161,7 @@ class TestProtocolConformance:
         (storage skipped — no pipe output), so headers and payload bytes come
         from the production delivery code path. The SSRF guards are relaxed for
         the loopback receiver: the request-time host check in
-        `api.schemas.models` and the connect-time guarded transport in
+        `pipelex_api.schemas.models` and the connect-time guarded transport in
         `pipelex.pipe_run.delivery_executor` both block loopback by design.
         """
         # --- local HTTP receiver -------------------------------------------------
@@ -171,7 +172,7 @@ class TestProtocolConformance:
         callback_url = f"http://127.0.0.1:{server.server_port}/completion"
 
         # --- relax both SSRF layers for the loopback receiver (test-only) --------
-        mocker.patch("api.schemas.models._is_disallowed_host", return_value=False)
+        mocker.patch("pipelex_api.schemas.models._is_disallowed_host", return_value=False)
         mocker.patch("pipelex.pipe_run.delivery_executor.SsrfGuardedTransport", httpx.AsyncHTTPTransport)
 
         # The signing secret is pinned HERE rather than relying on the ambient
@@ -209,7 +210,7 @@ class TestProtocolConformance:
         fake_orchestrator.start = mocker.AsyncMock(side_effect=fake_start)
         fake_registry = mocker.MagicMock()
         fake_registry.get_optional.return_value = fake_orchestrator
-        mocker.patch("api.routes.pipelex.pipeline.get_orchestrator_registry", return_value=fake_registry)
+        mocker.patch("pipelex_api.routes.pipelex.pipeline.get_orchestrator_registry", return_value=fake_registry)
 
         app = FastAPI(redirect_slashes=False)
         app.include_router(api_router, prefix="/v1")

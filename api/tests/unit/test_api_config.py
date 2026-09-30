@@ -12,11 +12,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.api_config import ApiBootConfigError, ApiConfig, get_api_config, resolve_boot_orchestrator, resolve_orchestration_mode
-from api.errors import ApiError
-from api.exception_handlers import register_exception_handlers
-from api.middleware import RequestIdMiddleware
-from api.routes.pipelex.pipeline import router as pipeline_router
+from pipelex_api.api_config import ApiBootConfigError, ApiConfig, get_api_config, resolve_boot_orchestrator, resolve_orchestration_mode
+from pipelex_api.errors import ApiError
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.middleware import RequestIdMiddleware
+from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
 
 

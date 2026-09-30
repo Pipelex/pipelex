@@ -9,7 +9,7 @@ consumer resolves could disagree with the owner this server authorized.
 
 import pytest
 
-from api.security import is_safe_user_id
+from pipelex_api.security import is_safe_user_id
 
 
 class TestIsSafeUserId:

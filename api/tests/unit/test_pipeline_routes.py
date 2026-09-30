@@ -18,10 +18,10 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
 from pytest_mock import MockerFixture
 
-import api.routes.pipelex.pipeline as pipeline_module
-from api.exception_handlers import register_exception_handlers
-from api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
-from api.routes.pipelex.pipeline import router as pipeline_router
+import pipelex_api.routes.pipelex.pipeline as pipeline_module
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
+from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
 
 
@@ -56,7 +56,7 @@ def _build_client(mocker: MockerFixture, *, with_request_id_middleware: bool = F
     fake_runner = mocker.MagicMock()
     fake_runner.execute = mocker.AsyncMock(return_value=fake_execute_response)
     fake_runner.start = mocker.AsyncMock(return_value=fake_start_response)
-    mocker.patch("api.routes.pipelex.pipeline.ApiRunner", return_value=fake_runner)
+    mocker.patch("pipelex_api.routes.pipelex.pipeline.ApiRunner", return_value=fake_runner)
 
     asgi_app = RequestIdMiddleware(app) if with_request_id_middleware else app
     return TestClient(asgi_app), fake_runner.execute, fake_runner.start
@@ -279,7 +279,7 @@ class TestPipelineRoutes:
         body_pipe_code = "echo"
         body_pipeline_run_id = "run-end-to-end-0001"
         start_mock.side_effect = PipelexConfigError("simulated config fault inside the runner")
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = client.post(
             "/v1/start",
             json={
@@ -302,7 +302,7 @@ class TestPipelineRoutes:
         # `_emit_api_error` drops those.
         client, _, start_mock = _build_client(mocker)
         start_mock.side_effect = PipelexConfigError("simulated config fault")
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = client.post(
             "/v1/start",
             json={
@@ -327,7 +327,7 @@ class TestPipelineRoutes:
         # is unchanged — only the `request.state` mirror is capped).
         client, _, start_mock = _build_client(mocker)
         start_mock.side_effect = PipelexConfigError("simulated config fault")
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         oversized = "x" * 5000
         response = client.post(
             "/v1/start",
@@ -350,7 +350,7 @@ class TestPipelineRoutes:
         # caller's `pipe_code` onto the operator record. The unit-level tests
         # cannot exercise this ordering — only an end-to-end POST does.
         client, _, _ = _build_client(mocker)
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         body_pipe_code = "echo"
         response = client.post(
             "/v1/start",

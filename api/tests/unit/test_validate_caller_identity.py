@@ -27,14 +27,14 @@ from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
 from pytest_mock import MockerFixture
 
-from api.api_config import ApiConfig
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
-from api.security import RequestUser
+from pipelex_api.api_config import ApiConfig
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
+from pipelex_api.security import RequestUser
 from tests.unit._constants import STUB_METHOD_ADDRESS, VALID_MTHDS
 
-_PIPELINE_NS = "api.routes.pipelex.pipeline"
-_RUNNER_NS = "api.routes.pipelex.build.runner"
+_PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
+_RUNNER_NS = "pipelex_api.routes.pipelex.build.runner"
 _DIRECT_VALIDATOR_NS = "pipelex.pipeline.direct_bundle_validator"
 _MODE = "temporal"
 _USER_ID = "user_42"

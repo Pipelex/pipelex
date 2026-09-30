@@ -10,8 +10,8 @@ from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunOutput, DryRunStatus
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
 
 
@@ -204,7 +204,7 @@ class TestBuildAndAgentRoutes:
         open_spy = mocker.spy(library_manager, "open_library")
         teardown_spy = mocker.spy(library_manager, "teardown")
         mocker.patch(
-            "api.routes.pipelex.build.runner._reject_if_requested_pipe_skipped",
+            "pipelex_api.routes.pipelex.build.runner._reject_if_requested_pipe_skipped",
             side_effect=RuntimeError("synthetic success-path failure"),
         )
 
@@ -315,7 +315,7 @@ class TestBuildAndAgentRoutes:
             "pipelex.pipeline.validate_bundle.BundleValidator.validate_pipes",
             new=mocker.AsyncMock(return_value=skipped_result),
         )
-        generate_spy = mocker.patch("api.routes.pipelex.build.runner.generate_runner_code")
+        generate_spy = mocker.patch("pipelex_api.routes.pipelex.build.runner.generate_runner_code")
 
         client = _build_client()
         response = client.post(
@@ -343,7 +343,7 @@ class TestBuildAndAgentRoutes:
             "pipelex.pipeline.validate_bundle.BundleValidator.validate_pipes",
             new=mocker.AsyncMock(side_effect=DryRunError("Dry run failed with 1 unexpected pipe failure(s): 'smoke.echo'")),
         )
-        generate_spy = mocker.patch("api.routes.pipelex.build.runner.generate_runner_code")
+        generate_spy = mocker.patch("pipelex_api.routes.pipelex.build.runner.generate_runner_code")
 
         client = _build_client()
         response = client.post(

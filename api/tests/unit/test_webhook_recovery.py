@@ -34,7 +34,7 @@ from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 
-from api.problem_document import build_problem_document
+from pipelex_api.problem_document import build_problem_document
 
 # Classification fields that, when populated on the source `ErrorReport`,
 # must appear with identical values in both renderings. Excluded from this

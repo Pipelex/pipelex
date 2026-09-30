@@ -19,9 +19,9 @@ from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
 from pytest_mock import MockerFixture
 
-from api.api_config import ApiConfig
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.api_config import ApiConfig
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
     NO_MAIN_PIPE_MTHDS,
     SECOND_MAIN_PIPE_MTHDS,
@@ -32,7 +32,7 @@ from tests.unit._constants import (
     VALID_MTHDS,
 )
 
-_PIPELINE_NS = "api.routes.pipelex.pipeline"
+_PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _MODE = "temporal"
 _METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
 

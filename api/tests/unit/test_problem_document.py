@@ -7,8 +7,8 @@ from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pytest_mock import MockerFixture
 
-from api.error_types import ErrorType
-from api.problem_document import build_problem_document, build_problem_document_from_api_error
+from pipelex_api.error_types import ErrorType
+from pipelex_api.problem_document import build_problem_document, build_problem_document_from_api_error
 
 
 def _synthetic_llm_report() -> ErrorReport:

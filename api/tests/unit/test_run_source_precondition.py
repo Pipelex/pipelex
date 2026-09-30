@@ -20,8 +20,8 @@ from fastapi.testclient import TestClient
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes.pipelex.pipeline import router as pipeline_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
 
 _BASE_PRECONDITION_FRAGMENT = "pipe_code and mthds_contents cannot both be empty"
@@ -53,7 +53,7 @@ def _build_client(mocker: MockerFixture) -> tuple[TestClient, Any]:
             workflow_id="wf-1",
         )
     )
-    mocker.patch("api.routes.pipelex.pipeline.ApiRunner", return_value=fake_runner)
+    mocker.patch("pipelex_api.routes.pipelex.pipeline.ApiRunner", return_value=fake_runner)
     return TestClient(app), fake_runner
 
 

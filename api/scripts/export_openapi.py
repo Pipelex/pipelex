@@ -21,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-from api.main import fastapi_app
+from pipelex_api.main import fastapi_app
 
 _GENERATED_HEADER = "# GENERATED FILE — do not edit by hand. Regenerate with `make openapi-export`.\n"
 

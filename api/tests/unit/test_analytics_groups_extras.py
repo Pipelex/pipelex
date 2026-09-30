@@ -25,15 +25,15 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 from pipelex.runtime_bridge.serialization import serialize_completed_output
 from pytest_mock import MockerFixture
 
-from api.api_config import ApiConfig
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.api_config import ApiConfig
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
 
 if TYPE_CHECKING:
     from pipelex.system.job_metadata import RunMetadata
 
-_PIPELINE_NS = "api.routes.pipelex.pipeline"
+_PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _MODE = "temporal"
 _ROUTES = ["/v1/execute", "/v1/start"]
 _SUCCESS_STATUS = {"/v1/execute": 200, "/v1/start": 202}

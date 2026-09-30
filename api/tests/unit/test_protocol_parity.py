@@ -26,8 +26,8 @@ from fastapi.testclient import TestClient
 from mthds.protocol.models import ModelCategory
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import HEADER_AND_DEFINITION_BATCH, NO_MAIN_PIPE_MTHDS, SIGNATURE_ONLY_BATCH, VALID_MTHDS
 
 # The hosted /validate envelope = canonical report + exactly these wire-only extras.

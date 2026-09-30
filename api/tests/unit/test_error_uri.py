@@ -2,7 +2,7 @@
 
 import pytest
 
-from api.error_uri import error_type_title, error_type_uri
+from pipelex_api.error_uri import error_type_title, error_type_uri
 
 
 class TestErrorUri:

@@ -24,16 +24,16 @@ from pipelex.runtime_bridge.serialization import serialize_completed_output
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, SINGLE_TENANT_USER_ID
 from pytest_mock import MockerFixture
 
-from api.api_config import ApiConfig
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
-from api.security import RequestUser
+from pipelex_api.api_config import ApiConfig
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
+from pipelex_api.security import RequestUser
 from tests.unit._constants import VALID_MTHDS
 
 if TYPE_CHECKING:
     from pipelex.system.job_metadata import RunMetadata
 
-_PIPELINE_NS = "api.routes.pipelex.pipeline"
+_PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _MODE = "temporal"
 _ROUTES = ["/v1/execute", "/v1/start"]
 _SUCCESS_STATUS = {"/v1/execute": 200, "/v1/start": 202}
@@ -72,7 +72,7 @@ def _build_client(mocker: MockerFixture, *, user_id: str | None = None) -> tuple
     app.include_router(api_router, prefix="/v1")
     register_exception_handlers(app)
     if user_id is not None:
-        # The shape `api.security` binds on an authenticated request.
+        # The shape `pipelex_api.security` binds on an authenticated request.
         async def _bind_user(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
             request.state.user = RequestUser(user_id=user_id)
             return await call_next(request)

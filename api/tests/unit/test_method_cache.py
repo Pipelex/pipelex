@@ -18,7 +18,7 @@ from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import parse_method_ref
 from pytest_mock import MockerFixture
 
-from api.method_cache import MethodCloneCache, resolve_remote_commit_sha
+from pipelex_api.method_cache import MethodCloneCache, resolve_remote_commit_sha
 from tests.unit._constants import STUB_METHOD_MANIFEST, VALID_MTHDS
 
 _REF = parse_method_ref("github.com/pipelex/methods/documents@v0.1.0")
@@ -73,7 +73,7 @@ class TestMethodCloneCache:
         head_sha = _git("rev-parse", "HEAD", cwd=repo)
         cache = MethodCloneCache(root_dir=tmp_path / "cache")
         fetch_spy = mocker.spy(cache, "_package_from_clone")
-        clone_spy = mocker.patch("api.method_cache.fetch_method_package", wraps=fetch_method_package)
+        clone_spy = mocker.patch("pipelex_api.method_cache.fetch_method_package", wraps=fetch_method_package)
 
         first = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
         second = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
@@ -107,7 +107,7 @@ class TestMethodCloneCache:
 
     def test_count_bound_evicts_oldest_keeping_newest(self, origin: tuple[str, Path], tmp_path: Path, mocker: MockerFixture):
         clone_url, repo = origin
-        mocker.patch("api.method_cache.MAX_METHOD_CACHE_CLONES", 1)
+        mocker.patch("pipelex_api.method_cache.MAX_METHOD_CACHE_CLONES", 1)
         cache = MethodCloneCache(root_dir=tmp_path / "cache")
         first = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
 
@@ -127,7 +127,7 @@ class TestMethodCloneCache:
 
     def test_age_bound_evicts_stale_entries(self, origin: tuple[str, Path], tmp_path: Path, mocker: MockerFixture):
         clone_url, repo = origin
-        mocker.patch("api.method_cache.MAX_METHOD_CACHE_AGE_SECONDS", 3600)
+        mocker.patch("pipelex_api.method_cache.MAX_METHOD_CACHE_AGE_SECONDS", 3600)
         cache = MethodCloneCache(root_dir=tmp_path / "cache")
         first = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
         stale = time.time() - 7200

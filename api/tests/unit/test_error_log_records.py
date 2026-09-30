@@ -22,10 +22,10 @@ from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.pretty import PrettyPrintMode
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
-from api.error_types import ErrorType
-from api.errors import raise_validation_error
-from api.exception_handlers import API_ERROR_EVENT, register_exception_handlers
-from api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
+from pipelex_api.error_types import ErrorType
+from pipelex_api.errors import raise_validation_error
+from pipelex_api.exception_handlers import API_ERROR_EVENT, register_exception_handlers
+from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 
 _SHIPPED_PIPELEX_CONFIG = Path(__file__).parents[2] / ".pipelex" / "pipelex.toml"
 

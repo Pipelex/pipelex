@@ -64,9 +64,9 @@ Run `git diff main...HEAD --name-only` to see which files changed on the current
 If $ARGUMENTS contains a PR number, use `gh pr diff <number>` instead.
 
 Categorize the changed files:
-- **Route files** (`api/routes/**/*.py`, `api/main.py`) → endpoints may have been added, removed, or modified
-- **Schema files** (`api/schemas/models.py`) → request/response shapes may have changed
-- **Security** (`api/security.py`) → auth behavior may have changed
+- **Route files** (`pipelex_api/routes/**/*.py`, `pipelex_api/main.py`) → endpoints may have been added, removed, or modified
+- **Schema files** (`pipelex_api/schemas/models.py`) → request/response shapes may have changed
+- **Security** (`pipelex_api/security.py`) → auth behavior may have changed
 - **Other files** → likely no Postman impact
 
 If NO route/schema/security files changed, tell the user "No API changes detected — Postman collection is already up to date" and stop.
@@ -74,10 +74,10 @@ If NO route/schema/security files changed, tell the user "No API changes detecte
 ### 3. Read the changed route files
 
 Only read the route files that actually changed (from step 2). Also read:
-- `api/routes/__init__.py` and any `__init__.py` in the hierarchy — to check if routers were added/removed
-- `api/main.py` — to check if prefix structure changed
+- `pipelex_api/routes/__init__.py` and any `__init__.py` in the hierarchy — to check if routers were added/removed
+- `pipelex_api/main.py` — to check if prefix structure changed
 
-Glob `api/routes/**/*.py` to detect any **new** route files not yet in Postman.
+Glob `pipelex_api/routes/**/*.py` to detect any **new** route files not yet in Postman.
 
 ### 4. Determine what needs to change
 

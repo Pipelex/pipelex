@@ -12,7 +12,7 @@ from pipelex.tools.log.log_context import get_log_context
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import Message, Receive, Scope, Send
 
-from api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware, generate_request_id, request_body_size_middleware, request_id_of
+from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware, generate_request_id, request_body_size_middleware, request_id_of
 
 # Crockford Base32, 26 chars — the ULID alphabet (no I, L, O, U).
 _ULID_RE = re.compile(r"\A[0-9A-HJKMNP-TV-Z]{26}\Z")
@@ -54,7 +54,7 @@ def _build_client(*, raise_server_exceptions: bool = True) -> TestClient:
     """Build a client over the production middleware composition.
 
     `RequestIdMiddleware` wraps a FastAPI app that itself carries the body-size
-    `BaseHTTPMiddleware` — mirroring `api.main`, so the tests exercise contextvar
+    `BaseHTTPMiddleware` — mirroring `pipelex_api.main`, so the tests exercise contextvar
     survival across the `BaseHTTPMiddleware` child-task boundary and the
     catch-all 500 emitted by Starlette's `ServerErrorMiddleware`.
     """

@@ -6,7 +6,7 @@ not the second is honored on the wire yet absent from the contract, so no genera
 send it, and nothing else fails.
 """
 
-from api.schemas.models import PipelexApiExecuteRequest, PipelexApiStartRequest, PipelineApiExtras
+from pipelex_api.schemas.models import PipelexApiExecuteRequest, PipelexApiStartRequest, PipelineApiExtras
 
 # `/execute` generates its own run id and delivers nothing asynchronously, so it reads neither.
 _START_ONLY_EXTRAS = {"pipeline_run_id", "callback_urls"}

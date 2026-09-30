@@ -34,12 +34,12 @@ from pydantic import BaseModel, ConfigDict
 from pytest_mock import MockerFixture
 from typing_extensions import override
 
-from api.error_types import ErrorType
-from api.errors import raise_internal_server_error, raise_validation_error
-from api.exception_handlers import API_ERROR_EVENT, register_exception_handlers
-from api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
-from api.problem_document import PROBLEM_JSON_MEDIA_TYPE
-from api.security import RequestUser
+from pipelex_api.error_types import ErrorType
+from pipelex_api.errors import raise_internal_server_error, raise_validation_error
+from pipelex_api.exception_handlers import API_ERROR_EVENT, register_exception_handlers
+from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
+from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
+from pipelex_api.security import RequestUser
 
 # Crockford Base32, 26 chars — the ULID alphabet RequestIdMiddleware mints.
 _ULID_RE = re.compile(r"\A[0-9A-HJKMNP-TV-Z]{26}\Z")
@@ -144,7 +144,7 @@ def _synthetic_http_error_mappers() -> dict[type[Exception], HttpErrorMapperFn]:
 
     Builds a `PluginRegistrar`, has a synthetic plugin contribute the mapper via
     `add_http_error_mapper`, and reads it back with `get_http_error_mappers` — exercising the real
-    producer→consumer seam (the same one `api.main` drives at app construction) without installing a
+    producer→consumer seam (the same one `pipelex_api.main` drives at app construction) without installing a
     plugin or importing an orchestrator SDK.
     """
     registrar = PluginRegistrar(config=get_config())
@@ -319,13 +319,13 @@ async def needs_body_route(_body: _RequestValidationBody) -> None:
 
 
 # A canonical user_id for the authenticated test routes — a realistic
-# path-safe id (`api.security.is_safe_user_id`), so the routes mirror real
+# path-safe id (`pipelex_api.security.is_safe_user_id`), so the routes mirror real
 # auth state rather than a placeholder string.
 _TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 
 
 def _bind_test_user(request: Request) -> None:
-    """Set `request.state.user` the same shape `api.security._set_request_user` would.
+    """Set `request.state.user` the same shape `pipelex_api.security._set_request_user` would.
 
     The throwaway app does not run the real auth dependency — these routes stand
     in for "auth succeeded" so the error-log enrichment can be exercised
@@ -335,7 +335,7 @@ def _bind_test_user(request: Request) -> None:
 
 
 # Canonical body-derived identifiers for the pipeline-state routes — bound on
-# `request.state` the same way `api.routes.pipelex.pipeline._parse_request`
+# `request.state` the same way `pipelex_api.routes.pipelex.pipeline._parse_request`
 # binds them in production.
 _TEST_PIPE_CODE = "echo"
 _TEST_RUN_ID = "run-00000000-0000-0000-0000-000000000099"
@@ -621,7 +621,7 @@ class TestExceptionHandlers:
         # the handler emits one `api_error` record at `error` level whose fields
         # mirror the response — the same set `_log_error_report` ships for a
         # pipelex-derived 500, so a downstream sink queries them uniformly.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/api-config-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
@@ -642,7 +642,7 @@ class TestExceptionHandlers:
         # Mirror at the warning level: an INPUT-domain `ApiError` is a caller
         # mistake, not an operator fault, so it logs at `warning` without a
         # traceback — same disposition rule `_log_error_report` uses.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/api-input-error")
         assert response.status_code == 422
         log_spy.warning.assert_called_once()
@@ -658,7 +658,7 @@ class TestExceptionHandlers:
     def test_the_summary_message_names_the_status_and_the_error_type(self, mocker: MockerFixture):
         # The message is built from server-authored values alone, so it stays a stable sentence
         # whatever a caller sent; everything variable is a field beside it.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         assert _build_client().get("/api-config-error").status_code == 500
         assert log_spy.error.call_args.args[0] == "API error 500: ServerMisconfigured"
 
@@ -668,7 +668,7 @@ class TestExceptionHandlers:
         # `request.state.user` so the operator can still tie a `PipelexError`
         # to the caller through the record alone — no correlating across
         # records on `request_id` required.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/authenticated-config-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
@@ -682,7 +682,7 @@ class TestExceptionHandlers:
         # uploader's same set). It must ride the same `user_id` correlation
         # `_log_error_report` does so the contract is uniform — a caller
         # mistake and a backend failure both name the caller.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/authenticated-api-input-error")
         assert response.status_code == 422
         log_spy.warning.assert_called_once()
@@ -694,7 +694,7 @@ class TestExceptionHandlers:
         # The catch-all 500 (`handle_unexpected_error`) is the one place a
         # missing `user_id` is most expensive — by definition the failure
         # was not classifiable upstream — so the same enrichment fires here.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client(raise_server_exceptions=False).get("/authenticated-unexpected-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
@@ -707,7 +707,7 @@ class TestExceptionHandlers:
         # `_user_id_of` returns `None` and `_emit_api_error` drops `None`-valued fields, so the
         # record carries no `user_id` attribute at all — never a null, which a query filtering on
         # presence would read as an answer.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/config-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
@@ -720,7 +720,7 @@ class TestExceptionHandlers:
         # them. Same mechanism as `user_id` (request.state + a `_*_of` getter
         # in the handler), now extended to the body-derived identifiers — the
         # last piece of Checkpoint B reconciliation #4.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/pipeline-state-pipelex-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
@@ -734,7 +734,7 @@ class TestExceptionHandlers:
         # route that has already bound pipe state must ship the same fields,
         # so the operator record is uniform across the validation and the
         # pipelex-domain failure surfaces.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/pipeline-state-api-input-error")
         assert response.status_code == 422
         log_spy.warning.assert_called_once()
@@ -749,7 +749,7 @@ class TestExceptionHandlers:
         # classifiable upstream, so the identifiers on the record are the
         # operator's only starting point for which pipe and which run were
         # in flight.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client(raise_server_exceptions=False).get("/pipeline-state-unexpected-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
@@ -764,7 +764,7 @@ class TestExceptionHandlers:
         # `pipeline_run_id` on `request.state`. The getters return `None` and
         # `_emit_api_error` drops those, so the record carries neither attribute.
         # Same defensive posture as `test_user_id_absent_from_unauthenticated_error_record`.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/config-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
@@ -777,7 +777,7 @@ class TestExceptionHandlers:
         # `handle_request_validation_error`, not `handle_api_error`, but emits
         # the same `api_error` record so the surface is uniform — whichever code
         # path rejects a caller-input failure, the operator record is identical.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         # `{"wrong": 1}` triggers FastAPI's automatic validation failure on
         # `_RequestValidationBody`: `field` is missing AND `wrong` is an
         # extra key (the body uses `extra="forbid"`, so the extra-key path
@@ -819,7 +819,7 @@ class TestExceptionHandlers:
         # field and cannot reach the message, and the selected sink is what escapes it on the way
         # out. Pin that at the handler, so a route shipping some new caller-controlled field later
         # is covered without re-auditing this surface.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/crafted-detail", params={"detail": crafted_detail})
         assert response.status_code == 422
         fields = _emitted_fields(log_spy, as_error=False)
@@ -857,7 +857,7 @@ class TestExceptionHandlers:
         # ``status=`` plumbing the record would carry 500 (the report's domain
         # default) while the response shipped 501 — a silent disagreement
         # between the two surfaces. Pin the alignment.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/async-execution-not-enabled")
         assert response.status_code == 501
         log_spy.error.assert_called_once()
@@ -893,7 +893,7 @@ class TestExceptionHandlers:
         # logs at `warning` without a traceback — never `error` (which would
         # page or pollute error dashboards for a normal conflict). The record
         # still agrees with the status the client saw.
-        log_spy = mocker.patch("api.exception_handlers.log")
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/pipeline-run-id-conflict")
         assert response.status_code == 409
         log_spy.warning.assert_called_once()

@@ -11,7 +11,7 @@ from pipelex.test_extras.shared_pytest_plugins import needs_inference_in_pipelex
 from pytest import FixtureRequest
 from pytest_mock import MockerFixture
 
-from api.api_config import get_api_config
+from pipelex_api.api_config import get_api_config
 from tests.unit._constants import STUB_METHOD_COMMIT_SHA, STUB_METHOD_MANIFEST
 
 
@@ -69,7 +69,7 @@ def install_method_package(mocker: MockerFixture, tmp_path: Path) -> Callable[..
 
     Writes the given `{relative_path: text}` files (plus `STUB_METHOD_MANIFEST` as
     `METHODS.toml`, overridable) into a stub clone in the library-repo layout
-    (`methods/documents/`), and patches `api.method_source.get_method_clone_cache` to serve
+    (`methods/documents/`), and patches `pipelex_api.method_source.get_method_clone_cache` to serve
     it. Returns the package directory.
     """
 
@@ -83,7 +83,7 @@ def install_method_package(mocker: MockerFixture, tmp_path: Path) -> Callable[..
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
         stub = _StubCloneCache(clone_root=clone_root, commit_sha=commit_sha)
-        mocker.patch("api.method_source.get_method_clone_cache", return_value=stub)
+        mocker.patch("pipelex_api.method_source.get_method_clone_cache", return_value=stub)
         return package_dir
 
     return _install

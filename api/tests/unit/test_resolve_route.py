@@ -16,8 +16,8 @@ from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 from pipelex.interpreter_hub import get_library_manager
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, SIBLING_MTHDS, VALID_MTHDS
 
 

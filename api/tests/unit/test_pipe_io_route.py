@@ -19,8 +19,8 @@ from pipelex.interpreter_hub import get_library_manager
 from pipelex.pipeline.exceptions import PipeIOContractError
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
     COLLIDING_ECHO_LIST_MTHDS,
     HEADER_AND_DEFINITION_BATCH,
@@ -455,7 +455,7 @@ class TestPipeIoRoute:
         # `PipeIOContractError` is left to the global handler, exactly as on `/v1/validate`: a fault of
         # the tool, not a verdict about the method. The library is still torn down.
         mocker.patch(
-            "api.routes.pipelex.pipe_io.build_pipe_io_artifacts",
+            "pipelex_api.routes.pipelex.pipe_io.build_pipe_io_artifacts",
             side_effect=PipeIOContractError(message="Failed to render the JSON Schema for the output of pipe 'smoke.echo'"),
         )
         library_manager = get_library_manager()

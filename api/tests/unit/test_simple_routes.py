@@ -9,10 +9,10 @@ from mthds.protocol.protocol import PROTOCOL_VERSION
 from pytest_mock import MockerFixture
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.exception_handlers import register_exception_handlers
-from api.middleware import request_body_size_middleware
-from api.routes.health import router as health_router
-from api.routes.version import router as version_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.middleware import request_body_size_middleware
+from pipelex_api.routes.health import router as health_router
+from pipelex_api.routes.version import router as version_router
 
 
 def _build_client_with_body_cap() -> TestClient:
@@ -43,7 +43,7 @@ class TestSimpleRoutes:
         assert body["runtime_version"] == package_version("pipelex")
 
     def test_version_handles_missing_metadata(self, mocker: MockerFixture):
-        mocker.patch("api.routes.version.version", side_effect=PackageNotFoundError("pipelex"))
+        mocker.patch("pipelex_api.routes.version.version", side_effect=PackageNotFoundError("pipelex"))
         client = _build_client_with_body_cap()
         response = client.get("/v1/version")
         assert response.status_code == 500

@@ -32,9 +32,9 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
-from api.routes.pipelex.pipeline import ApiRunner
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
+from pipelex_api.routes.pipelex.pipeline import ApiRunner
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, UNKNOWN_MODEL_MTHDS, VALID_MTHDS
 
 # Structural artifacts that exist only on the valid arm — the invalid arm must NOT carry them.

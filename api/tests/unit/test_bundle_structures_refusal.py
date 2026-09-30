@@ -20,12 +20,12 @@ from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
 from pytest_mock import MockerFixture
 
-from api.api_config import ApiConfig
-from api.exception_handlers import register_exception_handlers
-from api.routes import router as api_router
+from pipelex_api.api_config import ApiConfig
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
 
-_PIPELINE_NS = "api.routes.pipelex.pipeline"
+_PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
 _PIPE_FUNC_MTHDS = """\
 domain = "crunch_demo"

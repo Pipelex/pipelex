@@ -39,14 +39,14 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 from pipelex.runtime_bridge.serialization import serialize_completed_output
 from pytest_mock import MockerFixture
 
-from api.api_config import ApiConfig
-from api.exception_handlers import register_exception_handlers
-from api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
-from api.routes import router as api_router
-from api.routes.pipelex.pipeline import ApiRunner
+from pipelex_api.api_config import ApiConfig
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
+from pipelex_api.routes import router as api_router
+from pipelex_api.routes.pipelex.pipeline import ApiRunner
 from tests.unit._constants import VALID_MTHDS
 
-_PIPELINE_NS = "api.routes.pipelex.pipeline"
+_PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
 
 class _StubOrchestrator:
@@ -139,7 +139,7 @@ def _echo_pipe_io_artifacts() -> PipeIOArtifacts:
 
 
 def _build_client(*, with_request_id_middleware: bool = False) -> TestClient:
-    """Wire the real routes; `with_request_id_middleware` wraps the app the way `api.main` does."""
+    """Wire the real routes; `with_request_id_middleware` wraps the app the way `pipelex_api.main` does."""
     app = FastAPI()
     app.include_router(api_router, prefix="/v1")
     register_exception_handlers(app)

@@ -4,7 +4,7 @@ Guards what the committed artifact (`docs/openapi/pipelex-api.openapi.yaml`, reg
 this same `fastapi_app.openapi()`) tells a client about failures:
 
 - Every failure this server can emit is an `application/problem+json` problem document
-  (`api.exception_handlers`), so every documented 4xx/5xx must say so — with a `$ref` to the
+  (`pipelex_api.exception_handlers`), so every documented 4xx/5xx must say so — with a `$ref` to the
   typed `ProblemDocument`, not FastAPI's default `HTTPValidationError` on `application/json`.
 - The statuses a given route can additionally produce (`/execute`'s provider-429, `/start`'s
   409 duplicate run, `/resolve`'s 501 `method_ref`, …) are documented on that route.
@@ -14,7 +14,7 @@ this same `fastapi_app.openapi()`) tells a client about failures:
   how a conformance suite or a third-party runner extracts the portable subset of this artifact,
   so a Pipelex extension wearing it would misrepresent the standard.
 
-`api.main` is imported inside the fixture rather than at module scope so a bad env var fails
+`pipelex_api.main` is imported inside the fixture rather than at module scope so a bad env var fails
 THESE tests rather than the collection of every module that transitively imports the app.
 """
 
@@ -25,17 +25,17 @@ from typing import Any
 
 import pytest
 
-from api.problem_document import PROBLEM_JSON_MEDIA_TYPE
+from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
 
 # Methods that carry an operation object in an OpenAPI path item.
 _OPERATION_KEYS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 
-# Documented on EVERY auth-wrapped `/v1` operation, via the composite router in `api.routes`:
+# Documented on EVERY auth-wrapped `/v1` operation, via the composite router in `pipelex_api.routes`:
 # the auth dependency (401), the body-size middleware (413), request-shape / input-domain
 # rejections (422), and the server-fault floor (500).
 COMMON_STATUSES = (401, 413, 422, 500)
 
-# `GET /v1/version` is the public protocol handshake: `api.main` mounts it OUTSIDE the composite
+# `GET /v1/version` is the public protocol handshake: `pipelex_api.main` mounts it OUTSIDE the composite
 # router (and outside the auth dependency), so it inherits none of the shared responses.
 PUBLIC_PATHS = ("/v1/version",)
 
@@ -66,7 +66,7 @@ ROUTE_EXTRA_STATUSES = {
 
 @pytest.fixture(scope="class")
 def openapi_schema() -> dict[str, Any]:
-    from api.main import fastapi_app  # noqa: PLC0415 — see the module docstring
+    from pipelex_api.main import fastapi_app  # noqa: PLC0415 — see the module docstring
 
     return fastapi_app.openapi()
 

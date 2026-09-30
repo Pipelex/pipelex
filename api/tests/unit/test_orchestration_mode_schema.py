@@ -11,7 +11,7 @@ cannot infer the body), so this asserts the generated `app.openapi()` request-bo
 import pytest
 from fastapi import FastAPI
 
-from api.routes import router as api_router
+from pipelex_api.routes import router as api_router
 
 
 def _build_app() -> FastAPI:

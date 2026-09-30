@@ -3,7 +3,7 @@
 import pytest
 from pipelex.base_exceptions import DisclosureMode
 
-from api.disclosure import ERROR_DISCLOSURE_ENV_VAR, InvalidErrorDisclosureError, resolve_disclosure_mode
+from pipelex_api.disclosure import ERROR_DISCLOSURE_ENV_VAR, InvalidErrorDisclosureError, resolve_disclosure_mode
 
 
 class TestDisclosure:

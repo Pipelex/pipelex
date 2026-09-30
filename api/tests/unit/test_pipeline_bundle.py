@@ -19,8 +19,8 @@ from fastapi.testclient import TestClient
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes.pipelex.pipeline import router as pipeline_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
 
 _PIPE_FUNC_PY = "def echo(working_memory):\n    return 'hi'\n"
@@ -91,7 +91,7 @@ def _build_client(mocker: MockerFixture) -> tuple[TestClient, dict[str, Any]]:
         runner.start = _start
         return runner
 
-    mocker.patch("api.routes.pipelex.pipeline.ApiRunner", side_effect=_make_runner)
+    mocker.patch("pipelex_api.routes.pipelex.pipeline.ApiRunner", side_effect=_make_runner)
     return TestClient(app), snapshot
 
 
@@ -122,7 +122,7 @@ class TestPipelineBundle:
         assert snapshot["mthds_contents"] == [VALID_MTHDS]
 
     def test_python_bundle_forbidden_when_not_hosted(self, mocker: MockerFixture):
-        mocker.patch("api.routes.pipelex.pipeline.is_pipe_func_sandbox_hosted", return_value=False)
+        mocker.patch("pipelex_api.routes.pipelex.pipeline.is_pipe_func_sandbox_hosted", return_value=False)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"files": {"main.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY}})
         assert response.status_code == 403
@@ -133,7 +133,7 @@ class TestPipelineBundle:
         """The key fix: `.mthds` → `mthds_contents` (main_pipe path), ONLY the `.py`
         is materialized to the temp `library_dirs` for source capture.
         """
-        mocker.patch("api.routes.pipelex.pipeline.is_pipe_func_sandbox_hosted", return_value=True)
+        mocker.patch("pipelex_api.routes.pipelex.pipeline.is_pipe_func_sandbox_hosted", return_value=True)
         client, snapshot = _build_client(mocker)
         response = client.post("/v1/execute", json={"files": {"main.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY}})
         assert response.status_code == 200

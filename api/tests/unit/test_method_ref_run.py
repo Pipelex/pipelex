@@ -19,8 +19,8 @@ from pipelex.methods.exceptions import MethodFetchError
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
-from api.exception_handlers import register_exception_handlers
-from api.routes.pipelex.pipeline import router as pipeline_router
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import STUB_METHOD_ADDRESS, STUB_METHOD_COMMIT_SHA, VALID_MTHDS
 
 _METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
@@ -83,7 +83,7 @@ def _build_client(mocker: MockerFixture) -> tuple[TestClient, dict[str, Any]]:
         runner.start = _start
         return runner
 
-    mocker.patch("api.routes.pipelex.pipeline.ApiRunner", side_effect=_make_runner)
+    mocker.patch("pipelex_api.routes.pipelex.pipeline.ApiRunner", side_effect=_make_runner)
     return TestClient(app), snapshot
 
 
@@ -165,7 +165,7 @@ class TestMethodRefRun:
     def test_fetch_failure_is_422_with_fetch_error_type(self, mocker: MockerFixture):
         stub_cache = mocker.MagicMock()
         stub_cache.get_or_fetch.side_effect = MethodFetchError("Failed to fetch method 'github.com/pipelex/methods/documents': boom")
-        mocker.patch("api.method_source.get_method_clone_cache", return_value=stub_cache)
+        mocker.patch("pipelex_api.method_source.get_method_clone_cache", return_value=stub_cache)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": STUB_METHOD_ADDRESS, "inputs": {}})
         assert response.status_code == 422, response.text
@@ -174,7 +174,7 @@ class TestMethodRefRun:
 
     def test_python_package_forbidden_when_not_sandbox_hosted(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY})
-        mocker.patch("api.method_source.is_pipe_func_sandbox_hosted", return_value=False)
+        mocker.patch("pipelex_api.method_source.is_pipe_func_sandbox_hosted", return_value=False)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {}})
         assert response.status_code == 403, response.text
@@ -183,7 +183,7 @@ class TestMethodRefRun:
 
     def test_python_package_splits_mthds_from_py_when_sandbox_hosted(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY})
-        mocker.patch("api.method_source.is_pipe_func_sandbox_hosted", return_value=True)
+        mocker.patch("pipelex_api.method_source.is_pipe_func_sandbox_hosted", return_value=True)
         client, snapshot = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {}})
         assert response.status_code == 200, response.text
@@ -196,7 +196,7 @@ class TestMethodRefRun:
 
     def test_structures_package_refused_even_when_sandbox_hosted(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS, "structures/models.py": _STRUCTURES_PY})
-        mocker.patch("api.method_source.is_pipe_func_sandbox_hosted", return_value=True)
+        mocker.patch("pipelex_api.method_source.is_pipe_func_sandbox_hosted", return_value=True)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {}})
         assert response.status_code == 403, response.text

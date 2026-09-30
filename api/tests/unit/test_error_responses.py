@@ -23,12 +23,12 @@ from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.exception_handlers import register_exception_handlers
-from api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware, request_body_size_middleware
-from api.problem_document import PROBLEM_JSON_MEDIA_TYPE
-from api.routes import router as api_router
-from api.routes.version import router as version_router
-from api.security import RequestUser, get_request_user, verify_api_key
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware, request_body_size_middleware
+from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
+from pipelex_api.routes import router as api_router
+from pipelex_api.routes.version import router as version_router
+from pipelex_api.security import RequestUser, get_request_user, verify_api_key
 
 USER_A = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"
 USER_B = "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb"
@@ -38,13 +38,13 @@ FILE_HASH = "cccccccc-cccc-4ccc-cccc-cccccccccccc"
 def _build_client(*, user: RequestUser | None = None, with_auth: bool = False) -> TestClient:
     """Wire a production-faithful app: real routers, handlers, both middlewares.
 
-    `RequestIdMiddleware` wraps the whole app exactly as in `api.main`, so the
+    `RequestIdMiddleware` wraps the whole app exactly as in `pipelex_api.main`, so the
     request-id contextvars are bound and `X-Request-ID` is stamped on every
     response. `get_request_user` is overridden so routes see the caller
     identity the test wants.
 
     `with_auth` mounts the composite router behind the SAME `auth_dependency`
-    `api.main` uses, which is the only way to reach a real 401 — every
+    `pipelex_api.main` uses, which is the only way to reach a real 401 — every
     `raise_unauthenticated` lives in the verifiers that dependency runs, not in
     a route body.
     """
@@ -149,7 +149,7 @@ class TestErrorResponses:
         # only flips `too_large` after `call_next` returns, leaving the route free to
         # fully `await request.body()` on the oversized stream — defeating memory/CPU
         # protection and allowing route side effects to run before the 413.
-        mocker.patch("api.middleware.MAX_REQUEST_BODY_BYTES", 1024)
+        mocker.patch("pipelex_api.middleware.MAX_REQUEST_BODY_BYTES", 1024)
 
         bytes_seen_by_route: list[int] = []
 
@@ -183,7 +183,7 @@ class TestErrorResponses:
 
     def test_internal_server_error_is_rfc7807_config_domain(self, mocker: MockerFixture):
         # Absent package metadata → raise_internal_server_error → 500 CONFIG.
-        mocker.patch("api.routes.version.version", side_effect=PackageNotFoundError("pipelex"))
+        mocker.patch("pipelex_api.routes.version.version", side_effect=PackageNotFoundError("pipelex"))
         response = _build_client().get("/v1/version")
         assert response.status_code == 500
         assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
