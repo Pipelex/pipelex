@@ -1,5 +1,7 @@
 # Changelog
 
+This changelog ends at v0.33.2, the server's last release from the `Pipelex/pipelex-api` repository. The server is now released together with pipelex, under pipelex's version, and its changes are recorded in the pipelex repository's own `CHANGELOG.md`.
+
 ## [v0.33.2] - 2026-10-01
 
 ### Changed

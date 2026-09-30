@@ -22,7 +22,7 @@ The official REST API server for building and executing Pipelex pipelines. Deplo
 ---
 
 > [!IMPORTANT]
-> **This server is moving into [`Pipelex/pipelex`](https://github.com/Pipelex/pipelex).** It will live there as the repository's `api/` directory and be released together with the pipelex library, under the library's version number, so the next tag of the `pipelex/pipelex-api` image will be a pipelex version rather than the next `0.33.x`. The image keeps its name, its port and its `/root/.pipelex` configuration mount. This repository takes no new changes and will be archived once the move lands; please open new issues on `Pipelex/pipelex`.
+> **This server lives in [`Pipelex/pipelex`](https://github.com/Pipelex/pipelex), as the repository's `api/` directory.** It moved there from `Pipelex/pipelex-api` after v0.33.2 and is released together with the pipelex library, under the library's version number, so the tag of the `pipelex/pipelex-api` image that follows 0.33.2 is a pipelex version. The image keeps its name, its port and its `/root/.pipelex` configuration mount. Please open issues on `Pipelex/pipelex`.
 
 # 📑 Table of Contents
 
@@ -58,7 +58,7 @@ docker run --name pipelex-api -p 8081:8081 \
 
 To require authentication on the API, add `-e AUTH_MODE=api_key -e API_KEY=your-secret` (or `AUTH_MODE=jwt` + `JWT_SECRET_KEY`). See [`.env.example`](.env.example) for the full list of supported variables and [docs/configuration.md](docs/configuration.md) for `--env-file` and `docker compose` patterns if you'd rather keep config out of your shell history.
 
-If you'd rather build the image yourself instead of pulling, replace `pipelex/pipelex-api:latest` with a local tag after `docker build -t pipelex-api .`.
+If you'd rather build the image yourself instead of pulling, replace `pipelex/pipelex-api:latest` with a local tag after `docker build -f api/Dockerfile -t pipelex-api .`, run from the root of a `Pipelex/pipelex` checkout: the build context is the repository root, so the image installs the pipelex library of the same commit.
 
 ### 2. Verify
 
