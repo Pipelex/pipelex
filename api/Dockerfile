@@ -1,40 +1,57 @@
-FROM python:3.11-slim
+# The build context is the repository root, not this directory:
+#
+#   docker build -f api/Dockerfile .        (what `make -C api docker-build` runs)
+#
+# The server is a member of the uv workspace rooted there, and it installs pipelex from the same
+# commit rather than from PyPI, so the image cannot run a pipelex other than the one it was released
+# with. `api/Dockerfile.dockerignore` keeps that context down to the files this build reads.
 
-# ─── system packages (build deps removed in same layer to keep image small) ────
+# ─── builder: the virtual environment, built from the workspace lock ──────────
+FROM python:3.11-slim AS builder
+
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        git \
-        build-essential \
-        curl \
+    && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# ─── uv ────────────────────────────────────────────────────────────────────────
 RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-# Copy lockfile + project metadata first so dependency-install layer is cacheable.
-# The extras this installs are the ones declared in pyproject.toml, and `cli` is deliberately not
-# among them: the server selects the `json` log sink and a Rich-free pretty-print mode, so nothing
-# it does on a request renders a terminal. (Rich itself is still in the image — typer and
-# instructor both require it unconditionally — it is simply never reached.)
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# The lock and the two projects' metadata first, so the layer holding the third-party dependencies
+# is cached across source changes. `--package pipelex-api` installs the server's dependency set:
+# pipelex with the extras the server's pyproject.toml names, and `cli` deliberately not among them,
+# because the server selects the `json` log sink and a Rich-free pretty-print mode, so nothing it does
+# on a request renders a terminal. (Rich itself is still installed — typer and instructor both
+# require it unconditionally — it is simply never reached.)
+COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY api/pyproject.toml api/README.md api/LICENSE api/
+RUN uv sync --frozen --no-dev --package pipelex-api --no-install-workspace
 
-# Copy the rest of the app
-COPY . /app
-RUN uv sync --frozen --no-dev
+# Then the two packages themselves, built as wheels rather than linked to the source tree, so the
+# image runs what the published `pipelex` and `pipelex-api` distributions contain.
+COPY pipelex/ pipelex/
+COPY api/pipelex_api/ api/pipelex_api/
+RUN uv sync --frozen --no-dev --package pipelex-api --no-editable
+
+# ─── runtime ──────────────────────────────────────────────────────────────────
+FROM python:3.11-slim
+
+# curl serves the HEALTHCHECK below, and git is what pipelex runs to fetch a method by its address
+# (`method_ref` on the run and validate routes).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:${PATH}"
 
 # ─── Pipelex global config (terms acceptance, backends) ────────────────────────
-# Move the bundled config to ~/.pipelex (the global config dir) and drop it from
-# /app so users mounting overrides into /root/.pipelex aren't shadowed by a
-# project-level .pipelex inside the image. See docs/configuration.md.
-RUN cp -r /app/.pipelex /root/.pipelex && rm -rf /app/.pipelex
-
-# Strip build-only system packages now that wheels are compiled.
-RUN apt-get update \
-    && apt-get purge -y --auto-remove git build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# The server's bundled config becomes ~/.pipelex (the global config dir), and no project-level
+# .pipelex exists in the image, so users mounting overrides into /root/.pipelex aren't shadowed.
+# See api/docs/configuration.md.
+COPY api/.pipelex/ /root/.pipelex/
 
 # ─── runtime config ────────────────────────────────────────────────────────────
 # Note: container runs as root. Relocating the bundled `.pipelex/` to a
@@ -44,7 +61,7 @@ RUN apt-get update \
 
 LABEL org.opencontainers.image.title="pipelex-api" \
       org.opencontainers.image.description="Official Pipelex REST API server" \
-      org.opencontainers.image.source="https://github.com/Pipelex/pipelex-api" \
+      org.opencontainers.image.source="https://github.com/Pipelex/pipelex" \
       org.opencontainers.image.licenses="Elastic-2.0" \
       org.opencontainers.image.vendor="Evotis S.A.S."
 
@@ -53,4 +70,4 @@ EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8081/health || exit 1
 
-CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["uvicorn", "pipelex_api.main:app", "--host", "0.0.0.0", "--port", "8081"]

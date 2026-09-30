@@ -13,11 +13,10 @@ define HELP_LOCAL
 	$(GREEN)Run the API locally — two ways:$(RESET)
 
 	$(YELLOW)Native (uvicorn, hot reload — fastest dev loop):$(RESET)
-	make run$(RESET):           Run the API with uvicorn (requires `make install` first).
-	make run-wip$(RESET) ($(GREEN)wip$(RESET)):     Run against a LOCAL pipelex checkout (editable overlay). Path: make run-wip PIPELEX_REPO=../_bridge
+	make run$(RESET):           Run the API with uvicorn against the pipelex of this repository (requires `make install` first).
 
 	$(YELLOW)Docker (closest to what's deployed):$(RESET)
-	make docker-build$(RESET):    Build the API image from local source.
+	make docker-build$(RESET):    Build the API image from local source, with the repository root as the build context.
 	make docker-run$(RESET):      Build + run the image on http://localhost:8081 (foreground, Ctrl+C to stop).
 	make docker-run-hub$(RESET):  Pull + run the PUBLISHED Docker Hub image (no local build). Tag: make docker-run-hub HUB_TAG=0.5.0
 	make docker-stop$(RESET):     Force-stop the Docker container.
@@ -45,7 +44,6 @@ endef
 export HELP_LOCAL
 
 .PHONY: docker-build docker-run docker-run-hub docker-stop docker-logs
-.PHONY: check-pipelex-repo install-wip-pipelex run-wip wip
 .PHONY: temporal-server ts temporal-server-bare ts-bare tsb temporal-stop tstop
 .PHONY: check-bundle-arg bundle-run bundle-validate bundle-resolve bundle-codegen bundle-curl bundle-postman bundle-dry
 
@@ -53,10 +51,11 @@ export HELP_LOCAL
 #################################    API    #################################
 #################################################################################
 
-# Build the generic pipelex-api image from local source.
+# Build the generic pipelex-api image from local source. The build context is the repository root,
+# because the image installs pipelex from the same commit as the server (see the Dockerfile's header).
 docker-build:
 	@echo "\n=== Build $(LOCAL_IMAGE) from local source ==="
-	docker build --platform linux/amd64 -t $(LOCAL_IMAGE) .
+	docker build --platform linux/amd64 -f $(CURDIR)/Dockerfile -t $(LOCAL_IMAGE) $(WORKSPACE_ROOT)
 
 # Run the API on http://localhost:8081, foreground. Reads all env from .env.
 # Required: PIPELEX_GATEWAY_API_KEY (only if you use the default routing profile).
@@ -89,37 +88,6 @@ docker-stop:
 
 docker-logs:
 	docker logs -f $(CONTAINER_NAME)
-
-#################################################################################
-###########################   LOCAL PIPELEX (WIP)   #############################
-#################################################################################
-
-# Path to your local pipelex checkout — used by the -wip targets to run the API
-# against UNRELEASED pipelex code (e.g. a worktree such as ../_bridge), overlaid
-# on top of whatever `[tool.uv.sources]` currently resolves. This lets you switch
-# which pipelex the API runs WITHOUT hand-editing pyproject.toml. Override the
-# path per-invocation, e.g.:  make run-wip PIPELEX_REPO=../_bridge
-PIPELEX_REPO ?= ../pipelex
-
-check-pipelex-repo:
-	@test -d "$(PIPELEX_REPO)/pipelex" || { echo "ERROR: '$(PIPELEX_REPO)/pipelex' not found. Point PIPELEX_REPO at your pipelex checkout, e.g. make run-wip PIPELEX_REPO=../_bridge"; exit 1; }
-
-# Mirrors pipelex-worker's `install-wip-pipelex`: install your LOCAL pipelex
-# working tree (editable, with the API's extras) over the synced version. Depends
-# on `install` so the base deps (fastapi, uvicorn, ...) are present, then overlays
-# editable pipelex. STICKY — the overlay stays active for a plain `make run` too,
-# until you restore the synced version with `make install`. Once editable is in
-# place, pipelex code edits are picked up on the next API restart (no reinstall).
-install-wip-pipelex: check-pipelex-repo install
-	@echo "• Overlaying LOCAL pipelex (editable) from $(PIPELEX_REPO) over the synced version"
-	uv pip install --python $(VENV_PYTHON) -e "$(PIPELEX_REPO)[mistralai,anthropic,google,google-genai,bedrock,fal,temporal]"
-
-# Run the API against your LOCAL pipelex working tree (editable install, then run).
-# Restore the synced pipelex with `make install`.
-run-wip: install-wip-pipelex
-	@$(MAKE) run
-
-wip: run-wip
 
 #################################################################################
 #################################   TEMPORAL   #################################
@@ -195,13 +163,13 @@ tstop: temporal-stop
 # Postman query, or just print the body. Runs the skill's helper script with OUR
 # venv python.
 #
-#   make bundle-run      BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard
-#   make bundle-validate BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard
-#   make bundle-resolve  BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard
-#   make bundle-codegen  BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard TARGET=ts-zod
-#   make bundle-curl     BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard
-#   make bundle-postman  BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard
-#   make bundle-dry      BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard
+#   make bundle-run      BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
+#   make bundle-validate BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
+#   make bundle-resolve  BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
+#   make bundle-codegen  BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard TARGET=ts-zod
+#   make bundle-curl     BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
+#   make bundle-postman  BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
+#   make bundle-dry      BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
 #
 # Only execute/start trigger inference. bundle-validate (/v1/validate),
 # bundle-resolve (/v1/resolve), and bundle-codegen (/v1/codegen) are free —
@@ -224,7 +192,7 @@ BUNDLE_OPTS    = $(if $(ENDPOINT),--endpoint $(ENDPOINT)) $(if $(PIPE),--pipe $(
 BUNDLE_RUN_OPTS = $(if $(BASE_URL),--base-url $(BASE_URL)) $(if $(TOKEN),--token $(TOKEN))
 
 check-bundle-arg:
-	@test -n "$(BUNDLE)" || { echo "ERROR: set BUNDLE=<bundle dir or .mthds file>, e.g. make bundle-run BUNDLE=../pipelex-demos/mthds-wip/fashion_moodboard"; exit 1; }
+	@test -n "$(BUNDLE)" || { echo "ERROR: set BUNDLE=<bundle dir or .mthds file>, e.g. make bundle-run BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard"; exit 1; }
 
 bundle-run: env check-bundle-arg
 	$(call PRINT_TITLE,"Running bundle against the API")
