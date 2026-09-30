@@ -6,7 +6,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.doc_gen.doc_gen_format import parse_doc_gen_choice_key
-from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError, PluginModelDeclarationError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
@@ -236,10 +235,14 @@ class ModelManager(ModelManagerAbstract):
     def _collect_deck_referenced_handles(cls, deck: ModelDeck) -> list[tuple[str, ModelType]]:
         """Gather the (handle, model_type) pairs that the deck advertises as usable.
 
-        Covers presets and choice defaults across every model type. Aliases and waterfalls
-        are intentionally NOT enumerated directly — they are reachable via preset/choice
-        references, and the resolver walks through them. Including them here would force the
-        check on dangling helpers the user has not actively wired into a preset.
+        Covers presets and choice defaults across every model type a managed gateway can serve.
+        Aliases and waterfalls are intentionally NOT enumerated directly — they are reachable via
+        preset/choice references, and the resolver walks through them. Including them here would
+        force the check on dangling helpers the user has not actively wired into a preset.
+
+        Document engines (``doc_gen``) are left out: they are software on the host, which no
+        gateway serves, and a step whose engine is undeclared is refused at load naming the engine
+        and the fix, where a gateway error at boot would stop every method and blame the gateway.
         """
         references: list[tuple[str, ModelType]] = []
         for llm_setting in deck.llm_presets.values():
@@ -265,18 +268,10 @@ class ModelManager(ModelManagerAbstract):
         search_default_handle = cls._extract_choice_handle(deck.search_choice_default)
         if search_default_handle is not None:
             references.append((search_default_handle, ModelType.SEARCH))
-        for doc_gen_setting in deck.doc_gen_presets.values():
-            references.append((doc_gen_setting.model, ModelType.DOC_GEN))
-        for doc_gen_default in deck.doc_gen_choice_defaults.values():
-            doc_gen_default_handle = cls._extract_choice_handle(doc_gen_default)
-            if doc_gen_default_handle is not None:
-                references.append((doc_gen_default_handle, ModelType.DOC_GEN))
         return references
 
     @classmethod
-    def _extract_choice_handle(
-        cls, choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | ModelReference | str | None
-    ) -> str | None:
+    def _extract_choice_handle(cls, choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | ModelReference | str | None) -> str | None:
         """Normalise a ``*ModelChoice`` union (LLMModelChoice etc.) to a raw handle string.
 
         Choice defaults can be a typed setting object, a parsed ``ModelReference``, or a raw
