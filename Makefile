@@ -421,7 +421,7 @@ dc: drift-check
 drift-ack: env
 	$(call PRINT_TITLE,"Recording drift ack")
 	@if [ -z "$(CONTRACT)" ] || [ -z "$(RATIONALE)" ]; then \
-		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="…" [BY=<reviewer>]'; \
+		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="<real-catch|clean-pass|friction>: …" [BY=<reviewer>]'; \
 		exit 1; \
 	fi
 	$(VENV_PIPELEX_DEV) drift ack "$(CONTRACT)" --rationale "$(RATIONALE)" $(if $(BY),--by "$(BY)")

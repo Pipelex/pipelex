@@ -39,8 +39,9 @@ own (the per-library `ClassRegistry` lives on `Library`). Today the two cannot d
 interpreter hub resolves both the current library and the scoped registry from the same
 ``_library_id`` ContextVar, and every library the manager holds carries a registry of its own, so a
 provider read and a registry read of that one variable land on the same library. Scoping resolution
-to the provider's own library is therefore a one-place change if it is ever needed; see
-``wip/inputs/provider-scoped-class-resolution.md`` for the trip-wires that would make it needed.
+to the provider's own library is therefore a one-place change if it is ever needed, and it becomes
+needed the day a caller passes a provider other than ``get_concept_library()``, such as a dependency
+library's ``concept_library`` or a library fetched by id.
 
 ``pipelex.runtime_hub.get_class_registry`` is the public accessor and delegates here; prefer it
 everywhere except inside this module's own import closure.

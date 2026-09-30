@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:7884ebc7893389b5d54058576d36b731e56da1b3707986aac9b4000547cb040a"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-29T11:07:53Z"
-rationale = "Widened the triggers to every config submodel that configs.py imports from its own package: network_config.py, new on this branch, plus storage_config.py, secrets_config.py, graph_config.py, mthds_config.py and methods_config.py, which were already missing. None of the five pre-existing files changes content here, so no doc is stale because of them. network_config.py still matches docs/configuration/config-technical/network-config.md: one bool, is_fetch_ssrf_guard_enabled, with its default in pipelex/pipelex.toml. No validator narrows a domain and no migration ledger entry is owed."
+digest = "sha256:05a48390a2fdf7bf2c9aad6905b900118d0b8f17b5d42fd2e534e1966fa89ba7"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-09-30T10:30:17Z"
+rationale = "clean-pass: the only trigger change is one docstring sentence in pipelex/tools/secrets/secrets_config.py that stops citing a private design label (S4) for the external-provider config passthrough; SecretsConfig's fields, types and defaults are unchanged, so the pages under docs/configuration/, configs.py, config_cogt.py and the migration ledgers need nothing."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -23,5 +23,5 @@ rationale = "Widened the triggers to every config submodel that configs.py impor
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
 "pipelex/tools/log/log_config.py" = "blob:5b98b3ebe7090fa306cd5253c96812605f0d3dbc"
 "pipelex/tools/network/network_config.py" = "blob:e12d1d0e4a40d04859f10a77addeaf8fe2b00414"
-"pipelex/tools/secrets/secrets_config.py" = "blob:5f23e754ed4c5e76e62ea3a8f88fc885a4062551"
+"pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
 "pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"

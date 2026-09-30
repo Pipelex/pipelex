@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 #
 # v3 added ``add_storage_provider`` and ``add_secrets_provider`` — two config-selected,
 # process-global provider registries (``runtime.storage.method`` / ``runtime.secrets.method`` pick
-# the factory at boot). DX-1 batches both menu additions under this single bump so external plugins
+# the factory at boot). Both menu additions were batched under this single bump so external plugins
 # re-declare ``targets_api`` only once.
 #
 # v4 split the single ``pipelex.plugins`` entry-point group into the two ``PluginGroup`` groups
