@@ -11,7 +11,7 @@ class SecretsProviderConfig(ConfigModel):
     (e.g. ``"vault"``). An unknown token is validated at registry lookup (``UnknownSecretsMethodError``
     at boot), not at parse — so a config naming an external method still loads, and only the registry
     decides what is installable. The built-in ``env`` method needs no per-method sub-config; a future
-    external-provider config passthrough is a scoped follow-up (S4).
+    external-provider config passthrough is a possible follow-up, not built speculatively.
     """
 
     method: str = Field(strict=False)

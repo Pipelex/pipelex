@@ -13,8 +13,9 @@ This module is the top-down *dispatch*: the actual content building reuses the e
 (``StuffContentFactory`` / ``ConceptLibrary.is_compatible`` / the bottom-up ``StuffFactory``). The
 new code decides which arm each value takes; it does not invent new content builders.
 
-See ``wip/inputs/smart-inputs-design.md`` (D1-D11) for the full rationale, and
-``wip/anything-slot/design.md`` (R1-R10) for the ``Anything`` and ``JSON`` arms.
+The D-numbered decisions cited below (D1-D11) are the Smart Inputs design's; the rules they produced
+are documented for callers in ``docs/building-methods/pipes/provide-inputs.md``. The ``Anything`` and
+``JSON`` arms follow the rulings R1-R11 of L-260902-10eb56.
 """
 
 import datetime
@@ -935,7 +936,7 @@ class InputShaper:
         path enforces in ``_shape_with_multiplicity``. Without this, a caller handing an explicit
         ``ListContent`` (or an envelope whose ``content`` is a list) to a singular-declared input would
         have it *silently* stored into the singular slot. The singular-under-``[]`` auto-wrap question is
-        deliberately left to the caller's literal form (see ``wip/inputs/input-shaper-multiplicity-gaps.md``):
+        deliberately left to the caller's literal form (an open question, L-260930-c32629):
         an explicit singular is taken as given, not auto-wrapped.
         """
         content = stuff.content

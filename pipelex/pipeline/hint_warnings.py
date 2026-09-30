@@ -261,9 +261,8 @@ class _HintLinter:
                 return HintSiteValueKind.TEXT_VALUED
             if isinstance(value.structure, str):
                 # Class-backed: a native class name maps by identity to its native's value kind,
-                # mirroring the input-form deriver's judgment for resolvable sites (the known
-                # divergences are recorded in wip/engine-hints/deferred.md). Any other registered
-                # class is an object payload, hence OTHER.
+                # mirroring the input-form deriver's judgment for resolvable sites. Any other
+                # registered class is an object payload, hence OTHER.
                 return _native_class_value_kind(class_name=value.structure)
             return HintSiteValueKind.OTHER
 

@@ -22,7 +22,7 @@ Three pieces:
 
 - **`drift.toml`** (repo root, human-authored) declares the contracts: `triggers` (globs over tracked files), optional `exclude`, `review` targets, and optional `verify_commands`.
 - **`.drift/acks/<contract-id>.toml`** (tool-written, committed) records the last fulfilled review: a content digest, the reviewer, a timestamp, a rationale, and the per-file trigger snapshot.
-- **`pipelex-dev drift plan|check|ack`** computes obligations, checks them, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make agent-check` and `make check` aggregates; in CI it currently runs as an **advisory** job that is visible on the PR but does not block merges — it will be promoted to a required check), `make drift-ack CONTRACT=… RATIONALE="…"`.
+- **`pipelex-dev drift plan|check|ack`** computes obligations, checks them, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make agent-check` and `make check` aggregates, and run in CI as the `Lint (drift-contracts)` job, a required status check on `dev` and `main`), `make drift-ack CONTRACT=… RATIONALE="…"`.
 
 The validity rule is a single equality, with no base ref, no git diff, and no timestamps:
 
@@ -40,7 +40,7 @@ One view of every surface the contract system touches, from the working tree to 
 | **Quality checks** | `drift-check` runs inside the `make agent-check` and `make check` aggregates, alongside the other repo gates — a local check cannot pass with an open contract or a rotten manifest, so an open contract surfaces before CI. Mind the index: the digest reads staged content, so unstaged trigger edits are invisible to the gate until `git add`. |
 | **Commits** | The digest is computed from the **git index**, and `drift ack` stages the ack file it writes — so the ack, the code change, and any doc fix land in the same commit, reviewed as one diff. |
 | **Branches / merges** | After a merge, `drift check` recomputes the digest over the merged tree. An ack that was valid on either side but does not cover the merged trigger content fails the check until the merged state is reviewed and re-acked (see [Merges](#merges)). |
-| **PRs / CI** | The `lint-drift` CI job runs `make drift-check` on every PR — currently advisory (visible, not merge-blocking; promotion to a required check is planned). The committed ack file appears in the PR diff, so the reviewer sees the rationale next to the change it covers. |
+| **PRs / CI** | The `lint-drift` CI job (`Lint (drift-contracts)`) runs `make drift-check` on every PR and is a required status check, so an open contract blocks the merge. The committed ack file appears in the PR diff, so the reviewer sees the rationale next to the change it covers. |
 
 The gate acts on *content*, never on *time*: there is no base ref, no diff against a branch, no timestamp freshness — only the digest equality below.
 
@@ -66,7 +66,7 @@ It prints one Markdown packet per open contract: the description, exactly which 
 
 4. **Commit the ack file together with the change it covers** (it is already staged). The ack surfaces in the PR diff, so the reviewer sees the rationale next to the change — that is the audit trail.
 
-`reviewed_by` defaults from `git config user.name`; agents pass `BY=<identity>` (e.g. a model name or session URL). The rationale is required and is the on-the-record review decision — write an honest sentence, not "docs fine".
+`reviewed_by` defaults from `git config user.name`; agents pass `BY=<identity>` (e.g. a model name or session URL). The rationale is required and is the on-the-record review decision: it opens with its verdict (`real-catch`, `clean-pass` or `friction`) and then says honestly what was reviewed, not "docs fine".
 
 ## Why there is no bypass
 

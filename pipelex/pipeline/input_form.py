@@ -783,8 +783,7 @@ def _recast_text_kind(*, node: InputFormField, hints: dict[str, str], to_prose: 
 def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     """The node's site value-kind for intent applicability (spec: intent-hints.md, Applicability).
 
-    Recomputed from node facts, mirroring the lint's structural judgment (the known divergences are
-    recorded in wip/engine-hints/deferred.md): `number` nodes come only from `integer`/`number`
+    Recomputed from node facts, mirroring the lint's structural judgment: `number` nodes come only from `integer`/`number`
     fields and `native.Number` chains, so the kind IS the judgment; `text`/`prose` nodes are
     text-valued EXCEPT a time-formatted text (`type = "time"` is neither). A `native.Html` chain
     derives an `object` node since the standard put it on the object arm, so it never reaches the

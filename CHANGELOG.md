@@ -1146,7 +1146,7 @@
 - **Structured validation errors:** Bundle validation failures now emit categorized `validation_errors[]` items with identity locators, so machine consumers can read `error_type` and locators instead of parsing text. Categories: unresolved concept reference (`pipe_validation`/`unresolved_concept` with `pipe_code`, `concept_code`, `field_name`; or `blueprint_validation`/`unresolved_concept` with owning `concept_code`), undefined pipe dependency (`pipe_validation`/`unresolved_pipe_dependency` with `pipe_code` and the new `missing_pipe_code` locator), and unknown pipe type (`blueprint_validation`/`unknown_pipe_type` with `pipe_code`).
 - **New error locators and types:** Added the `missing_pipe_code` locator field and the `PipeValidationErrorType` values `unresolved_concept`, `unresolved_pipe_dependency`, and `unknown_pipe_type`.
 - **String utilities:** Added `pluralize` and `count_with_noun` to `pipelex.tools.misc.string_utils` for correct CLI output grammar (e.g. "1 pipe" instead of "1 pipe(s)").
-- **Documentation:** Documented the 0/1/2 exit-code policy in `docs/under-the-hood/error-model.md` and added `wip/structured-validation-errors-deferred-findings.md` tracking deferred follow-ups.
+- **Documentation:** Documented the 0/1/2 exit-code policy in `docs/under-the-hood/error-model.md`.
 
 ### Changed
 
@@ -1475,7 +1475,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ### Added
 
-- **`@@` and `$$` template escapes.** Authors can opt out of sigil interpolation per occurrence: `@@var` renders as the literal string `@var` (no `{{ ... }}`), and `$$var` renders as the literal `$var`. The escapes are non-overlapping left-to-right (`@@@@var` → `@@var`, two literal `@`s). Use these for any literal `@`/`$` the author needs to keep in the rendered output — most commonly `@@font-face`, `@@namespace`, `@@media` inside CSS `<style>` blocks, or `$$10` for a literal dollar amount. Cross-link: `wip/template-preprocessor-line-bounded-at.md`.
+- **`@@` and `$$` template escapes.** Authors can opt out of sigil interpolation per occurrence: `@@var` renders as the literal string `@var` (no `{{ ... }}`), and `$$var` renders as the literal `$var`. The escapes are non-overlapping left-to-right (`@@@@var` → `@@var`, two literal `@`s). Use these for any literal `@`/`$` the author needs to keep in the rendered output — most commonly `@@font-face`, `@@namespace`, `@@media` inside CSS `<style>` blocks, or `$$10` for a literal dollar amount.
 - **`TemplateSigilSyntaxError`** (`pipelex/cogt/templating/template_errors.py`): raised by the preprocessor when a candidate `@`/`@?` sigil is not alone on its line. Pipe blueprints (`PipeLLMBlueprint`, `PipeComposeBlueprint`, `PipeImgGenBlueprint`, `PipeSearchBlueprint`, `TemplateBlueprint`, `ConstructBlueprint`, `pipe_compose_factory`) and the `TemplateBlueprint` validator catch and re-raise as pydantic `ValueError` with pipe-specific context, so the diagnostic surfaces through normal MTHDS validation errors and IDE/`plxt check` diagnostics.
 
 ### Fixed

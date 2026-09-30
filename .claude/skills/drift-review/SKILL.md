@@ -6,15 +6,14 @@ description: >
   agent-check` / `make check` aggregates, or the CI lint-drift job) fails with
   open contracts, when the user
   says "drift check failed", "resolve the drift contract", "ack the drift",
-  "run drift plan", or after any change that touches drift trigger files (the
-  config model / pipelex.toml, CLI code, the keyword-only guard). Also use when
-  recording a drift dogfood observation. Performs the review for real, records
-  an honest ack, and logs the dogfood observation the pilot phase depends on.
+  "run drift plan", or after any change that touches a file a contract in
+  drift.toml names as a trigger. Performs the review for real and records an
+  honest ack whose rationale opens with the review's verdict.
 ---
 
 # Drift Review
 
-Resolve open drift contracts: review the declared targets against what actually changed, fix staleness, record the ack, log a dogfood observation. Full system reference: `docs/contribute/drift-contracts.md`. The manifest is `drift.toml` at the repo root.
+Resolve open drift contracts: review the declared targets against what actually changed, fix staleness, record the ack with its verdict. Full system reference: `docs/contribute/drift-contracts.md`. The manifest is `drift.toml` at the repo root.
 
 A contract is "open" when tracked files matching its triggers changed (in the git index) since the last recorded review — or the contract definition itself changed, or it never had an ack. The tool proves *that* a review happened; this skill's job is to make the review *genuine*. There is deliberately no bypass anywhere in the system — the legitimate escape is an honest "nothing to update" rationale, which is cheap and auditable.
 
@@ -45,7 +44,7 @@ Work from the trigger diff to the review targets:
 The digest is computed from the **git index**, not the working tree: `git add` the trigger files (and any doc fixes you made). Staging is enough — no commit needed first, and unrelated unstaged changes elsewhere are fine. Take `drift ack`'s warnings about untracked or unstaged-modified matched files seriously: an unstaged edit is invisible to the ack. For a contract with verify commands, a matched unstaged or untracked file is a hard error (the verify run would certify content the digest does not cover) — stage the files, then re-run.
 
 ```bash
-make drift-ack CONTRACT=<id> RATIONALE="<honest sentence>" BY="<your identity>"
+make drift-ack CONTRACT=<id> RATIONALE="<verdict>: <honest sentence>" BY="<your identity>"
 ```
 
 As an agent, always pass `BY` with your **own actual identity** — the model you are actually running as, in the form `BY="Claude (<your model name>)"`. Do not copy a model name from an example or from a previous ack; the reviewer field is audit data and must name who really did the review. Never ack under the human's `git config user.name`. The contract's verify commands run first (no shell, fail-fast); a failure aborts the ack. Fix what the verifier caught — do not look for a bypass; none exists, by design.
@@ -54,31 +53,27 @@ As an agent, always pass `BY` with your **own actual identity** — the model yo
 
 - Bad: `"docs fine"`, `"reviewed"`, `"re-ack after refactor"`
 - Bad: `"the page's claim still matches the test's stated exception"` — that is two documents agreeing. Name what you re-derived from the code, so a weak method is visible at write time rather than in the next merge.
-- Good: `"Documented the new activity_queues setting in general-config.md; other config pages unaffected."`
-- Good: `"CLI change is internal plumbing (renamed a private helper); no user-visible surface moved; cli docs and agent-CLI contract doc verified unchanged."`
+- Good: `"real-catch: Documented the new activity_queues setting in general-config.md; other config pages unaffected."`
+- Good: `"clean-pass: CLI change is internal plumbing (renamed a private helper); no user-visible surface moved; cli docs and agent-CLI contract doc verified unchanged."`
 
 ### 4. Verify and commit
 
 `make drift-check` must pass. `drift ack` stages the ack file it writes; commit the ack file(s) under `.drift/acks/` **together with the change they cover** — the rationale lands in the PR diff next to the change, which is the audit trail. Never hand-edit files under `.drift/acks/`.
 
-## Mandatory: log the dogfood observation
+## Mandatory: open the rationale with the verdict
 
-The drift system is in its pilot phase, and the one question only usage can answer is: **is the ack friction proportionate to the staleness caught?** Every ack must therefore produce one evidence entry — the per-contract keep/narrow/mechanize/drop verdict will be decided from this log.
+The one question only usage can answer about a contract is whether its ack friction is proportionate to the staleness it catches, so every rationale starts with one verdict:
 
-Append to `wip/drift-contracts/dogfood-log.md` (create it with this header if missing):
+- **real-catch** — the review found actual staleness, and this change fixes it;
+- **clean-pass** — genuinely reviewed, nothing was stale;
+- **friction** — the contract opened on changes that could not have affected its targets.
 
-```markdown
-# Drift-contracts dogfood log
+The ack file is committed with the change it covers, so `git log -p .drift/acks/` is the evidence from which a contract's keep, narrow, mechanize or drop decision is made. Write nothing anywhere else: there is no log file.
 
-One entry per ack. Verdicts: **real-catch** (the review found actual staleness), **clean-pass** (genuinely reviewed, nothing was stale), **friction** (the contract opened on changes that could not have affected the targets — candidate for narrowing or mechanizing).
-
-- **YYYY-MM-DD · <contract-id> · <verdict>** — one sentence: what triggered the contract, what the review found.
-```
-
-A `clean-pass` is a fine outcome; a *pattern* of clean-passes on the same contract is signal. When you record `friction`, also say which trigger narrowing would have prevented the false opening.
+A `clean-pass` is a fine outcome; a *pattern* of clean-passes on the same contract is signal. When the verdict is `friction`, say in the rationale which trigger narrowing would have prevented the opening, then file that narrowing in the workspace ledger, owned by `pipelex` (`ledger new --owner pipelex --type task --title "…" --gist "…"`), or note it on the open item that already proposes it. Where there is no ledger, put the proposal in your report to the user.
 
 ## Failure modes
 
 - **`drift check` fails on manifest rot** (dead trigger glob, zero-match review target, orphan ack, id/filename mismatch): the manifest itself needs fixing — edit `drift.toml` first (typically a rename left a glob dead), then re-review and re-ack. Editing a contract reopens it; that is expected.
 - **A verify command fails:** it caught something real — fix it; the ack stays blocked until the verifier passes.
-- **A contract keeps reopening on edits that cannot affect its targets:** keep recording `friction` entries and propose a trigger narrowing to the user. During the pilot, do not grow the manifest (no new contracts) without the user's explicit say-so — growth follows pain, not tooling enthusiasm.
+- **A contract keeps reopening on edits that cannot affect its targets:** keep recording `friction` in the rationale and file the trigger narrowing as above. Do not grow the manifest (no new contracts) without the user's explicit say-so — growth follows pain, not tooling enthusiasm.
