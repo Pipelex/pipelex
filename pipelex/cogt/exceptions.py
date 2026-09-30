@@ -510,6 +510,22 @@ class ModelManagerError(CogtError):
     pass
 
 
+class PluginModelDeclarationError(CogtError):
+    """A model a plugin declares, or a model deck default it sets, cannot be merged into this installation's inference configuration.
+
+    The model manager validates the plugins' declarations when it merges them at boot, since a plugin's ``register``
+    only stores them: a model whose name the installation's ``internal.toml`` already declares, a table that is not a
+    valid model spec, or a default for a format and source no step composes. The message names the plugin, and the
+    file when one is involved.
+    """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, *, plugin: str):
+        self.plugin = plugin
+        super().__init__(message)
+
+
 class ModelListingUnsupportedError(CogtError):
     """A registered lister cannot enumerate models for an SDK variant at runtime.
 

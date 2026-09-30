@@ -72,7 +72,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── vertexai.toml       # Google Vertex AI models (LLMs)
     │   ├── fal.toml            # FAL models (image generation)
     │   ├── linkup.toml          # Linkup models (web search)
-    │   ├── internal.toml       # Internal/local models (OCR)
+    │   ├── internal.toml       # Internal/local models (text extraction, the built-in document engine), managed by `pipelex update`
     │   └── ...
     └── deck/                   # Model deck configurations
         ├── 1_llm_deck.toml           # LLM aliases & presets
@@ -474,6 +474,8 @@ Unlike other backends, internal backend models are **always available** regardle
 
 This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
 
+`internal.toml` is the one backend file Pipelex manages: it declares the software-only models open Pipelex ships, so `pipelex update` refreshes it from the kit, and an existing install receives the models a release adds, such as the built-in document engine `reportlab-pdf`. A locally edited copy is backed up to `<file>.bak.<UTC timestamp>` first, unless you pass `--no-backup`, and your edits will not survive future updates, so declare models of your own in a backend of your own. Every other backend file is yours and is never touched. A plugin that ships a software-only engine declares its model in the internal backend itself when it loads, rather than in this file.
+
 ## Model Deck
 
 The Model Deck is the unified configuration hub for all AI model-related settings, including LLMs, OCR models, and image generation models.
@@ -595,19 +597,17 @@ Search presets support the following options:
 
 ### Document Engines
 
-The engines a `PipeDocGen` step prints with are models of the `doc_gen` family, declared in the `internal` backend: `reportlab-pdf` is built into Pipelex and prints a `pdf` from the auto-layout of the step's inputs, and `weasyprint-pdf`, `openpyxl-xlsx`, `docxtpl-docx` and `python-pptx` come with the Pipelex document generation plugin. Each lists the sources it prints from as its `inputs` (`layout`, `html` or `template_file`) and its format as its `outputs`. `.pipelex/inference/deck/5_doc_gen_deck.toml` names the engine a step prints with when it names none, for each format and source:
+The engines a `PipeDocGen` step prints with are models of the `doc_gen` family in the `internal` backend. `reportlab-pdf` is built into Pipelex, declared in `internal.toml`, and prints a `pdf` from the auto-layout of the step's inputs. `pipelex-pdf`, `pipelex-xlsx`, `pipelex-docx` and `pipelex-pptx` come with the Pipelex document generation plugin, which declares them when it loads, so no file of yours lists them. Each lists the sources it prints from as its `inputs` (`layout`, `html` or `template_file`) and its format as its `outputs`. `.pipelex/inference/deck/5_doc_gen_deck.toml` names the engine a step prints with when it names none, for the one format and source open Pipelex prints:
 
 ```toml
 [doc_gen.choice_defaults]
 "pdf.layout" = "@default-pdf"
-"pdf.html" = "@default-pdf-from-template"
 
 [doc_gen.aliases]
 default-pdf = "reportlab-pdf"
-default-pdf-from-template = "weasyprint-pdf"
 ```
 
-A step names another engine with `model`, such as `model = "weasyprint-pdf"` for a PDF without a template. See [PipeDocGen](../../building-methods/pipes/pipe-operators/PipeDocGen.md).
+The plugin declares the defaults for a `pdf` from a template and for `xlsx`, `docx` and `pptx` itself, beneath the deck files. You can still set any default yourself, for any format and source, in an `x_custom_*.toml` deck file, which overrides both. A step names another engine with `model`, such as `model = "pipelex-pdf"` for a PDF without a template. See [PipeDocGen](../../building-methods/pipes/pipe-operators/PipeDocGen.md).
 
 ### Default Choices
 
@@ -753,7 +753,7 @@ pipelex migrate             # ask, then rewrite in place
 What it touches and what it leaves alone:
 
 - **Every `*.toml` directly in `inference/backends/`** — the files this page describes, in both the global `~/.pipelex/` and a project's `.pipelex/`.
-- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`.
+- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`, which also refreshes `internal.toml` from the kit.
 - **Not a key you added yourself.** The history only describes keys *we* removed or renamed. An unknown key of your own — a misspelled `maxx_tokens`, an extra header that is not header-shaped — is still an error, and it names the file, the key and what to do. That is deliberate: silently dropping a key you meant to set would change which model you get.
 - **Every file it rewrites is copied first**, beside itself, as `<file>.bak.<UTC timestamp>`. Running the command twice is the same as running it once — a file already up to date comes back byte for byte identical.
 

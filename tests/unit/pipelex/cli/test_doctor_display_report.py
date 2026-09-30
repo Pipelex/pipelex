@@ -64,6 +64,9 @@ def _healthy_report_kwargs() -> dict[str, Any]:
         "deck_healthy": True,
         "deck_message": "Deck is up to date with pipelex 1.2.0",
         "deck_report": CLEAN_DECK,
+        "internal_backend_healthy": True,
+        "internal_backend_message": "backends/internal.toml is up to date with pipelex 1.2.0",
+        "internal_backend_report": CLEAN_DECK,
         "config_location": PROJECT_LOCATION,
     }
 

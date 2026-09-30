@@ -9,6 +9,10 @@
 # - Each model is defined in its own section with the model name as the header
 # - Model costs are in USD per million tokens (input/output)
 #
+# Managed by `pipelex update`, which refreshes this file from the kit and backs
+# up a locally edited copy to <file>.bak.<timestamp> first, so local edits will
+# not survive future runs. Declare your own models in a backend of your own.
+#
 # Documentation: https://docs.pipelex.com
 # Support: https://go.pipelex.com/discord
 #
@@ -50,8 +54,9 @@ costs = {}
 # The engines a PipeDocGen step prints with. Their inputs are the sources they
 # print from: "layout" is the auto-layout of the step's inputs, "html" an HTML
 # template, "template_file" an office template file. Their outputs are the
-# formats they print. reportlab-pdf is built into Pipelex; the others come with
-# the Pipelex document generation plugin, pipelex-doc-gen.
+# formats they print. reportlab-pdf is built into Pipelex. The other engines
+# come with the Pipelex document generation plugin, pipelex-doc-gen, which
+# declares them itself when it loads: they are never listed in this file.
 
 # --- ReportLab PDF ------------------------------------------------------------
 [reportlab-pdf]
@@ -60,40 +65,4 @@ sdk = "reportlab"
 model_id = "print-pdf"
 inputs = ["layout"]
 outputs = ["pdf"]
-costs = {}
-
-# --- WeasyPrint PDF -----------------------------------------------------------
-[weasyprint-pdf]
-model_type = "doc_gen"
-sdk = "weasyprint"
-model_id = "print-pdf"
-inputs = ["html", "layout"]
-outputs = ["pdf"]
-costs = {}
-
-# --- openpyxl Excel -----------------------------------------------------------
-[openpyxl-xlsx]
-model_type = "doc_gen"
-sdk = "openpyxl"
-model_id = "write-xlsx"
-inputs = ["layout", "template_file"]
-outputs = ["xlsx"]
-costs = {}
-
-# --- docxtpl Word -------------------------------------------------------------
-[docxtpl-docx]
-model_type = "doc_gen"
-sdk = "docxtpl"
-model_id = "write-docx"
-inputs = ["layout", "template_file"]
-outputs = ["docx"]
-costs = {}
-
-# --- python-pptx PowerPoint ---------------------------------------------------
-[python-pptx]
-model_type = "doc_gen"
-sdk = "python_pptx"
-model_id = "write-pptx"
-inputs = ["template_file"]
-outputs = ["pptx"]
 costs = {}

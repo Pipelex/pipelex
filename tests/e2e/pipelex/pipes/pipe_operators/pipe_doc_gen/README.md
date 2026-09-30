@@ -50,7 +50,7 @@ filename    = "invoice-{{ invoice.number }}"
 ```
 
 - **`format`** is `pdf`, `xlsx`, `docx` or `pptx`; open Pipelex prints a `pdf` without a template.
-- **`model`** names the document engine, such as `reportlab-pdf`, or `weasyprint-pdf` with the plugin. Without it, the model deck's default for the format prints the file, which for a `pdf` without a template is `reportlab-pdf`.
+- **`model`** names the document engine, such as `reportlab-pdf`, or `pipelex-pdf` with the plugin. Without it, the model deck's default for the format prints the file, which for a `pdf` without a template is `reportlab-pdf`.
 - **`filename`** is a Jinja expression over the inputs, and the suffix is added. It defaults to the pipe's code. It renders strictly, so a field the inputs do not have fails the step, and its field paths are checked against the inputs' concepts when the method loads.
 - **The output** is `Document` or a concept that refines it, and a single file.
 - **The inputs** each get a section when there are several, in the order the step declares them; a single input is the document itself.

@@ -9,23 +9,39 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import Pipe
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeDocGenLoadRefusals:
     @pytest.mark.parametrize(
-        "step_fields",
+        ("step_fields", "asks"),
         [
-            'format = "pdf"\ntemplate = "<h1>{{ invoice.number }}</h1>"',
-            'format = "xlsx"',
+            ('format = "pdf"\ntemplate = "<h1>{{ invoice.number }}</h1>"', "a pdf from an HTML template"),
+            ('format = "xlsx"', "an xlsx from the auto-layout of its inputs"),
         ],
         ids=["pdf_with_an_html_template", "xlsx_auto_layout"],
     )
-    async def test_a_step_no_installed_engine_prints_names_the_plugin(self, step_fields: str) -> None:
-        """Open Pipelex prints a pdf without a template only: any other step is refused at load, naming the plugin that prints it."""
+    async def test_a_step_no_installed_engine_prints_names_the_plugin(self, step_fields: str, asks: str) -> None:
+        """Open Pipelex declares a default for a pdf without a template only: any other step is refused at load, naming the plugin."""
         report = await refusal_report(step_fields=step_fields)
+        assert asks in report
         assert "pipelex-doc-gen" in report
+        assert "pipelex update" not in report
 
     async def test_a_step_naming_a_plugin_engine_is_refused_where_the_plugin_is_absent(self) -> None:
-        """A step may name WeasyPrint for a pdf without a template, and open Pipelex refuses it at load, naming the plugin."""
-        report = await refusal_report(step_fields='format = "pdf"\nmodel = "weasyprint-pdf"')
-        assert "weasyprint-pdf" in report
+        """A step may name the plugin's `pipelex-pdf` for a pdf without a template, and open Pipelex refuses it at load, naming the plugin."""
+        report = await refusal_report(step_fields='format = "pdf"\nmodel = "pipelex-pdf"')
+        assert "pipelex-pdf" in report
         assert "pipelex-doc-gen" in report
+        assert "was not found in the model deck" not in report
+
+    @pytest.mark.usefixtures("stale_internal_backend")
+    @pytest.mark.parametrize(
+        "step_fields",
+        [PipeDocGenTestData.PDF_LAYOUT_STEP, 'format = "pdf"\nmodel = "reportlab-pdf"'],
+        ids=["through_the_default", "named_by_the_step"],
+    )
+    async def test_a_pdf_layout_step_is_refused_where_internal_toml_predates_the_built_in_engine(self, step_fields: str) -> None:
+        """An installation whose internal.toml does not declare `reportlab-pdf` is told to run `pipelex update`, not that the model is unknown."""
+        report = await refusal_report(step_fields=step_fields)
+        assert "reportlab-pdf" in report
+        assert "pipelex update" in report
+        assert "was not found in the model deck" not in report
 
     async def test_an_engine_that_does_not_print_the_step_s_source_is_refused(self) -> None:
         """ReportLab prints only the auto-layout, so a step that names it with an HTML template is refused at load."""

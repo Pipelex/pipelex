@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:7884ebc7893389b5d54058576d36b731e56da1b3707986aac9b4000547cb040a"
+digest = "sha256:883f0529162543b874e242c09eca371228b11470268166edea7690b23ffaaff1"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-30T00:36:44Z"
-rationale = "The [runtime.doc_gen] section is removed again: the engine a PipeDocGen step prints with is now a doc_gen model chosen by the step's model or the model deck (DB12), so pipelex.toml, configs.py and the migration goldens are back to dev's state, and the doc-gen-config page and its two nav entries are gone. The deck gained 5_doc_gen_deck.toml, which the inference docs list; no ledger entry is owed."
+reviewed_at = "2026-09-30T07:49:40Z"
+rationale = "config_loader.py now stamps a kit manifest for backends/internal.toml beside the deck's when it installs the global kit, through stamp_kit_manifests. No config model, default or validator changed, so no migration ledger entry is owed; docs/configuration/config-technical/inference-backend-config.md now says internal.toml is managed by pipelex update, lists what the kit declares in it, and documents the plugin-declared document engines."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -13,7 +13,7 @@ rationale = "The [runtime.doc_gen] section is removed again: the engine a PipeDo
 "pipelex/pipelex.toml" = "blob:ca10eca8a5c04a73601ed1fc1f5fae0221ffadb0"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
-"pipelex/system/configuration/config_loader.py" = "blob:ac384ce993933656682999c26afffb4c9f9b1975"
+"pipelex/system/configuration/config_loader.py" = "blob:b1940ff11d9be7f9b8e113ec564d041ec53bb0ce"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/config_surface.py" = "blob:96f685656a3f4355e8a073e8bf6184e020fea8f5"

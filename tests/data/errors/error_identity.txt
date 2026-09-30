@@ -71,8 +71,10 @@ DryRunGraphNotProducedError | Dry run graph not produced | https://docs.pipelex.
 DryRunMockBuildError | Dry run mock build | https://docs.pipelex.com/latest/errors/dry-run-mock-build-error/
 DryRunObjectFidelityError | Dry run object fidelity | https://docs.pipelex.com/latest/errors/dry-run-object-fidelity-error/
 DuplicateBundleValidatorError | Duplicate bundle validator | https://docs.pipelex.com/latest/errors/duplicate-bundle-validator-error/
+DuplicateDocGenDefaultError | Duplicate doc gen default | https://docs.pipelex.com/latest/errors/duplicate-doc-gen-default-error/
 DuplicateHttpErrorMapperError | Duplicate http error mapper | https://docs.pipelex.com/latest/errors/duplicate-http-error-mapper-error/
 DuplicateInferenceBackendError | Duplicate inference backend | https://docs.pipelex.com/latest/errors/duplicate-inference-backend-error/
+DuplicateInternalModelError | Duplicate internal model | https://docs.pipelex.com/latest/errors/duplicate-internal-model-error/
 DuplicateLogSinkError | Duplicate log sink | https://docs.pipelex.com/latest/errors/duplicate-log-sink-error/
 DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/
 DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
@@ -273,6 +275,7 @@ PluginApiVersionMismatchError | Plugin api version mismatch | https://docs.pipel
 PluginDeclaredInMultipleGroupsError | Plugin declared in multiple groups | https://docs.pipelex.com/latest/errors/plugin-declared-in-multiple-groups-error/
 PluginError | Plugin error | https://docs.pipelex.com/latest/errors/plugin-error/
 PluginLayerViolationError | Plugin layer violation | https://docs.pipelex.com/latest/errors/plugin-layer-violation-error/
+PluginModelDeclarationError | Plugin model declaration | https://docs.pipelex.com/latest/errors/plugin-model-declaration-error/
 PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/errors/portkey-credentials-error/
 PortkeyError | Portkey | https://docs.pipelex.com/latest/errors/portkey-error/
 PortkeyFactoryError | Portkey factory | https://docs.pipelex.com/latest/errors/portkey-factory-error/

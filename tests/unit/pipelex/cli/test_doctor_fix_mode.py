@@ -57,6 +57,7 @@ class TestDoctorFixMode:
             "backends": mocker.patch("pipelex.cli.commands.doctor_cmd.check_backend_credentials", return_value=(True, {}, "OK")),
             "models": mocker.patch("pipelex.cli.commands.doctor_cmd.check_models", return_value=(True, "OK", {})),
             "deck": mocker.patch("pipelex.cli.commands.doctor_cmd.check_deck_sync", return_value=(True, CLEAN_DECK, "OK")),
+            "internal_backend": mocker.patch("pipelex.cli.commands.doctor_cmd.check_internal_backend_sync", return_value=(True, CLEAN_DECK, "OK")),
             "display": mocker.patch("pipelex.cli.commands.doctor_cmd.display_health_report"),
             "init_cmd": mocker.patch("pipelex.cli.commands.doctor_cmd.init_cmd"),
             "update_cmd": mocker.patch("pipelex.cli.commands.doctor_cmd.update_cmd"),
@@ -203,7 +204,21 @@ class TestDoctorFixMode:
         self._run_doctor_expecting_exit_one()
 
         doctor_mocks["update_cmd"].assert_called_once_with(yes=True)
-        assert "Model deck updated" in doctor_mocks["console"].export_text()
+        assert "Model deck and backends/internal.toml updated" in doctor_mocks["console"].export_text()
+
+    def test_fix_a_stale_internal_toml_runs_update(self, doctor_mocks: dict[str, Any]) -> None:
+        """A stale backends/internal.toml alone is the same fix as a stale deck: `pipelex update --yes`."""
+        stale_internal_backend = DeckSyncReport(
+            kit_version="1.3.0",
+            installed_kit_version=None,
+            manifest_present=False,
+            files={"internal.toml": DeckFileStatus.LOCALLY_MODIFIED},
+        )
+        doctor_mocks["internal_backend"].return_value = (False, stale_internal_backend, "backends/internal.toml manifest missing")
+
+        self._run_doctor_expecting_exit_one()
+
+        doctor_mocks["update_cmd"].assert_called_once_with(yes=True)
 
     def _make_invalid_backend_report(self, tmp_path: Path) -> BackendFileReport:
         return BackendFileReport(

@@ -8,7 +8,7 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.doc_gen.doc_gen_engine import resolve_doc_gen_setting
+from pipelex.cogt.doc_gen.doc_gen_engine import require_doc_gen_engine_declared, resolve_doc_gen_setting
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
@@ -111,6 +111,11 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         # The engine is resolved when the method loads, so a step no engine here prints is refused before a run spends anything.
         if self.doc_gen_choice is not None:
             with self.locating_model_choice(field_name="model"):
+                # The built-in engine or one of the plugin's, named where this installation does not declare it, is refused
+                # naming its remedy before the deck check would call it an unknown model.
+                require_doc_gen_engine_declared(
+                    doc_gen_choice=self.doc_gen_choice, doc_gen_format=self.doc_gen_format, source=self.source, pipe_code=self.code
+                )
                 check_doc_gen_choice_with_deck(doc_gen_choice=self.doc_gen_choice)
         self.resolve_engine()
 

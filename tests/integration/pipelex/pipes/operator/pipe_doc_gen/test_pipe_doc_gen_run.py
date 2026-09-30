@@ -59,13 +59,13 @@ class TestPipeDocGenRun:
         assert stub_engines.models == ["reportlab-pdf"]
 
     async def test_a_step_that_names_its_engine_prints_on_it(self, stub_engines: StubEngines) -> None:
-        """`model` chooses the engine: a pdf without a template prints on WeasyPrint when the step names it."""
+        """`model` chooses the engine: a pdf without a template prints on the plugin's `pipelex-pdf` when the step names it."""
         await PipelexMTHDSProtocol().execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\nmodel = "weasyprint-pdf"')],
+            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\nmodel = "pipelex-pdf"')],
             inputs=PipeDocGenTestData.INVOICE_INPUTS,
         )
 
-        assert stub_engines.models == ["weasyprint-pdf"]
+        assert stub_engines.models == ["pipelex-pdf"]
         (job,) = stub_engines.engine.jobs
         assert job.source == DocGenSource.LAYOUT
 
@@ -116,7 +116,7 @@ class TestPipeDocGenRun:
             inputs=PipeDocGenTestData.INVOICE_INPUTS,
         )
 
-        assert stub_engines.models == ["weasyprint-pdf"]
+        assert stub_engines.models == ["pipelex-pdf"]
         (job,) = stub_engines.engine.jobs
         assert job.source == DocGenSource.HTML
         assert job.html is not None

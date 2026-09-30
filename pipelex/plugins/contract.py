@@ -29,6 +29,10 @@ if TYPE_CHECKING:
 # ``doc_gen`` family registered through ``add_inference_backend`` — joined under v4 on the same reasoning. Its
 # worker (``DocGenWorkerAbstract``), render job and template check request (``pipelex.cogt.doc_gen``) are part
 # of the contract: a breaking change to any of them is a bump.
+#
+# ``add_internal_model`` and ``add_doc_gen_default`` — plain data a plugin declares for the model manager to merge at
+# boot: a model of the internal backend, as the table a backend file would hold, and the model deck's default engine for
+# one document format and source — joined under v4 without a bump, on the same reasoning as ``add_log_sink``.
 PLUGIN_API_VERSION: int = 4
 
 
@@ -36,8 +40,8 @@ PLUGIN_API_VERSION: int = 4
 class PipelexPlugin(Protocol):
     """A unit of optional capability discovered at startup.
 
-    A plugin contributes inference backends, model listers, orchestrators,
-    hub-slot claims, HTTP-error mappers and teardown callbacks by calling the menu
+    A plugin contributes inference backends, internal models and model deck defaults, model listers,
+    orchestrators, hub-slot claims, HTTP-error mappers and teardown callbacks by calling the menu
     methods on the ``PluginRegistrar`` it is handed.
 
     **Invariant — a plugin belongs to exactly one layer, and it is the highest tier it contributes
@@ -46,8 +50,9 @@ class PipelexPlugin(Protocol):
     interpreter-layer plugin and publishes under ``PluginGroup.INTERPRETER``. It may contribute
     kernel-tier capabilities alongside them, and ours does: it registers an orchestrator
     (interpreter-tier) *and* an HTTP-error mapper (kernel-tier). Do not split such a plugin in two.
-    A plugin contributing only kernel-tier capabilities — an inference backend, a model lister, a
-    storage or secrets provider, an HTTP-error mapper — is a kernel-layer plugin and publishes under
+    A plugin contributing only kernel-tier capabilities — an inference backend, an internal model or a
+    model deck default, a model lister, a storage or secrets provider, an HTTP-error mapper — is a
+    kernel-layer plugin and publishes under
     ``PluginGroup.KERNEL``.
 
     An external plugin declares its layer by the group it publishes under, and the registrar enforces

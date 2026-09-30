@@ -656,10 +656,18 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # typed as, and which is a public injection point. Widening that interface is a decision of
             # its own, so the gap is documented rather than half-closed. The docstrings say exactly
             # this; do not read ``config_dir`` as "only this directory is read" for inference.
+            #
+            # The interface WAS widened once, for ``plugin_model_declarations``, and that decision is
+            # the reason it is required rather than optional: a plugin that ships a document engine
+            # declares the engine's model and its deck defaults on the registrar, and the model deck
+            # is built here, so an implementation that could be set up without them would boot a deck
+            # missing every plugin engine and refuse those steps with a misleading "not installed".
+            # The registrar was built above, before any of this, so its declarations are final here.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
                 managed_gateway_configs=managed_gateway_configs,
                 gateway_config_source=gateway_config_source,
+                plugin_model_declarations=plugin_registrar.make_model_declarations(),
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:

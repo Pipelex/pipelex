@@ -63,6 +63,7 @@ own page. Classes are grouped by subsystem.
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
 - [`NeitherUrlNorDataError`](neither-url-nor-data-error.md) — Neither url nor data
 - [`OutputStructureSchemaError`](output-structure-schema-error.md) — Output structure schema
+- [`PluginModelDeclarationError`](plugin-model-declaration-error.md) — Plugin model declaration
 - [`PromptDocumentFactoryError`](prompt-document-factory-error.md) — Prompt document factory
 - [`PromptImageFactoryError`](prompt-image-factory-error.md) — Prompt image factory
 - [`PromptImageFormatError`](prompt-image-format-error.md) — Prompt image format
@@ -122,8 +123,10 @@ own page. Classes are grouped by subsystem.
 - [`BrokenPluginError`](broken-plugin-error.md) — Broken plugin
 - [`CoreUnconditionalPluginDisabledError`](core-unconditional-plugin-disabled-error.md) — Core unconditional plugin disabled
 - [`DuplicateBundleValidatorError`](duplicate-bundle-validator-error.md) — Duplicate bundle validator
+- [`DuplicateDocGenDefaultError`](duplicate-doc-gen-default-error.md) — Duplicate doc gen default
 - [`DuplicateHttpErrorMapperError`](duplicate-http-error-mapper-error.md) — Duplicate http error mapper
 - [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
+- [`DuplicateInternalModelError`](duplicate-internal-model-error.md) — Duplicate internal model
 - [`DuplicateLogSinkError`](duplicate-log-sink-error.md) — Duplicate log sink
 - [`DuplicateModelListerError`](duplicate-model-lister-error.md) — Duplicate model lister
 - [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator

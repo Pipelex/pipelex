@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.cogt.models.deck_manifest import kit_deck_dir, list_managed_kit_files
+from pipelex.cogt.models.deck_manifest import KitManagedArea, kit_deck_dir, list_managed_kit_files
 from pipelex.cogt.models.model_deck import (
     DocGenDeckBlueprint,
     ExtractDeckBlueprint,
@@ -146,13 +146,13 @@ class TestDeckVariants:
     @pytest.mark.parametrize("variant_dir", list_variant_dirs(), ids=lambda path: path.name)
     def test_variant_ships_the_same_deck_files(self, variant_dir: Path):
         variant_filenames = {entry.name for entry in variant_dir.iterdir() if entry.is_file() and entry.suffix == ".toml"}
-        assert variant_filenames == set(list_managed_kit_files()), (
+        assert variant_filenames == set(list_managed_kit_files(area=KitManagedArea.DECK)), (
             f"Variant '{variant_dir.name}' does not hold the same numbered deck files as the kit's shipped deck"
         )
 
     @pytest.mark.parametrize("variant_dir", list_variant_dirs(), ids=lambda path: path.name)
     def test_variant_matches_the_shipped_vocabulary(self, variant_dir: Path):
-        managed_filenames = list(list_managed_kit_files())
+        managed_filenames = list(list_managed_kit_files(area=KitManagedArea.DECK))
         shipped_blueprint = load_deck_from_dir(kit_deck_dir(), filenames=managed_filenames)
         variant_blueprint = load_deck_from_dir(variant_dir, filenames=managed_filenames)
 
@@ -166,7 +166,7 @@ class TestDeckVariants:
     @pytest.mark.parametrize("variant_dir", list_variant_dirs(), ids=lambda path: path.name)
     def test_variant_only_handles_are_still_declared_by_a_backend(self, variant_dir: Path):
         """Name parity says nothing about a handle that was retired from the backends underneath it."""
-        managed_filenames = list(list_managed_kit_files())
+        managed_filenames = list(list_managed_kit_files(area=KitManagedArea.DECK))
         shipped_handles = extract_model_handles(load_deck_from_dir(kit_deck_dir(), filenames=managed_filenames))
         variant_handles = extract_model_handles(load_deck_from_dir(variant_dir, filenames=managed_filenames))
 
@@ -183,7 +183,7 @@ class TestDeckVariants:
         No deck declares a waterfall today, so nothing else in this module would notice the
         collector skipping them, and the guard would go quietly blind the moment one does.
         """
-        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files()))
+        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
         probe_handle = "handle-named-only-by-a-waterfall"
         assert probe_handle not in extract_model_handles(blueprint)
 

@@ -1,13 +1,13 @@
 ---
 title: "Document Engine Plugins"
-description: "How a PipeDocGen step finds the engine that prints it, a model of the doc_gen family, the render job an engine receives, the template checker it may offer, and how a runtime refuses at load what it cannot print."
+description: "How a PipeDocGen step finds the engine that prints it, a model of the doc_gen family, how a plugin declares its engines and their defaults, the render job an engine receives, the template checker it may offer, and how a runtime refuses at load what it cannot print."
 ---
 
 # Document Engine Plugins
 
 A [`PipeDocGen`](../building-methods/pipes/pipe-operators/PipeDocGen.md) step turns its inputs into a document file in two stages. The **compose stage** is Pipelex's own and is pure: it lays the inputs out, or renders the step's HTML template, or gathers the inputs as plain data for a template file, and it renders the file's name. The **print stage** hands the result to a **document engine**, which returns the file's bytes, and Pipelex stores them.
 
-A document engine is a **model** of the `doc_gen` family, chosen the way a step chooses any model: by the step's `model`, or by the model deck's default. Its worker is contributed by a plugin, through the same `add_inference_backend` seam the inference backends use. Open Pipelex ships one engine, `reportlab-pdf`, which prints a `pdf` from the auto-layout of a step's inputs. The Pipelex document generation plugin, `pipelex-doc-gen`, registers the engines for a `pdf` from an HTML template and for the office formats from outside this repository.
+A document engine is a **model** of the `doc_gen` family, chosen the way a step chooses any model: by the step's `model`, or by the model deck's default. Its worker is contributed by a plugin, through the same `add_inference_backend` seam the inference backends use. Open Pipelex ships one engine, `reportlab-pdf`, which prints a `pdf` from the auto-layout of a step's inputs, and declares it in the kit's `internal.toml`. The Pipelex document generation plugin, `pipelex-doc-gen`, ships the engines for a `pdf` from an HTML template and for the office formats from outside this repository, and declares their models and their deck defaults itself when it loads.
 
 ---
 
@@ -21,7 +21,7 @@ A step asks for a **format** (`pdf`, `xlsx`, `docx`, `pptx`), and its template d
 | An HTML `template` or `.html` `template_file` (a `pdf` only) | `html` | The template rendered against the inputs |
 | An office `template_file` | `template_file` | The file's bytes and the inputs as plain data |
 
-Each engine is declared in the `internal` backend's `internal.toml`, with the sources it prints from as its `inputs` and its format as its `outputs`:
+Each engine is a model of the `internal` backend, declared with the sources it prints from as its `inputs` and its format as its `outputs`. The built-in engine is declared in the kit's `internal.toml`, which `pipelex update` refreshes, so an existing install receives it:
 
 ```toml
 [reportlab-pdf]
@@ -33,37 +33,34 @@ outputs = ["pdf"]
 costs = {}
 ```
 
-| Engine | Prints | From | Comes with |
+| Engine | Prints | From | Declared by |
 | --- | --- | --- | --- |
-| `reportlab-pdf` | `pdf` | `layout` | Pipelex |
-| `weasyprint-pdf` | `pdf` | `html`, `layout` | `pipelex-doc-gen` |
-| `openpyxl-xlsx` | `xlsx` | `layout`, `template_file` | `pipelex-doc-gen` |
-| `docxtpl-docx` | `docx` | `layout`, `template_file` | `pipelex-doc-gen` |
-| `python-pptx` | `pptx` | `template_file` | `pipelex-doc-gen` |
+| `reportlab-pdf` | `pdf` | `layout` | Pipelex, in the kit's `internal.toml` |
+| `pipelex-pdf` | `pdf` | `html`, `layout` | `pipelex-doc-gen`, when it loads |
+| `pipelex-xlsx` | `xlsx` | `layout`, `template_file` | `pipelex-doc-gen`, when it loads |
+| `pipelex-docx` | `docx` | `layout`, `template_file` | `pipelex-doc-gen`, when it loads |
+| `pipelex-pptx` | `pptx` | `template_file` | `pipelex-doc-gen`, when it loads |
 
-The model deck's `5_doc_gen_deck.toml` names the default engine for each format and source, keyed `<format>.<source>`, and a key naming a format and source no step can ask for fails when the deck loads:
+The model deck names the default engine for each format and source, keyed `<format>.<source>`, and a key naming a format and source no step can ask for fails when the deck loads. The kit's `5_doc_gen_deck.toml` sets the one default open Pipelex prints:
 
 ```toml
 [doc_gen.choice_defaults]
 "pdf.layout" = "@default-pdf"
-"pdf.html" = "@default-pdf-from-template"
-"xlsx.layout" = "@default-xlsx"
 
 [doc_gen.aliases]
 default-pdf = "reportlab-pdf"
-default-pdf-from-template = "weasyprint-pdf"
-default-xlsx = "openpyxl-xlsx"
 ```
 
-A step that names no engine prints on the deck's default, so it follows the install's deck, as an LLM step does. A step that names one, such as `model = "weasyprint-pdf"` on a `pdf` without a template, prints on that engine wherever it runs.
+The plugin declares the defaults for the formats it prints, beneath the deck files: a deck file that sets the same format and source overrides it, and a user sets any default of their own in an `x_custom_*.toml` deck file, which overrides both. A step that names no engine prints on the deck's default, so it follows the install's deck, as an LLM step does. A step that names one, such as `model = "pipelex-pdf"` on a `pdf` without a template, prints on that engine wherever it runs.
 
 ---
 
 ## Registering an engine
 
-A plugin registers a worker factory for an engine's sdk in the `doc_gen` family:
+A plugin registers a worker factory for its engine's sdk in the `doc_gen` family, declares the engine's model in the `internal` backend with `add_internal_model`, and declares the deck default for each format and source it prints with `add_doc_gen_default`:
 
 ```python
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.registrar import PluginRegistrar
@@ -75,9 +72,26 @@ class MyDocGenPlugin:
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.DOC_GEN, sdk="openpyxl", make_worker=make_xlsx_worker)
+        registrar.add_internal_model(
+            name="pipelex-xlsx",
+            spec={
+                "model_type": "doc_gen",
+                "sdk": "openpyxl",
+                "model_id": "write-xlsx",
+                "inputs": ["layout", "template_file"],
+                "outputs": ["xlsx"],
+                "costs": {},
+            },
+        )
+        registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.XLSX, source=DocGenSource.LAYOUT, model="pipelex-xlsx")
+        registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.XLSX, source=DocGenSource.TEMPLATE_FILE, model="pipelex-xlsx")
 ```
 
-A document engine is a kernel-layer capability, so an out-of-tree engine publishes under the `pipelex.plugins.kernel` entry-point group (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for the groups). `make_worker` is called for each print, with the model's spec, and imports the engine's library inside it, so `register` stays import-light and a process that never prints never imports the library. An engine loads its library, fonts and styles once per process, in the module that holds its worker, rather than per worker. A second registration of the same sdk fails loud at boot with `DuplicateInferenceBackendError`, naming both plugins.
+The model's `spec` is exactly the table a backend file would hold for it (`model_type`, `sdk`, `model_id`, `inputs`, `outputs`, `costs`, and any other model-spec field), and it is complete on its own: the `[defaults]` table of `internal.toml` is not applied to it. A default names a model, directly or through any reference the deck resolves.
+
+`register` stores these declarations and validates nothing. The model manager merges them at boot, before it builds the deck, and refuses what it cannot merge with `PluginModelDeclarationError`, naming the plugin: a model whose name the install's `internal.toml` already declares (the message names the file too), a table that is not a valid model spec, or a default for a format and source no step composes. Model names are not global across backends, so a name another backend declares is left to the routing profile, as it is for a model a file declares. When the install disables the `internal` backend, or declares none, the plugin's models are not merged, as a disabled backend's own models are not loaded, and its defaults are left out with them, so a plugin never makes a boot fail that would succeed without it. A second plugin declaring the same model fails at registration with `DuplicateInternalModelError`, and the same format and source with `DuplicateDocGenDefaultError`, each naming both plugins. `pipelex plugins list` shows each declaration on the plugin's row.
+
+A document engine is a kernel-layer capability, and so are its model and its defaults, so an out-of-tree engine publishes under the `pipelex.plugins.kernel` entry-point group (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for the groups). `make_worker` is called for each print, with the model's spec, and imports the engine's library inside it, so `register` stays import-light and a process that never prints never imports the library. An engine loads its library, fonts and styles once per process, in the module that holds its worker, rather than per worker. A second registration of the same sdk fails loud at boot with `DuplicateInferenceBackendError`, naming both plugins.
 
 ---
 
@@ -85,8 +99,10 @@ A document engine is a kernel-layer capability, so an out-of-tree engine publish
 
 When a method loads, each `PipeDocGen` step resolves its engine: the model it names, or the deck's default for its format and source. The step is refused right there, before a run spends anything on inference, when:
 
-- the deck names no engine for its format and source, and it names none (`DocGenEngineMissingError`, which says to run `pipelex update`);
-- the engine it names is not a model the deck defines (an unknown model, located on the step's `model` field);
+- the deck names no engine for its format and source, and it names none (`DocGenEngineMissingError`, which names `pipelex-doc-gen` for every format and source but a `pdf` from the auto-layout, and says to run `pipelex update` for that one);
+- the engine is `reportlab-pdf`, named by the step or through a default, and the install's `internal.toml` predates it (`DocGenEngineMissingError`, which says to run `pipelex update`);
+- the engine it names is one of the plugin's, `pipelex-pdf`, `pipelex-xlsx`, `pipelex-docx` or `pipelex-pptx`, and the plugin is not installed (`DocGenEngineMissingError`, naming `pipelex-doc-gen`);
+- the engine it names is any other model the deck does not define (an unknown model, located on the step's `model` field);
 - the engine does not print its format from its source, by the `inputs` and `outputs` it declares (`DocGenModelCapabilityError`);
 - no installed plugin registers the engine's sdk (`DocGenEngineMissingError`, naming the engine and `pipelex-doc-gen`, or saying the built-in engine is disabled).
 

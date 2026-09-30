@@ -5,8 +5,12 @@
 # This file defines the default engine a PipeDocGen step prints with, for each format and source,
 # when the step names none with `model`. A source is where the document comes from: "layout" is the
 # auto-layout of the step's inputs, "html" an HTML template, "template_file" an office template file.
-# reportlab-pdf is built into Pipelex; the other engines come with the Pipelex document generation
-# plugin, pipelex-doc-gen.
+#
+# Open Pipelex prints a pdf from the auto-layout, on its built-in engine reportlab-pdf, so that is
+# the one default this file sets. The Pipelex document generation plugin, pipelex-doc-gen, declares
+# the defaults for a pdf from a template and for xlsx, docx and pptx itself when it loads. You can
+# still set any default yourself, for any format and source, in an x_custom_*.toml file, which
+# overrides both this file and the plugin.
 #
 # Managed by `pipelex update`. To customize without conflict, create an
 # x_custom_*.toml file in this directory — pipelex never tracks or
@@ -28,12 +32,6 @@
 
 [doc_gen.choice_defaults]
 "pdf.layout" = "@default-pdf"
-"pdf.html" = "@default-pdf-from-template"
-"xlsx.layout" = "@default-xlsx"
-"xlsx.template_file" = "@default-xlsx"
-"docx.layout" = "@default-docx"
-"docx.template_file" = "@default-docx"
-"pptx.template_file" = "@default-pptx"
 
 ####################################################################################################
 # Aliases
@@ -41,7 +39,3 @@
 
 [doc_gen.aliases]
 default-pdf = "reportlab-pdf"
-default-pdf-from-template = "weasyprint-pdf"
-default-xlsx = "openpyxl-xlsx"
-default-docx = "docxtpl-docx"
-default-pptx = "python-pptx"

@@ -48,10 +48,10 @@ class PipeDocGenBlueprint(PipeBlueprint):
     `pdf` only; `template_file` is a path relative to the bundle's file: an `.html` for `pdf`, an `.xlsx` for `xlsx`, a
     `.docx` for `docx` and a `.pptx` for `pptx`, which `pptx` requires. `filename` is a Jinja expression over the
     inputs; the suffix is added. The output must be a single `Document`, or a concept refining it. `model` names the
-    document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or `weasyprint-pdf`;
-    without it, the model deck's default for the format and source prints it. Which engines a runtime has depends
-    on its plugins: open Pipelex prints a `pdf` without a template on `reportlab-pdf`, and a runtime without the
-    engine a step needs refuses the method when it loads.
+    document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or, with the Pipelex
+    document generation plugin, `pipelex-pdf`; without it, the model deck's default for the format and source prints
+    it. Which engines a runtime has depends on its plugins: open Pipelex prints a `pdf` without a template on
+    `reportlab-pdf`, and a runtime without the engine a step needs refuses the method when it loads.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"

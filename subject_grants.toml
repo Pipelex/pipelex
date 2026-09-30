@@ -445,8 +445,8 @@ param = "status"
 rationale = "Renders the status; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_apply_updates"]
-param = "deck_dir"
-rationale = "Applies deck updates in the deck dir; single operand."
+param = "installed_dir"
+rationale = "Applies one kit-managed area's updates in its installed dir; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_print_status_table"]
 param = "report"
@@ -2152,10 +2152,6 @@ rationale = "Predicate on the manifest_version; single operand."
 param = "version"
 rationale = "Deck/file op on the version; single operand."
 
-["pipelex/cogt/models/deck_manifest.py::compute_deck_sync_report"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
-
 ["pipelex/cogt/models/deck_manifest.py::compute_file_sha256"]
 param = "path"
 rationale = "Deck/file op on the path; single operand."
@@ -2164,21 +2160,25 @@ rationale = "Deck/file op on the path; single operand."
 param = "data"
 rationale = "Deck/file op on the data; single operand."
 
+["pipelex/cogt/models/deck_manifest.py::compute_sync_report"]
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
+
 ["pipelex/cogt/models/deck_manifest.py::is_deck_stale_fast"]
 param = "deck_dir"
 rationale = "Predicate on the deck_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::list_managed_installed_files"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::manifest_path"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::read_manifest"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::status_rich_label"]
 param = "status"

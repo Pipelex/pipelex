@@ -26,13 +26,12 @@ from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssi
 from pipelex.cogt.content_generation.dry_mock import dry_render_document
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
-from pipelex.cogt.doc_gen.doc_gen_engine import require_doc_gen_engine_installed
+from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model, require_doc_gen_engine_installed
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
 from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderResources
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.runtime_hub import get_model_deck, get_report_delegate
+from pipelex.runtime_hub import get_report_delegate
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
@@ -89,15 +88,19 @@ async def render_document_and_store(
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
         ModelNotFoundError: the assignment's engine is not a model served here.
-        DocGenEngineMissingError: no installed plugin registers the engine.
+        DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
+            no installed plugin registers it.
         DocGenRenderError: the engine could not print it, or failed in a way it did not report.
     """
     authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
     if render_assignment.cogt_run_params.run_mode.is_dry:
         return dry_render_document(render_assignment)
     composition = render_assignment.composition
-    inference_model = get_model_deck().get_required_inference_model(
-        model_handle=render_assignment.doc_gen_setting.model, model_type=ModelType.DOC_GEN
+    inference_model = get_doc_gen_inference_model(
+        model_handle=render_assignment.doc_gen_setting.model,
+        doc_gen_format=composition.format,
+        source=composition.source,
+        pipe_code=render_assignment.job_metadata.pipe_code,
     )
     require_doc_gen_engine_installed(
         inference_model=inference_model,

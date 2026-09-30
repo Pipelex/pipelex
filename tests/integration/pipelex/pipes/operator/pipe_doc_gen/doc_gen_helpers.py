@@ -1,23 +1,52 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typing_extensions import override
 
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
 from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderJob, RenderResources
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.config import get_config
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.plugins.inference_backend_registry import MakeWorkerFn
+from pipelex.plugins.contract import PLUGIN_API_VERSION
+from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
+from pipelex.plugins.plugin_group import PluginGroup
+from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
+from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.runtime_hub import get_secrets_provider
+from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
+from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
-# The sdks of the kit's doc_gen models the stubs stand in for: a pdf from the layout, a pdf from HTML, and a docx.
-STUB_DOC_GEN_SDKS = ("reportlab", "weasyprint", "docxtpl")
+# The engines the stubs stand in for: the built-in pdf from the layout, and two of the document generation plugin's,
+# a pdf from HTML and a docx, which the stub plugin declares as the real plugin would.
+BUILT_IN_STUB_SDK = "reportlab"
+PIPELEX_PDF_SPEC: dict[str, Any] = {
+    "model_type": "doc_gen",
+    "sdk": "weasyprint",
+    "model_id": "print-pdf",
+    "inputs": ["html", "layout"],
+    "outputs": ["pdf"],
+    "costs": {},
+}
+PIPELEX_DOCX_SPEC: dict[str, Any] = {
+    "model_type": "doc_gen",
+    "sdk": "docxtpl",
+    "model_id": "write-docx",
+    "inputs": ["layout", "template_file"],
+    "outputs": ["docx"],
+    "costs": {},
+}
 
 
 class StubEngine:
@@ -48,7 +77,7 @@ class StubDocGenWorker(DocGenWorkerAbstract):
 
 
 class StubEngines:
-    """The stub engines of one test, registered for the sdks of `reportlab-pdf`, `weasyprint-pdf` and `docxtpl-docx`."""
+    """The stub engines of one test, registered for the sdks of `reportlab-pdf`, `pipelex-pdf` and `pipelex-docx`."""
 
     def __init__(self) -> None:
         self.engine = StubEngine()
@@ -73,8 +102,59 @@ class StubEngines:
         self.check_requests.append(request)
         return self.findings
 
-    def backends(self) -> dict[str, MakeWorkerFn]:
-        return dict.fromkeys(STUB_DOC_GEN_SDKS, self.make_worker)
+    def register(self, registrar: PluginRegistrar) -> None:
+        """Register as the document generation plugin does: a worker per sdk, the plugin's models, and their deck defaults."""
+        for sdk in (BUILT_IN_STUB_SDK, PIPELEX_PDF_SPEC["sdk"], PIPELEX_DOCX_SPEC["sdk"]):
+            registrar.add_inference_backend(family=InferenceFamily.DOC_GEN, sdk=sdk, make_worker=self.make_worker)
+        registrar.add_internal_model(name="pipelex-pdf", spec=PIPELEX_PDF_SPEC)
+        registrar.add_internal_model(name="pipelex-docx", spec=PIPELEX_DOCX_SPEC)
+        registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.PDF, source=DocGenSource.HTML, model="pipelex-pdf")
+        registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.DOCX, source=DocGenSource.LAYOUT, model="pipelex-docx")
+        registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.DOCX, source=DocGenSource.TEMPLATE_FILE, model="pipelex-docx")
+
+    def make_registrar(self) -> PluginRegistrar:
+        """A registrar holding only the stub plugin's contributions, built the way discovery builds one."""
+        registrar = PluginRegistrar(config=get_config())
+        registrar.begin_plugin(name="stub-doc-gen", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=PluginGroup.KERNEL)
+        self.register(registrar)
+        return registrar
+
+
+def make_doc_gen_backends(*, registrar: PluginRegistrar) -> dict[str, MakeWorkerFn]:
+    """The document engine workers a registrar holds, keyed by sdk, for `InferenceBackendRegistry.with_family`."""
+    backends: dict[str, MakeWorkerFn] = {}
+    for (family, sdk), make_worker in registrar.inference_backends.items():
+        match family:
+            case InferenceFamily.DOC_GEN:
+                backends[sdk] = make_worker
+            case InferenceFamily.LLM | InferenceFamily.IMG_GEN | InferenceFamily.EXTRACT | InferenceFamily.SEARCH:
+                pass
+    return backends
+
+
+def make_models_manager(*, plugin_model_declarations: PluginModelDeclarations, backends_dir_path: Path | None = None) -> ModelManager:
+    """A model manager set up from this runtime's configuration with the given plugins' declarations.
+
+    Set up the way a boot that needs no model specs is, with the managed gateways' placeholder specs: nothing is
+    fetched, and the internal models, the plugins' included, resolve through the internal backend. A test that needs
+    other backend files hands their directory in.
+    """
+    managed_gateway_sections = enabled_managed_gateway_sections()
+    managed_gateway_configs = (
+        build_managed_gateway_configs(remote_config=RemoteConfigFetcher.make_dummy_remote_config(), managed_gateway_sections=managed_gateway_sections)
+        if managed_gateway_sections
+        else None
+    )
+    models_manager = ModelManager()
+    models_manager.setup(
+        secrets_provider=get_secrets_provider(),
+        managed_gateway_configs=managed_gateway_configs,
+        gateway_config_source=None,
+        plugin_model_declarations=plugin_model_declarations,
+        needs_inference=False,
+        backends_dir_path=str(backends_dir_path) if backends_dir_path is not None else None,
+    )
+    return models_manager
 
 
 async def refusal_report(*, step_fields: str) -> str:

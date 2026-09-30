@@ -67,6 +67,8 @@ A registry key is `(family, sdk)`. The same `sdk` string may appear in two famil
 
 One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves the four inference families, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`. This is the cross-family-vendor coordination point: one plugin, many backends. `DOC_GEN` is the family of the document engines a `PipeDocGen` step prints with, local libraries rather than inference, which the built-in `reportlab` plugin and the Pipelex document generation plugin serve (see [Document Engine Plugins](document-engine-plugins.md)).
 
+A plugin whose backend runs without an external service, such as a document engine, may also declare the models it serves rather than leave them to a backend file. `add_internal_model(name=…, spec=…)` declares a model in the `internal` backend, the spec being the table a backend file would hold for it, and `add_doc_gen_default(doc_gen_format=…, source=…, model=…)` declares the model deck's default engine for a document format and source. Both are stored at registration and merged by the model manager at boot, and [Document Engine Plugins](document-engine-plugins.md#registering-an-engine) gives their rules.
+
 ---
 
 ## `MakeWorkerFn` — the locked call shape

@@ -34,8 +34,8 @@ class PipeDocGenSpec(PipeSpec):
     model: str | None = Field(
         default=None,
         description=(
-            "The document engine that prints the file, a doc_gen model such as 'reportlab-pdf' or 'weasyprint-pdf'. "
-            "Omit it for the model deck's default for the format."
+            "The document engine that prints the file, a doc_gen model such as 'reportlab-pdf' or, "
+            "with the document generation plugin, 'pipelex-pdf'. Omit it for the model deck's default for the format."
         ),
     )
     template: str | None = Field(
