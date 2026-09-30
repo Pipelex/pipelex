@@ -9,13 +9,15 @@ on the plugin contract (`template_check.py`).
 import datetime
 import types
 import typing
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from enum import Enum, StrEnum
 from typing import Any, Literal, Union
 
 from pydantic import BaseModel, Field
 
+from pipelex.cogt.doc_gen.plain_data import plain_data
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -50,7 +52,9 @@ class InputShape(BaseModel):
 
     A structure lists its `fields`, which an image and a document also do (their URL among them, which an
     engine reads through `RenderResources`); a list has its `item`; anything else is a leaf. `ANY` is a value
-    whose shape is not declared, such as a JSON input, so a checker cannot tell what it holds.
+    whose shape is not declared, such as a JSON input, so a checker cannot tell what it holds. A native `Date`
+    is `DATE`, and its plain data is a `datetime.date`, or a `datetime.datetime`, which is one too, when it
+    carries a time of day.
     """
 
     kind: InputShapeKind = Field(strict=False)
@@ -85,7 +89,7 @@ def _content_leaf_kind(content_class: type[BaseModel]) -> InputShapeKind | None:
         return InputShapeKind.DATE
     if issubclass(content_class, TimeContent):
         return InputShapeKind.TIME
-    if issubclass(content_class, (JSONContent, ListContent)):
+    if issubclass(content_class, (JSONContent, ListContent, CompositeContent)):
         return InputShapeKind.ANY
     return None
 
@@ -128,7 +132,7 @@ def _shape_of_annotation(*, annotation: Any, title: str | None, description: str
     if origin is typing.Annotated:
         return _shape_of_annotation(annotation=typing.get_args(annotation)[0], title=title, description=description, seen=seen)
     if origin is Literal:
-        return _leaf(InputShapeKind.TEXT, title=title, description=description)
+        return _leaf(_kind_of_values(values=typing.get_args(annotation)), title=title, description=description)
     if origin in {list, tuple, set, frozenset, Sequence}:
         item_args = typing.get_args(annotation)
         item = _shape_of_annotation(annotation=item_args[0], title=None, description=None, seen=seen) if item_args else _leaf(InputShapeKind.ANY)
@@ -141,11 +145,27 @@ def _shape_of_annotation(*, annotation: Any, title: str | None, description: str
     return _leaf(_scalar_kind(scalar_type), title=title, description=description)
 
 
+def _kind_of_values(*, values: Iterable[Any]) -> InputShapeKind:
+    """The kind every one of these values has as plain data, an enum member being its value; `ANY` when they differ.
+
+    A `None` among them is left out, as an optional field's is.
+    """
+    kinds: set[InputShapeKind] = set()
+    for value in values:
+        if value is not None:
+            plain_value: object = plain_data(value)
+            kinds.add(_scalar_kind(type(plain_value)))
+    if len(kinds) == 1:
+        return kinds.pop()
+    return InputShapeKind.ANY
+
+
 def _scalar_kind(annotation: type) -> InputShapeKind:
+    if issubclass(annotation, Enum):
+        enum_class: type[Enum] = annotation
+        return _kind_of_values(values=[member.value for member in enum_class])
     if issubclass(annotation, bool):
         return InputShapeKind.BOOLEAN
-    if issubclass(annotation, Enum):
-        return InputShapeKind.TEXT
     if issubclass(annotation, (int, float, Decimal)):
         return InputShapeKind.NUMBER
     if issubclass(annotation, str):

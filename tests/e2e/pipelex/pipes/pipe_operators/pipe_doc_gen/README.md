@@ -24,12 +24,14 @@ P=tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen
 An LLM writes a report in Markdown on the topic in `report/inputs.json`, and the last step prints it formatted:
 
 ```bash
+P=tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen
 .venv/bin/pipelex run bundle $P/report --inputs $P/report/inputs.json
 ```
 
 An LLM invents an invoice from the brief in `invoice/brief_inputs.json`, and the last step prints it:
 
 ```bash
+P=tests/e2e/pipelex/pipes/pipe_operators/pipe_doc_gen
 .venv/bin/pipelex run bundle $P/invoice --inputs $P/invoice/brief_inputs.json
 ```
 

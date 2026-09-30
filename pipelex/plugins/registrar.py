@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Callable, Mapping
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
@@ -334,7 +335,7 @@ class PluginRegistrar:
             store=self.internal_models,
             sources=self._internal_model_sources,
             key=name,
-            value=dict(spec),
+            value=copy.deepcopy(dict(spec)),
             contribution=f"internal model {name}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicateInternalModelError(
                 name=name, first_plugin=first_plugin, second_plugin=second_plugin
@@ -449,11 +450,12 @@ class PluginRegistrar:
     def make_model_declarations(self) -> PluginModelDeclarations:
         """Freeze the internal models and model deck defaults the plugins declared, for ``ModelManagerAbstract.setup``.
 
-        A fresh value object with copies of the tables, so neither the model manager nor a plugin holding on to the
-        mapping it passed can change what the registrar recorded.
+        A fresh value object with deep copies of the tables, so neither the model manager nor a plugin holding on to
+        the mapping it passed, or a list inside it, can change what the registrar recorded.
         """
         internal_models = {
-            name: PluginInternalModel(spec=dict(spec), plugin=self._internal_model_sources[name]) for name, spec in self.internal_models.items()
+            name: PluginInternalModel(spec=copy.deepcopy(spec), plugin=self._internal_model_sources[name])
+            for name, spec in self.internal_models.items()
         }
         doc_gen_defaults = tuple(
             PluginDocGenDefault(

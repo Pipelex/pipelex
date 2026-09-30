@@ -3,11 +3,14 @@ import datetime
 from pydantic import Field
 
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document
-from pipelex.cogt.doc_gen.layout_tree import FieldGridBlock, ImageBlock, MarkdownBlock, ParagraphsBlock, SectionBlock, TableBlock
+from pipelex.cogt.doc_gen.layout_tree import FieldGridBlock, ImageBlock, LayoutField, MarkdownBlock, ParagraphsBlock, SectionBlock, TableBlock
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 
@@ -29,6 +32,11 @@ class _Invoice(StructuredContent):
     tags: list[str]
     customer: _Customer
     line_items: list[_LineItem]
+
+
+class _Tagged(StructuredContent):
+    tags: set[str]
+    codes: tuple[int, ...]
 
 
 def _invoice() -> _Invoice:
@@ -136,3 +144,40 @@ class TestLayoutBuilder:
         )
 
         assert document.blocks == [ParagraphsBlock(paragraphs=["Title", "Body text."])]
+
+    def test_a_composite_lays_out_its_components(self) -> None:
+        composite = CompositeContent.model_validate(
+            {"summary": TextContent(text="All good."), "score": NumberContent(number=3), "details": _Customer(name="Ada", city="Paris")}
+        )
+
+        document = build_layout_document(title="Review", named_contents=[("review", composite)])
+
+        grid, details = document.blocks
+        assert isinstance(grid, FieldGridBlock)
+        assert [(field.label, field.value) for field in grid.fields] == [("Summary", "All good."), ("Score", 3)]
+        assert isinstance(details, SectionBlock)
+        assert details.title == "Details"
+
+    def test_a_json_input_lays_out_nested_objects(self) -> None:
+        payload = JSONContent(json_obj={"customer": {"name": "Ada"}, "tags": ["a", "b"], "lines": [{"sku": "X", "qty": 1}]})
+
+        document = build_layout_document(title="Order", named_contents=[("order", payload)])
+
+        (order,) = document.blocks
+        assert isinstance(order, SectionBlock)
+        grid, customer, lines = order.blocks
+        assert isinstance(grid, FieldGridBlock)
+        assert [(field.label, field.value) for field in grid.fields] == [("Tags", "a, b")]
+        assert isinstance(customer, SectionBlock)
+        assert customer.blocks == [FieldGridBlock(fields=[LayoutField(label="Name", value="Ada")])]
+        assert isinstance(lines, SectionBlock)
+        (line,) = lines.blocks
+        assert isinstance(line, SectionBlock)
+        assert line.blocks == [FieldGridBlock(fields=[LayoutField(label="Sku", value="X"), LayoutField(label="Qty", value=1)])]
+
+    def test_a_set_field_lays_out_as_its_items(self) -> None:
+        tagged = _Tagged(tags={"b", "a"}, codes=(1, 2))
+
+        document = build_layout_document(title="Tagged", named_contents=[("tagged", tagged)])
+
+        assert document.blocks == [FieldGridBlock(fields=[LayoutField(label="Tags", value="a, b"), LayoutField(label="Codes", value="1, 2")])]

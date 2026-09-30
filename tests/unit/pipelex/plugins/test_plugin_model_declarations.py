@@ -122,12 +122,17 @@ class TestPluginModelDeclarations:
     def test_the_declarations_do_not_follow_a_table_the_plugin_changes_afterwards(self) -> None:
         registrar = _make_registrar()
         registrar.begin_plugin(name="doc-gen", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=PluginGroup.KERNEL)
-        spec = dict(PIPELEX_XLSX_SPEC)
+        spec = dict(PIPELEX_XLSX_SPEC, inputs=["layout", "template_file"])
         registrar.add_internal_model(name="pipelex-xlsx", spec=spec)
+        declarations = registrar.make_model_declarations()
 
         spec["sdk"] = "changed"
+        spec["inputs"].append("html")
+        declarations.internal_models["pipelex-xlsx"].spec["inputs"].append("html")
 
-        assert registrar.make_model_declarations().internal_models["pipelex-xlsx"].spec["sdk"] == "openpyxl"
+        recorded_spec = registrar.make_model_declarations().internal_models["pipelex-xlsx"].spec
+        assert recorded_spec["sdk"] == "openpyxl"
+        assert recorded_spec["inputs"] == ["layout", "template_file"]
 
     def test_no_declarations_make_no_deck_base(self) -> None:
         assert PluginModelDeclarations.make_empty().make_deck_base() == {}

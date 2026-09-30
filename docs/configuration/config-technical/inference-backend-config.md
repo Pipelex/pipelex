@@ -79,7 +79,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
         ├── 2_img_gen_deck.toml       # Image generation config
         ├── 3_extract_deck.toml       # Document extraction config
         ├── 4_search_deck.toml        # Web search config
-        ├── 5_doc_gen_deck.toml       # Document engines, by format
+        ├── 5_doc_gen_deck.toml       # Document engines, by format and source
         ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
         └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```

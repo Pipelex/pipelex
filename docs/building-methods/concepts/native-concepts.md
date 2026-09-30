@@ -96,7 +96,7 @@ class MarkdownContent(TextContent):
     text: str
 ```
 
-What sets it apart from `Text` is how it is shown: the views and the renditions format a `Markdown` value, while they show a `Text` value as it is, so a stray `#` or `1.` in a plain text never turns into a heading or a list.
+What sets it apart from `Text` is how it is shown: the HTML view, an HTML template and a PDF laid out without a template format a `Markdown` value and show a `Text` value as it is, so a stray `#` or `1.` in a plain text never turns into a heading or a list there. The terminal's pretty view is the exception: it renders both through Markdown.
 
 As a `PipeLLM` output, `output = "Markdown"` gives a report whose headings, bold text, lists, tables and links are formatted downstream. The LLM writes free text, exactly as it does for `Text`:
 

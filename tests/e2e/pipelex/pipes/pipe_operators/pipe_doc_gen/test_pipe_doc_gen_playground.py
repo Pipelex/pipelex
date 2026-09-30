@@ -58,3 +58,7 @@ class TestPipeDocGenPlayground:
         assert "**" not in full_text
         assert "# Quarterly" not in full_text
         assert "<script>" in full_text
+        assert "confidence_threshold = 0.9" in full_text
+        assert "```" not in full_text
+        assert "the automation dashboard" in full_text
+        assert "](https://" not in full_text

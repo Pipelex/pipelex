@@ -13,8 +13,8 @@ In the deck, numbered files (``<digits>_*.toml``, e.g. ``1_llm_deck.toml``) are 
 else is left alone — including ``x_custom_*.toml`` overrides (the recommended escape hatch) and any other
 project-local additions (e.g. a cookbook's preset file). In the backends directory only ``internal.toml`` is
 managed, because it declares the software-only models open Pipelex ships and an existing install must receive
-the ones a release adds: every other backend file is the user's, which ``pipelex init`` writes once and
-nothing ever overwrites.
+the ones a release adds: every other backend file is the user's, which ``pipelex update`` never touches
+(``pipelex init``, a full reset, rewrites the ones the kit ships).
 """
 
 from __future__ import annotations

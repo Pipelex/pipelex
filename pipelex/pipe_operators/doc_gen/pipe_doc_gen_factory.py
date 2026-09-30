@@ -56,7 +56,11 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
         if blueprint.template_file is not None:
             resolved_path = cls._resolve_template_file(pipe_code=pipe_code, template_file=blueprint.template_file, source=blueprint.source)
             if blueprint.format.is_template_html:
-                template = resolved_path.read_text(encoding="utf-8")
+                try:
+                    template = resolved_path.read_text(encoding="utf-8")
+                except (OSError, UnicodeError) as exc:
+                    msg = f"PipeDocGen '{pipe_code}' could not read the template file '{blueprint.template_file}' as UTF-8 text."
+                    raise PipeDocGenFactoryError(msg) from exc
                 cls._check_html_template_file(pipe_code=pipe_code, template=template, inputs=inputs, template_file=blueprint.template_file)
             else:
                 template_path = str(resolved_path)

@@ -34,11 +34,30 @@ def _main_stuff_file_name(*, url: str, filename: str | None, mime_type: str | No
     return f"{_FALLBACK_STEM}{extension}"
 
 
-async def save_main_stuff_file(*, content: StuffContent, output_dir: Path) -> Path | None:
+def _free_target_path(*, output_dir: Path, name: str, reserved_names: frozenset[str]) -> Path:
+    """`name` in `output_dir`, or a numbered variant of it when a file of that name is there or the run writes one later.
+
+    The results folder already holds the run's own artifacts, such as `main_stuff.json`, when the file is copied, and
+    a Document passed through from an earlier run can bear one of their names. Names compare without case, as they do
+    on a case-insensitive file system.
+    """
+    reserved = {reserved_name.casefold() for reserved_name in reserved_names}
+    stem = PurePosixPath(name).stem
+    suffix = PurePosixPath(name).suffix
+    target_path = output_dir / name
+    index = 1
+    while target_path.name.casefold() in reserved or target_path.exists():
+        target_path = output_dir / f"{stem}-{index}{suffix}"
+        index += 1
+    return target_path
+
+
+async def save_main_stuff_file(*, content: StuffContent, output_dir: Path, reserved_names: frozenset[str]) -> Path | None:
     """Write a Document or Image main output's bytes into `output_dir`, and return the file's path.
 
-    Returns None when the content is not file-shaped. Loading can fail like any fetch, which the caller
-    reports without failing the run that already succeeded.
+    The file never replaces one already in `output_dir`, nor takes one of `reserved_names`, the files the run writes
+    there afterwards. Returns None when the content is not file-shaped. Loading can fail like any fetch, which the
+    caller reports without failing the run that already succeeded.
     """
     url: str
     name: str
@@ -48,10 +67,10 @@ async def save_main_stuff_file(*, content: StuffContent, output_dir: Path) -> Pa
             name = _main_stuff_file_name(url=url, filename=content.filename, mime_type=content.mime_type)
         case ImageContent():
             url = content.url
-            name = _main_stuff_file_name(url=url, filename=None, mime_type=content.mime_type)
+            name = _main_stuff_file_name(url=url, filename=content.filename, mime_type=content.mime_type)
         case _:
             return None
     raw_bytes = await load_bytes_from_any_uri(url, storage_provider=get_storage_provider())
-    target_path = output_dir / name
+    target_path = _free_target_path(output_dir=output_dir, name=name, reserved_names=reserved_names)
     target_path.write_bytes(raw_bytes)
     return target_path

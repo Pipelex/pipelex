@@ -19,14 +19,25 @@ class TestDocumentComposition:
                 title="Report",
                 blocks=[
                     ImageBlock(url="pipelex-storage://s/cover.png"),
-                    SectionBlock(title="Figures", level=1, blocks=[ImageBlock(url="https://example.com/figure.png")]),
+                    SectionBlock(
+                        title="Figures",
+                        level=1,
+                        blocks=[
+                            ImageBlock(url="https://example.com/figure.png"),
+                            SectionBlock(title="Detail", level=2, blocks=[ImageBlock(url="https://example.com/detail.png")]),
+                        ],
+                    ),
                 ],
             ),
         )
 
         uri_references = composition.referenced_uris()
 
-        assert [uri_reference.uri for uri_reference in uri_references] == ["pipelex-storage://s/cover.png", "https://example.com/figure.png"]
+        assert [uri_reference.uri for uri_reference in uri_references] == [
+            "pipelex-storage://s/cover.png",
+            "https://example.com/figure.png",
+            "https://example.com/detail.png",
+        ]
         assert uri_references[1].position == "image 2 of the document 'report.pdf'"
 
     def test_composed_html_declares_no_read(self) -> None:
@@ -57,3 +68,14 @@ class TestDocumentComposition:
     def test_a_composition_without_its_payload_is_refused(self) -> None:
         with pytest.raises(ValidationError, match="carries its payload"):
             DocumentComposition(format=DocGenFormat.DOCX, source=DocGenSource.TEMPLATE_FILE, filename="invoice.docx", title="Invoice")
+
+    def test_a_composition_with_another_source_s_payload_too_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="carries only its own payload, not the template_file one"):
+            DocumentComposition(
+                format=DocGenFormat.PDF,
+                source=DocGenSource.HTML,
+                filename="report.pdf",
+                title="Report",
+                html="<p>Report</p>",
+                template_path="/nowhere/report.docx",
+            )

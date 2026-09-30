@@ -202,6 +202,36 @@ class TestPipeSpecToToml:
         toml = pipe_spec_to_toml(spec)
         assert "model" not in toml
 
+    # -- PipeDocGen -------------------------------------------------------
+
+    def test_doc_gen_model_in_toml(self) -> None:
+        spec = parse_pipe_spec(
+            {
+                "pipe_code": "print_invoice",
+                "description": "Print the invoice",
+                "inputs": {"invoice": "Invoice"},
+                "output": "Document",
+                "format": "docx",
+                "model": "pipelex-docx",
+                "template_file": "invoice.docx",
+                "filename": "invoice.docx",
+            },
+            pipe_type="PipeDocGen",
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert 'format = "docx"' in toml
+        assert 'model = "pipelex-docx"' in toml
+        assert 'template_file = "invoice.docx"' in toml
+        assert 'filename = "invoice.docx"' in toml
+
+    def test_doc_gen_no_model_omits_field(self) -> None:
+        spec = parse_pipe_spec(
+            {"pipe_code": "print_report", "description": "Print the report", "inputs": {"report": "Markdown"}, "output": "Document", "format": "pdf"},
+            pipe_type="PipeDocGen",
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "model" not in toml
+
     # -- PipeExtract ------------------------------------------------------
 
     def test_extract_model_in_toml(self) -> None:

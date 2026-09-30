@@ -1,3 +1,6 @@
+import base64
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -37,17 +40,19 @@ class TestRenderJob:
             )
 
     def test_a_job_round_trips_through_json_with_the_template_as_base64(self) -> None:
+        template = b"PK\x03\x04\xfb\xff not really a workbook"
         job = RenderJob(
             format=DocGenFormat.XLSX,
             source=DocGenSource.TEMPLATE_FILE,
             filename="invoice.xlsx",
             title="Invoice",
-            template=b"PK\x03\x04 not really a workbook",
+            template=template,
             template_name="invoice.xlsx",
             data={"invoice": {"number": "INV-1", "total": 12.5}},
         )
 
         json_text = job.model_dump_json()
 
-        assert "PK\\u0003" not in json_text
+        # Pydantic writes bytes as URL-safe base64, '-' and '_' where standard base64 has '+' and '/'.
+        assert json.loads(json_text)["template"] == base64.urlsafe_b64encode(template).decode()
         assert RenderJob.model_validate_json(json_text) == job

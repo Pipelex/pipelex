@@ -46,8 +46,13 @@ from pipelex.tools.tabular.exceptions import CsvFlatnessError
 
 # The tags after which the text of an HTML value starts a new paragraph when it is printed as text.
 _HTML_BLOCK_TAGS = frozenset(
-    {"p", "div", "br", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "table", "section", "article", "blockquote", "pre", "hr"}
+    {"p", "div", "br", "hr", "pre", "blockquote", "address", "details", "summary", "h1", "h2", "h3", "h4", "h5", "h6"}
+    | {"ul", "ol", "li", "dl", "dt", "dd", "table", "caption", "tr"}
+    | {"section", "article", "header", "footer", "main", "nav", "aside", "figure", "figcaption"}
 )
+# The tags that start a table cell: a row stays one paragraph, its cells separated.
+_HTML_CELL_TAGS = frozenset({"td", "th"})
+_HTML_CELL_SEPARATOR = " | "
 # The tags whose content is never text a reader sees.
 _HTML_HIDDEN_TAGS = frozenset({"script", "style", "head", "title", "template"})
 
@@ -73,6 +78,8 @@ class _HtmlTextExtractor(HTMLParser):
             self._hidden_depth += 1
         elif tag in _HTML_BLOCK_TAGS:
             self._break()
+        elif tag in _HTML_CELL_TAGS and "".join(self._current).strip():
+            self._current.append(_HTML_CELL_SEPARATOR)
 
     @override
     def handle_endtag(self, tag: str) -> None:
@@ -141,10 +148,22 @@ def _scalar(value: Any) -> tuple[bool, LayoutScalar]:
             return False, None
 
 
+def _collection_items(*, value: Any) -> list[Any] | None:
+    """The items of a list, a tuple or a set, a set's in a stable order; None for any other value."""
+    match value:
+        case list() | tuple():
+            return list(value)  # pyright: ignore[reportUnknownArgumentType]
+        case set() | frozenset():
+            return sorted(value, key=str)  # pyright: ignore[reportUnknownArgumentType]
+        case _:
+            return None
+
+
 def _is_list_of_scalars(value: Any) -> bool:
-    if not isinstance(value, list):
+    items = _collection_items(value=value)
+    if items is None:
         return False
-    return all(_scalar(item)[0] for item in value)  # pyright: ignore[reportUnknownVariableType]
+    return all(_scalar(item)[0] for item in items)
 
 
 def _joined_scalars(items: list[Any]) -> str:
@@ -214,16 +233,14 @@ def _blocks_for_value(*, value: Any, title: str, path: str, level: int) -> list[
             return _blocks_for_value(value=value.json_obj, title=title, path=path, level=level)
         case ListContent():
             return _blocks_for_list(items=list(value.items), title=title, path=path, level=level)  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
-        case list():
-            return _blocks_for_list(items=list(value), title=title, path=path, level=level)  # pyright: ignore[reportUnknownArgumentType]
+        case list() | tuple() | set() | frozenset():
+            return _blocks_for_list(items=_collection_items(value=value) or [], title=title, path=path, level=level)
         case BaseModel():
             return [SectionBlock(title=title, level=level, blocks=_blocks_for_structure(structure=value, path=path, level=level + 1))]
         case dict():
-            fields: list[LayoutField] = []
-            for key, item in value.items():  # pyright: ignore[reportUnknownVariableType]
-                is_item_scalar, item_scalar = _scalar(item)
-                fields.append(LayoutField(label=humanize(str(key)), value=item_scalar if is_item_scalar else str(item)))  # pyright: ignore[reportUnknownArgumentType]
-            return [SectionBlock(title=title, level=level, blocks=[FieldGridBlock(fields=fields)])]
+            json_object: dict[Any, Any] = value  # pyright: ignore[reportUnknownVariableType]
+            named_values = [(str(key), humanize(str(key)), item) for key, item in json_object.items()]
+            return [SectionBlock(title=title, level=level, blocks=_blocks_for_named_values(named_values=named_values, path=path, level=level + 1))]
         case _:
             return [FieldGridBlock(fields=[LayoutField(label=title, value=str(value))])]
 
@@ -241,21 +258,37 @@ def _blocks_for_list(*, items: list[Any], title: str, path: str, level: int) -> 
     return [SectionBlock(title=title, level=level, blocks=blocks)]
 
 
+def _named_fields(*, structure: BaseModel) -> list[tuple[str, str, Any]]:
+    """A structure's fields as (name, label, value): the declared ones in order, then the public extra ones.
+
+    The extra fields are where `CompositeContent` holds its parts. They are read from `model_extra` and never
+    with getattr, so a part named like a pydantic attribute resolves to the part.
+    """
+    named_fields: list[tuple[str, str, Any]] = []
+    for field_name, field_info in type(structure).model_fields.items():
+        named_fields.append((field_name, field_info.title or humanize(field_name), getattr(structure, field_name)))
+    for field_name, value in (structure.model_extra or {}).items():
+        if not field_name.startswith("_"):
+            named_fields.append((field_name, humanize(field_name), value))
+    return named_fields
+
+
 def _blocks_for_structure(*, structure: BaseModel, path: str, level: int) -> list[LayoutBlock]:
-    """A structure lays out as one grid of its scalar fields, then its other fields in declared order."""
+    return _blocks_for_named_values(named_values=_named_fields(structure=structure), path=path, level=level)
+
+
+def _blocks_for_named_values(*, named_values: list[tuple[str, str, Any]], path: str, level: int) -> list[LayoutBlock]:
+    """Named values, a structure's fields or a JSON object's, lay out as one grid of the scalar ones, then the others in order."""
     grid_fields: list[LayoutField] = []
     other_blocks: list[LayoutBlock] = []
-    for field_name, field_info in type(structure).model_fields.items():
-        value = getattr(structure, field_name)
-        label = field_info.title or humanize(field_name)
-        field_path = f"{path}.{field_name}"
+    for name, label, value in named_values:
         is_scalar, scalar = _scalar(value)
         if is_scalar:
             grid_fields.append(LayoutField(label=label, value=scalar))
         elif _is_list_of_scalars(value):
-            grid_fields.append(LayoutField(label=label, value=_joined_scalars(value)))
+            grid_fields.append(LayoutField(label=label, value=_joined_scalars(_collection_items(value=value) or [])))
         else:
-            other_blocks.extend(_blocks_for_value(value=value, title=label, path=field_path, level=level))
+            other_blocks.extend(_blocks_for_value(value=value, title=label, path=f"{path}.{name}", level=level))
     blocks: list[LayoutBlock] = []
     if grid_fields:
         blocks.append(FieldGridBlock(fields=grid_fields))

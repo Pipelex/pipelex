@@ -19,9 +19,9 @@ With no template, the step lays its inputs out by itself, which is called the au
 
 - the scalar fields of a structure, such as a number, a date or a short text, make a grid of labels and values, labelled from the fields' titles;
 - a list of structures the method declares, whose fields are all flat, makes a table, whose header row repeats on every page;
-- a nested structure makes a section with a heading;
+- a nested structure makes a section with a heading, and so does a nested object of a `JSON` input; a `Composite` lays out its components like a structure's fields;
 - a `Text` input prints as paragraphs, and a [`Markdown`](../../concepts/native-concepts.md) input prints formatted, with its headings, emphasis, lists, tables, code blocks and links;
-- an `Html` input prints as its text with the tags removed, since the auto-layout does not interpret HTML;
+- an `Html` input prints as its text with the tags removed, since the auto-layout does not interpret HTML, a table row on one line with its cells separated by `|`;
 - an `Image` prints as a picture, with its caption;
 - a list of images, of `Markdown` texts or of other native values prints item by item, each as it would print alone.
 
@@ -47,7 +47,7 @@ A step whose engine is not installed is refused **when the method loads**, befor
 PipeDocGen 'render_invoice_xlsx' asks for an xlsx from the auto-layout of its inputs, and no document engine for it is installed in this runtime. It comes with the Pipelex document generation plugin, pipelex-doc-gen.
 ```
 
-An install set up before `reportlab-pdf` existed does not declare it in its `internal.toml`, and its `pdf` steps are refused with an error saying to run `pipelex update`, which refreshes that file from the kit.
+An install set up before `reportlab-pdf` existed declares neither the engine in its `internal.toml` nor its default in the model deck, so a `pdf` step that would print on `reportlab-pdf`, by naming it or by default, is refused with an error saying to run `pipelex update`, which refreshes those files from the kit. A step that prints on the plugin's `pipelex-pdf` is unaffected.
 
 A step that names an engine which does not print its format from its source, such as `reportlab-pdf` with an HTML template, is refused at load as well.
 

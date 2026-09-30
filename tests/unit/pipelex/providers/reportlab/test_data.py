@@ -75,6 +75,9 @@ class ReportlabRendererTestData:
         (datetime.date(2026, 9, 29), "2026-09-29"),
         (datetime.datetime(2026, 9, 29, 14, 5, 59), "2026-09-29 14:05"),
         (datetime.time(9, 7, 30), "09:07"),
+        (datetime.datetime(2026, 9, 29, 14, 5, tzinfo=datetime.UTC), "2026-09-29 14:05 UTC"),
+        (datetime.datetime(2026, 9, 29, 14, 5, tzinfo=datetime.timezone(datetime.timedelta(hours=2))), "2026-09-29 14:05 +02:00"),
+        (datetime.time(9, 7, tzinfo=datetime.timezone(datetime.timedelta(hours=-5, minutes=-30))), "09:07 -05:30"),
         ("As written", "As written"),
     ]
 

@@ -22,7 +22,7 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeSearch`**](./PipeSearch.md): Searches the web using a configurable search provider and returns structured results with an answer and source citations.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
 -   [**`PipeCompose`**](./PipeCompose.md): Composes outputs deterministically from working memory — renders Jinja2 templates for formatted reports or complex prompts, or constructs structured objects by mapping fields from inputs, without an LLM.
--   [**`PipeDocGen`**](./PipeDocGen.md): Generates a document file from its inputs, calling no model: a PDF laid out from a structure or formatted from a Markdown report, and with the Pipelex document generation plugin a PDF from an HTML template, an Excel workbook, a Word document or a PowerPoint deck.
+-   [**`PipeDocGen`**](./PipeDocGen.md): Generates a document file from its inputs, calling no AI model: a PDF laid out from a structure or formatted from a Markdown report, and with the Pipelex document generation plugin a PDF from an HTML template, an Excel workbook, a Word document or a PowerPoint deck.
 
 ## Overview
 
@@ -97,7 +97,7 @@ Generates and manipulates images.
 
 ## PipeDocGen
 
-Generates a document file from its inputs, calling no model.
+Generates a document file from its inputs, calling no AI model.
 
 ### Key Features
 

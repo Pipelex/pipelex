@@ -35,6 +35,17 @@ class TestPipeDocGenTemplateFiles:
 
         assert expected in str(exc_info.value.to_error_report().model_dump())
 
+    @pytest.mark.usefixtures("stub_engines")
+    async def test_an_html_template_file_that_is_not_utf8_is_refused_naming_it(self, tmp_path: Path) -> None:
+        """A template saved in another encoding is refused at load, naming the file, rather than crashing the load."""
+        (tmp_path / "invoice.html").write_bytes("<p>Facture émise</p>".encode("latin-1"))
+        bundle_path = write_bundle(directory=tmp_path, step_fields='format = "pdf"\ntemplate_file = "invoice.html"')
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        assert "could not read the template file 'invoice.html' as UTF-8 text" in str(exc_info.value.to_error_report().model_dump())
+
     async def test_the_engine_s_checker_findings_fail_the_dry_run(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """The dry run hands the checker the file's bytes, the inputs' shapes and the mock data, and an error finding fails it."""
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")

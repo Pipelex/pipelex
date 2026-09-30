@@ -412,8 +412,24 @@ def _is_numeric_column(*, values: list[LayoutScalar]) -> bool:
     return bool(present) and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in present)
 
 
+def _utc_offset_suffix(*, value: datetime.datetime | datetime.time) -> str:
+    """The UTC offset a value states, as ' UTC' or ' +02:00', or nothing for a value that states none."""
+    offset = value.utcoffset()
+    if offset is None:
+        return ""
+    total_minutes = int(offset.total_seconds()) // 60
+    if total_minutes == 0:
+        return " UTC"
+    sign = "+" if total_minutes > 0 else "-"
+    hours, minutes = divmod(abs(total_minutes), 60)
+    return f" {sign}{hours:02d}:{minutes:02d}"
+
+
 def display_scalar(*, value: LayoutScalar) -> str:
-    """A scalar as the document prints it: blank for nothing, Yes or No, numbers plainly, dates and times in ISO order."""
+    """A scalar as the document prints it: blank for nothing, Yes or No, numbers plainly, dates and times in ISO order.
+
+    A time of day prints to the minute, with the UTC offset the value states, if any.
+    """
     match value:
         case None:
             return ""
@@ -426,10 +442,10 @@ def display_scalar(*, value: LayoutScalar) -> str:
                 return str(int(value))
             return format(value, ".15g")
         case datetime.datetime():
-            return value.strftime("%Y-%m-%d %H:%M")
+            return value.strftime("%Y-%m-%d %H:%M") + _utc_offset_suffix(value=value)
         case datetime.date():
             return value.isoformat()
         case datetime.time():
-            return value.strftime("%H:%M")
+            return value.strftime("%H:%M") + _utc_offset_suffix(value=value)
         case str():
             return value

@@ -29,17 +29,25 @@ class DocumentComposition(BaseModel):
     template_name: str | None = Field(default=None, description="The template file as the method names it")
     data: dict[str, Any] = Field(default_factory=dict)
 
+    def _carries_payload_of(self, *, source: DocGenSource) -> bool:
+        match source:
+            case DocGenSource.LAYOUT:
+                return self.layout is not None
+            case DocGenSource.HTML:
+                return self.html is not None
+            case DocGenSource.TEMPLATE_FILE:
+                return self.template_path is not None
+
     @model_validator(mode="after")
     def validate_payload(self) -> Self:
-        match self.source:
-            case DocGenSource.LAYOUT:
-                is_set = self.layout is not None
-            case DocGenSource.HTML:
-                is_set = self.html is not None
-            case DocGenSource.TEMPLATE_FILE:
-                is_set = self.template_path is not None
-        if not is_set:
+        """Exactly the payload its source names, as its `RenderJob` will need, so a wrong composition fails here and not at print."""
+        payloads = {source: self._carries_payload_of(source=source) for source in DocGenSource}
+        if not payloads[self.source]:
             msg = f"A document composed {self.source.desc} carries its payload."
+            raise ValueError(msg)
+        extra_payloads = [str(source) for source, is_set in payloads.items() if is_set and source != self.source]
+        if extra_payloads:
+            msg = f"A document composed {self.source.desc} carries only its own payload, not the {', '.join(extra_payloads)} one."
             raise ValueError(msg)
         return self
 

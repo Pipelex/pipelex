@@ -3,7 +3,8 @@
 An office template is filled by its engine from plain data: a Word template reads `{{ invoice.number }}`
 and an Excel template finds `invoice_number` by name, and neither knows what a stuff is. So a list stuff
 becomes a list, a text stuff its text, a number its number, and a structure a dict of its fields.
-Dates stay dates, so a spreadsheet cell keeps its type.
+Dates stay dates, so a spreadsheet cell keeps its type. That holds for an engine printing in the same process;
+once serialized to JSON, a date is its ISO text.
 """
 
 import datetime
@@ -45,9 +46,12 @@ def plain_data(value: Any) -> Any:
         case JSONContent():
             return value.json_obj
         case BaseModel():
-            return {field_name: plain_data(getattr(value, field_name)) for field_name in type(value).model_fields}
+            return _structure_plain_data(structure=value)
         case list() | tuple():
             return [plain_data(item) for item in value]  # pyright: ignore[reportUnknownVariableType]
+        case set() | frozenset():
+            # A set has no order of its own, so its items are sorted for a document that reads the same on every run.
+            return sorted((plain_data(item) for item in value), key=str)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
         case dict():
             return {str(key): plain_data(item) for key, item in value.items()}  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
         case Enum():
@@ -56,3 +60,18 @@ def plain_data(value: Any) -> Any:
             return float(value)
         case _:
             return value
+
+
+def _structure_plain_data(*, structure: BaseModel) -> dict[str, Any]:
+    """A structure's declared fields, then its public extra fields, which is where `CompositeContent` holds its parts.
+
+    The extra fields are read from `model_extra` and never with getattr, so a part named like a pydantic attribute
+    resolves to the part.
+    """
+    fields: dict[str, Any] = {}
+    for field_name in type(structure).model_fields:
+        fields[field_name] = plain_data(getattr(structure, field_name))
+    for field_name, value in (structure.model_extra or {}).items():
+        if not field_name.startswith("_"):
+            fields[field_name] = plain_data(value)
+    return fields

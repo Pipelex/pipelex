@@ -17,7 +17,7 @@ A step asks for a **format** (`pdf`, `xlsx`, `docx`, `pptx`), and its template d
 
 | The step has | Source | What the engine receives |
 | --- | --- | --- |
-| No template | `layout` | The layout tree of the inputs |
+| No template (a `pdf`, `xlsx` or `docx`; a `pptx` needs a template file) | `layout` | The layout tree of the inputs |
 | An HTML `template` or `.html` `template_file` (a `pdf` only) | `html` | The template rendered against the inputs |
 | An office `template_file` | `template_file` | The file's bytes and the inputs as plain data |
 
@@ -118,7 +118,7 @@ An engine's worker subclasses `DocGenWorkerAbstract` from `pipelex.cogt.doc_gen.
 def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument: ...
 ```
 
-- **`RenderJob`** is plain data, which crosses a process boundary as JSON (the template's bytes as base64): the format and source, the file's name with its suffix, the document's title, and exactly the payload its source names, `layout` (a `LayoutDocument` from `layout_tree.py`), `html`, or `template` with `data`, the inputs as plain data by input name. It carries no Pipelex object, so an ordinary Pipelex release does not break an engine; a change to it, or to the worker, is a change of the plugin contract.
+- **`RenderJob`** is plain data, which Pipelex builds in the print stage from the step's composition and hands to the worker in the same process. It has a JSON round trip for an engine that prints in another process, in which the template's bytes are URL-safe base64 and a date or a time is its ISO text. It holds the format and source, the file's name with its suffix, the document's title, and exactly the payload its source names, `layout` (a `LayoutDocument` from `layout_tree.py`), `html`, or `template` with `data`, the inputs as plain data by input name. It carries no Pipelex object, so an ordinary Pipelex release does not break an engine; a change to it, or to the worker, is a change of the plugin contract.
 - **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way.
 - **`RenderedDocument`** holds the bytes. Their MIME type and suffix are the format's.
 
@@ -134,7 +134,7 @@ An office template names the fields it is filled with in its own way, which Pipe
 def check_template(self, *, request: TemplateCheckRequest) -> list[TemplateFinding]: ...
 ```
 
-The request carries the template file's bytes and name, the shape of each input as an `InputShape` tree (which fields exist, which are lists, and what their items hold), and the dry run's mock inputs as plain data, so the checker can also fill the template in memory. The dry run, and so `pipelex validate`, calls it for every step with a template file: a finding of severity `error` fails the step with `PipeDocGenTemplateCheckError`, listing the findings, and a `warning` is logged. The default finds nothing: Pipelex checks HTML templates itself, against the inputs' concepts, and the built-in engine takes no template.
+The request carries the template file's bytes and name, the shape of each input as an `InputShape` tree (which fields exist, which are lists, and what their items hold), and the dry run's mock inputs as plain data, so the checker can also fill the template in memory. The dry run, and so `pipelex validate`, calls it for every step with an office template file: a finding of severity `error` fails the step with `PipeDocGenTemplateCheckError`, listing the findings, and a `warning` is logged. The default finds nothing. An HTML template, inline or in a `.html` template file, never reaches an engine's checker: Pipelex checks it itself, against the inputs' concepts, when the method loads. The built-in engine takes no template.
 
 ---
 

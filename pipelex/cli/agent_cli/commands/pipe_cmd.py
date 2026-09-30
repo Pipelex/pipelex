@@ -97,6 +97,8 @@ def _add_type_specific_fields(*, pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDo
 
     elif isinstance(pipe_spec, PipeDocGenSpec):
         pipe_table.add("format", str(pipe_spec.format))
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
         if pipe_spec.template is not None:
             pipe_table.add("template", format_toml_string(pipe_spec.template))
         if pipe_spec.template_file is not None:
