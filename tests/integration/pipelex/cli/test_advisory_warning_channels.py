@@ -11,7 +11,7 @@ know which pipes are entry pipes (it holds no `ValidateBundleResult` of its own)
 doubles as the proof that the `acquire_library` load path really does accumulate them.
 
 Two surfaces are deliberately absent. The builder's `validate_all` carries no `warnings` key at all
-and never did — see `wip/full-optional/deferred.md`. And the bare CLI's single-pipe `validate
+and never did (L-260930-3f3167). And the bare CLI's single-pipe `validate
 <PIPE_CODE>` echoes none of them: it makes no bundle-wide claim, and neither lint has anything to say
 about one pipe in isolation (the vacuous lint is scoped to entry pipes, the optionality lint
 aggregates across flows).

@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:883f0529162543b874e242c09eca371228b11470268166edea7690b23ffaaff1"
+digest = "sha256:10a3b527deabf7461808de985a1961fadfafaa59ada33d90cc0ffd53cb2b4034"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-30T07:49:40Z"
-rationale = "config_loader.py now stamps a kit manifest for backends/internal.toml beside the deck's when it installs the global kit, through stamp_kit_manifests. No config model, default or validator changed, so no migration ledger entry is owed; docs/configuration/config-technical/inference-backend-config.md now says internal.toml is managed by pipelex update, lists what the kit declares in it, and documents the plugin-declared document engines."
+reviewed_at = "2026-09-30T15:10:39Z"
+rationale = "clean-pass: merging dev into feature/Render-pdf-local joins two separately acked trigger changes, the kit manifest stamping for backends/internal.toml in config_loader.py (docs updated in inference-backend-config.md) and a docstring-only edit in secrets_config.py; the merge adds no new trigger content and no config model, default or validator changed, so the configuration docs and migration ledgers need nothing further."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -23,5 +23,5 @@ rationale = "config_loader.py now stamps a kit manifest for backends/internal.to
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
 "pipelex/tools/log/log_config.py" = "blob:5b98b3ebe7090fa306cd5253c96812605f0d3dbc"
 "pipelex/tools/network/network_config.py" = "blob:e12d1d0e4a40d04859f10a77addeaf8fe2b00414"
-"pipelex/tools/secrets/secrets_config.py" = "blob:5f23e754ed4c5e76e62ea3a8f88fc885a4062551"
+"pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
 "pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"

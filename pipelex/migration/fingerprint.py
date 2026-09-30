@@ -479,7 +479,7 @@ def _fold_bound(*, collected: dict[ConstraintKind, int | float], other: dict[Con
     correctly means recording bounds per member in the golden; no surface has a union with two
     bound-carrying members today, and the alternative that needs no format change — dropping a kind
     absent from some pool — cannot tell `gt` from `ge` here and would trade this over-report for a
-    silent under-report, which is the worse of the two. See `wip/pr-1113-review-notes.md`.
+    silent under-report, which is the worse of the two.
     """
     for kind, value in other.items():
         existing = collected.get(kind)

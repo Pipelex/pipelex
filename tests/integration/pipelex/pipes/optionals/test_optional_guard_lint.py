@@ -113,7 +113,7 @@ class TestOptionalGuardLint:
         assert wrapped.error_type == PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
 
     def test_presence_branching_idiom_is_accepted(self, load_empty_library: Callable[[], None]):
-        """The design §15 idiom: branch on presence with an `is defined` inline conditional."""
+        """The documented idiom: branch on presence with an `is defined` inline conditional."""
         load_empty_library()
         condition = PipeFactory[PipeCondition].make_from_blueprint(
             domain_code=_DOMAIN_CODE,

@@ -64,6 +64,8 @@ def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
     `MarkdownContent` the native Markdown one, which refines Text (both text-valued, both `prose` in the
     descriptor), `NumberContent` the native Number payload (number-valued). Every other class — the
     remaining natives and registered project classes alike — is not a hint-applicable site.
+    One divergence is open (L-260930-173b03): the deriver reflects a registered `RootModel` over a
+    scalar as its root value, which this lookup still classifies as OTHER.
     """
     native_code = next((code for code in NativeConceptCode if code.structure_class_name == class_name), None)
     match native_code:
@@ -267,9 +269,9 @@ class _HintLinter:
                 return HintSiteValueKind.TEXT_VALUED
             if isinstance(value.structure, str):
                 # Class-backed: a native class name maps by identity to its native's value kind,
-                # mirroring the input-form deriver's judgment for resolvable sites (the known
-                # divergences are recorded in wip/engine-hints/deferred.md). Any other registered
-                # class is an object payload, hence OTHER.
+                # mirroring the input-form deriver's judgment for resolvable sites. Any other
+                # registered class is classified OTHER, though the deriver reflects a `RootModel`
+                # over a scalar as its root value (L-260930-173b03).
                 return _native_class_value_kind(class_name=value.structure)
             return HintSiteValueKind.OTHER
 

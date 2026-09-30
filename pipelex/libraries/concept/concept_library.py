@@ -210,8 +210,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         """Resolve a concept string a **human** supplied — an input payload's `concept` field, a CLI argument.
 
         Entry-shaped lookup, the concept twin of `PipeLibrary.get_optional_entry_pipe` — kept a
-        deliberate near-copy rather than a shared helper (see
-        wip/pipe-refs/entry-affordance-share-vs-duplicate.md). Natives resolve first, per the
+        deliberate near-copy rather than a shared helper: the concept side has steps the pipe side
+        cannot have (natives first, then the scope preference), so a shared helper would carry dead
+        branches. Natives resolve first, per the
         standard's own step 1. A fully-specified ref (`domain.Concept`, `alias->domain.Concept`)
         is a direct hit or a miss. A bare code prefers `search_scope` — the entry pipe's own
         domain, carried as `alias->domain` when the entry pipe came from a dependency package —
