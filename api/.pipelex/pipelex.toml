@@ -139,14 +139,14 @@ uri_format = "{hash}.{extension}"
 uri_format = "{hash}.{extension}"
 bucket_name = ""
 region = ""
-signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
+signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
 
 [runtime.storage.gcp]
 # Google Cloud Storage settings (requires google-cloud-storage: `pip install pipelex[gcp-storage]`)
 uri_format = "{hash}.{extension}"
 bucket_name = ""
 project_id = ""
-signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
+signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
 
 ####################################################################################################
 # Log Config

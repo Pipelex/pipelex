@@ -60,13 +60,13 @@ If the collection does not exist (404), the baseline is empty — you'll create 
 
 ### 2. Discover what changed in the code
 
-Run `git diff main...HEAD --name-only` to see which files changed on the current branch.
-If $ARGUMENTS contains a PR number, use `gh pr diff <number>` instead.
+Run `git diff origin/dev...HEAD --name-only -- api/` to see which of the server's files changed on the current branch. The server lives in the `api/` directory of the pipelex repository, and git prints paths from the repository root, so every path below starts with `api/`.
+If $ARGUMENTS contains a PR number, use `gh pr diff <number> --name-only` instead.
 
 Categorize the changed files:
-- **Route files** (`pipelex_api/routes/**/*.py`, `pipelex_api/main.py`) → endpoints may have been added, removed, or modified
-- **Schema files** (`pipelex_api/schemas/models.py`) → request/response shapes may have changed
-- **Security** (`pipelex_api/security.py`) → auth behavior may have changed
+- **Route files** (`api/pipelex_api/routes/**/*.py`, `api/pipelex_api/main.py`) → endpoints may have been added, removed, or modified
+- **Schema files** (`api/pipelex_api/schemas/models.py`) → request/response shapes may have changed
+- **Security** (`api/pipelex_api/security.py`) → auth behavior may have changed
 - **Other files** → likely no Postman impact
 
 If NO route/schema/security files changed, tell the user "No API changes detected — Postman collection is already up to date" and stop.
@@ -74,10 +74,10 @@ If NO route/schema/security files changed, tell the user "No API changes detecte
 ### 3. Read the changed route files
 
 Only read the route files that actually changed (from step 2). Also read:
-- `pipelex_api/routes/__init__.py` and any `__init__.py` in the hierarchy — to check if routers were added/removed
-- `pipelex_api/main.py` — to check if prefix structure changed
+- `api/pipelex_api/routes/__init__.py` and any `__init__.py` in the hierarchy — to check if routers were added/removed
+- `api/pipelex_api/main.py` — to check if prefix structure changed
 
-Glob `pipelex_api/routes/**/*.py` to detect any **new** route files not yet in Postman.
+Glob `api/pipelex_api/routes/**/*.py` to detect any **new** route files not yet in Postman.
 
 ### 4. Determine what needs to change
 
@@ -102,7 +102,7 @@ Changes to apply:
 Only needed for endpoints that are new or modified.
 
 Check if the API is running: `curl -s http://127.0.0.1:8081/health`
-If not running, start it: `make run` (runs in background) and wait a few seconds.
+If not running, start it: `make -C api run` (runs in background) and wait a few seconds.
 
 Fetch `http://127.0.0.1:8081/openapi.json` to get the ground truth:
 - Exact parameter names and types
@@ -129,7 +129,7 @@ For **unchanged endpoints**, do NOT touch them.
 - Use realistic, meaningful data — never "test", "foo", "bar"
 - All examples must be **self-contained** and **copy-pasteable**
 - Response bodies must match **actual API responses** (from step 6)
-- Read `postman/examples/` for `.mthds` files and `results/pipe-builder/` for real-world examples
+- Read `api/postman/sample-bundles/` for `.mthds` files and their `.inputs.json` companions
 
 #### Pipe type diversity — for endpoints accepting `mthds_contents`:
 1. **PipeLLM** — text analysis, summarization, Q&A
