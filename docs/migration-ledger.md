@@ -505,7 +505,7 @@ Two rules govern how an entry appears, and both exist so that a report is never 
 
 That is a mechanical rule rather than a list of credential-shaped key names, because such a list is a guess that eventually misses one. The single deliberate exception is the backup file, which contains the user's values by definition and is protected by inheriting the source file's mode rather than the process umask.
 
-When migration is reported through a validation error, the error keeps `error_domain: "config"` and gains a structured `migration` block carrying the plan, the remedy and the diagnosis. Consumers branch on the presence of that block, never on wording. Following the workspace convention: the structured fields are the contract, and Markdown, exit codes and HTTP statuses are presentation.
+When migration is reported through a validation error, the error keeps `error_domain: "config"` and gains a structured `migration` block carrying the plan, the remedy and the diagnosis. Consumers branch on the presence of that block, never on wording: the structured fields are the contract, and Markdown, exit codes and HTTP statuses are presentation.
 
 ## The commands
 
@@ -527,7 +527,7 @@ Two commands run a migration, and they are the same run with two audiences.
 
 **Neither command boots.** A broken configuration is the reason to reach for `migrate`, so needing a working one would make it useless in exactly the case it exists for. What a migration may use is the ledger, the applier and the filesystem: no configuration load, no model deck, no credentials, no network. That is a property under test rather than an accident, and the test is what keeps a future import from creeping into the list.
 
-**The structured fields are the contract.** `needs_attention` is the verdict — *this run left something a person has to decide* — and it is deliberately not "did anything get written": a run that migrated every file it found has succeeded, and so has a dry run that found nothing blocked. The exit code (`1` when `needs_attention`, `2` on a contradictory pair of flags) and the rendering are presentation, and follow the workspace convention rather than carrying the verdict.
+**The structured fields are the contract.** `needs_attention` is the verdict — *this run left something a person has to decide* — and it is deliberately not "did anything get written": a run that migrated every file it found has succeeded, and so has a dry run that found nothing blocked. The exit code (`1` when `needs_attention`, `2` on a contradictory pair of flags) and the rendering are presentation, and never carry the verdict.
 
 ## Boot tolerance
 
