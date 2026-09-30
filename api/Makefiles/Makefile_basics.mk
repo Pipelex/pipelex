@@ -5,6 +5,15 @@ endif
 VIRTUAL_ENV := $(CURDIR)/.venv
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
+# This directory is a member of the uv workspace rooted at the repository root, which holds the one
+# `uv.lock`. uv would sync a member into the workspace root's `.venv`, pipelex's own environment, so
+# every uv command here is pointed at this member's own `.venv` instead: the server is tested with
+# exactly the dependencies it declares (pipelex with the server's extras, and without `cli`), and
+# pipelex is installed from the workspace in editable mode, so an edit to the library reaches this
+# environment without a reinstall.
+export UV_PROJECT_ENVIRONMENT := $(VIRTUAL_ENV)
+WORKSPACE_ROOT := $(abspath $(CURDIR)/..)
+
 # The "?" is used to make the variable optional, so that it can be overridden by the user.
 PYTHON_VERSION ?= 3.13
 VENV_PYTHON := $(VIRTUAL_ENV)/bin/python
@@ -16,7 +25,7 @@ VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
 VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
 VENV_PYLINT := $(VIRTUAL_ENV)/bin/pylint
 
-UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
+UV_MIN_VERSION = $(shell grep -m1 'required-version' $(WORKSPACE_ROOT)/pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
 USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or ocr)) and not (needs_output or pipelex_api)"
 
@@ -41,11 +50,9 @@ Manage $(PROJECT_NAME) located in $(CURDIR).
 Usage:
 
 make env                      - Create python virtual env
-make lock                     - Refresh uv.lock without updating anything
+make lock                     - Refresh the workspace uv.lock (at the repository root) without updating anything
 make install                  - Create local virtualenv & install all dependencies
-make update                   - Upgrade dependencies via uv
-make validate                 - Run the setup sequence to validate the config and libraries
-make build                    - Build the wheels
+make build                    - Build the pipelex-api wheel and sdist
 
 make format                   - format with ruff format
 make lint                     - lint with ruff check
@@ -61,7 +68,6 @@ make merge-check-ruff-format  - Run ruff merge check without updating files
 make merge-check-mypy         - Run mypy merge check without updating files
 make merge-check-pyright	  - Run pyright merge check without updating files
 
-make v                        - Shorthand -> validate
 make codex-tests              - Run tests for Codex (exit on first failure) (no inference, no codex_disabled)
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
@@ -86,16 +92,15 @@ make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
 make docs-check               - Check documentation build with mkdocs
-make docs-deploy              - Deploy documentation with mkdocs
 
 make openapi-export           - Export the FastAPI OpenAPI schema to docs/openapi/pipelex-api.openapi.yaml
 make openapi-check            - Fail if the committed OpenAPI artifact drifts from the app
 
-make kit-sync                 - Re-sync the vendored .pipelex/inference/ tree from the installed pipelex kit
-make kit-check                - Fail if the vendored .pipelex/inference/ tree drifts from the installed pipelex kit
+make kit-sync                 - Re-sync the vendored .pipelex/inference/ tree from the pipelex kit of this repository
+make kit-check                - Fail if the vendored .pipelex/inference/ tree drifts from the pipelex kit of this repository
 
-make agent-check              - Run check pipeline, silent on success (for AI agents)
-make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
+make agent-check              - Install, then fix-unused-imports format lint pyright mypy openapi-check kit-check (for AI agents)
+make agent-test               - Install, then run unit tests, silent on success, output on failure (for AI agents)
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -106,16 +111,16 @@ endef
 export HELP
 
 .PHONY: \
-	all help env lock install update build \
+	all help env lock install build \
 	format lint pyright mypy pylint \
 	cleanderived cleanenv cleanall \
 	agent-check agent-test \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-img-gen tg test-ocr to codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc \
+	check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
+	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check \
 	openapi-export openapi-check \
 	kit-sync kit-check \
 	test-count check-test-badge
@@ -151,30 +156,22 @@ env: check-uv
 	fi
 	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(which $$(readlink -f $(VENV_PYTHON)))"
 
+# `uv sync` from this directory syncs this member (pipelex-api) with all of its own extras, and
+# pipelex with the extras the member's dependency names; upgrading dependencies is done for the whole
+# workspace from the repository root.
 install: env
 	$(call PRINT_TITLE,"Installing dependencies")
-	@. $(VIRTUAL_ENV)/bin/activate && \
-	uv sync --all-extras && \
-	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
+	@uv sync --all-extras && \
+	echo "Installed pipelex-api dependencies in ${VIRTUAL_ENV} with all extras.";
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
 	@uv lock && \
 	echo uv lock without update;
 
-update: env
-	$(call PRINT_TITLE,"Updating all dependencies")
-	@uv lock --upgrade && \
-	uv sync --all-extras && \
-	echo "Updated dependencies in ${VIRTUAL_ENV}";
-
-validate: env
-	$(call PRINT_TITLE,"Running setup sequence")
-	$(VENV_PIPELEX) validate all -c api/pipelex/libraries
-
 build: env
-	$(call PRINT_TITLE,"Building the wheels")
-	@uv build
+	$(call PRINT_TITLE,"Building the pipelex-api wheel and sdist")
+	@uv build --package pipelex-api
 
 ##############################################################################################
 ############################      Cleaning                        ############################
@@ -196,9 +193,8 @@ cleanderived:
 
 cleanenv:
 	$(call PRINT_TITLE,"Erasing virtual environment")
-	find . -name 'uv.lock' -delete && \
-	find . -type d -wholename './.venv' -exec rm -rf {} + && \
-	echo "Cleaned up virtual env and dependency lock files";
+	rm -rf "$(VIRTUAL_ENV)" && \
+	echo "Cleaned up virtual env";
 
 cleanall: cleanderived cleanenv
 	@echo "Cleaned up all derived files and directories";
@@ -350,7 +346,7 @@ mypy: env
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	$(VENV_PYLINT) --rcfile pyproject.toml api tests
+	$(VENV_PYLINT) --rcfile pyproject.toml pipelex_api tests
 
 
 ##########################################################################################
@@ -381,9 +377,9 @@ merge-check-pylint: env
 ### RUN API
 ##########################################################################################
 
-run: env
+run: install
 	$(call PRINT_TITLE,"Running API server with uvicorn")
-	$(VIRTUAL_ENV)/bin/uvicorn api.main:app --reload --log-level debug --port 8081
+	$(VIRTUAL_ENV)/bin/uvicorn pipelex_api.main:app --reload --log-level debug --port 8081
 
 ##########################################################################################
 ### MISCELLANEOUS
@@ -409,10 +405,14 @@ check-TODOs: env
 ### SHORTHANDS
 ##########################################################################################
 
-agent-check: fix-unused-imports format lint pyright mypy
+# The drift gates ride along, so a pipelex change that moves the server's wire or the kit fails here,
+# in the same change: the OpenAPI artifact and the vendored inference tree both follow the pipelex of
+# this commit. `install` comes first because both gates, like the type checkers, must see the
+# environment the lock describes, and it makes a fresh worktree's first run provision itself.
+agent-check: install fix-unused-imports format lint pyright mypy openapi-check kit-check
 	@echo "> done: agent-check"
 
-agent-test: env
+agent-test: install
 	@echo "• Running unit tests..."
 	@tmpfile=$$(mktemp); \
 	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; \
@@ -431,9 +431,6 @@ cc: cleanderived c
 check: cc check-unused-imports pylint openapi-check kit-check
 	@echo "> done: check"
 
-v: validate
-	@echo "> done: v = validate"
-
 li: lock install
 	@echo "> done: lock install"
 
@@ -449,9 +446,6 @@ docs-check: env
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
 	$(VENV_MKDOCS) build --strict
 
-docs-deploy: env
-	$(call PRINT_TITLE,"Deploying documentation with mkdocs")
-	$(VENV_MKDOCS) gh-deploy --force --clean
 
 ##########################################################################################
 ### OPENAPI ARTIFACT
@@ -462,9 +456,10 @@ OPENAPI_ARTIFACT := docs/openapi/pipelex-api.openapi.yaml
 # These depend on `install` (not `env`) on purpose: `env` only ensures the venv
 # directory exists, it never runs `uv sync`. The schema is generated from whatever
 # is actually installed in .venv, so without a sync the export/check validates the
-# committed artifact against a drifted venv (e.g. a stale or editable pipelex) and
-# silently passes while CI — which runs `make install` (uv sync from the lock) first —
-# sees the real drift. Depending on `install` makes the local result match CI.
+# committed artifact against a drifted venv and silently passes while CI — which runs
+# `make install` (uv sync from the lock) first — sees the real drift. pipelex itself
+# is an editable install from the workspace, so its models reach the artifact as soon
+# as they change, and `openapi-check` in `agent-check` fails the change that moved them.
 openapi-export: install
 	$(call PRINT_TITLE,"Exporting OpenAPI schema to $(OPENAPI_ARTIFACT)")
 	$(VENV_PYTHON) scripts/export_openapi.py $(OPENAPI_ARTIFACT)
@@ -480,14 +475,15 @@ openapi-check: install
 VENDORED_CONFIG_DIR := .pipelex
 
 # The image serves the models `.pipelex/inference/` declares, and pipelex never reads its own
-# wheel's kit once that tree exists, so a pin bump moves nothing until `kit-sync` runs. The rules
-# (what is mirrored, what stays this image's own choice) are in scripts/sync_vendored_kit.py.
-# Like the OpenAPI targets, these depend on `install` so they compare against the pipelex the lock
-# pins, not whatever the venv last had.
+# package's kit once that tree exists, so a kit change reaches the server only when this tree moves
+# with it. The root `make up-kit-configs` (`ukc`), the step a kit change already takes, runs the same
+# sync, and `kit-check` in `agent-check` fails a change that left the tree behind. The rules (what is
+# mirrored, what stays this image's own choice) are in scripts/sync_vendored_kit.py, and the reason
+# the tree stays committed rather than generated when the image is built is in CLAUDE.md.
 kit-sync: install
-	$(call PRINT_TITLE,"Re-syncing $(VENDORED_CONFIG_DIR)/inference/ from the installed pipelex kit")
+	$(call PRINT_TITLE,"Re-syncing $(VENDORED_CONFIG_DIR)/inference/ from the pipelex kit")
 	$(VENV_PYTHON) scripts/sync_vendored_kit.py $(VENDORED_CONFIG_DIR)
 
 kit-check: install
-	$(call PRINT_TITLE,"Checking $(VENDORED_CONFIG_DIR)/inference/ against the installed pipelex kit")
+	$(call PRINT_TITLE,"Checking $(VENDORED_CONFIG_DIR)/inference/ against the pipelex kit")
 	$(VENV_PYTHON) scripts/sync_vendored_kit.py --check $(VENDORED_CONFIG_DIR)

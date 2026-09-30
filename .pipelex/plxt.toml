@@ -24,6 +24,10 @@ exclude = [
   "node_modules/**",
   ".git/**",
   "*.lock",
+  # The `api/` workspace member: its vendored inference files are kept byte-identical to the kit by its
+  # own sync, which a reformat here would read as drift, and its sample bundles include deliberately
+  # invalid ones.
+  "api/**",
   # The MTHDS Test Corpus's schema-fault entries, and ONLY those. Every other deliberately invalid
   # entry is linted like any other .mthds file in this repo: its fault needs the runtime to notice,
   # so the schema has nothing to say about it and a clean lint is the correct outcome. The two below

@@ -5,6 +5,8 @@ description = "Pipelex API"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license = "Elastic-2.0"
+# A copy of the repository's `LICENSE`: a distribution can only carry license files from inside its own
+# directory, and a symlink would dangle in the sdist. `tests/unit/test_license_copy.py` keeps the two equal.
 license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
@@ -18,6 +20,11 @@ classifiers = [
 dependencies = [
   # The extras deliberately leave out `cli`: the runner selects the `json` log sink and a Rich-free
   # pretty-print mode, so nothing it does on a request renders a terminal.
+  #
+  # pipelex resolves from this repository's workspace (`[tool.uv.sources]` below), so the server always
+  # runs the library of the same commit. The exact version stays because it is what the published
+  # `pipelex-api` wheel declares: the two ship in lockstep under one version, and `uv lock` refuses a
+  # root version the pin no longer names, so a release moves both together.
   "pipelex[mistralai,anthropic,google,google-genai,bedrock,fal]==0.70.0",
   "fastapi>=0.118.0",
   "pyjwt>=2.10.1",
@@ -30,9 +37,9 @@ build-backend = "hatchling.build"
 
 [project.urls]
 Homepage = "https://pipelex.com"
-Repository = "https://github.com/Pipelex/pipelex-api"
+Repository = "https://github.com/Pipelex/pipelex"
 Documentation = "https://docs.pipelex.com/pages/api/"
-Changelog = "https://github.com/Pipelex/pipelex-api/blob/main/CHANGELOG.md"
+Changelog = "https://docs.pipelex.com/changelog/"
 
 [project.optional-dependencies]
 dev = [
@@ -63,27 +70,32 @@ dev = [
   "types-PyYAML>=6.0.12.20250326",
   "types-toml>=0.10.8.20240310",
 ]
+# One lock resolves every workspace member's extras together, so these floors follow pipelex's own `docs`
+# extra rather than pinning versions of their own.
 docs = [
-  "mkdocs==1.6.1",
-  "mkdocs-glightbox==0.4.0",
-  "mkdocs-material==9.6.14",
-  "mkdocs-meta-manager==1.1.0",
+  "mkdocs>=1.6.1",
+  "mkdocs-glightbox>=0.4.0",
+  "mkdocs-material>=9.7.7",
+  "mkdocs-meta-manager>=1.1.0",
 ]
 
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["api"]
+packages = ["pipelex_api"]
 
-[tool.uv]
-required-version = ">=0.7.2"
+[tool.hatch.build.targets.sdist]
+packages = ["pipelex_api"]
+
+[tool.uv.sources]
+pipelex = { workspace = true }
 
 [tool.mypy]
 check_untyped_defs = true
 exclude = "^.*\\.venv/.*$"
 mypy_path = "."
-packages = ["api", "tests"]
+packages = ["pipelex_api", "tests"]
 plugins = ["pydantic.mypy"]
 python_version = "3.11"
 warn_return_any = true
@@ -91,13 +103,13 @@ warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = ["api", "tests"]
+module = ["pipelex_api", "tests"]
 
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.11"
-include = ["api", "tests"]
+include = ["pipelex_api", "tests"]
 exclude = [
   "**/__pycache__",
   ".venv",
@@ -206,7 +218,7 @@ minversion = "8.0"
 xfail_strict = true
 
 [tool.coverage.run]
-source = ["api"]
+source = ["pipelex_api"]
 omit = ["tests/*", "**/__init__.py"]
 
 [tool.coverage.report]
@@ -247,6 +259,8 @@ ignore = [
   "ASYNC230", # Async functions should not open files with blocking methods like `open`
 
   "C901",   # Is to complex
+
+  "CPY001", # Missing copyright notice at top of file: the repository's LICENSE covers every file, as in pipelex
   "COM812", # Checks for the absence of trailing commas.
 
   "D100", # Missing docstring in public module

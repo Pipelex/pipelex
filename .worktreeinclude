@@ -7,3 +7,7 @@
 .pipelex/inference/routing_profiles_override.toml
 .pipelex/pipelex_service.toml
 .pipelex-dev/test_profiles_override.toml
+# The api/ server (a workspace member) keeps its own .env and Pipelex overrides.
+api/.env
+api/.pipelex/pipelex_override.toml
+api/.pipelex/telemetry_override.toml
