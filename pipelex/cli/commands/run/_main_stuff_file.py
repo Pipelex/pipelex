@@ -38,15 +38,18 @@ def _free_target_path(*, output_dir: Path, name: str, reserved_names: frozenset[
     """`name` in `output_dir`, or a numbered variant of it when a file of that name is there or the run writes one later.
 
     The results folder already holds the run's own artifacts, such as `main_stuff.json`, when the file is copied, and
-    a Document passed through from an earlier run can bear one of their names. Names compare without case, as they do
-    on a case-insensitive file system.
+    a Document passed through from an earlier run can bear one of their names. Names compare without case, the files
+    already there included, so the folder gets the same names on a case-sensitive file system as on a case-insensitive
+    one, where `MAIN_STUFF.json` would overwrite `main_stuff.json`.
     """
-    reserved = {reserved_name.casefold() for reserved_name in reserved_names}
+    taken = {reserved_name.casefold() for reserved_name in reserved_names}
+    if output_dir.is_dir():
+        taken.update(existing_path.name.casefold() for existing_path in output_dir.iterdir())
     stem = PurePosixPath(name).stem
     suffix = PurePosixPath(name).suffix
     target_path = output_dir / name
     index = 1
-    while target_path.name.casefold() in reserved or target_path.exists():
+    while target_path.name.casefold() in taken:
         target_path = output_dir / f"{stem}-{index}{suffix}"
         index += 1
     return target_path

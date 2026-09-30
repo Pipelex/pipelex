@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:12eaa0b5402c7690e66064ee25083d20e8b0237d521d86c6cf32c648c7e7cc1e"
+digest = "sha256:edfad164dcb9959a90b014f8779348db0d43a1caaa23efa75b3eea3503b6f3ab"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-30T11:53:34Z"
-rationale = "Review fixes on the CLI: the PipeDocGen spec's model now reaches the agent pipe TOML (no doc names the fields it renders), the main output's file keeps an image's filename and never replaces an artifact of the run, which docs/tools/cli/run.md now says, and the run recap escapes its paths. The agent CLI's CLAUDE.md names none of these behaviours."
+reviewed_at = "2026-09-30T16:40:04Z"
+rationale = "clean-pass: the main-output file copy now compares the names already in the results folder without case on every file system, which the CI failure on Linux exposed; docs/tools/cli/run.md already states the rule (a taken name gets a -1 suffix) and the agent CLI CLAUDE.md names none of this behaviour, so no doc change is needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -111,7 +111,7 @@ rationale = "Review fixes on the CLI: the PipeDocGen spec's model now reaches th
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:dde781f846968b667a0acfb4b3e3cea01cef7049"
 "pipelex/cli/commands/run/_inputs_path_resolver.py" = "blob:c8ec89d98718e18af7aaaded44c9f545be60adab"
-"pipelex/cli/commands/run/_main_stuff_file.py" = "blob:cb83c0e0ae4b79bb47218a6e96765751ca4e5101"
+"pipelex/cli/commands/run/_main_stuff_file.py" = "blob:ca806e55085aa2e5748492751521296ce1f42960"
 "pipelex/cli/commands/run/_run_core.py" = "blob:12958ebb9bc89fec6f0e6faf0b79d031091f02b3"
 "pipelex/cli/commands/run/app.py" = "blob:a7090b0ff6bf2f1d47827fa27d2a138096a2e148"
 "pipelex/cli/commands/run/bundle_cmd.py" = "blob:cb420bf4879c863d64c5e20ed535c42732b720a2"
