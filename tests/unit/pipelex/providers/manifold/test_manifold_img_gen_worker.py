@@ -23,6 +23,7 @@ from portkey_ai.api_resources import exceptions as portkey_exc
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.providers.manifold.manifold_img_gen_worker import ManifoldImgGenWorker
+from tests.unit.pipelex.providers.manifold.test_data import ManifoldMetadataTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -62,6 +63,7 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     job = mocker.MagicMock()
     job.img_gen_prompt.positive_text = "a manifold, rendered"
     job.job_report.img_gen_tokens_usage = None
+    job.job_metadata = ManifoldMetadataTestData.JOB_METADATA
     return job
 
 

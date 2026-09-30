@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`x-pipelex-metadata` header on Pipelex Manifold calls**: every inference request the Manifold backend makes (chat completions, responses, image generation, extraction, search, and Claude over the Anthropic SDK) carries one JSON header holding the run's `extras` as they are, plus the run's `user_id` and `pipeline_run_id` and the step's `pipe_run_id`, `pipe_code` and `content_generation_job_id` when set, so the service can attribute each call's spend and log it. On a key collision the run's own id wins over the extras entry, and no other backend receives the header.
+
 ## [v0.70.0] - 2026-09-29
 
 ### Highlights

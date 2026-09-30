@@ -24,6 +24,7 @@ from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.providers.manifold.manifold_constants import MANIFOLD_API_VERSION_SEGMENT, MANIFOLD_AUTH_HEADER
 from pipelex.providers.manifold.manifold_exceptions import ManifoldCredentialsError, ManifoldEndpointError
+from pipelex.providers.manifold.manifold_metadata import make_manifold_metadata_headers
 
 if TYPE_CHECKING:
     from portkey_ai import AsyncPortkey
@@ -135,6 +136,10 @@ class ManifoldFactory:
     ) -> tuple[dict[str, str], dict[str, Any]]:
         """The per-request headers and body additions.
 
+        The headers always include `x-pipelex-metadata`, naming the run and the step this call
+        serves (see `manifold_metadata`). It is built here, per request, because it differs per job:
+        the token is a client default, this is not.
+
         `output_desc` is part of the shared factory signature and is unused on this path: it exists
         for the Portkey-path tracing header that names the job, and the manifold dialect sends no
         tracing headers in the beta.
@@ -147,6 +152,8 @@ class ManifoldFactory:
             # None of these is routing: the service refuses any client header that tries to choose a
             # provider, and passes the rest through to whichever one it picked.
             extra_headers.update(inference_model.extra_headers)
+        # After the catalog's headers, so a catalog entry cannot restate whose call this is.
+        extra_headers.update(make_manifold_metadata_headers(job_metadata=inference_job.job_metadata))
 
         if isinstance(inference_job, LLMJob) and inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
             # Mistral models really want a non-null seed.

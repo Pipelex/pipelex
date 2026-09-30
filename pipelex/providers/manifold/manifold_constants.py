@@ -1,4 +1,4 @@
-"""The manifold dialect's names: its sdk set, its one wire header, and its route paths.
+"""The manifold dialect's names: its sdk set, its two wire headers, and its route paths.
 
 Everything the manifold plugin needs to name is named here rather than imported from
 ``providers/portkey/`` or ``providers/gateway/``. The duplication is deliberate — it is the
@@ -19,6 +19,15 @@ from enum import StrEnum
 # shared Anthropic driver reads it from the backend's `auth_header` field, so the value in
 # `backends.toml` must spell it exactly as this constant does.
 MANIFOLD_AUTH_HEADER = "x-pipelex-api-key"
+
+# The header that says whose call this is, sent on every request beside the token.
+#
+# Its value is a flat JSON object of string to string: the run's opaque `extras` and the runtime's
+# own ids for the run and the step (see `manifold_metadata`). It differs per job, so unlike the token
+# it is never a client default: every path adds it per request. The vendor spelling of the same idea,
+# `x-portkey-metadata`, is never sent — the gateway reads this name, and the dialect speaks none of
+# the vendor's vocabulary it does not have to.
+MANIFOLD_METADATA_HEADER = "x-pipelex-metadata"
 
 # The gateway's response headers are named in `cogt/inference/error_classification.py`, not here.
 # `MANIFOLD_TRACE_ID_HEADER` and `MANIFOLD_VENDOR_TRACE_ID_HEADER` are the two spellings it stamps
