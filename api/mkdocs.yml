@@ -1,0 +1,121 @@
+site_name: Pipelex API Documentation
+
+site_url: https://pipelex.github.io/pipelex-api/
+site_description: "Official API documentation for Pipelex - REST API for executing Pipelex pipelines and validating MTHDS files"
+docs_dir: docs
+repo_url: "https://github.com/Pipelex/pipelex-api"
+repo_name: "Pipelex API on GitHub"
+
+# `CONTRIBUTING.md` lives at the repo root and is snippet-included into
+# `docs/contributing.md`. Its links (e.g. `docs/configuration.md`) are
+# authored to work from the repo root on GitHub; from mkdocs' perspective
+# the included content sits inside `docs/` and the same relative paths
+# can't resolve. Downgrade these specific link checks from `warn`
+# (which `mkdocs build --strict` treats as fatal) to `info` so we keep
+# the human-friendly GitHub links without the build failing.
+validation:
+  links:
+    not_found: info
+    unrecognized_links: info
+
+theme:
+  name: material
+  favicon: https://pipelex-web.s3.amazonaws.com/logo/pipelex-favicon-32.png
+  logo: https://pipelex-web.s3.amazonaws.com/logo/Pipelex-logo-wot-mono-560x176.png
+  features:
+    - navigation.footer
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+  palette:
+    - scheme: default
+      primary: teal
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+copyright: "© 2025-2026 Evotis S.A.S. <br/>Pipelex is a trademark of Evotis S.A.S."
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Pipelex/pipelex
+      name: Pipelex on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/pipelex/
+      name: pipelex on PyPI
+    - icon: fontawesome/brands/twitter
+      link: https://x.com/PipelexAI
+      name: Pipelex on X
+    - icon: fontawesome/brands/discord
+      link: https://go.pipelex.com/discord
+      name: Pipelex on Discord
+  generator: false
+
+plugins:
+  - search
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: 100%
+      height: auto
+      zoomable: true
+      draggable: true
+      auto_caption: false
+      caption_position: bottom
+
+markdown_extensions:
+  - meta
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      base_path: .
+  - admonition
+  - pymdownx.details
+
+extra_css:
+  - stylesheets/mermaid.css
+  - stylesheets/general.css
+  
+nav:
+  - Home: https://docs.pipelex.com/
+  - API:
+    - Overview: index.md
+    - Configuration: configuration.md
+    - Pipe Builder: pipe-builder.md
+    - Pipe Run: pipe-run.md
+    - Pipe Validate: pipe-validate.md
+    - Pipe I/O: pipe-io.md
+    - Resolve & Codegen: codegen.md
+    - MTHDS Tools: mthds-tools.md
+    - Storage Transport: storage-transport.md
+    - Error Responses: error-responses.md
+    - Logging: logging.md
+    - Contribute:
+      - Contributing: contributing.md
+      - Code of Conduct: CODE_OF_CONDUCT.md
+      - License: license.md
+    - Changelog: changelog.md
+  - n8n: https://pipelex.github.io/n8n-nodes-pipelex/
+  - Contribute: https://docs.pipelex.com/pages/contributing/
+  - Changelog: https://docs.pipelex.com/pages/changelog/

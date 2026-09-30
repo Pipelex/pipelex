@@ -1,0 +1,75 @@
+/* ===== Pipelex Docs – globals.css (final & minimal) ===== */
+
+/* Brand colors */
+:root {
+  --md-accent-fg-color: #45BF9F;
+  --md-primary-fg-color: #45BF9F;
+  --md-primary-fg-color--light: #6CD4B6;
+  --md-primary-fg-color--dark: #2E9A7F;
+}
+
+/* Utilities */
+.equal-width { width: 100%; max-width: 300px; display: inline-block; }
+pre code { white-space: pre-wrap !important; word-wrap: break-word; overflow-wrap: break-word; }
+
+/* --- Sidebar nav --- */
+
+/* Ensure all link and label elements have no shadow */
+.md-nav__link,
+label.md-nav__link {
+  box-shadow: none !important;
+}
+
+/* 1) Baseline: non-active links = light grey (declare ONCE) */
+.md-nav--primary .md-nav__link:not(.md-nav__link--active) {
+  color: rgba(0, 0, 0, 0.6) !important;
+}
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link:not(.md-nav__link--active) {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* 2) TOP-LEVEL SECTION HEADERS ONLY (dark & bold)
+      Works across Material versions:
+      - first-level <li> that contains a child <nav>
+      - OR first-level <li> that contains the toggle input
+      - OR items explicitly marked as section by Material */
+.md-sidebar__inner nav.md-nav--primary > ul.md-nav__list
+  > li.md-nav__item:has(> nav) > label.md-nav__link,
+.md-sidebar__inner nav.md-nav--primary > ul.md-nav__list
+  > li.md-nav__item:has(> input.md-nav__toggle) > label.md-nav__link,
+.md-nav--primary .md-nav__item.md-nav__item--section > label.md-nav__link {
+  color: #000 !important;
+  font-weight: 700 !important;
+}
+[data-md-color-scheme="slate"] .md-sidebar__inner nav.md-nav--primary > ul.md-nav__list
+  > li.md-nav__item:has(> nav) > label.md-nav__link,
+[data-md-color-scheme="slate"] .md-sidebar__inner nav.md-nav--primary > ul.md-nav__list
+  > li.md-nav__item:has(> input.md-nav__toggle) > label.md-nav__link,
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__item.md-nav__item--section > label.md-nav__link {
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+/* Constant, small pill padding on ALL items (links + labels) */
+.md-nav--primary .md-nav__link,
+.md-nav--primary label.md-nav__link {
+  padding: 6px 10px;      /* tighter than before */
+  margin: 0px 0px;
+  border-radius: 10px;   /* softer, not huge */
+  box-sizing: border-box;
+  transition: background-color 120ms ease, color 120ms ease; /* color only, no layout props */
+}
+
+/* Hover: color only (no padding/radius changes) */
+.md-nav--primary a.md-nav__link:not(.md-nav__link--active):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+[data-md-color-scheme="default"] .md-nav--primary a.md-nav__link:not(.md-nav__link--active):hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Active: color only (no padding/radius changes) */
+.md-nav--primary .md-nav__link--active {
+  color: #45BF9F !important;
+  font-weight: 700 !important;
+  background-color: rgba(69, 191, 159, 0.12) !important;
+}

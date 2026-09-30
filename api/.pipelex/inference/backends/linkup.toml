@@ -1,0 +1,49 @@
+################################################################################
+# Linkup Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Linkup search models.
+# Linkup provides web search capabilities with sourced answers and structured
+# data extraction.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "search"
+sdk = "linkup"
+thinking_mode = "none"
+
+################################################################################
+# SEARCH MODELS
+################################################################################
+
+["linkup-standard"]
+model_id = "standard"
+inputs = ["text"]
+outputs = ["sourced-answers", "structured"]
+costs = { input = 0.005, output = 0 }
+
+["linkup-deep"]
+model_id = "deep"
+inputs = ["text"]
+outputs = ["sourced-answers", "structured"]
+costs = { input = 0.05, output = 0 }
+
+################################################################################
+# FETCH / EXTRACT MODELS
+################################################################################
+
+["linkup-fetch"]
+model_type = "text_extractor"
+sdk = "linkup_fetch"
+model_id = "fetch"
+inputs = ["web_page"]
+outputs = ["pages"]
+costs = { input = 0.005, output = 0 }

@@ -1,0 +1,10 @@
+domain      = "hello_greeting"
+description = "Minimal runnable method — turn a name into a short greeting"
+main_pipe   = "write_greeting"
+
+[pipe.write_greeting]
+type        = "PipeLLM"
+description = "Write a short, friendly greeting for the given name"
+inputs      = { name = "Text" }
+output      = "Text"
+prompt      = "Write a short, friendly one-sentence greeting for $name."

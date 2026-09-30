@@ -1,0 +1,4 @@
+# Read only by `wt` — the grammar is the workspace's docs/workspace/worktrees.md, "What a repo declares".
+
+# `install` is defined in Makefiles/Makefile_basics.mk, which wt's probe of the root Makefile does not see.
+install = "make install"

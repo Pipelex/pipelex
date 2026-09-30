@@ -1,0 +1,32 @@
+domain = "cv_job_match"
+description = "Analyze the match between a candidate CV and a job offer."
+main_pipe = "analyze_cv_job_match"
+
+[concept.MatchAnalysis]
+description = "Structured assessment of how well a candidate CV matches a job offer."
+
+[concept.MatchAnalysis.structure]
+is_match = { type = "boolean", description = "Whether the candidate is a good match for the job", required = true }
+match_score = { type = "integer", description = "Score from 0 to 100 indicating how well the CV matches the job offer", required = true }
+key_strengths = { type = "text", description = "Candidate strengths relevant to the job requirements", required = true }
+gaps = { type = "text", description = "Notable gaps or missing qualifications", required = true }
+recommendation = { type = "text", description = "Final recommendation: proceed to interview, reject, or further review", required = true }
+
+[pipe.analyze_cv_job_match]
+type = "PipeLLM"
+description = "Analyze a CV against a job offer and produce a structured match assessment."
+inputs = { cv_text = "Text", job_offer_text = "Text" }
+output = "MatchAnalysis"
+model = "$writing-factual"
+system_prompt = """
+You are a senior HR expert with 20+ years of recruitment experience. Your task is to objectively assess how well a candidate's CV matches a given job offer. Be thorough, fair, and data-driven. A candidate with a score >= 60 who meets the core requirements should be considered a match.
+"""
+prompt = """
+Analyze the following CV against the job offer and produce a structured match analysis.
+
+## Candidate CV
+@cv_text
+
+## Job Offer
+@job_offer_text
+"""

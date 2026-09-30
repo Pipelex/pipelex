@@ -1,0 +1,146 @@
+domain        = "batch_candidate_screening"
+description   = "Analyzing Candidate Profiles and job offer compatibility and generating interview questions"
+system_prompt = "None"
+main_pipe     = "batch_analyze_cvs_for_job_offer"
+
+[concept.CandidateProfile]
+description = "A structured summary of a job candidate's professional background extracted from their CV."
+
+[concept.CandidateProfile.structure]
+skills       = { type = "text", description = "Technical and soft skills possessed by the candidate", required = true }
+experience   = { type = "text", description = "Work history and professional experience", required = true }
+education    = { type = "text", description = "Educational background and qualifications", required = true }
+achievements = { type = "text", description = "Notable accomplishments and certifications" }
+
+[concept.JobRequirements]
+description = "A structured summary of what a job position requires from candidates."
+
+[concept.JobRequirements.structure]
+required_skills  = { type = "text", description = "Skills that are mandatory for the position", required = true }
+responsibilities = { type = "text", description = "Main duties and tasks of the role", required = true }
+qualifications   = { type = "text", description = "Required education, certifications, or experience levels", required = true }
+nice_to_haves    = { type = "text", description = "Preferred but not mandatory qualifications" }
+
+[concept.CandidateMatch]
+description = "An evaluation of how well a candidate fits a job position."
+
+[concept.CandidateMatch.structure]
+match_score        = { type = "number", description = "Numerical score representing overall fit percentage between 0 and 100", required = true }
+strengths          = { type = "text", description = "Areas where the candidate meets or exceeds requirements", required = true }
+gaps               = { type = "text", description = "Areas where the candidate falls short of requirements", required = true }
+overall_assessment = { type = "text", description = "Summary evaluation of the candidate's suitability", required = true }
+
+[pipe.batch_analyze_cvs_for_job_offer]
+type = "PipeSequence"
+description = """
+Main orchestrator pipe that takes a bunch of CVs and a job offer in PDF format, and analyzes how they match.
+"""
+inputs = { cvs = "Document[]", job_offer_pdf = "Document" }
+output = "CandidateMatch[]"
+steps = [
+  { pipe = "prepare_job_offer", result = "job_requirements" },
+  { pipe = "process_cv", batch_over = "cvs", batch_as = "cv_pdf", result = "match_analyses" },
+]
+
+[pipe.prepare_job_offer]
+type = "PipeSequence"
+description = """
+Extracts the job offer PDF and analyzes it into structured job requirements.
+"""
+inputs = { job_offer_pdf = "Document" }
+output = "JobRequirements"
+steps = [
+  { pipe = "extract_one_job_offer", result = "job_offer_pages" },
+  { pipe = "analyze_job_requirements", result = "job_requirements" },
+]
+
+[pipe.extract_one_job_offer]
+type        = "PipeExtract"
+description = "Extracts text content from the job offer PDF document"
+inputs      = { job_offer_pdf = "Document" }
+output      = "Page[]"
+model       = "@default-extract-document"
+
+[pipe.analyze_job_requirements]
+type = "PipeLLM"
+description = """
+Parses and summarizes the job requirements from the extracted job offer content, identifying required skills, responsibilities, qualifications, and nice-to-haves
+"""
+inputs = { job_offer_pages = "Page" }
+output = "JobRequirements"
+model = "$writing-factual"
+system_prompt = """
+You are an expert HR analyst specializing in parsing job descriptions. Your task is to extract and summarize job requirements into a structured format.
+"""
+prompt = """
+Analyze the following job offer content and extract the key requirements for the position.
+
+@job_offer_pages
+"""
+
+[pipe.process_cv]
+type = "PipeSequence"
+description = "Processes one application"
+inputs = { cv_pdf = "Document", job_requirements = "JobRequirements" }
+output = "CandidateMatch"
+steps = [
+  { pipe = "extract_one_cv", result = "cv_pages" },
+  { pipe = "analyze_one_cv", result = "candidate_profile" },
+  { pipe = "search_candidate_online", result = "online_info" },
+  { pipe = "analyze_match", result = "match_analysis" },
+]
+
+[pipe.extract_one_cv]
+type        = "PipeExtract"
+description = "Extracts text content from the CV PDF document"
+inputs      = { cv_pdf = "Document" }
+output      = "Page[]"
+model       = "@default-extract-document"
+
+[pipe.analyze_one_cv]
+type = "PipeLLM"
+description = """
+Parses and summarizes the candidate's professional profile from the extracted CV content, identifying skills, experience, education, and achievements
+"""
+inputs = { cv_pages = "Page" }
+output = "CandidateProfile"
+model = "$writing-factual"
+system_prompt = """
+You are an expert HR analyst specializing in parsing and summarizing candidate CVs. Your task is to extract and structure the candidate's professional profile into a structured format.
+"""
+prompt = """
+Analyze the following CV content and extract the candidate's professional profile.
+
+@cv_pages
+"""
+
+[pipe.search_candidate_online]
+type        = "PipeSearch"
+description = "Searches the web for relevant professional information about the candidate based on their profile"
+inputs      = { candidate_profile = "CandidateProfile" }
+output      = "SearchResult"
+model       = "$standard"
+prompt      = "Professional background and online presence of $candidate_profile.skills $candidate_profile.experience"
+
+[pipe.analyze_match]
+type = "PipeLLM"
+description = """
+Evaluates how well the candidate matches the job requirements, calculating a match score and identifying strengths and gaps
+"""
+inputs = { candidate_profile = "CandidateProfile", job_requirements = "JobRequirements", online_info = "SearchResult" }
+output = "CandidateMatch"
+model = "$writing-factual"
+system_prompt = """
+You are an expert HR analyst specializing in candidate-job fit evaluation. Your task is to produce a structured match analysis comparing a candidate's profile against job requirements, enriched with information found online about the candidate.
+"""
+prompt = """
+Analyze how well the candidate matches the job requirements. Evaluate their fit by comparing their skills, experience, and qualifications against what the position demands. Also consider the following online research about the candidate:
+
+@online_info
+
+@candidate_profile
+
+@job_requirements
+
+Provide a comprehensive match analysis including a numerical score, identified strengths, gaps, and an overall assessment.
+"""

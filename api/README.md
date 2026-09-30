@@ -1,0 +1,143 @@
+<div align="center">
+  <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
+
+  <h2 align="center">Pipelex API</h2>
+
+The official REST API server for building and executing Pipelex pipelines. Deploy your pipelines as HTTP endpoints and integrate them into any application or workflow.
+
+  <div>
+    <a href="https://docs.pipelex.com/pages/api/"><strong>API Documentation</strong></a> -
+    <a href="https://github.com/Pipelex/pipelex"><strong>Pipelex Core</strong></a> -
+    <a href="https://go.pipelex.com/discord"><strong>Discord</strong></a>
+  </div>
+  <br/>
+
+  <p align="center">
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Elastic--2.0-blue.svg" alt="Elastic License 2.0"></a>
+    <a href="https://go.pipelex.com/discord"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+    <a href="https://docs.pipelex.com/"><img src="https://img.shields.io/badge/Docs-03bb95?logo=read-the-docs&logoColor=white&style=flat" alt="Documentation"></a>
+  </p>
+</div>
+
+---
+
+> [!IMPORTANT]
+> **This server is moving into [`Pipelex/pipelex`](https://github.com/Pipelex/pipelex).** It will live there as the repository's `api/` directory and be released together with the pipelex library, under the library's version number, so the next tag of the `pipelex/pipelex-api` image will be a pipelex version rather than the next `0.33.x`. The image keeps its name, its port and its `/root/.pipelex` configuration mount. This repository takes no new changes and will be archived once the move lands; please open new issues on `Pipelex/pipelex`.
+
+# 📑 Table of Contents
+
+- [Introduction](#introduction)
+- [Quick Start with Docker](#-quick-start-with-docker)
+- [Run your first pipeline](#-run-your-first-pipeline)
+- [How to scale Pipelex](#-how-to-scale-pipelex)
+- [API Documentation](#-api-documentation)
+- [Support](#-support)
+- [License](#-license)
+
+# Introduction
+
+The **Pipelex API Server** is a FastAPI-based REST API that allows you to execute [Pipelex](https://github.com/Pipelex/pipelex) pipelines via HTTP requests. Deploy your pipelines as HTTP endpoints and integrate them into any application or workflow.
+
+It is the source-available reference implementation of the **[MTHDS Protocol](https://mthds.ai)** — the minimal HTTP contract every MTHDS runner implements (`POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`). The contracts nest: **MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API**. This server adds the build tooling extensions (`/build/*`) on top of the protocol; the hosted API at `api.pipelex.com/v1` adds durable runs, the method catalog, and account management on top of this server — same shapes throughout. All routes live under the `/v1` base path; the committed contract is [`docs/openapi/pipelex-api.openapi.yaml`](docs/openapi/pipelex-api.openapi.yaml).
+
+# 🚀 Quick Start with Docker
+
+**Official Docker image available at:** [`pipelex/pipelex-api`](https://hub.docker.com/r/pipelex/pipelex-api)
+
+The published image is **generic and configuration-light**: Temporal is off, no S3, no remote tracing. It boots with a single required env var (`PIPELEX_GATEWAY_API_KEY`), and you bring your own [Pipelex configuration](docs/configuration.md) on top to enable storage, tracing, Temporal, or anything else.
+
+### 1. Run with Docker
+
+The only required env var is `PIPELEX_GATEWAY_API_KEY`. Get a free key (with free credits) at https://app.pipelex.com, then run:
+
+```bash
+docker run --name pipelex-api -p 8081:8081 \
+  -e PIPELEX_GATEWAY_API_KEY=your-pipelex-gateway-api-key \
+  pipelex/pipelex-api:latest
+```
+
+To require authentication on the API, add `-e AUTH_MODE=api_key -e API_KEY=your-secret` (or `AUTH_MODE=jwt` + `JWT_SECRET_KEY`). See [`.env.example`](.env.example) for the full list of supported variables and [docs/configuration.md](docs/configuration.md) for `--env-file` and `docker compose` patterns if you'd rather keep config out of your shell history.
+
+If you'd rather build the image yourself instead of pulling, replace `pipelex/pipelex-api:latest` with a local tag after `docker build -t pipelex-api .`.
+
+### 2. Verify
+
+```bash
+curl http://localhost:8081/health
+```
+
+The API is now running at `http://localhost:8081`. To customize behavior (enable Temporal, swap to S3 storage, layer in env-specific overrides, …), see [docs/configuration.md](docs/configuration.md).
+
+# 🧪 Run your first pipeline
+
+Once `/health` is green, send an inline pipeline definition and inputs to `/v1/execute`. The example below summarizes a string with a one-pipe MTHDS bundle — no files, no auth, copy-paste:
+
+```bash
+curl -s http://localhost:8081/v1/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pipe_code": "summarize",
+    "mthds_contents": ["domain = \"hello\"\nmain_pipe = \"summarize\"\n\n[pipe.summarize]\ntype = \"PipeLLM\"\ndescription = \"Summarize the input text in one sentence\"\ninputs = { text = \"Text\" }\noutput = \"Text\"\nprompt = \"Summarize in one sentence:\\n@text\"\n"],
+    "inputs": { "text": "Pipelex turns plain-language pipeline definitions into reproducible AI workflows that run as HTTP endpoints." }
+  }'
+```
+
+You'll get back a JSON response with `state: "COMPLETED"` and the summary under `pipe_output.working_memory.root.<main_stuff_name>.content`.
+
+**Passing files (PDFs, images) as inputs.** Use the `Document` concept and point it at any HTTP(S) URL:
+
+```json
+{
+  "pipe_code": "your_pipe",
+  "mthds_contents": ["...your MTHDS..."],
+  "inputs": {
+    "cv": { "concept": "Document", "content": { "url": "https://example.com/resume.pdf" } }
+  }
+}
+```
+
+`Document` accepts public HTTP/HTTPS URLs, `pipelex-storage://` URIs, or base64 data URLs. For images, use the `Image` concept with the same `{ "url": "..." }` shape.
+
+For inline MTHDS in the request, `mthds_contents` is a JSON array of raw `.mthds` (TOML) file contents as strings — typically `[open("my_pipe.mthds").read()]` from a client. See [docs/pipe-run.md](docs/pipe-run.md) for every supported input shape and the full `/execute` reference.
+
+# 📈 How to scale Pipelex
+
+A single Pipelex API container is great for development, prototyping, and low-concurrency workloads — pipelines run in-process and `/v1/execute` blocks the request thread until they finish.
+
+For production-scale workloads (high concurrency, long-running pipelines, retries, durable execution, horizontal scaling), the recommended path is to run Pipelex on top of [**Temporal**](https://temporal.io/). With Temporal enabled:
+
+- Pipeline runs become durable workflows — survive worker crashes, support retries and timeouts out of the box.
+- The API container becomes a thin orchestrator: it submits workflows to a Temporal cluster and returns a `pipeline_run_id` immediately (this is what `POST /v1/start` already does).
+- Pipeline execution itself runs on a separate pool of **Pipelex workers** that you scale independently from the HTTP layer.
+- Async completion callbacks (`callback_urls` + `X-Completion-Signature`, see [pipe-run.md](docs/pipe-run.md)) let your application be notified when each run finishes, without polling.
+
+Pipelex already integrates with Temporal under the hood, and the Docker image accepts `TEMPORAL_API_KEY` plus a `[temporal] is_enabled = true` override in `.pipelex/`. **A complete deployment recipe (Temporal cluster sizing, worker container, autoscaling guidance, and an end-to-end docker-compose) is coming soon.** In the meantime, if you need to scale today, get in touch on [Discord](https://go.pipelex.com/discord) and we'll help you wire it up.
+
+# 📖 API Documentation
+
+The full reference for this API server lives next to the code in [`docs/`](docs/):
+
+- [Overview](docs/index.md) — endpoints, authentication, deployment
+- [Pipe Run](docs/pipe-run.md) — `/execute`, `/start`, every input shape
+- [Pipe Validate](docs/pipe-validate.md) — `/validate`
+- [Pipe Builder](docs/pipe-builder.md) — `/build/inputs`, `/build/output`, `/build/runner`
+- [Configuration](docs/configuration.md) — env vars, mounting your own `.pipelex/` config
+
+For broader Pipelex documentation (MTHDS language, concepts, pipe types, the Gateway): **[https://docs.pipelex.com/](https://docs.pipelex.com/)**
+
+# 💬 Support
+
+- **API Documentation**: [https://docs.pipelex.com/pages/api/](https://docs.pipelex.com/pages/api/)
+- **Pipelex Documentation**: [https://docs.pipelex.com/](https://docs.pipelex.com/)
+- **Discord Community**: [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
+- **Main Repository**: [https://github.com/Pipelex/pipelex](https://github.com/Pipelex/pipelex)
+
+# 📝 License
+
+This project is licensed under the Elastic License 2.0 (ELv2); see [LICENSE](LICENSE) for the terms, and the [license page](https://docs.pipelex.com/latest/license/) for how Pipelex reads them. Runtime dependencies are distributed under their own licenses via PyPI.
+
+---
+
+"Pipelex" is a trademark of Evotis S.A.S.
+
+© 2025-2026 Evotis S.A.S.

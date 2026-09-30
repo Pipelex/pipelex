@@ -1,0 +1,158 @@
+################################################################################
+# Google Gemini API Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Google Gemini API models.
+# It contains model definitions for Gemini language models
+# accessible through the Google Gemini API (not VertexAI).
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gemini-3.1-pro"])
+# - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "google"
+structure_method = "instructor/genai_structured_outputs" # Gemini's native JSON output
+thinking_mode = "manual"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Gemini 2.5 Series ----------------------------------------
+["gemini-2.5-pro"]
+model_id = "gemini-2.5-pro"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+
+["gemini-2.5-flash"]
+model_id = "gemini-2.5-flash"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.30, output = 2.50 }
+
+["gemini-2.5-flash-lite"]
+model_id = "gemini-2.5-flash-lite"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.10, output = 0.40 }
+
+# --- Gemini 3.0 Series ----------------------------------------
+["gemini-3.0-flash"]
+model_id = "gemini-3-flash-preview"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.5, output = 3.0 }
+thinking_mode = "adaptive"
+
+# --- Gemini 3.1 Series ----------------------------------------
+["gemini-3.1-flash-lite"]
+model_id = "gemini-3.1-flash-lite-preview"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.25, output = 1.50 }
+thinking_mode = "adaptive"
+
+["gemini-3.1-pro"]
+model_id = "gemini-3.1-pro-preview"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 2, output = 12.0 }
+thinking_mode = "adaptive"
+
+# --- Gemini 3.5 Series ----------------------------------------
+["gemini-3.5-flash"]
+model_id = "gemini-3.5-flash"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.5, output = 9.0 }
+thinking_mode = "adaptive"
+
+# --- Latest Aliases (point to current generation, change over time) -----------
+["gemini-pro-latest"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+thinking_mode = "adaptive"
+
+["gemini-flash-latest"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.30, output = 2.50 }
+thinking_mode = "adaptive"
+
+["gemini-flash-lite-latest"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.10, output = 0.40 }
+thinking_mode = "adaptive"
+
+################################################################################
+# IMAGE GENERATION MODELS (Nano Banana)
+################################################################################
+
+[nano-banana]
+model_type = "img_gen"
+model_id = "gemini-2.5-flash-image"
+inputs = ["text", "images"]
+outputs = ["image"]
+thinking_mode = "none"
+costs = { input = 0.30, output = 30 }
+
+[nano-banana.rules]
+aspect_ratio = "gemini_2_5"
+
+[nano-banana-pro]
+model_type = "img_gen"
+model_id = "gemini-3-pro-image-preview"
+inputs = ["text", "images"]
+outputs = ["image"]
+thinking_mode = "none"
+costs = { input = 2.0, output = 120 }
+
+[nano-banana-pro.rules]
+aspect_ratio = "gemini_3_pro"
+
+[nano-banana-2]
+model_type = "img_gen"
+model_id = "gemini-3.1-flash-image-preview"
+inputs = ["text", "images"]
+outputs = ["image"]
+thinking_mode = "none"
+costs = { input = 0.50, output = 60 }
+
+[nano-banana-2.rules]
+aspect_ratio = "gemini_3_flash"
+
+[nano-banana-2-lite]
+model_type = "img_gen"
+model_id = "gemini-3.1-flash-lite-image"
+inputs = ["text", "images"]
+outputs = ["image"]
+thinking_mode = "none"
+costs = { input = 0.25, output = 30 }
+
+[nano-banana-2-lite.rules]
+aspect_ratio = "gemini_3_flash_lite"

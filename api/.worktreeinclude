@@ -1,0 +1,6 @@
+# .worktreeinclude — the gitignored files a fresh worktree of this repo needs.
+# Read by Claude Code for its own worktrees and by `wt` for ours.
+.env
+pipelex_super.toml
+pipelex_override.toml
+telemetry_override.toml
