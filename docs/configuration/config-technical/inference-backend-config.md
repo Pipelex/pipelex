@@ -79,6 +79,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
         ├── 2_img_gen_deck.toml       # Image generation config
         ├── 3_extract_deck.toml       # Document extraction config
         ├── 4_search_deck.toml        # Web search config
+        ├── 5_doc_gen_deck.toml       # Document engines, by format
         ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
         └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```
@@ -86,7 +87,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
 Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with custom/override files (`x_` prefix) loaded last.
 
 !!! tip "Numbered files are pipelex-managed; overrides go in `x_custom_*.toml`"
-    The numbered deck files (`1_llm_deck.toml`...`4_search_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
+    The numbered deck files (`1_llm_deck.toml`...`5_doc_gen_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
 
     To customize aliases, presets, or default choices without conflict, edit (or create) any file in this directory whose name starts with `x_custom_` — Pipelex never tracks or overwrites those. See [`pipelex update`](../../tools/cli/update.md) for the full workflow.
 
@@ -591,6 +592,22 @@ Search presets support the following options:
 - `model`: The search model to use (e.g., `linkup-standard`, `linkup-deep`)
 - `include_images`: Whether to include images in search results
 - `include_inline_citations`: Whether to include inline citations in the answer
+
+### Document Engines
+
+The engines a `PipeDocGen` step prints with are models of the `doc_gen` family, declared in the `internal` backend: `reportlab-pdf` is built into Pipelex and prints a `pdf` from the auto-layout of the step's inputs, and `weasyprint-pdf`, `openpyxl-xlsx`, `docxtpl-docx` and `python-pptx` come with the Pipelex document generation plugin. Each lists the sources it prints from as its `inputs` (`layout`, `html` or `template_file`) and its format as its `outputs`. `.pipelex/inference/deck/5_doc_gen_deck.toml` names the engine a step prints with when it names none, for each format and source:
+
+```toml
+[doc_gen.choice_defaults]
+"pdf.layout" = "@default-pdf"
+"pdf.html" = "@default-pdf-from-template"
+
+[doc_gen.aliases]
+default-pdf = "reportlab-pdf"
+default-pdf-from-template = "weasyprint-pdf"
+```
+
+A step names another engine with `model`, such as `model = "weasyprint-pdf"` for a PDF without a template. See [PipeDocGen](../../building-methods/pipes/pipe-operators/PipeDocGen.md).
 
 ### Default Choices
 

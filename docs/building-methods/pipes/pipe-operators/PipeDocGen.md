@@ -1,19 +1,19 @@
 ---
-description: "Generate a document file, such as a PDF, from a method's structured result with PipeDocGen. It calls no model: it lays out or fills what its inputs already hold."
+description: "Generate a document file, such as a PDF, from a method's structured result with PipeDocGen. It calls no AI model: a document engine lays out or fills what its inputs already hold."
 ---
 
 # PipeDocGen
 
 The `PipeDocGen` operator turns a method's result into a document file: a PDF, and with the Pipelex document generation plugin an Excel workbook, a Word document or a PowerPoint deck. The file is stored like any other file a run produces, and the step outputs a `Document`.
 
-`PipeDocGen` calls no model, unlike `PipeImgGen`, whose name it echoes. It lays out, or fills a template with, what its inputs already hold, so it costs nothing to run and produces the same file every time for the same inputs. The model work, such as an LLM writing a report or extracting an invoice, happens in the steps before it.
+`PipeDocGen` calls no AI model, unlike `PipeImgGen`, whose name it echoes. It lays out, or fills a template with, what its inputs already hold, so it costs nothing to run and produces the same file every time for the same inputs. The AI work, such as an LLM writing a report or extracting an invoice, happens in the steps before it. Its `model` is the **document engine** that prints the file, such as `reportlab-pdf` or `weasyprint-pdf`, chosen the way a step chooses any model.
 
 ## How it works
 
 The step runs in two stages:
 
 1. **Compose.** Pipelex lays the inputs out, or renders the step's HTML template against them, and renders the file's name. Every template here renders strictly: a field the inputs do not have fails the step instead of printing as empty text.
-2. **Print.** A document engine turns the composition into the file's bytes, and Pipelex stores them. The output is a `Document` whose URL ends in the file's own name, such as `invoice-INV-2026-0142.pdf`.
+2. **Print.** The step's document engine turns the composition into the file's bytes, and Pipelex stores them. The output is a `Document` whose URL ends in the file's own name, such as `invoice-INV-2026-0142.pdf`.
 
 With no template, the step lays its inputs out by itself, which is called the auto-layout:
 
@@ -27,22 +27,27 @@ With no template, the step lays its inputs out by itself, which is called the au
 
 A single input is the document itself: an invoice's fields fill the page. Several inputs each get a section, in the order the step declares them. Every page carries the document's title in a running header and "Page N of M" in its footer, on A4 portrait, in a font bundled with Pipelex so that a PDF looks the same on every machine.
 
-## What prints where
+## Document engines
 
-Which formats a runtime prints depends on the document engines installed in it:
+A document engine is a model of the `doc_gen` family. A step names one with `model`; a step that names none prints on the model deck's default for its format and for whether it has a template:
 
-| The step asks for | Open Pipelex | With the Pipelex document generation plugin |
-| --- | --- | --- |
-| `pdf` without a template | Printed by the built-in engine | The same built-in engine, so the same PDF |
-| `pdf` with an HTML template | Refused at load | Printed from the template |
-| `xlsx` or `docx`, with or without a template file | Refused at load | Printed |
-| `pptx` with a template file | Refused at load | Printed |
+| The step asks for | Default engine | Other engines that print it | Comes with |
+| --- | --- | --- | --- |
+| `pdf` without a template | `reportlab-pdf` | `weasyprint-pdf` | Pipelex; WeasyPrint with the plugin |
+| `pdf` with an HTML template | `weasyprint-pdf` | | The Pipelex document generation plugin |
+| `xlsx`, with or without a template file | `openpyxl-xlsx` | | The plugin |
+| `docx`, with or without a template file | `docxtpl-docx` | | The plugin |
+| `pptx` with a template file | `python-pptx` | | The plugin |
 
-A `pdf` without a template prints the same with or without the plugin, so a method prints the same PDF everywhere. A step that no installed engine prints is refused **when the method loads**, before a run spends anything on inference, with an error naming the format and the plugin that prints it:
+Open Pipelex prints a `pdf` without a template on its built-in `reportlab-pdf`. A step that names its engine prints the same file wherever it runs; a step that names none follows the deck of the install it runs on, whose defaults are in `.pipelex/inference/deck/5_doc_gen_deck.toml`.
+
+A step whose engine is not installed is refused **when the method loads**, before a run spends anything on inference, with an error naming the engine and the plugin that provides it:
 
 ```
-PipeDocGen 'render_invoice_xlsx' asks for a xlsx from the auto-layout of its inputs, and no document engine installed in this runtime prints it. The engines for it come with the Pipelex document generation plugin, pipelex-doc-gen, which is not installed here.
+PipeDocGen 'render_invoice_xlsx' asks for an xlsx from the auto-layout of its inputs, on the engine 'openpyxl-xlsx', which is not installed in this runtime. It comes with the Pipelex document generation plugin, pipelex-doc-gen.
 ```
+
+A step that names an engine which does not print its format from its source, such as `reportlab-pdf` with an HTML template, is refused at load as well.
 
 ## Configuration
 
@@ -60,6 +65,8 @@ format      = "pdf"
 filename    = "invoice-{{ invoice.number }}"
 ```
 
+To print the same invoice on WeasyPrint, which the plugin provides, the step names it: `model = "weasyprint-pdf"`.
+
 ### MTHDS parameters
 
 | Parameter | Type | Description | Required |
@@ -69,11 +76,10 @@ filename    = "invoice-{{ invoice.number }}"
 | `inputs` | dictionary | The inputs the document shows. Every declared input is in the template's context, so several inputs combine into one document. | Yes |
 | `output` | string | `Document`, or a concept that refines it. A single file: no multiplicity. | Yes |
 | `format` | string | `pdf`, `xlsx`, `docx` or `pptx`. It sets the file's type and suffix. | Yes |
+| `model` | string | The document engine that prints the file, a `doc_gen` model, alias or preset, such as `reportlab-pdf` or `weasyprint-pdf`. It defaults to the model deck's engine for the format and source. | No |
 | `template` | string | An inline HTML and Jinja2 template, for `pdf` only. A `pdf` with a template is printed by the plugin. | No |
 | `template_file` | string | A template file beside the bundle, relative to the bundle's file: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. It excludes `template`. `pptx` requires one. | No |
 | `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code. | No |
-
-There is no `engine` field: which engine prints a format is the runtime's business, not the method's.
 
 ### An LLM report as a PDF
 

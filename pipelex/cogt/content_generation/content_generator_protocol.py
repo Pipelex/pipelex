@@ -4,6 +4,7 @@ from typing import Any, ParamSpec, Protocol, TypeVar
 
 from pipelex.cogt.content_generation.assignment_models import SearchAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -136,8 +137,9 @@ class ContentGeneratorProtocol(Protocol):
         job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         composition: DocumentComposition,
+        doc_gen_setting: DocGenSetting,
     ) -> Coroutine[Any, Any, DocumentContent]:
-        """Print a `PipeDocGen` step's composed document with its engine and store it: the step's print stage."""
+        """Print a `PipeDocGen` step's composed document on the engine `doc_gen_setting` names and store it: the step's print stage."""
         ...
 
     def make_extract_pages(

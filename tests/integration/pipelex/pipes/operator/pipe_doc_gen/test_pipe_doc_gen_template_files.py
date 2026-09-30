@@ -51,7 +51,7 @@ class TestPipeDocGenTemplateFiles:
         assert set(request.data) == {"invoice"}
 
     async def test_warnings_alone_pass_and_print_nothing(self, tmp_path: Path, stub_engines: StubEngines) -> None:
-        """A warning is logged, not raised, and the dry run builds no engine."""
+        """A warning is logged, not raised, and the dry run prints nothing."""
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
         bundle_path = write_bundle(directory=tmp_path, step_fields=_DOCX_TEMPLATE_STEP)
         stub_engines.findings = [TemplateFinding(severity=TemplateFindingSeverity.WARNING, message="The notes are never printed")]
@@ -59,4 +59,4 @@ class TestPipeDocGenTemplateFiles:
         await validate_bundle(mthds_file_path=bundle_path)
 
         assert len(stub_engines.check_requests) == 1
-        assert stub_engines.nb_builds == 0
+        assert stub_engines.engine.jobs == []

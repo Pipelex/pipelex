@@ -1,14 +1,23 @@
 from pathlib import Path
 
 import pytest
+from typing_extensions import override
 
-from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
 from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderJob, RenderResources
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.plugins.document_renderer_registry import DocumentRendererEntry, DocumentRendererKey, DocumentRendererRegistry
+from pipelex.plugins.inference_backend_registry import MakeWorkerFn
+from pipelex.plugins.sdk_client_registry import SdkClientRegistry
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
+
+# The sdks of the kit's doc_gen models the stubs stand in for: a pdf from the layout, a pdf from HTML, and a docx.
+STUB_DOC_GEN_SDKS = ("reportlab", "weasyprint", "docxtpl")
 
 
 class StubEngine:
@@ -22,34 +31,50 @@ class StubEngine:
         return RenderedDocument(data=b"%PDF-stub " + job.model_dump_json().encode())
 
 
+class StubDocGenWorker(DocGenWorkerAbstract):
+    """The worker the stub sdks make: it prints on the test's engine and checks templates with the test's checker."""
+
+    def __init__(self, *, inference_model: InferenceModelSpec, engines: "StubEngines"):
+        super().__init__(inference_model=inference_model)
+        self._engines = engines
+
+    @override
+    def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:
+        return self._engines.engine.render(job=job, resources=resources)
+
+    @override
+    def check_template(self, *, request: TemplateCheckRequest) -> list[TemplateFinding]:
+        return self._engines.check_template(request=request)
+
+
 class StubEngines:
-    """The stub engines of one test: a pdf from the layout and from HTML, and a docx from a template file with a checker."""
+    """The stub engines of one test, registered for the sdks of `reportlab-pdf`, `weasyprint-pdf` and `docxtpl-docx`."""
 
     def __init__(self) -> None:
         self.engine = StubEngine()
         self.nb_builds = 0
         self.findings: list[TemplateFinding] = []
         self.check_requests: list[TemplateCheckRequest] = []
+        self.models: list[str] = []
 
-    def make_engine(self) -> StubEngine:
+    def make_worker(
+        self,
+        *,
+        inference_model: InferenceModelSpec,
+        backend: InferenceBackend,  # ruff: ignore[unused-method-argument]
+        sdk_clients: SdkClientRegistry,  # ruff: ignore[unused-method-argument]
+        reporting_delegate: ReportingProtocol | None,  # ruff: ignore[unused-method-argument]
+    ) -> InferenceWorkerAbstract:
         self.nb_builds += 1
-        return self.engine
+        self.models.append(inference_model.name)
+        return StubDocGenWorker(inference_model=inference_model, engines=self)
 
     def check_template(self, *, request: TemplateCheckRequest) -> list[TemplateFinding]:
         self.check_requests.append(request)
         return self.findings
 
-    def registry(self) -> DocumentRendererRegistry:
-        entries: dict[DocumentRendererKey, DocumentRendererEntry] = {}
-        for doc_gen_format, source, check_template in (
-            (DocGenFormat.PDF, DocGenSource.LAYOUT, None),
-            (DocGenFormat.PDF, DocGenSource.HTML, None),
-            (DocGenFormat.DOCX, DocGenSource.TEMPLATE_FILE, self.check_template),
-        ):
-            entries[DocumentRendererKey(doc_gen_format=doc_gen_format, source=source, engine="stub")] = DocumentRendererEntry(
-                engine="stub", make_renderer=self.make_engine, check_template=check_template, source_plugin="stub-plugin"
-            )
-        return DocumentRendererRegistry(entries=entries, engine_choices={})
+    def backends(self) -> dict[str, MakeWorkerFn]:
+        return dict.fromkeys(STUB_DOC_GEN_SDKS, self.make_worker)
 
 
 async def refusal_report(*, step_fields: str) -> str:

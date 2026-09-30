@@ -986,22 +986,6 @@
       "default": "aws_access",
       "open_node": false
     },
-    "runtime.doc_gen": {
-      "value_type": "table",
-      "required": true,
-      "open_node": false
-    },
-    "runtime.doc_gen.engines": {
-      "value_type": "dict[str, str]",
-      "required": true,
-      "default": {},
-      "open_node": true
-    },
-    "runtime.doc_gen.engines.*": {
-      "value_type": "str",
-      "required": true,
-      "open_node": false
-    },
     "runtime.log": {
       "value_type": "table",
       "required": true,

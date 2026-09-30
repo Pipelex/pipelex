@@ -1,16 +1,15 @@
-"""The template checker an engine may register beside its renderer, part of the plugin contract.
+"""What an engine's template checker takes and returns, part of the plugin contract.
 
 An office template names the fields it is filled with in its own way: an Excel workbook through its defined
 names and Tables, a Word document through its tags, a PowerPoint deck through its shape names. Pipelex cannot
-read those, so an engine that fills a template file may register a `check_template` with its renderer
-(`add_document_renderer`). The dry run, and so `pipelex validate`, calls it for every `PipeDocGen` step with a
-`template_file` whose format and source it prints, before anything is spent: an error finding fails the step,
-and a warning is logged. The built-in PDF engine takes no template, and Pipelex checks HTML templates itself,
-so neither registers one.
+read those, so an engine that fills a template file overrides its worker's `check_template`
+(`DocGenWorkerAbstract`). The dry run, and so `pipelex validate`, calls it for every `PipeDocGen` step with a
+`template_file`, before anything is spent: an error finding fails the step, and a warning is logged. The
+built-in PDF engine takes no template, and Pipelex checks HTML templates itself, so neither needs one.
 """
 
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,12 +55,3 @@ class TemplateCheckRequest(BaseModel):
             "what the fill would raise; None when only the structure is to be compared"
         ),
     )
-
-
-class TemplateCheckerProtocol(Protocol):
-    """An engine's template checker: it reads the template, compares it with the inputs, and returns its findings.
-
-    It raises only for a fault of its own: a template it cannot read at all is an error finding.
-    """
-
-    def __call__(self, *, request: TemplateCheckRequest) -> list[TemplateFinding]: ...

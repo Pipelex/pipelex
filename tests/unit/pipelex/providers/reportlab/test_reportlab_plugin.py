@@ -4,13 +4,15 @@ import textwrap
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
-from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pytest_mock import MockerFixture
+
 from pipelex.plugins.contract import PLUGIN_API_VERSION
-from pipelex.plugins.document_renderer_registry import DocumentRendererKey
+from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS
-from pipelex.providers.reportlab.reportlab_pdf_renderer import ReportlabPdfRenderer
+from pipelex.providers.reportlab.reportlab_pdf_renderer import ReportlabPdfWorker
 from pipelex.providers.reportlab.reportlab_plugin import ReportlabDocGenPlugin
+from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import reportlab_pdf_model
 
 if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelexConfig
@@ -38,7 +40,7 @@ _LAZY_IMPORT_SCRIPT = textwrap.dedent(
 
     registrar = PluginRegistrar(config=SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
     ReportlabDocGenPlugin().register(registrar)
-    assert len(registrar.document_renderers) == 1
+    assert list(registrar.inference_backends) == [("doc_gen", "reportlab")]
     assert not [name for name in sys.modules if name == "reportlab" or name.startswith("reportlab.")]
     print("import-light OK")
     """
@@ -50,24 +52,23 @@ def _registrar() -> PluginRegistrar:
 
 
 class TestReportlabPlugin:
-    def test_the_plugin_registers_one_engine_for_a_pdf_from_the_layout(self) -> None:
+    def test_the_plugin_registers_the_reportlab_sdk_of_the_doc_gen_family(self) -> None:
         plugin = ReportlabDocGenPlugin()
         registrar = _registrar()
         plugin.register(registrar)
         assert plugin.name == "reportlab"
         assert plugin.targets_api == PLUGIN_API_VERSION
-        assert list(registrar.document_renderers) == [
-            DocumentRendererKey(doc_gen_format=DocGenFormat.PDF, source=DocGenSource.LAYOUT, engine="reportlab")
-        ]
-        entry = registrar.document_renderers[DocumentRendererKey(doc_gen_format=DocGenFormat.PDF, source=DocGenSource.LAYOUT, engine="reportlab")]
-        assert entry.engine == "reportlab"
-        assert entry.check_template is None
+        assert list(registrar.inference_backends) == [(InferenceFamily.DOC_GEN, "reportlab")]
 
-    def test_the_factory_builds_the_reportlab_engine(self) -> None:
+    def test_the_factory_builds_the_reportlab_worker(self, mocker: MockerFixture) -> None:
         registrar = _registrar()
         ReportlabDocGenPlugin().register(registrar)
-        (entry,) = registrar.document_renderers.values()
-        assert isinstance(entry.make_renderer(), ReportlabPdfRenderer)
+        (make_worker,) = registrar.inference_backends.values()
+        worker = make_worker(
+            inference_model=reportlab_pdf_model(), backend=mocker.MagicMock(), sdk_clients=mocker.MagicMock(), reporting_delegate=None
+        )
+        assert isinstance(worker, ReportlabPdfWorker)
+        assert worker.check_template(request=mocker.MagicMock()) == []
 
     def test_the_plugin_is_a_kernel_builtin(self) -> None:
         assert [plugin.name for plugin in KERNEL_BUILTIN_PLUGINS].count("reportlab") == 1

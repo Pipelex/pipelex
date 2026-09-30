@@ -80,7 +80,6 @@ from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.discovery import build_registrar
-from pipelex.plugins.document_renderer_registry import DocumentRendererRegistry
 from pipelex.plugins.exceptions import UnknownBootOrchestratorError
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.log_sink_registry import LogSinkRegistry
@@ -711,9 +710,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.runtime_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
         self.runtime_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
         self.runtime_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
-        self.runtime_hub.set_document_renderer_registry(
-            DocumentRendererRegistry(entries=plugin_registrar.document_renderers, engine_choices=get_config().runtime.doc_gen.engines)
-        )
         storage_provider_registry = StorageProviderRegistry(plugin_registrar.storage_providers)
         self.runtime_hub.set_storage_provider_registry(storage_provider_registry)
         # Storage provider precedence: explicit setup() param > config-selected registry factory.

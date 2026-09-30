@@ -21,11 +21,31 @@ class TestPipeDocGenLoadRefusals:
         report = await refusal_report(step_fields=step_fields)
         assert "pipelex-doc-gen" in report
 
+    async def test_a_step_naming_a_plugin_engine_is_refused_where_the_plugin_is_absent(self) -> None:
+        """A step may name WeasyPrint for a pdf without a template, and open Pipelex refuses it at load, naming the plugin."""
+        report = await refusal_report(step_fields='format = "pdf"\nmodel = "weasyprint-pdf"')
+        assert "weasyprint-pdf" in report
+        assert "pipelex-doc-gen" in report
+
+    async def test_an_engine_that_does_not_print_the_step_s_source_is_refused(self) -> None:
+        """ReportLab prints only the auto-layout, so a step that names it with an HTML template is refused at load."""
+        report = await refusal_report(step_fields='format = "pdf"\nmodel = "reportlab-pdf"\ntemplate = "<h1>{{ invoice.number }}</h1>"')
+        assert "reportlab-pdf" in report
+        assert "from an HTML template, which it does not print" in report
+
+    async def test_an_engine_the_deck_does_not_define_is_an_unknown_model(self) -> None:
+        """A misspelled engine is refused at load like any unknown model, located on the step's `model` field."""
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\nmodel = "reportlab-pfd"')])
+        report = str(exc_info.value.to_error_report().model_dump())
+        assert "reportlab-pfd" in report
+        assert "model" in report
+
     @pytest.mark.usefixtures("no_engines")
     async def test_a_pdf_layout_step_is_refused_where_the_built_in_engine_is_disabled(self) -> None:
         """A host that disables the built-in engine and installs no plugin refuses even a pdf without a template."""
         report = await refusal_report(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)
-        assert "built-in" in report
+        assert "built into Pipelex and disabled" in report
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_template_file_in_a_bundle_loaded_from_a_string_is_refused(self) -> None:

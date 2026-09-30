@@ -30,6 +30,7 @@ from pipelex.cogt.content_generation.assignment_models import (
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.doc_gen.layout_tree import ImageBlock, LayoutDocument, SectionBlock
 from pipelex.cogt.document.prompt_document import PromptDocumentUri
@@ -189,6 +190,7 @@ URL_BEARING_SAMPLES: dict[type[BaseModel], tuple[_DeclaresReads, set[str]]] = {
                     ],
                 ),
             ),
+            doc_gen_setting=DocGenSetting(model="reportlab-pdf"),
         ),
         {"pipelex-storage://s/cover.png", "pipelex-storage://s/figure.png"},
     ),

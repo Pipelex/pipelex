@@ -3,8 +3,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex.cogt.doc_gen.doc_gen_format import DocGenSource
-from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
@@ -13,7 +11,6 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenFactoryError
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint, template_required_roots
-from pipelex.runtime_hub import get_document_renderer_registry
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
@@ -54,13 +51,6 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             )
             raise PipeDocGenFactoryError(msg)
 
-        # What no installed engine prints is refused here, when the method loads, before a run spends anything.
-        source = DocGenSource.for_step(
-            doc_gen_format=blueprint.format, has_template=blueprint.template is not None or blueprint.template_file is not None
-        )
-        if get_document_renderer_registry().resolve(doc_gen_format=blueprint.format, source=source) is None:
-            raise DocGenEngineMissingError(doc_gen_format=blueprint.format, source=source, pipe_code=pipe_code)
-
         template = blueprint.template
         template_path: str | None = None
         if blueprint.template_file is not None:
@@ -78,6 +68,7 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             inputs=inputs,
             output=output,
             doc_gen_format=blueprint.format,
+            doc_gen_choice=blueprint.model,
             template=template,
             template_file=blueprint.template_file,
             template_path=template_path,

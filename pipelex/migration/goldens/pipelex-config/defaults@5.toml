@@ -31,12 +31,6 @@ signed_urls_lifespan_seconds = 3600
 [runtime.network]
 is_fetch_ssrf_guard_enabled = true
 
-[runtime.doc_gen]
-# The document engine that prints a PipeDocGen format from a source, when more than one installed engine
-# does, keyed "<format>.<source>", such as "pdf.layout". A format and source that one installed engine alone
-# prints need no entry.
-engines = {}
-
 [runtime.secrets]
 method = "env" # env (built-in); an external plugin may add e.g. vault
 

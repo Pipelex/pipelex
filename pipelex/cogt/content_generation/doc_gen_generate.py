@@ -3,7 +3,7 @@
 Single home for "print a composed document and store it": the direct ``ContentGenerator`` calls it inline, and
 a Temporal activity would call it on a worker. Printing and storage happen inside the leaf so the file's bytes
 never cross a workflow boundary: only the URL-bearing ``DocumentContent`` is returned. The engine that prints is
-looked up in the document renderer registry by the composition's format and source, and it runs in a worker
+the worker of the ``doc_gen`` model the assignment names, resolved when the step ran, and it runs in a worker
 thread, since engines are synchronous; a file its document names, such as an image, it reads back through the
 ``RenderResources`` it is handed, under the run's read scope.
 
@@ -26,10 +26,13 @@ from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssi
 from pipelex.cogt.content_generation.dry_mock import dry_render_document
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
-from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError, DocGenRenderError
+from pipelex.cogt.doc_gen.doc_gen_engine import require_doc_gen_engine_installed
+from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
+from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
 from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderResources
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.runtime_hub import get_document_renderer_registry
+from pipelex.runtime_hub import get_model_deck, get_report_delegate
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
@@ -85,18 +88,24 @@ async def render_document_and_store(
 
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
-        DocGenEngineMissingError: no installed engine prints the composition's format from its source.
+        ModelNotFoundError: the assignment's engine is not a model served here.
+        DocGenEngineMissingError: no installed plugin registers the engine.
         DocGenRenderError: the engine could not print it, or failed in a way it did not report.
     """
     authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
     if render_assignment.cogt_run_params.run_mode.is_dry:
         return dry_render_document(render_assignment)
     composition = render_assignment.composition
-    renderer = get_document_renderer_registry().get_renderer(doc_gen_format=composition.format, source=composition.source)
-    if renderer is None:
-        raise DocGenEngineMissingError(
-            doc_gen_format=composition.format, source=composition.source, pipe_code=render_assignment.job_metadata.pipe_code
-        )
+    inference_model = get_model_deck().get_required_inference_model(
+        model_handle=render_assignment.doc_gen_setting.model, model_type=ModelType.DOC_GEN
+    )
+    require_doc_gen_engine_installed(
+        inference_model=inference_model,
+        doc_gen_format=composition.format,
+        source=composition.source,
+        pipe_code=render_assignment.job_metadata.pipe_code,
+    )
+    worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
     render_job = composition.make_render_job()
     resources = RunRenderResources(
         storage_provider=generated_content_factory.storage_provider,
@@ -107,7 +116,7 @@ async def render_document_and_store(
     run_context = contextvars.copy_context()
 
     def _print() -> RenderedDocument:
-        return run_context.run(renderer.render, job=render_job, resources=resources)
+        return run_context.run(worker.render, job=render_job, resources=resources)
 
     try:
         rendered = await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, _print)
@@ -117,7 +126,7 @@ async def render_document_and_store(
     except Exception as exc:
         # Dynamic plugin dispatch: an engine is plugin code whose exceptions cannot be enumerated, and anything
         # else it raises is a failure to print this document.
-        msg = f"The {composition.format} engine could not print '{composition.filename}': {exc}"
+        msg = f"The engine '{inference_model.name}' could not print '{composition.filename}': {exc}"
         raise DocGenRenderError(msg) from exc
     return await generated_content_factory.make_document_content(
         storage_scope=render_assignment.job_metadata.run_metadata.storage_scope,

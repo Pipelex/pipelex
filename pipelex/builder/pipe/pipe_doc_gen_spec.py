@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
@@ -13,12 +13,13 @@ if TYPE_CHECKING:
 
 
 class PipeDocGenSpec(PipeSpec):
-    """Spec for the PipeDocGen operator, which generates a document file from its inputs and calls no model.
+    """Spec for the PipeDocGen operator, which generates a document file from its inputs and calls no AI model.
 
     With no template, it lays the inputs out by itself: a `pdf` step without a template is what open Pipelex
-    prints, and a `Markdown` input comes out formatted. A `pdf` with an HTML template, and the `xlsx`, `docx`
-    and `pptx` formats, need the Pipelex document generation plugin, and a runtime without it refuses them when
-    the method loads.
+    prints, on its `reportlab-pdf` engine, and a `Markdown` input comes out formatted. A `pdf` with an HTML
+    template, and the `xlsx`, `docx` and `pptx` formats, need the Pipelex document generation plugin, and a
+    runtime without it refuses them when the method loads. `model` names the engine; without it, the model
+    deck's default for the format prints the file.
 
     Validation Rules:
         - the output must be a single Document, or a concept refining Document.
@@ -30,6 +31,13 @@ class PipeDocGenSpec(PipeSpec):
     type: Literal["PipeDocGen"] = "PipeDocGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     format: DocGenFormat = Field(strict=False, description="The file format to generate: pdf, xlsx, docx or pptx.")
+    model: str | None = Field(
+        default=None,
+        description=(
+            "The document engine that prints the file, a doc_gen model such as 'reportlab-pdf' or 'weasyprint-pdf'. "
+            "Omit it for the model deck's default for the format."
+        ),
+    )
     template: str | None = Field(
         default=None,
         description="An inline HTML and Jinja2 template, for pdf only. Omit it for the auto-layout of the inputs.",
@@ -42,6 +50,14 @@ class PipeDocGenSpec(PipeSpec):
         default=None,
         description="A Jinja expression over the inputs for the file's name, without its suffix, such as 'invoice-{{ invoice.number }}'.",
     )
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def reject_empty_model(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            msg = "Model cannot be an empty string; omit the field to use the default engine"
+            raise ValueError(msg)
+        return value
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
@@ -57,6 +73,7 @@ class PipeDocGenSpec(PipeSpec):
 
         doc_gen_group.renderables.append(Text())  # Blank line
         doc_gen_group.renderables.append(Text.from_markup(f"Format: [bold yellow]{escape(self.format)}[/bold yellow]"))
+        doc_gen_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{escape(self.model or '(default)')}[/bold yellow]"))
         if self.template_file is not None:
             doc_gen_group.renderables.append(Text.from_markup(f"Template file: [bold]{escape(self.template_file)}[/bold]"))
 
@@ -71,6 +88,7 @@ class PipeDocGenSpec(PipeSpec):
             inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             format=self.format,
+            model=self.model,
             template=self.template,
             template_file=self.template_file,
             filename=self.filename,

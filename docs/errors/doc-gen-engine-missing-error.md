@@ -7,7 +7,7 @@ description: "Reference for the `DocGenEngineMissingError` Pipelex error class."
 
 # Doc gen engine missing
 
-No document engine installed in this runtime prints the format a `PipeDocGen` step asks for, from its source.
+The document engine a `PipeDocGen` step prints with is not available in this runtime.
 
 | Field | Value |
 |---|---|

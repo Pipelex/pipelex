@@ -2,13 +2,13 @@
 
 A `PipeDocGen` step runs in two stages. The compose stage renders the templates and builds the layout tree,
 and it is pure. The print stage hands its result to an engine, as a `RenderJob`, and stores the bytes the
-engine returns. Engines register through the plugin registrar (`add_document_renderer`), per format and per
-source, and the Pipelex document generation plugin registers its own from outside this repository, so this
-module is that plugin's whole contract with Pipelex: everything an engine needs arrives as plain data in the
-job, and the one thing it reads from outside the job, a file the document names (an image), it reads through
-the `RenderResources` it is handed, which applies the run's read scope. The job never carries a Pipelex
-object, so an ordinary Pipelex release does not break an engine; changing this module is a change of the
-plugin contract, versioned by `PLUGIN_API_VERSION`.
+engine returns. An engine is the worker of a `doc_gen` model (`DocGenWorkerAbstract`), registered through
+the plugin registrar's `add_inference_backend`, and the Pipelex document generation plugin registers its own
+from outside this repository, so this module and the worker are that plugin's contract with Pipelex:
+everything an engine needs arrives as plain data in the job, and the one thing it reads from outside the job,
+a file the document names (an image), it reads through the `RenderResources` it is handed, which applies the
+run's read scope. The job never carries a Pipelex object, so an ordinary Pipelex release does not break an
+engine; changing this module is a change of the plugin contract, versioned by `PLUGIN_API_VERSION`.
 """
 
 from typing import Any, Protocol, Self
@@ -94,13 +94,3 @@ class RenderResources(Protocol):
             UriReadRefusedError: the run's read scope does not allow the URI.
         """
         ...
-
-
-class DocumentRendererProtocol(Protocol):
-    """An engine: it prints a render job, synchronously, and may be called from a worker thread.
-
-    One instance serves every render of its process, so it loads its library once, when its factory
-    builds it, and holds no state of one render into the next.
-    """
-
-    def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument: ...

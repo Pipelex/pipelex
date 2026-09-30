@@ -1548,6 +1548,10 @@ rationale = "Worker verb–object: processes the search_assignment; single opera
 param = "templating_assignment"
 rationale = "Processes the templating assignment; single operand."
 
+["pipelex/cogt/doc_gen/doc_gen_format.py::parse_doc_gen_choice_key"]
+param = "key"
+rationale = "Verb–object: parses the key of a doc gen default; single operand."
+
 ["pipelex/cogt/doc_gen/input_shape.py::_content_leaf_kind"]
 param = "content_class"
 rationale = "Classifies one content class as a leaf kind."
@@ -2203,6 +2207,10 @@ rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
 ["pipelex/cogt/models/model_deck.py::ModelDeck._resolve_waterfall"]
 param = "waterfall_name"
 rationale = "Operates on the waterfall_name; single operand (qualifiers keyword-only)."
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_doc_gen"]
+param = "name"
+rationale = "Verb–object: validates/checks the name; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_extract"]
 param = "name"
@@ -5555,10 +5563,6 @@ rationale = "Hub setter: installs the print target; single self-labelling operan
 ["pipelex/runtime_hub.py::RuntimeHub.set_content_generator"]
 param = "content_generator"
 rationale = "Hub setter: installs the content generator; single self-labelling operand."
-
-["pipelex/runtime_hub.py::RuntimeHub.set_document_renderer_registry"]
-param = "document_renderer_registry"
-rationale = "Setter of one hub registry, like its sibling setters."
 
 ["pipelex/runtime_hub.py::RuntimeHub.set_func_registry"]
 param = "func_registry"

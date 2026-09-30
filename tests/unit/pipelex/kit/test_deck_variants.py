@@ -20,6 +20,7 @@ import pytest
 
 from pipelex.cogt.models.deck_manifest import kit_deck_dir, list_managed_kit_files
 from pipelex.cogt.models.model_deck import (
+    DocGenDeckBlueprint,
     ExtractDeckBlueprint,
     ImgGenDeckBlueprint,
     LLMDeckBlueprint,
@@ -32,7 +33,7 @@ from pipelex.kit.paths import get_kit_configs_dir, get_kit_deck_variants_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 # A vocabulary coordinate: the model family, then the kind of name within it.
-DeckFamilyBlueprint = LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint
+DeckFamilyBlueprint = LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint | DocGenDeckBlueprint
 VocabularyKey = tuple[str, str]
 Vocabulary = dict[VocabularyKey, set[str]]
 PermittedDrops = Mapping[VocabularyKey, frozenset[str]]
@@ -61,6 +62,7 @@ def extract_vocabulary(blueprint: ModelDeckBlueprint) -> Vocabulary:
         "extract": blueprint.extract,
         "img_gen": blueprint.img_gen,
         "search": blueprint.search,
+        "doc_gen": blueprint.doc_gen,
     }
     vocabulary: Vocabulary = {}
     for family, family_blueprint in family_blueprints.items():
@@ -113,7 +115,7 @@ def extract_model_handles(blueprint: ModelDeckBlueprint) -> set[str]:
     through one of the three collections this function reads directly. A waterfall's own entries do
     carry handles, which is why they are read here and not only through whatever names the waterfall.
     """
-    family_blueprints: list[DeckFamilyBlueprint] = [blueprint.llm, blueprint.extract, blueprint.img_gen, blueprint.search]
+    family_blueprints: list[DeckFamilyBlueprint] = [blueprint.llm, blueprint.extract, blueprint.img_gen, blueprint.search, blueprint.doc_gen]
     references: list[str] = []
     for family_blueprint in family_blueprints:
         references.extend(family_blueprint.aliases.values())

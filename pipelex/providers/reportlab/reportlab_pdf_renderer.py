@@ -13,8 +13,9 @@ It writes the tree as ReportLab flowables on A4 portrait pages:
 
 Every text is escaped before it enters ReportLab's paragraph markup, so a value prints as written. The engine
 fetches nothing itself: an image is read through `RenderResources`, which applies the run's read scope, and a
-Markdown image is not read at all. It registers its bundled fonts once per process (`pdf_elements`), and it keeps
-nothing of one render into the next, so one instance serves every render of its process, from any thread.
+Markdown image is not read at all. It is the worker of the `reportlab-pdf` model, made for each print; it registers
+its bundled fonts once per process (`pdf_elements`) and builds its styles once, and it keeps nothing of one render
+into the next, so renders on any thread do not meet.
 
 Renders are built one at a time in a process (`_BUILD_LOCK`): ReportLab subsets a registered TrueType font through a
 cursor the font keeps on its file, so two documents saved at once corrupt each other's fonts. That costs no
@@ -25,6 +26,7 @@ the lock is taken, so a slow image does not hold up another render.
 import datetime
 import io
 import threading
+from functools import cache
 from typing import NamedTuple
 
 from PIL import Image as PilImage
@@ -36,6 +38,7 @@ from reportlab.platypus.doctemplate import LayoutError  # type: ignore[import-un
 from typing_extensions import override
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
 from pipelex.cogt.doc_gen.layout_tree import (
     FieldGridBlock,
@@ -48,7 +51,8 @@ from pipelex.cogt.doc_gen.layout_tree import (
     SectionBlock,
     TableBlock,
 )
-from pipelex.cogt.doc_gen.render_job import DocumentRendererProtocol, RenderedDocument, RenderJob, RenderResources
+from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderJob, RenderResources
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.reportlab.markdown_flowables import markdown_to_flowables
 from pipelex.providers.reportlab.pdf_elements import (
     MUTED_COLOR,
@@ -67,6 +71,7 @@ from pipelex.providers.reportlab.pdf_elements import (
     register_bundled_fonts,
     text_cell,
 )
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 LEFT_MARGIN = RIGHT_MARGIN = 18 * mm
@@ -92,16 +97,23 @@ _PDF_CREATOR = "Pipelex"
 _BUILD_LOCK = threading.Lock()
 
 
-class ReportlabPdfRenderer(DocumentRendererProtocol):
-    """The engine that prints a `pdf` from the layout tree: `DocGenFormat.PDF` from `DocGenSource.LAYOUT`.
+@cache
+def _pdf_styles() -> PdfStyles:
+    """The engine's paragraph and table styles, built once per process, after the fonts they name are registered."""
+    register_bundled_fonts()
+    return build_pdf_styles()
 
-    Built once per process by its plugin's factory, which is when it registers the bundled fonts and builds its
-    styles; `render` keeps its state in objects of its own call, so concurrent renders do not meet.
+
+class ReportlabPdfWorker(DocGenWorkerAbstract):
+    """The worker of `reportlab-pdf`, the engine that prints a `pdf` from the layout tree.
+
+    Made for each print by its plugin's factory; `render` keeps its state in objects of its own call, so concurrent
+    renders do not meet.
     """
 
-    def __init__(self) -> None:
-        register_bundled_fonts()
-        self._styles = build_pdf_styles()
+    def __init__(self, *, inference_model: InferenceModelSpec, reporting_delegate: ReportingProtocol | None = None):
+        super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
+        self._styles = _pdf_styles()
 
     @override
     def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:
@@ -138,8 +150,8 @@ class ReportlabPdfRenderer(DocumentRendererProtocol):
 
 
 def _layout_of_pdf_job(*, job: RenderJob) -> LayoutDocument:
-    """The layout tree of a job this engine prints, which is a PDF from the layout: the registry routes no other here."""
-    refusal = f"The built-in PDF engine prints a pdf from the auto-layout of its inputs, not a {job.format} {job.source.desc}."
+    """The layout tree of a job this engine prints, which is a PDF from the layout: its model declares no other."""
+    refusal = f"The built-in PDF engine prints a pdf from the auto-layout of its inputs, not {job.format.with_article} {job.source.desc}."
     match job.format:
         case DocGenFormat.PDF:
             pass

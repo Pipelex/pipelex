@@ -5,8 +5,8 @@ class DocGenFormat(StrEnum):
     """The file formats a `PipeDocGen` step can ask for.
 
     The tokens are MTHDS: a method names one, and it loads wherever the standard is read. Which of them a
-    runtime prints depends on the engines installed in it (`DocGenSource`, the document renderer
-    registry): open Pipelex prints a `pdf` laid out without a template, and the Pipelex document
+    runtime prints depends on the document engines installed in it, each a model of the `doc_gen` family:
+    open Pipelex prints a `pdf` laid out without a template, on `reportlab-pdf`, and the Pipelex document
     generation plugin prints the rest. HTML is not a format: `PipeCompose` already produces the native
     `Html`.
     """
@@ -27,6 +27,15 @@ class DocGenFormat(StrEnum):
                 return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             case DocGenFormat.PPTX:
                 return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+    @property
+    def with_article(self) -> str:
+        """The token after its indefinite article, for a message: 'a pdf', 'an xlsx'."""
+        match self:
+            case DocGenFormat.XLSX:
+                return f"an {self}"
+            case DocGenFormat.PDF | DocGenFormat.DOCX | DocGenFormat.PPTX:
+                return f"a {self}"
 
     @property
     def suffix(self) -> str:
@@ -74,8 +83,9 @@ class DocGenFormat(StrEnum):
 class DocGenSource(StrEnum):
     """What the compose stage hands an engine to print, which is half of what picks the engine.
 
-    A `pdf` from the layout tree and a `pdf` from composed HTML are different engines, so engines register
-    per format and per source.
+    A `pdf` from the layout tree and a `pdf` from composed HTML may print on different engines, so the model deck
+    names a default engine per format and per source, and a `doc_gen` model lists the sources it prints from as
+    its `inputs` and its format as its `outputs`.
     """
 
     LAYOUT = "layout"
@@ -107,15 +117,35 @@ class DocGenSource(StrEnum):
             return DocGenSource.HTML
         return DocGenSource.TEMPLATE_FILE
 
+    @classmethod
+    def possible_for(cls, *, doc_gen_format: DocGenFormat) -> list["DocGenSource"]:
+        """The sources a step in this format can compose from: the auto-layout where the format has one, and its kind of template."""
+        sources: list[DocGenSource] = []
+        if doc_gen_format.has_auto_layout:
+            sources.append(DocGenSource.LAYOUT)
+        sources.append(DocGenSource.HTML if doc_gen_format.is_template_html else DocGenSource.TEMPLATE_FILE)
+        return sources
 
-def is_printed_by_open_pipelex(*, doc_gen_format: DocGenFormat, source: DocGenSource) -> bool:
-    """Whether open Pipelex's built-in engine prints this format from this source: only a `pdf` without a template."""
-    match doc_gen_format:
-        case DocGenFormat.PDF:
-            match source:
-                case DocGenSource.LAYOUT:
-                    return True
-                case DocGenSource.HTML | DocGenSource.TEMPLATE_FILE:
-                    return False
-        case DocGenFormat.XLSX | DocGenFormat.DOCX | DocGenFormat.PPTX:
-            return False
+
+def doc_gen_choice_key(*, doc_gen_format: DocGenFormat, source: DocGenSource) -> str:
+    """The key the model deck lists a format and source's default engine under: 'pdf.layout'."""
+    return f"{doc_gen_format}.{source}"
+
+
+def parse_doc_gen_choice_key(key: str) -> tuple[DocGenFormat, DocGenSource]:
+    """The format and source a key of the model deck's doc-gen defaults names.
+
+    Raises:
+        ValueError: the key is not '<format>.<source>', or no step composes that format from that source.
+    """
+    format_token, separator, source_token = key.partition(".")
+    try:
+        doc_gen_format = DocGenFormat(format_token)
+        source = DocGenSource(source_token)
+    except ValueError as exc:
+        msg = f"'{key}' is not a '<format>.<source>' key, such as 'pdf.layout'."
+        raise ValueError(msg) from exc
+    if not separator or source not in DocGenSource.possible_for(doc_gen_format=doc_gen_format):
+        msg = f"'{key}' names no step: {doc_gen_format.with_article} is never composed {source.desc}."
+        raise ValueError(msg)
+    return doc_gen_format, source

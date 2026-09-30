@@ -25,10 +25,10 @@ if TYPE_CHECKING:
 # factory at boot) — joined the menu under v4 without a bump: a menu addition breaks no plugin that
 # targets v4, and a bump would have made every installed plugin re-declare ``targets_api`` for nothing.
 #
-# ``add_document_renderer`` — the document engines a ``PipeDocGen`` step prints with, keyed by format and
-# source, with an optional template checker — joined the menu under v4 on the same reasoning. Its render job
-# and template check request (``pipelex.cogt.doc_gen``) are plain data and part of the contract: a breaking
-# change to either is a bump.
+# ``InferenceFamily.DOC_GEN`` — the document engines a ``PipeDocGen`` step prints with, each a model of the
+# ``doc_gen`` family registered through ``add_inference_backend`` — joined under v4 on the same reasoning. Its
+# worker (``DocGenWorkerAbstract``), render job and template check request (``pipelex.cogt.doc_gen``) are part
+# of the contract: a breaking change to any of them is a bump.
 PLUGIN_API_VERSION: int = 4
 
 

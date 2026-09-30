@@ -8,12 +8,17 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.doc_gen.doc_gen_engine import resolve_doc_gen_setting
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
+from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.doc_gen.input_shape import InputShape, shape_of_input
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document, humanize
 from pipelex.cogt.doc_gen.plain_data import plain_data
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest
+from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -29,7 +34,7 @@ from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDo
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.runtime_hub import get_class_registry, get_content_generator, get_document_renderer_registry
+from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck, get_report_delegate
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -55,19 +60,21 @@ class PipeDocGenOutput(PipeOutput):
 
 
 class PipeDocGen(PipeOperator[PipeDocGenOutput]):
-    """Turn the step's inputs into a stored document file, in two stages. It calls no model.
+    """Turn the step's inputs into a stored document file, in two stages. It calls no AI model.
 
     The **compose stage** is pure: it builds the layout tree of the inputs, or renders the HTML template, or
     gathers the inputs as plain data for a template file, and it renders the filename, every template with a
     strict undefined so a missing field fails rather than printing as empty text. The **print stage** is the
-    content generator's `make_rendered_document`: the engine registered for the step's format and source prints
-    the composition, and the bytes are stored through the run's storage provider as a `DocumentContent`. A dry
-    run composes for real, which checks the templates against mock inputs, runs the engine's template checker on
-    a template file, and prints and stores nothing.
+    content generator's `make_rendered_document`: the step's engine prints the composition, and the bytes are
+    stored through the run's storage provider as a `DocumentContent`. The engine is a `doc_gen` model, the one the
+    step names or the model deck's default for its format and source, checked when the method loads. A dry run
+    composes for real, which checks the templates against mock inputs, runs the engine's template checker on a
+    template file, and prints and stores nothing.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
     doc_gen_format: DocGenFormat = Field(strict=False)
+    doc_gen_choice: DocGenModelChoice | None = Field(default=None, description="The engine the step names, or None for the deck's default")
     template: str | None = Field(default=None, description="The HTML template of a pdf step, inline or read from its template file")
     template_file: str | None = Field(default=None, description="The template file as the method names it")
     template_path: str | None = Field(default=None, description="The resolved path of an office template file, which its engine fills")
@@ -93,8 +100,20 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                     roots.add(root)
         return roots
 
+    def resolve_engine(self) -> DocGenSetting:
+        """The engine this step prints on, resolved in the model deck and checked to print its format from its source here."""
+        return resolve_doc_gen_setting(
+            doc_gen_choice=self.doc_gen_choice, doc_gen_format=self.doc_gen_format, source=self.source, pipe_code=self.code
+        )
+
     @override
     def validate_inputs_static(self):
+        # The engine is resolved when the method loads, so a step no engine here prints is refused before a run spends anything.
+        if self.doc_gen_choice is not None:
+            with self.locating_model_choice(field_name="model"):
+                check_doc_gen_choice_with_deck(doc_gen_choice=self.doc_gen_choice)
+        self.resolve_engine()
+
         # The same template lints as PipeCompose: no private names, and every reference to a declared-optional input
         # guarded. The filename gets both too, since it renders as strictly as the template does.
         if self.template is not None:
@@ -258,9 +277,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         """
         if self.template_path is None or self.template_file is None:
             return
-        entry = get_document_renderer_registry().resolve(doc_gen_format=self.doc_gen_format, source=self.source)
-        if entry is None or entry.check_template is None:
-            return
+        doc_gen_setting = self.resolve_engine()
+        inference_model = get_model_deck().get_required_inference_model(model_handle=doc_gen_setting.model, model_type=ModelType.DOC_GEN)
+        worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
         request = TemplateCheckRequest(
             format=self.doc_gen_format,
             template=Path(self.template_path).read_bytes(),
@@ -268,8 +287,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             inputs=self._input_shapes(),
             data={name: plain_data(content) for name, content in self._named_contents(working_memory)},
         )
-        check_template = entry.check_template
-        findings = await asyncio.to_thread(lambda: check_template(request=request))
+        findings = await asyncio.to_thread(worker.check_template, request=request)
         errors = [finding for finding in findings if finding.severity.is_error]
         for finding in findings:
             if not finding.severity.is_error:
@@ -290,6 +308,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         document: DocumentContent,
+        doc_gen_setting: DocGenSetting,
         output_name: str | None,
     ) -> PipeDocGenOutput:
         # The output concept refines Document, so its class is DocumentContent or a subclass of it.
@@ -298,7 +317,13 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         working_memory = store_result(memory=working_memory, concept=self.output.concept, content=content, result_name=output_name)
         self._register_execution_data(
             job_metadata=job_metadata,
-            execution_data={"format": self.doc_gen_format, "source": self.source, "filename": document.filename, "url": document.url},
+            execution_data={
+                "format": self.doc_gen_format,
+                "source": self.source,
+                "resolved_model": doc_gen_setting.model,
+                "filename": document.filename,
+                "url": document.url,
+            },
         )
         return PipeDocGenOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
@@ -312,13 +337,21 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         output_name: str | None = None,
     ) -> PipeDocGenOutput:
         composition = await self.compose(working_memory=working_memory, pipe_run_params=pipe_run_params)
+        doc_gen_setting = self.resolve_engine()
         document = await get_content_generator().make_rendered_document(
             job_metadata=job_metadata,
             cogt_run_params=pipe_run_params.cogt_run_params,
             composition=composition,
+            doc_gen_setting=doc_gen_setting,
         )
         log.verbose(f"PipeDocGen '{self.code}' stored {document.filename} at {document.url}")
-        return self._store_document(job_metadata=job_metadata, working_memory=working_memory, document=document, output_name=output_name)
+        return self._store_document(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            document=document,
+            doc_gen_setting=doc_gen_setting,
+            output_name=output_name,
+        )
 
     @override
     async def _dry_run_operator_pipe(

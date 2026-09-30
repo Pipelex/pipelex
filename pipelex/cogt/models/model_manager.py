@@ -4,6 +4,7 @@ from pathlib import Path
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
@@ -226,10 +227,18 @@ class ModelManager(ModelManagerAbstract):
         search_default_handle = cls._extract_choice_handle(deck.search_choice_default)
         if search_default_handle is not None:
             references.append((search_default_handle, ModelType.SEARCH))
+        for doc_gen_setting in deck.doc_gen_presets.values():
+            references.append((doc_gen_setting.model, ModelType.DOC_GEN))
+        for doc_gen_default in deck.doc_gen_choice_defaults.values():
+            doc_gen_default_handle = cls._extract_choice_handle(doc_gen_default)
+            if doc_gen_default_handle is not None:
+                references.append((doc_gen_default_handle, ModelType.DOC_GEN))
         return references
 
     @classmethod
-    def _extract_choice_handle(cls, choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | ModelReference | str | None) -> str | None:
+    def _extract_choice_handle(
+        cls, choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | ModelReference | str | None
+    ) -> str | None:
         """Normalise a ``*ModelChoice`` union (LLMModelChoice etc.) to a raw handle string.
 
         Choice defaults can be a typed setting object, a parsed ``ModelReference``, or a raw
@@ -433,6 +442,11 @@ class ModelManager(ModelManagerAbstract):
             search_waterfalls=model_deck_blueprint.search.waterfalls,
             search_presets=model_deck_blueprint.search.presets,
             search_choice_default=model_deck_blueprint.search.choice_default,
+            # DocGen
+            doc_gen_aliases=model_deck_blueprint.doc_gen.aliases,
+            doc_gen_waterfalls=model_deck_blueprint.doc_gen.waterfalls,
+            doc_gen_presets=model_deck_blueprint.doc_gen.presets,
+            doc_gen_choice_defaults=model_deck_blueprint.doc_gen.choice_defaults,
             model_deck_config=get_config().inference.model_deck,
         )
 

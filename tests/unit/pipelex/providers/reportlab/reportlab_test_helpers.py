@@ -12,7 +12,10 @@ from typing_extensions import override
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.layout_tree import LayoutBlock, LayoutDocument, MarkdownBlock
 from pipelex.cogt.doc_gen.render_job import RenderJob, RenderResources
-from pipelex.providers.reportlab.reportlab_pdf_renderer import ReportlabPdfRenderer
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.providers.reportlab.reportlab_pdf_renderer import ReportlabPdfWorker
 
 TEST_FILENAME = "test-document.pdf"
 TEST_TITLE = "Test document"
@@ -41,9 +44,26 @@ class StubRenderResources(RenderResources):
         return base64.b64decode(payload)
 
 
+def reportlab_pdf_model() -> InferenceModelSpec:
+    """The `reportlab-pdf` model as the kit's `internal.toml` declares it."""
+    return InferenceModelSpec(
+        backend_name="internal",
+        name="reportlab-pdf",
+        sdk="reportlab",
+        model_type=ModelType.DOC_GEN,
+        model_id="print-pdf",
+        inputs=["layout"],
+        outputs=["pdf"],
+        costs={},
+        thinking_mode=ThinkingMode.NONE,
+        max_tokens=None,
+        max_prompt_images=None,
+    )
+
+
 @cache
-def get_test_renderer() -> ReportlabPdfRenderer:
-    return ReportlabPdfRenderer()
+def get_test_renderer() -> ReportlabPdfWorker:
+    return ReportlabPdfWorker(inference_model=reportlab_pdf_model())
 
 
 def render_layout(*, blocks: list[LayoutBlock], title: str = TEST_TITLE, resources: RenderResources | None = None) -> bytes:

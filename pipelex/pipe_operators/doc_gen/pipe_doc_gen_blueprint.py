@@ -4,6 +4,7 @@ from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
@@ -42,19 +43,22 @@ def template_required_roots(*, template_source: str, template_category: Template
 class PipeDocGenBlueprint(PipeBlueprint):
     """Generate a document file from a method's structured result: a PDF, an Excel workbook, a Word document or a PowerPoint deck.
 
-    It calls no model: it lays out or fills what its inputs already hold. With no template, the pipe lays its inputs
+    It calls no AI model: it lays out or fills what its inputs already hold. With no template, the pipe lays its inputs
     out by itself (the auto-layout), for every format but `pptx`. `template` is an inline HTML and Jinja2 template, for
     `pdf` only; `template_file` is a path relative to the bundle's file: an `.html` for `pdf`, an `.xlsx` for `xlsx`, a
     `.docx` for `docx` and a `.pptx` for `pptx`, which `pptx` requires. `filename` is a Jinja expression over the
-    inputs; the suffix is added. The output must be a single `Document`, or a concept refining it. Which formats a
-    runtime prints depends on the document engines installed in it: open Pipelex prints a `pdf` without a template,
-    and a runtime without an engine for what a step asks refuses the method when it loads.
+    inputs; the suffix is added. The output must be a single `Document`, or a concept refining it. `model` names the
+    document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or `weasyprint-pdf`;
+    without it, the model deck's default for the format and source prints it. Which engines a runtime has depends
+    on its plugins: open Pipelex prints a `pdf` without a template on `reportlab-pdf`, and a runtime without the
+    engine a step needs refuses the method when it loads.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
 
     format: DocGenFormat = Field(strict=False)
+    model: DocGenModelChoice | None = None
     template: str | None = None
     template_file: str | None = None
     filename: str | None = None

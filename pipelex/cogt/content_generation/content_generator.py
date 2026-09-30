@@ -24,6 +24,7 @@ from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_
 from pipelex.cogt.content_generation.render_generate import render_page_views_and_store
 from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured_object
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -249,11 +250,13 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         composition: DocumentComposition,
+        doc_gen_setting: DocGenSetting,
     ) -> DocumentContent:
         render_assignment = RenderDocumentAssignment(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             composition=composition,
+            doc_gen_setting=doc_gen_setting,
         )
         return await render_document_and_store(
             render_assignment=render_assignment,

@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key, parse_doc_gen_choice_key
 
 
 class TestDocGenFormat:
@@ -27,3 +27,25 @@ class TestDocGenFormat:
         assert DocGenFormat.DOCX.template_file_suffix == ".docx"
         assert DocGenFormat.PDF.mime_type == "application/pdf"
         assert DocGenFormat.XLSX.suffix == "xlsx"
+
+    def test_every_step_a_format_can_make_has_a_choice_key_that_parses_back(self) -> None:
+        for doc_gen_format in DocGenFormat:
+            for source in DocGenSource.possible_for(doc_gen_format=doc_gen_format):
+                key = doc_gen_choice_key(doc_gen_format=doc_gen_format, source=source)
+                assert parse_doc_gen_choice_key(key) == (doc_gen_format, source)
+        assert doc_gen_choice_key(doc_gen_format=DocGenFormat.PDF, source=DocGenSource.LAYOUT) == "pdf.layout"
+
+    @pytest.mark.parametrize(
+        ("key", "expected"),
+        [
+            ("pdf", "is not a '<format>.<source>' key"),
+            ("html.layout", "is not a '<format>.<source>' key"),
+            ("pdf.markdown", "is not a '<format>.<source>' key"),
+            ("pdf.template_file", "a pdf is never composed from a template file"),
+            ("xlsx.html", "an xlsx is never composed from an HTML template"),
+            ("pptx.layout", "a pptx is never composed from the auto-layout of its inputs"),
+        ],
+    )
+    def test_a_choice_key_no_step_makes_is_refused(self, key: str, expected: str) -> None:
+        with pytest.raises(ValueError, match=expected):
+            parse_doc_gen_choice_key(key)
