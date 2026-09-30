@@ -22,7 +22,7 @@ Three pieces:
 
 - **`drift.toml`** (repo root, human-authored) declares the contracts: `triggers` (globs over tracked files), optional `exclude`, `review` targets, and optional `verify_commands`.
 - **`.drift/acks/<contract-id>.toml`** (tool-written, committed) records the last fulfilled review: a content digest, the reviewer, a timestamp, a rationale, and the per-file trigger snapshot.
-- **`pipelex-dev drift plan|check|ack`** computes obligations, checks them, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make agent-check` and `make check` aggregates, and run in CI as the `Lint (drift-contracts)` job, a required status check on `dev` and `main`), `make drift-ack CONTRACT=… RATIONALE="…"`.
+- **`pipelex-dev drift plan|check|ack`** computes obligations, checks them, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make agent-check` and `make check` aggregates, and run in CI as the `Lint (drift-contracts)` job, a required status check on `dev` and `main`), `make drift-ack CONTRACT=… RATIONALE="<verdict>: …"`.
 
 The validity rule is a single equality, with no base ref, no git diff, and no timestamps:
 
@@ -36,7 +36,7 @@ One view of every surface the contract system touches, from the working tree to 
 
 | Surface | What happens there |
 |---|---|
-| **Make targets** | `make drift-check` (alias `dc`) is the pass/fail gate; `make drift-plan` (`dp`) is the read-only diagnosis; `make drift-ack CONTRACT=… RATIONALE="…"` (`da`, optional `BY=` for agents) records the review. All three wrap `pipelex-dev drift`. |
+| **Make targets** | `make drift-check` (alias `dc`) is the pass/fail gate; `make drift-plan` (`dp`) is the read-only diagnosis; `make drift-ack CONTRACT=… RATIONALE="<verdict>: …"` (`da`, optional `BY=` for agents) records the review. All three wrap `pipelex-dev drift`. |
 | **Quality checks** | `drift-check` runs inside the `make agent-check` and `make check` aggregates, alongside the other repo gates — a local check cannot pass with an open contract or a rotten manifest, so an open contract surfaces before CI. Mind the index: the digest reads staged content, so unstaged trigger edits are invisible to the gate until `git add`. |
 | **Commits** | The digest is computed from the **git index**, and `drift ack` stages the ack file it writes — so the ack, the code change, and any doc fix land in the same commit, reviewed as one diff. |
 | **Branches / merges** | After a merge, `drift check` recomputes the digest over the merged tree. An ack that was valid on either side but does not cover the merged trigger content fails the check until the merged state is reviewed and re-acked (see [Merges](#merges)). |
@@ -59,18 +59,18 @@ It prints one Markdown packet per open contract: the description, exactly which 
 3. **Record the ack:**
 
     ```bash
-    make drift-ack CONTRACT=config-docs RATIONALE="Documented the new activity_queues setting; other config pages unaffected."
+    make drift-ack CONTRACT=config-docs RATIONALE="real-catch: Documented the new activity_queues setting; other config pages unaffected."
     ```
 
     This first runs the contract's `verify_commands` (each one `shlex`-split and run without a shell, from the repo root; the first failure aborts the ack), then recomputes the digest from the index, writes the ack file, and stages it — the ack lands in the same index the check reads, so the local gate and the commit you are building agree. If staging the written ack fails (e.g. a locked git index), the ack file is removed rather than left unstaged, so a later `drift check` reports a missing ack instead of a false green.
 
 4. **Commit the ack file together with the change it covers** (it is already staged). The ack surfaces in the PR diff, so the reviewer sees the rationale next to the change — that is the audit trail.
 
-`reviewed_by` defaults from `git config user.name`; agents pass `BY=<identity>` (e.g. a model name or session URL). The rationale is required and is the on-the-record review decision: it opens with its verdict (`real-catch`, `clean-pass` or `friction`) and then says honestly what was reviewed, not "docs fine".
+`reviewed_by` defaults from `git config user.name`; agents pass `BY=<identity>` (e.g. a model name or session URL). The rationale is required and is the on-the-record review decision: it opens with its verdict (`real-catch`, `clean-pass` or `friction`) and a colon, then says honestly what was reviewed, not "docs fine". `drift ack` refuses a rationale that does not open with one of the three, before any verify command runs.
 
 ## Why there is no bypass
 
-`drift ack` has no `--skip-verify`, and `drift check` has no override label. Every escape hatch here is a rubber-stamp invitation, and the legitimate escape already exists: acking with a rationale that says "no doc change needed" is cheap, honest, and auditable. If a contract opens so often that acking feels like ceremony, the contract is mis-scoped — narrow its triggers or mechanize it into a derived check; don't add a bypass.
+`drift ack` has no `--skip-verify`, and `drift check` has no override label. Every escape hatch here is a rubber-stamp invitation, and the legitimate escape already exists: acking with a rationale that says "clean-pass: no doc change needed" is cheap, honest, and auditable. If a contract opens so often that acking feels like ceremony, the contract is mis-scoped — narrow its triggers or mechanize it into a derived check; don't add a bypass.
 
 ## Merges
 

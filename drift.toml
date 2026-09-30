@@ -2,7 +2,7 @@
 #
 # A contract says: when these trigger files change, these review targets must be
 # re-examined against the change, and the examination must be recorded with
-# `make drift-ack CONTRACT=<id> RATIONALE="…"`. `make drift-check` gates the local
+# `make drift-ack CONTRACT=<id> RATIONALE="<verdict>: …"`. `make drift-check` gates the local
 # `make agent-check` and `make check` aggregates, and `Lint (drift-contracts)` is a
 # required status check on `dev` and `main`. See docs/contribute/drift-contracts.md
 # for the full workflow.

@@ -62,7 +62,7 @@ As an agent, always pass `BY` with your **own actual identity** — the model yo
 
 ## Mandatory: open the rationale with the verdict
 
-The one question only usage can answer about a contract is whether its ack friction is proportionate to the staleness it catches, so every rationale starts with one verdict:
+The one question only usage can answer about a contract is whether its ack friction is proportionate to the staleness it catches, so every rationale starts with one verdict, followed by a colon — `drift ack` refuses a rationale that does not:
 
 - **real-catch** — the review found actual staleness, and this change fixes it;
 - **clean-pass** — genuinely reviewed, nothing was stale;
