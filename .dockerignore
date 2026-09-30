@@ -1,12 +1,14 @@
-# The ignore file for `docker build -f api/Dockerfile .`: BuildKit reads `<Dockerfile>.dockerignore`
-# beside the Dockerfile in place of a `.dockerignore` at the root of the context. The context is the
-# whole repository, so this is an allowlist: everything is left out, then only what the Dockerfile
-# reads is let back in.
+# The ignore file for `docker build -f api/Dockerfile .`, the API server's image, which is the only image
+# built from this repository. It sits at the root of the context rather than beside the Dockerfile as
+# `api/Dockerfile.dockerignore`, because the legacy builder (`DOCKER_BUILDKIT=0`) reads no other file:
+# without this one it would send the whole repository and copy the untracked overrides below into the
+# image. The context is the whole repository, so this is an allowlist: everything is left out, then
+# only what the Dockerfile reads is let back in.
 *
 
 # The workspace: its lock, and the root project's metadata, which a build of the `pipelex` package
-# reads. The `.gitignore` files ride along so the wheels are built with the same exclusions as
-# anywhere else.
+# reads. The Dockerfile copies the `.gitignore` files too, because hatchling leaves out of a wheel what
+# they ignore, so the wheels are built with the same exclusions as anywhere else.
 !pyproject.toml
 !uv.lock
 !README.md

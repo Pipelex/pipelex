@@ -4,7 +4,7 @@
 #
 # The server is a member of the uv workspace rooted there, and it installs pipelex from the same
 # commit rather than from PyPI, so the image cannot run a pipelex other than the one it was released
-# with. `api/Dockerfile.dockerignore` keeps that context down to the files this build reads.
+# with. The root `.dockerignore` keeps that context down to the files this build reads.
 
 # ─── builder: the virtual environment, built from the workspace lock ──────────
 FROM python:3.11-slim AS builder
@@ -28,7 +28,11 @@ COPY api/pyproject.toml api/README.md api/LICENSE api/
 RUN uv sync --frozen --no-dev --package pipelex-api --no-install-workspace
 
 # Then the two packages themselves, built as wheels rather than linked to the source tree, so the
-# image runs what the published `pipelex` and `pipelex-api` distributions contain.
+# image runs what the published `pipelex` and `pipelex-api` distributions contain. hatchling leaves
+# out of a wheel what the project's `.gitignore` ignores, so those come first: without them, a local
+# build would ship whatever ignored files lie in the working tree.
+COPY .gitignore ./
+COPY api/.gitignore api/
 COPY pipelex/ pipelex/
 COPY api/pipelex_api/ api/pipelex_api/
 RUN uv sync --frozen --no-dev --package pipelex-api --no-editable
