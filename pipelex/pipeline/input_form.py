@@ -787,7 +787,8 @@ def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     fields and `native.Number` chains, so the kind IS the judgment; `text`/`prose` nodes are
     text-valued EXCEPT a time-formatted text (`type = "time"` is neither). A `native.Html` chain
     derives an `object` node since the standard put it on the object arm, so it never reaches the
-    text-valued case.
+    text-valued case. One divergence is open (L-260930-173b03): a class-backed `RootModel` over a
+    scalar derives its root value's node here, while the lint classifies every non-native class OTHER.
     """
     match node:
         case NumberField():

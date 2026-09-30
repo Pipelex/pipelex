@@ -131,7 +131,7 @@ class PipeCondition(PipeController):
 
     @override
     def validate_output_static(self):
-        # OPTIONAL_OUTPUT_REQUIRED (D5/D6): `continue` resolves the declared output as ABSENT,
+        # OPTIONAL_OUTPUT_REQUIRED (D5/D6 of the Optionals design, L-260930-241424): `continue` resolves the declared output as ABSENT,
         # so a `continue`-reachable condition must declare its output optional —
         # otherwise the no-output path would be invisible to the type system, which is exactly
         # the invisible-optional wart this feature removes.

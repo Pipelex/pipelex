@@ -13,7 +13,7 @@ This module is the top-down *dispatch*: the actual content building reuses the e
 (``StuffContentFactory`` / ``ConceptLibrary.is_compatible`` / the bottom-up ``StuffFactory``). The
 new code decides which arm each value takes; it does not invent new content builders.
 
-The D-numbered decisions cited below (D1-D11) are the Smart Inputs design's; the rules they produced
+The D-numbered decisions cited below (D1-D11) are the Smart Inputs design's (L-260930-8fcfbe); the rules they produced
 are documented for callers in ``docs/building-methods/pipes/provide-inputs.md``. The ``Anything`` and
 ``JSON`` arms follow the rulings R1-R11 of L-260902-10eb56.
 """
