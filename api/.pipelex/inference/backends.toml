@@ -1,5 +1,5 @@
-# pipelex-api: this is the kit's `inference/backends.toml` from the pinned pipelex, re-synced by
-# `make kit-sync`. Only the `enabled` switches are this image's own choice, and the sync keeps them;
+# pipelex-api: this is the kit's `inference/backends.toml` from the pipelex of this repository, re-synced
+# by `make kit-sync`. Only the `enabled` switches are this image's own choice, and the sync keeps them;
 # any other edit is reported as drift by `make kit-check`.
 #
 ####################################################################################################

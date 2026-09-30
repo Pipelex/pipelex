@@ -1,29 +1,36 @@
-"""Keep the vendored `.pipelex/inference/` tree in step with the installed pipelex's kit.
+"""Keep the server's vendored `.pipelex/inference/` tree in step with the kit of the pipelex beside it.
 
-The image serves the models its `/root/.pipelex/inference/` tree declares, and that tree is this
-repository's `.pipelex/inference/`, copied in by the Dockerfile. Once a config directory exists,
-pipelex never reads the kit shipped inside its own wheel, so a pin bump changes nothing the image
-serves until these files move with it. `pipelex update` refreshes only the numbered deck files; this
-script owns the whole tree, under four rules:
+The image serves the models its `/root/.pipelex/inference/` tree declares, and that tree is the
+member's `api/.pipelex/inference/`, copied in by the Dockerfile; `make run` and the tests read the
+same tree. Once a config directory exists, pipelex never reads the kit shipped inside its own
+package, so a kit change reaches the server only when these files move with it. The server runs the
+pipelex of the same commit, so the tree is kept in step in the same change as the kit: the root
+`make up-kit-configs` (`ukc`), the step a kit change already takes, runs this script too, and
+`make -C api kit-check`, part of the member's `agent-check`, fails a change that left the tree
+behind. This script owns the whole tree, under four rules:
 
-- `inference/backends/` mirrors the kit's directory: every kit file byte for byte, and no other
-  file. What `pipelex migrate` leaves beside the files it rewrites is never counted or deleted.
+- `inference/backends/` mirrors the kit's directory: every kit file byte for byte, the kit's
+  `.kit_manifest.json` included, and no other file. What `pipelex migrate` leaves beside the files
+  it rewrites is never counted or deleted.
 - `inference/routing_profiles.toml` is the kit's, byte for byte.
 - `inference/backends.toml` is the kit's except for each backend's `enabled` switch, which is this
   image's own choice: the switch is carried over from the current file, read the way pipelex reads
   it (a table with no `enabled` key is on), and a backend the kit adds arrives disabled. The current
   file is the only record of those choices, so when it is missing or unreadable, or lacks the table
   of a backend whose file is already vendored, both modes stop rather than invent a switch.
-- `inference/deck/`: the numbered files are the kit's, with the `.kit_manifest.json` pipelex keeps
-  for them. The `x_custom_*` overrides are this repository's and are never touched.
+- `inference/deck/`: the numbered files and the `.kit_manifest.json` are the kit's, byte for byte.
+  The `x_custom_*` overrides are this server's own and are never touched.
+
+The manifests are mirrored rather than recomputed so that nothing here depends on the version
+number: a release moves the version and leaves this tree as it is.
 
 Usage:
     python scripts/sync_vendored_kit.py .pipelex
     python scripts/sync_vendored_kit.py --check .pipelex
 
-`--check` exits non-zero when the vendored tree has drifted from the kit — wired into CI via
-`make kit-check`. Both modes also fail when the kit ships an `inference/` entry none of the rules
-above covers, since only a person can decide what this image does with it.
+`--check` exits non-zero when the vendored tree has drifted from the kit. Both modes also fail when
+the kit ships an `inference/` entry none of the rules above covers, since only a person can decide
+what this image does with it.
 """
 
 import argparse
@@ -34,15 +41,15 @@ from pathlib import Path
 from typing import cast
 
 from pipelex.cogt.models.deck_manifest import (
-    compute_kit_manifest,
+    MANIFEST_FILENAME,
+    KitManagedArea,
     kit_deck_dir,
     list_managed_installed_files,
     list_managed_kit_files,
-    read_manifest,
-    write_manifest,
 )
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.backup import BACKUP_INFIX, RESCUE_INFIX
+from pipelex.tools.misc.package_utils import get_package_version
 from pydantic import BaseModel, ConfigDict, Field
 
 _BACKENDS_DIR = "backends"
@@ -62,8 +69,8 @@ _TABLE_HEADER = re.compile(r"^\[([^\[\]]+)\]")
 _ENABLED_SWITCH = re.compile(r"^(enabled\s*=\s*)(true|false)\b")
 
 _BACKENDS_TOML_PREAMBLE = """\
-# pipelex-api: this is the kit's `inference/backends.toml` from the pinned pipelex, re-synced by
-# `make kit-sync`. Only the `enabled` switches are this image's own choice, and the sync keeps them;
+# pipelex-api: this is the kit's `inference/backends.toml` from the pipelex of this repository, re-synced
+# by `make kit-sync`. Only the `enabled` switches are this image's own choice, and the sync keeps them;
 # any other edit is reported as drift by `make kit-check`.
 #
 """
@@ -91,14 +98,12 @@ class SyncPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     drifts: list[Drift] = Field(default_factory=list[Drift])
-    deck_dir: Path | None = None
-    manifest_is_stale: bool = False
     unhandled_kit_entries: list[str] = Field(default_factory=list)
     dropped_backend_switches: dict[str, bool] = Field(default_factory=dict)
 
     @property
     def is_clean(self) -> bool:
-        return not self.drifts and not self.manifest_is_stale and not self.unhandled_kit_entries
+        return not self.drifts and not self.unhandled_kit_entries
 
 
 def _is_mirrored_name(name: str) -> bool:
@@ -225,13 +230,17 @@ def _plan_backends_toml(*, kit_file: Path, vendored_file: Path, vendored_backend
 
 def _plan_deck(*, vendored_deck_dir: Path, plan: SyncPlan) -> None:
     kit_dir = kit_deck_dir()
-    kit_names = set(list_managed_kit_files())
-    vendored_names = set(list_managed_installed_files(vendored_deck_dir))
+    kit_names = set(list_managed_kit_files(area=KitManagedArea.DECK))
+    vendored_names = set(list_managed_installed_files(vendored_deck_dir, area=KitManagedArea.DECK))
     for name in sorted(kit_names | vendored_names):
         expected = (kit_dir / name).read_bytes() if name in kit_names else None
         _compare_file(target=vendored_deck_dir / name, expected=expected, plan=plan)
-    plan.deck_dir = vendored_deck_dir
-    plan.manifest_is_stale = read_manifest(vendored_deck_dir) != compute_kit_manifest()
+    kit_manifest = kit_dir / MANIFEST_FILENAME
+    _compare_file(
+        target=vendored_deck_dir / MANIFEST_FILENAME,
+        expected=kit_manifest.read_bytes() if kit_manifest.is_file() else None,
+        plan=plan,
+    )
 
 
 def plan_sync(config_dir: Path) -> SyncPlan:
@@ -262,15 +271,10 @@ def apply_plan(plan: SyncPlan) -> None:
         else:
             drift.path.parent.mkdir(parents=True, exist_ok=True)
             drift.path.write_bytes(drift.content)
-    if plan.manifest_is_stale and plan.deck_dir is not None:
-        write_manifest(compute_kit_manifest(), deck_dir=plan.deck_dir)
 
 
 def _describe(plan: SyncPlan) -> list[str]:
-    lines = [f"  {drift.path}: {drift.reason}" for drift in plan.drifts]
-    if plan.manifest_is_stale and plan.deck_dir is not None:
-        lines.append(f"  {plan.deck_dir / '.kit_manifest.json'}: does not record the installed kit")
-    return lines
+    return [f"  {drift.path}: {drift.reason}" for drift in plan.drifts]
 
 
 def _describe_unhandled(plan: SyncPlan) -> str:
@@ -285,7 +289,7 @@ def main() -> int:
     args = parser.parse_args()
 
     config_dir: Path = args.config_dir
-    kit_version = compute_kit_manifest().kit_version
+    kit_version = get_package_version()
     mode = "drift check" if args.check else "sync"
     try:
         plan = plan_sync(config_dir)
@@ -302,14 +306,14 @@ def main() -> int:
             print(line)
         if plan.unhandled_kit_entries:
             print(_describe_unhandled(plan))
-        if plan.drifts or plan.manifest_is_stale:
-            print("Run `make kit-sync` and commit the result.")
+        if plan.drifts:
+            print("Run `make kit-sync` in api/, or `make up-kit-configs` at the repository root, and commit the result.")
         return 1
 
     for backend_name, enabled in sorted(plan.dropped_backend_switches.items()):
         state = "enabled" if enabled else "disabled"
         print(f"Note: backend '{backend_name}' is no longer in the kit, so its switch ({state}) is dropped.")
-    if plan.drifts or plan.manifest_is_stale:
+    if plan.drifts:
         apply_plan(plan)
         print(f"Re-synced the vendored inference tree to the pipelex {kit_version} kit:")
         for line in _describe(plan):

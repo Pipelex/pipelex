@@ -384,7 +384,7 @@ paths:
 
         regardless of backend (wait-semantics is endpoint-set, never requestable). Pipelex domain
 
-        failures propagate untouched: the global `PipelexError` handler in `api.exception_handlers`
+        failures propagate untouched: the global `PipelexError` handler in `pipelex_api.exception_handlers`
 
         turns them into an RFC 7807 problem response.'
       operationId: execute_v1_execute_post
@@ -623,7 +623,7 @@ paths:
 
         `StartAck.pipeline_run_id` is always authoritative). Pipelex domain failures propagate untouched: the global
 
-        `PipelexError` handler in `api.exception_handlers` turns them into an
+        `PipelexError` handler in `pipelex_api.exception_handlers` turns them into an
 
         RFC 7807 problem response.
 
@@ -927,7 +927,7 @@ paths:
         \  is also a no-verdict condition — never an `is_valid: false`: a malformed reference or a\n  failed fetch is a **422**,\
         \ no matching package in the repository a **404**, and the\n  custom-Python policy (the sandbox gate, the structures\
         \ refusal) a **403**, each with the\n  originating error class as `error_type`. All are RFC 7807 `application/problem+json`\n\
-        \  rendered by the global handler in `api.exception_handlers` — routes never shape them."
+        \  rendered by the global handler in `pipelex_api.exception_handlers` — routes never shape them."
       operationId: validate_mthds_v1_validate_post
       requestBody:
         content:
@@ -1461,7 +1461,7 @@ paths:
 
         422. Pipelex domain failures propagate untouched to the global
 
-        `PipelexError` handler in `api.exception_handlers`.
+        `PipelexError` handler in `pipelex_api.exception_handlers`.
 
 
         A malformed shape — a non-mapping `structure` (`{"structure": "string"}`)
@@ -1540,7 +1540,7 @@ paths:
 
         exactly one site). Pipelex domain failures propagate untouched to the
 
-        global `PipelexError` handler in `api.exception_handlers`.'
+        global `PipelexError` handler in `pipelex_api.exception_handlers`.'
       operationId: build_pipe_spec_v1_build_pipe_spec_post
       requestBody:
         content:
@@ -2801,6 +2801,42 @@ components:
       - range
       title: Diagnostic
       description: Structured lint/format diagnostic returned by `pipelex-tools-py`.
+    DocGenFormat:
+      type: string
+      enum:
+      - pdf
+      - xlsx
+      - docx
+      - pptx
+      title: DocGenFormat
+      description: 'The file formats a `PipeDocGen` step can ask for.
+
+
+        The tokens are MTHDS: a method names one, and it loads wherever the standard is read. Which of them a
+
+        runtime prints depends on the document engines installed in it, each a model of the `doc_gen` family:
+
+        open Pipelex prints a `pdf` laid out without a template, on `reportlab-pdf`, and the Pipelex document
+
+        generation plugin prints the rest. HTML is not a format: `PipeCompose` already produces the native
+
+        `Html`.'
+    DocGenSetting:
+      properties:
+        model:
+          type: string
+          title: Model
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      additionalProperties: false
+      type: object
+      required:
+      - model
+      title: DocGenSetting
+      description: 'The document engine a `PipeDocGen` step prints with: a model of the `doc_gen` family, such as `reportlab-pdf`.'
     DocumentField:
       properties:
         title:
@@ -5060,6 +5096,91 @@ components:
       - output
       - default_outcome
       title: PipeConditionBlueprint
+    PipeDocGenBlueprint:
+      properties:
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        pipe_category:
+          type: string
+          const: PipeOperator
+          title: Pipe Category
+          default: PipeOperator
+        type:
+          type: string
+          const: PipeDocGen
+          title: Type
+          default: PipeDocGen
+        description:
+          type: string
+          title: Description
+        inputs:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/InputSlotBlueprint'
+            type: object
+          - type: 'null'
+          title: Inputs
+        output:
+          type: string
+          title: Output
+        format:
+          $ref: '#/components/schemas/DocGenFormat'
+        model:
+          anyOf:
+          - $ref: '#/components/schemas/DocGenSetting'
+          - type: string
+          - $ref: '#/components/schemas/ModelReference'
+          - type: 'null'
+          title: Model
+        template:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template
+        template_file:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template File
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filename
+      additionalProperties: false
+      type: object
+      required:
+      - description
+      - output
+      - format
+      title: PipeDocGenBlueprint
+      description: 'Generate a document file from a method''s structured result: a PDF, an Excel workbook, a Word document
+        or a PowerPoint deck.
+
+
+        It calls no AI model: it lays out or fills what its inputs already hold. With no template, the pipe lays its inputs
+
+        out by itself (the auto-layout), for every format but `pptx`. `template` is an inline HTML and Jinja2 template, for
+
+        `pdf` only; `template_file` is a path relative to the bundle''s file: an `.html` for `pdf`, an `.xlsx` for `xlsx`,
+        a
+
+        `.docx` for `docx` and a `.pptx` for `pptx`, which `pptx` requires. `filename` is a Jinja expression over the
+
+        inputs; the suffix is added. The output must be a single `Document`, or a concept refining it. `model` names the
+
+        document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or, with the Pipelex
+
+        document generation plugin, `pipelex-pdf`; without it, the model deck''s default for the format and source prints
+
+        it. Which engines a runtime has depends on its plugins: open Pipelex prints a `pdf` without a template on
+
+        `reportlab-pdf`, and a runtime without the engine a step needs refuses the method when it loads.'
     PipeExtractBlueprint:
       properties:
         source:
@@ -6043,6 +6164,7 @@ components:
       - PipeExtract
       - PipeSearch
       - PipeStructure
+      - PipeDocGen
       - PipeBatch
       - PipeCondition
       - PipeParallel
@@ -6217,6 +6339,7 @@ components:
               - $ref: '#/components/schemas/PipeExtractBlueprint'
               - $ref: '#/components/schemas/PipeSearchBlueprint'
               - $ref: '#/components/schemas/PipeStructureBlueprint'
+              - $ref: '#/components/schemas/PipeDocGenBlueprint'
               - $ref: '#/components/schemas/PipeBatchBlueprint'
               - $ref: '#/components/schemas/PipeConditionBlueprint'
               - $ref: '#/components/schemas/PipeParallelBlueprint'
@@ -6228,6 +6351,7 @@ components:
                   PipeBatch: '#/components/schemas/PipeBatchBlueprint'
                   PipeCompose: '#/components/schemas/PipeComposeBlueprint'
                   PipeCondition: '#/components/schemas/PipeConditionBlueprint'
+                  PipeDocGen: '#/components/schemas/PipeDocGenBlueprint'
                   PipeExtract: '#/components/schemas/PipeExtractBlueprint'
                   PipeFunc: '#/components/schemas/PipeFuncBlueprint'
                   PipeImgGen: '#/components/schemas/PipeImgGenBlueprint'
