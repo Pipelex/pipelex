@@ -18,7 +18,7 @@ members = ["api"]
 
 The member depends on the library through the workspace (`pipelex = { workspace = true }` in its `[tool.uv.sources]`), so the server always runs the library of the same commit, and the repository keeps a single `uv.lock` at its root. The `pipelex` wheel and sdist are unaffected: both restrict themselves to `packages = ["pipelex"]`.
 
-The two are released together, under one version number. The member's dependency names that version exactly, `pipelex[...]==X.Y.Z`, which is what the published `pipelex-api` wheel declares, and `uv lock` refuses a root version the pin no longer names, so a release moves both.
+The two are released together, under one version number. The member declares its version dynamic and hatch reads it from the root `pyproject.toml` (`[tool.hatch.version]` in `api/pyproject.toml`), so a release bumps one file, and the member's `[tool.uv] cache-keys` name the root file so that uv notices the bump. Its dependency on `pipelex` names no version, because uv ignores a version specifier on a workspace source and a pin there would only go stale.
 
 ## Its own environment
 
@@ -31,7 +31,7 @@ The root `make agent-check` ends with `make api-agent-check`, which runs `make -
 - **`make -C api openapi-check`** compares the committed OpenAPI artifact, `api/docs/openapi/pipelex-api.openapi.yaml`, with what the app generates. pipelex's own models ride the server's wire (the run result, the bundle blueprint, the validation error vocabulary), so a library change can move the artifact with no change to the server's code. Regenerate it with `make -C api openapi-export` and read the diff: it is what the change did to the server's callers.
 - **`make -C api kit-check`** compares the server's vendored inference tree with the kit.
 
-The root configurations of ruff and plxt exclude `api/`, which the member's gate covers under its own.
+The root ruff configuration excludes `api/`, which the member's gate lints under its own. The root plxt configuration formats and lints the member's TOML and MTHDS files like any other, except its vendored inference tree, which the sync keeps byte-identical to the kit, and its deliberately invalid sample bundles.
 
 ## The vendored inference tree
 
@@ -47,4 +47,4 @@ The image is built with the repository root as its context, so it installs the p
 docker build -f api/Dockerfile .
 ```
 
-`make -C api docker-build` runs exactly that. `api/Dockerfile.dockerignore`, the ignore file BuildKit reads for that Dockerfile, keeps the context down to the files the build reads.
+`make -C api docker-build` runs exactly that. The root `.dockerignore` keeps the context down to the files the build reads. It is an allowlist, and it sits at the root rather than beside the Dockerfile because the legacy builder reads no other ignore file, and without one it would copy local override files, which can hold credentials, into the image.

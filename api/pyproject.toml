@@ -1,6 +1,8 @@
 [project]
 name = "pipelex-api"
-version = "0.33.2"
+# The server is released with the library under one version number, read from the root `pyproject.toml`
+# (`[tool.hatch.version]` below), so a release bumps one file.
+dynamic = ["version"]
 description = "Pipelex API"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -22,10 +24,9 @@ dependencies = [
   # pretty-print mode, so nothing it does on a request renders a terminal.
   #
   # pipelex resolves from this repository's workspace (`[tool.uv.sources]` below), so the server always
-  # runs the library of the same commit. The exact version stays because it is what the published
-  # `pipelex-api` wheel declares: the two ship in lockstep under one version, and `uv lock` refuses a
-  # root version the pin no longer names, so a release moves both together.
-  "pipelex[mistralai,anthropic,google,google-genai,bedrock,fal]==0.70.0",
+  # runs the library of the same commit, and no version is written here: uv ignores a version specifier
+  # on a workspace source, so a pin would only go stale.
+  "pipelex[mistralai,anthropic,google,google-genai,bedrock,fal]",
   "fastapi>=0.118.0",
   "pyjwt>=2.10.1",
   "uvicorn>=0.37.0",
@@ -87,6 +88,15 @@ packages = ["pipelex_api"]
 
 [tool.hatch.build.targets.sdist]
 packages = ["pipelex_api"]
+
+[tool.hatch.version]
+path = "../pyproject.toml"
+pattern = '(?m)^version = "(?P<version>[^"]+)"'
+
+[tool.uv]
+# The version comes from the root `pyproject.toml`, so uv has to rebuild this member's metadata when that
+# file changes, not only when this one does.
+cache-keys = [{ file = "pyproject.toml" }, { file = "../pyproject.toml" }]
 
 [tool.uv.sources]
 pipelex = { workspace = true }
@@ -258,7 +268,7 @@ ignore = [
   "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed in `...`
   "ASYNC230", # Async functions should not open files with blocking methods like `open`
 
-  "C901",   # Is to complex
+  "C901", # Is to complex
 
   "CPY001", # Missing copyright notice at top of file: the repository's LICENSE covers every file, as in pipelex
   "COM812", # Checks for the absence of trailing commas.

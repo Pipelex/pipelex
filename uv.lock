@@ -3746,7 +3746,6 @@ provides-extras = ["anthropic", "bedrock", "cli", "docling", "fal", "gcp-logging
 
 [[package]]
 name = "pipelex-api"
-version = "0.33.2"
 source = { editable = "api" }
 dependencies = [
     { name = "fastapi" },
@@ -3798,7 +3797,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "pandas-stubs", marker = "extra == 'dev'", specifier = ">=2.2.3.241126" },
-    { name = "pipelex", extras = ["mistralai", "anthropic", "google", "google-genai", "bedrock", "fal"], editable = "." },
+    { name = "pipelex", extras = ["anthropic", "bedrock", "fal", "google", "google-genai", "mistralai"], editable = "." },
     { name = "pyjwt", specifier = ">=2.10.1" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.3.8" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.405" },

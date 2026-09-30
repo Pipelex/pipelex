@@ -32,7 +32,8 @@ ifneq (,$(wildcard .env))
     export $(shell sed 's/=.*//' .env)
 endif
 
-$(eval VERSION=$(shell grep '^version' pyproject.toml | sed -E 's/version = "(.*)"/\1/'))
+# The server takes the library's version, from the root `pyproject.toml` (see this member's `[tool.hatch.version]`).
+$(eval VERSION=$(shell grep -m1 '^version' ../pyproject.toml | sed -E 's/version = "(.*)"/\1/'))
 
 check-version-format:
 	@echo "Checking version format: $(VERSION)"

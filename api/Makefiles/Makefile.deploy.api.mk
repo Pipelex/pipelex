@@ -14,10 +14,12 @@ export HELP_DEPLOY_API
 
 # Builds the public Pipelex API image and publishes it to Docker Hub as
 # pipelex/pipelex-api:$(VERSION) and :latest, with the repository root as the
-# build context (see the Dockerfile's header). The release workflow that runs it
-# is pipelex's own. This repo only publishes to Docker Hub — anything beyond
-# (private registries, ECR/ACR/GCR, ECS/k8s deploys) is the user's
-# responsibility, typically in a separate infra repo.
+# build context (see the Dockerfile's header). $(VERSION) is the library's
+# version, read from the root pyproject.toml. No workflow runs this target yet:
+# publishing the image from pipelex's release is still to be wired, so until
+# then a release does not push an image. This repo only publishes to Docker
+# Hub — anything beyond (private registries, ECR/ACR/GCR, ECS/k8s deploys) is
+# the user's responsibility, typically in a separate infra repo.
 .PHONY: deploy-docker-hub
 deploy-docker-hub:
 	@echo "\n########################### Docker Hub Build ##########################"
