@@ -27,6 +27,7 @@ from pipelex.base_exceptions import (
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.config import get_config
+from pipelex.methods.exceptions import MethodPackageSymlinkError
 from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipeline.exceptions import PipelineManagerAlreadyExistsError
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -261,6 +262,15 @@ async def pipeline_run_id_conflict_route() -> None:
     # API maps it to 409 Conflict (see ``_ERROR_TYPE_STATUS_OVERRIDES``).
     msg = "Pipeline some-run-id already exists"
     raise PipelineManagerAlreadyExistsError(msg)
+
+
+@_router.get("/method-package-symlink")
+async def method_package_symlink_route() -> None:
+    # Pipelex raises this from ``ensure_package_within_bounds`` when a package fetched
+    # by ``method_ref`` carries a symlink. The API maps it to 422 (see
+    # ``_ERROR_TYPE_STATUS_OVERRIDES``).
+    msg = "Method package 'github.com/acme/linked' contains a symlink ('vendored') — fetched packages must not contain symlinks."
+    raise MethodPackageSymlinkError(msg)
 
 
 @_router.get("/synthetic-transport-error")
@@ -942,6 +952,23 @@ class TestExceptionHandlers:
         assert body["instance"] == "/pipeline-run-id-conflict"
         assert body["type"].endswith("/pipeline-manager-already-exists-error/")
         assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
+
+    def test_method_package_symlink_maps_to_422(self, mocker: MockerFixture):
+        # ``MethodPackageSymlinkError`` carries no ``error_domain`` (-> 500 under the
+        # default mapping), but a symlink in a fetched package is a rule about the
+        # fetched content that its author fixes, not a server fault: the API overrides
+        # it to 422, like the fetched-package ceilings, and logs it at warning.
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
+        response = _build_client().get("/method-package-symlink")
+        assert response.status_code == 422
+        assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
+        body = response.json()
+        assert body["status"] == 422
+        assert body["error_type"] == "MethodPackageSymlinkError"
+        assert "contains a symlink ('vendored')" in body["detail"]
+        assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
+        log_spy.warning.assert_called_once()
+        log_spy.error.assert_not_called()
 
     def test_pipeline_run_id_conflict_logs_at_warning_post_override_status(self, mocker: MockerFixture):
         # A duplicate pipeline_run_id is a client-visible 409 conflict, not a

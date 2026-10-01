@@ -340,6 +340,10 @@ _ERROR_TYPE_STATUS_OVERRIDES: dict[str, int] = {
     #     cannot be processed under this deployment's bounds → 422 (not 413, which is about
     #     the request entity itself).
     "MethodPackageTooLargeError": 422,
+    #   - The selected package carries a symlink, file or directory, which fetched packages must
+    #     not: a rule about the fetched content that the method's author fixes by removing the
+    #     link → 422, like the ceilings above (not 403, kept for refusing in-process Python).
+    "MethodPackageSymlinkError": 422,
     #   - The method's Python declares structure classes, whether it was sent as a bundle or
     #     fetched by `method_ref`: a policy refusal (hosted execution accepts MTHDS concepts and
     #     sandboxed PipeFuncs, not in-process Python) → 403, the same status as the bundle
