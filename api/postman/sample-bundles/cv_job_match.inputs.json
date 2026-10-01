@@ -1,0 +1,4 @@
+{
+  "cv_text": "Jane Doe — Senior Software Engineer\n5 years of experience in Python, FastAPI, and cloud infrastructure (AWS).\nLed a team of 4 engineers to build a real-time data pipeline processing 10M events/day.\nSkills: Python, TypeScript, PostgreSQL, Docker, Kubernetes, CI/CD, Terraform.\nEducation: M.Sc. Computer Science, MIT (2019).\nCertifications: AWS Solutions Architect Associate.",
+  "job_offer_text": "Senior Backend Engineer — Acme Corp\nWe are looking for a Senior Backend Engineer to design and scale our API platform.\nRequirements: 4+ years Python, experience with FastAPI or Django, strong SQL skills, cloud infrastructure (AWS or GCP), familiarity with containerization (Docker/K8s).\nNice to have: Terraform, CI/CD pipelines, real-time data processing.\nStack: Python, FastAPI, PostgreSQL, AWS, Docker, Kubernetes."
+}

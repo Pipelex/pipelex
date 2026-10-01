@@ -336,6 +336,8 @@ exclude_lines = [
 
 [tool.ruff]
 exclude = [
+  # The `api/` workspace member runs ruff under its own configuration (`make -C api agent-check`).
+  "api",
   ".cursor",
   ".git",
   ".github",
@@ -519,6 +521,13 @@ banned-module-level-imports = ["rich"]
 
 [tool.uv]
 required-version = ">=0.7.2"
+
+# The Pipelex API server lives in `api/` as a second workspace member, the `pipelex-api` distribution.
+# It depends on this package through the workspace, so it always runs the library of the same commit,
+# and the repository keeps one `uv.lock`. Nothing of it reaches the `pipelex` wheel or sdist, which
+# the hatch targets below restrict to `packages = ["pipelex"]`. See `api/CLAUDE.md`.
+[tool.uv.workspace]
+members = ["api"]
 
 
 [tool.hatch.build.targets.wheel]

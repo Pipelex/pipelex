@@ -1,0 +1,48 @@
+# The ignore file for `docker build -f api/Dockerfile .`, the API server's image, which is the only image
+# built from this repository. It sits at the root of the context rather than beside the Dockerfile as
+# `api/Dockerfile.dockerignore`, because the legacy builder (`DOCKER_BUILDKIT=0`) reads no other file:
+# without this one it would send the whole repository and copy the untracked overrides below into the
+# image. The context is the whole repository, so this is an allowlist: everything is left out, then
+# only what the Dockerfile reads is let back in.
+*
+
+# The workspace: its lock, and the root project's metadata, which a build of the `pipelex` package
+# reads. The Dockerfile copies the `.gitignore` files too, because hatchling leaves out of a wheel what
+# they ignore, so the wheels are built with the same exclusions as anywhere else.
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!.gitignore
+!pipelex/
+
+# The server: its metadata, its package, and the configuration the image ships as /root/.pipelex.
+!api/pyproject.toml
+!api/README.md
+!api/LICENSE
+!api/.gitignore
+!api/pipelex_api/
+!api/.pipelex/
+
+# Never inside those: bytecode and OS droppings.
+**/__pycache__
+**/*.py[cod]
+**/.DS_Store
+
+# Per-developer Pipelex overrides and runtime leftovers. These files are untracked, so CI builds the
+# published image without them — but a local `make docker-build` would otherwise bake one machine's
+# settings into the image: its storage backend, its log level, its telemetry credentials. The image
+# would then behave differently from the published one, and nothing in the diff would say so. An
+# operator supplies overrides to a container by mounting them at /root/.pipelex, the documented path.
+#
+# The runtime layers more than the `_override` tier over a base file: `_local`, `_{environment}`
+# selected by PIPELEX_ENV, and `_temporary_override`, for every configuration family in the
+# directory rather than for `pipelex` alone. Environment names are open-ended, so the exclusion is
+# by shape — any suffixed variant of a base file — and the one tracked variant is named back in.
+# The nested inference overrides need their own line because a pattern's `*` does not cross a `/`.
+api/.pipelex/*_*.toml
+!api/.pipelex/pipelex_service.toml
+api/.pipelex/inference/*_override.toml
+api/.pipelex/storage
+api/.pipelex/traces
+api/.pipelex/**/*.bak.*
