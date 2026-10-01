@@ -234,16 +234,61 @@ jobs:
         run: make check-rules
 
 # --------------------------------------------------------------------------
-# 9.  Aggregator job — the required status check that covers every lint job,
+# 9.  The API server (`api/`, the `pipelex-api` workspace member) — its own
+#     ruff, pyright and mypy, and the drift checks of its committed OpenAPI
+#     artifact and of its vendored inference tree, in its own environment
+#     (`api/.venv`) against the pipelex of this commit. No path filter: the
+#     server runs the library of the same commit, so a library change can break
+#     it, move its wire or leave its inference tree behind, and this pull
+#     request is where that is found. Floor Python only, as for the library; the
+#     pre-main gate (`lint-fresh-check.yml`) checks every supported version.
+# --------------------------------------------------------------------------
+  lint-api:
+    name: Lint (api)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install the server's environment
+        run: PYTHON_VERSION=3.11 make -C api install
+
+      - name: Run ruff format merge check
+        run: make -C api merge-check-ruff-format
+
+      - name: Run ruff lint merge check
+        run: make -C api merge-check-ruff-lint
+
+      - name: Run pyright merge check
+        run: make -C api merge-check-pyright
+
+      - name: Run mypy merge check
+        run: make -C api merge-check-mypy
+
+      - name: Check the committed OpenAPI artifact for drift
+        run: make -C api openapi-check
+
+      - name: Check the vendored inference tree for drift
+        run: make -C api kit-check
+
+# --------------------------------------------------------------------------
+# 10. Aggregator job — the required status check that covers every lint job,
 #     including the ones the rulesets do not name individually
-#     (`Lint (hub layering)`, `Lint (rich imports)`, `Lint (agent-rules)`). It is
-#     not the only required lint check: the rulesets name several of the jobs
-#     above by name as well. Anything added to `needs` becomes blocking through here.
+#     (`Lint (hub layering)`, `Lint (rich imports)`, `Lint (agent-rules)`,
+#     `Lint (api)`). It is not the only required lint check: the rulesets name
+#     several of the jobs above by name as well. Anything added to `needs`
+#     becomes blocking through here.
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-rich-imports, lint-agent-rules]
+    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-rich-imports, lint-agent-rules, lint-api]
     if: always()
 
     steps:
@@ -255,7 +300,8 @@ jobs:
              [ "${{ needs.lint-keyword-only.result }}" != "success" ] || \
              [ "${{ needs.lint-hub-layering.result }}" != "success" ] || \
              [ "${{ needs.lint-rich-imports.result }}" != "success" ] || \
-             [ "${{ needs.lint-agent-rules.result }}" != "success" ]; then
+             [ "${{ needs.lint-agent-rules.result }}" != "success" ] || \
+             [ "${{ needs.lint-api.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."
             exit 1
           fi

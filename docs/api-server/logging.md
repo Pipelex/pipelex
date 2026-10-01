@@ -59,7 +59,7 @@ Disposition follows the HTTP status, not the error domain: a `4xx` is a caller m
 
 ## Configuration
 
-The keys live in `[runtime.log]` of the `.pipelex/pipelex.toml` this repository ships, which the image copies to `/root/.pipelex/`:
+The keys live in `[runtime.log]` of the server's own `api/.pipelex/pipelex.toml`, which the image copies to `/root/.pipelex/`:
 
 ```toml
 [runtime.log]

@@ -18,6 +18,7 @@ define HELP_LOCAL
 	$(YELLOW)Docker (closest to what's deployed):$(RESET)
 	make docker-build$(RESET):    Build the API image from local source, with the repository root as the build context.
 	make docker-run$(RESET):      Build + run the image on http://localhost:8081 (foreground, Ctrl+C to stop).
+	make docker-smoke$(RESET):    Boot the local image and check /health and the versions /v1/version reports (SMOKE_IMAGE=<tag> for another).
 	make docker-run-hub$(RESET):  Pull + run the PUBLISHED Docker Hub image (no local build). Tag: make docker-run-hub HUB_TAG=0.5.0
 	make docker-stop$(RESET):     Force-stop the Docker container.
 	make docker-logs$(RESET):     Tail Docker container logs.
@@ -43,7 +44,7 @@ define HELP_LOCAL
 endef
 export HELP_LOCAL
 
-.PHONY: docker-build docker-run docker-run-hub docker-stop docker-logs
+.PHONY: docker-build docker-run docker-smoke docker-run-hub docker-stop docker-logs
 .PHONY: temporal-server ts temporal-server-bare ts-bare tsb temporal-stop tstop
 .PHONY: check-bundle-arg bundle-run bundle-validate bundle-resolve bundle-codegen bundle-curl bundle-postman bundle-dry
 
@@ -82,6 +83,40 @@ docker-run-hub:
 	docker run --rm --name $(CONTAINER_NAME) -p 8081:8081 \
 		--env-file $(ENV_FILE) \
 		$(HUB_IMAGE)
+
+# Boot an image and check that it serves: `/health` answers, and `/v1/version` reports this
+# repository's version for both the server and the pipelex it runs, which is the lockstep the release
+# promises. Pull-request CI runs it on the image `docker-build` made, and `deploy-docker-hub` runs it
+# on the image it is about to push. The gateway key is a placeholder: boot requires one, and neither
+# route reaches a provider. SMOKE_IMAGE=<tag> names another image.
+SMOKE_IMAGE     ?= $(LOCAL_IMAGE)
+SMOKE_CONTAINER ?= pipelex-api-smoke
+SMOKE_PORT      ?= 18081
+SMOKE_TIMEOUT   ?= 90
+
+docker-smoke:
+	@echo "\n=== Smoke-test $(SMOKE_IMAGE): /health, then /v1/version against $(VERSION) ==="
+	@docker rm -f $(SMOKE_CONTAINER) >/dev/null 2>&1 || true
+	@docker run --detach --platform linux/amd64 --name $(SMOKE_CONTAINER) \
+		-p 127.0.0.1:$(SMOKE_PORT):8081 \
+		-e PIPELEX_GATEWAY_API_KEY=smoke-test-placeholder \
+		$(SMOKE_IMAGE) >/dev/null
+	@healthy=""; \
+	for attempt in $$(seq 1 $(SMOKE_TIMEOUT)); do \
+		if curl -fsS http://127.0.0.1:$(SMOKE_PORT)/health >/dev/null 2>&1; then healthy=1; break; fi; \
+		if [ "$$(docker inspect --format '{{.State.Running}}' $(SMOKE_CONTAINER) 2>/dev/null)" != "true" ]; then break; fi; \
+		sleep 1; \
+	done; \
+	if [ -z "$$healthy" ]; then \
+		echo "ERROR: $(SMOKE_IMAGE) did not answer /health within $(SMOKE_TIMEOUT)s. Its logs:"; \
+		docker logs $(SMOKE_CONTAINER) 2>&1 | tail -60; \
+		docker rm -f $(SMOKE_CONTAINER) >/dev/null 2>&1; \
+		exit 1; \
+	fi; \
+	python3 $(CURDIR)/scripts/check_served_version.py http://127.0.0.1:$(SMOKE_PORT) --version $(VERSION); \
+	exit_code=$$?; \
+	docker rm -f $(SMOKE_CONTAINER) >/dev/null 2>&1; \
+	exit $$exit_code
 
 docker-stop:
 	@docker rm -f $(CONTAINER_NAME) 2>/dev/null && echo "Stopped $(CONTAINER_NAME)" || echo "$(CONTAINER_NAME) was not running"

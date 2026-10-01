@@ -1,8 +1,9 @@
 [project]
 name = "pipelex-api"
 # The server is released with the library under one version number, read from the root `pyproject.toml`
-# (`[tool.hatch.version]` below), so a release bumps one file.
-dynamic = ["version"]
+# (`[tool.hatch.version]` below), so a release bumps one file. The dependencies are dynamic too: they are
+# written in `[tool.hatch.metadata.hooks.custom]` below, whose hook pins pipelex to that version.
+dynamic = ["version", "dependencies"]
 description = "Pipelex API"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -19,19 +20,6 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 
-dependencies = [
-  # The extras deliberately leave out `cli`: the runner selects the `json` log sink and a Rich-free
-  # pretty-print mode, so nothing it does on a request renders a terminal.
-  #
-  # pipelex resolves from this repository's workspace (`[tool.uv.sources]` below), so the server always
-  # runs the library of the same commit, and no version is written here: uv ignores a version specifier
-  # on a workspace source, so a pin would only go stale.
-  "pipelex[mistralai,anthropic,google,google-genai,bedrock,fal]",
-  "fastapi>=0.118.0",
-  "pyjwt>=2.10.1",
-  "uvicorn>=0.37.0",
-]
-
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
@@ -39,8 +27,8 @@ build-backend = "hatchling.build"
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
-Documentation = "https://docs.pipelex.com/pages/api/"
-Changelog = "https://docs.pipelex.com/changelog/"
+Documentation = "https://docs.pipelex.com/latest/api-server/"
+Changelog = "https://docs.pipelex.com/latest/changelog/"
 
 [project.optional-dependencies]
 dev = [
@@ -71,14 +59,6 @@ dev = [
   "types-PyYAML>=6.0.12.20250326",
   "types-toml>=0.10.8.20240310",
 ]
-# One lock resolves every workspace member's extras together, so these floors follow pipelex's own `docs`
-# extra rather than pinning versions of their own.
-docs = [
-  "mkdocs>=1.6.1",
-  "mkdocs-glightbox>=0.4.0",
-  "mkdocs-material>=9.7.7",
-  "mkdocs-meta-manager>=1.1.0",
-]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -93,10 +73,35 @@ packages = ["pipelex_api"]
 path = "../pyproject.toml"
 pattern = '(?m)^version = "(?P<version>[^"]+)"'
 
+# The server's dependencies, which `hatch_build.py` writes into the distribution's metadata. Each requirement
+# of `lockstep-dependencies` is pinned to `==` the release's own version, so a published `pipelex-api` installs
+# exactly the pipelex it was released with; `dependencies` is copied as written. In the workspace, pipelex
+# resolves from the same commit (`[tool.uv.sources]` below) and uv ignores the pin, so nothing here goes stale
+# between releases. The release workflow checks the pin in the built wheel before it uploads it.
+[tool.hatch.metadata.hooks.custom]
+path = "hatch_build.py"
+# The extras deliberately leave out `cli`: the runner selects the `json` log sink and a Rich-free pretty-print
+# mode, so nothing it does on a request renders a terminal.
+lockstep-dependencies = [
+  "pipelex[mistralai,anthropic,google,google-genai,bedrock,fal]",
+]
+dependencies = [
+  # FastAPI 0.142 changed how included routers are mounted, and the server's router assembly
+  # (`pipelex_api/main.py`) loses every `/v1` route under it. The ceiling stays until that assembly is
+  # adapted: the lock alone cannot hold it, since a published wheel installs whatever its metadata allows.
+  "fastapi>=0.118.0,<0.142",
+  "pyjwt>=2.10.1",
+  "uvicorn>=0.37.0",
+]
+
 [tool.uv]
-# The version comes from the root `pyproject.toml`, so uv has to rebuild this member's metadata when that
-# file changes, not only when this one does.
-cache-keys = [{ file = "pyproject.toml" }, { file = "../pyproject.toml" }]
+# The version comes from the root `pyproject.toml` and the dependencies from `hatch_build.py`, so uv has to
+# rebuild this member's metadata when either changes, not only when this file does.
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "../pyproject.toml" },
+  { file = "hatch_build.py" },
+]
 
 [tool.uv.sources]
 pipelex = { workspace = true }

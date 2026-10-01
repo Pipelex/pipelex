@@ -16,13 +16,17 @@ WORKSPACE_ROOT := $(abspath $(CURDIR)/..)
 
 # The "?" is used to make the variable optional, so that it can be overridden by the user.
 PYTHON_VERSION ?= 3.13
+# The Python version pyright and mypy check against, when it is not the environment's own: the root's
+# pre-main gate (`lint-fresh-check.yml`) checks every supported version from one 3.11 environment.
+LINT_PYTHON_VERSION ?=
+# Where `make build` writes the pipelex-api wheel and sdist, and where `make check-lockstep-pin` reads them.
+DIST_DIR ?= dist
 VENV_PYTHON := $(VIRTUAL_ENV)/bin/python
 VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
 VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
 VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
 VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
-VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
 VENV_PYLINT := $(VIRTUAL_ENV)/bin/pylint
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' $(WORKSPACE_ROOT)/pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
@@ -52,7 +56,8 @@ Usage:
 make env                      - Create python virtual env
 make lock                     - Refresh the workspace uv.lock (at the repository root) without updating anything
 make install                  - Create local virtualenv & install all dependencies
-make build                    - Build the pipelex-api wheel and sdist
+make build                    - Build the pipelex-api wheel and sdist into $(DIST_DIR)
+make check-lockstep-pin       - Check that the built distributions pin pipelex to this version (after make build)
 
 make format                   - format with ruff format
 make lint                     - lint with ruff check
@@ -90,10 +95,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 make fui                      - Shorthand -> fix-unused-imports
 make check-TODOs              - Check for TODOs
 
-make docs                     - Serve documentation locally with mkdocs
-make docs-check               - Check documentation build with mkdocs
-
-make openapi-export           - Export the FastAPI OpenAPI schema to docs/openapi/pipelex-api.openapi.yaml
+make openapi-export           - Export the FastAPI OpenAPI schema to the docs site's docs/api-server/openapi/pipelex-api.openapi.yaml
 make openapi-check            - Fail if the committed OpenAPI artifact drifts from the app
 
 make kit-sync                 - Re-sync the vendored .pipelex/inference/ tree from the pipelex kit of this repository
@@ -111,7 +113,7 @@ endef
 export HELP
 
 .PHONY: \
-	all help env lock install build \
+	all help env lock install build check-lockstep-pin \
 	format lint pyright mypy pylint \
 	cleanderived cleanenv cleanall \
 	agent-check agent-test \
@@ -120,7 +122,7 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check \
+	li check-unused-imports fix-unused-imports check-uv check-TODOs \
 	openapi-export openapi-check \
 	kit-sync kit-check \
 	test-count check-test-badge
@@ -169,9 +171,16 @@ lock: env
 	@uv lock && \
 	echo uv lock without update;
 
+# The metadata hook (`hatch_build.py`) pins pipelex to this version in what it builds; the check below is
+# what the release workflow runs on its own build before uploading it.
 build: env
 	$(call PRINT_TITLE,"Building the pipelex-api wheel and sdist")
-	@uv build --package pipelex-api
+	@rm -f $(DIST_DIR)/pipelex_api-*
+	@uv build --package pipelex-api --out-dir $(DIST_DIR)
+
+check-lockstep-pin:
+	$(call PRINT_TITLE,"Checking the lockstep pin in the distributions in $(DIST_DIR)")
+	@python3 scripts/check_lockstep_pin.py $(DIST_DIR)
 
 ##############################################################################################
 ############################      Cleaning                        ############################
@@ -363,11 +372,11 @@ merge-check-ruff-lint: env check-unused-imports
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3
+	$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3 $(if $(LINT_PYTHON_VERSION),--pythonversion $(LINT_PYTHON_VERSION))
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	$(VENV_MYPY) --config-file pyproject.toml $(if $(LINT_PYTHON_VERSION),--python-version $(LINT_PYTHON_VERSION))
 
 merge-check-pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
@@ -435,23 +444,12 @@ li: lock install
 	@echo "> done: lock install"
 
 ##########################################################################################
-### DOCUMENTATION
-##########################################################################################
-
-docs: env
-	$(call PRINT_TITLE,"Serving documentation with mkdocs")
-	$(VENV_MKDOCS) serve -a 127.0.0.1:8001 --watch docs
-
-docs-check: env
-	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
-	$(VENV_MKDOCS) build --strict
-
-
-##########################################################################################
 ### OPENAPI ARTIFACT
 ##########################################################################################
 
-OPENAPI_ARTIFACT := docs/openapi/pipelex-api.openapi.yaml
+# The server's pages are part of the pipelex docs site (`docs/api-server/` at the repository root, served by
+# the root `make docs`), and the artifact sits among them, so the site publishes it beside the pages that link it.
+OPENAPI_ARTIFACT := $(WORKSPACE_ROOT)/docs/api-server/openapi/pipelex-api.openapi.yaml
 
 # These depend on `install` (not `env`) on purpose: `env` only ensures the venv
 # directory exists, it never runs `uv sync`. The schema is generated from whatever

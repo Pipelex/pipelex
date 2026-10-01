@@ -18,6 +18,7 @@
 
 # The server: its metadata, its package, and the configuration the image ships as /root/.pipelex.
 !api/pyproject.toml
+!api/hatch_build.py
 !api/README.md
 !api/LICENSE
 !api/.gitignore

@@ -9,9 +9,6 @@ __pycache__/
 dist/
 *.egg-info/
 
-# mkdocs
-site/
-
 # Unit test / coverage reports
 htmlcov/
 .pytest_cache/
