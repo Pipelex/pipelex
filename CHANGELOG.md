@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.71.0] - 2026-10-01
+
+### Highlights
+
+**The Pipelex API server and its `pipelex/pipelex-api` image now ship from the `pipelex` repository, so they take `pipelex`'s version number.** The image's last standalone release was `0.33.2`, on the server's own release line, and its next tag is `0.71.0`, the same version as the `pipelex` and `pipelex-api` packages published beside it.
 
 ### Added
 
