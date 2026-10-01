@@ -40,7 +40,7 @@ The guard (`pipelex-dev check-actions-allowlist`, core in `pipelex/cli/dev_cli/c
 
 Anything else fails the check, with the file, the line, the reference and the reason. A `docker://` image is refused as well, since no pattern can name one, and so is a `./` reference the guard cannot read: one that leaves the repository, names nothing, or names a directory with no `action.yml` or `action.yaml`.
 
-Patterns follow GitHub's syntax, and where that syntax leaves a doubt the guard takes the stricter reading, so that a pass here is a pass on GitHub: `*` matches any run of characters except `/`, `**` matches any run at all, the owner, repository and path compare without regard to case, and the ref after `@` compares exactly. `astral-sh/setup-uv@*` therefore allows every ref of that action, and `sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9` allows that one commit only.
+Patterns follow GitHub's syntax, and where that syntax leaves a doubt the guard takes the stricter reading, so that a pass here is a pass on GitHub: `*` matches any run of characters except `/`, `**` matches any run at all, and every comparison respects case, the owner and repository included, since GitHub does not document whether its policy check ignores case. A workflow therefore spells an owner as the mirror does, `PyO3/maturin-action`, never `pyo3/maturin-action`. `astral-sh/setup-uv@*` therefore allows every ref of that action, and `sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9` allows that one commit only.
 
 The guard refuses to pass vacuously: a missing or malformed mirror, a workflow that is not valid YAML, or a scan that finds no workflow or no `uses:` reference at all fails the check instead of reporting a pass.
 

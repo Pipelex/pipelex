@@ -25,7 +25,7 @@ REFUSED_ACTION = "peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a2
 
 POLICY = ActionsAllowlist(
     github_owned_allowed=True,
-    enterprise_owners=frozenset({"pipelex"}),
+    enterprise_owners=frozenset({"Pipelex"}),
     patterns_allowed=("astral-sh/setup-uv@*", "dorny/paths-filter@v3", "octo-org/*", "space-org*/**"),
 )
 
@@ -81,7 +81,7 @@ class TestActionsAllowlistGuard:
             ("one exact tag", "dorny/paths-filter@v3", "dorny/paths-filter@v3", True),
             ("another tag than the pinned one", "dorny/paths-filter@v3", "dorny/paths-filter@v4", False),
             ("a ref merely starting like the pinned one", "dorny/paths-filter@v3", "dorny/paths-filter@v3.1", False),
-            ("owner and repository compare without case", "PyO3/maturin-action@*", "pyo3/Maturin-Action@v1", True),
+            ("owner and repository compare with case", "PyO3/maturin-action@*", "pyo3/maturin-action@v1", False),
             ("the ref compares with case", "dorny/paths-filter@v3", "dorny/paths-filter@V3", False),
             ("one star stops at a slash", "octo-org/*", "octo-org/repo/sub/path@v1", False),
             ("one star crosses the ref", "octo-org/*", "octo-org/repo@v1", True),
@@ -100,7 +100,8 @@ class TestActionsAllowlistGuard:
             ("a local reusable workflow", "./.github/workflows/publish-docker-hub.yml", True),
             ("an action GitHub created", "actions/checkout@v4", True),
             ("another action GitHub created", "github/codeql-action/init@v3", True),
-            ("an enterprise-owned action, any case", "Pipelex/some-action@v1", True),
+            ("an enterprise-owned action", "Pipelex/some-action@v1", True),
+            ("an enterprise owner spelled with another case", "pipelex/some-action@v1", False),
             ("an action a pattern allows", "astral-sh/setup-uv@v7", True),
             ("the action that stopped a release", REFUSED_ACTION, False),
             ("a Docker image", "docker://alpine:3.20", False),
@@ -166,7 +167,7 @@ class TestActionsAllowlistGuard:
 
     def test_collects_the_refused_references_of_a_tree(self, tmp_path: Path) -> None:
         """A refused action is reported at its file and line, and the allowed ones beside it are not."""
-        release = f"jobs:\n  publish:\n    steps:\n      - uses: actions/checkout@v4\n      - uses: {REFUSED_ACTION}\n"
+        release = f"jobs:\n  publish:\n    steps:\n      - uses: Pipelex/some-action@v1\n      - uses: {REFUSED_ACTION}\n"
         _write_tree(root=tmp_path, workflows={"ci.yml": WORKFLOW, "other.yml": OTHER_WORKFLOW, "release.yml": release})
         violations = collect_violations(root=tmp_path)
         assert [(violation.relative_path, violation.lineno, violation.reference) for violation in violations] == [

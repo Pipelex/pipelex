@@ -19,8 +19,9 @@ A reference is allowed when it is:
 
 Patterns follow GitHub's syntax. Where that syntax leaves a doubt, the guard takes the stricter reading,
 so that a pass here is a pass on GitHub: ``*`` matches any run of characters except ``/`` and ``**`` any
-run at all, the owner, repository and path compare without case, and the ref after ``@`` compares with
-case. A ``docker://`` image is refused too, since no pattern can name one.
+run at all, and every comparison respects case, the owner and repository included, since GitHub does not
+document whether its policy check ignores case. A ``docker://`` image is refused too, since no pattern can
+name one.
 
 The human-readable specification lives in ``docs/contribute/actions-allowlist.md``. The presentation
 layer wired into the ``pipelex-dev`` Typer app lives in ``check_actions_allowlist_cmd.py``.
@@ -78,7 +79,7 @@ class ActionsAllowlist(NamedTuple):
 
     Attributes:
         github_owned_allowed: Whether actions created by GitHub are allowed.
-        enterprise_owners: The enterprise's organizations, lowercased, whose actions are allowed.
+        enterprise_owners: The enterprise's organizations, as GitHub spells them, whose actions are allowed.
         patterns_allowed: The policy's patterns, verbatim.
     """
 
@@ -132,7 +133,7 @@ def load_allowlist(*, path: Path) -> ActionsAllowlist:
         path: The allowlist file.
 
     Returns:
-        The policy, with the enterprise owners lowercased for comparison.
+        The policy.
 
     Raises:
         ActionsAllowlistGuardError: When the file is missing, is not valid TOML, carries an unknown key, or
@@ -159,15 +160,9 @@ def load_allowlist(*, path: Path) -> ActionsAllowlist:
     patterns_allowed = _string_list(raw=raw, key="patterns_allowed", path=path)
     return ActionsAllowlist(
         github_owned_allowed=github_owned_allowed,
-        enterprise_owners=frozenset(owner.lower() for owner in enterprise_owners),
+        enterprise_owners=frozenset(enterprise_owners),
         patterns_allowed=tuple(patterns_allowed),
     )
-
-
-def _case_normalized(*, text: str) -> str:
-    """Lowercase the owner, repository and path of a reference or a pattern, and keep the ref after ``@`` as written."""
-    name, separator, ref = text.partition("@")
-    return f"{name.lower()}{separator}{ref}"
 
 
 def _pattern_regex(*, pattern: str) -> re.Pattern[str]:
@@ -189,8 +184,7 @@ def _pattern_regex(*, pattern: str) -> re.Pattern[str]:
 
 def pattern_matches(*, pattern: str, reference: str) -> bool:
     """Whether a policy pattern allows a reference, read the strict way the module docstring describes."""
-    regex = _pattern_regex(pattern=_case_normalized(text=pattern))
-    return regex.fullmatch(_case_normalized(text=reference)) is not None
+    return _pattern_regex(pattern=pattern).fullmatch(reference) is not None
 
 
 def refusal_reason(*, reference: str, allowlist: ActionsAllowlist) -> str | None:
@@ -211,7 +205,7 @@ def refusal_reason(*, reference: str, allowlist: ActionsAllowlist) -> str | None
     segments = name.split("/")
     if not separator or not ref or len(segments) < 2 or not all(segments):
         return "is not of the form `owner/repository[/path]@ref`"
-    owner = segments[0].lower()
+    owner = segments[0]
     if allowlist.github_owned_allowed and owner in GITHUB_OWNERS:
         return None
     if owner in allowlist.enterprise_owners:
