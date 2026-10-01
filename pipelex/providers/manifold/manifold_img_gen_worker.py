@@ -45,6 +45,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.providers.manifold.manifold_metadata import make_manifold_metadata_headers
 from pipelex.providers.manifold.manifold_schemas import ManifoldImgGenAzureGptImage
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -96,12 +97,20 @@ class ManifoldImgGenWorker(ImgGenWorkerAbstract):
         )
 
         image_files: list[ImageFileTuple] | None = args_dict.pop("image", None)
-        response_dict = await self._call_images_api(image_files=image_files, args_dict=args_dict)
+        extra_headers = make_manifold_metadata_headers(job_metadata=img_gen_job.job_metadata)
+        response_dict = await self._call_images_api(image_files=image_files, args_dict=args_dict, extra_headers=extra_headers)
         self._record_usage(response_dict=response_dict, img_gen_job=img_gen_job)
         return self._make_generated_images(response_dict=response_dict)
 
-    async def _call_images_api(self, *, image_files: list[ImageFileTuple] | None, args_dict: dict[str, Any]) -> dict[str, Any]:
+    async def _call_images_api(
+        self, *, image_files: list[ImageFileTuple] | None, args_dict: dict[str, Any], extra_headers: dict[str, str]
+    ) -> dict[str, Any]:
         """One call, one dict back — whichever of the two Images routes the job needs.
+
+        `extra_headers` is the per-request `x-pipelex-metadata` header. It goes through the SDK's
+        own `extra_headers` rather than the client's defaults because it differs per job, and the
+        vendor client's `metadata` constructor argument is left alone: it would be sent as
+        `x-portkey-metadata`, a name the gateway does not read.
 
         There is no `endpoint_path` here and no config id: the manifold dialect puts the model in the
         body and lets the gateway decide who serves it, so which *route* is called is the SDK
@@ -120,9 +129,9 @@ class ManifoldImgGenWorker(ImgGenWorkerAbstract):
                 # `image` parts keeps one and silently drops the rest, so an edit of several images
                 # would come back as a plausible edit of the first.
                 images_arg: Any = image_files[0] if len(image_files) == 1 else list(image_files)
-                response = await self.portkey_client.images.edit(image=images_arg, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                response = await self.portkey_client.images.edit(image=images_arg, extra_headers=extra_headers, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             else:
-                response = await self.portkey_client.images.generate(**args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                response = await self.portkey_client.images.generate(extra_headers=extra_headers, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         except (portkey_exceptions.APIError, portkey_vendored_openai.APIError) as exc:
             metadata = extract_gateway_metadata(exc)
             classification = classify_inference_error(metadata)

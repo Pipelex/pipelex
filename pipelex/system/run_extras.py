@@ -19,10 +19,21 @@ is the backend that supports grouping. So whatever is put here is a live group
 key in those projects and a span attribute on every OpenTelemetry export, and the
 bounds below are shaped by that consumer.
 
-The hosted Pipelex platform fills it with `{"organization": "<org_id>"}`, but
-nothing here knows or checks that: no key is privileged, and a deployment that
-sends `{"tenant": …, "workspace": …}` is served identically. A single-user
-deployment sends nothing at all.
+The inference gateway is the other reader. Every call the Pipelex Manifold
+dialect makes carries the mapping, whole, in its `x-pipelex-metadata` header,
+beside the runtime's own ids for the run and the step, so the gateway can
+attribute the call's spend and log it (`pipelex.providers.manifold.manifold_metadata`).
+The runtime's ids win when an extras key collides with one of them — every one of
+their names (`user_id`, `pipeline_run_id`, `pipe_run_id`, `pipe_code`,
+`content_generation_job_id`) fits the key charset below — because this mapping is
+caller data and must not be able to restate whose run it is. No other inference
+path sends it: a vendor reached directly has no use for a host's labels.
+
+The hosted Pipelex platform fills it with `{"org_id": "<org_id>"}`, plus
+`"api_key_id"` on a call made with an API key, but nothing here knows or checks
+that: no key is privileged, and a deployment that sends
+`{"tenant": …, "workspace": …}` is served identically. A single-user deployment
+sends nothing at all.
 
 **Why the value is validated on the type.** The mapping is caller data that
 arrives over a wire, so its contents are whatever the other side put there. It

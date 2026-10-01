@@ -83,6 +83,7 @@ class ManifoldExtractWorker(ExtractWorkerAbstract):
             body=request.model_dump(exclude_none=True),
             family=InferenceErrorFamily.EXTRACT,
             inference_model=self.inference_model,
+            job_metadata=extract_job.job_metadata,
         )
         self._record_usage(response_body=response_body, extract_job=extract_job)
         try:
