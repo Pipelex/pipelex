@@ -365,6 +365,7 @@ plugins:
         - contribute/keyword-only-arguments.md: "Keyword-Only Arguments"
         - contribute/hub-layering.md: "Hub Layering"
         - contribute/rich-imports.md: "Rich Imports"
+        - contribute/actions-allowlist.md: "Actions Allowlist"
         - contribute/test-duration-map.md: "Test Duration Map"
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
@@ -616,6 +617,7 @@ nav:
     - Keyword-Only Arguments: contribute/keyword-only-arguments.md
     - Hub Layering: contribute/hub-layering.md
     - Rich Imports: contribute/rich-imports.md
+    - Actions Allowlist: contribute/actions-allowlist.md
     - Test Duration Map: contribute/test-duration-map.md
     - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
