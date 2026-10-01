@@ -27,7 +27,7 @@ def _write_manifest(package_dir: Path, *, address: str, name: str | None = None,
 
 
 class TestPackageLocator:
-    """Tests for locating a package by manifest identity (repo-root and library-repo layouts)."""
+    """Tests for locating a package by manifest identity (repo-root and library-repo layouts), and for how the scan reads each manifest."""
 
     def test_repo_root_package_matches_by_address(self, tmp_path: Path) -> None:
         """A repo-root package whose manifest address equals the requested address is located."""
@@ -147,13 +147,9 @@ class TestPackageLocator:
 
         assert [candidate.full_address for candidate in scan.candidates] == ["github.com/acme/real/real"]
 
-
-class TestManifestReadingRule:
-    """Tests for how the scan reads one manifest: regular files only, within the size ceiling, as UTF-8.
-
-    A fetched repository can commit a `METHODS.toml` that is a symlink, a directory or arbitrary
-    bytes. None of them may make the scan read outside the clone, read without end, or crash.
-    """
+    # How the scan reads one manifest: a fetched repository can commit a `METHODS.toml` that is a
+    # symlink, a directory or arbitrary bytes, and none of them may make the scan read outside the
+    # clone, read without end, or crash. Only a regular file within the size ceiling is read, as UTF-8.
 
     def test_symlinked_manifest_is_skipped_unread(self, tmp_path: Path) -> None:
         """A symlinked manifest pointing outside the clone is never read: its target's values stay out of the miss.
