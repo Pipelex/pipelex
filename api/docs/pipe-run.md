@@ -388,7 +388,9 @@ Provide a structured object directly (for Python clients):
 # Python client example
 from my_project.domain.domain_struct import MyConcept, MySubClass
 
-inputs = {"invoice_data": MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4"))}
+inputs = {
+    "invoice_data": MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4")),
+}
 ```
 
 **What is StructuredContent?**
@@ -411,7 +413,10 @@ Provide multiple content objects in a plain Python list:
 ```python
 # Python client example
 inputs = {
-    "invoice_list": [MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4")), MyConcept(arg1="arg1_2", arg2=2, arg3=MySubClass(arg4="arg4_2"))]
+    "invoice_list": [
+        MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4")),
+        MyConcept(arg1="arg1_2", arg2=2, arg3=MySubClass(arg4="arg4_2")),
+    ],
 }
 ```
 
@@ -436,8 +441,11 @@ from pipelex.core.stuffs.list_content import ListContent
 
 inputs = {
     "invoice_list": ListContent(
-        items=[MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4")), MyConcept(arg1="arg1_2", arg2=2, arg3=MySubClass(arg4="arg4_2"))]
-    )
+        items=[
+            MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4")),
+            MyConcept(arg1="arg1_2", arg2=2, arg3=MySubClass(arg4="arg4_2")),
+        ]
+    ),
 }
 ```
 
@@ -651,7 +659,16 @@ client = PipelexClient(api_token="YOUR_API_KEY")
 # Using DictStuff instance with dict content
 response = await client.execute_pipeline(
     pipe_code="process_invoice",
-    inputs={"invoice": DictStuff(concept="accounting.Invoice", content={"invoice_number": "INV-001", "amount": 1250.00, "date": "2025-10-20"})},
+    inputs={
+        "invoice": DictStuff(
+            concept="accounting.Invoice",
+            content={
+                "invoice_number": "INV-001",
+                "amount": 1250.00,
+                "date": "2025-10-20",
+            },
+        ),
+    },
 )
 
 # Using DictStuff instance with list of dicts content
@@ -659,14 +676,24 @@ response = await client.execute_pipeline(
     pipe_code="process_invoices",
     inputs={
         "invoices": DictStuff(
-            concept="accounting.Invoice", content=[{"invoice_number": "INV-001", "amount": 1250.00}, {"invoice_number": "INV-002", "amount": 890.00}]
-        )
+            concept="accounting.Invoice",
+            content=[
+                {"invoice_number": "INV-001", "amount": 1250.00},
+                {"invoice_number": "INV-002", "amount": 890.00},
+            ],
+        ),
     },
 )
 
 # Using DictStuff instance with list of strings (for Text concept)
 response = await client.execute_pipeline(
-    pipe_code="analyze_texts", inputs={"documents": DictStuff(concept="Text", content=["document 1", "document 2", "document 3"])}
+    pipe_code="analyze_texts",
+    inputs={
+        "documents": DictStuff(
+            concept="Text",
+            content=["document 1", "document 2", "document 3"],
+        ),
+    },
 )
 ```
 

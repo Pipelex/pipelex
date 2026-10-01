@@ -129,7 +129,7 @@ This only affects `start` — no other endpoint takes `callback_urls`. The API's
 
 ## How to run it
 
-From the `pipelex-api` repo root, the make targets are the convenient wrapper (they run the script with the project venv):
+Every command on this page runs from `api/`, the server's directory in the pipelex repository: `cd api` first, or prefix the make targets with `-C api` from the repository root (`make -C api bundle-run …`), and give `BUNDLE` and the script's paths relative to `api/`. The make targets are the convenient wrapper (they run the script with the server's venv):
 
 ```bash
 make bundle-run      BUNDLE=<dir|.mthds>                 # POST to a running API, print the response
