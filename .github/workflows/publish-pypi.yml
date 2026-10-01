@@ -4,15 +4,16 @@ name: Publish the release 📦 to PyPI and Docker Hub
 # `pipelex-api` distribution (the API server, the `api/` workspace member) and the
 # `pipelex/pipelex-api` image. The order is deliberate:
 #
-#   build -> publish-to-pypi -> github-release -> publish-docker-hub
-#   build -> build-api -> publish-api-to-pypi, which also waits for publish-to-pypi
+#   build -> publish-to-pypi -> github-release -> publish-api-to-pypi -> publish-docker-hub
+#   build -> build-api, whose dists publish-api-to-pypi uploads
 #
 # Nothing of the server ships before the `pipelex` wheel is on PyPI, because the `pipelex-api`
-# wheel pins `pipelex==X.Y.Z` exactly and the image is the release's third artifact. The image
-# goes last, after the GitHub Release has tagged the release commit, because
-# `publish-docker-hub.yml` pushes only from the commit `vX.Y.Z` names. Each publishing job can be
+# wheel pins `pipelex==X.Y.Z` exactly. Nothing of it ships before `github-release` either, whose tag
+# guard is what proves the commit this run checked out is the release's: a retry from a ref whose
+# head the tag does not name fails there, before a server file reaches PyPI, where it could never be
+# replaced. The image goes last, built from the commit `vX.Y.Z` names. Each publishing job can be
 # re-run on its own with "Re-run failed jobs"; the image can also be pushed again by dispatching
-# `publish-docker-hub.yml` from the tagged commit's branch, without this workflow.
+# `publish-docker-hub.yml` with the version, without this workflow.
 
 on:
   pull_request:
@@ -404,7 +405,8 @@ jobs:
 
   # The server's distribution. It is built from the same checkout as `pipelex` and, unlike it, is
   # simply rebuilt on a retry: it is not attached to the GitHub Release or signed, so no recovered
-  # bytes need to match, and `skip-existing` below leaves PyPI's copy alone once it is there.
+  # bytes need to match, and `skip-existing` below leaves PyPI's copy alone once it is there. Which
+  # commit that checkout is gets settled by `github-release`'s tag guard, which the upload waits for.
   # `hatch_build.py` writes the exact pin on `pipelex` into its metadata, and the check below refuses
   # to store a build that does not carry it, so a missing or wrong pin never reaches PyPI.
   build-api:
@@ -451,7 +453,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     needs:
       - build-api
-      - publish-to-pypi # the wheel pins pipelex==X.Y.Z, which must be installable first
+      # After `publish-to-pypi` through it, since the wheel pins pipelex==X.Y.Z, which must be
+      # installable first; and after its tag guard, which refuses a checkout the tag does not name.
+      - github-release
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -471,20 +475,20 @@ jobs:
           # The same rule as `publish-to-pypi`: only a retry may skip files PyPI already holds.
           skip-existing: ${{ github.run_attempt > 1 || github.event_name == 'workflow_dispatch' }}
 
-  # The image, last. `publish-docker-hub.yml` checks that the commit it builds is the one the tag
-  # names, which `github-release` has just created, so it runs after it rather than beside it.
+  # The image, last, once both distributions are on PyPI. `publish-docker-hub.yml` builds the commit
+  # the `vX.Y.Z` tag names, which `github-release` has just created.
   publish-docker-hub:
     name: Publish the API server image 🐳 to Docker Hub
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     needs:
-      - publish-to-pypi
+      - build # the version
       - github-release
+      - publish-api-to-pypi
     permissions:
       contents: read
     uses: ./.github/workflows/publish-docker-hub.yml
     with:
-      # Empty on a dispatch, where the called workflow ships `github.sha`, the dispatched ref's head.
-      merge-commit-sha: ${{ github.event.pull_request.merge_commit_sha }}
+      version: ${{ needs.build.outputs.version }}
     secrets:
       DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
 

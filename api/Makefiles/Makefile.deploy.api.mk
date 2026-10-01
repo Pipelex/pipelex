@@ -5,6 +5,7 @@
 define HELP_DEPLOY_API
 	$(GREEN)Deployment Commands:$(RESET)
 	make deploy-docker-hub                  - Build, smoke-test and push the image to Docker Hub (the release workflow runs it).
+	make deploy-docker-hub-latest           - Point :latest at the already-published :VERSION image, without rebuilding it.
 endef
 export HELP_DEPLOY_API
 
@@ -20,13 +21,16 @@ export HELP_DEPLOY_API
 # before anything is pushed, so a build that does not boot, or that reports
 # another version, never reaches Docker Hub.
 #
-# The release workflow runs this target from the release commit, after the
-# pipelex wheel is on PyPI: `.github/workflows/publish-docker-hub.yml`, which
-# `publish-pypi.yml` calls and which can also be dispatched on its own to retry
-# a failed push. It passes PUSH_LATEST=false for a pre-release, so `latest`
-# keeps naming the last stable release. DOCKER_HUB_TOKEN comes from that
-# workflow's secret, through the environment: the recipe reads it from the shell
-# rather than expanding it into the command line. This repository only publishes to Docker Hub; anything
+# The release workflow runs this target from the commit the release's tag names,
+# once both distributions are on PyPI: `.github/workflows/publish-docker-hub.yml`,
+# which `publish-pypi.yml` calls and which can also be dispatched on its own to
+# retry a failed push. It runs this target only when Docker Hub does not serve
+# the version yet, since a rebuild would be a different image under the same
+# tag, and passes PUSH_LATEST=false unless the version is the newest stable
+# release, so `latest` never moves to a pre-release or back to an older
+# release. DOCKER_HUB_TOKEN comes from that workflow's secret, through the
+# environment: the recipe reads it from the shell rather than expanding it into
+# the command line. This repository only publishes to Docker Hub; anything
 # beyond (private registries, ECR/ACR/GCR, ECS/k8s deploys) is the user's
 # responsibility, typically in a separate infra repo.
 PUSH_LATEST ?= true
@@ -54,3 +58,16 @@ deploy-docker-hub:
 		echo "✓ Built and pushed pipelex/pipelex-api:$(VERSION) to Docker Hub; :latest left where it was"; \
 	fi
 	@echo "✓ Image available at: https://hub.docker.com/r/pipelex/pipelex-api"
+
+# Points pipelex/pipelex-api:latest at the image Docker Hub already serves as
+# pipelex/pipelex-api:$(VERSION), copying the manifest registry-side without
+# building or pulling anything, so `latest` names exactly the published image.
+# The release workflow runs it on a retry that finds the version tag already
+# pushed, the case `deploy-docker-hub` must not rebuild.
+.PHONY: deploy-docker-hub-latest
+deploy-docker-hub-latest:
+	@test -n "$$DOCKER_HUB_TOKEN" || { echo "ERROR: DOCKER_HUB_TOKEN is not set in the environment."; exit 1; }
+	@echo "Logging in to Docker Hub..."
+	@printf '%s' "$$DOCKER_HUB_TOKEN" | docker login --username pipelex --password-stdin
+	docker buildx imagetools create --tag pipelex/pipelex-api:latest pipelex/pipelex-api:$(VERSION)
+	@echo "✓ pipelex/pipelex-api:latest now names the published pipelex/pipelex-api:$(VERSION)"
