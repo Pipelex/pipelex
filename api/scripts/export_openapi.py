@@ -12,7 +12,8 @@ Usage:
     python scripts/export_openapi.py --check docs/openapi/pipelex-api.openapi.yaml
 
 `--check` exits non-zero when the committed artifact drifts from the schema the
-app currently generates — wired into CI via `make openapi-check`.
+app currently generates — `make openapi-check`, which the gate (`make agent-check`, here or at the
+repository root) runs.
 """
 
 import argparse
@@ -24,6 +25,7 @@ import yaml
 from pipelex_api.main import fastapi_app
 
 _GENERATED_HEADER = "# GENERATED FILE — do not edit by hand. Regenerate with `make openapi-export`.\n"
+_EXPORT_HINT = "`make openapi-export` in api/ (`make -C api openapi-export` from the repository root)"
 
 
 def render_openapi_yaml() -> str:
@@ -43,10 +45,10 @@ def main() -> int:
 
     if args.check:
         if not target.exists():
-            print(f"OpenAPI drift check FAILED: {target} does not exist. Run `make openapi-export`.")
+            print(f"OpenAPI drift check FAILED: {target} does not exist. Run {_EXPORT_HINT}.")
             return 1
         if target.read_text(encoding="utf-8") != rendered:
-            print(f"OpenAPI drift check FAILED: {target} is stale. Run `make openapi-export` and commit the result.")
+            print(f"OpenAPI drift check FAILED: {target} is stale. Run {_EXPORT_HINT} and commit the result.")
             return 1
         print(f"OpenAPI artifact is up to date: {target}")
         return 0

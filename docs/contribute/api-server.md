@@ -26,7 +26,7 @@ The server is tested with exactly the dependencies it declares, which are not th
 
 ## The gate covers it
 
-The root `make agent-check` ends with `make api-agent-check`, which runs `make -C api agent-check`: the member's install, ruff, pyright and mypy under its own configuration, then two drift checks. The root `make agent-test` ends with `make api-agent-test`, the server's unit tests. A library change that breaks the server therefore fails in the change that makes it, and so does one that moves the server's wire or its inference tree:
+The root `make agent-check` ends with `make api-agent-check`, which runs `make -C api agent-check`: the member's install, ruff, pyright and mypy under its own configuration, then two drift checks. The root `make agent-test` ends with `make api-agent-test`, the server's unit tests. A library change that breaks the server therefore fails the gate in the change that makes it, and so does one that moves the server's wire or its inference tree. pipelex's pull-request workflows run the library's checks only, so it is this gate, run before pushing, that catches them:
 
 - **`make -C api openapi-check`** compares the committed OpenAPI artifact, `api/docs/openapi/pipelex-api.openapi.yaml`, with what the app generates. pipelex's own models ride the server's wire (the run result, the bundle blueprint, the validation error vocabulary), so a library change can move the artifact with no change to the server's code. Regenerate it with `make -C api openapi-export` and read the diff: it is what the change did to the server's callers.
 - **`make -C api kit-check`** compares the server's vendored inference tree with the kit.
