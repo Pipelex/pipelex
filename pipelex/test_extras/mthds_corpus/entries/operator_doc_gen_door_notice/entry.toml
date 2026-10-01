@@ -1,0 +1,10 @@
+name = "operator_doc_gen_door_notice"
+description = "A shop's opening hours laid out as a notice page to print and tape to the door"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "operator.doc_gen",
+]

@@ -1,10 +1,12 @@
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
+from pipelex.cogt.doc_gen.doc_gen_format import parse_doc_gen_choice_key
+from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError, PluginModelDeclarationError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -23,6 +25,7 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
+from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.tools.misc.file_utils import find_files_in_dir
@@ -69,6 +72,7 @@ class ModelManager(ModelManagerAbstract):
         secrets_provider: SecretsProviderAbstract,
         managed_gateway_configs: dict[str, GatewayConfig] | None,
         gateway_config_source: RemoteConfigSource | None,
+        plugin_model_declarations: PluginModelDeclarations,
         needs_inference: bool = True,
         backends_library_paths: Sequence[Path] | None = None,
         backends_dir_path: str | None = None,
@@ -79,10 +83,11 @@ class ModelManager(ModelManagerAbstract):
         # back to layered config_manager paths for all other callers. The two documents are
         # sequences — the base file, then the personal override files — see
         # `ConfigLoader.backends_file_paths`.
+        resolved_backends_dir_path = backends_dir_path or str(config_manager.backends_dir_path)
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_paths=backends_library_paths or config_manager.backends_file_paths(),
-            backends_dir_path=backends_dir_path or str(config_manager.backends_dir_path),
+            backends_dir_path=resolved_backends_dir_path,
             managed_gateway_configs=managed_gateway_configs,
             lenient=not needs_inference,
         )
@@ -92,6 +97,12 @@ class ModelManager(ModelManagerAbstract):
         # single copy, and by here logging is configured.
         if (stale_warning := self.inference_backend_library.take_stale_configuration_warning()) is not None:
             log.warning(stale_warning)
+        # The plugins' internal models join the internal backend before anything reads the library, so routing, the
+        # deck and the gateway check below see them exactly as they see a model `internal.toml` declares.
+        has_internal_backend = self.inference_backend_library.merge_plugin_internal_models(
+            plugin_model_declarations=plugin_model_declarations,
+            backends_dir_path=resolved_backends_dir_path,
+        )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
             routing_profile_library_paths=routing_profile_library_paths or config_manager.routing_profiles_file_paths(),
@@ -99,7 +110,12 @@ class ModelManager(ModelManagerAbstract):
             lenient=not needs_inference,
         )
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=deck_dir_path or str(config_manager.model_decks_dir_path))
-        deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
+        deck_blueprint = load_model_deck_blueprint(
+            model_deck_paths=model_deck_paths,
+            base_deck_dict=self._make_plugin_deck_base(
+                plugin_model_declarations=plugin_model_declarations, has_internal_backend=has_internal_backend
+            ),
+        )
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 
         self._enforce_gateway_model_membership(
@@ -107,6 +123,28 @@ class ModelManager(ModelManagerAbstract):
             gateway_config_source=gateway_config_source,
             enabled_backends=enabled_backends,
         )
+
+    @classmethod
+    def _make_plugin_deck_base(cls, *, plugin_model_declarations: PluginModelDeclarations, has_internal_backend: bool) -> dict[str, Any]:
+        """The model deck document the plugins' defaults make, for the deck files to be merged over.
+
+        Left out entirely without an internal backend, as the plugins' models are: a default pointing at a model this
+        boot does not serve is exactly what a live gateway's membership check refuses, and a plugin must not make a
+        boot fail that would succeed without it. The kit's own internal models set the precedent: with the backend
+        disabled their files' models are not loaded, and nothing a plugin adds changes that.
+
+        Raises:
+            PluginModelDeclarationError: a plugin declares a default for a format and source no step composes.
+        """
+        if not has_internal_backend:
+            return {}
+        for doc_gen_default in plugin_model_declarations.doc_gen_defaults:
+            try:
+                parse_doc_gen_choice_key(doc_gen_default.choice_key)
+            except ValueError as exc:
+                msg = f"Plugin '{doc_gen_default.plugin}' declares a default document engine that no step can use: {exc}"
+                raise PluginModelDeclarationError(msg, plugin=doc_gen_default.plugin) from exc
+        return plugin_model_declarations.make_deck_base()
 
     def _enforce_gateway_model_membership(
         self,
@@ -197,10 +235,14 @@ class ModelManager(ModelManagerAbstract):
     def _collect_deck_referenced_handles(cls, deck: ModelDeck) -> list[tuple[str, ModelType]]:
         """Gather the (handle, model_type) pairs that the deck advertises as usable.
 
-        Covers presets and choice defaults across every model type. Aliases and waterfalls
-        are intentionally NOT enumerated directly — they are reachable via preset/choice
-        references, and the resolver walks through them. Including them here would force the
-        check on dangling helpers the user has not actively wired into a preset.
+        Covers presets and choice defaults across every model type a managed gateway can serve.
+        Aliases and waterfalls are intentionally NOT enumerated directly — they are reachable via
+        preset/choice references, and the resolver walks through them. Including them here would
+        force the check on dangling helpers the user has not actively wired into a preset.
+
+        Document engines (``doc_gen``) are left out: they are software on the host, which no
+        gateway serves, and a step whose engine is undeclared is refused at load naming the engine
+        and the fix, where a gateway error at boot would stop every method and blame the gateway.
         """
         references: list[tuple[str, ModelType]] = []
         for llm_setting in deck.llm_presets.values():
@@ -433,6 +475,11 @@ class ModelManager(ModelManagerAbstract):
             search_waterfalls=model_deck_blueprint.search.waterfalls,
             search_presets=model_deck_blueprint.search.presets,
             search_choice_default=model_deck_blueprint.search.choice_default,
+            # DocGen
+            doc_gen_aliases=model_deck_blueprint.doc_gen.aliases,
+            doc_gen_waterfalls=model_deck_blueprint.doc_gen.waterfalls,
+            doc_gen_presets=model_deck_blueprint.doc_gen.presets,
+            doc_gen_choice_defaults=model_deck_blueprint.doc_gen.choice_defaults,
             model_deck_config=get_config().inference.model_deck,
         )
 

@@ -14,6 +14,7 @@ async def render_template(
     context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,
     finalize: Callable[[Any], Any] | None = None,
+    is_undefined_strict: bool = False,
 ) -> str:
     template_source = rewrite_template_sigils(template)
 
@@ -23,4 +24,5 @@ async def render_template(
         templating_context=context,
         templating_style=templating_style,
         finalize=finalize,
+        is_undefined_strict=is_undefined_strict,
     )

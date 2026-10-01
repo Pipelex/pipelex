@@ -70,10 +70,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             return pipe
 
         # 2. Cross-package refs. The bare-remainder search below survives the strictness change on
-        # purpose (OQ3): the qualification pass leaves `alias->…` refs alone — it cannot know the
+        # purpose: the qualification pass leaves `alias->…` refs alone — it cannot know the
         # dependency's domain layout — so removing it would break every `alias->bare_code` ref with
         # no canonical spelling to migrate to. It is alias-scoped, so it cannot reach a host pipe;
-        # revisit when the packaging design rules on cross-package reference forms.
+        # revisit when the packaging program (L-260827-0f95ca) rules on cross-package reference forms.
         if QualifiedRef.has_cross_package_prefix(pipe_code):
             alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
             # Try domain-qualified remainder as direct key

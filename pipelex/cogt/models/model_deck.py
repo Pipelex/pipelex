@@ -4,7 +4,10 @@ from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from pipelex import log
 from pipelex.cogt.config_cogt import ModelDeckConfig
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key, parse_doc_gen_choice_key
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.exceptions import (
+    DocGenHandleNotFoundError,
     ExtractHandleNotFoundError,
     ImgGenHandleNotFoundError,
     LLMHandleNotFoundError,
@@ -73,11 +76,30 @@ class SearchDeckBlueprint(ConfigModel):
     choice_default: SearchModelChoice
 
 
+class DocGenDeckBlueprint(ConfigModel):
+    """The document engines' deck: one default engine per format and source, keyed '<format>.<source>' ('pdf.layout')."""
+
+    aliases: dict[str, str] = Field(default_factory=dict)
+    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    presets: dict[str, DocGenSetting] = Field(default_factory=dict)
+    choice_defaults: dict[str, DocGenModelChoice] = Field(default_factory=dict)
+
+    @field_validator("choice_defaults", mode="after")
+    @classmethod
+    def validate_choice_default_keys(cls, choice_defaults: dict[str, DocGenModelChoice]) -> dict[str, DocGenModelChoice]:
+        for key in choice_defaults:
+            parse_doc_gen_choice_key(key)
+        return choice_defaults
+
+
 class ModelDeckBlueprint(ConfigModel):
     llm: LLMDeckBlueprint
     extract: ExtractDeckBlueprint
     img_gen: ImgGenDeckBlueprint
     search: SearchDeckBlueprint
+    # Optional, unlike the other families: a project whose deck predates it still boots, and only its
+    # `PipeDocGen` steps are refused, naming the missing default, until `pipelex update` adds the deck file.
+    doc_gen: DocGenDeckBlueprint = Field(default_factory=DocGenDeckBlueprint)
 
 
 class ModelDeck(ConfigModel):
@@ -117,6 +139,12 @@ class ModelDeck(ConfigModel):
     search_presets: dict[str, SearchSetting] = Field(default_factory=dict)
     search_choice_default: SearchModelChoice
 
+    # DocGen-specific
+    doc_gen_aliases: dict[str, str] = Field(default_factory=dict)
+    doc_gen_waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    doc_gen_presets: dict[str, DocGenSetting] = Field(default_factory=dict)
+    doc_gen_choice_defaults: dict[str, DocGenModelChoice] = Field(default_factory=dict)
+
     def get_aliases_and_waterfalls_for_type(self, model_type: ModelType) -> tuple[dict[str, str], dict[str, list[str]]]:
         """Return the type-specific aliases and waterfalls dictionaries."""
         match model_type:
@@ -128,6 +156,8 @@ class ModelDeck(ConfigModel):
                 return self.img_gen_aliases, self.img_gen_waterfalls
             case ModelType.SEARCH:
                 return self.search_aliases, self.search_waterfalls
+            case ModelType.DOC_GEN:
+                return self.doc_gen_aliases, self.doc_gen_waterfalls
 
     def is_model_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
         """Check if a model handle is defined in the model deck.
@@ -213,12 +243,26 @@ class ModelDeck(ConfigModel):
                 f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
             )
 
+    def _warn_if_ambiguous_doc_gen(self, name: str) -> None:
+        """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
+        matches: list[str] = []
+        if name in self.doc_gen_presets:
+            matches.append(f"doc gen preset (use ${name} or preset:{name})")
+        if name in self.doc_gen_aliases:
+            matches.append(f"alias (use @{name} or alias:{name})")
+        if name in self.doc_gen_waterfalls:
+            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
+        if matches:
+            log.warning(
+                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
+            )
+
     def _raise_handle_not_found_error(
         self,
         ref: ModelReference,
         *,
         model_type: ModelType,
-        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting],
+        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting] | dict[str, DocGenSetting],
     ) -> NoReturn:
         """Raise ModelChoiceNotFoundError with migration hints if applicable."""
         msg = f"Model handle '{ref.name}' was not found in the model deck"
@@ -454,6 +498,59 @@ class ModelDeck(ConfigModel):
                     presets=self.search_presets,
                 )
 
+    def get_doc_gen_choice_default(self, *, doc_gen_format: DocGenFormat, source: DocGenSource) -> DocGenModelChoice | None:
+        """The engine the deck prints this format from this source with when a step names none, or None when it names none either."""
+        return self.doc_gen_choice_defaults.get(doc_gen_choice_key(doc_gen_format=doc_gen_format, source=source))
+
+    def get_doc_gen_setting(self, *, doc_gen_choice: DocGenModelChoice) -> DocGenSetting:
+        if isinstance(doc_gen_choice, DocGenSetting):
+            return doc_gen_choice
+
+        ref = ensure_model_reference(doc_gen_choice)
+        match ref.kind:
+            case ModelReferenceKind.PRESET:
+                if preset := self.doc_gen_presets.get(ref.name):
+                    return preset
+                msg = f"Doc gen preset '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.DOC_GEN,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.PRESET,
+                    available_options=list(self.doc_gen_presets.keys()),
+                )
+            case ModelReferenceKind.ALIAS:
+                if alias_target := self.doc_gen_aliases.get(ref.name):
+                    return DocGenSetting(model=alias_target)
+                msg = f"Alias '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.DOC_GEN,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.ALIAS,
+                    available_options=list(self.doc_gen_aliases.keys()),
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in self.doc_gen_waterfalls:
+                    return DocGenSetting(model=ref.name)
+                msg = f"Waterfall '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.DOC_GEN,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.WATERFALL,
+                    available_options=list(self.doc_gen_waterfalls.keys()),
+                )
+            case ModelReferenceKind.HANDLE:
+                self._warn_if_ambiguous_doc_gen(ref.name)
+                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.DOC_GEN):
+                    return DocGenSetting(model=ref.name)
+                self._raise_handle_not_found_error(
+                    ref=ref,
+                    model_type=ModelType.DOC_GEN,
+                    presets=self.doc_gen_presets,
+                )
+
     def get_img_gen_setting(self, img_gen_choice: ImgGenModelChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
             return img_gen_choice
@@ -580,6 +677,17 @@ class ModelDeck(ConfigModel):
                 )
         return self
 
+    def validate_doc_gen_presets(self) -> Self:
+        for doc_gen_preset_id, doc_gen_setting in self.doc_gen_presets.items():
+            if not self.is_model_handle_defined(model_handle=doc_gen_setting.model, model_type=ModelType.DOC_GEN):
+                msg = f"Doc gen handle '{doc_gen_setting.model}' for doc gen preset '{doc_gen_preset_id}' was not found in the model deck"
+                raise DocGenHandleNotFoundError(
+                    message=msg,
+                    preset_id=doc_gen_preset_id,
+                    model_handle=doc_gen_setting.model,
+                )
+        return self
+
     def validate_registered_models(self):
         self.validate_inference_models()
         try:
@@ -645,6 +753,22 @@ class ModelDeck(ConfigModel):
                     ) from exc
                 case ProblemReaction.LOG:
                     log.warning(f"Search handle not found: {exc}")
+                case ProblemReaction.NONE:
+                    pass
+        try:
+            self.validate_doc_gen_presets()
+        except DocGenHandleNotFoundError as exc:
+            match self.model_deck_config.missing_presets_reaction:
+                case ProblemReaction.RAISE:
+                    msg = f"Failed to validate all DocGen presets: {exc}"
+                    raise ModelDeckPresetValidatonError(
+                        message=msg,
+                        model_type=ModelType.DOC_GEN,
+                        preset_id=exc.preset_id,
+                        model_handle=exc.model_handle,
+                    ) from exc
+                case ProblemReaction.LOG:
+                    log.warning(f"DocGen handle not found: {exc}")
                 case ProblemReaction.NONE:
                     pass
 
@@ -872,8 +996,8 @@ class ModelDeck(ConfigModel):
         named_references: set[str] = set(aliases.values())
         for fallback_list in waterfalls.values():
             named_references.update(fallback_list)
-        deck_settings: list[LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting]
-        deck_choices: list[LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | None]
+        deck_settings: list[LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting]
+        deck_choices: list[LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | DocGenModelChoice | None]
         match model_type:
             case ModelType.LLM:
                 deck_settings = list(self.llm_presets.values())
@@ -892,9 +1016,12 @@ class ModelDeck(ConfigModel):
             case ModelType.SEARCH:
                 deck_settings = list(self.search_presets.values())
                 deck_choices = [self.search_choice_default]
+            case ModelType.DOC_GEN:
+                deck_settings = list(self.doc_gen_presets.values())
+                deck_choices = list(self.doc_gen_choice_defaults.values())
         named_references.update(deck_setting.model for deck_setting in deck_settings)
         for deck_choice in deck_choices:
-            if isinstance(deck_choice, (LLMSetting, ExtractSetting, ImgGenSetting, SearchSetting)):
+            if isinstance(deck_choice, (LLMSetting, ExtractSetting, ImgGenSetting, SearchSetting, DocGenSetting)):
                 named_references.add(deck_choice.model)
             elif isinstance(deck_choice, ModelReference):
                 match deck_choice.kind:

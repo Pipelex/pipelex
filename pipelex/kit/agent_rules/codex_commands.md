@@ -7,7 +7,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports drift-check)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check api-agent-check)
    ```
 
    This runs multiple code quality tools:
@@ -17,6 +17,7 @@
    - plxt: Format and lint TOML, MTHDS, and PLX files
    - Migration ledgers: every checked-in ledger must be legal and replay harmlessly over its reference documents (`make check-ledger`, alias `cl`)
    - Drift contracts: open code↔docs review obligations fail the gate (note the digest reads the git index, so stage your changes for the check to see them)
+   - The Pipelex API server's own gate (`make -C api agent-check`): the server lives in `api/` as a uv workspace member with its own environment, and its checks include the drift of its OpenAPI artifact and of its vendored inference tree
 
    Always fix any issues reported by these tools before proceeding.
 

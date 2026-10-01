@@ -28,4 +28,4 @@ Use it whenever a change touches the emission chain — the structure blueprint,
 .venv/bin/pipelex-dev trace-input-semantics tests/data/input_semantics/probe_bundle.mthds -o /tmp/probe-trace
 ```
 
-The harness was built for the S1 input-semantics audit; its measured survival table and findings live with that audit's working documents. The integration test at `tests/integration/pipelex/cli/test_trace_input_semantics_cmd.py` keeps the per-hop capture format honest.
+The harness was built for the S1 input-semantics audit of the input-form program. The integration test at `tests/integration/pipelex/cli/test_trace_input_semantics_cmd.py` keeps the per-hop capture format honest.

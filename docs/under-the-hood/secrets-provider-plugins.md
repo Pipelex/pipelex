@@ -111,7 +111,7 @@ def _make_env_secrets_provider(config: SecretsProviderConfig) -> SecretsProvider
 
 ## Selecting a method by config
 
-`runtime.secrets.method` is an **open `str` token** (Decision S1), not a closed enum. The built-in uses `"env"`; an external `pipelex-secrets-<backend>` plugin registers its own (e.g. `"vault"`). A config naming an external method **parses fine** — the token is stored verbatim and its installability is validated later, at registry lookup:
+`runtime.secrets.method` is an **open `str` token**, not a closed enum. The built-in uses `"env"`; an external `pipelex-secrets-<backend>` plugin registers its own (e.g. `"vault"`). A config naming an external method **parses fine** — the token is stored verbatim and its installability is validated later, at registry lookup:
 
 ```toml
 # .pipelex/pipelex.toml
@@ -122,7 +122,7 @@ method = "vault"          # an out-of-tree provider — selected iff its plugin 
 Whether that token names an *installed* provider is validated at **registry lookup**, not at parse: an unknown method surfaces as `UnknownSecretsMethodError` at boot, which is the right layer — it lists the registered methods so the fix is obvious.
 
 !!! note "External-provider config surface is a scoped follow-up"
-    `SecretsProviderConfig` today carries only `method` — the built-in `env` backend needs no per-method sub-config. An out-of-tree `vault` provider has nowhere to read *its* structured config yet; a generic passthrough for external providers is a captured follow-up (Decision S4), not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file.
+    `SecretsProviderConfig` today carries only `method` — the built-in `env` backend needs no per-method sub-config. An out-of-tree `vault` provider has nowhere to read *its* structured config yet; a generic passthrough for external providers is a possible follow-up, not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file.
 
 ---
 

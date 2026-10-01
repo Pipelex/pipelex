@@ -114,6 +114,23 @@ class TestCliPipeCmd:
         toml = _pipe_spec_to_toml(spec)
         assert 'model = "@default-extract-document"' in toml
 
+    def test_doc_gen_model_in_toml(self) -> None:
+        spec = parse_pipe_spec(
+            {
+                "pipe_code": "print_invoice",
+                "description": "Print the invoice",
+                "inputs": {"invoice": "Invoice"},
+                "output": "Document",
+                "format": "pdf",
+                "model": "reportlab-pdf",
+                "filename": "invoice.pdf",
+            },
+            pipe_type="PipeDocGen",
+        )
+        toml = _pipe_spec_to_toml(spec)
+        assert 'model = "reportlab-pdf"' in toml
+        assert 'filename = "invoice.pdf"' in toml
+
     def test_img_gen_model_in_toml(self) -> None:
         spec = parse_pipe_spec(
             {

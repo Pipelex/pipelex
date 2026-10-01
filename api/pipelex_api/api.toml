@@ -1,0 +1,21 @@
+# Pipelex-API deployment config — the packaged default, loaded by `load_api_config()`
+# (pipelex_api/api_config.py) via core's env-aware `load_plugin_config` and validated into `ApiConfig`.
+# Keys live at the file root (no `[api]` wrapper) — `load_plugin_config` validates the whole merged
+# document against the schema, exactly like `pipelex-temporal`'s `temporal.toml`. The packaged
+# default here is deep-merged with an optional `api_{env}.toml` / `api_override.toml` at `~/.pipelex`
+# then the project `.pipelex` (env selected by `PIPELEX_ENV`). This source-available base names NO
+# orchestrator: it ships the in-process `direct` mode and refuses per-request override. A deployment
+# flavor bakes its own `.pipelex/api_{env}.toml` to flip this (e.g. `pipelex-api-hosted` sets
+# `orchestration_mode = "temporal"`).
+
+# Which orchestrator a top-level run dispatches to, through the orchestrator registry.
+# `orchestration_mode` is an OPEN string token: core owns "direct" (in-process); each orchestrator
+# plugin owns its own ("temporal" from pipelex-temporal, "mistral-workflows" from
+# pipelex-mistral-workflows). A token whose plugin is not installed fails loud at dispatch with the
+# plugin's install hint. The delivery axis (blocking vs fire-and-forget) is NOT configured here — it
+# is set by the endpoint (`/execute` and `/validate` block; `/start` is fire-and-forget).
+orchestration_mode = "direct"
+
+# Whether a caller may override `orchestration_mode` per request. Off on the base (and recommended off
+# on hosted flavors): a locked-down distributed runner must not be coercible into `direct`.
+allow_request_orchestration_mode_override = false

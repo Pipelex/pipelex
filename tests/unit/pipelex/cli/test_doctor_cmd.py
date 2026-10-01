@@ -85,6 +85,14 @@ class TestDoctorLayeredResolution:
                 "OK",
             ),
         )
+        mock_check_internal_backend = mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_internal_backend_sync",
+            return_value=(
+                True,
+                DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),
+                "OK",
+            ),
+        )
         mock_check_migrations = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_pending_migrations",
             return_value=NO_PENDING_MIGRATIONS,
@@ -103,6 +111,7 @@ class TestDoctorLayeredResolution:
         mock_check_backends.assert_called_once_with()
         mock_check_models.assert_called_once_with()
         mock_check_deck.assert_called_once_with()
+        mock_check_internal_backend.assert_called_once_with()
         # The migration row takes no directory at all — it answers for `pipelex migrate`, which
         # walks both configuration directories and has no way to be pointed at one.
         mock_check_migrations.assert_called_once_with()
@@ -139,6 +148,14 @@ class TestDoctorLayeredResolution:
         )
         mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_deck_sync",
+            return_value=(
+                True,
+                DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),
+                "OK",
+            ),
+        )
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_internal_backend_sync",
             return_value=(
                 True,
                 DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),

@@ -159,6 +159,32 @@ def compute_current_digest(contract: DriftContract, *, contract_id: str, staged_
     return ContractDigestResult(digest=digest, trigger_files=trigger_files)
 
 
+class DriftVerdict(StrEnum):
+    """What a review concluded. Every rationale `drift ack` records opens with one, then a colon."""
+
+    REAL_CATCH = "real-catch"
+    CLEAN_PASS = "clean-pass"
+    FRICTION = "friction"
+
+
+RATIONALE_TEMPLATE = f"<{'|'.join(DriftVerdict)}>: …"
+
+
+def read_rationale_verdict(*, rationale: str) -> DriftVerdict | None:
+    """Return the verdict a rationale opens with, or None when it opens with none.
+
+    A rationale reads `<verdict>: <what was reviewed>`. A verdict with nothing after its
+    colon counts as none: the verdict says how the review ended, not what it looked at.
+    """
+    head, separator, tail = rationale.strip().partition(":")
+    if not separator or not tail.strip():
+        return None
+    try:
+        return DriftVerdict(head)
+    except ValueError:
+        return None
+
+
 class DriftIssueKind(StrEnum):
     """Everything `drift check` can flag."""
 

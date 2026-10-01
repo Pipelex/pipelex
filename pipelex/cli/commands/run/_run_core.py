@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING, cast
 
 import typer
 from posthog import tag
+from rich.markup import escape
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
+from pipelex.cli.commands.run._main_stuff_file import save_main_stuff_file
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_dedicated_failure_panel,
@@ -54,6 +56,7 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 COMMAND = "run"
+_WORKING_MEMORY_FILENAME = "working_memory.json"
 
 
 def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_inputs: bool) -> None:
@@ -311,6 +314,7 @@ async def _execute_run(
     # Save main_stuff files if enabled. An absent main output saves the explicit absence
     # artifact (json + md, no interactive viewer — nothing to view), never value renders.
     saved_main_stuff_formats: list[str] = []
+    saved_main_stuff_file: Path | None = None
     if save_main_stuff and output_path:
         if isinstance(main_resolved, AbsenceRecord):
             absence_json_path = output_path / "main_stuff.json"
@@ -348,13 +352,23 @@ async def _execute_run(
             log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
             saved_main_stuff_formats.append("html_viewer")
 
+            # A Document or Image main output also lands as the file itself, under its own name. A dry run
+            # produced a placeholder, not a file, so there is nothing to copy.
+            if not dry_run:
+                try:
+                    saved_main_stuff_file = await save_main_stuff_file(
+                        content=main_stuff.content, output_dir=output_path, reserved_names=frozenset({_WORKING_MEMORY_FILENAME})
+                    )
+                except (PipelexError, OSError, ValueError) as file_exc:
+                    typer.secho(f"Could not copy the main output's file into {output_path}: {file_exc}", fg=typer.colors.YELLOW, err=True)
+
     # Save working memory to JSON if enabled
     working_memory_output_path: str | None = None
     if save_working_memory and output_path:
         if working_memory_path:
             working_memory_output_path = working_memory_path
         else:
-            working_memory_output_path = str(output_path / "working_memory.json")
+            working_memory_output_path = str(output_path / _WORKING_MEMORY_FILENAME)
         working_memory_dict = pipe_output.working_memory.smart_dump()
         save_as_json_to_path(object_to_save=working_memory_dict, path=Path(working_memory_output_path))
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
@@ -435,20 +449,23 @@ async def _execute_run(
         console.print("\n[yellow]✓[/yellow] [bold]Dry run completed successfully[/bold]")
     else:
         console.print("\n[green]✓[/green] [bold]Pipeline execution completed successfully[/bold]")
+    # Paths are escaped: a file name or an --output-dir can hold brackets, which Rich would read as markup.
     if output_path:
-        console.print(f"  Output saved to [bold magenta]{output_path}[/bold magenta]:")
+        console.print(f"  Output saved to [bold magenta]{escape(str(output_path))}[/bold magenta]:")
         if saved_graphs:
             console.print(f"    [green]✓[/green] graphs: {', '.join(saved_graphs)}")
         if saved_main_stuff_formats:
             console.print(f"    [green]✓[/green] main_stuff: {', '.join(saved_main_stuff_formats)}")
+        if saved_main_stuff_file:
+            console.print(f"    [green]✓[/green] file: [bold magenta]{escape(str(saved_main_stuff_file))}[/bold magenta]")
         if working_memory_output_path:
             if Path(working_memory_output_path).is_relative_to(output_path):
-                console.print("    [green]✓[/green] working_memory.json")
+                console.print(f"    [green]✓[/green] {_WORKING_MEMORY_FILENAME}")
             else:
-                console.print(f"    [green]✓[/green] working_memory: {working_memory_output_path}")
+                console.print(f"    [green]✓[/green] working_memory: {escape(working_memory_output_path)}")
     # CSV output is written to a literal cwd-relative path (CQ1), independent of --output-dir.
     if save_csv is not None:
-        console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{save_csv}[/bold magenta]")
+        console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{escape(save_csv)}[/bold magenta]")
 
 
 def execute_run(

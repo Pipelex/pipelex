@@ -13,7 +13,7 @@ from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 # (multiplicity, provided value) — every JSON type at each declaration, including the ones refused. Two shapes
 # are left out because the two sides differ on them by design: a single bare value at `Anything[]`, which the
 # shaper wraps into a one-item list, and an `Anything[]` item keyed exactly `concept` and `content`, which R10
-# refuses and the schema does not state (`wip/anything-slot/plan.md` defers it).
+# refuses and the schema does not state (L-260902-10eb56 deferred stating it).
 AGREEMENT_CASES: list[tuple[VariableMultiplicity | None, Any]] = [
     (None, {}),
     (None, {"a": 1}),

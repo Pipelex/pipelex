@@ -1,0 +1,10 @@
+domain      = "unknown_concept"
+description = "A pipe outputs a concept that is never declared"
+main_pipe   = "make_thing"
+
+[pipe.make_thing]
+type        = "PipeLLM"
+description = "Produce an undeclared concept"
+inputs      = { topic = "Text" }
+output      = "NonExistentConcept"
+prompt      = "Write a paragraph about $topic"

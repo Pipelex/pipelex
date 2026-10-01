@@ -20,6 +20,9 @@ code = "Dynamic"
 [native.text]
 code = "Text"
 
+[native.markdown]
+code = "Markdown"
+
 [native.image]
 code = "Image"
 
@@ -80,6 +83,9 @@ code = "PipeSearch"
 
 [operator.structure]
 code = "PipeStructure"
+
+[operator.doc_gen]
+code = "PipeDocGen"
 
 [controller.batch]
 code = "PipeBatch"

@@ -32,6 +32,7 @@ from pipelex.cogt.llm.llm_utils import (
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
@@ -42,6 +43,7 @@ from pipelex.providers.anthropic.anthropic_factory import (
     AnthropicFactory,
     AnthropicSdkVariant,
 )
+from pipelex.providers.manifold.manifold_metadata import make_manifold_metadata_headers
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -249,6 +251,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 max_tokens=max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,
+                **self._request_header_kwargs(llm_job=llm_job),
             ) as stream:
                 final_message: Message = await stream.get_final_message()
         except (APIStatusError, APIConnectionError) as sdk_exc:
@@ -304,6 +307,19 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=final_message.usage)
 
         return full_reply_content
+
+    def _request_header_kwargs(self, *, llm_job: LLMJob) -> dict[str, Any]:
+        """The per-request headers this call adds, as SDK keyword arguments: none, except behind Manifold.
+
+        Claude reaches the Pipelex Manifold service over this shared driver rather than over a
+        manifold sdk, so this is where the manifold dialect's `x-pipelex-metadata` header joins an
+        Anthropic request — per request, because it names the job, where the token is a client
+        default. Every other Anthropic backend is a direct provider SDK path and sends nothing of the
+        kind: the run's identity and labels are ours to forward to our own service, not to a vendor.
+        """
+        if self.inference_model.backend_name != PipelexBackend.MANIFOLD:
+            return {}
+        return {"extra_headers": make_manifold_metadata_headers(job_metadata=llm_job.job_metadata)}
 
     def _structure_method_kwargs(self) -> dict[str, Any]:
         """What the structured call sends, beyond what instructor's mode sets, for the model's structure method.
@@ -361,6 +377,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 max_tokens=effective_max_tokens,
                 timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
                 **self._structure_method_kwargs(),
+                **self._request_header_kwargs(llm_job=llm_job),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying

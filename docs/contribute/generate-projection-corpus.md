@@ -43,7 +43,7 @@ The classes it declares today:
 - `object-native-keeps-envelope` — a native carrying an optional field beside its required one (`native.Date`) renders as an object once the optional field is included, and the shaper's bare-value arm dispatches a native on its scalar kind, so the object form is only re-shapable inside its `{concept, content}` envelope. The projection keeps that envelope; the engine unwraps to a bare scalar, which it can only do because it drops the optional field. A consequence of `optional-field-included`.
 - `unknown-empty-object` — an `unknown` node renders as the empty object, because the descriptor withholds the payload shape at that position and a projection that invented one would stop projecting the descriptor. The engine reflects the runtime content class instead and fills a required dict with a sample key/value pair whoever fills the template in has to delete. Reached by `json_obj` inside `native.JSON`, the corpus's first *required* dict; the optional dict fields elsewhere never reach it, because the engine drops those entirely and that is `optional-field-included`.
 
-Most are `pipelex` defects filed in the workspace ledger rather than differences of taste, and the manifest names the item whose fix would retire each one. Some carry no item, deliberately: `file-leaf-not-expanded` and `unknown-empty-object` are the descriptor's vantage rather than engine bugs, and `object-native-keeps-envelope` is a consequence of `optional-field-included` rather than a defect of its own. The manifest is what records that the corpus knowingly departs from the engine, and why.
+Most are `pipelex` defects rather than differences of taste, and the manifest names the tracked item whose fix would retire each one. Some carry no item, deliberately: `file-leaf-not-expanded` and `unknown-empty-object` are the descriptor's vantage rather than engine bugs, and `object-native-keeps-envelope` is a consequence of `optional-field-included` rather than a defect of its own. The manifest is what records that the corpus knowingly departs from the engine, and why.
 
 ### What the gate can and cannot separate
 
@@ -57,7 +57,7 @@ A fill-in template exists to be filled in and handed back to the runtime, so sur
 
 So every projected template goes straight back through the shaper, assembled exactly as an entry-pipe run assembles it: the pipe's own declared inputs as the signature, its domain as the search scope. Both shapes, both pipes' worth — the explicit template is as much a runnable scaffold as the compact one. The round-trip is offline: the file-ish arms wrap a mock URL without fetching it.
 
-The verdict follows the same declared-never-discovered discipline as the divergence record, through the `EXPECTED_UNSHAPEABLE` registry in `generate_projection_corpus_cmd.py`, which maps a `(pipe_ref, shape)` to the ledger item tracking the gap:
+The verdict follows the same declared-never-discovered discipline as the divergence record, through the `EXPECTED_UNSHAPEABLE` registry in `generate_projection_corpus_cmd.py`, which maps a `(pipe_ref, shape)` to the tracked item for the gap:
 
 - A refusal **not** in the registry fails the command, naming the pipe, the shape, the error class and the error's first line. This is the mechanism that would have caught both prior escapes at capture time.
 - A registry entry whose template **now shapes** fails the command too — *delete the entry, the gap closed* — so a fix retires its declaration deliberately rather than leaving the manifest claiming a defect that no longer exists.

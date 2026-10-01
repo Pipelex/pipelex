@@ -142,6 +142,34 @@ class DuplicateLogSinkError(PluginError):
         super().__init__(message)
 
 
+class DuplicateInternalModelError(PluginError):
+    """Two plugins declared a model of the same name in the internal backend."""
+
+    def __init__(self, *, name: str, first_plugin: str, second_plugin: str):
+        self.name = name
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Internal model '{name}' is declared by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            "Each internal model must be declared by a single plugin."
+        )
+        super().__init__(message)
+
+
+class DuplicateDocGenDefaultError(PluginError):
+    """Two plugins declared the model deck's default document engine for the same format and source."""
+
+    def __init__(self, *, choice_key: str, first_plugin: str, second_plugin: str):
+        self.choice_key = choice_key
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"The default document engine for '{choice_key}' is declared by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            "Each format and source must have its default declared by a single plugin; a user sets their own in an x_custom_*.toml deck file."
+        )
+        super().__init__(message)
+
+
 class DuplicatePipeFuncExecutorError(PluginError):
     """Two plugins registered a PipeFunc executor for the same execution mode."""
 

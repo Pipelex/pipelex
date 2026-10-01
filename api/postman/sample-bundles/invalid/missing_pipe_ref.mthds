@@ -1,0 +1,20 @@
+domain      = "missing_pipe_ref"
+description = "A sequence step references a pipe that is never defined"
+main_pipe   = "do_two_steps"
+
+[pipe.do_two_steps]
+type        = "PipeSequence"
+description = "Two-step sequence whose second step does not exist"
+inputs      = { text = "Text" }
+output      = "Text"
+steps = [
+  { pipe = "first_step", result = "interim" },
+  { pipe = "second_step_missing", result = "final" },
+]
+
+[pipe.first_step]
+type        = "PipeLLM"
+description = "Echo the text"
+inputs      = { text = "Text" }
+output      = "Text"
+prompt      = "Repeat verbatim: $text"

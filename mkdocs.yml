@@ -278,6 +278,7 @@ plugins:
         - building-methods/pipes/pipe-operators/PipeImgGen.md: "PipeImgGen"
         - building-methods/pipes/pipe-operators/PipeSearch.md: "PipeSearch"
         - building-methods/pipes/pipe-operators/PipeCompose.md: "PipeCompose"
+        - building-methods/pipes/pipe-operators/PipeDocGen.md: "PipeDocGen"
         - building-methods/pipes/pipe-operators/PipeFunc.md: "PipeFunc"
         - building-methods/pipes/pipe-controllers/index.md: "Pipe Controllers Overview"
         - building-methods/pipes/pipe-controllers/PipeSequence.md: "PipeSequence"
@@ -354,6 +355,7 @@ plugins:
         - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
         - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
         - under-the-hood/log-sink-plugins.md: "Log Sink Plugins"
+        - under-the-hood/document-engine-plugins.md: "Document Engine Plugins"
         - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
         - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
@@ -363,6 +365,7 @@ plugins:
         - contribute/keyword-only-arguments.md: "Keyword-Only Arguments"
         - contribute/hub-layering.md: "Hub Layering"
         - contribute/rich-imports.md: "Rich Imports"
+        - contribute/actions-allowlist.md: "Actions Allowlist"
         - contribute/test-duration-map.md: "Test Duration Map"
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
@@ -370,8 +373,20 @@ plugins:
         - contribute/trace-input-semantics.md: "Tracing Input Semantics"
         - contribute/generate-projection-corpus.md: "Projection Fixture Corpus"
         - contribute/typescript-emission-gates.md: "TypeScript Emission Gates"
+        - contribute/api-server.md: "The API Server"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
+        API Server:
+        - api-server/index.md: "Pipelex API Server Overview"
+        - api-server/configuration.md: "API Server Configuration"
+        - api-server/pipe-run.md: "API Server Pipe Run"
+        - api-server/pipe-validate.md: "API Server Pipe Validate"
+        - api-server/pipe-io.md: "API Server Pipe I/O"
+        - api-server/codegen.md: "API Server Resolve & Codegen"
+        - api-server/pipe-builder.md: "API Server Pipe Builder"
+        - api-server/mthds-tools.md: "API Server MTHDS Tools"
+        - api-server/error-responses.md: "API Server Error Responses"
+        - api-server/logging.md: "API Server Logging"
 
 markdown_extensions:
   - meta
@@ -493,6 +508,7 @@ nav:
           - PipeImgGen: building-methods/pipes/pipe-operators/PipeImgGen.md
           - PipeSearch: building-methods/pipes/pipe-operators/PipeSearch.md
           - PipeCompose: building-methods/pipes/pipe-operators/PipeCompose.md
+          - PipeDocGen: building-methods/pipes/pipe-operators/PipeDocGen.md
           - PipeFunc: building-methods/pipes/pipe-operators/PipeFunc.md
         - Pipe Controllers:
           - Overview: building-methods/pipes/pipe-controllers/index.md
@@ -591,6 +607,7 @@ nav:
       - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
       - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md
       - Log Sink Plugins: under-the-hood/log-sink-plugins.md
+      - Document Engine Plugins: under-the-hood/document-engine-plugins.md
       - Error Model: under-the-hood/error-model.md
       - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
       - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md
@@ -600,6 +617,7 @@ nav:
     - Keyword-Only Arguments: contribute/keyword-only-arguments.md
     - Hub Layering: contribute/hub-layering.md
     - Rich Imports: contribute/rich-imports.md
+    - Actions Allowlist: contribute/actions-allowlist.md
     - Test Duration Map: contribute/test-duration-map.md
     - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
@@ -607,8 +625,21 @@ nav:
     - Tracing Input Semantics: contribute/trace-input-semantics.md
     - Projection Fixture Corpus: contribute/generate-projection-corpus.md
     - TypeScript Emission Gates: contribute/typescript-emission-gates.md
+    - The API Server: contribute/api-server.md
     - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
     - Changelog: changelog.md
-  - API: https://pipelex.github.io/pipelex-api/
+  - API Server:
+    - Overview: api-server/index.md
+    - Configuration: api-server/configuration.md
+    - Pipe Run: api-server/pipe-run.md
+    - Pipe Validate: api-server/pipe-validate.md
+    - Pipe I/O: api-server/pipe-io.md
+    - Resolve & Codegen: api-server/codegen.md
+    - Pipe Builder: api-server/pipe-builder.md
+    - MTHDS Tools: api-server/mthds-tools.md
+    - Error Responses: api-server/error-responses.md
+    - Logging: api-server/logging.md
+    - Storage Transport (Removed): api-server/storage-transport.md
+    - Changelog to v0.33.2: api-server/changelog.md

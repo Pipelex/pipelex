@@ -1,15 +1,20 @@
-"""Model deck manifest: detect when an installed deck has drifted from the kit-shipped templates.
+"""Kit manifests: detect when the kit-managed files of an installation have drifted from the kit-shipped templates.
 
-The manifest pins, for one specific deck install, the kit version that produced it and the SHA-256 of
-each managed deck file at install/update time. It enables three independent signals:
+``pipelex update`` manages two areas of an installed configuration, each a ``KitManagedArea`` with its own
+manifest file in its own directory: the model deck, and the one backend file the kit owns, the internal
+backend's ``internal.toml``. A manifest pins, for one install of an area, the kit version that produced it and
+the SHA-256 of each managed file at install/update time. It enables three independent signals:
 
 - Manifest's ``kit_version`` vs the running ``pipelex`` version → behind upstream.
-- Manifest's per-file hash vs the installed file's actual hash → user has locally edited a numbered file.
+- Manifest's per-file hash vs the installed file's actual hash → user has locally edited a managed file.
 - Kit content vs installed content → upstream changed.
 
-Numbered deck files (``<digits>_*.toml``, e.g. ``1_llm_deck.toml``) are pipelex-managed. Anything
-else is left alone — including ``x_custom_*.toml`` overrides (the recommended escape hatch) and
-any other project-local additions (e.g. a cookbook's preset file).
+In the deck, numbered files (``<digits>_*.toml``, e.g. ``1_llm_deck.toml``) are pipelex-managed. Anything
+else is left alone — including ``x_custom_*.toml`` overrides (the recommended escape hatch) and any other
+project-local additions (e.g. a cookbook's preset file). In the backends directory only ``internal.toml`` is
+managed, because it declares the software-only models open Pipelex ships and an existing install must receive
+the ones a release adds: every other backend file is the user's, which ``pipelex update`` never touches
+(``pipelex init``, a full reset, rewrites the ones the kit ships).
 """
 
 from __future__ import annotations
@@ -21,15 +26,41 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 
 MANIFEST_FILENAME = ".kit_manifest.json"
+# The one backend file ``pipelex update`` manages: the internal backend's, which declares the models open Pipelex ships.
+MANAGED_BACKEND_FILENAME = f"{PipelexBackend.INTERNAL}.toml"
+
+
+class KitManagedArea(StrEnum):
+    """A directory of an installed configuration whose kit-shipped files ``pipelex update`` manages, each with its own manifest."""
+
+    DECK = "deck"
+    BACKENDS = "backends"
+
+    @property
+    def display_name(self) -> str:
+        match self:
+            case KitManagedArea.DECK:
+                return "Model deck"
+            case KitManagedArea.BACKENDS:
+                return "Internal backend"
+
+    def is_managed_filename(self, *, filename: str) -> bool:
+        """Whether ``pipelex update`` manages a file of this name in this area's directory."""
+        match self:
+            case KitManagedArea.DECK:
+                return _is_managed_deck_filename(filename)
+            case KitManagedArea.BACKENDS:
+                return filename == MANAGED_BACKEND_FILENAME
 
 
 class DeckFileStatus(StrEnum):
-    """Per-file sync status between the installed deck and the kit-shipped templates."""
+    """Per-file sync status between an installed kit-managed area and the kit-shipped templates."""
 
     UP_TO_DATE = "up_to_date"
     KIT_ADDED = "kit_added"
@@ -57,7 +88,7 @@ class DeckManifest(BaseModel):
 
 
 class DeckSyncReport(BaseModel):
-    """Result of comparing an installed deck dir to the currently shipping kit."""
+    """Result of comparing an installed kit-managed area's directory to the currently shipping kit."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -95,6 +126,20 @@ def kit_deck_dir() -> Path:
     return Path(str(get_kit_configs_dir())) / "inference" / "deck"
 
 
+def kit_backends_dir() -> Path:
+    """Return the kit's shipped backends directory as a real filesystem path, the way ``kit_deck_dir`` does for the deck."""
+    return Path(str(get_kit_configs_dir())) / "inference" / "backends"
+
+
+def kit_area_dir(*, area: KitManagedArea) -> Path:
+    """The kit's shipped directory for an area."""
+    match area:
+        case KitManagedArea.DECK:
+            return kit_deck_dir()
+        case KitManagedArea.BACKENDS:
+            return kit_backends_dir()
+
+
 def _is_managed_deck_filename(filename: str) -> bool:
     """True for files that follow the pipelex-managed numbered convention.
 
@@ -108,38 +153,52 @@ def _is_managed_deck_filename(filename: str) -> bool:
     return bool(sep) and head.isdigit()
 
 
-def list_managed_kit_files() -> dict[str, str]:
-    """Hash every managed deck file shipped in the current pipelex wheel."""
-    kit_dir = kit_deck_dir()
+def list_managed_kit_files(*, area: KitManagedArea) -> dict[str, str]:
+    """Hash every managed file of an area shipped in the current pipelex wheel."""
+    kit_dir = kit_area_dir(area=area)
     return {
-        entry.name: compute_file_sha256(entry) for entry in sorted(kit_dir.iterdir()) if entry.is_file() and _is_managed_deck_filename(entry.name)
+        entry.name: compute_file_sha256(entry)
+        for entry in sorted(kit_dir.iterdir())
+        if entry.is_file() and area.is_managed_filename(filename=entry.name)
     }
 
 
-def list_managed_installed_files(deck_dir: Path) -> dict[str, str]:
-    """Hash every managed deck file present in the user's installed deck dir."""
-    if not deck_dir.is_dir():
+def list_managed_installed_files(installed_dir: Path, *, area: KitManagedArea) -> dict[str, str]:
+    """Hash every managed file of an area present in the user's installed directory for it."""
+    if not installed_dir.is_dir():
         return {}
     return {
-        entry.name: compute_file_sha256(entry) for entry in sorted(deck_dir.iterdir()) if entry.is_file() and _is_managed_deck_filename(entry.name)
+        entry.name: compute_file_sha256(entry)
+        for entry in sorted(installed_dir.iterdir())
+        if entry.is_file() and area.is_managed_filename(filename=entry.name)
     }
 
 
-def compute_kit_manifest() -> DeckManifest:
-    """Build the manifest that should be written after a fresh install or successful update."""
-    return DeckManifest(kit_version=get_package_version(), files=list_managed_kit_files())
+def compute_kit_manifest(*, area: KitManagedArea) -> DeckManifest:
+    """Build the manifest that should be written for an area after a fresh install or successful update."""
+    return DeckManifest(kit_version=get_package_version(), files=list_managed_kit_files(area=area))
 
 
-def manifest_path(deck_dir: Path) -> Path:
-    return deck_dir / MANIFEST_FILENAME
+def stamp_kit_manifests(*, inference_dir: Path) -> None:
+    """Write both areas' manifests for an ``inference/`` directory whose managed files were just copied from the kit.
+
+    For the installers (``pipelex init``, the first-run materialization), so a later ``pipelex update`` tells a file
+    the user edited from one the kit moved on.
+    """
+    for area in KitManagedArea:
+        write_manifest(compute_kit_manifest(area=area), installed_dir=inference_dir / area)
 
 
-def read_manifest(deck_dir: Path) -> DeckManifest | None:
+def manifest_path(installed_dir: Path) -> Path:
+    return installed_dir / MANIFEST_FILENAME
+
+
+def read_manifest(installed_dir: Path) -> DeckManifest | None:
     """Return the persisted manifest, or ``None`` when absent or unreadable.
 
     A corrupt manifest is treated as missing — the caller will warn the user and offer to rebuild it.
     """
-    target = manifest_path(deck_dir)
+    target = manifest_path(installed_dir)
     if not path_exists(str(target)):
         return None
     try:
@@ -152,11 +211,11 @@ def read_manifest(deck_dir: Path) -> DeckManifest | None:
         return None
 
 
-def write_manifest(manifest: DeckManifest, *, deck_dir: Path) -> None:
-    """Persist the manifest, creating the deck directory if needed."""
-    deck_dir.mkdir(parents=True, exist_ok=True)
+def write_manifest(manifest: DeckManifest, *, installed_dir: Path) -> None:
+    """Persist the manifest, creating the area's directory if needed."""
+    installed_dir.mkdir(parents=True, exist_ok=True)
     payload = manifest.model_dump()
-    target = manifest_path(deck_dir)
+    target = manifest_path(installed_dir)
     target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -230,15 +289,15 @@ def suggest_x_custom_filename(numbered_filename: str) -> str:
     return f"x_custom_{tail}"
 
 
-def compute_deck_sync_report(deck_dir: Path) -> DeckSyncReport:
-    """Full per-file diff between the installed deck and the running pipelex's kit.
+def compute_sync_report(installed_dir: Path, *, area: KitManagedArea) -> DeckSyncReport:
+    """Full per-file diff between an installed area and the running pipelex's kit.
 
     This walks every managed file in either side and assigns it a ``DeckFileStatus``. Cost is one
     SHA-256 per file — only call from ``pipelex update`` and ``pipelex doctor``, never on the boot path.
     """
-    kit_files = list_managed_kit_files()
-    installed_files = list_managed_installed_files(deck_dir)
-    manifest = read_manifest(deck_dir)
+    kit_files = list_managed_kit_files(area=area)
+    installed_files = list_managed_installed_files(installed_dir, area=area)
+    manifest = read_manifest(installed_dir)
     manifest_files: dict[str, str] = manifest.files if manifest is not None else {}
 
     all_filenames = set(kit_files) | set(installed_files)

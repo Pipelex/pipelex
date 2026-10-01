@@ -1,0 +1,210 @@
+####################################################################################################
+# Pipelex Configuration File
+####################################################################################################
+#
+# This configuration file is copied to client projects' .pipelex/ directory when running:
+#   `pipelex init config`
+#
+# Purpose:
+# - This file allows you to override Pipelex's default settings for specific projects
+# - All values below are set to their defaults - modify them as needed
+# - The values here will override the defaults from the Pipelex package
+#
+# Finding Available Settings:
+# - See the full default configuration in: pipelex/pipelex.toml (in the Pipelex package)
+# - See the configuration structure classes in: pipelex/config.py and pipelex/cogt/config_cogt.py
+#
+# Common customizations include:
+# - Logging levels and behavior
+# - Excluded directories for scanning
+# - LLM prompt dumping for debugging
+# - Feature flags
+# - Observer and reporting output directories
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# Pipeline Execution Config
+####################################################################################################
+
+[interpreter.pipeline_execution]
+# Set to false to disable conversion of incoming data URLs to pipelex-storage:// URIs
+is_normalize_data_urls_to_storage = true
+# Set to false to disable generation of execution graphs
+is_generate_graph = true
+
+[interpreter.pipeline_execution.graph.data_inclusion]
+# Control what data is included in graph outputs
+stuff_json_content = true
+error_stack_traces = true
+
+[interpreter.pipeline_execution.graph.graphs_inclusion]
+# Control which graph outputs are generated
+graphspec_json = true
+mermaidflow_mmd = true
+mermaidflow_html = true
+reactflow_html = true
+
+[interpreter.pipeline_execution.graph.reactflow]
+# Customize ReactFlow graph rendering
+edge_type = "bezier" # Options: "bezier", "smoothstep", "step", "straight"
+nodesep = 50         # Horizontal spacing between nodes
+ranksep = 30         # Vertical spacing between ranks/levels
+initial_zoom = 1.0   # Initial zoom level (1.0 = 100%)
+pan_to_top = true    # Pan to show top of graph on load
+
+[interpreter.pipeline_execution.graph.reactflow.style]
+theme = "dark"
+palette = "dracula"
+
+####################################################################################################
+# Scan Config
+####################################################################################################
+
+[interpreter.scan]
+# Directories to exclude when scanning for pipeline files
+excluded_dirs = [
+  ".venv",
+  "venv",
+  "env",
+  ".env",
+  "virtualenv",
+  ".virtualenv",
+  ".git",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  "node_modules",
+  "results",
+]
+
+####################################################################################################
+# Builder Config
+####################################################################################################
+
+[interpreter.builder]
+# Settings for generated pipelines
+default_output_dir = "."
+default_bundle_file_name = "bundle"
+default_directory_base_name = "pipeline"
+
+####################################################################################################
+# Inference Config (model deck, LLM, image generation, extraction)
+####################################################################################################
+
+[inference.model_deck]
+# Model fallback behavior: if true, uses secondary model options when primary fails
+is_model_fallback_enabled = true
+# Reaction to missing presets: "raise", "log", or "none"
+missing_presets_reaction = "log"
+
+[inference.llm]
+# Enable dumping of LLM inputs/outputs for debugging
+is_dump_text_prompts_enabled = false
+is_dump_response_text_enabled = false
+
+[inference.llm.instructor]
+# Enable dumping of structured content generation details for debugging
+is_dump_kwargs_enabled = false
+is_dump_response_enabled = false
+is_dump_error_enabled = false
+
+####################################################################################################
+# Storage Config
+####################################################################################################
+
+[runtime.storage]
+# Storage method: "local", "in_memory", "s3", or "gcp"
+method = "local"
+# Whether to fetch remote HTTP URLs and store them locally
+is_fetch_remote_content_enabled = true
+# Whether to upload local file paths to storage and replace with pipelex-storage:// URIs
+is_upload_local_content_enabled = true
+
+[runtime.storage.local]
+# Local storage settings
+uri_format = "{hash}.{extension}"
+local_storage_path = ".pipelex/storage"
+
+[runtime.storage.in_memory]
+# In-memory storage settings
+uri_format = "{hash}.{extension}"
+
+[runtime.storage.s3]
+# AWS S3 storage settings (requires boto3: `pip install pipelex[s3]`)
+uri_format = "{hash}.{extension}"
+bucket_name = ""
+region = ""
+signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
+
+[runtime.storage.gcp]
+# Google Cloud Storage settings (requires google-cloud-storage: `pip install pipelex[gcp-storage]`)
+uri_format = "{hash}.{extension}"
+bucket_name = ""
+project_id = ""
+signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
+
+####################################################################################################
+# Log Config
+####################################################################################################
+
+[runtime.log]
+# Default logging level: "DEBUG", "INFO", "WARNING", "ERROR"
+default_log_level = "INFO"
+# The registered log sink this server installs. "json" writes one JSON object per line, with every
+# field, the bound run identifiers and the message flat beside each other — the shape a log agent
+# in front of a container ingests without a parser. The alternative, "console", is the Rich
+# renderer meant for a terminal; this server does not ask for the `cli` extra that declares Rich,
+# which is what makes the renderer unused here rather than unavailable — see pretty_print_mode.
+sink = "json"
+# The stream the json sink writes to: "stdout" or "stderr". Logs are diagnostics and belong off
+# the data channel.
+console_log_target = "stderr"
+console_print_target = "stdout"
+# The panels `pretty_print(...)` draws, the "Output of pipe" one after every operator pipe among
+# them. A server has no terminal to draw into and must not spend time rendering on the thread
+# serving a request, so nothing is printed and no renderable is built. This is what keeps Rich off
+# the request path, and it is not the same as keeping it out of the image: `typer` and `instructor`
+# are core pipelex dependencies that require Rich unconditionally, so an `import pipelex` loads it
+# whatever this file says. Selecting "rich" here, or the "console" sink above, would therefore work
+# rather than refuse — these two keys are the whole of what keeps the renderer unused.
+pretty_print_mode = "silent"
+
+[runtime.log.package_log_levels]
+# Log levels for specific packages (use "-" instead of "." in package names)
+pipelex = "INFO"
+
+####################################################################################################
+# Reporting Config
+####################################################################################################
+
+[runtime.reporting]
+# Cost reporting settings
+is_log_costs_to_console = false
+is_generate_cost_report_file_enabled = false
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "csv"
+cost_report_unit_scale = 1.0
+
+####################################################################################################
+# Tracing Config
+####################################################################################################
+
+[runtime.tracing]
+# Tracing is opt-in. Enable in your own pipelex_override.toml and set the backend
+# of your choice. See pipelex/pipelex.toml in the Pipelex package for all options.
+is_enabled = false
+backend = "ndjson"
+
+[runtime.tracing.ndjson]
+traces_dir = ".pipelex/traces"
+
+[runtime.tracing.dynamodb]
+# Configure your own table_name + region in your override file when backend = "dynamodb".
+table_name = ""
+region = ""

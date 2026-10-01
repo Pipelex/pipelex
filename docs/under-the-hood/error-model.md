@@ -141,7 +141,7 @@ The **fix planner** (`pipelex/pipeline/fixes/planner.py`) translates enriched ty
 
 Applying fixes is the runtime's job too: the **applier** (`pipelex/pipeline/fixes/applier.py`) mutates a tomlkit DOM in place per op (guarded — an op whose target table is absent is skipped and reported, never raised) and then reflows the whole file to canonical MTHDS style, and the **convergence loop** (`pipelex/pipeline/fixes/fix_loop.py`) runs validate → apply SAFE fixes → re-validate to a fixed point, reporting non-convergence loudly. The user-facing surface is [`pipelex fix bundle`](../tools/cli/fix.md).
 
-On the hosted API the same payload rides the wire verbatim as `validation_errors[].suggested_fix`; how it appears in HTTP error responses is documented on the API side, in `pipelex-api`'s `docs/error-responses.md` → "Suggested fixes".
+On the hosted API the same payload rides the wire verbatim as `validation_errors[].suggested_fix`; how it appears in HTTP error responses is documented on the API side, in the API server's [Error Responses](../api-server/error-responses.md#suggested-fixes) page.
 
 ---
 
@@ -348,7 +348,7 @@ Everything said above about the request limits holds here too — the code is th
 - **One member is not the caller's problem at all.** `pipelex_storage_uri_unsupported` means no bucket is configured, so the deployment does not serve the scheme: no input avoids it, and telling the caller to fix theirs is wrong in kind. It is the family's one `CONFIGURATION` / `CONTACT_SUPPORT` arm, the same call `BODY_LENGTH_REQUIRED` gets among the request limits.
 - **`pig-09` is one code for every storage failure but "over its cap", and the advice says so.** On the LLM routes the client is speaking a provider's protocol, so the gateway's `pig-0N` family is the only vocabulary available and it has a single fail-closed slot for "cannot resolve" — no bucket configured, not a storage reference, no such object, an object it cannot read, a type no provider takes, or no way to hand a file to the provider the model resolves to. The message carries the difference; the code does not, so `REFERENCE_UNRESOLVED` defers to the message rather than guessing which it was. The native `/v1/pipelex/*` routes name each cause with its own frozen contract code, which is why the rest of the table is `pipelex_*`.
 
-`pig-09` also folds in causes that are not the caller's to repair — no bucket configured, and no way to hand a file to the provider the model resolves to — because the LLM routes have one slot for all of them. The native routes name the first of those separately (`pipelex_storage_uri_unsupported`, `CONTACT_SUPPORT`), so the same storage-less deployment reads differently by route. Splitting `pig-09` is a gateway-side change, filed on `pipelex-manifold` as `L-260901-f2b554`.
+`pig-09` also folds in causes that are not the caller's to repair — no bucket configured, and no way to hand a file to the provider the model resolves to — because the LLM routes have one slot for all of them. The native routes name the first of those separately (`pipelex_storage_uri_unsupported`, `CONTACT_SUPPORT`), so the same storage-less deployment reads differently by route. Splitting `pig-09` is a change on the gateway's side.
 
 #### When the model cannot be routed
 
@@ -385,7 +385,7 @@ Two of the gateway's routing codes are deliberately **not** in the family, becau
 
 Nothing in any of the three families is ever retried, and no two of them overlap: a code names a bound the request exceeded, a reference that could not be resolved, or a request that could not be routed. `pig-09` and `pig-10` are the clearest illustration — the same middleware raises both, one when the object cannot be resolved and one when it is over its cap.
 
-The gateway's remaining codes belong to no family and classify on their status like anything else. For the storage deadline outcomes (`pig_storage_timeout` at 504, `pig_storage_client_disconnected` at 499) that is the right reading — a timeout is a timeout. For `pig-12` at 400, the LLM routes' "no storage bucket is configured", it is not: it is the operator's fact and reads as a prompt to revise, exactly as `pipelex_storage_uri_unsupported` does not on the native routes. One map entry into `GatewayUnresolvedReference.STORAGE_NOT_SERVED` closes it, filed as `L-260901-0859e8`.
+The gateway's remaining codes belong to no family and classify on their status like anything else. For the storage deadline outcomes (`pig_storage_timeout` at 504, `pig_storage_client_disconnected` at 499) that is the right reading — a timeout is a timeout. For `pig-12` at 400, the LLM routes' "no storage bucket is configured", it is not: it is the operator's fact and reads as a prompt to revise, exactly as `pipelex_storage_uri_unsupported` does not on the native routes. One map entry into `GatewayUnresolvedReference.STORAGE_NOT_SERVED` would close it.
 
 ### The `instructor` Unwrap
 

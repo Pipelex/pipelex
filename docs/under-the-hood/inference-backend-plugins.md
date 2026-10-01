@@ -29,7 +29,7 @@ run time (e.g. LLMWorkerFactory.make_llm_worker)
   └─ worker = make_worker(inference_model=…, backend=…, sdk_clients=…, reporting_delegate=…)
 ```
 
-The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
+The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`, `DocGenWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
 
 ---
 
@@ -57,7 +57,7 @@ A backend plugin's `register` calls one menu method per `(family, sdk)` it serve
 
 ```python
 registrar.add_inference_backend(
-    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH
+    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH | DOC_GEN
     sdk="acme",  # the model's `sdk` string
     make_worker=_make_acme_worker,  # a MakeWorkerFn (a plain callable)
 )
@@ -65,7 +65,9 @@ registrar.add_inference_backend(
 
 A registry key is `(family, sdk)`. The same `sdk` string may appear in two families (e.g. `google` serves both `LLM` and `IMG_GEN`); they are distinct keys. A duplicate `(family, sdk)` fails loud with `DuplicateInferenceBackendError` naming **both** contributing plugins.
 
-One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves all four, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`. This is the cross-family-vendor coordination point: one plugin, many backends.
+One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves the four inference families, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`. This is the cross-family-vendor coordination point: one plugin, many backends. `DOC_GEN` is the family of the document engines a `PipeDocGen` step prints with, local libraries rather than inference, which the built-in `reportlab` plugin and the Pipelex document generation plugin serve (see [Document Engine Plugins](document-engine-plugins.md)).
+
+A plugin whose backend runs without an external service, such as a document engine, may also declare the models it serves rather than leave them to a backend file. `add_internal_model(name=…, spec=…)` declares a model in the `internal` backend, the spec being the table a backend file would hold for it, and `add_doc_gen_default(doc_gen_format=…, source=…, model=…)` declares the model deck's default engine for a document format and source. Both are stored at registration and merged by the model manager at boot, and [Document Engine Plugins](document-engine-plugins.md#registering-an-engine) gives their rules.
 
 ---
 

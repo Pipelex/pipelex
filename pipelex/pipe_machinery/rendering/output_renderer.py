@@ -116,6 +116,7 @@ def _collect_possible_outputs(
             | PipeType.PIPE_EXTRACT
             | PipeType.PIPE_SEARCH
             | PipeType.PIPE_STRUCTURE
+            | PipeType.PIPE_DOC_GEN
             | PipeType.PIPE_BATCH
             | PipeType.PIPE_PARALLEL
         ):
