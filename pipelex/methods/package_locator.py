@@ -10,6 +10,7 @@ Address comparison is case-insensitive: GitHub owner and repository names are
 case-insensitive, and manifests in the wild mix their casing.
 """
 
+import os
 import stat
 from pathlib import Path
 
@@ -91,6 +92,21 @@ def _read_manifest_text(*, manifest_path: Path) -> _ManifestRead:
         return _ManifestRead(skip_reason="is not valid UTF-8, skipped")
 
 
+def _manifest_paths(*, clone_root: Path) -> list[Path]:
+    """Every entry named `METHODS.toml` in the clone, whatever its type, sorted.
+
+    The walk lists entries by name without inspecting them, so a dangling symlink and a
+    directory named like a manifest are found too, on every Python version (`Path.rglob`
+    drops a dangling link on 3.11), and reach the reading rule to be skipped and reported.
+    It never descends into a symlinked directory, and it prunes `.git`.
+    """
+    manifest_paths: list[Path] = []
+    for dir_path, dir_names, file_names in os.walk(clone_root, followlinks=False):
+        dir_names[:] = [dir_name for dir_name in dir_names if dir_name not in _SKIPPED_DIR_NAMES]
+        manifest_paths.extend(Path(dir_path) / entry_name for entry_name in (*dir_names, *file_names) if entry_name == MANIFEST_FILENAME)
+    return sorted(manifest_paths)
+
+
 def scan_packages_in_clone(*, clone_root: Path) -> PackageScan:
     """Scan a clone for packages, skipping and reporting every manifest it cannot use.
 
@@ -114,15 +130,12 @@ def scan_packages_in_clone(*, clone_root: Path) -> PackageScan:
     candidates: list[PackageCandidate] = []
     skipped_manifests: list[str] = []
     manifest_count = 0
-    for manifest_path in sorted(clone_root.rglob(MANIFEST_FILENAME)):
-        relative_parts = manifest_path.relative_to(clone_root).parts
-        if any(part in _SKIPPED_DIR_NAMES for part in relative_parts):
-            continue
+    for manifest_path in _manifest_paths(clone_root=clone_root):
         manifest_count += 1
         if manifest_count > MAX_SCANNED_MANIFESTS:
             msg = f"The fetched repository contains more than {MAX_SCANNED_MANIFESTS} {MANIFEST_FILENAME} manifests; refusing to scan further."
             raise MethodPackageTooLargeError(msg)
-        relative_path = "/".join(relative_parts)
+        relative_path = manifest_path.relative_to(clone_root).as_posix()
         manifest_read = _read_manifest_text(manifest_path=manifest_path)
         if manifest_read.text is None:
             skipped_manifests.append(f"{relative_path}: {manifest_read.skip_reason}")
