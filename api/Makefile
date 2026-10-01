@@ -33,16 +33,8 @@ ifneq (,$(wildcard .env))
 endif
 
 # The server takes the library's version, from the root `pyproject.toml` (see this member's `[tool.hatch.version]`).
+# Its form is checked where the release is cut, by the root's `version-check.yml` and `prerelease-version-check.yml`.
 $(eval VERSION=$(shell grep -m1 '^version' ../pyproject.toml | sed -E 's/version = "(.*)"/\1/'))
-
-check-version-format:
-	@echo "Checking version format: $(VERSION)"
-	@if ! echo "$(VERSION)" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$'; then \
-		echo "Error: Version $(VERSION) is not in the correct format (x.y.z where x, y, z are non-negative integers)."; \
-		exit 1; \
-	else \
-		echo "Version $(VERSION) is valid."; \
-	fi
 
 
 -include Makefiles/Makefile_basics.mk

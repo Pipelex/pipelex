@@ -1,4 +1,18 @@
-name: Publish Python 🐍 distribution 📦 to PyPI
+name: Publish the release 📦 to PyPI and Docker Hub
+
+# One release, three artifacts under one version number: the `pipelex` distribution, the
+# `pipelex-api` distribution (the API server, the `api/` workspace member) and the
+# `pipelex/pipelex-api` image. The order is deliberate:
+#
+#   build ─────────── publish-to-pypi ──┬── github-release ── publish-docker-hub
+#   build-api ──────────────────────────┴── publish-api-to-pypi
+#
+# Nothing of the server ships before the `pipelex` wheel is on PyPI, because the `pipelex-api`
+# wheel pins `pipelex==X.Y.Z` exactly and the image is the release's third artifact. The image
+# goes last, after the GitHub Release has tagged the release commit, because
+# `publish-docker-hub.yml` pushes only from the commit `vX.Y.Z` names. Each publishing job can be
+# re-run on its own with "Re-run failed jobs"; the image can also be pushed again by dispatching
+# `publish-docker-hub.yml` from the tagged commit's branch, without this workflow.
 
 on:
   pull_request:
@@ -23,6 +37,9 @@ jobs:
     permissions:
       contents: read
       actions: read # reading artifact lists — this run's, and the repository's
+
+    outputs:
+      version: ${{ steps.project.outputs.version }}
 
     env:
       # The commit whose build this job is looking for, resolved into HEAD_SHA
@@ -384,6 +401,92 @@ jobs:
           # originals. Failing here is what keeps that release intact — and the tag
           # guard there is what keeps it intact on the two paths this flag opens.
           skip-existing: ${{ github.run_attempt > 1 || github.event_name == 'workflow_dispatch' }}
+
+  # The server's distribution. It is built from the same checkout as `pipelex` and, unlike it, is
+  # simply rebuilt on a retry: it is not attached to the GitHub Release or signed, so no recovered
+  # bytes need to match, and `skip-existing` below leaves PyPI's copy alone once it is there.
+  # `hatch_build.py` writes the exact pin on `pipelex` into its metadata, and the check below refuses
+  # to store a build that does not carry it, so a missing or wrong pin never reaches PyPI.
+  build-api:
+    name: Build the pipelex-api distribution 📦
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    needs:
+      - build # the dispatched-ref guard runs there, and the version comes from there
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install pypa/build
+        run: >-
+          python3 -m
+          pip install
+          build
+          --user
+      - name: Build a binary wheel and a source tarball of the server
+        run: python3 -m build api --outdir dist-api
+      - name: Verify they are this version's and pin pipelex to it exactly
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: python3 api/scripts/check_lockstep_pin.py dist-api --version "$VERSION"
+      - name: Store the pipelex-api distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipelex-api-distributions
+          path: dist-api/
+          # A "Re-run all jobs" rebuilds, and its build replaces the one an earlier attempt stored.
+          overwrite: true
+
+  publish-api-to-pypi:
+    name: >-
+      Publish the pipelex-api distribution 📦 to PyPI
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    needs:
+      - build-api
+      - publish-to-pypi # the wheel pins pipelex==X.Y.Z, which must be installable first
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipelex-api
+    permissions:
+      id-token: write # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+      - name: Download the pipelex-api dists
+        uses: actions/download-artifact@v4
+        with:
+          name: pipelex-api-distributions
+          path: dist/
+      - name: Publish the pipelex-api distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          # The same rule as `publish-to-pypi`: only a retry may skip files PyPI already holds.
+          skip-existing: ${{ github.run_attempt > 1 || github.event_name == 'workflow_dispatch' }}
+
+  # The image, last. `publish-docker-hub.yml` checks that the commit it builds is the one the tag
+  # names, which `github-release` has just created, so it runs after it rather than beside it.
+  publish-docker-hub:
+    name: Publish the API server image 🐳 to Docker Hub
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    needs:
+      - publish-to-pypi
+      - github-release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publish-docker-hub.yml
+    with:
+      # Empty on a dispatch, where the called workflow ships `github.sha`, the dispatched ref's head.
+      merge-commit-sha: ${{ github.event.pull_request.merge_commit_sha }}
+    secrets:
+      DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
 
   github-release:
     name: >-

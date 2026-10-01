@@ -1,0 +1,213 @@
+name: Publish the API server image 🐳 to Docker Hub
+
+# The third artifact of a release, beside the `pipelex` and `pipelex-api` distributions: the
+# `pipelex/pipelex-api` image, built from the release commit and tagged with the release's version,
+# which is the version of the pipelex it runs. `latest` moves only for a stable version.
+#
+# Two ways in, one job:
+#
+# - `workflow_call` from `publish-pypi.yml`, as the last link of the release chain: it runs only
+#   once the `pipelex` wheel is on PyPI and the GitHub Release has tagged the release commit, and
+#   the caller hands it that commit (the release pull request's merge commit).
+# - `workflow_dispatch`, the retry of a failed push. A re-run of the release run ("Re-run failed
+#   jobs") is the first resort, and needs nothing else; this dispatch is for when the fix is a change
+#   to a workflow file, which a re-run would not pick up. Dispatch it from the ref whose head is the
+#   commit the release is tagged at — `main` after a release, `pre-release/v…` after a pre-release —
+#   and it builds, smoke-tests and pushes that commit again. Pushing a tag again is harmless.
+#
+# Either way the job refuses a commit that is not the one `vX.Y.Z` tags, so no path can push an
+# image of an unreleased commit under a release's version.
+
+on:
+  workflow_call:
+    inputs:
+      merge-commit-sha:
+        description: "The release pull request's merge commit, when the caller runs on that pull request's merge."
+        type: string
+        required: false
+        default: ""
+    secrets:
+      DOCKER_HUB_TOKEN:
+        required: true
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Build, smoke-test, push and confirm the image
+    runs-on: ubuntu-latest
+    # One push at a time, never cancelled half-way: a second release, or a retry dispatched while the
+    # release run is still pushing, waits for the first.
+    concurrency:
+      group: publish-docker-hub
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    env:
+      # Resolved into RELEASE_SHA below, for the reason `publish-pypi.yml` gives in `github-release`:
+      # on the `pull_request` path `github.sha` is the event's merge ref, not the commit the release
+      # tagged, and a `${{ cond && a || b }}` expression would fall through to it whenever `a` were empty.
+      # In a called workflow, `github.event_name` and `github.sha` are the caller's.
+      MERGE_COMMIT_SHA: ${{ inputs.merge-commit-sha }}
+      DISPATCH_SHA: ${{ github.sha }}
+
+    steps:
+      # The refs a release can be published from, as `publish-pypi.yml` allows them. The tag check
+      # below is the stricter guard; this one makes a dispatch from a feature branch fail by name.
+      - name: Verify the dispatched ref may publish
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "Dispatched from $REF"
+          if [[ "$REF" != "refs/heads/main" ]] \
+            && [[ ! "$REF" =~ ^refs/heads/release/v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            && [[ ! "$REF" =~ ^refs/heads/pre-release/v ]]; then
+            echo "::error::Manual publish is allowed only from main, release/vX.Y.Z or pre-release/v*. Got: $REF"
+            exit 1
+          fi
+
+      - name: Resolve the release commit
+        id: release
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            RELEASE_SHA="$MERGE_COMMIT_SHA"
+          else
+            RELEASE_SHA="$DISPATCH_SHA"
+          fi
+          if [ -z "$RELEASE_SHA" ]; then
+            echo "::error::Could not determine which commit this run is publishing ($GITHUB_EVENT_NAME). Refusing to build an image without it."
+            exit 1
+          fi
+          echo "sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "This run publishes the image of $RELEASE_SHA"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+          persist-credentials: false
+
+      # The tag is created by `github-release` in `publish-pypi.yml`, which runs before this job on the
+      # release path, and it names the commit that release shipped. An image is pushed under a release's
+      # version only from that commit. Uses the commits endpoint so an annotated tag resolves to its
+      # commit, and tells "no such tag" from "the API could not answer", as the guard there does.
+      - name: Read the version, and refuse a commit its tag does not name
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -m 1 '^version = ' pyproject.toml | cut -d '"' -f 2)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read the version out of pyproject.toml."
+            exit 1
+          fi
+          if BODY=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$VERSION" 2>/dev/null); then
+            TAGGED_SHA=$(jq -r '.sha' <<<"$BODY")
+          else
+            case "$(jq -r '.status // empty' <<<"$BODY" 2>/dev/null || true)" in
+              404|422)
+                echo "::error::v$VERSION is not tagged, so $RELEASE_SHA is not a released commit. The image is published only after the GitHub Release has tagged the release; re-run this once it has."
+                exit 1
+                ;;
+              *)
+                REASON=$(jq -r '.message // empty' <<<"$BODY" 2>/dev/null || true)
+                echo "::error::Could not determine which commit v$VERSION tags: ${REASON:-the GitHub API call returned no response body}. Refusing to push an image without knowing it is the release's."
+                exit 1
+                ;;
+            esac
+          fi
+          if [ "$TAGGED_SHA" != "$RELEASE_SHA" ]; then
+            echo "::error::v$VERSION tags $TAGGED_SHA, but this run would build $RELEASE_SHA. Dispatch this workflow from the ref whose head is the tagged commit (main after a release, pre-release/v… after a pre-release)."
+            exit 1
+          fi
+          # A pre-release (PEP 440 a, b or rc) gets its own tag and leaves `latest` on the last stable release.
+          if [[ "$VERSION" =~ (a|b|rc)[0-9]+$ ]]; then
+            PUSH_LATEST=false
+          else
+            PUSH_LATEST=true
+          fi
+          {
+            echo "version=$VERSION"
+            echo "push_latest=$PUSH_LATEST"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing pipelex/pipelex-api:$VERSION from $RELEASE_SHA (latest moves: $PUSH_LATEST)"
+
+      # `deploy-docker-hub` builds the image from the repository root, smoke-tests it (it must boot and
+      # report this version for the server and the pipelex it runs), and only then pushes it.
+      - name: Build, smoke-test and push the image
+        env:
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+          PUSH_LATEST: ${{ steps.version.outputs.push_latest }}
+        run: make -C api deploy-docker-hub PUSH_LATEST="$PUSH_LATEST"
+
+      # Docker Hub's own answer, read back from its public tags API rather than from the local daemon:
+      # the version tag exists for linux/amd64, and `latest`, when it moved, names the same image.
+      - name: Confirm the tags on Docker Hub
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PUSH_LATEST: ${{ steps.version.outputs.push_latest }}
+        run: |
+          set -euo pipefail
+          hub_digest() {
+            local tag="$1" attempt code
+            for attempt in 1 2 3 4 5 6; do
+              code=$(curl -sS -o "$RUNNER_TEMP/hub-tag.json" -w '%{http_code}' \
+                "https://hub.docker.com/v2/namespaces/pipelex/repositories/pipelex-api/tags/$tag" || echo "transport-failure")
+              if [ "$code" = "200" ]; then
+                if ! jq -e '[.images[]?.architecture] | index("amd64")' "$RUNNER_TEMP/hub-tag.json" >/dev/null; then
+                  echo "::error::Docker Hub serves pipelex/pipelex-api:$tag with no linux/amd64 image." >&2
+                  return 1
+                fi
+                jq -r '.digest' "$RUNNER_TEMP/hub-tag.json"
+                return 0
+              fi
+              echo "Docker Hub answered '$code' for pipelex/pipelex-api:$tag (attempt $attempt); retrying." >&2
+              sleep 10
+            done
+            echo "::error::Docker Hub does not serve pipelex/pipelex-api:$tag after the push." >&2
+            return 1
+          }
+          VERSION_DIGEST=$(hub_digest "$VERSION")
+          echo "pipelex/pipelex-api:$VERSION is $VERSION_DIGEST on Docker Hub"
+          if [ "$PUSH_LATEST" = "true" ]; then
+            LATEST_DIGEST=$(hub_digest latest)
+            if [ "$LATEST_DIGEST" != "$VERSION_DIGEST" ]; then
+              echo "::error::pipelex/pipelex-api:latest is $LATEST_DIGEST on Docker Hub, not $VERSION_DIGEST, the image just pushed as $VERSION."
+              exit 1
+            fi
+            echo "pipelex/pipelex-api:latest names the same image"
+          fi
+          SUMMARY="Published \`pipelex/pipelex-api:$VERSION\` ($VERSION_DIGEST)"
+          if [ "$PUSH_LATEST" = "true" ]; then
+            SUMMARY="$SUMMARY and moved \`latest\` to it"
+          fi
+          {
+            echo "$SUMMARY."
+            echo "https://hub.docker.com/r/pipelex/pipelex-api"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The Docker Hub overview is the server's README, pushed with the image of each stable release so
+      # it never lags behind the repository. It is cosmetic beside the image, so a failure here is a
+      # warning and not a failed release: the usual cause is a token without the read/write/delete
+      # scope Docker Hub requires for editing a repository's description.
+      - name: Update the Docker Hub overview from the server's README
+        id: overview
+        if: steps.version.outputs.push_latest == 'true'
+        continue-on-error: true
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: pipelex
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+          repository: pipelex/pipelex-api
+          readme-filepath: api/README.md
+
+      - name: Report an overview that was not updated
+        if: steps.version.outputs.push_latest == 'true' && steps.overview.outcome != 'success'
+        run: >-
+          echo "::warning::The image is published, but the Docker Hub overview was not updated from
+          api/README.md. Check that DOCKER_HUB_TOKEN has the read/write/delete scope, then re-run this
+          job, or paste the README into the repository's overview on Docker Hub."
