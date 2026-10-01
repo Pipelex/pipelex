@@ -62,12 +62,16 @@ deploy-docker-hub:
 # Points pipelex/pipelex-api:latest at the image Docker Hub already serves as
 # pipelex/pipelex-api:$(VERSION), copying the manifest registry-side without
 # building or pulling anything, so `latest` names exactly the published image.
-# The release workflow runs it on a retry that finds the version tag already
-# pushed, the case `deploy-docker-hub` must not rebuild.
+# `--prefer-index=false` makes it a carbon copy: by default buildx wraps a
+# single image manifest, which is what `docker push` publishes here, in a new
+# index whose digest differs, and the release workflow's confirmation, which
+# requires both tags to name one digest, would then never pass. The release
+# workflow runs it on a retry that finds the version tag already pushed, the
+# case `deploy-docker-hub` must not rebuild.
 .PHONY: deploy-docker-hub-latest
 deploy-docker-hub-latest:
 	@test -n "$$DOCKER_HUB_TOKEN" || { echo "ERROR: DOCKER_HUB_TOKEN is not set in the environment."; exit 1; }
 	@echo "Logging in to Docker Hub..."
 	@printf '%s' "$$DOCKER_HUB_TOKEN" | docker login --username pipelex --password-stdin
-	docker buildx imagetools create --tag pipelex/pipelex-api:latest pipelex/pipelex-api:$(VERSION)
+	docker buildx imagetools create --prefer-index=false --tag pipelex/pipelex-api:latest pipelex/pipelex-api:$(VERSION)
 	@echo "✓ pipelex/pipelex-api:latest now names the published pipelex/pipelex-api:$(VERSION)"
