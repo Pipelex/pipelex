@@ -82,7 +82,9 @@ pattern = '(?m)^version = "(?P<version>[^"]+)"'
 path = "hatch_build.py"
 # The extras deliberately leave out `cli`: the runner selects the `json` log sink and a Rich-free pretty-print
 # mode, so nothing it does on a request renders a terminal.
-lockstep-dependencies = ["pipelex[mistralai,anthropic,google,google-genai,bedrock,fal]"]
+lockstep-dependencies = [
+  "pipelex[mistralai,anthropic,google,google-genai,bedrock,fal]",
+]
 dependencies = [
   # FastAPI 0.142 changed how included routers are mounted, and the server's router assembly
   # (`pipelex_api/main.py`) loses every `/v1` route under it. The ceiling stays until that assembly is
@@ -93,9 +95,13 @@ dependencies = [
 ]
 
 [tool.uv]
-# The version comes from the root `pyproject.toml`, so uv has to rebuild this member's metadata when that
-# file changes, not only when this one does.
-cache-keys = [{ file = "pyproject.toml" }, { file = "../pyproject.toml" }, { file = "hatch_build.py" }]
+# The version comes from the root `pyproject.toml` and the dependencies from `hatch_build.py`, so uv has to
+# rebuild this member's metadata when either changes, not only when this file does.
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "../pyproject.toml" },
+  { file = "hatch_build.py" },
+]
 
 [tool.uv.sources]
 pipelex = { workspace = true }
