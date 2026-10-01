@@ -7,9 +7,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex_api.errors import raise_validation_error
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.limits import MAX_MTHDS_FILE_BYTES
 
-router = APIRouter(tags=["tools"])
+router = APIRouter(tags=["tools"], route_class=JsonBodyRoute)
 
 
 class MthdsToolRequest(BaseModel):

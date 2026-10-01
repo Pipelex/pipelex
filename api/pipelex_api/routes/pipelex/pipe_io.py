@@ -11,6 +11,7 @@ from pipelex.pipeline.validate_bundle import build_pending_signatures
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
@@ -26,7 +27,7 @@ from pipelex_api.schemas.models import MthdsFileItem, MthdsPipeRequest
 if TYPE_CHECKING:
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
-router = APIRouter(tags=["pipe-io"])
+router = APIRouter(tags=["pipe-io"], route_class=JsonBodyRoute)
 
 
 class PipeIORequest(MthdsPipeRequest):

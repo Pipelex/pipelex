@@ -8,6 +8,8 @@ SDK), and uncaught `Exception` each end up at their respective handler exactly
 the way the real app routes them.
 """
 
+import asyncio
+import json
 import re
 from typing import Any, cast
 
@@ -32,6 +34,7 @@ from pipelex.plugins.registrar import HttpErrorMapperFn, PluginOrigin, PluginReg
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pydantic import BaseModel, ConfigDict
 from pytest_mock import MockerFixture
+from starlette.types import Message, Scope
 from typing_extensions import override
 
 from pipelex_api.error_types import ErrorType
@@ -39,6 +42,8 @@ from pipelex_api.errors import raise_internal_server_error, raise_validation_err
 from pipelex_api.exception_handlers import API_ERROR_EVENT, register_exception_handlers
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
+from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
+from pipelex_api.routes.pipelex.tools import router as tools_router
 from pipelex_api.security import RequestUser
 
 # Crockford Base32, 26 chars — the ULID alphabet RequestIdMiddleware mints.
@@ -653,6 +658,57 @@ class TestExceptionHandlers:
         assert fields["error_domain"] == "input"
         assert fields["retryable"] is False
         assert fields["detail"] == "a caller-side mistake"
+        log_spy.error.assert_not_called()
+
+    @pytest.mark.parametrize("path", ["/v1/lint", "/v1/execute"], ids=["typed-body-route", "raw-body-run-route"])
+    def test_client_disconnect_is_a_400_logged_as_a_warning(self, mocker: MockerFixture, path: str):
+        # A client that leaves mid-upload makes the body read raise `ClientDisconnect`, from a typed route's
+        # nesting check or from a run route's own read. It is the caller's failure: a 400 at warning, never a
+        # 500 server fault with a traceback.
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
+        app = FastAPI()
+        register_exception_handlers(app)
+        app.include_router(tools_router, prefix="/v1")
+        app.include_router(pipeline_router, prefix="/v1")
+        sent: list[Message] = []
+        reads = 0
+
+        async def receive() -> Message:
+            # The first read gets the start of the body; every later one finds the client gone.
+            nonlocal reads
+            reads += 1
+            if reads == 1:
+                return {"type": "http.request", "body": b'{"content": "dom', "more_body": True}
+            return {"type": "http.disconnect"}
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        scope: Scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": path,
+            "raw_path": path.encode(),
+            "root_path": "",
+            "query_string": b"",
+            "headers": [(b"content-type", b"application/json")],
+            "client": ("testclient", 50000),
+            "server": ("testserver", 80),
+        }
+        asyncio.run(app(scope, receive, send))
+
+        start = next(message for message in sent if message["type"] == "http.response.start")
+        assert start["status"] == 400
+        body = json.loads(b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body"))
+        assert body["error_type"] == "BadRequest"
+        assert body["error_domain"] == "input"
+        log_spy.warning.assert_called_once()
+        fields = _emitted_fields(log_spy, as_error=False)
+        assert fields["status"] == 400
+        assert fields["error_type"] == "BadRequest"
         log_spy.error.assert_not_called()
 
     def test_the_summary_message_names_the_status_and_the_error_type(self, mocker: MockerFixture):

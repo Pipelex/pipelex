@@ -381,6 +381,7 @@ runtime-evaluated-base-classes = [
 "tests/**/*.py" = [
   "T201",   # Allow print statements in test files
   "INP001", # Allow test files to not have __init__.py in their directories (avoids namespace collisions)
+  "S311",   # Seeded pseudo-random test data is not cryptography
 ]
 "scripts/**/*.py" = [
   "INP001", # scripts/ is a directory of standalone entry points, not a package

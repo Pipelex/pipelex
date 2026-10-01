@@ -4,6 +4,7 @@ The actual pipeline runner is mocked: we only assert that the API layer
 parses, validates, dispatches, and shapes responses correctly.
 """
 
+import json
 from typing import Any, cast
 
 import pytest
@@ -20,6 +21,7 @@ from pytest_mock import MockerFixture
 
 import pipelex_api.routes.pipelex.pipeline as pipeline_module
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.limits import MAX_JSON_NESTING_DEPTH
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
@@ -128,9 +130,10 @@ class TestPipelineRoutes:
         assert response.json()["error_type"] == "InvalidJSON"
 
     def test_execute_rejects_recursion_error(self, mocker: MockerFixture):
-        # A deeply nested JSON array exhausts the parser's recursion budget and raises
-        # `RecursionError` inside `json.loads`. That is a caller-input failure and must map
-        # to 422 InvalidJSON, not escape to the catch-all 500 handler.
+        # A body nested this deep made `json.loads` raise `RecursionError` up to Python 3.13, while on
+        # 3.14 it parses whenever the thread's stack is large enough. The server bounds the nesting
+        # before parsing, so the answer is the same 422 InvalidJSON on every interpreter and stack,
+        # never the catch-all 500 nor a later `ValidationError`.
         client, _, _ = _build_client(mocker)
         depth = 100_000
         response = client.post(
@@ -143,8 +146,28 @@ class TestPipelineRoutes:
         problem = response.json()
         assert problem["error_type"] == "InvalidJSON"
         assert problem["error_domain"] == "input"
+        assert f"at most {MAX_JSON_NESTING_DEPTH} levels" in problem["detail"]
         # The opaque-500 sentinel must never appear for a caller-input failure.
         assert problem["error_type"] != "InternalServerError"
+
+    @pytest.mark.parametrize("route", ["/v1/execute", "/v1/start"])
+    def test_run_routes_bound_nesting_at_the_limit(self, mocker: MockerFixture, route: str):
+        # The envelope and `inputs` are two levels, so this body nests exactly the limit and the next one level past it.
+        client, execute_mock, start_mock = _build_client(mocker)
+
+        def run_body(nesting: int) -> bytes:
+            nested = b"[" * nesting + b"]" * nesting
+            return b'{"pipe_code": "echo", "mthds_contents": ' + json.dumps([VALID_MTHDS]).encode() + b', "inputs": {"text": ' + nested + b"}}"
+
+        accepted = client.post(route, content=run_body(MAX_JSON_NESTING_DEPTH - 2), headers={"content-type": "application/json"})
+        assert accepted.status_code in {200, 202}, accepted.text
+        assert execute_mock.await_count + start_mock.await_count == 1
+
+        refused = client.post(route, content=run_body(MAX_JSON_NESTING_DEPTH - 1), headers={"content-type": "application/json"})
+        assert refused.status_code == 422
+        assert refused.json()["error_type"] == "InvalidJSON"
+        assert f"at most {MAX_JSON_NESTING_DEPTH} levels" in refused.json()["detail"]
+        assert execute_mock.await_count + start_mock.await_count == 1
 
     @pytest.mark.parametrize("route", ["/v1/execute", "/v1/start"])
     def test_run_routes_never_instantiate_a_class_the_body_names(self, mocker: MockerFixture, route: str):

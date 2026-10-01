@@ -37,6 +37,8 @@ PIPELEX_ENV=dev
 # rejects with 413. Defaults to 100 MiB. Raise it for larger documents,
 # lower it to harden the server. Read at startup — change requires a restart.
 # MAX_REQUEST_BODY_MIB=100
+# A JSON body may also nest its arrays and objects at most 128 levels deep. That bound is
+# fixed, not configurable (see error-responses.md).
 
 # ── Running a method by address (`method_ref`) ────────────────────────────
 # See pipe-run.md → "Running a method by address". All read at startup.

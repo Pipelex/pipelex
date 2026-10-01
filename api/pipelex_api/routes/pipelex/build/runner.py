@@ -25,6 +25,7 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
 from pipelex_api.errors import raise_validation_error
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
@@ -37,7 +38,7 @@ from pipelex_api.routes.pipelex.crate_ops import (
 from pipelex_api.routes.pipelex.pipeline import get_request_user_id
 from pipelex_api.schemas.models import ALLOW_SIGNATURES_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsPipeRequest
 
-router = APIRouter(tags=["build"])
+router = APIRouter(tags=["build"], route_class=JsonBodyRoute)
 
 
 class BuildRunnerRequest(MthdsPipeRequest, CallerAnalyticsGroupsMixin):

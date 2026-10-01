@@ -36,6 +36,7 @@ from fastapi.responses import JSONResponse
 from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport, PipelexError
 from pipelex.plugins.registrar import HttpErrorMapperFn
+from starlette.requests import ClientDisconnect
 
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import ApiError
@@ -54,7 +55,7 @@ if TYPE_CHECKING:
 _ExceptionHandler = Callable[[Request, Exception], Awaitable[Response]]
 
 # The value of the `event` field every error record carries: the one key a log sink filters this
-# server's error stream on, whichever of the three handlers below produced the record.
+# server's error stream on, whichever of the handlers below produced the record.
 API_ERROR_EVENT = "api_error"
 
 
@@ -615,6 +616,26 @@ async def handle_request_validation_error(request: Request, exc: Exception) -> R
     return JSONResponse(status_code=422, content=document, media_type=PROBLEM_JSON_MEDIA_TYPE)
 
 
+async def handle_client_disconnect(request: Request, exc: Exception) -> Response:  # noqa: ARG001 — Starlette's handler contract
+    """Answer a client that left before its request body arrived in full with a 400, logged as a caller's failure.
+
+    Starlette raises `ClientDisconnect` from a body read when the client goes away mid-upload: from the
+    nesting check of a `JsonBodyRoute`, and from the run routes, which read their raw body themselves.
+    Nobody is left to read the answer, so what matters is the record it leaves: a 400 `BadRequest` at
+    `warning`, as FastAPI's own body read answered it, never a 500 server fault logged with a traceback.
+    """
+    document = build_problem_document_from_api_error(
+        ErrorType.BAD_REQUEST,
+        "The client disconnected before the request body was received in full.",
+        400,
+        instance=request.url.path,
+        request_id=request_id_of(request),
+        error_domain=ErrorDomain.INPUT,
+    )
+    _log_api_authored_error(document=document, status=400, request=request)
+    return JSONResponse(status_code=400, content=document, media_type=PROBLEM_JSON_MEDIA_TYPE)
+
+
 def register_exception_handlers(
     app: FastAPI,
     *,
@@ -626,6 +647,8 @@ def register_exception_handlers(
     Resolution is most-specific-first: an API-authored `ApiError` →
     `handle_api_error`; a FastAPI `RequestValidationError` (automatic
     request-body / parameter validation) → `handle_request_validation_error`; a
+    Starlette `ClientDisconnect` (the client left mid-upload) →
+    `handle_client_disconnect`; a
     `PipelexError` (including an orchestrator plugin's `PipelexError`-derived
     workflow failure) → `handle_pipelex_error`; a bare orchestrator-SDK transport
     error → that plugin's mapper-backed handler (see `http_error_mappers`);
@@ -652,7 +675,7 @@ def register_exception_handlers(
     (`handle_pipelex_error` and every mapper handler) via the closures below —
     production passes the startup-resolved value (`pipelex_api.main.ERROR_DISCLOSURE_MODE`);
     tests pass whatever the test needs and the default (`VERBOSE`) covers the common
-    case. The other three handlers don't render an `ErrorReport`, so they register
+    case. The other handlers don't render an `ErrorReport`, so they register
     directly — `handle_unexpected_error` still honors the mode, reading it back off
     `app.state` (set below) rather than through a closure.
     """
@@ -663,6 +686,7 @@ def register_exception_handlers(
 
     app.add_exception_handler(ApiError, handle_api_error)
     app.add_exception_handler(RequestValidationError, handle_request_validation_error)
+    app.add_exception_handler(ClientDisconnect, handle_client_disconnect)
     app.add_exception_handler(PipelexError, _pipelex_error)
     for exc_type, mapper in (http_error_mappers or {}).items():
         app.add_exception_handler(exc_type, _make_orchestrator_error_handler(mapper, disclosure_mode=disclosure_mode))
