@@ -188,6 +188,8 @@ make check-hub-layering       - Enforce the runtime_hub / interpreter_hub layeri
 make chl                      - Shorthand -> check-hub-layering
 make check-rich-imports       - Refuse a module-level Rich import or reach outside pipelex/cli/ (Rich is the cli extra)
 make cri                      - Shorthand -> check-rich-imports
+make check-actions-allowlist  - Refuse a workflow action outside the committed Actions allowlist
+make caa                      - Shorthand -> check-actions-allowlist
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -227,7 +229,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rich-imports cri check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rich-imports cri check-actions-allowlist caa check-rules check-urls cu insert-skeleton \
 	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -412,6 +414,13 @@ check-rich-imports: env
 
 cri: check-rich-imports
 	@echo "> done: cri = check-rich-imports"
+
+check-actions-allowlist: env
+	$(call PRINT_TITLE,"Refusing workflow actions the Actions allowlist does not name")
+	$(VENV_PIPELEX_DEV) check-actions-allowlist --quiet
+
+caa: check-actions-allowlist
+	@echo "> done: caa = check-actions-allowlist"
 
 drift-plan: env
 	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
@@ -1302,10 +1311,10 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet genera
 up: generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema generate-corpus-vocabulary update-gateway-models up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering check-rich-imports drift-check format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports drift-check api-agent-check
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check api-agent-check
 	@echo "> done: agent-check"
 
 v: validate

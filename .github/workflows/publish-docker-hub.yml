@@ -214,25 +214,3 @@ jobs:
             echo "$SUMMARY."
             echo "https://hub.docker.com/r/pipelex/pipelex-api"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      # The Docker Hub overview is the server's README, pushed with the image of the newest stable
-      # release so it never lags behind the repository. It is cosmetic beside the image, so a failure
-      # here is a warning and not a failed release: the usual cause is a token without the
-      # read/write/delete scope Docker Hub requires for editing a repository's description.
-      - name: Update the Docker Hub overview from the server's README
-        id: overview
-        if: steps.release.outputs.push_latest == 'true'
-        continue-on-error: true
-        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
-        with:
-          username: pipelex
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-          repository: pipelex/pipelex-api
-          readme-filepath: api/README.md
-
-      - name: Report an overview that was not updated
-        if: steps.release.outputs.push_latest == 'true' && steps.overview.outcome != 'success'
-        run: >-
-          echo "::warning::The image is published, but the Docker Hub overview was not updated from
-          api/README.md. Check that DOCKER_HUB_TOKEN has the read/write/delete scope, then re-run this
-          job, or paste the README into the repository's overview on Docker Hub."

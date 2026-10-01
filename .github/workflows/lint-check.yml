@@ -181,6 +181,34 @@ jobs:
         run: make check-rich-imports
 
 # --------------------------------------------------------------------------
+# 6b. Actions allowlist — single job, version-independent. GitHub rejects a
+#     whole workflow at startup when one of its actions is outside the
+#     organization's Actions policy, and the release workflows never run on a
+#     pull request, so this job reads every workflow against the policy's
+#     mirror in .github/actions-allowlist.toml.
+# --------------------------------------------------------------------------
+  lint-actions-allowlist:
+    name: Lint (actions allowlist)
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Run Actions allowlist check
+        run: make check-actions-allowlist
+
+# --------------------------------------------------------------------------
 # 7.  Drift contracts — single job, version-independent
 #     BLOCKING, but through the ruleset rather than through lint-all: `Lint
 #     (drift-contracts)` is named as a required status check on both `dev` and
@@ -280,15 +308,15 @@ jobs:
 # --------------------------------------------------------------------------
 # 10. Aggregator job — the required status check that covers every lint job,
 #     including the ones the rulesets do not name individually
-#     (`Lint (hub layering)`, `Lint (rich imports)`, `Lint (agent-rules)`,
-#     `Lint (api)`). It is not the only required lint check: the rulesets name
+#     (`Lint (hub layering)`, `Lint (rich imports)`, `Lint (actions allowlist)`,
+#     `Lint (agent-rules)`, `Lint (api)`). It is not the only required lint check: the rulesets name
 #     several of the jobs above by name as well. Anything added to `needs`
 #     becomes blocking through here.
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-rich-imports, lint-agent-rules, lint-api]
+    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-rich-imports, lint-actions-allowlist, lint-agent-rules, lint-api]
     if: always()
 
     steps:
@@ -300,6 +328,7 @@ jobs:
              [ "${{ needs.lint-keyword-only.result }}" != "success" ] || \
              [ "${{ needs.lint-hub-layering.result }}" != "success" ] || \
              [ "${{ needs.lint-rich-imports.result }}" != "success" ] || \
+             [ "${{ needs.lint-actions-allowlist.result }}" != "success" ] || \
              [ "${{ needs.lint-agent-rules.result }}" != "success" ] || \
              [ "${{ needs.lint-api.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."
