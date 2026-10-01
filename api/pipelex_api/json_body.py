@@ -42,8 +42,9 @@ _OPEN_BRACKET = ord("[")
 _BRACKET_RUN = re.compile(rb"\[+|\]+")
 # Peeling stops once a pass removes less than this fraction of the brackets the scan started with.
 _PEEL_STOP_DIVISOR = 8
-# The runs are measured a chunk at a time, so no list is ever as long as the body.
-_RUN_CHUNK_BYTES = 1 << 22
+# The stages that build a list per piece, splitting at quotes and measuring runs, work a chunk at a time,
+# so no list grows with the body and its memory stays bounded however the body is shaped.
+_CHUNK_BYTES = 1 << 20
 
 
 def _as_utf8(body: bytes) -> bytes:
@@ -71,12 +72,20 @@ def _brackets_outside_strings(body: bytes) -> bytes:
     and brackets. Adjacent quotes enclose no bracket, whether they open and close one string or close one and
     open the next, so dropping them changes nothing and spares the split below a piece per short string.
     With every quote left a delimiter, the pieces between quotes alternate outside and inside strings,
-    starting outside, and the outside ones hold the brackets that nest. An unterminated string runs to the
-    end, as it does for a parser.
+    starting outside, and the outside ones hold the brackets that nest. The skeleton is split a chunk at a
+    time, each chunk starting inside a string when the quotes before it are odd in number. An unterminated
+    string runs to the end, as it does for a parser.
     """
     unescaped = body.replace(_ESCAPED_BACKSLASH, b"").replace(_ESCAPED_QUOTE, b"")
     skeleton = unescaped.translate(_BRACES_AS_BRACKETS, _NOT_STRUCTURAL).replace(_ADJACENT_QUOTES, b"")
-    return b"".join(skeleton.split(_QUOTE)[::2])
+    outside: list[bytes] = []
+    in_string = False
+    for start in range(0, len(skeleton), _CHUNK_BYTES):
+        pieces = skeleton[start : start + _CHUNK_BYTES].split(_QUOTE)
+        outside.append(b"".join(pieces[1 if in_string else 0 :: 2]))
+        # A chunk split into an even number of pieces holds an odd number of quotes.
+        in_string ^= len(pieces) % 2 == 0
+    return b"".join(outside)
 
 
 def json_nesting_exceeds(body: bytes, *, max_depth: int) -> bool:
@@ -108,8 +117,8 @@ def json_nesting_exceeds(body: bytes, *, max_depth: int) -> bool:
         if removed < stop_below:
             break
     depth = 0
-    for start in range(0, len(brackets), _RUN_CHUNK_BYTES):
-        chunk = brackets[start : start + _RUN_CHUNK_BYTES]
+    for start in range(0, len(brackets), _CHUNK_BYTES):
+        chunk = brackets[start : start + _CHUNK_BYTES]
         # Maximal runs alternate between opening and closing brackets, so their signs alternate too.
         signs = cycle((1, -1) if chunk[0] == _OPEN_BRACKET else (-1, 1))
         running = list(accumulate(map(mul, map(len, _BRACKET_RUN.findall(chunk)), signs), initial=depth))

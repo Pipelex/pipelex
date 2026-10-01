@@ -126,6 +126,19 @@ class TestJsonBodyNesting:
             for max_depth in range(12):
                 assert json_nesting_exceeds(body, max_depth=max_depth) == (depth > max_depth), (body, max_depth)
 
+    @pytest.mark.parametrize("chunk_bytes", [1, 2, 3, 7, 64])
+    def test_chunk_boundaries_do_not_change_the_answer(self, mocker: MockerFixture, chunk_bytes: int):
+        # The scan splits at quotes and measures runs a chunk at a time; tiny chunks cut strings, escapes
+        # and runs at every possible point, and the answer must stay the parsed depth.
+        mocker.patch("pipelex_api.json_body._CHUNK_BYTES", chunk_bytes)
+        rng = random.Random(chunk_bytes)
+        for _ in range(60):
+            document = _random_value(rng, budget=rng.randint(0, 8))
+            body = json.dumps(document).encode("utf-8")
+            depth = _parsed_depth(document)
+            for max_depth in range(10):
+                assert json_nesting_exceeds(body, max_depth=max_depth) == (depth > max_depth), (body, max_depth)
+
     @pytest.mark.parametrize(
         "body",
         [
