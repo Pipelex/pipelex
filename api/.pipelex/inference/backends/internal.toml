@@ -1,0 +1,68 @@
+################################################################################
+# Internal Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for internal software-only models.
+# These models run internally without external APIs or AI services.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Model costs are in USD per million tokens (input/output)
+#
+# Managed by `pipelex update`, which refreshes this file from the kit and backs
+# up a locally edited copy to <file>.bak.<timestamp> first, so local edits will
+# not survive future runs. Declare your own models in a backend of your own.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+thinking_mode = "none"
+
+################################################################################
+# TEXT EXTRACTION MODELS
+################################################################################
+
+# --- PyPDFium2 Text Extractor -------------------------------------------------
+[pypdfium2-extract-pdf]
+model_type = "text_extractor"
+sdk = "pypdfium2"
+model_id = "extract-text"
+inputs = ["pdf"]
+outputs = ["pages"]
+costs = {}
+
+# --- Docling Text Extractor ---------------------------------------------------
+[docling-extract-text]
+model_type = "text_extractor"
+sdk = "docling_sdk"
+model_id = "extract-text"
+inputs = ["pdf", "image"]
+outputs = ["pages"]
+costs = {}
+
+################################################################################
+# DOCUMENT GENERATION ENGINES
+################################################################################
+#
+# The engines a PipeDocGen step prints with. Their inputs are the sources they
+# print from: "layout" is the auto-layout of the step's inputs, "html" an HTML
+# template, "template_file" an office template file. Their outputs are the
+# formats they print. reportlab-pdf is built into Pipelex. The other engines
+# come with the Pipelex document generation plugin, pipelex-doc-gen, which
+# declares them itself when it loads: they are never listed in this file.
+
+# --- ReportLab PDF ------------------------------------------------------------
+[reportlab-pdf]
+model_type = "doc_gen"
+sdk = "reportlab"
+model_id = "print-pdf"
+inputs = ["layout"]
+outputs = ["pdf"]
+costs = {}

@@ -1,0 +1,168 @@
+# Routing profile library - Routes models to their backends
+# =========================================================================================
+# This file controls which backend serves which model.
+# Simply change the 'active' field to switch profiles,
+# or you can add your own custom profiles.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+# =========================================================================================
+
+# Note: The internal backend (software-only models) is always available regardless of
+# which routing profile you select. See the documentation for details.
+
+# Which profile to use (change this to switch routing)
+active = "all_pipelex_gateway"
+
+# We recommend using the "all_pipelex_gateway" profile to get a head start with all models.
+# To use the Pipelex Gateway backend:
+# 1. Get your API key at https://app.pipelex.com (free credits included)
+# 2. Add it to your .env file: PIPELEX_GATEWAY_API_KEY=your-key-here
+# 3. Run `pipelex init` and accept the Gateway terms of service
+
+# =========================================================================================
+# Routing Profiles
+# =========================================================================================
+
+[profiles.all_pipelex_gateway]
+description = "Use Pipelex Gateway for all its supported models"
+default = "pipelex_gateway"
+
+# The same model names, served by the Pipelex-operated inference service instead. Switching between
+# this profile and the one above needs no other edit: a model's wire id and sdk are per-backend, so
+# decks, aliases and presets keep naming the same handles.
+[profiles.all_pipelex_manifold]
+description = "Use Pipelex Manifold (private beta) for all its supported models"
+default = "pipelex_manifold"
+
+[profiles.all_anthropic]
+description = "Use Anthropic backend for all its supported models"
+default = "anthropic"
+
+[profiles.all_azure_openai]
+description = "Use Azure OpenAI backend for all its supported models"
+default = "azure_openai"
+
+[profiles.all_bedrock]
+description = "Use Bedrock backend for all its supported models"
+default = "bedrock"
+
+[profiles.all_blackboxai]
+description = "Use BlackBoxAI backend for all its supported models"
+default = "blackboxai"
+
+[profiles.all_fal]
+description = "Use FAL backend for all its supported models"
+default = "fal"
+
+[profiles.all_google]
+description = "Use Google GenAI backend for all its supported models"
+default = "google"
+
+[profiles.all_groq]
+description = "Use groq backend for all its supported models"
+default = "groq"
+
+[profiles.all_huggingface]
+description = "Use HuggingFace backend for all its supported models"
+default = "huggingface"
+
+[profiles.all_linkup]
+description = "Use Linkup backend for all its supported models"
+default = "linkup"
+
+[profiles.all_minimax]
+description = "Use MiniMax backend for all its supported models"
+default = "minimax"
+
+[profiles.all_mistral]
+description = "Use Mistral backend for all its supported models"
+default = "mistral"
+
+[profiles.all_ollama]
+description = "Use Ollama backend for all its supported models"
+default = "ollama"
+
+[profiles.all_openai]
+description = "Use OpenAI backend for all its supported models"
+default = "openai"
+
+[profiles.all_openrouter]
+description = "Use OpenRouter backend for all its supported models"
+default = "openrouter"
+
+[profiles.all_portkey]
+description = "Use Portkey backend for all its supported models"
+default = "portkey"
+
+[profiles.all_scaleway]
+description = "Use Scaleway backend for all its supported models"
+default = "scaleway"
+
+[profiles.all_vertexai]
+description = "Use Vertex AI backend for all its supported models"
+default = "vertexai"
+
+[profiles.all_xai]
+description = "Use xAI backend for all its supported models"
+default = "xai"
+
+[profiles.all_internal]
+description = "Use internal backend for all its supported models"
+default = "internal"
+
+# =========================================================================================
+# Custom Profiles
+# =========================================================================================
+# Add your own profiles below following the same pattern:
+#
+# [profiles.your_profile_name]
+# description = "What this profile does"
+# default = "backend-name"  # Where to route models by default
+# [profiles.your_profile_name.routes]
+# "model-pattern" = "backend-name"  # Specific routing rules
+#
+# Pattern matching supports:
+# - Exact names: "gpt-4o-mini"
+# - Wildcards: "claude-*" (matches all models starting with claude-)
+# - Partial wildcards: "*-sonnet" (matches all sonnet variants)
+
+# =========================================================================================
+# Example of a custom routing profile with mostly pattern matching and one specific model
+# =========================================================================================
+[profiles.example_routing_using_patterns]
+description = "Example routing profile using patterns"
+default = "pipelex_gateway"
+
+[profiles.example_routing_using_patterns.routes]
+# Pattern matching: "model-pattern" = "backend-name"
+"gpt-*" = "azure_openai"
+"claude-*" = "bedrock"
+"gemini-*" = "google"
+"grok-*" = "xai"
+"*-sdxl" = "fal"
+"flux-*" = "fal"
+"gpt-image-1" = "openai"
+
+# =========================================================================================
+# Example of a custom routing profile with specific model matching
+# =========================================================================================
+
+[profiles.example_routing_using_specific_models]
+description = "Example routing profile using specific models"
+
+[profiles.example_routing_using_specific_models.routes]
+"gpt-5.4-nano" = "pipelex_gateway"
+"gpt-4o-mini" = "blackboxai"
+"gpt-5.4-mini" = "openai"
+"gpt-5.5" = "azure_openai"
+
+"claude-4-sonnet" = "pipelex_gateway"
+"claude-3.7-sonnet" = "blackboxai"
+
+"gemini-2.5-flash-lite" = "pipelex_gateway"
+"gemini-2.5-flash" = "blackboxai"
+"gemini-2.5-pro" = "vertexai"
+
+"grok-3" = "pipelex_gateway"
+"grok-3-mini" = "xai"

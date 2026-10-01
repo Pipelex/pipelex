@@ -39,6 +39,7 @@ git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 - **The lock** — `make li` (lock + install) regenerates `uv.lock`. Stop and report if it fails; `uv-lock-check` in CI fails the pull request over a stale lock.
 - **Also stamped:**
   - **`.badges/tests.json`** — set `"message"` to what `make test-count` prints, leaving every other field alone, then run `make check-test-badge` to confirm the two agree. A mismatch is a CI failure on the pull request.
+  - **`api/docs/openapi/pipelex-api.openapi.yaml`** — `make -C api openapi-export`. The API server in `api/` takes the library's version, and its committed OpenAPI artifact carries it as `info.version`, so the bump moves the artifact and `make agent-check`, whose `api-agent-check` runs `openapi-check`, fails until it is re-exported. The only change it should show is that one line; anything more is a wire change that belongs in the changelog.
   - **`.test_durations`** — `make store-test-durations`, the per-test timing map `pytest-split` uses to balance the CI test shards. The refresh is incremental: it collects the suite and measures only the tests missing from the map, so it takes seconds on a quiet release and writes no diff at all when nothing was missing. Read the coverage line it prints before judging how long it should take — past roughly 40% of the suite missing it falls back to re-measuring everything, which takes minutes; treat a long run as a hang only when it reported few tests missing. Include the file in the commit only when it changed. `make store-test-durations-force` is **not** part of the release flow; it is for when recorded values are no longer comparable to each other because the machine or the suite changed shape. The rationale is `docs/contribute/test-duration-map.md`.
   - **`pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/`** — only when the migration gate below finds an unaccounted schema change, and then written by the `add-migration` skill, never by hand.
 
@@ -62,7 +63,7 @@ git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 
 ## The release commit
 
-`pyproject.toml`, `CHANGELOG.md`, `uv.lock`, `.badges/tests.json`, `.test_durations` when `make store-test-durations` changed it, whatever `make agent-check` rewrote, and the `pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/` files the `add-migration` skill wrote when it ran. By name.
+`pyproject.toml`, `CHANGELOG.md`, `uv.lock`, `.badges/tests.json`, `api/docs/openapi/pipelex-api.openapi.yaml`, `.test_durations` when `make store-test-durations` changed it, whatever `make agent-check` rewrote, and the `pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/` files the `add-migration` skill wrote when it ran. By name.
 
 ## CI on the release pull request
 

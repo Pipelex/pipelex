@@ -141,7 +141,7 @@ The **fix planner** (`pipelex/pipeline/fixes/planner.py`) translates enriched ty
 
 Applying fixes is the runtime's job too: the **applier** (`pipelex/pipeline/fixes/applier.py`) mutates a tomlkit DOM in place per op (guarded — an op whose target table is absent is skipped and reported, never raised) and then reflows the whole file to canonical MTHDS style, and the **convergence loop** (`pipelex/pipeline/fixes/fix_loop.py`) runs validate → apply SAFE fixes → re-validate to a fixed point, reporting non-convergence loudly. The user-facing surface is [`pipelex fix bundle`](../tools/cli/fix.md).
 
-On the hosted API the same payload rides the wire verbatim as `validation_errors[].suggested_fix`; how it appears in HTTP error responses is documented on the API side, in `pipelex-api`'s `docs/error-responses.md` → "Suggested fixes".
+On the hosted API the same payload rides the wire verbatim as `validation_errors[].suggested_fix`; how it appears in HTTP error responses is documented on the API side, in the server's `api/docs/error-responses.md` → "Suggested fixes".
 
 ---
 

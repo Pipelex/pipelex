@@ -372,6 +372,7 @@ plugins:
         - contribute/trace-input-semantics.md: "Tracing Input Semantics"
         - contribute/generate-projection-corpus.md: "Projection Fixture Corpus"
         - contribute/typescript-emission-gates.md: "TypeScript Emission Gates"
+        - contribute/api-server.md: "The API Server"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
 
@@ -611,6 +612,7 @@ nav:
     - Tracing Input Semantics: contribute/trace-input-semantics.md
     - Projection Fixture Corpus: contribute/generate-projection-corpus.md
     - TypeScript Emission Gates: contribute/typescript-emission-gates.md
+    - The API Server: contribute/api-server.md
     - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md

@@ -1,0 +1,169 @@
+################################################################################
+# Amazon Bedrock Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Amazon Bedrock models.
+# It contains model definitions for various language models
+# accessible through the Amazon Bedrock service.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["claude-3.5-sonnet"])
+# - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "bedrock_aioboto"
+thinking_mode = "none"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Mistral Models -----------------------------------------------------------
+[bedrock-mistral-large]
+model_id = "mistral.mistral-large-2407-v1:0"
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 4.0, output = 12.0 }
+
+# --- Meta Llama Models --------------------------------------------------------
+[bedrock-meta-llama-3-3-70b-instruct]
+model_id = "us.meta.llama3-3-70b-instruct-v1:0"
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+# TODO: find out the actual cost per million tokens for llama3 on bedrock
+costs = { input = 3.0, output = 15.0 }
+
+# --- Amazon Nova Models -------------------------------------------------------
+[bedrock-nova-pro]
+model_id = "us.amazon.nova-pro-v1:0"
+max_tokens = 5120
+inputs = ["text"]
+outputs = ["text"]
+# TODO: find out the actual cost per million tokens for nova on bedrock
+costs = { input = 3.0, output = 15.0 }
+
+# --- DeepSeek Models ----------------------------------------------------------
+["deepseek-v3.1"]
+model_id = "deepseek.v3-v1:0"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+max_tokens = 8192
+
+# --- Claude LLMs --------------------------------------------------------------
+[claude-4-sonnet]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
+
+[claude-4-opus]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
+max_tokens = 32000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
+
+["claude-4.1-opus"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-opus-4-1-20250805-v1:0"
+max_tokens = 32000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
+
+["claude-4.5-sonnet"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
+
+["claude-4.5-haiku"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 1.0, output = 5.0 }
+thinking_mode = "manual"
+
+["claude-4.5-opus"]
+sdk = "bedrock_anthropic"
+model_id = "global.anthropic.claude-opus-4-5-20251101-v1:0"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "manual"
+
+["claude-4.6-sonnet"]
+sdk = "bedrock_anthropic"
+model_id = "global.anthropic.claude-sonnet-4-6"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+thinking_mode = "adaptive"
+
+["claude-4.6-opus"]
+sdk = "bedrock_anthropic"
+model_id = "global.anthropic.claude-opus-4-6-v1"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+
+# --- Claude 4.7 Series --------------------------------------------------------
+["claude-4.7-opus"]
+sdk = "bedrock_anthropic"
+model_id = "global.anthropic.claude-opus-4-7"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+# --- Claude 4.8 Series --------------------------------------------------------
+["claude-4.8-opus"]
+sdk = "bedrock_anthropic"
+model_id = "global.anthropic.claude-opus-4-8"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
