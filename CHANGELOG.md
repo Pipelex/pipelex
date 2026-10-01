@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A symlink in a fetched package is a 422 on the API server**: `MethodPackageSymlinkError`, raised when a package fetched by `method_ref` carries a symlink, is now answered as a 422 the method's author can act on, where it was a 500 server fault.
+
+### Security
+
+- **Locating a fetched package never follows a symlinked `METHODS.toml`**: when `pipelex run <address>`, fetch-on-miss or the API server's `method_ref` scans a fetched repository for its packages, a `METHODS.toml` that is a symlink, or is not a regular file, is now skipped and reported without being opened. A repository could commit one linking to a file on the fetching machine and get that file's values back in the error message, even under strict error disclosure, or link it to `/dev/zero` and make the read run without end. The read now also stops at the manifest size ceiling whatever size the file reports, and a manifest that is not valid UTF-8, or a directory named `METHODS.toml`, is skipped and reported instead of failing the whole fetch.
+
 ## [v0.71.0] - 2026-10-01
 
 ### Highlights
