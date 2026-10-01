@@ -4,16 +4,18 @@ name: Publish the release 📦 to PyPI and Docker Hub
 # `pipelex-api` distribution (the API server, the `api/` workspace member) and the
 # `pipelex/pipelex-api` image. The order is deliberate:
 #
-#   build -> publish-to-pypi -> github-release -> publish-api-to-pypi -> publish-docker-hub
-#   build -> build-api, whose dists publish-api-to-pypi uploads
+#   build -> build-api -> publish-to-pypi -> github-release -> publish-api-to-pypi -> publish-docker-hub
 #
-# Nothing of the server ships before the `pipelex` wheel is on PyPI, because the `pipelex-api`
-# wheel pins `pipelex==X.Y.Z` exactly. Nothing of it ships before `github-release` either, whose tag
-# guard is what proves the commit this run checked out is the release's: a retry from a ref whose
-# head the tag does not name fails there, before a server file reaches PyPI, where it could never be
-# replaced. The image goes last, built from the commit `vX.Y.Z` names. Each publishing job can be
-# re-run on its own with "Re-run failed jobs"; the image can also be pushed again by dispatching
-# `publish-docker-hub.yml` with the version, without this workflow.
+# Both distributions are built and checked before anything is uploaded, so a server that does not
+# build stops the release while the version is still free, rather than after `pipelex` X.Y.Z is on
+# PyPI and tagged, when no fixed commit could ship under it. Nothing of the server ships before the
+# `pipelex` wheel is on PyPI, because the `pipelex-api` wheel pins `pipelex==X.Y.Z` exactly, nor
+# before `github-release`, whose tag guard is what proves the commit this run checked out is the
+# release's: a retry from a ref whose head the tag does not name fails there, before a server file
+# reaches PyPI, where it could never be replaced. The image goes last, built from the commit
+# `vX.Y.Z` names. Each publishing job can be re-run on its own with "Re-run failed jobs"; the image
+# can also be pushed again by dispatching `publish-docker-hub.yml` with the version, without this
+# workflow.
 
 on:
   pull_request:
@@ -365,6 +367,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     needs:
       - build
+      # The server is built and its pin checked before this irrevocable upload, so a server that
+      # does not build stops the release while X.Y.Z can still ship from a fixed commit.
+      - build-api
     runs-on: ubuntu-latest
     environment:
       name: pypi
