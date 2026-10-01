@@ -4,8 +4,8 @@ name: Publish the release 📦 to PyPI and Docker Hub
 # `pipelex-api` distribution (the API server, the `api/` workspace member) and the
 # `pipelex/pipelex-api` image. The order is deliberate:
 #
-#   build ─────────── publish-to-pypi ──┬── github-release ── publish-docker-hub
-#   build-api ──────────────────────────┴── publish-api-to-pypi
+#   build -> publish-to-pypi -> github-release -> publish-docker-hub
+#   build -> build-api -> publish-api-to-pypi, which also waits for publish-to-pypi
 #
 # Nothing of the server ships before the `pipelex` wheel is on PyPI, because the `pipelex-api`
 # wheel pins `pipelex==X.Y.Z` exactly and the image is the release's third artifact. The image

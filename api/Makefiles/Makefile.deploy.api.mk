@@ -25,7 +25,8 @@ export HELP_DEPLOY_API
 # `publish-pypi.yml` calls and which can also be dispatched on its own to retry
 # a failed push. It passes PUSH_LATEST=false for a pre-release, so `latest`
 # keeps naming the last stable release. DOCKER_HUB_TOKEN comes from that
-# workflow's secret. This repository only publishes to Docker Hub; anything
+# workflow's secret, through the environment: the recipe reads it from the shell
+# rather than expanding it into the command line. This repository only publishes to Docker Hub; anything
 # beyond (private registries, ECR/ACR/GCR, ECS/k8s deploys) is the user's
 # responsibility, typically in a separate infra repo.
 PUSH_LATEST ?= true
@@ -33,10 +34,10 @@ PUSH_LATEST ?= true
 .PHONY: deploy-docker-hub
 deploy-docker-hub:
 	@echo "\n########################### Docker Hub Build ##########################"
-	@test -n "$(DOCKER_HUB_TOKEN)" || { echo "ERROR: DOCKER_HUB_TOKEN is not set."; exit 1; }
+	@test -n "$$DOCKER_HUB_TOKEN" || { echo "ERROR: DOCKER_HUB_TOKEN is not set in the environment."; exit 1; }
 	@case "$(PUSH_LATEST)" in true|false) ;; *) echo "ERROR: PUSH_LATEST must be true or false, got '$(PUSH_LATEST)'."; exit 1;; esac
 	@echo "Logging in to Docker Hub..."
-	@echo "$(DOCKER_HUB_TOKEN)" | docker login --username pipelex --password-stdin
+	@printf '%s' "$$DOCKER_HUB_TOKEN" | docker login --username pipelex --password-stdin
 
 	@echo "Building Docker image for Docker Hub..."
 	docker build --platform linux/amd64 -f $(CURDIR)/Dockerfile -t pipelex-api:$(VERSION) $(WORKSPACE_ROOT)
