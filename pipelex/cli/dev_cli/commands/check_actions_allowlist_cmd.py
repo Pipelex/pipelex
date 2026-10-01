@@ -13,10 +13,10 @@ from pathlib import Path
 from rich.markup import escape
 from rich.panel import Panel
 
+from pipelex.cli.dev_cli.commands.actions_allowlist_exceptions import ActionsAllowlistGuardError
 from pipelex.cli.dev_cli.commands.actions_allowlist_guard import (
     ALLOWLIST_FILE,
     REMEDY,
-    ActionsAllowlistGuardError,
     ActionsAllowlistViolation,
     collect_violations,
 )

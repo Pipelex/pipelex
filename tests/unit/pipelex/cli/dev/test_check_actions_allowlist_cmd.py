@@ -7,7 +7,8 @@ import pytest
 from rich.console import Console
 
 from pipelex.cli.dev_cli.commands import check_actions_allowlist_cmd as cmd_mod
-from pipelex.cli.dev_cli.commands.actions_allowlist_guard import REMEDY, ActionsAllowlistGuardError, ActionsAllowlistViolation
+from pipelex.cli.dev_cli.commands.actions_allowlist_exceptions import ActionsAllowlistGuardError
+from pipelex.cli.dev_cli.commands.actions_allowlist_guard import REMEDY, ActionsAllowlistViolation
 from pipelex.cli.dev_cli.commands.check_actions_allowlist_cmd import check_actions_allowlist_cmd
 
 if TYPE_CHECKING:

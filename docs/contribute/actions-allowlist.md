@@ -31,14 +31,14 @@ and copies `github_owned_allowed` and `patterns_allowed` into the mirror. The mi
 make check-actions-allowlist   # alias: make caa
 ```
 
-The guard (`pipelex-dev check-actions-allowlist`, core in `pipelex/cli/dev_cli/commands/actions_allowlist_guard.py`) runs in `make agent-check`, in the `make check` aggregate, and in CI as the `Lint (actions allowlist)` job, which the required `Lint (all)` aggregate waits for. It reads every workflow directly under `.github/workflows/` and every local action definition under `.github/actions/`, takes each `uses:` reference from where GitHub reads one (`jobs.<job>.steps[].uses` and `jobs.<job>.uses` in a workflow, `runs.steps[].uses` in a composite action), and allows it when it is:
+The guard (`pipelex-dev check-actions-allowlist`, core in `pipelex/cli/dev_cli/commands/actions_allowlist_guard.py`) runs in `make agent-check`, in the `make check` aggregate, and in CI as the `Lint (actions allowlist)` job, which the required `Lint (all)` aggregate waits for. It reads every workflow directly under `.github/workflows/`, every local action definition under `.github/actions/`, and every local action a `./` reference names wherever it lives in the repository, takes each `uses:` reference from where GitHub reads one (`jobs.<job>.steps[].uses` and `jobs.<job>.uses` in a workflow, `runs.steps[].uses` in a composite action), and allows it when it is:
 
-1. local, starting with `./`: an action or reusable workflow of this repository;
+1. local, starting with `./`: an action or reusable workflow of this repository, whose own references the guard then reads in turn, since the policy applies to the actions a local composite action uses as well;
 2. created by GitHub, when `github_owned_allowed` is true;
 3. owned by an organization in `enterprise_owners`;
 4. matched by a pattern of `patterns_allowed`.
 
-Anything else fails the check, with the file, the line, the reference and the reason. A `docker://` image is refused as well, since no pattern can name one.
+Anything else fails the check, with the file, the line, the reference and the reason. A `docker://` image is refused as well, since no pattern can name one, and so is a `./` reference the guard cannot read: one that leaves the repository, names nothing, or names a directory with no `action.yml` or `action.yaml`.
 
 Patterns follow GitHub's syntax, and where that syntax leaves a doubt the guard takes the stricter reading, so that a pass here is a pass on GitHub: `*` matches any run of characters except `/`, `**` matches any run at all, the owner, repository and path compare without regard to case, and the ref after `@` compares exactly. `astral-sh/setup-uv@*` therefore allows every ref of that action, and `sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9` allows that one commit only.
 

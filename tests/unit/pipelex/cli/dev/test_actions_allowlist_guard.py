@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.cli.dev_cli.commands.actions_allowlist_exceptions import ActionsAllowlistGuardError
 from pipelex.cli.dev_cli.commands.actions_allowlist_guard import (
     ALLOWLIST_FILE,
     ActionsAllowlist,
-    ActionsAllowlistGuardError,
     collect_violations,
     find_references_in_source,
     iter_workflow_files,
@@ -47,6 +47,9 @@ jobs:
   reuse:
     uses: ./.github/workflows/other.yml
 """
+
+#: The reusable workflow `WORKFLOW` calls with `./.github/workflows/other.yml`.
+OTHER_WORKFLOW = "on: workflow_call\njobs:\n  build:\n    steps:\n      - uses: actions/checkout@v4\n"
 
 COMPOSITE_ACTION = """\
 name: Local action
@@ -164,11 +167,70 @@ class TestActionsAllowlistGuard:
     def test_collects_the_refused_references_of_a_tree(self, tmp_path: Path) -> None:
         """A refused action is reported at its file and line, and the allowed ones beside it are not."""
         release = f"jobs:\n  publish:\n    steps:\n      - uses: actions/checkout@v4\n      - uses: {REFUSED_ACTION}\n"
-        _write_tree(root=tmp_path, workflows={"ci.yml": WORKFLOW, "release.yml": release})
+        _write_tree(root=tmp_path, workflows={"ci.yml": WORKFLOW, "other.yml": OTHER_WORKFLOW, "release.yml": release})
         violations = collect_violations(root=tmp_path)
         assert [(violation.relative_path, violation.lineno, violation.reference) for violation in violations] == [
             (".github/workflows/release.yml", 5, REFUSED_ACTION),
         ]
+
+    @pytest.mark.parametrize(
+        ("reference", "action_files", "expected"),
+        [
+            pytest.param(
+                "./ci/my-action",
+                {"ci/my-action/action.yml": f"runs:\n  using: composite\n  steps:\n    - uses: {REFUSED_ACTION}\n"},
+                [("ci/my-action/action.yml", 4, REFUSED_ACTION, "matched by no pattern")],
+                id="a refused action inside a local action outside .github/actions",
+            ),
+            pytest.param(
+                "./ci/my-action",
+                {"ci/my-action/action.yaml": "runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@v4\n"},
+                [],
+                id="an allowed action inside a local action named action.yaml",
+            ),
+            pytest.param(
+                "./ci/loop",
+                {"ci/loop/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: ./ci/loop\n"},
+                [],
+                id="a local action naming itself is read once",
+            ),
+            pytest.param(
+                "./ci/missing",
+                {},
+                [(".github/workflows/ci.yml", 5, "./ci/missing", "does not exist")],
+                id="a local action that does not exist",
+            ),
+            pytest.param(
+                "./ci/empty",
+                {"ci/empty/README.md": "no definition here"},
+                [(".github/workflows/ci.yml", 5, "./ci/empty", "no action.yml or action.yaml")],
+                id="a local directory with no action definition",
+            ),
+            pytest.param(
+                "./../outside",
+                {},
+                [(".github/workflows/ci.yml", 5, "./../outside", "outside the repository")],
+                id="a local reference leaving the repository",
+            ),
+        ],
+    )
+    def test_follows_local_references_to_their_definitions(
+        self, tmp_path: Path, reference: str, action_files: dict[str, str], expected: list[tuple[str, int, str, str]]
+    ) -> None:
+        """GitHub runs a `./` action from anywhere in the repository and applies the policy to the actions it uses, so the guard reads it too."""
+        workflow = f"jobs:\n  build:\n    steps:\n      - uses: actions/checkout@v4\n      - uses: {reference}\n"
+        root = tmp_path / "repo"
+        _write_tree(root=root, workflows={"ci.yml": workflow})
+        for relative_path, content in action_files.items():
+            target = root / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+        violations = collect_violations(root=root)
+        assert [(violation.relative_path, violation.lineno, violation.reference) for violation in violations] == [
+            (relative_path, lineno, found) for relative_path, lineno, found, _detail in expected
+        ]
+        for violation, (_relative_path, _lineno, _found, detail) in zip(violations, expected, strict=True):
+            assert detail in violation.detail
 
     def test_reads_only_the_files_github_reads(self, tmp_path: Path) -> None:
         """Workflows directly under `.github/workflows/` and action definitions under `.github/actions/`; nothing else."""

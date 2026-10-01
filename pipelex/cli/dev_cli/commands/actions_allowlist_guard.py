@@ -6,11 +6,13 @@ the run, and a workflow using one the policy refuses does not run at all: GitHub
 closes into ``main``, so pull-request CI never loads them, and an action the policy refuses there
 surfaces only when a release is cut, as a release that publishes nothing.
 
-This guard reads every workflow directly under ``.github/workflows/`` and every local action under
-``.github/actions/``, and refuses each ``uses:`` reference the policy mirrored in
-``.github/actions-allowlist.toml`` would refuse. A reference is allowed when it is:
+This guard reads every workflow directly under ``.github/workflows/``, every local action under
+``.github/actions/``, and every local action a ``./…`` reference names wherever it lives in the repository,
+and refuses each ``uses:`` reference the policy mirrored in ``.github/actions-allowlist.toml`` would refuse.
+A reference is allowed when it is:
 
-1. local (``./…``), an action or reusable workflow of this repository;
+1. local (``./…``), an action or reusable workflow of this repository, whose own ``uses:`` references are
+   then read in turn, since the policy applies to the actions a local composite action uses as well;
 2. created by GitHub (the ``actions`` and ``github`` owners), when the policy allows GitHub's actions;
 3. owned by one of the enterprise's organizations listed in ``enterprise_owners``;
 4. matched by one of ``patterns_allowed``.
@@ -32,6 +34,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 import yaml
+
+from pipelex.cli.dev_cli.commands.actions_allowlist_exceptions import ActionsAllowlistGuardError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -67,14 +71,6 @@ REMEDY = (
     "use an action GitHub created, one an organization of the enterprise owns or one a pattern allows, or replace the step "
     "with a `run:` script; when the organization's policy itself changed, mirror it in .github/actions-allowlist.toml"
 )
-
-
-class ActionsAllowlistGuardError(Exception):
-    """The guard cannot run as configured: a missing or malformed allowlist, an unreadable workflow, or nothing to scan.
-
-    Kept local to this module rather than derived from ``PipelexError``, for the reason ``hub_layering_guard``
-    gives for its own: the dev guards stand apart from the runtime's error hierarchy.
-    """
 
 
 class ActionsAllowlist(NamedTuple):
@@ -314,8 +310,40 @@ def iter_workflow_files(*, root: Path) -> Iterator[Path]:
                 yield path
 
 
+def _local_definition(*, root: Path, reference: str) -> tuple[Path | None, str | None]:
+    """Find the file a ``./…`` reference names, so that its own references can be read in turn.
+
+    A reference to a workflow file names that file; any other names a directory holding ``action.yml`` or
+    ``action.yaml``, which is how GitHub finds a local action wherever it lives in the repository.
+
+    Args:
+        root: The repo root.
+        reference: The ``uses:`` value, starting with ``./``.
+
+    Returns:
+        The file to read and no reason, or no file and the reason the guard cannot read the definition, which
+        the check reports, since an action it cannot read is an action it has not checked.
+    """
+    root_resolved = root.resolve()
+    target = (root / reference.removeprefix(LOCAL_PREFIX)).resolve()
+    if not target.is_relative_to(root_resolved):
+        return None, "names a path outside the repository"
+    relative_target = target.relative_to(root_resolved)
+    if target.is_file() and target.suffix in YAML_SUFFIXES:
+        return root / relative_target, None
+    if target.is_dir():
+        for file_name in sorted(ACTION_FILE_NAMES):
+            if (target / file_name).is_file():
+                return root / relative_target / file_name, None
+        return None, "names a local action with no action.yml or action.yaml, which the guard cannot read"
+    return None, "names a local action or workflow that does not exist"
+
+
 def collect_violations(*, root: Path) -> list[ActionsAllowlistViolation]:
     """Check every ``uses:`` reference under ``root`` against the committed allowlist, and return the refusals sorted.
+
+    The scan starts from the workflows and the ``.github/actions/`` definitions, and reads every local action or
+    reusable workflow a ``./…`` reference names as well, once each, wherever it lives in the repository.
 
     Args:
         root: The repo root, which holds ``.github/``.
@@ -327,14 +355,24 @@ def collect_violations(*, root: Path) -> list[ActionsAllowlistViolation]:
     """
     allowlist = load_allowlist(path=root / ALLOWLIST_FILE)
     violations: list[ActionsAllowlistViolation] = []
+    pending = list(iter_workflow_files(root=root))
+    seen = {path.resolve() for path in pending}
     nb_files = 0
     nb_references = 0
-    for path in iter_workflow_files(root=root):
+    while pending:
+        path = pending.pop(0)
         nb_files += 1
         relative_path = path.relative_to(root).as_posix()
         for found in find_references_in_source(source=path.read_text(encoding="utf-8"), relative_path=relative_path):
             nb_references += 1
-            reason = refusal_reason(reference=found.reference, allowlist=allowlist)
+            reason: str | None
+            if found.reference.startswith(LOCAL_PREFIX):
+                definition, reason = _local_definition(root=root, reference=found.reference)
+                if definition is not None and definition.resolve() not in seen:
+                    seen.add(definition.resolve())
+                    pending.append(definition)
+            else:
+                reason = refusal_reason(reference=found.reference, allowlist=allowlist)
             if reason is not None:
                 violations.append(
                     ActionsAllowlistViolation(relative_path=found.relative_path, lineno=found.lineno, reference=found.reference, detail=reason)
