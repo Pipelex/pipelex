@@ -1,9 +1,14 @@
-# Pipelex API Documentation
+---
+title: Pipelex API Server
+description: "The Pipelex API server: the self-hostable FastAPI runner published as the pipelex/pipelex-api Docker image and the pipelex-api package, and the reference implementation of the MTHDS Protocol."
+---
 
-!!! important "This server lives in [`Pipelex/pipelex`](https://github.com/Pipelex/pipelex), as the repository's `api/` directory"
-    It moved there from `Pipelex/pipelex-api` after v0.33.2 and is released together with the pipelex library, under the library's version number, so the tag of the `pipelex/pipelex-api` image that follows 0.33.2 is a pipelex version. The image keeps its name, its port and its `/root/.pipelex` configuration mount. Please open issues on `Pipelex/pipelex`.
+# Pipelex API Server
 
-Welcome to the Pipelex API documentation. The API provides programmatic access to the Pipelex system.
+The Pipelex API server runs MTHDS methods over HTTP on infrastructure you host yourself. It is published as the [`pipelex/pipelex-api`](https://hub.docker.com/r/pipelex/pipelex-api) Docker image and as the `pipelex-api` package on PyPI, and its source is the [`api/` directory](https://github.com/Pipelex/pipelex/tree/main/api) of the pipelex repository.
+
+!!! note "Released with pipelex, under pipelex's version"
+    Every pipelex release also ships the server: the `pipelex-api` package pins the `pipelex` of the same version, and the image tag is that version too, so `pipelex/pipelex-api:X.Y.Z` runs pipelex X.Y.Z. The server was released on its own, from the `Pipelex/pipelex-api` repository, until v0.33.2; its image tag then jumped to the pipelex version that first shipped it. Its history up to then is the [server's changelog to v0.33.2](changelog.md), and its changes since are in the [Pipelex changelog](../changelog.md).
 
 ## The three-layer contract
 
@@ -45,7 +50,7 @@ docker run --name pipelex-api -p 8081:8081 \
   pipelex/pipelex-api:latest
 ```
 
-To require authentication on the API itself, add `-e AUTH_MODE=api_key -e API_KEY=your-secret` (or `AUTH_MODE=jwt` + `JWT_SECRET_KEY`). The full set of accepted env vars is documented in [Configuration](configuration.md) and `.env.example`.
+To require authentication on the API itself, add `-e AUTH_MODE=api_key -e API_KEY=your-secret` (or `AUTH_MODE=jwt` + `JWT_SECRET_KEY`). The full set of accepted env vars is documented in [Configuration](configuration.md) and in the server's [`.env.example`](https://github.com/Pipelex/pipelex/blob/main/api/.env.example).
 
 If you'd rather keep config out of your shell history, use `--env-file .env` or a `docker-compose.yml` instead — see [Configuration → Setting env vars in Docker](configuration.md#setting-env-vars-in-docker) for both patterns.
 

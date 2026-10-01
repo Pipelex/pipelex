@@ -375,6 +375,17 @@ plugins:
         - contribute/api-server.md: "The API Server"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
+        API Server:
+        - api-server/index.md: "Pipelex API Server Overview"
+        - api-server/configuration.md: "API Server Configuration"
+        - api-server/pipe-run.md: "API Server Pipe Run"
+        - api-server/pipe-validate.md: "API Server Pipe Validate"
+        - api-server/pipe-io.md: "API Server Pipe I/O"
+        - api-server/codegen.md: "API Server Resolve & Codegen"
+        - api-server/pipe-builder.md: "API Server Pipe Builder"
+        - api-server/mthds-tools.md: "API Server MTHDS Tools"
+        - api-server/error-responses.md: "API Server Error Responses"
+        - api-server/logging.md: "API Server Logging"
 
 markdown_extensions:
   - meta
@@ -617,4 +628,16 @@ nav:
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
     - Changelog: changelog.md
-  - API: https://pipelex.github.io/pipelex-api/
+  - API Server:
+    - Overview: api-server/index.md
+    - Configuration: api-server/configuration.md
+    - Pipe Run: api-server/pipe-run.md
+    - Pipe Validate: api-server/pipe-validate.md
+    - Pipe I/O: api-server/pipe-io.md
+    - Resolve & Codegen: api-server/codegen.md
+    - Pipe Builder: api-server/pipe-builder.md
+    - MTHDS Tools: api-server/mthds-tools.md
+    - Error Responses: api-server/error-responses.md
+    - Logging: api-server/logging.md
+    - Storage Transport (Removed): api-server/storage-transport.md
+    - Changelog to v0.33.2: api-server/changelog.md

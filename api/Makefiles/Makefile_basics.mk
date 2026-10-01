@@ -27,7 +27,6 @@ VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
 VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
 VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
 VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
-VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
 VENV_PYLINT := $(VIRTUAL_ENV)/bin/pylint
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' $(WORKSPACE_ROOT)/pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
@@ -96,10 +95,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 make fui                      - Shorthand -> fix-unused-imports
 make check-TODOs              - Check for TODOs
 
-make docs                     - Serve documentation locally with mkdocs
-make docs-check               - Check documentation build with mkdocs
-
-make openapi-export           - Export the FastAPI OpenAPI schema to docs/openapi/pipelex-api.openapi.yaml
+make openapi-export           - Export the FastAPI OpenAPI schema to the docs site's docs/api-server/openapi/pipelex-api.openapi.yaml
 make openapi-check            - Fail if the committed OpenAPI artifact drifts from the app
 
 make kit-sync                 - Re-sync the vendored .pipelex/inference/ tree from the pipelex kit of this repository
@@ -126,7 +122,7 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check \
+	li check-unused-imports fix-unused-imports check-uv check-TODOs \
 	openapi-export openapi-check \
 	kit-sync kit-check \
 	test-count check-test-badge
@@ -448,23 +444,12 @@ li: lock install
 	@echo "> done: lock install"
 
 ##########################################################################################
-### DOCUMENTATION
-##########################################################################################
-
-docs: env
-	$(call PRINT_TITLE,"Serving documentation with mkdocs")
-	$(VENV_MKDOCS) serve -a 127.0.0.1:8001 --watch docs
-
-docs-check: env
-	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
-	$(VENV_MKDOCS) build --strict
-
-
-##########################################################################################
 ### OPENAPI ARTIFACT
 ##########################################################################################
 
-OPENAPI_ARTIFACT := docs/openapi/pipelex-api.openapi.yaml
+# The server's pages are part of the pipelex docs site (`docs/api-server/` at the repository root, served by
+# the root `make docs`), and the artifact sits among them, so the site publishes it beside the pages that link it.
+OPENAPI_ARTIFACT := $(WORKSPACE_ROOT)/docs/api-server/openapi/pipelex-api.openapi.yaml
 
 # These depend on `install` (not `env`) on purpose: `env` only ensures the venv
 # directory exists, it never runs `uv sync`. The schema is generated from whatever

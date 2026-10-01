@@ -1,15 +1,14 @@
 """Export the FastAPI-generated OpenAPI schema to the committed YAML artifact.
 
-The committed file (`docs/openapi/pipelex-api.openapi.yaml`) is the layer-2
-contract of the MTHDS Protocol nesting (MTHDS Protocol ⊂ Pipelex API ⊂ Pipelex
-hosted API): the five protocol routes are tagged `x-mthds-protocol: true`, the
-build tooling extensions ride alongside, and the non-contract storage routes
-(`/upload`, `/resolve-storage-url`) are documented as such in their
-descriptions.
+The committed file (`docs/api-server/openapi/pipelex-api.openapi.yaml` at the repository root,
+published on the pipelex docs site beside the server's pages) is the layer-2 contract of the MTHDS
+Protocol nesting (MTHDS Protocol ⊂ Pipelex API ⊂ Pipelex hosted API): the five protocol routes are
+tagged `x-mthds-protocol: true`, the build tooling extensions ride alongside, and the non-contract
+storage routes (`/upload`, `/resolve-storage-url`) are documented as such in their descriptions.
 
 Usage:
-    python scripts/export_openapi.py docs/openapi/pipelex-api.openapi.yaml
-    python scripts/export_openapi.py --check docs/openapi/pipelex-api.openapi.yaml
+    python scripts/export_openapi.py ../docs/api-server/openapi/pipelex-api.openapi.yaml
+    python scripts/export_openapi.py --check ../docs/api-server/openapi/pipelex-api.openapi.yaml
 
 `--check` exits non-zero when the committed artifact drifts from the schema the
 app currently generates — `make openapi-check`, which the gate (`make agent-check`, here or at the

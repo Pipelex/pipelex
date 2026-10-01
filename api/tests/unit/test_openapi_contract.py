@@ -1,7 +1,7 @@
 """The published error contract — every `/v1` operation documents RFC 7807, with real schemas.
 
-Guards what the committed artifact (`docs/openapi/pipelex-api.openapi.yaml`, regenerated from
-this same `fastapi_app.openapi()`) tells a client about failures:
+Guards what the committed artifact (`docs/api-server/openapi/pipelex-api.openapi.yaml` at the repository root,
+regenerated from this same `fastapi_app.openapi()`) tells a client about failures:
 
 - Every failure this server can emit is an `application/problem+json` problem document
   (`pipelex_api.exception_handlers`), so every documented 4xx/5xx must say so — with a `$ref` to the

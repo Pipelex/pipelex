@@ -27,8 +27,8 @@ build-backend = "hatchling.build"
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
-Documentation = "https://docs.pipelex.com/pages/api/"
-Changelog = "https://docs.pipelex.com/changelog/"
+Documentation = "https://docs.pipelex.com/latest/api-server/"
+Changelog = "https://docs.pipelex.com/latest/changelog/"
 
 [project.optional-dependencies]
 dev = [
@@ -58,14 +58,6 @@ dev = [
   "types-requests>=2.32.0.2024091",
   "types-PyYAML>=6.0.12.20250326",
   "types-toml>=0.10.8.20240310",
-]
-# One lock resolves every workspace member's extras together, so these floors follow pipelex's own `docs`
-# extra rather than pinning versions of their own.
-docs = [
-  "mkdocs>=1.6.1",
-  "mkdocs-glightbox>=0.4.0",
-  "mkdocs-material>=9.7.7",
-  "mkdocs-meta-manager>=1.1.0",
 ]
 
 [tool.hatch.metadata]

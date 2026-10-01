@@ -3789,22 +3789,12 @@ dev = [
     { name = "types-requests" },
     { name = "types-toml" },
 ]
-docs = [
-    { name = "mkdocs" },
-    { name = "mkdocs-glightbox" },
-    { name = "mkdocs-material" },
-    { name = "mkdocs-meta-manager" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "boto3-stubs", marker = "extra == 'dev'", specifier = ">=1.35.24" },
     { name = "fastapi", specifier = ">=0.118.0,<0.142" },
     { name = "httpx2", marker = "extra == 'dev'", specifier = ">=2.4.0" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.1" },
-    { name = "mkdocs-glightbox", marker = "extra == 'docs'", specifier = ">=0.4.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.7.7" },
-    { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "pandas-stubs", marker = "extra == 'dev'", specifier = ">=2.2.3.241126" },
     { name = "pipelex", extras = ["anthropic", "bedrock", "fal", "google", "google-genai", "mistralai"], editable = "." },
@@ -3829,7 +3819,7 @@ requires-dist = [
     { name = "types-toml", marker = "extra == 'dev'", specifier = ">=0.10.8.20240310" },
     { name = "uvicorn", specifier = ">=0.37.0" },
 ]
-provides-extras = ["dev", "docs"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "pipelex-tools"
