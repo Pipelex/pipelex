@@ -146,6 +146,7 @@ class ManifoldSearchWorker(SearchWorkerAbstract):
             body=request.model_dump(exclude_none=True),
             family=InferenceErrorFamily.SEARCH,
             inference_model=self.inference_model,
+            job_metadata=search_job.job_metadata,
         )
         self._record_usage(response_body=response_body, search_job=search_job)
         return response_body

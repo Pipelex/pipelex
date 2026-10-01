@@ -3,7 +3,8 @@
 `POST /v1/pipelex/extract` and `POST /v1/pipelex/search` are not OpenAI-shaped, so they are called
 with plain `httpx`. Building the request by hand is what makes the dialect's two properties readable
 in a test rather than dependent on a vendor constructor's defaults: the only header about us is the
-service token, and the body carries the model with nothing about routing.
+service token, the only other one says whose call it is, and the body carries the model with
+nothing about routing.
 
 The failure arm is the other half. A 2xx whose body is not JSON — an intermediary's HTML error page
 is how this happens — left raw is neither a `PipelexError` nor annotated with the model, so it
@@ -23,6 +24,7 @@ from pipelex.cogt.inference.error_render import InferenceErrorFamily
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.providers.manifold.manifold_exceptions import ManifoldError
 from pipelex.providers.manifold.manifold_native_client import ManifoldNativeClient
+from tests.unit.pipelex.providers.manifold.test_data import ManifoldMetadataTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -68,12 +70,18 @@ class TestManifoldNativeClientRequest:
             body={"model": "linkup/standard", "query": "what is a manifold"},
             family=InferenceErrorFamily.SEARCH,
             inference_model=_inference_model(mocker),
+            job_metadata=ManifoldMetadataTestData.JOB_METADATA,
         )
 
         assert post.call_args.args[0] == f"{_ORIGIN}/v1/pipelex/search"
         headers = post.call_args.kwargs["headers"]
-        # Asserted whole: a header added later should turn this red rather than widen silently.
-        assert headers == {"x-pipelex-api-key": _TOKEN, "Content-Type": "application/json"}
+        # Asserted whole: a header added later should turn this red rather than widen silently. The
+        # metadata header says whose call this is, not anything about us or about routing.
+        assert headers == {
+            "x-pipelex-api-key": _TOKEN,
+            "x-pipelex-metadata": ManifoldMetadataTestData.EXPECTED_HEADER_VALUE,
+            "Content-Type": "application/json",
+        }
         assert post.call_args.kwargs["json"] == {"model": "linkup/standard", "query": "what is a manifold"}
 
     async def test_a_json_object_body_comes_back_as_a_dict(self, mocker: MockerFixture) -> None:
@@ -84,6 +92,7 @@ class TestManifoldNativeClientRequest:
             body={"model": "linkup/standard", "query": "q"},
             family=InferenceErrorFamily.SEARCH,
             inference_model=_inference_model(mocker),
+            job_metadata=ManifoldMetadataTestData.JOB_METADATA,
         )
 
         assert result == {"answer": "ok", "sources": []}
@@ -100,6 +109,7 @@ class TestManifoldNativeClientFailures:
                 body={"model": "linkup/standard", "query": "q"},
                 family=InferenceErrorFamily.SEARCH,
                 inference_model=_inference_model(mocker),
+                job_metadata=ManifoldMetadataTestData.JOB_METADATA,
             )
 
         assert "linkup-sourced-answer" in exc_info.value.message
@@ -113,6 +123,7 @@ class TestManifoldNativeClientFailures:
                 body={"model": "linkup/standard", "query": "q"},
                 family=InferenceErrorFamily.SEARCH,
                 inference_model=_inference_model(mocker),
+                job_metadata=ManifoldMetadataTestData.JOB_METADATA,
             )
 
     async def test_a_status_error_is_classified_rather_than_raised_raw(self, mocker: MockerFixture) -> None:
@@ -124,4 +135,5 @@ class TestManifoldNativeClientFailures:
                 body={"model": "linkup/standard", "query": "q"},
                 family=InferenceErrorFamily.SEARCH,
                 inference_model=_inference_model(mocker),
+                job_metadata=ManifoldMetadataTestData.JOB_METADATA,
             )
