@@ -16,6 +16,11 @@ WORKSPACE_ROOT := $(abspath $(CURDIR)/..)
 
 # The "?" is used to make the variable optional, so that it can be overridden by the user.
 PYTHON_VERSION ?= 3.13
+# The Python version pyright and mypy check against, when it is not the environment's own: the root's
+# pre-main gate (`lint-fresh-check.yml`) checks every supported version from one 3.11 environment.
+LINT_PYTHON_VERSION ?=
+# Where `make build` writes the pipelex-api wheel and sdist, and where `make check-lockstep-pin` reads them.
+DIST_DIR ?= dist
 VENV_PYTHON := $(VIRTUAL_ENV)/bin/python
 VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
@@ -52,7 +57,8 @@ Usage:
 make env                      - Create python virtual env
 make lock                     - Refresh the workspace uv.lock (at the repository root) without updating anything
 make install                  - Create local virtualenv & install all dependencies
-make build                    - Build the pipelex-api wheel and sdist
+make build                    - Build the pipelex-api wheel and sdist into $(DIST_DIR)
+make check-lockstep-pin       - Check that the built distributions pin pipelex to this version (after make build)
 
 make format                   - format with ruff format
 make lint                     - lint with ruff check
@@ -111,7 +117,7 @@ endef
 export HELP
 
 .PHONY: \
-	all help env lock install build \
+	all help env lock install build check-lockstep-pin \
 	format lint pyright mypy pylint \
 	cleanderived cleanenv cleanall \
 	agent-check agent-test \
@@ -169,9 +175,16 @@ lock: env
 	@uv lock && \
 	echo uv lock without update;
 
+# The metadata hook (`hatch_build.py`) pins pipelex to this version in what it builds; the check below is
+# what the release workflow runs on its own build before uploading it.
 build: env
 	$(call PRINT_TITLE,"Building the pipelex-api wheel and sdist")
-	@uv build --package pipelex-api
+	@rm -f $(DIST_DIR)/pipelex_api-*
+	@uv build --package pipelex-api --out-dir $(DIST_DIR)
+
+check-lockstep-pin:
+	$(call PRINT_TITLE,"Checking the lockstep pin in the distributions in $(DIST_DIR)")
+	@python3 scripts/check_lockstep_pin.py $(DIST_DIR)
 
 ##############################################################################################
 ############################      Cleaning                        ############################
@@ -363,11 +376,11 @@ merge-check-ruff-lint: env check-unused-imports
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3
+	$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3 $(if $(LINT_PYTHON_VERSION),--pythonversion $(LINT_PYTHON_VERSION))
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	$(VENV_MYPY) --config-file pyproject.toml $(if $(LINT_PYTHON_VERSION),--python-version $(LINT_PYTHON_VERSION))
 
 merge-check-pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")

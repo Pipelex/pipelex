@@ -18,13 +18,14 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 
 # The lock and the two projects' metadata first, so the layer holding the third-party dependencies
-# is cached across source changes. `--package pipelex-api` installs the server's dependency set:
-# pipelex with the extras the server's pyproject.toml names, and `cli` deliberately not among them,
-# because the server selects the `json` log sink and a Rich-free pretty-print mode, so nothing it does
-# on a request renders a terminal. (Rich itself is still installed — typer and instructor both
-# require it unconditionally — it is simply never reached.)
+# is cached across source changes. The server's metadata includes `hatch_build.py`, the hook that
+# writes its dependencies and pins pipelex to the release's version. `--package pipelex-api` installs
+# the server's dependency set: pipelex with the extras the server's pyproject.toml names, and `cli`
+# deliberately not among them, because the server selects the `json` log sink and a Rich-free
+# pretty-print mode, so nothing it does on a request renders a terminal. (Rich itself is still
+# installed — typer and instructor both require it unconditionally — it is simply never reached.)
 COPY pyproject.toml uv.lock README.md LICENSE ./
-COPY api/pyproject.toml api/README.md api/LICENSE api/
+COPY api/pyproject.toml api/hatch_build.py api/README.md api/LICENSE api/
 RUN uv sync --frozen --no-dev --package pipelex-api --no-install-workspace
 
 # Then the two packages themselves, built as wheels rather than linked to the source tree, so the

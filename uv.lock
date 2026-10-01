@@ -3799,7 +3799,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "boto3-stubs", marker = "extra == 'dev'", specifier = ">=1.35.24" },
-    { name = "fastapi", specifier = ">=0.118.0" },
+    { name = "fastapi", specifier = ">=0.118.0,<0.142" },
     { name = "httpx2", marker = "extra == 'dev'", specifier = ">=2.4.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.1" },
     { name = "mkdocs-glightbox", marker = "extra == 'docs'", specifier = ">=0.4.0" },
