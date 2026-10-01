@@ -157,6 +157,7 @@ class MethodCloneCache:
             MethodPackageNotFoundError: If no package matches the requested address.
             MethodPackageAmbiguityError: If more than one package matches.
             MethodPackageTooLargeError: If the selected package exceeds the ceilings.
+            MethodPackageSymlinkError: If the selected package contains a symlink.
         """
         commit_sha = resolve_remote_commit_sha(ref=ref, clone_url=clone_url)
         clone_dir = self._root / commit_sha

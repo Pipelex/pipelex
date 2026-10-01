@@ -270,6 +270,7 @@ Both `/execute` and `/start` accept **`method_ref`** — a globally resolvable a
 | No package matches the address (message lists what the repo contains) | 404 | `MethodPackageNotFoundError` |
 | More than one package matches | 422 | `MethodPackageAmbiguityError` |
 | Package exceeds the fetched-package ceilings | 422 | `MethodPackageTooLargeError` |
+| Package contains a symlink (file or directory) | 422 | `MethodPackageSymlinkError` |
 | Package declares Python structure classes | 403 | `MethodStructuresRefusedError` |
 | Package ships `.py` on a non-sandbox deployment | 403 | `CustomCodeRequiresSandbox` |
 
