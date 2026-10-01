@@ -13,6 +13,14 @@ DEFAULT_MAX_MTHDS_FILE_KIB = 1024  # 1 MiB per .mthds file
 DEFAULT_MAX_MTHDS_FILES_PER_REQUEST = 16
 DEFAULT_MAX_PIPE_CODE_LEN = 256
 MAX_METHOD_REF_LEN = 512  # `method_ref` selector strings; a fixed schema bound, not env-tunable
+# How deep the arrays and objects of a JSON request body may nest, the body's own envelope included
+# (`{"inputs": {"x": [1]}}` nests three levels). Every route checks it before parsing, with
+# `pipelex_api.json_body`, because how deep `json.loads` can recurse depends on the interpreter and,
+# from Python 3.14, on the thread's stack size. Real inputs nest a few dozen levels at most, and
+# pydantic's own JSON parser refuses a document much deeper than this, so a body past it could not
+# travel through the runtime anyway. A fixed bound, not env-tunable: raising it would hand the parser's
+# stack back to the caller.
+MAX_JSON_NESTING_DEPTH = 200
 DEFAULT_MAX_CALLBACK_URLS = 5
 DEFAULT_MAX_CALLBACK_URL_LEN = 2048
 DEFAULT_MAX_AGENT_SPEC_KIB = 256  # 256 KiB for JSON concept/pipe specs

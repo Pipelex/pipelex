@@ -8,6 +8,7 @@ from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
@@ -19,7 +20,7 @@ from pipelex_api.routes.pipelex.crate_ops import (
 )
 from pipelex_api.schemas.models import MthdsPipeRequest
 
-router = APIRouter(tags=["build"])
+router = APIRouter(tags=["build"], route_class=JsonBodyRoute)
 
 INPUTS_GENERATED_MESSAGE = "Inputs template generated successfully"
 NO_INPUTS_MESSAGE = "This pipe declares no inputs — the template is empty."

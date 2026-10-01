@@ -174,6 +174,7 @@ except SomeSpecificError as exc:
 
 - One router per feature domain, tagged for OpenAPI: `APIRouter(tags=["pipeline"])`
 - Routers composed hierarchically in `routes/__init__.py`
+- A router whose routes declare a JSON body is built with `route_class=JsonBodyRoute` (`pipelex_api/json_body.py`), which refuses a body nested deeper than `MAX_JSON_NESTING_DEPTH` before FastAPI parses it; `tests/unit/test_json_body.py` fails on a body-declaring route that is not one. A route that reads its raw body parses it with `decode_json_body`, never with a bare `json.loads`
 - Auth applied at router level via `dependencies=[Depends(auth_dependency)]`
 - Health check endpoint excluded from auth
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
@@ -30,6 +29,7 @@ from pipelex_api.api_config import get_api_config, resolve_orchestration_mode
 from pipelex_api.bundle import ParsedBundle, materialize_parsed, parse_bundle
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_bad_request, raise_forbidden, raise_validation_error
+from pipelex_api.json_body import decode_json_body
 from pipelex_api.method_source import fetched_method_source
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import (
@@ -545,7 +545,7 @@ def _find_reserved_object_key(payload: object) -> str | None:
 def _decode_body(body: bytes) -> dict[str, Any]:
     """Parse the run body as plain JSON and confirm it is an object free of class markers. Raises 422 if not.
 
-    The body is parsed with `json.loads`, never with kajson. kajson reads a
+    The body is parsed as plain JSON by `decode_json_body`, never with kajson. kajson reads a
     `{"__class__": ..., "__module__": ...}` object as an order to import that module and
     instantiate that class, so decoding a caller's body with it let any caller run code on the
     server (`subprocess.Popen` included) before a single field was validated. The MTHDS Protocol
@@ -555,20 +555,12 @@ def _decode_body(body: bytes) -> dict[str, Any]:
     back to life the moment the runtime round-trips the inputs through kajson. So a key a kajson
     decoder treats as a marker is refused at any depth with a 422 `ReservedObjectKey`.
 
-    The parse failures are caller mistakes, so they map to a 422 `InvalidJSON` rather than a
-    sanitized 500:
-      - `UnicodeDecodeError` — the body bytes are not valid UTF-8.
-      - `ValueError` — `json.JSONDecodeError` (it subclasses `ValueError`).
-      - `RecursionError` — a deeply nested JSON array or object exhausts the parser's
-        recursion budget.
+    The parse is `decode_json_body`'s, so its failures are caller mistakes answered with a 422
+    `InvalidJSON` rather than a sanitized 500: a body nested deeper than `MAX_JSON_NESTING_DEPTH`,
+    refused before it is parsed whatever the interpreter and its stack, a body that is not UTF-8,
+    and one that is not JSON.
     """
-    try:
-        decoded = json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
-        raise_validation_error(
-            message=f"Request body is not valid JSON: {exc!s}",
-            error_type=ErrorType.INVALID_JSON,
-        )
+    decoded = decode_json_body(body)
     if not isinstance(decoded, dict):
         raise_validation_error(
             message="Request body must be a JSON object",

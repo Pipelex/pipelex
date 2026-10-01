@@ -7,6 +7,7 @@ from pipelex.codegen.crate_encoding import encode_crate_json
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pydantic import BaseModel, Field
 
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
@@ -16,7 +17,7 @@ from pipelex_api.routes.pipelex.crate_ops import (
 )
 from pipelex_api.schemas.models import MthdsFilesRequest
 
-router = APIRouter(tags=["resolve"])
+router = APIRouter(tags=["resolve"], route_class=JsonBodyRoute)
 
 
 class ResolveValidReport(BaseModel):

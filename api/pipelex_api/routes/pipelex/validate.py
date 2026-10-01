@@ -14,12 +14,13 @@ from pydantic import BaseModel, Field, model_validator
 
 from pipelex_api.errors import raise_validation_error
 from pipelex_api.exception_handlers import problem_response_from_error_report
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_source import fetched_method_source
 from pipelex_api.openapi_responses import PROBLEM_403_RUN_POLICY, PROBLEM_404_METHOD_PACKAGE
 from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id
 from pipelex_api.schemas.models import CallerAnalyticsGroupsMixin, MthdsContentsRequest
 
-router = APIRouter(tags=["validate"])
+router = APIRouter(tags=["validate"], route_class=JsonBodyRoute)
 
 
 class RenderFormat(StrEnum):

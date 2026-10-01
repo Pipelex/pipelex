@@ -12,6 +12,7 @@ from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
@@ -22,7 +23,7 @@ from pipelex_api.routes.pipelex.crate_ops import (
 )
 from pipelex_api.schemas.models import MthdsFilesRequest
 
-router = APIRouter(tags=["codegen"])
+router = APIRouter(tags=["codegen"], route_class=JsonBodyRoute)
 
 
 class CodegenRouteKind(StrEnum):

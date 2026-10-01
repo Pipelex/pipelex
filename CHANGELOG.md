@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- **The API server refuses a deeply nested body the same way on every Python**: a JSON request body whose arrays and objects nest deeper than 200 levels, its own envelope included, is now refused before it is parsed, on every route that takes one, with a 422 `InvalidJSON` saying it is nested too deeply. On Python 3.14 whether the run routes refused such a body depended on the size of the thread's stack, so it could reach validation and fail as a `ValidationError` or be accepted, and the other routes answered it with a bare 400 rather than a problem document.
 - **The API image runs methods by address**: the image carries `git`, which fetching a method named by `method_ref` needs, where the `0.33.2` image removed it with the build tools and failed every such run.
 
 ## [v0.70.0] - 2026-09-29

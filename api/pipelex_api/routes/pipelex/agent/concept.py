@@ -8,9 +8,10 @@ from pipelex.builder.operations.concept_ops import concept_spec_to_toml, parse_c
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from pipelex_api.errors import raise_validation_error
+from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.limits import MAX_AGENT_SPEC_BYTES
 
-router = APIRouter(tags=["agent"])
+router = APIRouter(tags=["agent"], route_class=JsonBodyRoute)
 
 
 class BuildConceptRequest(BaseModel):
