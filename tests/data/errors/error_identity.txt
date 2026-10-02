@@ -143,6 +143,7 @@ InputStuffSpecsFactoryError | Input stuff specs factory | https://docs.pipelex.c
 Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/jinja2-context-error/
 Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
 Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/
+Jinja2TemplateBudgetError | Template render budget exceeded | https://docs.pipelex.com/latest/errors/jinja2-template-budget-error/
 Jinja2TemplateRenderError | Jinja 2 template render | https://docs.pipelex.com/latest/errors/jinja2-template-render-error/
 Jinja2TemplateSecurityError | Jinja 2 template security | https://docs.pipelex.com/latest/errors/jinja2-template-security-error/
 Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/

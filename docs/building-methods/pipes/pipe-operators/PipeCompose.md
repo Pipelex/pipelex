@@ -109,7 +109,7 @@ template = """
 """
 ```
 
-**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through. A bare URL becomes a link only when it has a scheme, such as `https://example.com`, so a file name like `README.md` stays text; a link written in Markdown, such as `[the guide](docs/guide.md)`, is a link whatever its target. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template.
+**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through. A bare URL becomes a link only when it has a scheme, such as `https://example.com`, so a file name like `README.md` stays text; a link written in Markdown, such as `[the guide](docs/guide.md)`, is a link whatever its target. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template. Converting Markdown is charged to the template's [render budget](../../../under-the-hood/template-sandbox.md#the-render-budget), so one render converts at most about 65,000 characters of it, each conversion counting.
 
 ## Construct Mode
 

@@ -13,7 +13,12 @@
 
 ### Fixed
 
+- **Markdown with unclosed emphasis is converted in memory proportional to its length**: the Markdown parser behind the `markdown` filter, the `Markdown` concept's HTML and the built-in PDF engine held memory growing with the square of the text when emphasis or strikethrough markers were left unmatched, about 1.5 GB for 64,000 characters of `**a `; it now joins the text they leave behind in one pass, and renders the same HTML.
 - **Routing profiles no longer rewrite their own routes**: matching a model merged the enabled `optional_routes` into the profile's declared `routes` in place, so after the first match a route declared optional had become an unconditional one in the loaded profile. Only the enablement checks each match repeats kept that from changing a routing decision.
+
+### Security
+
+- **Every template render spends from a budget (Breaking)**: a render is charged for what it reads, allocates and prints, and an operation that would overdraw its budget, such as `'x' * 10 ** 9`, a huge format width, `lipsum(n=10 ** 9)`, nested empty loops or a runaway recursive macro, is refused before it allocates and raises `Jinja2TemplateBudgetError`. Converting Markdown to HTML, with the `markdown` filter or by printing a Markdown value in an HTML template, is charged for every character and table cell of its source, so one render converts at most about 65,000 characters of Markdown. Template arithmetic stops at 64-bit integers, and a template can no longer call `str.encode` or `int.to_bytes`. A filter or test registered on a template environment needs a cost in the render budget's tables, or the first compile raises a `TypeError` naming it, and Pipelex now requires `jinja2` below 3.2.
 
 ## [v0.71.1] - 2026-10-01
 

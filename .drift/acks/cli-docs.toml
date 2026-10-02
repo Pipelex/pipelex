@@ -1,8 +1,8 @@
 contract = "cli-docs"
 digest = "sha256:9ba08b783d4a8cbd140a7e64af16b43ccc7987be97ea9ee0bcfe76d30da7fae2"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-02T16:17:24Z"
-rationale = "clean-pass: merging dev into the TypeSafe branch leaves one trigger change against dev's ack, the branch's own check-model --type help naming judgment, already reviewed on the branch; the agent CLI CLAUDE.md describes check-model by its options and output formats rather than its category vocabulary, and docs/tools/cli/update.md already lists 6_judgment_deck.toml among the managed deck files after the merge."
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-02T21:24:09Z"
+rationale = "clean-pass: merging dev into the judgment cogt branch leaves one trigger change against dev's ack, check-model's --type help naming judgment, which matches ModelCategory's members as pipelex/builder/operations/models_ops.py defines them; no page under docs/tools/cli/ enumerates check-model's categories, the agent CLI CLAUDE.md describes --type without listing them, and docs/tools/cli/update.md lists 6_judgment_deck.toml among the managed deck files."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
