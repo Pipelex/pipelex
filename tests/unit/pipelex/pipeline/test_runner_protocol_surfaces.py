@@ -98,6 +98,27 @@ class TestRunnerProtocolSurfaces:
         assert deck.waterfalls == {"llm": {"main_chain": ["smart_llm", "cheap_llm"]}, "extract": {}}
         list_models_mock.assert_called_once_with(categories=None)
 
+    async def test_models_skips_a_category_the_protocol_has_no_word_for(self, mocker: MockerFixture) -> None:
+        """A judgment preset must not take the whole deck down.
+
+        `judgment` is a category this runtime serves and the standard's flat model list cannot yet
+        name, so its presets are left out of `models` rather than raising on the enum; the routing
+        extensions, which are keyed by plain strings, still carry it. Delete this test once the
+        protocol's `ModelCategory` learns the member.
+        """
+        payload: dict[str, Any] = {
+            "presets": {"llm": [{"name": "smart_llm"}], "judgment": [{"name": "strict_verdict"}]},
+            "aliases": {"llm": {"best": "smart_llm"}, "judgment": {"default-judgment": "strict_verdict"}},
+            "waterfalls": {"llm": {}, "judgment": {}},
+        }
+        mocker.patch("pipelex.pipeline.runner.list_models", return_value=payload)
+        runner = PipelexMTHDSProtocol()
+
+        deck = await runner.models()
+
+        assert [(model_info.name, model_info.type) for model_info in deck.models] == [("smart_llm", MthdsModelCategory.LLM)]
+        assert deck.aliases["judgment"] == {"default-judgment": "strict_verdict"}
+
     async def test_models_category_filter_translates_to_builder_enum(self, mocker: MockerFixture) -> None:
         """A protocol-level category filter reaches list_models as the builder's enum."""
         llm_only_payload: dict[str, Any] = {

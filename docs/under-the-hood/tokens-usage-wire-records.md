@@ -20,12 +20,12 @@ One record per inference call, in completion order:
 
 | field | type | semantics |
 |---|---|---|
-| `model_type` | string | Kind of inference: known values `llm`, `img_gen`, `extract`, `search`. Open set. |
+| `model_type` | string | Kind of inference: known values `llm`, `img_gen`, `extract`, `search`, `judgment`. Open set. |
 | `inference_model_name` | string | Human model name (e.g. `gpt-4o`). |
 | `inference_model_id` | string | Provider/platform model id (e.g. `gpt-4o-2024-11-20`). |
 | `pipe_code` | string \| null | Pipe that made the call — per-pipe cost attribution. |
-| `job_category` | string \| null | Known values: `llm_job`, `img_gen_job`, `extract_job`, `search_job`, `jinja2_job`, `mock_job`. Open set. |
-| `unit_job_id` | string \| null | Known values: `llm_gen_text`, `llm_gen_object`, `img_gen_text_to_image`, `extract_pages`, `search_sourced_answer`, `search_structured`. Open set. |
+| `job_category` | string \| null | Known values: `llm_job`, `img_gen_job`, `extract_job`, `search_job`, `judgment_job`, `jinja2_job`, `mock_job`. Open set. |
+| `unit_job_id` | string \| null | Known values: `llm_gen_text`, `llm_gen_object`, `img_gen_text_to_image`, `extract_pages`, `search_sourced_answer`, `search_structured`, `judgment_answer`. Open set. |
 | `nb_tokens_by_category` | object&lt;string, int&gt; | Raw provider-reported token counts, keyed by `TokenCategory` values (`input`, `input_cached`, `output`, ...). Open set. `input` is the joined total; `input_cached` is a subset of it, not additive. |
 | `cost` | number \| null | Computed USD cost of this call. `null` when the model has no rate table (own-GPU, mock, dry-run). |
 | `started_at` | string \| null | ISO 8601. |

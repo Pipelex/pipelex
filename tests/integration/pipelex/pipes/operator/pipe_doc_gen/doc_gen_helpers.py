@@ -127,7 +127,7 @@ def make_doc_gen_backends(*, registrar: PluginRegistrar) -> dict[str, MakeWorker
         match family:
             case InferenceFamily.DOC_GEN:
                 backends[sdk] = make_worker
-            case InferenceFamily.LLM | InferenceFamily.IMG_GEN | InferenceFamily.EXTRACT | InferenceFamily.SEARCH:
+            case InferenceFamily.LLM | InferenceFamily.IMG_GEN | InferenceFamily.EXTRACT | InferenceFamily.SEARCH | InferenceFamily.JUDGMENT:
                 pass
     return backends
 

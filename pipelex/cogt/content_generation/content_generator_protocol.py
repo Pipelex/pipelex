@@ -2,7 +2,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, Protocol, TypeVar
 
-from pipelex.cogt.content_generation.assignment_models import SearchAssignment
+from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment, SearchAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
@@ -10,6 +10,7 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -164,3 +165,8 @@ class ContentGeneratorProtocol(Protocol):
         output_structure_class: type[BaseModelTypeVar],
         search_assignment: SearchAssignment,
     ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...
+
+    def make_judgment_answers(
+        self,
+        judgment_assignment: JudgmentAssignment,
+    ) -> Coroutine[Any, Any, dict[str, JudgmentAnswer]]: ...

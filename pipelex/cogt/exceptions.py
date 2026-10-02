@@ -358,6 +358,15 @@ class DocGenHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
+class JudgmentHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
+
+
 class ExtractOutputError(CogtError):
     pass
 
@@ -439,6 +448,18 @@ class SearchJobFailureError(CogtError):
 
 
 class SearchModelNotFoundError(ModelNotFoundError):
+    pass
+
+
+class JudgmentJobFailureError(CogtError):
+    pass
+
+
+class JudgmentAnswerMismatchError(CogtError):
+    """A judgment worker answered questions nobody asked, or answered one in the wrong shape."""
+
+
+class JudgmentModelNotFoundError(ModelNotFoundError):
     pass
 
 

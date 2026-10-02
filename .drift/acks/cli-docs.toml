@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:edfad164dcb9959a90b014f8779348db0d43a1caaa23efa75b3eea3503b6f3ab"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-30T16:40:04Z"
-rationale = "clean-pass: the main-output file copy now compares the names already in the results folder without case on every file system, which the CI failure on Linux exposed; docs/tools/cli/run.md already states the rule (a taken name gets a -1 suffix) and the agent CLI CLAUDE.md names none of this behaviour, so no doc change is needed."
+digest = "sha256:9ba08b783d4a8cbd140a7e64af16b43ccc7987be97ea9ee0bcfe76d30da7fae2"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-02T21:24:09Z"
+rationale = "clean-pass: merging dev into the judgment cogt branch leaves one trigger change against dev's ack, check-model's --type help naming judgment, which matches ModelCategory's members as pipelex/builder/operations/models_ops.py defines them; no page under docs/tools/cli/ enumerates check-model's categories, the agent CLI CLAUDE.md describes --type without listing them, and docs/tools/cli/update.md lists 6_judgment_deck.toml among the managed deck files."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -14,7 +14,7 @@ rationale = "clean-pass: the main-output file copy now compares the names alread
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:49b8bab889d8673e7d4f1d683efe0928e43914b9"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:30ecf4a3b1cb778864ed821a7b9918f62407a7f4"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:91589e517509248a4639a37e82f46a69538f8071"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:fbf29c499d8856f06736656ba17953457d04ca46"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"

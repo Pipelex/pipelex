@@ -15,6 +15,7 @@ from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
@@ -40,6 +41,8 @@ def _make_deck(
     img_gen_choice_default: ImgGenModelChoice = "img-gen-default-handle",
     search_presets: dict[str, SearchSetting] | None = None,
     search_choice_default: SearchModelChoice = "search-default-handle",
+    judgment_presets: dict[str, JudgmentSetting] | None = None,
+    judgment_choice_default: JudgmentModelChoice | None = None,
     llm_aliases: dict[str, str] | None = None,
     llm_waterfalls: dict[str, list[str]] | None = None,
 ) -> ModelDeck:
@@ -72,6 +75,11 @@ def _make_deck(
         search_waterfalls={},
         search_presets=search_presets or {},
         search_choice_default=search_choice_default,
+        # Judgment — its choice default is optional, so the deck's own absent default is the base case here
+        judgment_aliases={},
+        judgment_waterfalls={},
+        judgment_presets=judgment_presets or {},
+        judgment_choice_default=judgment_choice_default,
         model_deck_config=ModelDeckConfig(is_model_fallback_enabled=True, missing_presets_reaction=ProblemReaction.NONE),
     )
 
@@ -87,11 +95,12 @@ class TestCollectDeckReferencedHandles:
             (ExtractSetting(model="extract-model"), "extract-model"),
             (ImgGenSetting(model="img-gen-model"), "img-gen-model"),
             (SearchSetting(model="search-model"), "search-model"),
+            (JudgmentSetting(model="judgment-model"), "judgment-model"),
         ],
     )
     def test_extract_choice_handle(
         self,
-        choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | ModelReference | str | None,
+        choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | JudgmentSetting | ModelReference | str | None,
         expected: str | None,
     ) -> None:
         """_extract_choice_handle normalises every choice shape: None, raw str, ModelReference, typed setting."""
@@ -112,6 +121,8 @@ class TestCollectDeckReferencedHandles:
             img_gen_choice_default="img-gen-default-handle",
             search_presets={"web": SearchSetting(model="search-preset-web")},
             search_choice_default="search-default-handle",
+            judgment_presets={"verdict": JudgmentSetting(model="judgment-preset-verdict")},
+            judgment_choice_default="judgment-default-handle",
         )
 
         collected = _collect_deck_referenced_handles(deck)
@@ -127,6 +138,8 @@ class TestCollectDeckReferencedHandles:
             ("img-gen-default-handle", ModelType.IMG_GEN),
             ("search-preset-web", ModelType.SEARCH),
             ("search-default-handle", ModelType.SEARCH),
+            ("judgment-preset-verdict", ModelType.JUDGMENT),
+            ("judgment-default-handle", ModelType.JUDGMENT),
         }
 
     def test_aliases_and_waterfalls_are_not_enumerated_directly(self) -> None:
@@ -142,3 +155,16 @@ class TestCollectDeckReferencedHandles:
         assert "alias-target-handle" not in handles
         assert "my-waterfall" not in handles
         assert "waterfall-target-handle" not in handles
+
+    def test_an_absent_judgment_default_contributes_no_reference(self) -> None:
+        """The judgment family alone may have no choice default, and then it names no handle to check.
+
+        This is what keeps a deck with no judgment backend installed bootable: the gateway's
+        membership check walks exactly these references, and a default naming a model no enabled
+        backend serves would fail every boot, judgment or not.
+        """
+        deck = _make_deck(judgment_choice_default=None)
+
+        collected = _collect_deck_referenced_handles(deck)
+
+        assert not [pair for pair in collected if pair[1] == ModelType.JUDGMENT]

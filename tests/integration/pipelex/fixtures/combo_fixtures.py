@@ -33,6 +33,7 @@ from tests.integration.pipelex.fixtures.model_selection import (
     ModelCombo,
     get_extract_combos,
     get_img_gen_combos,
+    get_judgment_combos,
     get_llm_combos,
     get_search_combos,
 )
@@ -161,6 +162,21 @@ def search_combo(request: pytest.FixtureRequest):
 
     Yields:
         ModelCombo(handle, backend) for search.
+    """
+    combo: ModelCombo = request.param
+    monkeypatch, temp_dir = _setup_routing_for_backend(combo.backend)
+
+    yield combo
+
+    _cleanup_routing(monkeypatch, temp_dir)
+
+
+@pytest.fixture(scope="module", params=get_judgment_combos())
+def judgment_combo(request: pytest.FixtureRequest):
+    """Provides a valid ModelCombo(handle, backend) for judgment with routing configured.
+
+    Yields:
+        ModelCombo(handle, backend) for judgment.
     """
     combo: ModelCombo = request.param
     monkeypatch, temp_dir = _setup_routing_for_backend(combo.backend)

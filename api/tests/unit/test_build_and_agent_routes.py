@@ -5,6 +5,8 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from pipelex.builder.operations.models_ops import ModelCategory
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunOutput, DryRunStatus
@@ -161,7 +163,8 @@ class TestBuildAndAgentRoutes:
         # per-category payload caused in the SDK — F2) plus this implementation's routing
         # extensions, keyed by category (the same alias name exists in several categories —
         # a flat map would silently drop entries on collision). The old raw keys (`presets`
-        # by category, `success`) are gone.
+        # by category, `success`) are gone. The flat list speaks the protocol's categories only,
+        # while the extensions are keyed by every category this runtime serves, `judgment` included.
         client = _build_client()
         response = client.get("/v1/models")
         assert response.status_code == 200, response.text
@@ -170,7 +173,8 @@ class TestBuildAndAgentRoutes:
         first_model = body["models"][0]
         assert first_model["name"]
         assert first_model["type"]
-        valid_categories = {"llm", "extract", "img_gen", "search"}
+        assert {model["type"] for model in body["models"]} <= {category.value for category in MthdsModelCategory}
+        valid_categories = {category.value for category in ModelCategory}
         assert set(body["aliases"]) <= valid_categories
         assert all(isinstance(category_aliases, dict) for category_aliases in body["aliases"].values())
         assert set(body["waterfalls"]) <= valid_categories

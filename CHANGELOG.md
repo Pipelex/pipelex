@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A `judgment` inference family**: a new family beside `llm`, `img_gen`, `extract`, `search` and `doc_gen`, for models that answer a closed-form question over some material — yes or no, one option out of a declared set, or a position on a declared scale — and report how sure they are. The worker contract is batch-shaped (one state, a map of questions, a map of answers), every measure of uncertainty is optional so a backend that measures none can still serve the family honestly, and usage is reported as real input and output tokens priced per million. The deck gains a `[judgment]` section in a new managed file, `6_judgment_deck.toml`, which `pipelex update` installs, and a deck installed before it keeps loading with no judgment model; it ships with no `choice_default`, because no backend serves the family yet, so a judgment names its own model. `pipelex-agent models` lists the new category, and a `judgment` pytest marker joins the inference markers.
+
 ### Changed
 
 - **The method-app template and the SDK references link `Pipelex/pipelex-sdk`**: the SDKs and the method-app templates now live in the `Pipelex/pipelex-sdk` repository, so the README and the documentation's **Quick Start** link the method-app template to its `method-apps/` directory, the webapp's by-hand commands clone it and copy `method-apps/webapp-js/`, and the `@pipelex/sdk` and `pipelex-sdk` references point at its `js/docs/` and `python/docs/` directories.
