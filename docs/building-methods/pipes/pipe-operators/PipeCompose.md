@@ -40,7 +40,7 @@ A template reads data and calls methods of plain values, and nothing else: it ca
 | `output`        | string            | The concept for the output                                                  | Yes      |
 | `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
 
-Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 *Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
 

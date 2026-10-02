@@ -16,7 +16,7 @@ from pydantic.dataclasses import dataclass
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.jinja2.jinja2_scopes import ScopeBindings, attribute_chain, walk_template_reads
+from pipelex.tools.jinja2.jinja2_scopes import ScopeBindings, dotted_attribute_path, walk_template_reads
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -35,15 +35,6 @@ class VariableReference:
 
     path: str
     filters: list[str] = field(default_factory=list[str])
-
-
-def _dotted_path(node: nodes.Node) -> str | None:
-    """The dotted path of a pure attribute chain (`user.profile.name`), or None for any other shape."""
-    chain = attribute_chain(node)
-    if chain is None:
-        return None
-    name, attributes = chain
-    return ".".join([name, *attributes])
 
 
 def detect_jinja2_required_variables(
@@ -89,7 +80,7 @@ def detect_jinja2_required_variables(
         # Only the full path of an access chain is collected: `{{ foo.bar.baz }}` gives `foo.bar.baz`, not `foo.bar` or `foo`
         if not isinstance(node, (nodes.Name, nodes.Getattr)):
             return False
-        full_path = _dotted_path(node)
+        full_path = dotted_attribute_path(node)
         if full_path is None:
             # An attribute on a subscript, a call or a filter (`items[0].text`) reads the path its chain starts from
             return False
@@ -172,7 +163,7 @@ def detect_jinja2_variable_references(
             filters, base_node = [], node
         else:
             return False
-        full_path = _dotted_path(base_node) if base_node is not None else None
+        full_path = dotted_attribute_path(base_node) if base_node is not None else None
         if full_path is None or get_root_from_dotted_path(full_path) in bindings:
             return True
         if full_path in references:

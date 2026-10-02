@@ -6056,10 +6056,6 @@ rationale = "Transforms the value; single operand."
 param = "value"
 rationale = "Jinja filter: Jinja passes the filtered value positionally."
 
-["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._assign_target_names"]
-param = "target"
-rationale = "Noun-named derivation: the assigned names of the target node; single operand."
-
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._guard_vars"]
 param = "test_node"
 rationale = "Noun-named derivation: the guarded vars of the test node; single operand."
@@ -6083,10 +6079,6 @@ rationale = "Visitor: walks the test node; guard sets stay keyword."
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker.walk"]
 param = "node"
 rationale = "Visitor: walks the node; guard sets stay keyword."
-
-["pipelex/tools/jinja2/jinja2_optional_guards.py::_build_full_path"]
-param = "node"
-rationale = "Noun-named derivation: the full dotted path of the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_parsing.py::check_jinja2_parsing"]
 param = "template_source"
@@ -6128,10 +6120,6 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
-["pipelex/tools/jinja2/jinja2_required_variables.py::_dotted_path"]
-param = "node"
-rationale = "Noun-named derivation: the dotted path of the node; single operand."
-
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
@@ -6151,6 +6139,10 @@ rationale = "Reads the attribute chain of one Jinja node."
 ["pipelex/tools/jinja2/jinja2_scopes.py::definitely_assigned_names"]
 param = "statement"
 rationale = "Noun-named derivation: the names one statement binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::dotted_attribute_path"]
+param = "node"
+rationale = "Noun-named derivation: the dotted path of the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_scopes.py::frame_bound_names"]
 param = "statement"

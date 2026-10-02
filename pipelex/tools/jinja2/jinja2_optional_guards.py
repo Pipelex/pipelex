@@ -27,6 +27,7 @@ from pydantic.dataclasses import dataclass
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.jinja2_scopes import definitely_assigned_names, dotted_attribute_path, frame_bound_names
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -42,20 +43,14 @@ class UnguardedOptionalReference:
     path: str
 
 
-def _build_full_path(node: nodes.Node) -> str | None:
-    """Build the dotted path of a Name / Getattr chain, or None for unsupported shapes."""
-    if isinstance(node, nodes.Name):
-        return node.name
-    if isinstance(node, nodes.Getattr):
-        parent_path = _build_full_path(node.node)
-        if parent_path is not None:
-            return f"{parent_path}.{node.attr}"
-    return None
-
-
 class _GuardWalker:
     """Recursive AST walk tracking which optional variables are currently guarded and which
     names are locally declared (loop targets, macro params, `{% set %}` assignments).
+
+    Where a name is declared follows Jinja's scopes, from the rules `jinja2_scopes.py` states for
+    every template walker: after an `if`, only a name every branch sets is declared, so an optional
+    that only some branches rebind may still be read absent; and a loop, a macro, a call, filter or
+    set block and a `with` keep what they set to their own body.
     """
 
     def __init__(self, *, optional_variable_names: set[str]) -> None:
@@ -109,37 +104,28 @@ class _GuardWalker:
         self.walk(test_node, guarded=guarded, declared=declared)
 
     def _walk_body(self, body_nodes: list[nodes.Node], *, guarded: frozenset[str], declared: frozenset[str]) -> None:
-        """Walk a statement body sequentially: a `{% set %}` or `{% macro %}` declares its name
-        for SUBSEQUENT statements only — a read occurring before the assignment still refers to
-        the (possibly undefined) context value and must be classified against it.
+        """Walk a statement body sequentially: what a statement binds for certain (a `{% set %}`, a
+        `{% macro %}`, a name every branch of an `if` sets) is declared for SUBSEQUENT statements
+        only — a read occurring before the assignment still refers to the (possibly undefined)
+        context value and must be classified against it.
         """
         for body_node in body_nodes:
             if isinstance(body_node, nodes.Assign):
-                # The assignment's right-hand side is evaluated against the current scope.
+                # The assignment's right-hand side is evaluated against the current scope; the
+                # target is a store, never a read.
                 self.walk(body_node.node, guarded=guarded, declared=declared)
-                declared |= self._assign_target_names(body_node.target)
-                continue
-            if isinstance(body_node, nodes.AssignBlock):
-                # `{% set x %}...{% endset %}`: the body (and filter) evaluate against the
-                # current scope; the target declares for subsequent statements only — and the
-                # target itself is a store, never a read.
+            elif isinstance(body_node, nodes.AssignBlock):
+                # `{% set x %}...{% endset %}`: the body runs in a frame of its own, so what it sets
+                # stays in it; the target is a store, never a read.
                 self._walk_body(body_node.body, guarded=guarded, declared=declared)
                 if body_node.filter is not None:
                     self.walk(body_node.filter, guarded=guarded, declared=declared)
-                declared |= self._assign_target_names(body_node.target)
-                continue
-            if isinstance(body_node, nodes.Macro):
-                declared |= {body_node.name}
-            self.walk(body_node, guarded=guarded, declared=declared)
-
-    @classmethod
-    def _assign_target_names(cls, target: nodes.Node) -> frozenset[str]:
-        """The names a `{% set %}` target declares — a plain Name or a Tuple of Names."""
-        if isinstance(target, nodes.Name):
-            return frozenset({target.name})
-        if isinstance(target, nodes.Tuple):
-            return frozenset(item.name for item in target.items if isinstance(item, nodes.Name))
-        return frozenset()
+            else:
+                if isinstance(body_node, nodes.Macro):
+                    # A macro may call itself
+                    declared |= {body_node.name}
+                self.walk(body_node, guarded=guarded, declared=declared)
+            declared |= definitely_assigned_names(body_node)
 
     def walk(self, node: nodes.Node, *, guarded: frozenset[str], declared: frozenset[str]) -> None:
         if isinstance(node, nodes.Template):
@@ -158,13 +144,7 @@ class _GuardWalker:
         if isinstance(node, nodes.For):
             # The iterable is evaluated before the loop targets bind.
             self.walk(node.iter, guarded=guarded, declared=declared)
-            loop_declared: set[str] = {"loop"}
-            if isinstance(node.target, nodes.Name):
-                loop_declared.add(node.target.name)
-            elif isinstance(node.target, nodes.Tuple):
-                for item in node.target.items:
-                    if isinstance(item, nodes.Name):
-                        loop_declared.add(item.name)
+            loop_declared = frame_bound_names(node)
             if node.test is not None:
                 # The loop filter evaluates after the target binds per item, so a shadowing
                 # target stays a local while an optional read in the filter gets classified.
@@ -181,13 +161,24 @@ class _GuardWalker:
             # miscount the store-context Names as reads.
             for value in node.values:
                 self.walk(value, guarded=guarded, declared=declared)
-            with_declared = frozenset(target.name for target in node.targets if isinstance(target, nodes.Name))
-            self._walk_body(node.body, guarded=guarded, declared=declared | with_declared)
+            self._walk_body(node.body, guarded=guarded, declared=declared | frame_bound_names(node))
             return
 
-        if isinstance(node, nodes.Macro):
-            macro_declared = frozenset(arg.name for arg in node.args)
-            self._walk_body(node.body, guarded=guarded, declared=declared | macro_declared)
+        if isinstance(node, (nodes.Macro, nodes.CallBlock)):
+            if isinstance(node, nodes.CallBlock):
+                # The call is made from the enclosing scope; the block's body is the macro it passes as `caller`.
+                self.walk(node.call, guarded=guarded, declared=declared)
+            # The arguments are locals of the macro, and a default is evaluated where they are bound.
+            macro_declared = declared | frame_bound_names(node)
+            for default in node.defaults:
+                self.walk(default, guarded=guarded, declared=macro_declared)
+            self._walk_body(node.body, guarded=guarded, declared=macro_declared)
+            return
+
+        if isinstance(node, nodes.FilterBlock):
+            # The body runs in a frame of its own, so what it sets stays in it.
+            self._walk_body(node.body, guarded=guarded, declared=declared)
+            self.walk(node.filter, guarded=guarded, declared=declared)
             return
 
         if isinstance(node, nodes.CondExpr):
@@ -199,7 +190,7 @@ class _GuardWalker:
             return
 
         if isinstance(node, (nodes.Name, nodes.Getattr)):
-            full_path = _build_full_path(node)
+            full_path = dotted_attribute_path(node)
             if full_path is None:
                 # Not a plain Name/Getattr chain (e.g. an attribute on a subscript or call
                 # result): keep walking inward so inner references still get classified.

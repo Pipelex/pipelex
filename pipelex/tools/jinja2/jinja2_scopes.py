@@ -103,6 +103,15 @@ def attribute_chain(node: nodes.Node) -> tuple[str, list[str]] | None:
     return None
 
 
+def dotted_attribute_path(node: nodes.Node) -> str | None:
+    """The dotted path of a pure attribute chain (`user.profile.name`), or None for any other shape."""
+    chain = attribute_chain(node)
+    if chain is None:
+        return None
+    name, attributes = chain
+    return ".".join([name, *attributes])
+
+
 def resolve_bound_path(*, name: str, attributes: list[str], bindings: ScopeBindings) -> tuple[str, ...] | None:
     """The input path a chain reads, through the bindings: None when it starts from a name that cannot be followed."""
     if name not in bindings:

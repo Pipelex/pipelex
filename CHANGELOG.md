@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A name a template sets is read where Jinja binds it (Breaking)**: the input check of `PipeLLM`, `PipeCompose`, `PipeSearch`, `PipeImgGen` and `PipeDocGen`, `PipeDocGen`'s field check and the optional-input guard now treat a `{% set %}` name as the template's own inside the loop, macro or block that sets it and after an `{% if %}` every branch of which sets it, so a template setting a name in a loop body or in each branch of an `if` and reading it there is no longer refused as reading an undeclared input. A name only some branches set is still read from the input of that name. Newly refused: an input declared only so that such a set would load, which is now never read, a macro called before its `{% macro %}`, and an optional input read unguarded in a macro argument's default.
+
 ### Changed
 
 - **The method-app template and the SDK references link `Pipelex/pipelex-sdk`**: the SDKs and the method-app templates now live in the `Pipelex/pipelex-sdk` repository, so the README and the documentation's **Quick Start** link the method-app template to its `method-apps/` directory, the webapp's by-hand commands clone it and copy `method-apps/webapp-js/`, and the `@pipelex/sdk` and `pipelex-sdk` references point at its `js/docs/` and `python/docs/` directories.
