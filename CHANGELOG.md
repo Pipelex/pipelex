@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The method-app template and the SDK references link `Pipelex/pipelex-sdk`**: the SDKs and the method-app templates now live in the `Pipelex/pipelex-sdk` repository, so the README and the documentation's **Quick Start** link the method-app template to its `method-apps/` directory, the webapp's by-hand commands clone it and copy `method-apps/webapp-js/`, and the `@pipelex/sdk` and `pipelex-sdk` references point at its `js/docs/` and `python/docs/` directories.
+
 ## [v0.71.1] - 2026-10-01
 
 ### Fixed
