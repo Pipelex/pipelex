@@ -5,25 +5,23 @@ item: L-260919-9965d0
 
 # Judgment family — what is left, and in what order
 
-Phases 1 and 2 are built and reviewed, and the design was ratified on 2026-09-20, so nothing is waiting on a decision. Three things finish the campaign, and they are ordered: the branches land, the standard change merges, then phase 3 is written. `design.md` holds the contracts and the ratified decisions; `plan.md` is the tracker and carries phase 3's checklist; this file is the way back in.
+Phases 1 and 2 are built and reviewed, and the design was ratified on 2026-09-20, so nothing is waiting on a decision. Three things finish the campaign, and they are ordered: the last branch lands, the standard change merges, then phase 3 is written. `design.md` holds the contracts and the ratified decisions; `plan.md` is the tracker and carries phase 3's checklist; this file is the way back in.
 
 Re-derive where things stand rather than trusting a note: `gh pr list --repo Pipelex/pipelex`, `wt list`, and `ledger show <id>`.
 
-## 1. Land the stack, bottom up — `pipelex`
+## 1. Land #1216 — `pipelex`
 
-Three stacked pull requests, each targeting the one below it, with a worktree apiece:
+The bottom two pull requests of the stack have landed on `dev`: #1214 (phase 1, the spike, its findings and the campaign documents) as `fbe8dffa9`, and #1215 (phase 2a, the judgment family at the cogt level) as `9d54f072b`. Before #1215 landed, its deck file was renumbered `6_judgment_deck.toml`, so that it no longer shares the `5_` prefix with `5_doc_gen_deck.toml`. One pull request is left, and it now targets `dev`:
 
 | PR | Branch | Worktree | What it carries |
 | --- | --- | --- | --- |
-| #1214 | `feature/Judgment-family` | `_pipelex--judgment-family` | Phase 1: the spike, its findings, the campaign documents |
-| #1215 | `feature/Judgment-cogt-family` | `_pipelex--judgment-cogt-family` | Phase 2a: the judgment family at the cogt level |
 | #1216 | `feature/Typesafe-backend` | `_pipelex--typesafe-backend` | Phase 2b: the TypeSafe backend, and the ratification |
 
-Land them with `/ledger-land pipelex#<n> --merge`, which squashes into the base, reaps the worktree and reads the body's ledger lines. Between one landing and the next, GitHub moves the branch above onto `dev`; run `gh pr update-branch <n>` on it so CI runs against the real `dev` before it merges.
+Land it with `/ledger-land pipelex#1216 --merge`, which squashes it into `dev`, reaps the worktree and reads the body's ledger lines. If `dev` has moved since the branch last took it in, merge `origin/dev` into the branch first so CI runs against the real `dev`. Where that merge conflicts on a file #1215 also touched, the branch's side is dev's content plus the TypeSafe layer, so keep it and add only what `dev` has gained since.
 
-**Never rebase one of these branches.** A rebase rewrites its commits, the recorded `/rev` passes stop being ancestors of the head, and the merge gate then refuses the landing. Merging `dev` in is what `gh pr update-branch` does and is safe.
+**Never rebase this branch.** A rebase rewrites its commits, the recorded `/rev` passes stop being ancestors of the head, and the merge gate then refuses the landing. Merging `dev` in, by `git merge origin/dev` or `gh pr update-branch`, is safe.
 
-#1216 closes L-260919-502f36; the two below it advance the epic. Once #1216 is on `dev`, checkpoint 1's release condition is met — the `typesafe` extra is no longer published against an SDK nothing imports — and the changelog entry under `## [Unreleased]` announces the family and the backend together.
+#1214 closed L-260919-3aeab8 and advanced the epic, #1215 advanced L-260919-502f36, and #1216 closes it. Once #1216 is on `dev`, checkpoint 1's release condition is met — the `typesafe` extra is no longer published against an SDK nothing imports — and the changelog entries under `## [Unreleased]` announce the family and the backend together.
 
 ## 2. The standard change — `mthds`
 
