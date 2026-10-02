@@ -1,6 +1,6 @@
 # Input-Form Descriptor
 
-Every valid `validate` report carries, beside `pipe_io_contracts`, an **input-form descriptor** per pipe: an ordered list of field descriptors a renderer can turn into a fill-in form with no schema heuristics, no hardcoded concept tables, and no description matching. The wire contract is the MTHDS spec `docs/specs/mthds-input-form-descriptor.md` at the workspace root; this page documents Pipelex's reference derivation of it.
+Every valid `validate` report carries, beside `pipe_io_contracts`, an **input-form descriptor** per pipe: an ordered list of field descriptors a renderer can turn into a fill-in form with no schema heuristics, no hardcoded concept tables, and no description matching. The wire contract is the MTHDS standard's [Input-Form Descriptor specification](https://mthds.ai/latest/spec/input-form-descriptor/); this page documents Pipelex's reference derivation of it.
 
 The descriptor exists because the emitted `json_schema` is a *payload* contract, and the projection that produces it loses facts a form needs: which concept a node is, what it refines, whether `!` or plain was authored, a fixed `[N]` count, an authored default, a one-member choice list. The descriptor reports those facts from where they still exist — the authored blueprints — and leaves the payload shape to the schema. It is presentation; it never changes what a caller submits.
 
@@ -34,11 +34,11 @@ Kinds are decided by chain membership and declared types — never by sniffing a
 
 The crate the deriver reads is the current library's accumulated one, which holds the validated bundle and every `library_dirs` bundle loaded beside it — so a concept from a library dir, or a local concept refining one, follows the same rules as a local concept. A concept absent from that crate altogether is `unknown`.
 
-The table and rules above ARE the no-hint kind assignment — stated rules, not heuristics: with no applicable intent hint, a node's kind is exactly what they produce. An applicable authored `intent` (spec: MTHDS `intent-hints.md`) *feeds* that assignment, never competes with it: on a **text-valued** node — one whose site is a `text` field, a `native.Text`-chained or description-only concept, judged per item on plural sites — an effective `intent = "prose"` yields `kind: "prose"` and `intent = "label"` yields `kind: "text"`; an absent, unknown, or inapplicable intent leaves the no-hint kind untouched. On a **number-valued** node, `rating` and `quantity` never change `kind` (both are `number`; the union has no finer kind) — they ride the `hints` slot for the renderer to honor. A time-formatted `text` node is *not* a text-valued site, so no intent word applies to it (and `native.Html`, being an `object` node, never reaches the text-valued judgment at all).
+The table and rules above ARE the no-hint kind assignment — stated rules, not heuristics: with no applicable intent hint, a node's kind is exactly what they produce. An applicable authored `intent` (spec: MTHDS `intent-hints.md`) *feeds* that assignment, never competes with it: on a **text-valued** node — one whose site is a `text` field, a concept chained to `native.Text` or `native.Markdown`, or a description-only concept, judged per item on plural sites — an effective `intent = "prose"` yields `kind: "prose"` and `intent = "label"` yields `kind: "text"`; an absent, unknown, or inapplicable intent leaves the no-hint kind untouched. On a **number-valued** node, `rating` and `quantity` never change `kind` (both are `number`; the union has no finer kind) — they ride the `hints` slot for the renderer to honor. A time-formatted `text` node is *not* a text-valued site, so no intent word applies to it (and `native.Html`, being an `object` node, never reaches the text-valued judgment at all).
 
 | Native concept | Kind |
 |---|---|
-| `Text` | `prose` |
+| `Text`, `Markdown` | `prose` |
 | `Number` | `number` with `integer: false` |
 | `YesNo` | `boolean` |
 | `Time` | `text` with `format: "time"` |

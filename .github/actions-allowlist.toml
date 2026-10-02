@@ -1,0 +1,46 @@
+# The GitHub Actions policy of the Pipelex organization, mirrored for `make check-actions-allowlist`.
+#
+# GitHub refuses a whole workflow at startup when one of its `uses:` references is not allowed, and
+# the release workflows never run on a pull request, so a disallowed action there surfaces only when
+# a release is cut. The guard reads this file and refuses any reference the policy would refuse; the
+# specification is docs/contribute/actions-allowlist.md.
+#
+# The policy itself lives on GitHub, under the organization's Actions settings, and is enforced by
+# the enterprise. This file only mirrors it: when the policy changes, change this file to match what
+# `gh api orgs/Pipelex/actions/permissions/selected-actions` prints, keeping the patterns verbatim.
+
+# Actions created by GitHub, those of the `actions` and `github` owners.
+github_owned_allowed = true
+
+# Organizations the enterprise owns, whose actions the policy allows without a pattern.
+enterprise_owners = ["Pipelex"]
+
+# The policy's `patterns_allowed`, verbatim and in the order GitHub prints them.
+patterns_allowed = [
+  "Swatinem/rust-cache@*",
+  "PyO3/maturin-action@*",
+  "pypa/gh-action-pypi-publish@*",
+  "peaceiris/actions-gh-pages@*",
+  "sigstore/gh-action-sigstore-python@v3.0.0",
+  "contributor-assistant/github-action@v2.6.1",
+  "astral-sh/setup-uv@v3",
+  "softprops/action-gh-release@v2",
+  "astral-sh/setup-uv@v5",
+  "anthropics/claude-code-action@v1",
+  "oven-sh/setup-bun@*",
+  "aws-actions/configure-aws-credentials@v4",
+  "docker/setup-buildx-action@v3",
+  "dorny/paths-filter@v3",
+  "hashicorp/setup-terraform@v3",
+  "astral-sh/setup-uv@v4",
+  "astral-sh/setup-uv@*",
+  "dtolnay/rust-toolchain@*",
+  "terraform-linters/setup-tflint@v4",
+  "sigstore/gh-action-sigstore-python@f514d46b907ebcd5bedc05145c03b69c1edd8b46",
+  "pnpm/action-setup@v4",
+  "aws-actions/amazon-ecr-login@v2",
+  "docker/setup-qemu-action@v3",
+  "docker/build-push-action@v6",
+  "sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9",
+  "softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228",
+]

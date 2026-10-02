@@ -255,11 +255,10 @@ class TestOpenAIResponsesWorkerObjectErrorHandling:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.sdk_exception_type == "ValueError"
 
-    async def test_real_instructor_propagates_transport_error_raw(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library (Responses adapter) with an SDK transport
-        exception and verify the W2.3 behavior — instructor, confined to schema re-ask, does NOT
-        retry the transport error and does NOT wrap it in ``InstructorRetryException``. It
-        propagates raw, and the worker classifies it as TRANSIENT with provider metadata.
+    async def test_real_instructor_transport_error_is_unwrapped(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library with an SDK transport exception, through the Responses adapter, and verify
+        that instructor, confined to schema re-ask, does not retry it: it raises an ``InstructorRetryException``
+        from it after the one attempt, which the worker unwraps to classify the SDK exception as TRANSIENT.
         """
         import instructor  # ruff: ignore[import-outside-top-level]  # imported here to mirror runtime usage
 
@@ -280,8 +279,10 @@ class TestOpenAIResponsesWorkerObjectErrorHandling:
         assert metadata is not None
         assert metadata.provider == "openai"
         assert metadata.status_code == 429
-        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
-        assert exc_info.value.__cause__ is sdk_exc
+        # instructor raises its InstructorRetryException from the SDK exception, which it did not retry
+        wrapper_exc = exc_info.value.__cause__
+        assert wrapper_exc is not None
+        assert wrapper_exc.__cause__ is sdk_exc
 
     @pytest.mark.parametrize(
         ("sdk_exc", "expected_category"),
@@ -297,9 +298,9 @@ class TestOpenAIResponsesWorkerObjectErrorHandling:
         sdk_exc: Exception,
         expected_category: InferenceErrorCategory,
     ) -> None:
-        """W2.3 regression: now that ``instructor`` no longer retries transport errors, a raw SDK
-        transport exception is the primary path out of ``create_with_completion`` — it must be
-        classified into the right category, never flattened to ``UNKNOWN``, never escape unhandled.
+        """W2.3 regression: a raw SDK transport exception reaching the worker unwrapped, as it would if
+        ``instructor`` stopped wrapping the exception that ends its loop, must be classified into the
+        right category, never flattened to ``UNKNOWN``, never escape unhandled.
         """
         worker = _make_worker(mocker)
         worker.instructor_for_objects.responses.create_with_completion.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]

@@ -7,7 +7,9 @@ are called with plain ``httpx`` rather than through a vendor SDK wrapped around 
 **Building the request by hand is what makes the wire readable.** Two properties of the manifold
 dialect live in this one method and can be asserted in a test that reads the request it built: the
 only header about us is the service token, and the body carries the model with nothing about
-routing. A client whose constructor defaults decide the headers cannot say that.
+routing. A client whose constructor defaults decide the headers cannot say that. The one other
+header is `x-pipelex-metadata`, which says whose call it is rather than anything about us; it
+differs per job, so the caller hands the job's metadata to each call rather than to the client.
 """
 
 from __future__ import annotations
@@ -23,11 +25,13 @@ from pipelex.cogt.inference.transport_retry import request_with_transport_retry
 from pipelex.config import get_config
 from pipelex.providers.manifold.manifold_exceptions import ManifoldError
 from pipelex.providers.manifold.manifold_factory import ManifoldFactory
+from pipelex.providers.manifold.manifold_metadata import make_manifold_metadata_headers
 
 if TYPE_CHECKING:
     from pipelex.cogt.inference.error_render import InferenceErrorFamily
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+    from pipelex.system.job_metadata import JobMetadata
 
 # Generous, and deliberately so: a deep web search or a many-page extraction is a slow call, and the
 # runtime's own job-level timeouts are the ones that should bound it. Matches the SDK-less image
@@ -49,14 +53,20 @@ class ManifoldNativeClient:
         body: dict[str, Any],
         family: InferenceErrorFamily,
         inference_model: InferenceModelSpec,
+        job_metadata: JobMetadata,
     ) -> dict[str, Any]:
         url = f"{self.base_url}{route}"
+        headers = {
+            **self.auth_headers,
+            **make_manifold_metadata_headers(job_metadata=job_metadata),
+            "Content-Type": "application/json",
+        }
 
         async def _send() -> httpx.Response:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     url,
-                    headers={**self.auth_headers, "Content-Type": "application/json"},
+                    headers=headers,
                     json=body,
                     timeout=MANIFOLD_NATIVE_TIMEOUT_SECONDS,
                 )

@@ -1,12 +1,42 @@
+import re
+from contextlib import AbstractContextManager
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from pipelex.system.storage_scope import validate_storage_scope
+from pipelex.system.run_extras import validate_run_extras
+from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.log.log_context import LogContext, bind_log_context
+
+REQUEST_ID_MAX_LENGTH = 128
+REQUEST_ID_PATTERN = re.compile(r"[\x20-\x7E]+")
+
+
+def validate_request_id(*, value: str) -> str:
+    """Return `value` if it is a usable inbound request id, else raise `ValueError`.
+
+    The one statement of the constraint, which `RunMetadata` applies at construction and a
+    host entry point applies before it builds a run, so both refuse exactly the same values.
+
+    Raises:
+        ValueError: the value is empty, longer than `REQUEST_ID_MAX_LENGTH`, or holds a
+            character outside printable ASCII.
+    """
+    if len(value) > REQUEST_ID_MAX_LENGTH:
+        msg = f"Invalid request_id: it has {len(value)} characters, and at most {REQUEST_ID_MAX_LENGTH} are allowed."
+        raise ValueError(msg)
+    # `fullmatch`, not `match` with a trailing `$`, which would admit one final newline.
+    if not REQUEST_ID_PATTERN.fullmatch(value):
+        msg = (
+            f"Invalid request_id {value!r}: expected one or more printable ASCII characters. "
+            "The value is quoted into log lines and error reports, so a control character in it would forge one."
+        )
+        raise ValueError(msg)
+    return value
 
 
 class SpecialPipelineId(StrEnum):
@@ -55,9 +85,9 @@ class UnitJobId(StrEnum):
 
 
 class RunMetadata(BaseModel):
-    """Who is running, which run it is, and where its bytes go.
+    """Who is running, which run it is, where its bytes go, and what it belongs to.
 
-    **The four facts that are constant for a whole run**, split out from
+    **The facts that are constant for a whole run**, split out from
     :class:`JobMetadata` — which mixes them with per-job facts that change at
     every step (``pipe_code``, ``pipe_run_id``, ``otel_context``,
     ``content_generation_job_id``). Grouping them says which is which: a copy
@@ -69,7 +99,29 @@ class RunMetadata(BaseModel):
     ``JobMetadata`` it was produced under, so a transport that offloads an
     oversized result to storage can key it inside the run's own namespace
     instead of at the root of a bucket.
+
+    **Frozen**, so the field validators below are the last word on every value
+    here rather than a check at construction that a later assignment undoes.
+    Nothing ever needed to reassign one — these are the facts that are constant
+    for a whole run, which is the definition this class exists to draw — and
+    since telemetry began forwarding ``extras`` to a backend and
+    composing ``storage_scope`` into storage keys, "validated at construction"
+    has to mean "validated, full stop".
+
+    **What the freeze does not close**, named here so nobody mistakes any of it
+    for closed. Freezing refuses a REASSIGNMENT and nothing else, so an in-place
+    edit of the mapping (``run_metadata.extras[k] = v``) still reaches
+    a backend unvalidated, and pydantic's two deliberate bypasses —
+    ``model_copy(update=...)`` and ``model_construct`` — still build an instance
+    without running a validator. The runtime does none of the three, and a
+    future consumer must not start: ``copy_with_update`` only ever carries
+    already-validated values forward, and a value that arrives from request data
+    is constructed here or not at all. Closing them properly means re-validating
+    at the point of use, which would put a raise inside a span site, where
+    telemetry must never break the app.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     user_id: str
     pipeline_run_id: str
@@ -87,6 +139,20 @@ class RunMetadata(BaseModel):
     # `DRY_RUN_STORAGE_SCOPE`.
     storage_scope: str
 
+    # The prefix every storage key this run reads must lie under, and the
+    # statement that it reads nothing from the local disk. Opaque like the
+    # storage scope, which must lie under it, and supplied by the host — see
+    # `pipelex.system.storage_scope` for why it is not derived from the storage
+    # scope, and `pipelex.tools.uri.uri_read_scope` for the check.
+    #
+    # REQUIRED, with no default, for the storage scope's reason: a default on a
+    # tenancy field is how a missing value becomes a present-looking one. Here
+    # the present-looking value would be `None`, which reads everything, so a
+    # host that forgot the field would open every key without a word. `None` is
+    # the explicit statement that the run is unscoped: a local run, or a server
+    # with a single tenant.
+    read_scope: str | None
+
     # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
     # HTTP request enters Pipelex). Rides here so it crosses the Temporal
     # serialization boundary — every activity / workflow can correlate logs and
@@ -94,10 +160,25 @@ class RunMetadata(BaseModel):
     # from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
     # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
     # both can appear together when the API surfaces a provider failure.
-    # Constrained at the wire-format boundary (printable ASCII only, max 128
-    # chars) so an unsanitized upstream value cannot inject newlines or control
-    # characters into the log lines or ``ErrorReport`` envelopes that quote it.
-    request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
+    # Constrained at the wire-format boundary by `validate_request_id` (printable
+    # ASCII only, max 128 chars) so an unsanitized upstream value cannot inject
+    # newlines or control characters into the log lines or ``ErrorReport``
+    # envelopes that quote it.
+    request_id: str | None = None
+
+    # The opaque labels the host attaches to this run. Never read by name;
+    # telemetry forwards the whole mapping as the groups of each capture, and
+    # the Manifold dialect forwards it in its `x-pipelex-metadata` header
+    # — see `pipelex.system.run_extras` for why the host's own concepts
+    # (organization, tenant, plan tier) deliberately do not cross this boundary,
+    # and for the charset and the size bound.
+    #
+    # It DEFAULTS, unlike `user_id` and `storage_scope` above, and the asymmetry
+    # is the point: those two refuse to default because a missing identity once
+    # became a present-looking one and a shared storage prefix. An absent label
+    # creates no namespace and misattributes nothing — it only leaves the group
+    # facet empty — so a caller with no labels to send says nothing.
+    extras: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("storage_scope")
     @classmethod
@@ -113,6 +194,50 @@ class RunMetadata(BaseModel):
         request data after this point.
         """
         return validate_storage_scope(value=value)
+
+    @field_validator("read_scope")
+    @classmethod
+    def _validate_read_scope(cls, value: str | None) -> str | None:
+        """Refuse a read scope that is not a path-safe prefix, at construction."""
+        if value is None:
+            return None
+        return validate_read_scope(value=value)
+
+    @model_validator(mode="after")
+    def _validate_storage_scope_within_read_scope(self) -> Self:
+        """Refuse a run that could not read what it writes, at construction rather than at its first read."""
+        validate_storage_scope_within_read_scope(storage_scope=self.storage_scope, read_scope=self.read_scope)
+        return self
+
+    @field_validator("request_id")
+    @classmethod
+    def _validate_request_id(cls, value: str | None) -> str | None:
+        """Refuse a request id that would forge a log line, at construction."""
+        if value is None:
+            return None
+        return validate_request_id(value=value)
+
+    @field_validator("extras")
+    @classmethod
+    def _validate_run_extras(cls, value: dict[str, str]) -> dict[str, str]:
+        """Refuse a mapping the runtime could not safely forward, at construction.
+
+        On the TYPE for the same reason as `storage_scope`: the value is caller
+        data that ends up quoted into log lines and handed to a telemetry
+        backend, so a newline in it forges a log line and an unbounded mapping
+        is an unbounded capture payload. Validating here means a mapping that
+        ARRIVED through construction is safe, which is the case that matters:
+        every mapping crossing the wire or a call site is built here.
+
+        The guarantee stops at construction, and deliberately so. The model is
+        frozen, so reassigning the field raises — but freezing does not reach
+        inside the mapping, and mutating it in place
+        (`run_metadata.extras[k] = v`) still bypasses this validator.
+        See the class docstring for that hole and for pydantic's two others.
+        Nothing in the runtime mutates the mapping after construction; a future
+        consumer that forwards it must not start.
+        """
+        return validate_run_extras(value=value)
 
 
 class JobMetadata(BaseModel):
@@ -153,6 +278,22 @@ class JobMetadata(BaseModel):
         if self.started_at is not None and self.completed_at is not None:
             return (self.completed_at - self.started_at).total_seconds()
         return None
+
+    def log_context(self) -> AbstractContextManager[LogContext]:
+        """Bind this job's identifiers onto every record emitted inside the block.
+
+        The one spelling of the binding: ``request_id`` and ``pipeline_run_id`` from the run half,
+        ``pipe_run_id`` from the job half. It merges over whatever is already bound, so an identifier
+        this metadata does not carry (a submission's ``pipe_run_id``, a run with no ``request_id``)
+        inherits the enclosing binding rather than clearing it, and the previous binding comes back
+        when the block exits. ``PipeRun.run`` binds a direct-mode run through it, and every kernel
+        function that takes a ``job_metadata`` binds its step through it.
+        """
+        return bind_log_context(
+            request_id=self.run_metadata.request_id,
+            pipeline_run_id=self.run_metadata.pipeline_run_id,
+            pipe_run_id=self.pipe_run_id,
+        )
 
     def copy_with_update(
         self,

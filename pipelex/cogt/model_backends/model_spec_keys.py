@@ -26,8 +26,8 @@ not become "whatever this version of h11 does".
 This module is deliberately pure and deliberately silent. It runs on the success path of every backend
 load, including loads that precede `runtime_hub.set_config()`, so a `log` call here would turn a data
 transform into a boot-order dependency. It also does not decide what a rejected key *means*: only the
-caller knows whether the table came from a local file (where a rejected key is the author's typo, and
-fatal) or from the served gateway config (where it is version skew, and pruned).
+caller knows whether the table came from a local file or a plugin (where a rejected key is the author's
+typo, and fatal) or from the served gateway config (where it is version skew, and pruned).
 """
 
 import re
@@ -49,6 +49,8 @@ class ModelSpecSource(StrEnum):
 
     LOCAL_FILE = "local_file"
     REMOTE_GATEWAY = "remote_gateway"
+    PLUGIN = "plugin"
+    """A table a plugin declared with `add_internal_model`, merged into the internal backend at boot."""
 
 
 class ModelSpecKeyRejection(StrEnum):

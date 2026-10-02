@@ -1,5 +1,5 @@
 # pyright: reportImportCycles=false
-from typing import Any, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, cast, get_args, get_origin
 
 from kajson import kajson
 from mthds.protocol.stuff import StuffAbstract
@@ -15,6 +15,7 @@ from pipelex.core.stuffs.exceptions import StuffContentTypeError, StuffContentVa
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
@@ -22,9 +23,12 @@ from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
-from pipelex.tools.misc.pretty import PrettyPrintable, PrettyRenderable
+from pipelex.tools.misc.pretty import PrettyRenderable
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffContent]):
@@ -245,12 +249,17 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
         return self.content_as(content_type=HtmlContent)
 
     @property
+    def as_markdown(self) -> MarkdownContent:
+        """Get content as MarkdownContent if applicable."""
+        return self.content_as(content_type=MarkdownContent)
+
+    @property
     def as_mermaid(self) -> MermaidContent:
         """Get content as MermaidContent if applicable."""
         return self.content_as(MermaidContent)
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
         """Render stuff for pretty printing.
 
         Args:

@@ -1,23 +1,15 @@
 from __future__ import annotations
 
-import sys
+import re
 from enum import StrEnum
 from typing import cast
 
 from pydantic import Field, field_validator
-from rich.console import Console
-from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
-from rich.logging import RichHandler
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.misc.pretty import PrettyPrintMode
-
-
-class LogMode(StrEnum):
-    RICH = "rich"
-    POOR = "poor"
 
 
 class HighlighterName(StrEnum):
@@ -58,6 +50,8 @@ class CallerInfoTemplate(StrEnum):
 
 
 class RichLogConfig(ConfigModel):
+    """The settings of the ``console`` sink's Rich handler. Read by the sink; this module imports no Rich."""
+
     is_show_time: bool
     is_show_level: bool
     is_link_path_enabled: bool
@@ -69,48 +63,85 @@ class RichLogConfig(ConfigModel):
     tracebacks_suppress: list[str]
     keywords_to_hilight: list[str]
 
-    def make_rich_handler(self, target: ConsoleTarget) -> RichHandler:
-        match target:
-            case ConsoleTarget.STDOUT:
-                console = Console(file=sys.stdout)
-            case ConsoleTarget.STDERR:
-                console = Console(file=sys.stderr)
-            # case ConsoleTarget.FILE:
-            #     console = Console(file=target.file_path)
-            case _:
-                msg = f"Invalid console target: {target}"
-                raise ValueError(msg)
-        highlighter: Highlighter
-        match self.highlighter_name:
-            case HighlighterName.JSON:
-                highlighter = JSONHighlighter()
-            case HighlighterName.REPR:
-                highlighter = ReprHighlighter()
 
-        return RichHandler(
-            console=console,
-            show_time=self.is_show_time,
-            show_level=self.is_show_level,
-            enable_link_path=self.is_link_path_enabled,
-            highlighter=highlighter,
-            markup=self.is_markup_enabled,
-            rich_tracebacks=self.is_rich_tracebacks,
-            tracebacks_word_wrap=self.is_tracebacks_word_wrap,
-            tracebacks_show_locals=self.is_tracebacks_show_locals,
-            tracebacks_suppress=self.tracebacks_suppress,
-            keywords=self.keywords_to_hilight,
-        )
+class OtlpLogSinkConfig(ConfigModel):
+    """The settings of the ``otlp`` sink.
+
+    An absent ``endpoint`` leaves the exporter to the OpenTelemetry environment conventions:
+    ``OTEL_EXPORTER_OTLP_LOGS_ENDPOINT``, then ``OTEL_EXPORTER_OTLP_ENDPOINT`` with the ``/v1/logs``
+    path, then the collector default on localhost. Empty ``headers`` likewise leave
+    ``OTEL_EXPORTER_OTLP_HEADERS`` in charge.
+    """
+
+    endpoint: str | None = None
+    headers: dict[str, str]
+
+
+class GcpLogSinkConfig(ConfigModel):
+    """The settings of the ``gcp`` sink.
+
+    ``log_name`` is the Cloud Logging log the entries land under. An absent ``project_id`` leaves the
+    project to the client library, which reads it from the credentials or from the metadata server of
+    the machine the process runs on. An absent ``credentials_file_path`` leaves authentication to
+    Application Default Credentials, which is what a process already running on Google Cloud has; a
+    path names a service-account JSON file to build the client from instead.
+
+    The path is a plain config value rather than a secret id resolved through the secrets provider,
+    because the log sink is the first capability boot resolves — ahead of the secrets provider, so
+    that every later line of the boot goes through the sink the configuration chose — and there is no
+    provider on the hub to ask at the moment this section is read.
+    """
+
+    log_name: str
+    project_id: str | None = None
+    credentials_file_path: str | None = None
+
+
+class LogRedactionConfig(ConfigModel):
+    """What the redaction processor removes from a record before any sink renders it.
+
+    ``is_enabled`` turns the processor off for a process that redacts downstream, or one whose records
+    must be reproduced exactly as the call made them. ``extra_patterns`` are regular expressions a
+    deployment adds to the shipped families, for the secret shapes only it knows: every match is
+    replaced by the redaction text. A pattern the ``re`` module refuses is a configuration error named
+    at load rather than a boot that dies later on a regex nobody can see, and so is one that matches the
+    empty string, which is a typo away from any quantifier and destroys every line the process writes.
+    """
+
+    is_enabled: bool
+    extra_patterns: list[str]
+
+    @field_validator("extra_patterns")
+    @classmethod
+    def validate_extra_patterns(cls, value: list[str]) -> list[str]:
+        for pattern in value:
+            try:
+                compiled = re.compile(pattern)
+            except re.error as exc:
+                msg = f"extra_patterns under [runtime.log.redaction] holds a regular expression the re module refuses: '{pattern}' ({exc})"
+                raise ValueError(msg) from exc
+            if compiled.match("") is not None:
+                # ``x*`` for ``x+`` is the whole of it: a pattern that matches nothing matches at every
+                # position, so the substitution writes the redaction text between every two characters
+                # of every message and every field value, for the life of the process. Named here, where
+                # the pattern is still in front of whoever typed it.
+                msg = (
+                    f"extra_patterns under [runtime.log.redaction] holds a regular expression that matches the empty string: '{pattern}'. "
+                    "It would match at every position of every log line and replace the whole of it with the redaction text. "
+                    "A quantifier that admits zero repetitions is the usual cause: write '+' where you wrote '*'."
+                )
+                raise ValueError(msg)
+        return value
 
 
 class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
     package_log_levels: dict[str, LogLevel]
-    log_mode: LogMode = Field(strict=False)
+    # The registered log-sink token boot selects: an open string, validated at the registry lookup.
+    sink: str
     pretty_print_mode: PrettyPrintMode = Field(strict=False)
     console_log_target: ConsoleTarget = Field(strict=False)
     console_print_target: ConsoleTarget = Field(strict=False)
-
-    is_console_logging_enabled: bool
 
     json_logs_indent: int
     presentation_line_width: int
@@ -119,11 +150,10 @@ class LogConfig(ConfigModel):
 
     silenced_problem_ids: list[str]
 
+    redaction: LogRedactionConfig
     rich_log: RichLogConfig
-
-    # logger name to use for safe logging without fancy features like code filepath and stuff
-    generic_poor_logger: str
-    poor_loggers: list[str]
+    otlp: OtlpLogSinkConfig
+    gcp: GcpLogSinkConfig
 
     @field_validator("package_log_levels", mode="before")
     @classmethod

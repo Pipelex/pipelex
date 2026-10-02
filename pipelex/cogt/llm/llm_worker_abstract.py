@@ -16,20 +16,22 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedCons
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.system.exceptions import JobMetadataError
 from pipelex.system.job_metadata import UnitJobId
+from pipelex.system.telemetry.current_span import pipelex_span_active
 from pipelex.system.telemetry.otel_constants import (
     GenAISpanAttr,
     LangfuseSpanAttr,
+    OTelAttributeValue,
     PipelexSpanAttr,
     SpanCategory,
     make_otel_gen_ai_output_type,
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
-    from opentelemetry.util.types import AttributeValue
     from pydantic import BaseModel
 
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -118,7 +120,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if not pipe_code:
             msg = "pipe_code is required for LLM span"
             raise JobMetadataError(msg)
-        pipeline_run_id = job_metadata.run_metadata.pipeline_run_id
+        run_metadata = job_metadata.run_metadata
+        pipeline_run_id = run_metadata.pipeline_run_id
 
         # Build output description for span name (full values - exporter handles redaction)
         output_desc: str
@@ -138,7 +141,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Build all span attributes with FULL (non-redacted) values
         # PostHog exporters will apply redaction based on their TelemetryRedactionConfig
-        span_attributes: dict[str, AttributeValue] = {
+        span_attributes: dict[str, OTelAttributeValue] = {
             # GenAI standard attributes
             GenAISpanAttr.OPERATION_NAME: unit_job_id,
             GenAISpanAttr.OUTPUT_TYPE: make_otel_gen_ai_output_type(output_type=output_type).value,
@@ -158,7 +161,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if output_class_name:
             span_attributes[PipelexSpanAttr.OUTPUT_CLASS_NAME] = output_class_name
 
-        if TelemetryManagerAbstract.get_langfuse_enabled():
+        # The run's own identity, so a generation lands on the caller who asked for it
+        # rather than on the process that served it.
+        is_langfuse_enabled = TelemetryManagerAbstract.get_langfuse_enabled()
+        span_attributes.update(make_run_identity_span_attributes(run_metadata=run_metadata, is_langfuse_enabled=is_langfuse_enabled))
+
+        if is_langfuse_enabled:
             span_attributes[LangfuseSpanAttr.TRACE_NAME] = otel_context.trace_name
             span_attributes[LangfuseSpanAttr.RELEASE] = get_package_version()
         if job_params.max_tokens:
@@ -196,7 +204,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         messages_json = OtelFactory.stringify_json(json_conent=messages)
         span_attributes[GenAISpanAttr.PROMPT_CONTENT] = messages_json
-        if TelemetryManagerAbstract.get_langfuse_enabled():
+        if is_langfuse_enabled:
             span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = messages_json
 
         # Use trace_id and span_id from otel_context (precomputed)
@@ -219,17 +227,22 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             context=parent_ctx,
             attributes=span_attributes,
         )
+        # A tracer that records nothing, the no-op tracer `OTEL_SDK_DISABLED` hands out for one, gives back the
+        # parent it was handed rather than a span of its own; that is no span, exactly as with no tracer.
+        if span.get_span_context() == parent_span_context:
+            return None
 
-        # Debug logging
+        # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
         span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] LLM SPAN STARTED:\n"
-            f"  pipe_code='{pipe_code}'\n"
-            f"  pipeline_run_id='{pipeline_run_id}'\n"
-            f"  trace_id={span_ctx.trace_id:032x}\n"
-            f"  span_id={span_ctx.span_id:016x}\n"
-            f"  parent_span_id={parent_span_id:016x}"
-        )
+        with pipelex_span_active(span=span):
+            log.verbose(
+                f"[OTel] LLM SPAN STARTED:\n"
+                f"  pipe_code='{pipe_code}'\n"
+                f"  pipeline_run_id='{pipeline_run_id}'\n"
+                f"  trace_id={span_ctx.trace_id:032x}\n"
+                f"  span_id={span_ctx.span_id:016x}\n"
+                f"  parent_span_id={parent_span_id:016x}"
+            )
 
         return span
 
@@ -455,20 +468,24 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.TEXT)
 
-        try:
-            text_result = await self._gen_text(llm_job=llm_job)
-            await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
-            return text_result
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
-            raise
-        finally:
-            # `_gen_text` / `_after_text_job` raised before the span was ended — close it with the
-            # in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
-            # failure stays in telemetry. On success `_after_text_job` already ended the span.
-            pending_error = sys.exc_info()[1]
-            if pending_error is not None and span is not None and span.is_recording():
-                self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
+        # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
+        # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
+        # context is left alone, and it is what the line's standard trace fields name.
+        with pipelex_span_active(span=span):
+            try:
+                text_result = await self._gen_text(llm_job=llm_job)
+                await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
+                return text_result
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
+                raise
+            finally:
+                # `_gen_text` / `_after_text_job` raised before the span was ended — close it with the
+                # in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
+                # failure stays in telemetry. On success `_after_text_job` already ended the span.
+                pending_error = sys.exc_info()[1]
+                if pending_error is not None and span is not None and span.is_recording():
+                    self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
 
     @abstractmethod
     async def _gen_text(
@@ -494,25 +511,29 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.OBJECT, output_class_name=schema.__name__)
 
-        try:
-            object_result = await self._gen_object(llm_job=llm_job, schema=schema)
+        # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
+        # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
+        # context is left alone, and it is what the line's standard trace fields name.
+        with pipelex_span_active(span=span):
+            try:
+                object_result = await self._gen_object(llm_job=llm_job, schema=schema)
 
-            # Cleanup result
-            if hasattr(object_result, "_raw_response"):
-                delattr(object_result, "_raw_response")  # ruff: ignore[del-attr-with-constant] - not a declared model field, so `del obj._attr` cannot type-check
+                # Cleanup result
+                if hasattr(object_result, "_raw_response"):
+                    delattr(object_result, "_raw_response")  # ruff: ignore[del-attr-with-constant] - not a declared model field, so `del obj._attr` cannot type-check
 
-            await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
-            return object_result
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
-            raise
-        finally:
-            # `_gen_object` / `_after_object_job` raised before the span was ended — close it with
-            # the in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
-            # failure stays in telemetry. On success `_after_object_job` already ended the span.
-            pending_error = sys.exc_info()[1]
-            if pending_error is not None and span is not None and span.is_recording():
-                self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
+                await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
+                return object_result
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
+                raise
+            finally:
+                # `_gen_object` / `_after_object_job` raised before the span was ended — close it with
+                # the in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
+                # failure stays in telemetry. On success `_after_object_job` already ended the span.
+                pending_error = sys.exc_info()[1]
+                if pending_error is not None and span is not None and span.is_recording():
+                    self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
 
     @abstractmethod
     async def _gen_object(

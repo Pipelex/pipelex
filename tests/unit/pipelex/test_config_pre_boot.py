@@ -1,6 +1,6 @@
 from pytest_mock import MockerFixture
 
-from pipelex.config import get_pipe_func_execution_mode, is_pipe_func_sandbox_hosted
+from pipelex.config import get_pipe_func_execution_mode, is_fetch_ssrf_guard_enabled, is_pipe_func_sandbox_hosted
 from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTION_MODE
 from pipelex.runtime_hub import RuntimeHub, get_optional_config
 
@@ -18,3 +18,8 @@ class TestConfigPreBoot:
         mocker.patch.object(RuntimeHub, "_instance", None)
         assert get_pipe_func_execution_mode() == DIRECT_PIPE_FUNC_EXECUTION_MODE
         assert is_pipe_func_sandbox_hosted() is False
+
+    def test_fetch_ssrf_guard_is_enabled_without_hub(self, mocker: MockerFixture):
+        """A process that fetches before, or without, loading the config fails closed: the guard is on."""
+        mocker.patch.object(RuntimeHub, "_instance", None)
+        assert is_fetch_ssrf_guard_enabled() is True

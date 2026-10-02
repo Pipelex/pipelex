@@ -39,6 +39,7 @@ type = "PipeLLM"
 description = "Extract key terms from a contract"
 inputs = { contract = "Contract" }  # Clear what type of document is expected
 output = "ContractTerms"
+prompt = "Extract the key terms from this contract:\n@contract"
 ```
 
 ### 3. Domain-Specific Methods
@@ -164,6 +165,16 @@ refines = "Text"
 [concept.Summary]
 description = "A condensed version of a longer text"
 refines = "Text"
+```
+
+### Refining JSON
+
+Data you already have as JSON objects is best named by a concept refining `JSON`. It takes the object exactly as you have it, with no structure to write, and its name and description say what the object means. See [Choosing among `Anything`, `JSON` and `Dynamic`](native-concepts.md#choosing-among-anything-json-and-dynamic).
+
+```toml
+[concept.Order]
+description = "A customer order, as the shop's API returns it"
+refines = "JSON"
 ```
 
 ### Building Concept Hierarchies
@@ -316,12 +327,14 @@ output = "Page[]"
 type = "PipeLLM"
 inputs = { invoice = "Invoice" }
 output = "InvoiceData"
+prompt = "Extract the invoice data:\n@invoice"
 
 # This pipe accepts Contract (and any concept that refines Contract)
 [pipe.process_contract]
 type = "PipeLLM"
 inputs = { contract = "Contract" }
 output = "ContractData"
+prompt = "Extract the contract data:\n@contract"
 ```
 
 In this setup:

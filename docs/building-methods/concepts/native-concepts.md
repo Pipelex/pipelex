@@ -26,6 +26,7 @@ Here are all the native concepts you can use out of the box:
 | Concept | Description | Content Class Name |
 |-----------------|-------------|---------------------|
 | `Text` | A text | `TextContent` |
+| `Markdown` | A text written in Markdown, which refines `Text` | `MarkdownContent` |
 | `Image` | An image | `ImageContent` |
 | `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
@@ -41,6 +42,36 @@ Here are all the native concepts you can use out of the box:
 | `Composite` | A named composition of contents | `CompositeContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
+## Choosing among `Anything`, `JSON` and `Dynamic`
+
+Three natives hold data whose shape your method does not describe, and each takes a different kind of input. Choose in this order:
+
+1. **Data you already have as JSON objects: name it.** Declare a concept that refines `JSON`, with a plain-language description. It takes the object exactly as you have it, with no data model to write, and its name and description tell an agent or a reader what the object means, which a bare `JSON` does not. When you later want the fields validated, turn it into a concept with a structure.
+2. **`JSON` or `JSON[]`** when the data has no name worth giving it. `JSON` is a JSON object, not any JSON value; a list of objects is `JSON[]`.
+3. **`Anything`** when the pipe is generic over its input: it passes a value along or renders it, whatever it is. It is not the place to put JSON data.
+4. **`Dynamic`** is not recommended for inputs for now: what a `Dynamic` input holds is still being settled.
+
+For example, a pipe summarizing orders from a shop's API names them:
+
+```toml
+[concept.Order]
+description = "A customer order, as the shop's API returns it"
+refines = "JSON"
+
+[pipe.summarize_order]
+type = "PipeLLM"
+description = "Summarize a customer order"
+inputs = { order = "Order" }
+output = "Text"
+prompt = """
+Summarize this order in two sentences:
+
+@order
+"""
+```
+
+The input is the object itself, `{"order": {"id": 42, "items": [{"sku": "A-1", "quantity": 2}]}}`, and a list of orders would be declared `Order[]`.
+
 ## Native Concept Structures
 
 Each native concept has a corresponding Python structure that defines its data model. Understanding these structures helps you work with the data they contain.
@@ -55,6 +86,51 @@ class TextContent(StuffContent):
 ```
 
 **Use for:** Plain text outputs, summaries, descriptions, etc.
+
+### MarkdownContent
+
+A text written in Markdown. `Markdown` refines `Text`, and its content class keeps the single field of `TextContent`, which holds the Markdown source:
+
+```python
+class MarkdownContent(TextContent):
+    text: str
+```
+
+What sets it apart from `Text` is how it is shown: the HTML view, an HTML template and a PDF laid out without a template format a `Markdown` value and show a `Text` value as it is, so a stray `#` or `1.` in a plain text never turns into a heading or a list there. The terminal's pretty view is the exception: it renders both through Markdown.
+
+As a `PipeLLM` output, `output = "Markdown"` gives a report whose headings, bold text, lists, tables and links are formatted downstream. The LLM writes free text, exactly as it does for `Text`:
+
+```toml
+[pipe.write_inspection_report]
+type = "PipeLLM"
+description = "Write site notes up as an inspection report"
+inputs = { notes = "Text" }
+output = "Markdown"
+prompt = """
+Write these site notes up as an inspection report in Markdown, with a heading for each area inspected.
+
+@notes
+"""
+```
+
+Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.text`.
+
+**Refinement.** A `Markdown` value is accepted wherever a `Text` is: a pipe whose input is `Text` takes a `Markdown` report, and its prompt receives the source. The reverse does not hold: a `Text` value, or a concept that refines `Text`, is not accepted where a `Markdown` is required, since nothing says it was written as Markdown. To name a specific kind of report, declare a concept with `refines = "Markdown"`.
+
+**As an input**, `Markdown` takes a string, as `Text` does: `"report": "# Roof\n\n- two cracked tiles"`, or the envelope form `{"concept": "Markdown", "content": "# Roof"}`.
+
+**How it renders:**
+
+- In a prompt, and in the plain and Markdown views, it is its source as it is. `pipelex run --save-main-stuff` writes that source verbatim as `main_stuff.md`.
+- Its HTML view converts the Markdown to HTML rather than escaping it, so `main_stuff.html` and the HTML tab of `main_stuff_viewer.html` show the formatted report. Raw HTML inside the source is shown as text rather than passed through, and only URLs with a scheme, such as `https://example.com`, become links, so a file name like `README.md` stays text.
+- The pretty view in the terminal renders it as Markdown.
+- Its JSON form is `{"text": "..."}`, the same as a `Text`.
+
+**Inside an HTML template**, such as a `PipeCompose` template with `category = "html"`, `{{ report }}` prints a `Markdown` value as its converted HTML with no filter, while a `Text` value keeps being escaped. A `Markdown` field of a structure converts the same way, as in `{{ digest.summary }}`. `{{ report.text }}` is the Markdown source, escaped like any string. The `$report` sigil and `{{ report | format }}` print the converted HTML too, unless the template names another format, as in `{{ report | format("plain") }}`, which prints the Markdown source, escaped. The `@report` sigil wraps the source in tags for a prompt and is not meant for HTML templates.
+
+**In a document**, a [`PipeDocGen`](../pipes/pipe-operators/PipeDocGen.md) step that prints a PDF without a template formats a `Markdown` value, with its headings, lists, tables, code and links, and prints a `Text` value as plain paragraphs.
+
+**Use for:** Reports, summaries and write-ups an LLM writes to be read formatted, in an HTML page or a PDF.
 
 ### ImageContent
 
@@ -76,7 +152,7 @@ class ImageContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the image (a storage URI, an HTTP(S) URL, or a base64 data URL)
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes, passed alone, in a list or in a structured field: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
 - `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
 - `mime_type`: Optional MIME type of the image
@@ -102,7 +178,7 @@ class DocumentContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the document file, storage URL, or web page URL
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `public_url`: A URL a viewer can open, filled by the runtime for every document input it normalizes, exactly as for `ImageContent`: the storage provider's link for a stored file, which expires when signed URLs are configured, and the URL itself for an `http(s)` one
 - `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 - `filename`: Optional filename of the document
 - `title`: Optional title of the document or source
@@ -240,6 +316,10 @@ class JSONContent(StuffContent):
     json_obj: dict[str, Any]
 ```
 
+A `JSON` input takes a JSON object as it is, `{"a": 1}`, and its inputs template shows the bare object; `JSON[]` takes a list of objects. `JSON` is a JSON object, not any JSON value, so a string or a number there is refused. The explicit form carries the content form: `{"concept": "JSON", "content": {"json_obj": {"a": 1}}}`.
+
+**Use for:** Data you already have as JSON objects, preferably through a concept that refines `JSON` (see [Choosing among `Anything`, `JSON` and `Dynamic`](#choosing-among-anything-json-and-dynamic)).
+
 ### HtmlContent
 
 Represents HTML content with styling:
@@ -289,8 +369,12 @@ Each named sub-content is a top-level field of the composite — there is no wra
 
 ### Anything
 
-!!! note "Special Concepts"
-    `Anything` is referenced in the native concept definitions but does not have specific implementations. It is handled through the generic content system and is primarily used as semantic markers.
+`Anything` has no content class of its own: an `Anything` value is held in the content class matching what it is.
+
+- **As an input**, it takes any JSON value but an array or null. A string, a number, a boolean or an object becomes text, a number, a yes/no or a JSON object, and the input keeps the `Anything` concept. A typed envelope, `{"concept": "Text", "content": "hi"}`, hands it a specific concept, which it keeps, since every concept satisfies `Anything`. `Anything[]` takes a list of such values.
+- **As an output**, it promises nothing narrower: a pipe declared to output `Anything` may produce any concept.
+
+**Use for:** Pipes that are generic over their input, passing a value along or rendering it whatever it is.
 
 ## Using Native Concepts
 

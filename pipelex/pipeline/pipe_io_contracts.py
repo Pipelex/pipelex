@@ -90,8 +90,8 @@ def _render_output_schema(*, pipe: PipeAbstract, concept_provider: ConceptProvid
     try:
         if not pipe.output.is_multiple():
             # The single arm needs no structureless special case: `render_stuff_spec` handles
-            # `native.Anything` itself, publishing the permissive schema with the concept's
-            # identity annotations. Short-circuiting to a bare `{}` here would be strictly
+            # `native.Anything` itself, publishing its schema with the concept's identity
+            # annotations. Short-circuiting to a bare `{}` here would be strictly
             # worse — it would drop the `title`/`description` every rendered schema is
             # supposed to carry.
             rendered = pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=ConceptRepresentationFormat.SCHEMA)

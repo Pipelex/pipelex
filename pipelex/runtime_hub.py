@@ -24,10 +24,9 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, TextIO
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
-from rich.console import Console
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import (
@@ -49,12 +48,16 @@ from pipelex.system.registries.class_registry_access import get_class_registry a
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
+from pipelex.tools.misc.rich_extra import require_rich
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
     from opentelemetry.trace import Tracer as OTelTracer
+
+    # Rich is the `cli` extra: the console is built when it is first asked for, never at import or at boot.
+    from rich.console import Console
 
     from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
@@ -74,6 +77,18 @@ def _never_in_isolated_execution() -> bool:
     return False
 
 
+def _make_console(*, file: TextIO | None = None, stderr: bool = False) -> "Console":
+    """A Rich console, built on demand because Rich is the ``cli`` extra.
+
+    Raises:
+        MissingDependencyError: If Rich is not installed.
+    """
+    require_rich(message="get_console() hands out the Rich console the CLI prints its tables, panels and banners through.")
+    from rich.console import Console
+
+    return Console(file=file, stderr=stderr)
+
+
 class RuntimeHub:
     """Central dependency manager for process-scoped infrastructure services.
 
@@ -89,6 +104,8 @@ class RuntimeHub:
         # tools
         self._config: ConfigRoot | None = None
         self._console: Console | None = None
+        # The stream boot's console_print_target resolved to, held until the console is first asked for.
+        self._console_print_stream: TextIO | None = None
         self._secrets_provider: SecretsProviderAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
         self._telemetry_manager: TelemetryManagerAbstract | None = None
@@ -222,16 +239,23 @@ class RuntimeHub:
         PrettyPrinter.mode = mode
 
     def set_console_print_target(self, target: ConsoleTarget):
+        """Resolve the stream ``get_console()`` prints to, and drop any console built or set before.
+
+        The stream is the one current now, as the console built here used to capture it; the console
+        itself is built when first asked for, because Rich is the ``cli`` extra and a process that never
+        prints a table must not need it.
+        """
         match target:
             case ConsoleTarget.STDOUT:
-                self._console = Console(file=sys.stdout)
+                self._console_print_stream = sys.stdout
             case ConsoleTarget.STDERR:
-                self._console = Console(file=sys.stderr)
+                self._console_print_stream = sys.stderr
             case _:
                 msg = f"Invalid console target: {target}"
                 raise ValueError(msg)
+        self._console = None
 
-    def set_console(self, console: Console):
+    def set_console(self, console: "Console"):
         self._console = console
 
     def set_secrets_provider(self, secrets_provider: SecretsProviderAbstract):
@@ -328,11 +352,18 @@ class RuntimeHub:
         """
         return self._config
 
-    def get_console(self) -> Console:
+    def get_console(self) -> "Console":
+        """The console set, or the one on boot's print target, built on first use; a stderr console before boot.
+
+        Raises:
+            MissingDependencyError: If a console has to be built and Rich is not installed.
+        """
         if self._console:
             return self._console
-        else:
-            return Console(stderr=True)
+        if self._console_print_stream is not None:
+            self._console = _make_console(file=self._console_print_stream)
+            return self._console
+        return _make_console(stderr=True)
 
     def get_required_secrets_provider(self) -> SecretsProviderAbstract:
         if self._secrets_provider is None:
@@ -667,9 +698,14 @@ def get_event_log_override() -> "EventLogProtocol | None":
     return _event_log_override.get()
 
 
-def get_console() -> Console:
+def get_console() -> "Console":
+    """The Rich console the CLI prints its tables, panels and banners through.
+
+    Raises:
+        MissingDependencyError: If Rich is not installed.
+    """
     runtime_hub = RuntimeHub.get_optional_instance()
     if runtime_hub:
         return runtime_hub.get_console()
     else:
-        return Console(stderr=True)
+        return _make_console(stderr=True)

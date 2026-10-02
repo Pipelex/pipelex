@@ -267,6 +267,15 @@ lead = { type = "concept", concept_ref = "myapp.Employee", description = "Team l
 
 Pipelex automatically handles concept dependencies. You can define concepts in any order—Pipelex loads them in the correct sequence based on their relationships.
 
+A field may name a concept declared in the same bundle, in another bundle loaded into the same library (in the same load or an earlier one), or in a method package the bundle depends on, written with the package's address: `concept_ref = "github.com/acme/crm-methods/crm->crm.Customer"`. A method package is loaded when one of the bundle's pipes references it, so a field alone does not bring a package in. A concept in a method package sees only that package's own concepts.
+
+Two things refuse the load rather than failing later, when the concept is first used:
+
+- **A cycle between concepts**, such as `A` holding a `B` that holds an `A`, including a concept that holds itself.
+- **A field naming a concept that cannot be found**, because no bundle the concept can see declares it. A concept declared only by a bundle loaded afterwards cannot be found either.
+
+A method package's own dependencies are never loaded, so a concept in the package that names one of their concepts is not refused. It fails when first used, and so does any concept holding it.
+
 ## Choice Fields (Enums)
 
 For fields that should only accept specific values, use the `choices` property. When using `choices`, you don't need to specify a `type`.

@@ -48,76 +48,52 @@ class StructureMethod(StrEnum):
     INSTRUCTOR_OPENROUTER_STRUCTURED_OUTPUTS = "instructor/openrouter_structured_outputs"
 
     def as_instructor_mode(self) -> "InstructorMode":
+        """The core instructor mode this structure method stands for.
+
+        instructor deprecates its provider-specific modes, because the provider now comes from the client,
+        and resolves each one to a core mode, the same one whichever provider it is used with. That
+        resolution is done here instead, because an OpenAI client refuses another provider's mode rather
+        than resolving it, and a gateway serves every model through an OpenAI client, whichever provider's
+        method its spec names.
+        """
         from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
 
         match self:
-            # generic
-            case StructureMethod.INSTRUCTOR_JSON:
-                return InstructorMode.JSON
-            case StructureMethod.INSTRUCTOR_MD_JSON:
-                return InstructorMode.MD_JSON
-            case StructureMethod.INSTRUCTOR_JSON_SCHEMA:
-                return InstructorMode.JSON_SCHEMA
-            # openai
-            case StructureMethod.INSTRUCTOR_OPENAI_PARALLEL_TOOLS:
-                return InstructorMode.PARALLEL_TOOLS
-            case StructureMethod.INSTRUCTOR_OPENAI_TOOLS:
+            case (
+                StructureMethod.INSTRUCTOR_OPENAI_TOOLS
+                | StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED_OUTPUTS
+                | StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS
+                | StructureMethod.INSTRUCTOR_ANTHROPIC_REASONING_TOOLS
+                | StructureMethod.INSTRUCTOR_MISTRAL_TOOLS
+                | StructureMethod.INSTRUCTOR_VERTEXAI_TOOLS
+                | StructureMethod.INSTRUCTOR_GENAI_TOOLS
+                | StructureMethod.INSTRUCTOR_COHERE_TOOLS
+                | StructureMethod.INSTRUCTOR_CEREBRAS_TOOLS
+                | StructureMethod.INSTRUCTOR_FIREWORKS_TOOLS
+                | StructureMethod.INSTRUCTOR_BEDROCK_TOOLS
+                | StructureMethod.INSTRUCTOR_WRITER_TOOLS
+            ):
                 return InstructorMode.TOOLS
-            case StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED_OUTPUTS:
-                return InstructorMode.TOOLS_STRICT
-            case StructureMethod.INSTRUCTOR_OPENAI_JSON_O1:
-                return InstructorMode.JSON_O1
-            case StructureMethod.INSTRUCTOR_OPENAI_RESPONSES_TOOLS:
+            case StructureMethod.INSTRUCTOR_OPENAI_PARALLEL_TOOLS | StructureMethod.INSTRUCTOR_VERTEXAI_PARALLEL_TOOLS:
+                return InstructorMode.PARALLEL_TOOLS
+            case StructureMethod.INSTRUCTOR_JSON | StructureMethod.INSTRUCTOR_ANTHROPIC_JSON | StructureMethod.INSTRUCTOR_GENAI_STRUCTURED_OUTPUTS:
+                return InstructorMode.JSON
+            case (
+                StructureMethod.INSTRUCTOR_MD_JSON
+                | StructureMethod.INSTRUCTOR_VERTEXAI_JSON
+                | StructureMethod.INSTRUCTOR_CEREBRAS_JSON
+                | StructureMethod.INSTRUCTOR_FIREWORKS_JSON
+                | StructureMethod.INSTRUCTOR_BEDROCK_JSON
+                | StructureMethod.INSTRUCTOR_PERPLEXITY_JSON
+            ):
+                return InstructorMode.MD_JSON
+            case (
+                StructureMethod.INSTRUCTOR_JSON_SCHEMA
+                | StructureMethod.INSTRUCTOR_OPENAI_JSON_O1
+                | StructureMethod.INSTRUCTOR_MISTRAL_STRUCTURED_OUTPUTS
+                | StructureMethod.INSTRUCTOR_COHERE_JSON_SCHEMA
+                | StructureMethod.INSTRUCTOR_OPENROUTER_STRUCTURED_OUTPUTS
+            ):
+                return InstructorMode.JSON_SCHEMA
+            case StructureMethod.INSTRUCTOR_OPENAI_RESPONSES_TOOLS | StructureMethod.INSTRUCTOR_OPENAI_RESPONSES_TOOLS_WITH_INBUILT_TOOLS:
                 return InstructorMode.RESPONSES_TOOLS
-            case StructureMethod.INSTRUCTOR_OPENAI_RESPONSES_TOOLS_WITH_INBUILT_TOOLS:
-                return InstructorMode.RESPONSES_TOOLS_WITH_INBUILT_TOOLS
-            # anthropic
-            case StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS:
-                return InstructorMode.ANTHROPIC_TOOLS
-            case StructureMethod.INSTRUCTOR_ANTHROPIC_REASONING_TOOLS:
-                return InstructorMode.ANTHROPIC_REASONING_TOOLS
-            case StructureMethod.INSTRUCTOR_ANTHROPIC_JSON:
-                return InstructorMode.ANTHROPIC_JSON
-            # mistral
-            case StructureMethod.INSTRUCTOR_MISTRAL_TOOLS:
-                return InstructorMode.MISTRAL_TOOLS
-            case StructureMethod.INSTRUCTOR_MISTRAL_STRUCTURED_OUTPUTS:
-                return InstructorMode.MISTRAL_STRUCTURED_OUTPUTS
-            # vertexai & google
-            case StructureMethod.INSTRUCTOR_VERTEXAI_TOOLS:
-                return InstructorMode.VERTEXAI_TOOLS
-            case StructureMethod.INSTRUCTOR_VERTEXAI_JSON:
-                return InstructorMode.VERTEXAI_JSON
-            case StructureMethod.INSTRUCTOR_VERTEXAI_PARALLEL_TOOLS:
-                return InstructorMode.VERTEXAI_PARALLEL_TOOLS
-            case StructureMethod.INSTRUCTOR_GENAI_TOOLS:
-                return InstructorMode.GENAI_TOOLS
-            case StructureMethod.INSTRUCTOR_GENAI_STRUCTURED_OUTPUTS:
-                return InstructorMode.GENAI_STRUCTURED_OUTPUTS
-            # cohere
-            case StructureMethod.INSTRUCTOR_COHERE_TOOLS:
-                return InstructorMode.COHERE_TOOLS
-            case StructureMethod.INSTRUCTOR_COHERE_JSON_SCHEMA:
-                return InstructorMode.COHERE_JSON_SCHEMA
-            # cerebras
-            case StructureMethod.INSTRUCTOR_CEREBRAS_TOOLS:
-                return InstructorMode.CEREBRAS_TOOLS
-            case StructureMethod.INSTRUCTOR_CEREBRAS_JSON:
-                return InstructorMode.CEREBRAS_JSON
-            # fireworks
-            case StructureMethod.INSTRUCTOR_FIREWORKS_TOOLS:
-                return InstructorMode.FIREWORKS_TOOLS
-            case StructureMethod.INSTRUCTOR_FIREWORKS_JSON:
-                return InstructorMode.FIREWORKS_JSON
-            # bedrock
-            case StructureMethod.INSTRUCTOR_BEDROCK_TOOLS:
-                return InstructorMode.BEDROCK_TOOLS
-            case StructureMethod.INSTRUCTOR_BEDROCK_JSON:
-                return InstructorMode.BEDROCK_JSON
-            # other providers
-            case StructureMethod.INSTRUCTOR_WRITER_TOOLS:
-                return InstructorMode.WRITER_TOOLS
-            case StructureMethod.INSTRUCTOR_PERPLEXITY_JSON:
-                return InstructorMode.PERPLEXITY_JSON
-            case StructureMethod.INSTRUCTOR_OPENROUTER_STRUCTURED_OUTPUTS:
-                return InstructorMode.OPENROUTER_STRUCTURED_OUTPUTS

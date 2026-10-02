@@ -117,7 +117,7 @@ A few behaviors worth knowing:
 
 - **Installed wins.** Once a method is installed, it is used as-is — including when a reference pins a different `@<tag>` than what is installed (a warning tells you so). Remove the installed directory to re-fetch.
 - **A miss that cannot be bridged is a loud diagnostic, never a silent pass**: fetch disabled, an unfetchable address, or a failed fetch each raise an error naming the address and the remedy.
-- **Hosted parity warning.** A fetched method declaring Python structure classes runs locally but triggers the same warning as a direct CLI fetch: hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python. On a sandbox-hosted deployment the fetch refuses such a package outright, with the same rule-naming error.
+- **Hosted parity warning.** A fetched method declaring Python structure classes runs locally but triggers the same warning as a direct CLI fetch: hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python. On a sandbox-hosted deployment the fetch refuses such a package outright, with the same rule-naming error. The refusal is not specific to fetching: a sandbox-hosted deployment refuses every method whose Python declares structure classes, however it arrived (see [Python classes](concepts/python-classes.md)).
 
 To **disable network fetches at load time**, set the switch in your `pipelex.toml` (or use the environment variable, which takes precedence):
 

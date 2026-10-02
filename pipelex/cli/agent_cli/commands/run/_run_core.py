@@ -74,6 +74,8 @@ async def run_pipeline_core(
         Dictionary with execution results suitable for JSON serialization.
 
     Raises:
+        ValidateBundleError: If the bundle is refused while it loads, before any pipe runs; it carries
+            the same located ``validation_errors`` validating the bundle gives.
         PipelineExecutionError: If the pipeline execution fails.
     """
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
@@ -96,6 +98,8 @@ async def run_pipeline_core(
         execution_config=execution_config,
         library_dirs=library_dirs,
         inputs_base_dir=inputs_base_dir,
+        # The directories a CLI loads are the caller's own: a refusal there is their invalid bundle.
+        library_dirs_are_callers=True,
     )
     response = await runner.execute(
         pipe_code=pipe_code,

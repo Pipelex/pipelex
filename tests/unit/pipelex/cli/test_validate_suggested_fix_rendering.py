@@ -17,7 +17,7 @@ import typer
 from rich.console import Console
 
 from pipelex.cli.error_handlers import handle_validate_bundle_error
-from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import DryRunFailureErrorData, PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
@@ -35,6 +35,21 @@ def _fixable_pipe_error(*, source: str | None = None) -> PipesAndConceptValidati
         field_path="pipes.list_ideas.output",
         expected_output_ref="Idea[]",
         source=source,
+    )
+
+
+def _unsafe_fixable_pipe_error() -> PipesAndConceptValidationErrorData:
+    """An ``unknown_model`` with one close match — the planner derives the UNSAFE ``rename-model`` from it."""
+    return PipesAndConceptValidationErrorData(
+        error_type=PipeValidationErrorType.UNKNOWN_MODEL,
+        domain_code="tide_tables",
+        pipe_code="write_tide_note",
+        field_name="model",
+        message="Alias 'best-sonet' was not found in the model deck",
+        field_path="pipe.write_tide_note.model",
+        model_reference="@best-sonet",
+        model_type="llm",
+        suggestions=["@best-gpt"],
     )
 
 
@@ -141,6 +156,37 @@ class TestValidateSuggestedFixRendering:
         assert "can be fixed automatically" not in output
         assert "💡 Tip:" in output
 
+    def test_unsafe_fix_says_it_needs_confirmation_and_is_not_counted(self, console: Console) -> None:
+        """A safe fix keeps the plain line; an unsafe one says so, and the automatic-fix footer counts only the safe one."""
+        exc = ValidateBundleError(
+            message="validation failed",
+            pipe_validation_errors=[_fixable_pipe_error(), _unsafe_fixable_pipe_error()],
+        )
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(exc, bundle_path=Path("methods/demo.mthds"))
+
+        output = console.export_text()
+        assert "💡 Suggested fix: Set output of pipe 'list_ideas' to 'Idea[]' to match its last step" in output
+        assert (
+            "💡 Suggested fix (unsafe, confirm before applying): Replace model '@best-sonet' of pipe 'write_tide_note' with '@best-gpt'"
+        ) in output
+        assert "💡 Suggested fix: Replace model" not in output
+        assert "1 of these errors can be fixed automatically" in output
+
+    def test_only_unsafe_fix_keeps_generic_tip(self, console: Console) -> None:
+        """An unsafe fix is never applied by `pipelex fix bundle`, so it alone offers no fix command."""
+        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_unsafe_fixable_pipe_error()])
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(exc, bundle_path=Path("methods/demo.mthds"))
+
+        output = console.export_text()
+        assert "💡 Suggested fix (unsafe, confirm before applying): Replace model '@best-sonet'" in output
+        assert "can be fixed automatically" not in output
+        assert "pipelex fix bundle" not in output
+        assert "💡 Tip:" in output
+
     def test_fixable_count_sums_only_fixable_items(self, console: Console) -> None:
         exc = ValidateBundleError(
             message="validation failed",
@@ -175,17 +221,20 @@ class TestValidateSuggestedFixRendering:
         assert "concept 'MissingConcept' is not declared in domain 'demo'" in output
         assert "Declared Concepts: Idea, Report" in output
 
-    def test_dry_run_message_stays_visible_alongside_categorized_errors(self, console: Console) -> None:
-        """The wire builder suppresses the dry-run residual when categorized errors exist; the human surface keeps it."""
+    def test_dry_run_items_stay_visible_alongside_categorized_errors(self, console: Console) -> None:
+        """A dry-run item renders beside the categorized errors, located on its pipe."""
         exc = ValidateBundleError(
             message="validation failed",
             pipe_validation_errors=[_non_fixable_pipe_error()],
-            dry_run_error_message="dry run exploded",
+            dry_run_failures=[
+                DryRunFailureErrorData(pipe_code="third_pipe", domain_code="demo", message="Pipe 'third_pipe' failed its dry run: exploded")
+            ],
         )
 
         with pytest.raises(typer.Exit):
             handle_validate_bundle_error(exc, bundle_path=Path("methods/demo.mthds"))
 
         output = console.export_text()
-        assert "Dry Run Error:" in output
-        assert "dry run exploded" in output
+        assert "Dry Run Errors:" in output
+        assert "Pipe: third_pipe" in output
+        assert "Pipe 'third_pipe' failed its dry run: exploded" in output

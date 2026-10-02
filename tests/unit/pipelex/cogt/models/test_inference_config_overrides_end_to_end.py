@@ -17,6 +17,7 @@ import pytest
 
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import CONFIG_DIR_NAME, INFERENCE_DIR_NAME
 from pipelex.system.pipelex_service.pipelex_service_config import is_pipelex_gateway_enabled
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
@@ -51,6 +52,7 @@ class TestInferenceConfigOverridesEndToEnd:
             secrets_provider=EnvSecretsProvider(),
             managed_gateway_configs=None,
             gateway_config_source=None,
+            plugin_model_declarations=PluginModelDeclarations.make_empty(),
             needs_inference=False,
         )
         return models_manager.routing_profile.name

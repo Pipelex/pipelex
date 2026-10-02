@@ -6,6 +6,7 @@ class Jinja2FilterName(StrEnum):
     TAG = "tag"
     ESCAPE_SCRIPT_TAG = "escape_script_tag"
     WITH_IMAGES = "with_images"
+    MARKDOWN = "markdown"
 
 
 class Jinja2ContextKey(StrEnum):

@@ -239,6 +239,23 @@ class GoogleLLMWorker(LLMWorkerAbstract):
 
         return text_content
 
+    def _validates_structured_output_strictly(self) -> bool:
+        """Whether ``instructor`` validates a structured response in pydantic's strict mode.
+
+        Under tool calling, Gemini's function-call arguments reach ``instructor`` as Python values, and strict
+        mode refuses a string for an enum field when it validates Python input, so every schema with an enum
+        would fail. Gemini's native JSON output is parsed from text, where strict mode accepts a string for an
+        enum. So tool calling validates in lax mode, and JSON output stays strict.
+        """
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
+
+        match self.instructor_for_objects.mode:
+            case InstructorMode.TOOLS:
+                return False
+            case _:
+                # `from_genai` supports only TOOLS and JSON; any other mode is parsed from text like JSON.
+                return True
+
     @override
     async def _gen_object(
         self,
@@ -251,14 +268,6 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
-        # Build generation config
-        generation_config = genai_types.GenerateContentConfig(
-            system_instruction=llm_job.llm_prompt.system_text,
-            temperature=job_params.temperature,
-            max_output_tokens=job_params.max_tokens,
-            candidate_count=1,
-        )
-
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
@@ -267,11 +276,19 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 messages=[cast("ChatCompletionMessageParam", contents)],
                 response_model=schema,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
-                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
-                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                # re-asks on a malformed/invalid output but never retries a transport error, which ends the
+                # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
+                # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
-                generation_config=generation_config,
+                # instructor's genai handlers build the Google config themselves and read these as
+                # top-level OpenAI-style kwargs: a `GenerateContentConfig` passed as `generation_config`
+                # or `config` is dropped, and the system prompt is read only from `system`.
+                system=llm_job.llm_prompt.system_text,
+                temperature=job_params.temperature,
+                max_tokens=job_params.max_tokens,
+                n=1,
+                strict=self._validates_structured_output_strictly(),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying

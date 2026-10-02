@@ -86,7 +86,9 @@ class TestJudgmentModels:
         re-validate would fail there and nowhere else.
         """
         assignment = JudgmentAssignment(
-            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_judgment_wire")),
+            job_metadata=JobMetadata(
+                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_judgment_wire")
+            ),
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             state={"message": "the roof is on fire", "read_count": 3, "starred": True, "labels": ["home", "urgent"]},
             questions={

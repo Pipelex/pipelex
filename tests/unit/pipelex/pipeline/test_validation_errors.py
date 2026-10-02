@@ -12,7 +12,12 @@ import json
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import extract_validation_errors
-from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import (
+    DryRunFailureErrorData,
+    PipeFactoryErrorData,
+    PipelexBundleBlueprintValidationErrorData,
+    PipesAndConceptValidationErrorData,
+)
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp, SetKeyOp
@@ -25,9 +30,8 @@ def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
     The pipe-validation arm uses ``pipe_validation_error_data`` (pipe validation **plus**
     pipe/concept instantiation errors) — the same combined accessor both real call sites
     (``ValidateBundleError.to_error_report`` and the CLI ``extract_validation_errors``) pass.
-    The residual channels (``dry_run_error_message`` / ``fallback_message``) are intentionally
-    omitted here so these tests pin the categorized projection in isolation; the residual behavior
-    has its own dedicated tests below.
+    The dry-run failures and the ``fallback_message`` residual are intentionally omitted here so these
+    tests pin the categorized projection in isolation; they have their own dedicated tests below.
     """
     return build_validation_error_items(
         blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
@@ -122,26 +126,27 @@ class TestBuildValidationErrorItems:
         """A ValidateBundleError with no categorized lists builds an empty list."""
         assert _build_items(ValidateBundleError(message="no details")) == []
 
-    def test_dry_run_residual_becomes_single_dry_run_item(self) -> None:
-        """A residual dry-run failure (no categorized data) yields one ``dry_run`` item — the structured-info invariant.
-
-        This is the case that previously produced a bare-message error with an empty
-        ``validation_errors[]``; it now carries the message as a ``dry_run``-category item.
-        It is graph-level, so it has no ``source``.
-        """
+    def test_each_dry_run_failure_becomes_a_located_dry_run_item(self) -> None:
+        """Each pipe whose dry run failed yields its own ``dry_run`` item, located on that pipe."""
         items = build_validation_error_items(
             blueprint_errors=[],
             factory_errors=[],
             pipe_validation_errors=[],
-            dry_run_error_message="Dry run failed: residual error",
+            dry_run_failures=[
+                DryRunFailureErrorData(
+                    pipe_code="analyze", domain_code="probe", source="probe.mthds", message="Pipe 'analyze' failed its dry run: x"
+                ),
+                DryRunFailureErrorData(pipe_code="publish", domain_code="probe", message="Pipe 'publish' failed its dry run: y"),
+            ],
         )
-        assert [item.category for item in items] == [ValidationErrorCategory.DRY_RUN]
-        assert items[0].message == "Dry run failed: residual error"
-        assert items[0].error_type == "DryRunError"
-        assert items[0].source is None
+        assert [item.category for item in items] == [ValidationErrorCategory.DRY_RUN, ValidationErrorCategory.DRY_RUN]
+        assert all(item.error_type == "DryRunError" for item in items)
+        assert (items[0].pipe_code, items[0].domain_code, items[0].source) == ("analyze", "probe", "probe.mthds")
+        assert items[0].message == "Pipe 'analyze' failed its dry run: x"
+        assert (items[1].pipe_code, items[1].source) == ("publish", None)
 
-    def test_dry_run_residual_suppressed_when_categorized_data_present(self) -> None:
-        """When a categorized error carries data, the dry-run residual is NOT added — the categorized items win."""
+    def test_dry_run_items_ride_beside_categorized_items(self) -> None:
+        """A dry-run failure is kept beside a categorized error: no channel hides another."""
         items = build_validation_error_items(
             blueprint_errors=[],
             factory_errors=[
@@ -153,15 +158,19 @@ class TestBuildValidationErrorItems:
                 ),
             ],
             pipe_validation_errors=[],
-            dry_run_error_message="should be ignored",
+            dry_run_failures=[DryRunFailureErrorData(pipe_code="pipe_y", domain_code="dom", message="Pipe 'pipe_y' failed its dry run: z")],
         )
-        assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY]
+        assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY, ValidationErrorCategory.DRY_RUN]
 
-    def test_to_error_report_projects_dry_run_residual(self) -> None:
-        """A ``ValidateBundleError`` carrying only ``dry_run_error_message`` surfaces one ``dry_run`` item on the report."""
-        report = ValidateBundleError(message="Dry run failed", dry_run_error_message="Dry run failed: residual error").to_error_report()
+    def test_to_error_report_projects_dry_run_failures(self) -> None:
+        """A ``ValidateBundleError`` carrying dry-run failures surfaces one ``dry_run`` item per failure on the report."""
+        report = ValidateBundleError(
+            message="Dry run failed",
+            dry_run_failures=[DryRunFailureErrorData(pipe_code="analyze", domain_code="probe", message="Pipe 'analyze' failed its dry run: x")],
+        ).to_error_report()
         assert report.validation_errors is not None
         assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.DRY_RUN]
+        assert report.message == "Pipe 'analyze' failed its dry run: x"
 
     def test_fallback_message_residual_becomes_single_blueprint_item(self) -> None:
         """A parse-level failure (only a message, no categorized data) yields one ``blueprint_validation`` item.
@@ -182,13 +191,13 @@ class TestBuildValidationErrorItems:
         assert items[0].error_type is None
         assert items[0].source is None
 
-    def test_dry_run_residual_wins_over_fallback_message(self) -> None:
-        """When both residual channels are available, the more-specific ``dry_run`` item wins (ordering)."""
+    def test_dry_run_items_win_over_fallback_message(self) -> None:
+        """The fallback residual is a last resort: a dry-run item leaves it unused."""
         items = build_validation_error_items(
             blueprint_errors=[],
             factory_errors=[],
             pipe_validation_errors=[],
-            dry_run_error_message="Dry run failed: residual error",
+            dry_run_failures=[DryRunFailureErrorData(pipe_code="analyze", message="Pipe 'analyze' failed its dry run: x")],
             fallback_message="should not be used",
         )
         assert [item.category for item in items] == [ValidationErrorCategory.DRY_RUN]

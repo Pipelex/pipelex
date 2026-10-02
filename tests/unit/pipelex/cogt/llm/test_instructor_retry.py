@@ -2,7 +2,7 @@
 
 ``make_instructor_schema_retrying`` must confine ``instructor``'s retry to genuine schema re-ask:
 a validation failure is retried up to the attempt budget, while a transport error is *not*
-retried (so it propagates raw for the worker's ``except`` clause to classify, instead of being
+retried (so it ends instructor's loop at once for the worker to classify, instead of being
 re-run on top of the SDK client's own transport retry).
 """
 
@@ -13,8 +13,9 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
+from instructor.core import ResponseParsingError
 from pydantic import BaseModel, ValidationError
-from tenacity import RetryError
+from tenacity import RetryError, retry_if_exception_type
 
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 
@@ -56,6 +57,28 @@ class TestInstructorSchemaRetrying:
         with pytest.raises(RetryError):
             await retrying(send)
         assert send.call_count == 2
+
+    async def test_unparseable_response_is_retried(self, mocker: MockerFixture) -> None:
+        # instructor raises this when a response carries no tool call or no JSON at all, and re-asks it
+        parsing_error = ResponseParsingError("No tool call found in the response", mode="TOOLS", raw_response=None)
+        send = mocker.AsyncMock(side_effect=[parsing_error, "ok"])
+        retrying = make_instructor_schema_retrying(max_attempts=3)
+
+        result: object = await retrying(send)
+        assert result == "ok"
+        assert send.call_count == 2
+
+    async def test_predicate_matches_what_instructor_itself_reasks(self) -> None:
+        # instructor's default loop, the one a bare `max_retries` int builds, re-asks exactly this set.
+        # It is private, and it is read here so that an instructor upgrade that changes it fails this test
+        from instructor.v2.core.retry import _RETRYABLE_PARSE_ERRORS  # pyright: ignore[reportPrivateUsage]  # ruff: ignore[import-outside-top-level]
+
+        retrying = make_instructor_schema_retrying(max_attempts=2)
+
+        assert isinstance(retrying.retry, retry_if_exception_type)
+        exception_types = retrying.retry.exception_types
+        assert isinstance(exception_types, tuple)
+        assert set(exception_types) == set(_RETRYABLE_PARSE_ERRORS)
 
     @pytest.mark.parametrize(
         "transport_exc",

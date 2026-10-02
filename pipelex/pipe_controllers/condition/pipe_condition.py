@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -12,9 +13,10 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
@@ -108,9 +110,9 @@ class PipeCondition(PipeController):
 
     @override
     def validate_inputs_static(self):
-        # Guard-lint (D7): a declared-optional input referenced unguarded in the expression
-        # would evaluate over an undefined variable when the value is absent.
-        lint_optional_input_guards(
+        # Template lints: no private names, and no declared-optional input referenced unguarded in
+        # the expression, which would evaluate over an undefined variable when the value is absent (D7).
+        lint_authored_template(
             pipe_code=self.code,
             domain_code=self.domain_code,
             inputs=self.inputs,
@@ -129,8 +131,8 @@ class PipeCondition(PipeController):
 
     @override
     def validate_output_static(self):
-        # OPTIONAL_OUTPUT_REQUIRED (D5/D6): `continue` resolves the declared output as ABSENT
-        # (design §14), so a `continue`-reachable condition must declare its output optional —
+        # OPTIONAL_OUTPUT_REQUIRED (D5/D6 of the Optionals design, L-260930-241424): `continue` resolves the declared output as ABSENT,
+        # so a `continue`-reachable condition must declare its output optional —
         # otherwise the no-output path would be invisible to the type system, which is exactly
         # the invisible-optional wart this feature removes.
         if self._continue_reachable and not self.output.presence.is_optional:
@@ -236,11 +238,21 @@ class PipeCondition(PipeController):
             context=working_memory.generate_context(),
         )
         if not evaluated_expression or evaluated_expression == "None":
+            # The expression is the caller's own method, rendered over their run's data: when it renders
+            # nothing, no outcome can be chosen, and the method is theirs to fix. The message names only the pipe.
             error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
             raise PipeRunError(
                 pipe_code=self.code,
                 message=error_msg,
                 run_mode=pipe_run_params.run_mode,
+            ).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=(
+                        f"Change the expression of PipeCondition '{self.code}' so that it always renders a value: "
+                        "the name of one of its outcomes, or any other value, which takes the default outcome."
+                    ),
+                )
             )
 
     @override
@@ -297,24 +309,38 @@ class PipeCondition(PipeController):
             "selected_outcome": str(outcome),
         }
 
-        # Handle continue case (design §14, phase 1): `continue` resolves the declared output as
+        # Handle continue case (phase 1): `continue` resolves the declared output as
         # ABSENT — a declared-absent record with provenance, memory otherwise unchanged. A previous
         # main stuff stays under its own name (the migration idiom: consume it explicitly
         # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
+            # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it to the caller
+            # under STRICT disclosure, and the value the expression rendered can be literal text of a condition a host
+            # library declared. The execution data above keeps that value.
             self._record_declared_absent_output(
                 working_memory=working_memory,
                 output_name=output_name,
-                reason=f"PipeCondition '{self.code}' resolved to 'continue' for evaluated expression '{evaluated_expression}'",
+                reason=f"PipeCondition '{self.code}' resolved to its 'continue' outcome",
             )
             return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
             self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
-            msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            # The caller's method maps this outcome to 'fail' on purpose, a refusal of the run it was given. The
+            # message names only the pipe: the value the expression rendered can be literal text of the expression,
+            # or an outcome key, of a condition a host library declared. The execution data above keeps that value.
+            msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=(
+                        f"PipeCondition '{self.code}' refuses this run on purpose: change the inputs so that its expression "
+                        "selects another outcome, or map that outcome to a pipe or to 'continue'."
+                    ),
+                )
+            )
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
 
@@ -334,11 +360,16 @@ class PipeCondition(PipeController):
         # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
         missing_names = working_memory.list_missing_names(names=required_stuff_names)
         if missing_names:
-            pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
-            pipe_condition_path_str = ".".join(pipe_condition_path)
-            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{missing_names[0]}'"
-            msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            # The caller's request or an earlier step of their method left out what the chosen pipe needs. The
+            # message names only the pipes and the input names.
+            missing_names_str = ", ".join(missing_names)
+            msg = f"PipeCondition '{self.code}' chose pipe '{outcome}', whose required inputs are missing: {missing_names_str}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Provide the missing required inputs of '{outcome}', which PipeCondition '{self.code}' chose: {missing_names_str}.",
+                )
+            )
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
@@ -373,11 +404,18 @@ class PipeCondition(PipeController):
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
-            msg = (
-                f"Dry run failed for pipe '{self.code}' (PipeCondition): could not detect required variables "
-                f"from expression template: {exc}\nTemplate:\n'{self.expression}'"
-            )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            # The expression is the caller's own method. The message quotes neither the expression nor the parser's
+            # diagnosis, which names the token it stopped at: the condition may be a host library's, whose text
+            # must not reach the caller. The line locates the fault. It is raised from the parser's own error,
+            # past the `Jinja2DetectVariablesError` that quotes the expression: a run failure reports the innermost
+            # Pipelex error on its chain (`find_root_fault`), which must be this refusal.
+            msg = f"Dry run failed for pipe '{self.code}' (PipeCondition): its expression {describe_expression_parse_failure(error=exc)}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Fix the expression of PipeCondition '{self.code}' so that it parses as a Jinja2 expression.",
+                )
+            ) from exc.__cause__
 
         # Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
@@ -385,14 +423,18 @@ class PipeCondition(PipeController):
             all_pipe_codes.add(self.default_outcome)
         all_pipe_codes -= set(SpecialOutcome.value_list())
 
-        missing_pipes = [pipe_code for pipe_code in all_pipe_codes if not get_optional_pipe(pipe_code=pipe_code)]
+        missing_pipes = sorted(pipe_code for pipe_code in all_pipe_codes if not get_optional_pipe(pipe_code=pipe_code))
 
         if missing_pipes:
-            msg = (
-                f"Dry run failed for PipeCondition '{self.code}': missing pipes: {', '.join(missing_pipes)}. "
-                f"Pipe map: {self.outcome_map}, default: {self.default_outcome}"
+            # The caller's method names these pipes in its outcomes. The message names only the pipe codes.
+            missing_pipes_str = ", ".join(missing_pipes)
+            msg = f"Dry run failed for PipeCondition '{self.code}': its outcomes name pipes that do not exist: {missing_pipes_str}."
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Declare the pipes {missing_pipes_str}, or change the outcomes of PipeCondition '{self.code}' to name existing pipes.",
+                )
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # Here, it should launch the dry run of all the pipes in the outcomes map.
         # pipe_dependencies() is a set, and every branch dry-runs into the SAME
@@ -423,11 +465,17 @@ class PipeCondition(PipeController):
         # fail at runtime.
         if not self.pipe_dependencies():
             if not self._continue_reachable:
+                # The caller's method maps every outcome to 'fail'. The message names only the pipe.
                 msg = (
                     f"PipeCondition '{self.code}' maps every outcome (and the default) to 'fail': "
                     f"every live run of this pipe raises. Map at least one outcome to a pipe or to 'continue'."
                 )
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=f"Map at least one outcome of PipeCondition '{self.code}' to a pipe or to 'continue'.",
+                    )
+                )
             self._record_declared_absent_output(
                 working_memory=working_memory,
                 output_name=output_name,

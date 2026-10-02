@@ -73,14 +73,15 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── fal.toml            # FAL models (image generation)
     │   ├── linkup.toml          # Linkup models (web search)
     │   ├── typesafe.toml       # TypeSafe models (judgment)
-    │   ├── internal.toml       # Internal/local models (OCR)
+    │   ├── internal.toml       # Internal/local models (text extraction, the built-in document engine), managed by `pipelex update`
     │   └── ...
     └── deck/                   # Model deck configurations
         ├── 1_llm_deck.toml           # LLM aliases & presets
         ├── 2_img_gen_deck.toml       # Image generation config
         ├── 3_extract_deck.toml       # Document extraction config
         ├── 4_search_deck.toml        # Web search config
-        ├── 5_judgment_deck.toml      # Judgment config
+        ├── 5_doc_gen_deck.toml       # Document engines, by format and source
+        ├── 6_judgment_deck.toml      # Judgment config
         ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
         └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```
@@ -88,7 +89,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
 Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with custom/override files (`x_` prefix) loaded last.
 
 !!! tip "Numbered files are pipelex-managed; overrides go in `x_custom_*.toml`"
-    The numbered deck files (`1_llm_deck.toml`...`5_judgment_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
+    The numbered deck files (`1_llm_deck.toml`...`6_judgment_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
 
     To customize aliases, presets, or default choices without conflict, edit (or create) any file in this directory whose name starts with `x_custom_` — Pipelex never tracks or overwrites those. See [`pipelex update`](../../tools/cli/update.md) for the full workflow.
 
@@ -187,7 +188,7 @@ If you need to customize how a specific model behaves through the Gateway, you c
 - `sdk`: The SDK to use for the model (e.g., `gateway_completions`)
 - `structure_method`: The method for structured output (e.g., `instructor/openai_tools`)
 
-All other keys will be ignored.
+All other keys will be ignored. What each structure method sends is described under [Structure methods](#structure-methods).
 
 ```toml
 # .pipelex/inference/backends/pipelex_gateway.toml
@@ -307,7 +308,10 @@ Each backend has its own model specification file in `.pipelex/inference/backend
 
 ```toml
 # openai.toml
-default_sdk = "openai"
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-4o-mini]
 model_id = "gpt-4o-mini"
@@ -315,18 +319,30 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
-[gpt-4-turbo]
-model_id = "gpt-4-turbo"
-inputs = ["text"]
+["gpt-5.4"]
+model_id = "gpt-5.4"
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
-costs = { input = 10.0, output = 30.0 }
+costs = { input = 2.5, output = 15.0 }
 
 [gpt-image-1]
 model_id = "gpt-image-1"
+sdk = "openai_img_gen"
+model_type = "img_gen"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.04, output = 0.0 }
 ```
+
+The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
+
+#### Structure methods
+
+`structure_method` says how a model is asked for structured output. A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and so is `instructor/openai_structured_outputs`, which sends OpenAI a non-strict tool schema; `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through the Gateway's OpenAI-compatible SDKs.
+
+One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice.
+
+The `google` backend uses `instructor/genai_structured_outputs`, Gemini's native JSON output. `instructor/genai_tools` works on it too: Gemini returns the function-call arguments as plain values, so pipelex validates them in pydantic's lax mode, where a string reaches an enum field as its member.
 
 #### Sending extra request headers per model
 
@@ -468,6 +484,8 @@ Unlike other backends, internal backend models are **always available** regardle
 
 This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
 
+`internal.toml` is the one backend file Pipelex manages: it declares the software-only models open Pipelex ships, so `pipelex update` refreshes it from the kit, and an existing install receives the models a release adds, such as the built-in document engine `reportlab-pdf`. A locally edited copy is backed up to `<file>.bak.<UTC timestamp>` first, unless you pass `--no-backup`, and your edits will not survive future updates, so declare models of your own in a backend of your own. Every other backend file is yours and is never touched. A plugin that ships a software-only engine declares its model in the internal backend itself when it loads, rather than in this file.
+
 ## Model Deck
 
 The Model Deck is the unified configuration hub for all AI model-related settings, including LLMs, OCR models, and image generation models.
@@ -479,21 +497,19 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 ```toml
 [llm.aliases]
 # Simple aliases map to a single model
-best-claude = "claude-4.8-opus"
-best-gpt = "gpt-5.5"
-best-gemini = "gemini-pro-latest"
+best-gpt = "gpt-5.6-sol"
 
 # Default aliases (used in presets)
-default-general = "claude-4.6-sonnet"
-default-premium = "claude-4.8-opus"
-default-large-context-text = "gemini-flash-latest"
-default-small = "gpt-4o-mini"
+default-general = "gpt-5.6-terra"
+default-premium = "gpt-5.6-sol"
+default-large-context-text = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 When using aliases in `.mthds` files or other configurations, prefix them with `@`:
 
 ```toml
-model = "@best-claude"           # References the best-claude alias
+model = "@best-gpt"              # References the best-gpt alias
 model = "@default-general"       # References the default-general alias
 ```
 
@@ -503,21 +519,22 @@ Presets combine model selection with optimized parameters for specific tasks. De
 
 ```toml
 [llm.presets]
-# Writing presets
-writing-factual = { model = "@default-premium", temperature = 0.1 }
-writing-creative = { model = "@default-premium", temperature = 0.9 }
+# Every model this deck resolves to fixes its temperature at 1, so every preset
+# declares that value rather than one the worker would override.
+writing-factual = { model = "@default-premium", temperature = 1 }
+writing-creative = { model = "@default-premium", temperature = 1 }
 
 # Retrieval
-retrieval = { model = "@default-large-context-text", temperature = 0.1 }
+retrieval = { model = "@default-large-context-text", temperature = 1 }
 
 # Engineering
-engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
-engineering-code = { model = "@default-premium", temperature = 0.1 }
+engineering-structured = { model = "@default-premium-structured", temperature = 1 }
+engineering-code = { model = "@default-premium", temperature = 1 }
 
 # Vision
-vision = { model = "@default-premium-vision", temperature = 0.5 }
-vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
-vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
+vision = { model = "@default-premium-vision", temperature = 1 }
+vision-cheap = { model = "@default-small-vision", temperature = 1 }
+vision-diagram = { model = "@default-premium-vision", temperature = 1 }
 ```
 
 When using presets in `.mthds` files, prefix them with `$`:
@@ -587,6 +604,20 @@ Search presets support the following options:
 - `model`: The search model to use (e.g., `linkup-standard`, `linkup-deep`)
 - `include_images`: Whether to include images in search results
 - `include_inline_citations`: Whether to include inline citations in the answer
+
+### Document Engines
+
+The engines a `PipeDocGen` step prints with are models of the `doc_gen` family in the `internal` backend. `reportlab-pdf` is built into Pipelex, declared in `internal.toml`, and prints a `pdf` from the auto-layout of the step's inputs. `pipelex-pdf`, `pipelex-xlsx`, `pipelex-docx` and `pipelex-pptx` come with the Pipelex document generation plugin, which declares them when it loads, so no file of yours lists them. Each lists the sources it prints from as its `inputs` (`layout`, `html` or `template_file`) and its format as its `outputs`. `.pipelex/inference/deck/5_doc_gen_deck.toml` names the engine a step prints with when it names none, for the one format and source open Pipelex prints:
+
+```toml
+[doc_gen.choice_defaults]
+"pdf.layout" = "@default-pdf"
+
+[doc_gen.aliases]
+default-pdf = "reportlab-pdf"
+```
+
+The plugin declares the defaults for a `pdf` from a template and for `xlsx`, `docx` and `pptx` itself, beneath the deck files. You can still set any default yourself, for any format and source, in an `x_custom_*.toml` deck file, which overrides both. A step names another engine with `model`, such as `model = "pipelex-pdf"` for a PDF without a template. See [PipeDocGen](../../building-methods/pipes/pipe-operators/PipeDocGen.md).
 
 ### Default Choices
 
@@ -661,7 +692,7 @@ for_object = "@my-custom-alias"
 
 # Add custom waterfalls - lists of models tried in order
 [llm.waterfalls]
-premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.2"]
+premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.4"]
 small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 ```
 
@@ -675,7 +706,7 @@ document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 When using waterfalls in `.mthds` files, prefix them with `~`:
 
 ```toml
-model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.2
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.4
 model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 
@@ -732,7 +763,7 @@ pipelex migrate             # ask, then rewrite in place
 What it touches and what it leaves alone:
 
 - **Every `*.toml` directly in `inference/backends/`** — the files this page describes, in both the global `~/.pipelex/` and a project's `.pipelex/`.
-- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`.
+- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`, which also refreshes `internal.toml` from the kit.
 - **Not a key you added yourself.** The history only describes keys *we* removed or renamed. An unknown key of your own — a misspelled `maxx_tokens`, an extra header that is not header-shaped — is still an error, and it names the file, the key and what to do. That is deliberate: silently dropping a key you meant to set would change which model you get.
 - **Every file it rewrites is copied first**, beside itself, as `<file>.bak.<UTC timestamp>`. Running the command twice is the same as running it once — a file already up to date comes back byte for byte identical.
 

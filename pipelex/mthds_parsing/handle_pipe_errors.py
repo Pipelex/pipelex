@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeOperatorModelChoiceError, PipeValidationError
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -234,4 +234,35 @@ def categorize_pipe_factory_error(
         missing_concept_code=factory_error.missing_concept_code,
         declared_concepts=factory_error.declared_concepts,
         message=factory_error.message,
+    )
+
+
+def categorize_pipe_operator_model_choice_error(
+    *,
+    model_choice_error: PipeOperatorModelChoiceError,
+) -> PipesAndConceptValidationErrorData:
+    """Categorize an unknown model into the ``unknown_model`` error data, located on its pipe and field.
+
+    The ``field_path`` addresses the reference in the bundle (``pipe.<code>.model``, or
+    ``pipe.<code>.model_to_structure`` on a ``PipeLLM``). The reference as written, the model type and
+    the deck's suggestions ride as their own fields, and the suggestions stay in the message too, for
+    the consumers that keep only an item's message.
+
+    Args:
+        model_choice_error: The located unknown-model refusal a pipe operator raised when it was built.
+
+    Returns:
+        PipesAndConceptValidationErrorData with the unknown-model locators populated
+    """
+    return PipesAndConceptValidationErrorData(
+        error_type=PipeValidationErrorType.UNKNOWN_MODEL,
+        domain_code=model_choice_error.domain_code,
+        source=model_choice_error.source,
+        pipe_code=model_choice_error.pipe_code,
+        field_name=model_choice_error.field_name,
+        field_path=f"pipe.{model_choice_error.pipe_code}.{model_choice_error.field_name}",
+        message=model_choice_error.message,
+        model_reference=model_choice_error.model_choice,
+        model_type=model_choice_error.model_type,
+        suggestions=list(model_choice_error.suggestions),
     )

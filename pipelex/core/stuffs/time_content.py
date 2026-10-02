@@ -1,15 +1,17 @@
 import datetime
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, field_validator
-from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.core.stuffs.iso_temporal import parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.misc.string_utils import is_numeric_string
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class TimeContent(StuffContent):
@@ -71,7 +73,10 @@ class TimeContent(StuffContent):
         return json.dumps({"time": self.time.isoformat()})
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.json import JSON
+
         # The base renders smart_dump() (a real time object, which stdlib json can't serialize);
         # render the ISO JSON instead so pretty_print of a Time does not crash.
         return JSON(self.rendered_json())

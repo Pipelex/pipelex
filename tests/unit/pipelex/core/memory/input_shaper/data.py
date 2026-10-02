@@ -1,6 +1,6 @@
 """Shared fixtures data for the InputShaper unit tests.
 
-Defines a small library of concepts covering each D5 arm — Text/Number/YesNo/Date/Image/Document
+Defines a small library of concepts covering each D5 arm — Text/Number/YesNo/Date/Image/Document/JSON
 refinements plus structured concepts — and a helper to build an ``InputStuffSpecs`` fixture from a
 list of ``(variable_name, concept_ref, multiplicity)`` entries resolved against the current library.
 """
@@ -13,6 +13,7 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -50,6 +51,10 @@ class Exhibit(DocumentContent):
     """Refines native Document."""
 
 
+class Payload(JSONContent):
+    """Refines native JSON — the subclass generated for `refines = "JSON"`."""
+
+
 # Structured test concepts carry a `Shaper`-prefixed name so their registration in the by-name
 # global class registry can never be shadowed by an identically-named StructuredContent from another
 # test suite (e.g. an integration test's `Person`/`Invoice`). The concept code matches the class name
@@ -64,6 +69,13 @@ class ShaperPerson(StructuredContent):
     name: str = Field(description="The person's name")
 
 
+class ShaperRecord(StructuredContent):
+    """A structure every field of which is optional, so any object built of its keys validates."""
+
+    a: int | None = Field(default=None, description="An optional number")
+    b: int | None = Field(default=None, description="Another optional number")
+
+
 class ShaperWeird(StructuredContent):
     """A pathological structure whose fields are literally `concept` and `content` (collision-rule test)."""
 
@@ -73,7 +85,7 @@ class ShaperWeird(StructuredContent):
 
 # Non-StructuredContent refinements — registered explicitly (the refinement machinery would register
 # a subclass like these for a `refines = "<native>"` concept).
-REFINING_CLASSES = [Question, Priority, Verdict, Deadline, OpeningTime, Photo, Exhibit]
+REFINING_CLASSES = [Question, Priority, Verdict, Deadline, OpeningTime, Photo, Exhibit, Payload]
 
 # (concept_code, structure_class_name, refines) for every test concept.
 CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
@@ -84,8 +96,10 @@ CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
     ("OpeningTime", "OpeningTime", "native.Time"),
     ("Photo", "Photo", "native.Image"),
     ("Exhibit", "Exhibit", "native.Document"),
+    ("Payload", "Payload", "native.JSON"),
     ("ShaperInvoice", "ShaperInvoice", None),
     ("ShaperPerson", "ShaperPerson", None),
+    ("ShaperRecord", "ShaperRecord", None),
     ("ShaperWeird", "ShaperWeird", None),
 ]
 

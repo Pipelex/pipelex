@@ -27,7 +27,9 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 class TestJudgmentGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode) -> JudgmentAssignment:
         return JudgmentAssignment(
-            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_judgment_dry")),
+            job_metadata=JobMetadata(
+                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_judgment_dry")
+            ),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             state={"message": "the roof is on fire"},
             questions={

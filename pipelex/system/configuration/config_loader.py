@@ -65,8 +65,10 @@ class ConfigLoader:
         """The warning a tolerated boot owes the user, once — or ``None`` when the load was clean.
 
         The loader parks it rather than logging it because the main configuration is what
-        *configures logging*: at the moment the retry succeeds there is no logger yet, and the
-        dispatch raises on any attempt. The boot emits it right after ``log.configure``.
+        *configures logging*: at the moment the retry succeeds no handler is installed yet, and a
+        line emitted then goes to the stdlib's default handling, where an ``INFO`` is dropped and a
+        warning lands on stderr unformatted, ahead of the console about to be configured. The boot
+        emits it right after ``log.configure``, where it reads like every other line.
         """
         warning, self._stale_warning = self._stale_warning, None
         return warning
@@ -308,11 +310,12 @@ class ConfigLoader:
 
         copy_directory_structure(src_dir=config_template_dir, dst_dir=global_dir)
 
-        # Stamp the deck manifest so the boot-time staleness check has a baseline.
+        # Stamp the kit manifests of the deck and of backends/internal.toml so the boot-time staleness
+        # check and `pipelex update` have a baseline.
         # Imported lazily to avoid a circular import — config_loader is loaded very early.
-        from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest  # ruff: ignore[import-outside-top-level]
+        from pipelex.cogt.models.deck_manifest import stamp_kit_manifests  # ruff: ignore[import-outside-top-level]
 
-        write_manifest(compute_kit_manifest(), deck_dir=global_dir / "inference" / "deck")
+        stamp_kit_manifests(inference_dir=global_dir / "inference")
 
     @classmethod
     def _override_files_for_dir(cls, config_dir: Path, *, include_run_mode: bool) -> list[Path]:

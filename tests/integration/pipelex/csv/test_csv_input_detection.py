@@ -60,7 +60,7 @@ class TestCsvInputDetection:
         load_test_library([BUNDLE_DIR])
         inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": remote_url}}}
         with pytest.raises(CsvError) as exc_info:
-            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         message = str(exc_info.value)
         assert "local" in message.lower()
         # The path is preserved so the user can identify the offending input...
@@ -80,7 +80,7 @@ class TestCsvInputDetection:
         assert resolved["people"]["content"]["url"] == "s3://bucket/people.csv"  # not rewritten
         inputs = cast("PipelineInputs", resolved)
         with pytest.raises(CsvError) as exc_info:
-            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         assert "local" in str(exc_info.value).lower()
 
     def test_xlsx_input_routes_to_tabular_seam(self, load_test_library: Callable[[list[Path]], None]) -> None:
@@ -89,7 +89,7 @@ class TestCsvInputDetection:
         # raises a clear "needs pipelex[tabular]" CsvError (the Excel backend isn't built in v1).
         inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": "people.xlsx"}}}
         with pytest.raises(CsvError) as exc_info:
-            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         assert "pipelex[tabular]" in str(exc_info.value)
 
     def test_unparseable_url_rejected_without_leak(self, load_test_library: Callable[[list[Path]], None]) -> None:
@@ -99,7 +99,7 @@ class TestCsvInputDetection:
         bad_url = "https://[bad/people.csv?token=abc"
         inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": bad_url}}}
         with pytest.raises(CsvError) as exc_info:
-            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+            WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         message = str(exc_info.value)
         assert "local" in message.lower()
         # The unparseable url can't be sanitized, so it is not echoed at all — the token must not leak.
@@ -109,7 +109,7 @@ class TestCsvInputDetection:
         load_test_library([URL_FIELD_DIR])
         # url field value that is NOT a tabular suffix → ordinary single record, not a CSV table.
         inputs: PipelineInputs = {"link": {"concept": "url_field_concept.Link", "content": {"label": "Home", "url": "https://example.com"}}}
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
 
         content = working_memory.get_stuff("link").content
         assert not isinstance(content, ListContent)
@@ -122,7 +122,7 @@ class TestCsvInputDetection:
         # A record that has sibling keys alongside a .csv-suffixed `url` is NOT a table reference:
         # detection is gated to the bare {"url": ...} wrapper, so the siblings are never dropped.
         inputs: PipelineInputs = {"link": {"concept": "url_field_concept.Link", "content": {"label": "Home", "url": "report.csv"}}}
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
 
         content = working_memory.get_stuff("link").content
         assert not isinstance(content, ListContent)
@@ -134,7 +134,7 @@ class TestCsvInputDetection:
         load_test_library([URL_FIELD_DIR])
         # The file-level url ends .csv → read as a table; the inner `url` column is plain data.
         inputs: PipelineInputs = {"links": {"concept": "url_field_concept.Link", "content": {"url": str(LINKS_CSV)}}}
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
 
         content = working_memory.get_stuff("links").content
         assert isinstance(content, ListContent)
@@ -149,7 +149,7 @@ class TestCsvInputDetection:
         people_csv.write_text(PEOPLE_CSV.read_text(encoding="utf-8"), encoding="utf-8")
         inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": str(people_csv)}}}
 
-        first = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+        first = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         first_people = cast("ListContent[StuffContent]", first.get_stuff("people").content)
         assert len(first_people.items) == 3
 
@@ -158,6 +158,6 @@ class TestCsvInputDetection:
             "name,job,country,birth_year,death_year\nAda Lovelace,Mathematician,United Kingdom,1815,1852\n",
             encoding="utf-8",
         )
-        second = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library())
+        second = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         second_people = cast("ListContent[StuffContent]", second.get_stuff("people").content)
         assert len(second_people.items) == 1

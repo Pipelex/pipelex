@@ -30,7 +30,7 @@ Define a reusable preset in your LLM deck, then reference it with the `$` prefix
 ```toml
 # In .pipelex/inference/deck/1_llm_deck.toml
 [llm.presets]
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high" }
 ```
 
 ```toml
@@ -87,13 +87,13 @@ Effort maps to a `ThinkingLevel` enum sent to the Google SDK:
 model = { model = "gemini-3.1-pro", temperature = 0.3, reasoning_effort = "high" }
 ```
 
-**GPT-5.2 — manual mode**
+**GPT-5.4 — manual mode**
 
 Effort maps directly to OpenAI's `reasoning_effort` parameter:
 
 ```toml
 # Manual: effort "max" -> reasoning_effort = "xhigh" in the SDK call
-model = { model = "gpt-5.2", temperature = 0.1, reasoning_effort = "max" }
+model = { model = "gpt-5.4", temperature = 0.1, reasoning_effort = "max" }
 ```
 
 !!! note "Structured Generation"
@@ -158,7 +158,7 @@ flowchart TB
     C -->|Anthropic| E["_build_thinking_params()<br>-> _ThinkingParams"]
     C -->|Google| F["_build_thinking_config()<br>-> ThinkingConfig"]
     C -->|Mistral| G["_resolve_prompt_mode()<br>-> prompt_mode"]
-    C -->|Bedrock (aioboto3)| H["_validate_no_reasoning_params()<br>-> LLMCapabilityError if set"]
+    C -->|Bedrock (aiobotocore)| H["_validate_no_reasoning_params()<br>-> LLMCapabilityError if set"]
 ```
 
 ---
@@ -308,9 +308,9 @@ Mistral does not support `reasoning_budget` or `thinking_mode = "adaptive"`. Bot
 
 Temperature is passed normally to the Mistral API regardless of reasoning mode.
 
-### Bedrock (aioboto3 native models)
+### Bedrock (aiobotocore native models)
 
-Bedrock native models using the `bedrock_aioboto3` SDK do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
+Bedrock native models using the `bedrock_aioboto` SDK do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
 
 !!! note
     Claude models accessed through Bedrock use the `bedrock_anthropic` SDK variant and go through the Anthropic worker, which does support reasoning.
@@ -423,7 +423,7 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `reasoning_effort` on a `thinking_mode = "none"` model | "does not support reasoning" |
 | `reasoning_budget` on a provider that doesn't support it | "does not support reasoning_budget" |
 | `thinking_mode = "adaptive"` on OpenAI or Mistral | "adaptive ... not supported" |
-| Any reasoning param on Bedrock (aioboto3) models | "does not support reasoning parameters" |
+| Any reasoning param on Bedrock (aiobotocore) models | "does not support reasoning parameters" |
 | Reasoning params during structured generation | "does not support reasoning parameters for structured generation" |
 | Both `reasoning_effort` and `reasoning_budget` set | `ValueError` / `LLMSettingValueError` (mutual exclusivity) |
 

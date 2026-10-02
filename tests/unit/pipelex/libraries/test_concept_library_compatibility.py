@@ -100,21 +100,28 @@ class TestConceptLibraryCompatibility:
 
         assert library.is_compatible(tested_concept=one, wanted_concept=other) is False
 
-    def test_the_structureless_native_concept_is_answered_not_raised(self):
-        """`native.Anything` declares no content class, so there is no structural check to attempt.
+    @pytest.mark.parametrize("strict", [False, True])
+    def test_every_concept_satisfies_the_structureless_native_concept(self, strict: bool):
+        """`native.Anything` is the top of the lattice: every concept satisfies it, and it satisfies nothing narrower.
 
-        This is the one case where "no class" is a property of the concept rather than a missing
-        registration, and it must stay a plain `False` — the loud raise is for names that *should*
-        have resolved.
+        The declaration tier decides both directions, so no class is ever resolved: the user concept
+        below names a structure class that is never registered, and asking about it still answers
+        instead of raising `ConceptStructureClassNotFoundError`. The reverse direction stays a plain
+        `False` rather than a raise, because `Anything`'s missing class is a property of the concept,
+        not a missing registration.
         """
         library = ConceptLibrary.make_empty_with_native_concepts()
         anything = library.get_native_concept(native_concept=NativeConceptCode.ANYTHING)
         text = library.get_native_concept(native_concept=NativeConceptCode.TEXT)
+        dynamic = library.get_native_concept(native_concept=NativeConceptCode.DYNAMIC)
+        user_concept = _make_concept(code="Ghost", domain_code="nowhere", structure_class_name="GhostContentThatIsNeverRegistered")
 
         assert anything.declares_a_structure_class is False
         assert text.declares_a_structure_class is True
-        assert library.is_compatible(tested_concept=anything, wanted_concept=text) is False
-        assert library.is_compatible(tested_concept=text, wanted_concept=anything) is False
+        for tested in (text, dynamic, user_concept, anything):
+            assert library.is_compatible(tested_concept=tested, wanted_concept=anything, strict=strict) is True, tested.concept_ref
+        assert library.is_compatible(tested_concept=anything, wanted_concept=text, strict=strict) is False
+        assert library.is_compatible(tested_concept=anything, wanted_concept=user_concept, strict=strict) is False
 
     def test_get_structure_class_raises_on_an_unregistered_name(self):
         library = ConceptLibrary.make_empty()

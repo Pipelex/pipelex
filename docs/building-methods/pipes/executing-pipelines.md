@@ -216,7 +216,7 @@ pipe_output = response.pipe_output
 
 ## Using the Pipelex API
 
-Pipelex has a REST API for executing pipelines. See more about it [here](https://pipelex.github.io/pipelex-api/).
+The [Pipelex API server](../../api-server/index.md) runs pipelines over HTTP on infrastructure you host yourself: it is published as the `pipelex/pipelex-api` Docker image, and [Pipe Run](../../api-server/pipe-run.md) documents its `/v1/execute` and `/v1/start` routes.
 
 ---
 

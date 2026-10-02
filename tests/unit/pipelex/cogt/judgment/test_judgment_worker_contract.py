@@ -73,7 +73,9 @@ class TestJudgmentWorkerContract:
             state={"message": "the roof is on fire"},
             questions=questions,
             judgment_setting=JudgmentSetting(model="fake-judgment-handle"),
-            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_judgment")),
+            job_metadata=JobMetadata(
+                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_judgment")
+            ),
         )
 
     def _model(self) -> InferenceModelSpec:

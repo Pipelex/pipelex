@@ -203,8 +203,10 @@ def _classify_gateway_routing_refusal(*, refusal: GatewayRoutingRefusal) -> Clas
 
     Every member is ``CONFIGURATION``: nothing in the prompt, the parameters or the
     inputs causes any of these, and no edit to them avoids one. That is the whole
-    point of the family — without it all four take the status ladder's 400 arm and
-    read as a provider rejecting the caller's content.
+    point of the family — without it the ``pig-`` members take the status ladder's
+    400 arm and read as a provider rejecting the caller's content, and
+    ``MODEL_NOT_ALLOWED`` takes its generic 4xx arm, whose domain is right but whose
+    action sends the caller to edit their inputs.
 
     None is retryable, for the reason none of the other two gateway families is:
     the gateway refused before a provider saw the request, and an identical retry
@@ -225,9 +227,10 @@ def _classify_gateway_routing_refusal(*, refusal: GatewayRoutingRefusal) -> Clas
                 is_model_not_found=True,
                 gateway_routing_refusal=refusal,
             )
-        case GatewayRoutingRefusal.WRONG_PROTOCOL | GatewayRoutingRefusal.UNSERVED_CAPABILITY:
-            # The model exists and is served — it just cannot do what was asked, or
-            # was asked over a protocol its integration does not speak. So the flag
+        case GatewayRoutingRefusal.WRONG_PROTOCOL | GatewayRoutingRefusal.UNSERVED_CAPABILITY | GatewayRoutingRefusal.MODEL_NOT_ALLOWED:
+            # The model exists and is served — it just cannot do what was asked, was
+            # asked over a protocol its integration does not speak, or is served by
+            # an integration that does not allow it for this caller. So the flag
             # stays unset: telling a caller the model was not found would be false,
             # and the Render step carries the real distinction. ``CHANGE_MODEL`` is
             # still what an end caller can do about it.
@@ -289,9 +292,11 @@ def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult
     # And its refusals to route the request at all, on the same footing again. All
     # three gateway code sets are disjoint, so the order among these branches
     # carries no meaning; what matters is that all three run ahead of the status
-    # ladder. Every routing refusal arrives on 400, which the ladder would read as
-    # a provider rejecting the prompt — for a model the gateway does not serve, is
-    # not configured to reach, or cannot ask what was asked.
+    # ladder. The ``pig-`` refusals arrive on 400, which the ladder would read as a
+    # provider rejecting the prompt — for a model the gateway does not serve, is
+    # not configured to reach, or cannot ask what was asked. The substrate's
+    # ``model_not_allowed_error`` arrives on 412, which the ladder would send to
+    # the prompt, the parameters and the inputs too.
     gateway_routing_refusal = metadata.gateway_routing_refusal
     if gateway_routing_refusal is not None:
         return _classify_gateway_routing_refusal(refusal=gateway_routing_refusal)

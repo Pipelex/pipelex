@@ -65,7 +65,7 @@ def _job(questions: dict[str, JudgmentQuestion]) -> JudgmentJob:
         state={"message": "Our production checkout has been returning 500s for every card payment since 09:14 UTC."},
         questions=questions,
         judgment_setting=JudgmentSetting(model="jev-1.13.0"),
-        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_typesafe")),
+        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_typesafe")),
     )
 
 

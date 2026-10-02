@@ -1,0 +1,379 @@
+{
+  "invoice": {
+    "concept": "invoice_rendering.Invoice",
+    "content": {
+      "number": "INV-2026-0142",
+      "issue_date": "2026-09-29",
+      "due_date": "2026-10-29",
+      "customer": {
+        "name": "Evotis S.A.S.",
+        "address": "12 rue de la Paix, 75002 Paris"
+      },
+      "currency": "EUR",
+      "line_items": [
+        {
+          "description": "Method design workshop — day 1",
+          "quantity": 1,
+          "unit_price": 850.0,
+          "amount": 850.0
+        },
+        {
+          "description": "Pipeline implementation — day 2",
+          "quantity": 2,
+          "unit_price": 860.0,
+          "amount": 1720.0
+        },
+        {
+          "description": "Prompt engineering review — day 3",
+          "quantity": 3,
+          "unit_price": 870.0,
+          "amount": 2610.0
+        },
+        {
+          "description": "Structured output hardening — day 4",
+          "quantity": 1,
+          "unit_price": 880.0,
+          "amount": 880.0
+        },
+        {
+          "description": "Document extraction tuning — day 5",
+          "quantity": 2,
+          "unit_price": 890.0,
+          "amount": 1780.0
+        },
+        {
+          "description": "Integration testing — day 6",
+          "quantity": 3,
+          "unit_price": 850.0,
+          "amount": 2550.0
+        },
+        {
+          "description": "Deployment support — day 7",
+          "quantity": 1,
+          "unit_price": 860.0,
+          "amount": 860.0
+        },
+        {
+          "description": "Training session — day 8",
+          "quantity": 2,
+          "unit_price": 870.0,
+          "amount": 1740.0
+        },
+        {
+          "description": "Method design workshop — day 9",
+          "quantity": 3,
+          "unit_price": 880.0,
+          "amount": 2640.0
+        },
+        {
+          "description": "Pipeline implementation — day 10",
+          "quantity": 1,
+          "unit_price": 890.0,
+          "amount": 890.0
+        },
+        {
+          "description": "Prompt engineering review — day 11",
+          "quantity": 2,
+          "unit_price": 850.0,
+          "amount": 1700.0
+        },
+        {
+          "description": "Structured output hardening — day 12",
+          "quantity": 3,
+          "unit_price": 860.0,
+          "amount": 2580.0
+        },
+        {
+          "description": "Document extraction tuning — day 13",
+          "quantity": 1,
+          "unit_price": 870.0,
+          "amount": 870.0
+        },
+        {
+          "description": "Integration testing — day 14",
+          "quantity": 2,
+          "unit_price": 880.0,
+          "amount": 1760.0
+        },
+        {
+          "description": "Deployment support — day 15",
+          "quantity": 3,
+          "unit_price": 890.0,
+          "amount": 2670.0
+        },
+        {
+          "description": "Training session — day 16",
+          "quantity": 1,
+          "unit_price": 850.0,
+          "amount": 850.0
+        },
+        {
+          "description": "Method design workshop — day 17",
+          "quantity": 2,
+          "unit_price": 860.0,
+          "amount": 1720.0
+        },
+        {
+          "description": "Pipeline implementation — day 18",
+          "quantity": 3,
+          "unit_price": 870.0,
+          "amount": 2610.0
+        },
+        {
+          "description": "Prompt engineering review — day 19",
+          "quantity": 1,
+          "unit_price": 880.0,
+          "amount": 880.0
+        },
+        {
+          "description": "Structured output hardening — day 20",
+          "quantity": 2,
+          "unit_price": 890.0,
+          "amount": 1780.0
+        },
+        {
+          "description": "Document extraction tuning — day 21",
+          "quantity": 3,
+          "unit_price": 850.0,
+          "amount": 2550.0
+        },
+        {
+          "description": "Integration testing — day 22",
+          "quantity": 1,
+          "unit_price": 860.0,
+          "amount": 860.0
+        },
+        {
+          "description": "Deployment support — day 23",
+          "quantity": 2,
+          "unit_price": 870.0,
+          "amount": 1740.0
+        },
+        {
+          "description": "Training session — day 24",
+          "quantity": 3,
+          "unit_price": 880.0,
+          "amount": 2640.0
+        },
+        {
+          "description": "Method design workshop — day 25",
+          "quantity": 1,
+          "unit_price": 890.0,
+          "amount": 890.0
+        },
+        {
+          "description": "Pipeline implementation — day 26",
+          "quantity": 2,
+          "unit_price": 850.0,
+          "amount": 1700.0
+        },
+        {
+          "description": "Prompt engineering review — day 27",
+          "quantity": 3,
+          "unit_price": 860.0,
+          "amount": 2580.0
+        },
+        {
+          "description": "Structured output hardening — day 28",
+          "quantity": 1,
+          "unit_price": 870.0,
+          "amount": 870.0
+        },
+        {
+          "description": "Document extraction tuning — day 29",
+          "quantity": 2,
+          "unit_price": 880.0,
+          "amount": 1760.0
+        },
+        {
+          "description": "Integration testing — day 30",
+          "quantity": 3,
+          "unit_price": 890.0,
+          "amount": 2670.0
+        },
+        {
+          "description": "Deployment support — day 31",
+          "quantity": 1,
+          "unit_price": 850.0,
+          "amount": 850.0
+        },
+        {
+          "description": "Training session — day 32",
+          "quantity": 2,
+          "unit_price": 860.0,
+          "amount": 1720.0
+        },
+        {
+          "description": "Method design workshop — day 33",
+          "quantity": 3,
+          "unit_price": 870.0,
+          "amount": 2610.0
+        },
+        {
+          "description": "Pipeline implementation — day 34",
+          "quantity": 1,
+          "unit_price": 880.0,
+          "amount": 880.0
+        },
+        {
+          "description": "Prompt engineering review — day 35",
+          "quantity": 2,
+          "unit_price": 890.0,
+          "amount": 1780.0
+        },
+        {
+          "description": "Structured output hardening — day 36",
+          "quantity": 3,
+          "unit_price": 850.0,
+          "amount": 2550.0
+        },
+        {
+          "description": "Document extraction tuning — day 37",
+          "quantity": 1,
+          "unit_price": 860.0,
+          "amount": 860.0
+        },
+        {
+          "description": "Integration testing — day 38",
+          "quantity": 2,
+          "unit_price": 870.0,
+          "amount": 1740.0
+        },
+        {
+          "description": "Deployment support — day 39",
+          "quantity": 3,
+          "unit_price": 880.0,
+          "amount": 2640.0
+        },
+        {
+          "description": "Training session — day 40",
+          "quantity": 1,
+          "unit_price": 890.0,
+          "amount": 890.0
+        },
+        {
+          "description": "Method design workshop — day 41",
+          "quantity": 2,
+          "unit_price": 850.0,
+          "amount": 1700.0
+        },
+        {
+          "description": "Pipeline implementation — day 42",
+          "quantity": 3,
+          "unit_price": 860.0,
+          "amount": 2580.0
+        },
+        {
+          "description": "Prompt engineering review — day 43",
+          "quantity": 1,
+          "unit_price": 870.0,
+          "amount": 870.0
+        },
+        {
+          "description": "Structured output hardening — day 44",
+          "quantity": 2,
+          "unit_price": 880.0,
+          "amount": 1760.0
+        },
+        {
+          "description": "Document extraction tuning — day 45",
+          "quantity": 3,
+          "unit_price": 890.0,
+          "amount": 2670.0
+        },
+        {
+          "description": "Integration testing — day 46",
+          "quantity": 1,
+          "unit_price": 850.0,
+          "amount": 850.0
+        },
+        {
+          "description": "Deployment support — day 47",
+          "quantity": 2,
+          "unit_price": 860.0,
+          "amount": 1720.0
+        },
+        {
+          "description": "Training session — day 48",
+          "quantity": 3,
+          "unit_price": 870.0,
+          "amount": 2610.0
+        },
+        {
+          "description": "Method design workshop — day 49",
+          "quantity": 1,
+          "unit_price": 880.0,
+          "amount": 880.0
+        },
+        {
+          "description": "Pipeline implementation — day 50",
+          "quantity": 2,
+          "unit_price": 890.0,
+          "amount": 1780.0
+        },
+        {
+          "description": "Prompt engineering review — day 51",
+          "quantity": 3,
+          "unit_price": 850.0,
+          "amount": 2550.0
+        },
+        {
+          "description": "Structured output hardening — day 52",
+          "quantity": 1,
+          "unit_price": 860.0,
+          "amount": 860.0
+        },
+        {
+          "description": "Document extraction tuning — day 53",
+          "quantity": 2,
+          "unit_price": 870.0,
+          "amount": 1740.0
+        },
+        {
+          "description": "Integration testing — day 54",
+          "quantity": 3,
+          "unit_price": 880.0,
+          "amount": 2640.0
+        },
+        {
+          "description": "Deployment support — day 55",
+          "quantity": 1,
+          "unit_price": 890.0,
+          "amount": 890.0
+        },
+        {
+          "description": "Training session — day 56",
+          "quantity": 2,
+          "unit_price": 850.0,
+          "amount": 1700.0
+        },
+        {
+          "description": "Method design workshop — day 57",
+          "quantity": 3,
+          "unit_price": 860.0,
+          "amount": 2580.0
+        },
+        {
+          "description": "Pipeline implementation — day 58",
+          "quantity": 1,
+          "unit_price": 870.0,
+          "amount": 870.0
+        },
+        {
+          "description": "Prompt engineering review — day 59",
+          "quantity": 2,
+          "unit_price": 880.0,
+          "amount": 1760.0
+        },
+        {
+          "description": "Structured output hardening — day 60",
+          "quantity": 3,
+          "unit_price": 890.0,
+          "amount": 2670.0
+        }
+      ],
+      "total": 104400.0,
+      "notes": "**Payment terms**\n\n- Bank transfer within 30 days\n- Late payments bear interest at three times the legal rate\n\nThank you for your trust."
+    }
+  }
+}

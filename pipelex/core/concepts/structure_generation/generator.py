@@ -364,7 +364,8 @@ class StructureGenerator:
 
         The concept ref is already normalized by the resolved-field layer (natives flagged, bare
         refs promoted to the local domain). Emits:
-        - for native concepts: an import of the native content class and its class name;
+        - for native concepts: an import of the native content class and its class name, or `Any` for
+          `native.Anything`, which has no content class;
         - otherwise: a domain-qualified forward reference (resolved via model_rebuild at runtime).
         """
         concept_ref = resolved_type.concept_ref
@@ -382,6 +383,9 @@ class StructureGenerator:
                 if structure_class:
                     self.imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
                     return structure_class.__name__
+                # `native.Anything` has no content class: a field holding it holds any value, and a forward
+                # reference to its code would name a class no namespace has.
+                return "Any"
 
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
         parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)

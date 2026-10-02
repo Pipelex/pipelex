@@ -13,6 +13,7 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.pretty import PRETTY_WIDTH_FOR_EXPORT
+from pipelex.tools.misc.rich_extra import is_rich_installed
 
 # Template registry key
 _STUFF_VIEWER_TEMPLATE_KEY = "stuff/stuff_viewer.html.jinja2"
@@ -44,7 +45,9 @@ async def render_stuff_viewer(
 
     # Get content data in various formats
     stuff_data = stuff.content.smart_dump()
-    stuff_data_text = stuff.content.rendered_pretty_text(width=PRETTY_WIDTH_FOR_EXPORT)
+    # The Pretty tab is Rich's text rendering, and Rich is the `cli` extra: without it the tab shows the JSON,
+    # which is the fallback the page already has for a missing text rendering.
+    stuff_data_text = stuff.content.rendered_pretty_text(width=PRETTY_WIDTH_FOR_EXPORT) if is_rich_installed() else None
     stuff_data_html = await stuff.content.rendered_html_async()
     content_type = stuff.content.content_type
 

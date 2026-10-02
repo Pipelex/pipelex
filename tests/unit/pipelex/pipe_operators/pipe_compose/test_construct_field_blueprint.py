@@ -323,6 +323,19 @@ class TestConstructFieldBlueprintValidation:
         with pytest.raises(ConstructFieldBlueprintTypeError, match="string path"):
             ConstructFieldBlueprint.make_from_raw({"from": 123})
 
+    @pytest.mark.parametrize(
+        "from_path",
+        ["note.__class__.__init__.__globals__.sys.modules.os.environ", "note._stuff", "_private"],
+    )
+    def test_from_path_with_private_segment_raises_value_error(self, from_path: str):
+        """A 'from' path is walked with getattr at run time, so a segment starting with an underscore is refused at load."""
+        with pytest.raises(ConstructFieldBlueprintValueError, match="starting with an underscore"):
+            ConstructFieldBlueprint.make_from_raw({"from": from_path})
+
+    def test_list_to_dict_keyed_by_private_name_raises_value_error(self):
+        with pytest.raises(ConstructFieldBlueprintValueError, match="starting with an underscore"):
+            ConstructFieldBlueprint.make_from_raw({"from": "items", "list_to_dict_keyed_by": "__module__"})
+
     def test_list_to_dict_keyed_by_not_string_raises_type_error(self):
         """'list_to_dict_keyed_by' value must be a string."""
         with pytest.raises(ConstructFieldBlueprintTypeError, match="string attribute name"):

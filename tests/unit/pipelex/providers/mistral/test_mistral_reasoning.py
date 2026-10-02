@@ -101,7 +101,7 @@ class TestMistralReasoning:
 
     def test_no_reasoning_params_returns_unset(self, mocker: MockerFixture):
         """When neither reasoning_effort nor reasoning_budget is set, returns UNSET."""
-        from mistralai.types import UNSET  # ruff: ignore[import-outside-top-level]
+        from mistralai.client.types import UNSET  # ruff: ignore[import-outside-top-level]
 
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5)

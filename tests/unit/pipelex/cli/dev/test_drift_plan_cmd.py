@@ -69,12 +69,12 @@ class TestDriftPlanCmd:
         assert "- docs/demo.md" in output
 
     def test_ack_invocation_is_exact_and_copy_pasteable(self, git_repo: GitRepo, capfd: pytest.CaptureFixture[str]) -> None:
-        """Agents run the emitted make command verbatim — its shape is part of the contract."""
+        """Agents run the emitted make command with only its placeholder filled in — its shape is part of the contract."""
         _seed_repo(git_repo)
         drift_plan_cmd(repo_root=git_repo.root)
         output = capfd.readouterr().out
-        assert 'make drift-ack CONTRACT=demo-docs RATIONALE="…"' in output
-        assert 'make drift-ack CONTRACT=other-docs RATIONALE="…"' in output
+        assert 'make drift-ack CONTRACT=demo-docs RATIONALE="<real-catch|clean-pass|friction>: …"' in output
+        assert 'make drift-ack CONTRACT=other-docs RATIONALE="<real-catch|clean-pass|friction>: …"' in output
 
     def test_modified_trigger_and_previous_rationale_are_reported(self, git_repo: GitRepo, capfd: pytest.CaptureFixture[str]) -> None:
         _seed_repo(git_repo)

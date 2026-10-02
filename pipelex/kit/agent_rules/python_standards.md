@@ -50,6 +50,7 @@
 - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
 - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
 - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.
+- **Rich is the standing exception.** It is the `cli` extra, which a server does not install, so outside `pipelex/cli/` it is imported inside the function that renders, after `require_rich(...)` (`pipelex.tools.misc.rich_extra`) or `require_rich_for_rendering()` (`pipelex.tools.misc.pretty`), and a type-only import of it goes under `if TYPE_CHECKING:`. Such a deferred import needs no suppression comment, and `make check-rich-imports` refuses a module-level one, as well as a module-level import of a CLI module that imports Rich. See `docs/contribute/rich-imports.md`.
 
 ### Removing unused imports
 

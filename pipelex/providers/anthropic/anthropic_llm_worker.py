@@ -30,7 +30,9 @@ from pipelex.cogt.llm.llm_utils import (
     dump_response_from_structured_gen,
 )
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
@@ -41,6 +43,7 @@ from pipelex.providers.anthropic.anthropic_factory import (
     AnthropicFactory,
     AnthropicSdkVariant,
 )
+from pipelex.providers.manifold.manifold_metadata import make_manifold_metadata_headers
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -248,6 +251,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 max_tokens=max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,
+                **self._request_header_kwargs(llm_job=llm_job),
             ) as stream:
                 final_message: Message = await stream.get_final_message()
         except (APIStatusError, APIConnectionError) as sdk_exc:
@@ -304,6 +308,35 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
 
         return full_reply_content
 
+    def _request_header_kwargs(self, *, llm_job: LLMJob) -> dict[str, Any]:
+        """The per-request headers this call adds, as SDK keyword arguments: none, except behind Manifold.
+
+        Claude reaches the Pipelex Manifold service over this shared driver rather than over a
+        manifold sdk, so this is where the manifold dialect's `x-pipelex-metadata` header joins an
+        Anthropic request — per request, because it names the job, where the token is a client
+        default. Every other Anthropic backend is a direct provider SDK path and sends nothing of the
+        kind: the run's identity and labels are ours to forward to our own service, not to a vendor.
+        """
+        if self.inference_model.backend_name != PipelexBackend.MANIFOLD:
+            return {}
+        return {"extra_headers": make_manifold_metadata_headers(job_metadata=llm_job.job_metadata)}
+
+    def _structure_method_kwargs(self) -> dict[str, Any]:
+        """What the structured call sends, beyond what instructor's mode sets, for the model's structure method.
+
+        instructor resolves `anthropic_reasoning_tools` to its core tool mode, which forces `tool_choice` onto
+        the response tool unless thinking is on, and thinking never is for a structured call. A model that
+        refuses a forced tool choice, Fable 5.1 among them, names that method to get the request instructor used
+        to make for it: `tool_choice` left on auto, with a system line steering the model to the tool call.
+        instructor leaves a `tool_choice` it is given as it is, and sends a `system` it is given ahead of the prompt's.
+        """
+        if self.inference_model.structure_method != StructureMethod.INSTRUCTOR_ANTHROPIC_REASONING_TOOLS:
+            return {}
+        return {
+            "tool_choice": {"type": "auto"},
+            "system": [{"type": "text", "text": "Return only the tool call and no additional text."}],
+        }
+
     @override
     async def _gen_object(
         self,
@@ -335,13 +368,16 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 messages=messages,
                 response_model=schema,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
-                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
-                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                # re-asks on a malformed/invalid output but never retries a transport error, which ends the
+                # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
+                # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
                 temperature=omit if temperature_unsupported else job_params.temperature,
                 max_tokens=effective_max_tokens,
                 timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
+                **self._structure_method_kwargs(),
+                **self._request_header_kwargs(llm_job=llm_job),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying

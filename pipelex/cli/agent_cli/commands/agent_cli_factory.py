@@ -146,16 +146,17 @@ def apply_agent_cli_output_discipline() -> None:
     start of every agent CLI entry point); this helper handles the channels that are
     INDEPENDENT of Python's logging system:
 
-      1. ``log.redirect_to_stderr`` keeps the RichHandler's console on stderr — defense
-         in case ``logging.disable`` is ever cleared.
+      1. ``log.redirect_to_stderr`` points the installed sink at stderr when it writes to a
+         process stream — defense in case ``logging.disable`` is ever cleared.
       2. ``PrettyPrinter.mode = SILENT`` neutralizes ``pretty_print(...)`` entirely
          (Rich-based, not logging-based).
       3. Hub-level ``set_console_print_target(STDERR)`` for the Rich ``Console`` used by
          banners / tables (also Rich-based, not logging-based).
 
     Safe to call from the broken-config doctor path where ``setup_doctor_runtime`` was
-    skipped: ``log.redirect_to_stderr`` no-ops when no rich_handler is registered, and
-    the hub print-target call is gated on a hub being installed.
+    skipped: ``log.redirect_to_stderr`` no-ops before a sink is installed, a sink that
+    writes to no process stream ignores it, and the hub print-target call is gated on a
+    hub being installed.
     """
     log.redirect_to_stderr()
     PrettyPrinter.mode = PrettyPrintMode.SILENT

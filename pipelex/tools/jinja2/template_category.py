@@ -2,7 +2,7 @@ from collections.abc import Callable
 from enum import StrEnum
 from typing import Any
 
-from pipelex.tools.jinja2.jinja2_filters import escape_script_tag, tag, text_format
+from pipelex.tools.jinja2.jinja2_filters import escape_script_tag, markdown_to_html, tag, text_format
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
 from pipelex.tools.jinja2.jinja2_with_images_filter import with_images
 
@@ -26,7 +26,14 @@ class TemplateCategory(StrEnum):
                 }
             case TemplateCategory.EXPRESSION:
                 return {}
-            case TemplateCategory.HTML | TemplateCategory.MARKDOWN:
+            case TemplateCategory.HTML:
+                return {
+                    Jinja2FilterName.FORMAT: text_format,
+                    Jinja2FilterName.TAG: tag,
+                    Jinja2FilterName.ESCAPE_SCRIPT_TAG: escape_script_tag,
+                    Jinja2FilterName.MARKDOWN: markdown_to_html,
+                }
+            case TemplateCategory.MARKDOWN:
                 return {
                     Jinja2FilterName.FORMAT: text_format,
                     Jinja2FilterName.TAG: tag,

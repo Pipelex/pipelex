@@ -1,17 +1,59 @@
 ---
-title: "Build & Run AI Methods"
-description: "Methods are reusable, typed AI procedures written in MTHDS and executed by Pipelex. Build repeatable AI know-how with structured concepts, focused pipes, and 60+ models."
+title: "Turn your expertise into an AI-powered App, MCP or API"
+description: "Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software."
 ---
 
 ![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png)
 
-# Build & Run AI Methods
+# Turn your expertise into an AI-powered App, MCP or API
 
-A method is a reusable, typed AI procedure — declared in a `.mthds` file and executed by Pipelex. Each step is explicit, each output is structured, and every run is repeatable.
+Describe how the work gets done in plain English, and your coding agent builds it into a method with the Pipelex plugin. A method is a multi-step, deterministic AI procedure that chains LLMs, OCR, image generation and more. Then run it as a webapp for your team or as SaaS for your customers, as an MCP for chatbots, or via API for your software.
 
-[:material-robot-outline: Claude Code](./get-started/build-with-claude-code.md){ .md-button .md-button--primary }
-[:material-school: MTHDS Tutorial](./get-started/mthds-language-tutorial.md){ .md-button }
+[:material-rocket-launch: Quick Start](./get-started/quick-start.md){ .md-button .md-button--primary }
+[:material-account-plus: Sign up at app.pipelex.com](https://app.pipelex.com){ .md-button }
 [:material-book-open-variant: Cookbook](./cookbook/index.md){ .md-button }
+
+---
+
+## Get Started
+
+<div class="grid cards" markdown>
+
+-   :material-rocket-launch: **[Quick Start](./get-started/quick-start.md)**
+
+    Sign up, install the Pipelex plugin in Claude Code or Codex, and ask your agent for the method you want — then run it from your chatbot, as a webapp, or via API.
+
+-   :material-laptop: **[Run It Yourself](./get-started/run-it-yourself.md)**
+
+    Install the Pipelex runtime and run methods on your own machine, against the model providers you choose.
+
+-   :material-school: **[MTHDS Language Tutorial](./get-started/mthds-language-tutorial.md)**
+
+    Learn the declarative language step by step: concepts, pipes, sequences, inputs, and structured outputs.
+
+-   :material-book-open-variant: **[Cookbook](./cookbook/index.md)**
+
+    Example methods you run by their address, each with a page showing every way to use it: in your chatbot, in your code, as an app, or as a method of your own.
+
+</div>
+
+---
+
+## What a Method Looks Like
+
+A method is a reusable, typed AI procedure, written in [MTHDS](https://mthds.ai/latest/), an open standard, and saved as a `.mthds` file. Each step is explicit, each output is structured, and every run is repeatable.
+
+A single pipe in MTHDS — five lines that call an LLM with typed inputs and output:
+
+```toml
+[pipe.summarize_article]
+type    = "PipeLLM"
+inputs  = { article = "Text", audience = "Text" }
+output  = "Text"
+prompt  = "Summarize $article in three bullet points for $audience."
+```
+
+From here, Pipelex handles model routing across 60+ models, structured output parsing, and pipeline orchestration.
 
 ---
 
@@ -36,22 +78,6 @@ A method is a reusable, typed AI procedure — declared in a `.mthds` file and e
     Chain pipes into sequences, nest methods inside methods, and share them with the community.
 
 </div>
-
----
-
-## What a Method Looks Like
-
-A single pipe in MTHDS — five lines that call an LLM with typed inputs and output:
-
-```toml
-[pipe.summarize_article]
-type    = "PipeLLM"
-inputs  = { article = "Text", audience = "Text" }
-output  = "Text"
-prompt  = "Summarize $article in three bullet points for $audience."
-```
-
-From here, Pipelex handles model routing across 60+ models, structured output parsing, and pipeline orchestration.
 
 ---
 
@@ -87,33 +113,16 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 
 ---
 
-## The MTHDS Ecosystem
+## The Ecosystem
 
 MTHDS is the open standard behind Pipelex methods. It defines the language, the file format, and the ecosystem for sharing methods.
 
-!!! info "Explore the ecosystem"
+!!! info "Explore the MTHDS ecosystem"
 
     - **[mthds.ai](https://mthds.ai/latest/)** — The MTHDS language specification
     - **[mthds.sh](https://mthds.sh)** — The Methods Hub for discovering and sharing methods
-    - **[MTHDS Plugins](https://github.com/mthds-ai/mthds-plugins)** — Claude Code plugin for building, running, and validating methods
 
----
+!!! info "Build and run methods with Pipelex"
 
-## Get Started
-
-<div class="grid cards" markdown>
-
--   :material-robot-outline: **[Build with Claude Code](./get-started/build-with-claude-code.md)**
-
-    Describe what you want in natural language — Claude writes, runs, and iterates on your method for you.
-
--   :material-school: **[MTHDS Language Tutorial](./get-started/mthds-language-tutorial.md)**
-
-    Learn the declarative language step by step: concepts, pipes, sequences, inputs, and structured outputs.
-
--   :material-book-open-variant: **[Cookbook Examples](./cookbook/index.md)**
-
-    Production-ready recipes — from Hello World to document extraction, synthetic data, and image generation.
-
-</div>
-
+    - **[Pipelex plugin](./features/pipelex-plugin.md)** — The Pipelex plugin for Claude Code and Codex: skills that build and run methods, a hook that checks every edit, and the Pipelex tools
+    - **[Pipelex MCP](https://github.com/Pipelex/pipelex-mcp)** — The Pipelex MCP, which ChatGPT or Claude adds to run the methods saved in your account

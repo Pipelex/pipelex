@@ -48,6 +48,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     JudgmentAssignment,
     LLMAssignment,
     ObjectAssignment,
+    RenderDocumentAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
     SearchObjectAssignment,
@@ -416,6 +417,16 @@ def dry_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[
     nb_pages = get_config().inference.dry_run.nb_extract_pages
     image_urls = get_config().inference.dry_run.image_urls
     return [_dry_image_content(image_url=image_urls[page_index % len(image_urls)]) for page_index in range(nb_pages)]
+
+
+def dry_render_document(render_assignment: RenderDocumentAssignment) -> DocumentContent:
+    """Dry leaf for document printing: a mock Document named as the live one would be, no engine, no storage IO.
+
+    Its URL is the blank one-page PDF every mocked document carries, whatever the format asked for.
+    """
+    composition = render_assignment.composition
+    log.verbose(f"🤡 DRY RUN: render_document '{composition.filename}' for '{render_assignment.job_metadata.run_metadata.pipeline_run_id}'")
+    return DocumentContent(url=DryRunFactory.generate_mock_document_url(), mime_type=composition.format.mime_type, filename=composition.filename)
 
 
 def dry_search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:

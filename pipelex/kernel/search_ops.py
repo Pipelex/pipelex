@@ -84,34 +84,35 @@ async def run_search(
     it replay-safe under a distributed orchestrator and lets its failures cross a workflow boundary as
     classified errors instead of hanging.
     """
-    query_text = await render_template(
-        template=template,
-        category=category,
-        context=memory.generate_context(),
-        templating_style=templating_style,
-    )
-    search_assignment = SearchAssignment(
-        job_metadata=job_metadata,
-        cogt_run_params=cogt_run_params,
-        query=query_text,
-        search_setting=search_setting,
-        include_domains=include_domains,
-        exclude_domains=exclude_domains,
-        from_date=from_date,
-        to_date=to_date,
-    )
-    content_generator = get_content_generator()
-    content: StuffContent
-    if output_structure_class is None:
-        content = await content_generator.make_search_sourced_answer(search_assignment=search_assignment)
-    else:
-        content = await content_generator.make_search_structured(
-            output_structure_class=output_structure_class,
-            search_assignment=search_assignment,
+    with job_metadata.log_context():
+        query_text = await render_template(
+            template=template,
+            category=category,
+            context=memory.generate_context(),
+            templating_style=templating_style,
         )
-    return SearchResult(
-        memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
-        content=content,
-        rendered_query=query_text,
-        search_setting=search_setting,
-    )
+        search_assignment = SearchAssignment(
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            query=query_text,
+            search_setting=search_setting,
+            include_domains=include_domains,
+            exclude_domains=exclude_domains,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        content_generator = get_content_generator()
+        content: StuffContent
+        if output_structure_class is None:
+            content = await content_generator.make_search_sourced_answer(search_assignment=search_assignment)
+        else:
+            content = await content_generator.make_search_structured(
+                output_structure_class=output_structure_class,
+                search_assignment=search_assignment,
+            )
+        return SearchResult(
+            memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
+            content=content,
+            rendered_query=query_text,
+            search_setting=search_setting,
+        )
