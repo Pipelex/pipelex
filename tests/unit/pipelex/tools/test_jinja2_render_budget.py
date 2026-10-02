@@ -24,16 +24,18 @@ from markupsafe import Markup
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateBudgetError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
-from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, RenderBudgetExceededError
+from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, RenderBudgetExceededError, active_render_budget
 from pipelex.tools.jinja2.jinja2_render_charging import CHARGED_MARK, INTERNAL_FILTERS
 from pipelex.tools.jinja2.jinja2_render_costs import FILTER_COSTS, PLAIN_VALUE_METHOD_COSTS, REFUSED_PLAIN_VALUE_METHODS, TEST_COSTS
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_sandbox import PipelexTemplateEnvironment
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.markdown.markdown_parser import render_markdown_as_html
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
 
@@ -306,6 +308,59 @@ _UNCHANGED = [
 _STYLE = TemplatingStyle(tag_style=TagStyle.XML, text_format=TextFormat.PLAIN)
 
 
+# A table whose two hundred columns pad three hundred one-character rows: sixty thousand cells, about sixty
+# megabytes of parsed tokens, out of two kilobytes of text.
+_PADDED_TABLE = "'|' ~ ('a|' * 222) ~ '\\n|' ~ ('-|' * 222) ~ '\\n' ~ ('|a\\n' * 300) ~ '\\n'"
+
+# Markdown a template converts with the `markdown` filter, each refused before it parses or renders what it
+# asks: a long source, which costs microseconds a character to parse; padded tables, which cost their cells;
+# and a reference used thousands of times, whose destination is printed at every use.
+_MARKDOWN_AMPLIFIERS = [
+    pytest.param("{{ ('**a ' * 100000) | markdown }}", id="long_source"),
+    pytest.param("{{ ((" + _PADDED_TABLE + ") * 3) | markdown }}", id="padded_tables"),
+    pytest.param("{{ ('[a][r] ' * 2000 ~ '\\n\\n[r]: /' ~ 'y' * 20000) | markdown }}", id="reused_reference"),
+]
+
+# What a refused conversion may hold before the refusal: the source and its table scan, never its tokens
+# or its output.
+_MARKDOWN_REFUSAL_PEAK_BYTES = 32 * 1024 * 1024
+
+# A Markdown value an HTML template converts again at every print, escape, join or format, the last only in
+# async mode, where Pipelex's own `format` filter is registered.
+_MARKDOWN_CONVERSIONS = [
+    *(
+        pytest.param(template_source, is_async, id=f"{name}-{'async' if is_async else 'sync'}")
+        for name, template_source in (
+            ("print", "{% for i in range(100) %}{{ report }}{% endfor %}"),
+            ("escape", "{% for i in range(100) %}{{ report | e }}{% endfor %}"),
+            ("join", "{{ ([report] * 100) | join }}"),
+        )
+        for is_async in (False, True)
+    ),
+    pytest.param("{% for i in range(100) %}{{ report | format }}{% endfor %}", True, id="format-async"),
+]
+
+_MARKDOWN_REPORT = "## Findings\n\nSome *text* with a [link](https://a.co), `code` and more.\n\n- one\n- two\n\n" * 300
+
+_MARKDOWN_SAMPLE = (
+    "# Report\n\n| a | b |\n| :- | -: |\n| 1 | 2 |\n| 3 |\n\n> quoted **bold** and ~~gone~~\n\n"
+    'See [the docs][docs] and [again][docs], ![a chart](https://a.co/c.png "Chart"), https://a.co & <tags>.\n\n'
+    "```python\nprint('<x>')\n```\n\n[docs]: https://a.co/docs \"The docs\"\n"
+)
+
+
+def _make_html_template(template_source: str, *, is_async: bool) -> Any:
+    return make_jinja2_env_without_loader(TemplateCategory.HTML, enable_async=is_async).from_string(template_source)
+
+
+def _render_html(template_source: str, *, is_async: bool, **context: Any) -> str:
+    template = _make_html_template(template_source, is_async=is_async)
+    context[Jinja2ContextKey.TEXT_FORMAT] = TextFormat.PLAIN
+    if is_async:
+        return cast("str", asyncio.run(template.render_async(**context)))
+    return cast("str", template.render(**context))
+
+
 class _Opaque:
     """An object of the run's data whose `repr` fails, as nothing a template does should call it."""
 
@@ -425,6 +480,46 @@ class TestRenderBudget:
                 templating_context={},
                 templating_style=_STYLE,
             )
+
+    @pytest.mark.parametrize("template_source", _MARKDOWN_AMPLIFIERS)
+    @pytest.mark.parametrize("is_async", [False, True])
+    def test_markdown_conversion_refused_before_it_parses_or_renders(self, template_source: str, is_async: bool) -> None:
+        peak_bytes = _refused_render_peak_bytes(lambda: _render_html(template_source, is_async=is_async))
+        assert peak_bytes < _MARKDOWN_REFUSAL_PEAK_BYTES
+
+    @pytest.mark.parametrize(("template_source", "is_async"), _MARKDOWN_CONVERSIONS)
+    def test_markdown_value_is_charged_at_every_conversion(self, template_source: str, is_async: bool) -> None:
+        # Each conversion of this report costs about a third of the default budget, and takes a few
+        # milliseconds whatever it is charged: printed a hundred times, it is refused at the fourth.
+        report = MarkdownContent(text=_MARKDOWN_REPORT)
+        with pytest.raises(RenderBudgetExceededError, match="converting Markdown to HTML"):
+            _render_html(template_source, is_async=is_async, report=report)
+
+    @pytest.mark.parametrize("is_async", [False, True])
+    def test_markdown_renders_as_outside_any_render(self, is_async: bool) -> None:
+        rendered = _render_html(
+            "{{ notes | markdown }}|{{ report }}", is_async=is_async, notes=_MARKDOWN_SAMPLE, report=MarkdownContent(text=_MARKDOWN_SAMPLE)
+        )
+        assert active_render_budget() is None
+        expected = render_markdown_as_html(_MARKDOWN_SAMPLE)
+        assert rendered == f"{expected}|{expected}"
+
+    def test_markdown_the_budget_admits_parses_within_it(self) -> None:
+        # Unclosed emphasis leaves a text token per delimiter, which markdown-it's own join held a copy of
+        # every prefix of: thirty thousand characters peaked at over three hundred megabytes.
+        tracemalloc.start()
+        try:
+            rendered = _render_html("{{ ('**a ' * 7500) | markdown }}", is_async=False)
+            _, peak_bytes = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        assert len(rendered) > 30_000
+        assert peak_bytes < _MARKDOWN_REFUSAL_PEAK_BYTES
+
+    def test_the_active_budget_ends_with_its_render(self) -> None:
+        with pytest.raises(RenderBudgetExceededError):
+            _render_html("{{ ('**a ' * 100000) | markdown }}", is_async=False)
+        assert active_render_budget() is None
 
     def test_budget_error_is_the_caller_s_and_caller_facing(self) -> None:
         report = Jinja2TemplateBudgetError("refused by the render budget").to_error_report()

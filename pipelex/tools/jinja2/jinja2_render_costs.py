@@ -23,7 +23,7 @@ import jinja2.tests
 from markupsafe import Markup
 from pydantic import BaseModel
 
-from pipelex.tools.jinja2.jinja2_filters import escape_script_tag, tag, text_format
+from pipelex.tools.jinja2.jinja2_filters import escape_script_tag, markdown_to_html, tag, text_format
 from pipelex.tools.jinja2.jinja2_render_budget import (
     ELEMENT_UNITS,
     ESCAPE_FACTOR,
@@ -891,6 +891,8 @@ FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     _FILTERS["xmlattr"]: OperationCost(estimate=_escaped_text),
     text_format: LINEAR,
     tag: LINEAR,
+    # The conversion charges itself, by its source and its output (`markdown_parser.py`).
+    markdown_to_html: LINEAR,
     escape_script_tag: OperationCost(estimate=_script_tag_escaped),
     with_images: OperationCost(estimate=_rendered_with_images),
 }

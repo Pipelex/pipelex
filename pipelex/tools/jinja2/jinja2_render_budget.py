@@ -21,12 +21,19 @@ result can be much larger than its inputs, for an estimate of that result before
 
 Where the charges are made, and the estimates, are in `jinja2_render_charging.py` and
 `jinja2_render_costs.py`; the environment that applies them is `PipelexTemplateEnvironment`.
+
+A render's budget is also its **active** budget while the render runs (`active_render_budget`), for the
+work a template sets off in code that no hook reaches and that costs far more than the bytes it
+produces: converting a Markdown value to HTML, which markupsafe does through `__html__` wherever a
+value is escaped, is charged where it happens (`markdown_parser.py`).
 """
 
 from __future__ import annotations
 
 import sys
 from collections.abc import AsyncIterator, Iterator, Sized
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeVar, cast
 
 from jinja2.exceptions import TemplateError
@@ -36,7 +43,7 @@ from markupsafe import Markup
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable, Callable, Collection, Iterable
+    from collections.abc import AsyncIterable, Callable, Collection, Generator, Iterable
 
 # A render's budget unless the environment is given another: a few hundred megabytes allocated in
 # total at the very worst, and well under a second of CPU.
@@ -54,6 +61,14 @@ CALL_UNITS: Final[int] = 1024
 # reference, plus the small object behind it when the element is new, and the time a loop takes to
 # draw it.
 ELEMENT_UNITS: Final[int] = 64
+
+# The cost of converting one character of Markdown to HTML, or one cell of a table, which a render pays
+# wherever a template sets the conversion off (`markdown_parser.py`): the `markdown` filter, or printing,
+# joining or formatting a Markdown value in an HTML template. markdown-it-py takes up to about ten
+# microseconds and five hundred bytes of tokens a character, and five microseconds and a kilobyte a table
+# cell, so the charge stops a render at about 65,000 characters of Markdown under the default budget,
+# which the slowest text measured converts in about six tenths of a second.
+MARKDOWN_UNITS_PER_CHARACTER: Final[int] = 2048
 
 # The factor by which escaping can grow a text: `'` becomes `&#39;` in HTML and `'` in JSON.
 ESCAPE_FACTOR: Final[int] = 6
@@ -117,6 +132,24 @@ class RenderBudget:
             f"{described} needs about {units:,}, and {self.remaining:,} are left."
         )
         raise RenderBudgetExceededError(msg)
+
+
+_ACTIVE_RENDER_BUDGET: Final[ContextVar[RenderBudget | None]] = ContextVar("pipelex_active_render_budget", default=None)
+
+
+def active_render_budget() -> RenderBudget | None:
+    """The budget of the template render running now, or None outside any render."""
+    return _ACTIVE_RENDER_BUDGET.get()
+
+
+@contextmanager
+def spending_from(*, budget: RenderBudget) -> Generator[None, None, None]:
+    """Make `budget` the active one for the duration of a render, and the previous one again after it."""
+    token = _ACTIVE_RENDER_BUDGET.set(budget)
+    try:
+        yield
+    finally:
+        _ACTIVE_RENDER_BUDGET.reset(token)
 
 
 def refuse_int_result(*, bits: int, operation: str) -> None:

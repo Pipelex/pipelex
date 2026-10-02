@@ -1,7 +1,8 @@
 """Where a render is charged: the hooks `PipelexTemplateEnvironment` installs, and the budget they share.
 
 Every render gets its own `RenderBudget` with its context (`BudgetedContext`), and every hook below
-reaches it through that context:
+reaches it through that context. The template (`BudgetedTemplate`) also makes it the active budget while
+the render runs, for the work a template sets off where no hook reaches (`active_render_budget`):
 
 - **Calls and operators.** The sandbox's `call` and `call_binop` hooks hand over to `charged_call` and
   `charged_binop`.
@@ -24,6 +25,7 @@ import operator
 from typing import TYPE_CHECKING, Any, Final, cast
 
 from jinja2 import pass_context
+from jinja2.environment import Template
 from jinja2.runtime import Context, LoopContext, Macro, markup_join, str_join
 from jinja2.sandbox import SandboxedEscapeFormatter, SandboxedFormatter, safe_range
 from jinja2.utils import generate_lorem_ipsum
@@ -45,6 +47,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
     produced_size,
     refuse_int_result,
     size_of,
+    spending_from,
     text_size,
 )
 from pipelex.tools.jinja2.jinja2_render_costs import (
@@ -91,6 +94,38 @@ class BudgetedContext(Context):
             budget = RenderBudget(total=total)
             self.vars[RENDER_BUDGET_KEY] = budget
         self.render_budget: RenderBudget = budget
+
+
+def _with_render_budget(*, environment: Environment, variables: dict[str, Any]) -> RenderBudget:
+    """The budget of the render about to start with `variables`, put among them for its context to find."""
+    budget = variables.get(RENDER_BUDGET_KEY)
+    if not isinstance(budget, RenderBudget):
+        total: int = getattr(environment, "render_budget_units", DEFAULT_RENDER_BUDGET_UNITS)
+        budget = RenderBudget(total=total)
+        variables[RENDER_BUDGET_KEY] = budget
+    return budget
+
+
+class BudgetedTemplate(Template):
+    """A template whose render makes its budget the active one (`spending_from`) while it runs.
+
+    The hooks reach the budget through the render's context; the active budget is for code that no hook
+    reaches and that has no context, such as markupsafe calling a Markdown value's `__html__`. A render
+    started with `generate` or `stream` has no active budget, since its output is produced as its caller
+    iterates; Pipelex renders only with `render` and `render_async`.
+    """
+
+    @override
+    def render(self, *args: Any, **kwargs: Any) -> str:
+        variables: dict[str, Any] = dict(*args, **kwargs)
+        with spending_from(budget=_with_render_budget(environment=self.environment, variables=variables)):
+            return super().render(variables)
+
+    @override
+    async def render_async(self, *args: Any, **kwargs: Any) -> str:
+        variables: dict[str, Any] = dict(*args, **kwargs)
+        with spending_from(budget=_with_render_budget(environment=self.environment, variables=variables)):
+            return await super().render_async(variables)
 
 
 def render_budget_of(context: Context) -> RenderBudget:

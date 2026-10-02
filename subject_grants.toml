@@ -6328,6 +6328,10 @@ rationale = "Logs the content; single operand (formatting keyword-only)."
 param = "channel_name"
 rationale = "Renders the channel_name; single operand."
 
+["pipelex/tools/markdown/markdown_parser.py::_join_text_fragments"]
+param = "state"
+rationale = "markdown-it rule callback: the inline ruler calls each rule with its state positionally."
+
 ["pipelex/tools/markdown/markdown_parser.py::render_markdown_as_html"]
 param = "markdown_text"
 rationale = "Renders one Markdown text as HTML."

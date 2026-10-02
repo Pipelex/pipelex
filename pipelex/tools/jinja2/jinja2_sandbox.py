@@ -28,8 +28,10 @@ forge content, such as an image pointing at another organisation's storage key.
 - **Spending.** What a template may reach says nothing about what it may spend, so every render also
   spends from one budget (`jinja2_render_budget.py`), charged by the hooks of this class, by wrappers
   around every filter and test, and by a rewrite of the parsed template for what no hook reaches
-  (`jinja2_render_charging.py`, `jinja2_render_rewrite.py`). An overdraft raises
-  `RenderBudgetExceededError`, which the render functions turn into `Jinja2TemplateBudgetError`.
+  (`jinja2_render_charging.py`, `jinja2_render_rewrite.py`). Converting Markdown, which markupsafe
+  does through `__html__` where no hook sees it, charges the budget the template makes active while it
+  renders (`markdown_parser.py`). An overdraft raises `RenderBudgetExceededError`, which the render
+  functions turn into `Jinja2TemplateBudgetError`.
 
 Filters and tests are not calls in this sense: they are Pipelex's or Jinja's own code, registered by
 the environment, and Jinja invokes them directly. That makes every filter trusted code with one
@@ -64,6 +66,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNIT
 from pipelex.tools.jinja2.jinja2_render_charging import (
     INTERNAL_FILTERS,
     BudgetedContext,
+    BudgetedTemplate,
     SandboxedStrFormat,
     charge_registered_functions,
     charged_binop,
@@ -229,6 +232,7 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
     """
 
     context_class = BudgetedContext
+    template_class = BudgetedTemplate
     intercepted_binops = frozenset({"+", "-", "*", "/", "//", "%", "**"})
 
     def __init__(
