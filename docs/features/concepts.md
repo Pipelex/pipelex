@@ -17,6 +17,7 @@ Pre-built universal concepts available in every Pipelex project:
 
 - **Dynamic** — Dynamic typing, resolved at runtime
 - **Text** — Plain text content
+- **Markdown** — A text written in Markdown, which refines Text and is formatted when shown
 - **Image** — Image data (base64, URL, or file path)
 - **Document** — A document container (PDF, image, or other file)
 - **Html** — HTML content

@@ -1,0 +1,13 @@
+domain      = "missing_main_pipe"
+description = "Declares a pipe but no main_pipe"
+
+[concept.Greeting]
+description = "A greeting"
+refines     = "Text"
+
+[pipe.greet]
+type        = "PipeLLM"
+description = "Say hello to the given name"
+inputs      = { name = "Text" }
+output      = "Greeting"
+prompt      = "Say hello to $name"

@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from pydantic import Field, RootModel
-from rich import box
-from rich.table import Table
 
 from pipelex import log
 from pipelex.cogt.exceptions import CostRegistryError
@@ -158,8 +156,18 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             msg = "Empty report aggregation by model name"
             raise CostRegistryError(msg)
 
+        # The CSV report is written first because it is the output that does not need Rich, the `cli` extra.
+        # Rendering the console table ahead of it would make a process without the extra lose both: the caller
+        # downgrades the missing-dependency error to a warning, so the loss would be silent.
+        if cost_report_file_path:
+            cls.save_to_csv(records, file_path=cost_report_file_path)
+
         if print_to_console:
+            # The console table is the one output here that needs Rich.
             console = get_console()
+            from rich import box
+            from rich.table import Table
+
             title = f"Costs by model for pipeline '{pipeline_run_id}'"
             table = Table(title=title, box=box.ROUNDED)
 
@@ -222,9 +230,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
 
             console.print(table)
             console.print(" [dim]Note: some costs might be missing or not up-to-date.[/dim]")
-
-        if cost_report_file_path:
-            cls.save_to_csv(records, file_path=cost_report_file_path)
 
     @staticmethod
     def save_to_csv(records: list[dict[str, Any]], *, file_path: Path) -> None:

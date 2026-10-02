@@ -50,7 +50,7 @@ def build_pipe_job(
         pipe=pipe,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         job_metadata=JobMetadata(
-            run_metadata=RunMetadata(storage_scope="test/scope", user_id=DRY_RUN_USER_ID, pipeline_run_id=resolved_pipeline_run_id)
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=resolved_pipeline_run_id)
         ),
         working_memory=WorkingMemoryFactory.make_empty(),
         library_crate=library_crate,

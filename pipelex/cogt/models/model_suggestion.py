@@ -48,6 +48,8 @@ def get_collection_keys(
                     return list(model_deck.img_gen_presets.keys())
                 case ModelType.SEARCH:
                     return list(model_deck.search_presets.keys())
+                case ModelType.DOC_GEN:
+                    return list(model_deck.doc_gen_presets.keys())
         case ModelReferenceKind.ALIAS:
             match model_type:
                 case ModelType.LLM:
@@ -58,6 +60,8 @@ def get_collection_keys(
                     return list(model_deck.img_gen_aliases.keys())
                 case ModelType.SEARCH:
                     return list(model_deck.search_aliases.keys())
+                case ModelType.DOC_GEN:
+                    return list(model_deck.doc_gen_aliases.keys())
         case ModelReferenceKind.WATERFALL:
             match model_type:
                 case ModelType.LLM:
@@ -68,6 +72,8 @@ def get_collection_keys(
                     return list(model_deck.img_gen_waterfalls.keys())
                 case ModelType.SEARCH:
                     return list(model_deck.search_waterfalls.keys())
+                case ModelType.DOC_GEN:
+                    return list(model_deck.doc_gen_waterfalls.keys())
         case ModelReferenceKind.HANDLE:
             return sorted(handle for handle, spec in model_deck.inference_models.items() if spec.model_type == model_type)
 
@@ -86,7 +92,7 @@ def suggest_model_alternatives(
     Returns:
         A tuple of three lists:
         - suggestions: fuzzy matches within the same collection, with sigil prefix
-        - wrong_sigil_hints: exact matches found in other collections (e.g. "best-claude exists as @best-claude (alias)")
+        - wrong_sigil_hints: exact matches found in other collections (e.g. "best-gpt exists as @best-gpt (alias)")
         - cross_collection_suggestions: fuzzy matches in other collections, with sigil and label
     """
     sigil = KIND_SIGILS[kind]

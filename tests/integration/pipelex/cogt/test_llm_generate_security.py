@@ -21,7 +21,9 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 
 def _make_stub_llm_assignment() -> LLMAssignment:
     return LLMAssignment(
-        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")),
+        job_metadata=JobMetadata(
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="test-user", pipeline_run_id="test-run")
+        ),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         llm_setting=LLMSetting(model="test-model", temperature=0.7),
         llm_prompt=LLMPrompt(user_text="test prompt"),

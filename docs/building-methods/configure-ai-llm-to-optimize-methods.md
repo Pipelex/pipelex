@@ -27,10 +27,9 @@ An LLM handle can be either:
 
 ```toml
 [llm.aliases]
-best-claude = "claude-4.1-opus"
-best-gemini = "gemini-2.5-pro"
-best-mistral = "mistral-large"
-base-gpt = "gpt-5"
+best-gpt = "gpt-5.6-sol"
+default-general = "gpt-5.6-terra"
+default-small = "gpt-5.6-luna"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
@@ -51,12 +50,12 @@ An LLM Preset is simply a name for a LLM Settings that you have predefined in or
 
 engineering-structured = {
     model = "@default-premium-structured",
-    temperature = 0.2
+    temperature = 1
 }
 
 retrieval = {
     model = "@default-large-context-text",
-    temperature = 0.1
+    temperature = 1
 }
 ```
 
@@ -66,9 +65,11 @@ LLM Settings support `reasoning_effort` and `reasoning_budget` parameters for en
 
 ```toml
 [llm.presets]
-deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
-quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
+deep-analysis = { model = "@default-premium", temperature = 1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
+quick-reasoning = { model = "@default-premium", temperature = 1, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 ```
+
+Both declare `temperature = 1` because every model the shipped deck resolves to fixes its temperature at that value. The deck states the temperature the model will actually use, rather than one the runtime would override on every call. A method that needs a temperature of its own writes an inline LLM settings table, shown below: a bare model name is paired with `[llm.choice_defaults].default_temperature`, which this deck sets to 1, so naming a handle on its own does not give the author control of the temperature.
 
 `reasoning_effort` accepts values from `"none"` to `"max"`. For an explicit token budget, use `reasoning_budget` instead (mutually exclusive with `reasoning_effort`). For provider-specific behavior and model examples, see [Reasoning Controls](../under-the-hood/reasoning-controls.md).
 
@@ -83,7 +84,7 @@ description = "Generate a creative response"
 inputs = { question = "Question" }
 output = "Response"
 model = {
-    model = "gpt-4-turbo",  # Using inline LLM settings
+    model = "gpt-5.4",  # Using inline LLM settings
     temperature = 0.8,
 }
 prompt = """
@@ -113,6 +114,7 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
 - `2_img_gen_deck.toml`: Image generation configuration
 - `3_extract_deck.toml`: Document extraction configuration
 - `4_search_deck.toml`: Search configuration
+- `5_doc_gen_deck.toml`: The document engines `PipeDocGen` prints with, by format and source
 - `x_custom_extract_deck.toml`: Custom extraction waterfalls/overrides (loaded last)
 - `x_custom_llm_deck.toml`: Custom LLM waterfalls/overrides (loaded last)
 
@@ -132,6 +134,7 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
         ├── 2_img_gen_deck.toml        # Image generation config
         ├── 3_extract_deck.toml        # Document extraction config
         ├── 4_search_deck.toml         # Search config
+        ├── 5_doc_gen_deck.toml        # Document engines, by format and source
         ├── x_custom_extract_deck.toml # Custom extraction waterfalls/overrides
         └── x_custom_llm_deck.toml     # Custom LLM waterfalls/overrides
 ```

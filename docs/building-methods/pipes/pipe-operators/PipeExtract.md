@@ -106,6 +106,6 @@ Pass a web URL as the `article_url` input when running the pipe. PipeExtract fet
 
 ## Related Documentation
 
-- [Generic Document Extraction Example](../../../cookbook/extract-generic.md) - Extract markdown from complex PDFs using vision
-- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline
+- [Generic document extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_generic) - A cookbook method that returns each page of any document as Markdown, including the text inside its images and diagrams
+- [Invoice extraction](https://github.com/Pipelex/methods/tree/main/methods/invoice_extraction) - A method in the method library that extracts structured invoice data using both the OCR text and the page view
 - [Document Extraction Feature](../../../features/document-extraction.md) - Overview of document extraction capabilities

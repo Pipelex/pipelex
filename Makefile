@@ -103,7 +103,7 @@ make plxt-lint                - Lint MTHDS/TOML/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
 make rules-claude-standalone  - Install a standalone CLAUDE.md (full ruleset, for contributors without the Pipelex workspace)
-make up-kit-configs           - Update kit configs from .pipelex/
+make up-kit-configs           - Update kit configs from .pipelex/, then the api/ server's vendored inference tree from the kit
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
 make ccs                      - Shorthand -> check-config-sync
@@ -152,7 +152,9 @@ make codex-tests              - Run tests for Codex (exit on first failure) (no 
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
-make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
+make agent-test               - Run unit tests, silent on success, output on failure (for AI agents), then the server's (api-agent-test)
+make api-agent-check          - The api/ server's own gate: its install, ruff, pyright, mypy, OpenAPI and vendored-kit drift checks
+make api-agent-test           - The api/ server's unit tests, in its own environment
 make agent-test-debug         - Debug variant: cleanup + outer timeout + live log; use when agent-test hangs or fails opaquely
 make atd                      - Shorthand -> agent-test-debug
 make ts-toolchain             - Install the pinned prettier + zod the TypeScript emission gates need
@@ -184,6 +186,10 @@ make subject-grant            - Record a subject grant (FUNC="<path>::<qualname>
 make sgr                      - Shorthand -> subject-grant
 make check-hub-layering       - Enforce the runtime_hub / interpreter_hub layering boundary
 make chl                      - Shorthand -> check-hub-layering
+make check-rich-imports       - Refuse a module-level Rich import or reach outside pipelex/cli/ (Rich is the cli extra)
+make cri                      - Shorthand -> check-rich-imports
+make check-actions-allowlist  - Refuse a workflow action outside the committed Actions allowlist
+make caa                      - Shorthand -> check-actions-allowlist
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -223,14 +229,14 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rich-imports cri check-actions-allowlist caa check-rules check-urls cu insert-skeleton \
 	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	store-test-durations std store-test-durations-force stdf \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc agent-check agent-test agent-test-debug atd \
+	validate v check c cc agent-check agent-test agent-test-debug atd api-agent-check api-agent-test \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
@@ -349,9 +355,15 @@ cu: env
 # Kit configs are mirrored from .pipelex/ by the pipelex-dev CLI, which derives its
 # exclude list from the single source of truth in pipelex/kit/paths.py — the same sets
 # `make check-config-sync` enforces, so a sync is always followed by a passing check.
+# The api/ server serves the models of its own vendored copy of the kit's inference tree,
+# so the same step carries a kit change there too, keeping the server's own choices (its
+# backend switches, its x_custom deck files); `make -C api kit-check`, part of the gate,
+# fails a change that skipped it. The script only imports pipelex, so the root venv runs it.
 up-kit-configs: env
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
 	$(VENV_PIPELEX_DEV) sync-kit-configs
+	$(call PRINT_TITLE,"Re-syncing the vendored inference tree of the api/ server from the kit")
+	$(VENV_PYTHON) api/scripts/sync_vendored_kit.py api/.pipelex
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"
@@ -396,6 +408,20 @@ check-hub-layering: env
 chl: check-hub-layering
 	@echo "> done: chl = check-hub-layering"
 
+check-rich-imports: env
+	$(call PRINT_TITLE,"Refusing module-level Rich imports and reaches outside pipelex/cli/")
+	$(VENV_PIPELEX_DEV) check-rich-imports --quiet
+
+cri: check-rich-imports
+	@echo "> done: cri = check-rich-imports"
+
+check-actions-allowlist: env
+	$(call PRINT_TITLE,"Refusing workflow actions the Actions allowlist does not name")
+	$(VENV_PIPELEX_DEV) check-actions-allowlist --quiet
+
+caa: check-actions-allowlist
+	@echo "> done: caa = check-actions-allowlist"
+
 drift-plan: env
 	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
 
@@ -412,7 +438,7 @@ dc: drift-check
 drift-ack: env
 	$(call PRINT_TITLE,"Recording drift ack")
 	@if [ -z "$(CONTRACT)" ] || [ -z "$(RATIONALE)" ]; then \
-		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="…" [BY=<reviewer>]'; \
+		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="<real-catch|clean-pass|friction>: …" [BY=<reviewer>]'; \
 		exit 1; \
 	fi
 	$(VENV_PIPELEX_DEV) drift ack "$(CONTRACT)" --rationale "$(RATIONALE)" $(if $(BY),--by "$(BY)")
@@ -890,6 +916,18 @@ agent-test: env
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
 	exit $$exit_code
+	@$(MAKE) --no-print-directory api-agent-test
+
+# The Pipelex API server is the `api/` workspace member (see api/CLAUDE.md). It keeps its own
+# environment (`api/.venv`, provisioned by its own `install` on the first run) and its own gates, which
+# the root `agent-check` and `agent-test` run after pipelex's: the server runs the library of the same
+# commit, so a library change that breaks the server, moves its OpenAPI artifact or leaves its vendored
+# inference tree behind fails here, in the same change.
+api-agent-check:
+	@$(MAKE) --no-print-directory -C api agent-check
+
+api-agent-test:
+	@$(MAKE) --no-print-directory -C api agent-test
 
 # Debug variant of agent-test for when the suite hangs or fails opaquely.
 # Use this instead of agent-test when:
@@ -1273,10 +1311,10 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet genera
 up: generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema generate-corpus-vocabulary update-gateway-models up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering drift-check
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check api-agent-check
 	@echo "> done: agent-check"
 
 v: validate

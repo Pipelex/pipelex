@@ -1,0 +1,720 @@
+"""The ``gcp`` sink: a record reaches the Cloud Logging transport as one struct entry.
+
+The sink is built around a fake transport, a subclass of the client library's own ``Transport``, so
+each entry is captured where the library would have batched it; production builds it on the
+``BackgroundThreadTransport`` around a real client instead. The guards on the export path are here
+too, since what they guard is the handler. ``test_log_gcp_sink_mapping.py`` reads the severity scale
+and the trace name on their own, ``test_log_gcp_json_payload_parity.py`` holds this payload and the
+``json`` sink's line together, and ``test_log_gcp_client_library_contract.py`` pins what the sink
+assumes of ``google-cloud-logging`` itself.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from typing import TYPE_CHECKING, Any
+
+import pytest
+from google.cloud.logging_v2.handlers.transports.base import Transport
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
+from typing_extensions import override
+
+from pipelex.system.configuration.config_loader import ConfigLoader
+from pipelex.system.telemetry.current_span import PIPELEX_SPAN_ID_KEY, PIPELEX_TRACE_ID_KEY, pipelex_span_active
+from pipelex.tools.log.gcp_log_sink import (
+    EXCEPTION_KEY,
+    GCP_WORKER_THREAD_NAME,
+    LOGGER_KEY,
+    MESSAGE_KEY,
+    GcpCredentialsCheck,
+    GcpExportPathFilter,
+    GcpLogSeverity,
+    GcpLogSink,
+)
+from pipelex.tools.log.log import Log
+from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_redaction import CYCLE_TEXT
+from pipelex.tools.misc.toml_utils import load_toml_from_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from pytest_mock import MockerFixture
+
+PROJECT = "a-test-project"
+
+# The keyword arguments the sink passes the transport for OpenTelemetry's current span, and only when there is one.
+ENTRY_TRACE_KWARGS = frozenset({"trace", "span_id", "trace_sampled"})
+PIPELEX_TRACE_KEYS: tuple[str, ...] = (PIPELEX_TRACE_ID_KEY, PIPELEX_SPAN_ID_KEY)
+
+
+class CapturedEntry:
+    """One entry the sink handed the transport, as the transport received it."""
+
+    def __init__(self, *, record: logging.LogRecord, payload: dict[str, Any], kwargs: dict[str, Any]) -> None:
+        self.record = record
+        self.payload = payload
+        self.severity: Any = kwargs.get("severity")
+        self.labels: dict[str, str] = kwargs.get("labels") or {}
+        self.trace: str | None = kwargs.get("trace")
+        self.span_id: str | None = kwargs.get("span_id")
+        self.trace_sampled: bool | None = kwargs.get("trace_sampled")
+        self.kwarg_names = frozenset(kwargs)
+
+
+class FakeTransport(Transport):  # pyright: ignore[reportUntypedBaseClass]
+    """The client library's transport contract, capturing instead of batching to the API."""
+
+    def __init__(self) -> None:
+        self.entries: list[CapturedEntry] = []
+        self.flush_count = 0
+        self.close_count = 0
+
+    @override
+    def send(self, record: logging.LogRecord, message: dict[str, Any], **kwargs: Any) -> None:  # kw-only: ignore — the library's own signature
+        self.entries.append(CapturedEntry(record=record, payload=message, kwargs=kwargs))
+
+    @override
+    def flush(self) -> None:
+        self.flush_count += 1
+
+    @override
+    def close(self) -> None:
+        self.close_count += 1
+
+
+def _package_log_config() -> LogConfig:
+    config_dict = load_toml_from_path(ConfigLoader().pipelex_root_dir / "pipelex.toml")
+    return LogConfig.model_validate(config_dict["runtime"]["log"])
+
+
+def _own_entries(transport: FakeTransport) -> list[CapturedEntry]:
+    """The entries this module's own records produced, whatever else the process logged meanwhile."""
+    return [entry for entry in transport.entries if entry.record.name == __name__]
+
+
+class NeverDrainingTransport(Transport):  # pyright: ignore[reportUntypedBaseClass]
+    """A transport whose flush waits on a queue that never drains, which is what the library's does."""
+
+    def __init__(self) -> None:
+        self.entered = threading.Event()
+        self.released = threading.Event()
+
+    @override
+    def send(self, record: logging.LogRecord, message: dict[str, Any], **kwargs: Any) -> None:  # kw-only: ignore — the library's own signature
+        return None
+
+    @override
+    def flush(self) -> None:
+        self.entered.set()
+        # Bounded only so a regression fails the test instead of hanging the suite.
+        self.released.wait(timeout=10)
+
+    @override
+    def close(self) -> None:
+        return None
+
+
+class FailingFlushTransport(Transport):  # pyright: ignore[reportUntypedBaseClass]
+    """A transport whose flush raises, as one refusing the API does."""
+
+    def __init__(self) -> None:
+        self.message = "the API refused the batch"
+
+    @override
+    def send(self, record: logging.LogRecord, message: dict[str, Any], **kwargs: Any) -> None:  # kw-only: ignore — the library's own signature
+        return None
+
+    @override
+    def flush(self) -> None:
+        raise RuntimeError(self.message)
+
+    @override
+    def close(self) -> None:
+        return None
+
+
+class FailingCloseTransport(Transport):  # pyright: ignore[reportUntypedBaseClass]
+    """A transport whose closing drain meets a refused batch, which the library reports through its own logger."""
+
+    def __init__(self) -> None:
+        self.handler: logging.Handler | None = None
+
+    @override
+    def send(self, record: logging.LogRecord, message: dict[str, Any], **kwargs: Any) -> None:  # kw-only: ignore — the library's own signature
+        return None
+
+    @override
+    def flush(self) -> None:
+        return None
+
+    @override
+    def close(self) -> None:
+        assert self.handler is not None
+        self.handler.handle(_library_record(level=logging.ERROR, msg="Failed to submit the last batch"))
+
+
+class CapturingHandler(logging.Handler):
+    """Stands in for the stdlib's last-resort handler, keeping what it would have printed on stderr."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.records: list[logging.LogRecord] = []
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+def _refuse_the_grant() -> None:
+    """A refresh the token endpoint refuses, as it refuses a revoked refresh token."""
+    msg = "invalid_grant: Token has been expired or revoked."
+    raise PermissionError(msg)
+
+
+def _miss_the_endpoint() -> None:
+    """A refresh that cannot reach the token endpoint."""
+    msg = "connection refused"
+    raise ConnectionError(msg)
+
+
+class TestGcpLogSink:
+    @pytest.fixture
+    def gcp_log(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, FakeTransport]]:
+        # pytest's ``log_level`` option restores the root logger's level at every phase boundary, undoing the
+        # level ``configure`` sets from inside a fixture; the module's own logger is enabled explicitly and
+        # ``caplog`` restores it at teardown.
+        caplog.set_level(logging.INFO, logger=__name__)
+        transport = FakeTransport()
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config())
+        fresh.install_sink(GcpLogSink(transport=transport, project=PROJECT))
+        try:
+            yield fresh, transport
+        finally:
+            fresh.reset()
+
+    def test_the_message_and_the_fields_land_in_the_struct_payload(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        fresh.info("scanned", fields={"files": 7, "ratio": 0.5, "tags": ["a", "b"], "meta": {"k": "v"}})
+
+        (entry,) = _own_entries(transport)
+        assert entry.payload[MESSAGE_KEY] == "scanned"
+        assert entry.payload[LOGGER_KEY] == __name__
+        assert entry.payload["files"] == 7
+        assert entry.payload["ratio"] == 0.5
+        assert entry.payload["tags"] == ["a", "b"]
+        assert entry.payload["meta"] == {"k": "v"}
+        assert entry.severity == GcpLogSeverity.INFO.value
+
+    def test_the_run_scoped_identifiers_become_labels_and_stay_out_of_the_payload(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        with fresh.context(request_id="r1", pipe_run_id="pr1"):
+            fresh.info("bound")
+
+        (entry,) = _own_entries(transport)
+        assert entry.labels == {"request_id": "r1", "pipe_run_id": "pr1"}
+        assert "request_id" not in entry.payload
+        assert "pipe_run_id" not in entry.payload
+
+    def test_a_record_in_a_run_under_a_host_span_is_filed_under_the_host_span_and_names_the_pipelex_one(
+        self, gcp_log: tuple[Log, FakeTransport]
+    ) -> None:
+        fresh, transport = gcp_log
+        tracer = TracerProvider().get_tracer(__name__)
+        pipelex_span = tracer.start_span("pipe")
+        with tracer.start_as_current_span("host") as host_span, pipelex_span_active(span=pipelex_span), fresh.context(pipeline_run_id="plr-01"):
+            fresh.info("running")
+        host_context = host_span.get_span_context()
+        pipelex_context = pipelex_span.get_span_context()
+
+        (entry,) = _own_entries(transport)
+        assert entry.trace == f"projects/{PROJECT}/traces/{host_context.trace_id:032x}"
+        assert entry.span_id == f"{host_context.span_id:016x}"
+        assert entry.trace_sampled is True
+        assert entry.payload[PIPELEX_TRACE_ID_KEY] == f"{pipelex_context.trace_id:032x}"
+        assert entry.payload[PIPELEX_SPAN_ID_KEY] == f"{pipelex_context.span_id:016x}"
+        assert entry.labels == {"pipeline_run_id": "plr-01"}
+
+    def test_a_record_in_a_run_with_no_host_span_is_filed_under_no_trace_and_names_the_pipelex_span(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """The run's id no longer stands in for a trace: the ``pipeline_run_id`` label is what selects the run's lines."""
+        fresh, transport = gcp_log
+        pipelex_span = TracerProvider().get_tracer(__name__).start_span("pipe")
+        with pipelex_span_active(span=pipelex_span), fresh.context(pipeline_run_id="plr-01"):
+            fresh.info("running")
+        pipelex_context = pipelex_span.get_span_context()
+
+        (entry,) = _own_entries(transport)
+        assert not ENTRY_TRACE_KWARGS & entry.kwarg_names
+        assert entry.payload[PIPELEX_TRACE_ID_KEY] == f"{pipelex_context.trace_id:032x}"
+        assert entry.payload[PIPELEX_SPAN_ID_KEY] == f"{pipelex_context.span_id:016x}"
+        assert entry.labels == {"pipeline_run_id": "plr-01"}
+
+    def test_a_record_carrying_a_run_id_with_no_span_at_all_is_filed_under_no_trace(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        with fresh.context(pipeline_run_id="plr-01"):
+            fresh.info("running")
+
+        (entry,) = _own_entries(transport)
+        assert not ENTRY_TRACE_KWARGS & entry.kwarg_names
+        assert not set(PIPELEX_TRACE_KEYS) & set(entry.payload)
+        assert entry.labels == {"pipeline_run_id": "plr-01"}
+
+    def test_a_record_outside_a_run_under_a_host_span_is_filed_under_it_with_no_pipelex_keys(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        with TracerProvider().get_tracer(__name__).start_as_current_span("host") as host_span:
+            fresh.info("in the host")
+        host_context = host_span.get_span_context()
+
+        (entry,) = _own_entries(transport)
+        assert entry.trace == f"projects/{PROJECT}/traces/{host_context.trace_id:032x}"
+        assert entry.span_id == f"{host_context.span_id:016x}"
+        assert entry.trace_sampled is True
+        assert not set(PIPELEX_TRACE_KEYS) & set(entry.payload)
+
+    def test_an_unsampled_host_span_is_passed_as_unsampled_with_zero_padded_ids(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        unsampled = NonRecordingSpan(SpanContext(trace_id=0xAB, span_id=0xCD, is_remote=False, trace_flags=TraceFlags(TraceFlags.DEFAULT)))
+        with trace.use_span(unsampled):
+            fresh.info("unsampled")
+
+        (entry,) = _own_entries(transport)
+        assert entry.trace == f"projects/{PROJECT}/traces/000000000000000000000000000000ab"
+        assert entry.span_id == "00000000000000cd"
+        assert entry.trace_sampled is False
+
+    def test_a_record_outside_any_run_and_any_span_carries_no_trace_and_no_labels(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        fresh.info("unbound")
+
+        (entry,) = _own_entries(transport)
+        assert not ENTRY_TRACE_KWARGS & entry.kwarg_names
+        assert not set(PIPELEX_TRACE_KEYS) & set(entry.payload)
+        assert entry.labels == {}
+
+    def test_the_pipelex_keys_follow_the_exception_and_precede_the_fields(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        with pipelex_span_active(span=TracerProvider().get_tracer(__name__).start_span("pipe")):
+            try:
+                message = "kaput"
+                raise ValueError(message)
+            except ValueError:
+                fresh.error("failed", fields={"files": 7}, include_exception=True)
+
+        (entry,) = _own_entries(transport)
+        assert list(entry.payload) == [MESSAGE_KEY, LOGGER_KEY, EXCEPTION_KEY, PIPELEX_TRACE_ID_KEY, PIPELEX_SPAN_ID_KEY, "files"]
+
+    def test_the_pipelex_keys_are_reserved_with_or_without_a_pipelex_span(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """A field named like a ``pipelex.*`` key is prefixed on every entry, so its wire name never depends on a span being held."""
+        fresh, transport = gcp_log
+        supplied = dict.fromkeys(PIPELEX_TRACE_KEYS, "supplied")
+        fresh.info("no span", fields=supplied)
+        with pipelex_span_active(span=TracerProvider().get_tracer(__name__).start_span("pipe")):
+            fresh.info("in a pipe", fields=supplied)
+
+        without_span, with_span = (entry.payload for entry in _own_entries(transport))
+        for key in PIPELEX_TRACE_KEYS:
+            assert key not in without_span
+            assert without_span[f"field_{key}"] == "supplied"
+            assert with_span[f"field_{key}"] == "supplied"
+            assert with_span[key] != "supplied"
+
+    def test_structured_content_rides_in_the_data_key_of_the_payload(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        fresh.info({"key": "value", "nested": {"flag": True}}, title="Config")
+
+        (entry,) = _own_entries(transport)
+        assert entry.payload["data"] == {"key": "value", "nested": {"flag": True}}
+
+    def test_a_value_json_cannot_carry_is_written_as_text_rather_than_costing_the_line(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """A non-finite float is spelled as text, and a cycle is cut by the redaction walk and keeps the payload a struct."""
+        fresh, transport = gcp_log
+        circular: dict[str, Any] = {}
+        circular["self"] = circular
+        fresh.info("odd values", fields={"nan": float("nan"), "inf": float("inf"), "circular": circular})
+
+        (entry,) = _own_entries(transport)
+        assert entry.payload[MESSAGE_KEY] == "odd values"
+        assert entry.payload["nan"] == "NaN"
+        assert entry.payload["inf"] == "Infinity"
+        assert entry.payload["circular"] == {"self": CYCLE_TEXT}
+
+    def test_a_raw_cycle_reaching_the_handler_is_written_as_text_rather_than_costing_the_line(self) -> None:
+        """The sink's own guard, for a process with redaction off: a value ``json`` refuses is written as its ``repr``, the payload stays a struct."""
+        transport = FakeTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+        cyclic: dict[str, Any] = {}
+        cyclic["me"] = cyclic
+        record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="cyclic value", args=(), exc_info=None)
+        record.loop = cyclic
+
+        handler.handle(record)
+
+        (entry,) = transport.entries
+        assert entry.payload[MESSAGE_KEY] == "cyclic value"
+        assert isinstance(entry.payload["loop"], str)
+        assert "{...}" in entry.payload["loop"]
+
+    def test_a_field_named_like_a_fixed_key_keeps_its_value_under_the_prefix(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        fresh.info("the message", fields={"logger": "mine"})
+
+        (entry,) = _own_entries(transport)
+        assert entry.payload[LOGGER_KEY] == __name__
+        assert entry.payload["field_logger"] == "mine"
+
+    def test_the_exception_lands_under_the_exception_key(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        fresh, transport = gcp_log
+        try:
+            msg = "boom"
+            raise ValueError(msg)
+        except ValueError:
+            fresh.error("failed", include_exception=True)
+
+        (entry,) = _own_entries(transport)
+        assert entry.severity == GcpLogSeverity.ERROR.value
+        assert "Traceback (most recent call last)" in entry.payload[EXCEPTION_KEY]
+        assert "ValueError: boom" in entry.payload[EXCEPTION_KEY]
+
+    @pytest.mark.parametrize(
+        ("method_name", "severity"),
+        [
+            ("verbose", GcpLogSeverity.DEBUG),
+            ("debug", GcpLogSeverity.DEBUG),
+            ("dev", GcpLogSeverity.DEBUG),
+            ("info", GcpLogSeverity.INFO),
+            ("warning", GcpLogSeverity.WARNING),
+            ("error", GcpLogSeverity.ERROR),
+            ("critical", GcpLogSeverity.CRITICAL),
+        ],
+    )
+    def test_every_level_maps_onto_the_cloud_logging_severity_scale(
+        self,
+        gcp_log: tuple[Log, FakeTransport],
+        caplog: pytest.LogCaptureFixture,
+        method_name: str,
+        severity: GcpLogSeverity,
+    ) -> None:
+        fresh, transport = gcp_log
+        caplog.set_level(logging.NOTSET + 1, logger=__name__)
+        getattr(fresh, method_name)("at every level")
+
+        (entry,) = _own_entries(transport)
+        assert entry.severity == severity.value
+
+    def test_the_teardown_flushes_and_closes_the_transport(self, caplog: pytest.LogCaptureFixture) -> None:
+        caplog.set_level(logging.INFO, logger=__name__)
+        transport = FakeTransport()
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config())
+        fresh.install_sink(GcpLogSink(transport=transport, project=PROJECT))
+        fresh.reset()
+
+        assert transport.flush_count > 0
+
+    def test_the_same_sink_installed_again_after_a_reset_is_refused_rather_than_sending_nothing(self) -> None:
+        """The teardown closes the transport, whose worker thread nothing starts again, so a second install must say so."""
+        transport = FakeTransport()
+        sink = GcpLogSink(transport=transport, project=PROJECT)
+        fresh = Log()
+        fresh.configure(log_config=_package_log_config())
+        fresh.install_sink(sink)
+        fresh.reset()
+        fresh.configure(log_config=_package_log_config())
+        try:
+            with pytest.raises(RuntimeError, match="installed once already"):
+                fresh.install_sink(sink)
+
+            assert fresh.sink is None
+            assert sink.processors == []
+        finally:
+            fresh.reset()
+
+    def test_the_client_librarys_own_export_failure_is_rejected_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """The library reports a refused batch at ``ERROR``; exported, that report fails with the batch and is reported again."""
+        _, transport = gcp_log
+        logging.getLogger("google.cloud.logging_v2.handlers.transports.background_thread").error("Failed to submit 1 logs.")
+        logging.getLogger("google.cloud.logging").warning("dropped")
+
+        assert [entry for entry in transport.entries if entry.record.name.startswith("google.cloud.logging")] == []
+
+    def test_a_record_emitted_on_the_export_thread_is_rejected_whatever_its_logger_is_called(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """The auth stack and the HTTP client log under their own names, and only ever reach this handler from that thread."""
+        _, transport = gcp_log
+
+        def log_as_the_exporting_thread() -> None:
+            logging.getLogger("urllib3.connectionpool").error("Retrying after connection broken")
+
+        exporting = threading.Thread(target=log_as_the_exporting_thread, name=GCP_WORKER_THREAD_NAME)
+        exporting.start()
+        exporting.join()
+        logging.getLogger("urllib3.connectionpool").error("Retrying, on any other thread")
+
+        urllib3_entries = [entry for entry in transport.entries if entry.record.name.startswith("urllib3")]
+        assert [entry.payload[MESSAGE_KEY] for entry in urllib3_entries] == ["Retrying, on any other thread"]
+
+    def test_the_export_paths_record_is_rejected_before_the_handler_lock_is_taken(self, gcp_log: tuple[Log, FakeTransport]) -> None:
+        """At exit the stdlib's shutdown holds this lock while it flushes, and an exporting thread reporting its failure must not wait on it."""
+        fresh, _ = gcp_log
+        assert fresh.sink is not None
+        handler = fresh.sink.handler
+        assert any(isinstance(handler_filter, GcpExportPathFilter) for handler_filter in handler.filters)
+        library_record = logging.LogRecord(
+            name="google.cloud.logging_v2.handlers.transports.background_thread",
+            level=logging.ERROR,
+            pathname="",
+            lineno=0,
+            msg="Failed to submit 1 logs.",
+            args=(),
+            exc_info=None,
+        )
+        lock_taken = threading.Event()
+        let_go = threading.Event()
+
+        def hold_the_lock() -> None:
+            handler.acquire()
+            lock_taken.set()
+            let_go.wait()
+            handler.release()
+
+        holder = threading.Thread(target=hold_the_lock)
+        holder.start()
+        lock_taken.wait()
+        handled = threading.Event()
+
+        def handle_the_librarys_record() -> None:
+            handler.handle(library_record)
+            handled.set()
+
+        try:
+            threading.Thread(target=handle_the_librarys_record, daemon=True).start()
+            assert handled.wait(timeout=2), "the guard ran after the lock was taken"
+        finally:
+            let_go.set()
+            holder.join()
+
+    def test_the_flush_gives_up_on_a_queue_that_never_drains(self, mocker: MockerFixture) -> None:
+        """The library's flush ends in ``queue.join()``, which takes no deadline, so the teardown would never return."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        transport = NeverDrainingTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+
+        started = time.monotonic()
+        try:
+            handler.flush()
+            waited = time.monotonic() - started
+        finally:
+            transport.released.set()
+
+        assert transport.entered.is_set(), "the flush never reached the transport"
+        assert waited < 5, f"the flush waited {waited:.1f}s on a queue that never drains"
+
+    def test_a_transport_that_refuses_the_flush_still_reports_it(self) -> None:
+        """The bound must not swallow what the teardown is there to report."""
+        handler = GcpLogSink(transport=FailingFlushTransport(), project=PROJECT).make_handler()
+
+        with pytest.raises(RuntimeError, match="the API refused the batch"):
+            handler.flush()
+
+    @pytest.mark.parametrize(
+        ("credentials_check", "cause"),
+        [
+            (None, None),
+            (
+                GcpCredentialsCheck(refresh=lambda: None, transport_error_types=(ConnectionError,), source="the test credentials"),
+                "A refresh of the test credentials still succeeds, so the Cloud Logging API or the network is what holds the write.",
+            ),
+            (
+                GcpCredentialsCheck(refresh=_refuse_the_grant, transport_error_types=(ConnectionError,), source="the test credentials"),
+                "A refresh of the test credentials is now refused, which is why: PermissionError: invalid_grant: Token has been expired or revoked.",
+            ),
+            (
+                GcpCredentialsCheck(refresh=_miss_the_endpoint, transport_error_types=(ConnectionError,), source="the test credentials"),
+                "A refresh of the test credentials cannot reach the credential endpoint either: ConnectionError: connection refused",
+            ),
+        ],
+    )
+    def test_a_flush_that_runs_out_of_time_says_so_with_what_a_fresh_refresh_answers(
+        self,
+        mocker: MockerFixture,
+        credentials_check: GcpCredentialsCheck | None,
+        cause: str | None,
+    ) -> None:
+        """The library's close only counts what is still queued; a process whose writes are held must be told, and why."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = NeverDrainingTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT, credentials_check=credentials_check).make_handler()
+
+        try:
+            handler.flush()
+        finally:
+            transport.released.set()
+
+        (record,) = stderr.records
+        message = record.getMessage()
+        assert message.startswith(
+            "The 'gcp' log sink's transport was still writing to Cloud Logging when the 0.2-second flush deadline passed, "
+            "and the records it still holds are lost unless it sends them while it closes."
+        )
+        if cause is None:
+            assert message.endswith("while it closes.")
+        else:
+            assert message.endswith(f" {cause}")
+
+    def test_a_flush_that_drains_in_time_says_nothing(self, mocker: MockerFixture) -> None:
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = FakeTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+
+        handler.flush()
+
+        assert transport.flush_count == 1
+        assert stderr.records == []
+
+    def test_a_closed_handler_neither_flushes_nor_closes_again(self, mocker: MockerFixture) -> None:
+        """The stdlib's shutdown at exit flushes every handler still alive, and a drain left running keeps this one alive."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = NeverDrainingTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+        closing = FakeTransport()
+        closed_handler = GcpLogSink(transport=closing, project=PROJECT).make_handler()
+
+        handler.close()
+        started = time.monotonic()
+        handler.flush()
+        waited = time.monotonic() - started
+        closed_handler.close()
+        closed_handler.close()
+
+        assert not transport.entered.is_set(), "a closed handler reached its transport's flush"
+        assert waited < 0.2
+        assert stderr.records == []
+        assert closing.close_count == 1
+
+    def test_the_credentials_check_at_teardown_answers_while_the_shutdown_holds_the_handler_lock(self, mocker: MockerFixture) -> None:
+        """The stdlib's shutdown at exit holds this lock around the flush, and the refresh the flush starts logs through the handler it waits on."""
+        mocker.patch("pipelex.tools.log.gcp_log_sink.FLUSH_TIMEOUT_SECONDS", 0.2)
+        mocker.patch("pipelex.tools.log.gcp_log_sink.CREDENTIALS_CHECK_TIMEOUT_SECONDS", 2.0)
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        auth_logger = logging.getLogger(f"{__name__}.auth")
+        auth_logger.propagate = False
+
+        def refresh_after_a_retry() -> None:
+            auth_logger.warning("Compute Engine Metadata server unavailable on attempt 1 of 5.")
+
+        transport = NeverDrainingTransport()
+        credentials_check = GcpCredentialsCheck(
+            refresh=refresh_after_a_retry, transport_error_types=(ConnectionError,), source="the test credentials"
+        )
+        handler = GcpLogSink(transport=transport, project=PROJECT, credentials_check=credentials_check).make_handler()
+        auth_logger.addHandler(handler)
+
+        handler.acquire()
+        try:
+            handler.flush()
+        finally:
+            handler.release()
+            auth_logger.removeHandler(handler)
+            transport.released.set()
+
+        assert [record.getMessage() for record in stderr.records] == [
+            "Compute Engine Metadata server unavailable on attempt 1 of 5.",
+            (
+                "The 'gcp' log sink's transport was still writing to Cloud Logging when the 0.2-second flush deadline passed, "
+                "and the records it still holds are lost unless it sends them while it closes. "
+                "A refresh of the test credentials still succeeds, so the Cloud Logging API or the network is what holds the write."
+            ),
+        ]
+
+    def test_an_export_failure_is_printed_on_stderr_rather_than_exported(self, gcp_log: tuple[Log, FakeTransport], mocker: MockerFixture) -> None:
+        """The library reports a refused batch only through this record, and the sink's own handler is never the place it can go."""
+        _, transport = gcp_log
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+
+        logging.getLogger("google.cloud.logging_v2.handlers.transports.background_thread").error("Failed to submit 10 logs.")
+
+        assert [record.getMessage() for record in stderr.records] == ["Failed to submit 10 logs."]
+        assert [entry for entry in transport.entries if entry.record.name.startswith("google.cloud.logging")] == []
+
+    def test_the_export_paths_routine_records_are_not_printed(self, mocker: MockerFixture) -> None:
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        export_filter = GcpExportPathFilter()
+
+        assert not export_filter.filter(_library_record(level=logging.DEBUG, msg="Submitted 10 logs"))
+        assert stderr.records == []
+
+    def test_a_refusal_that_persists_is_counted_rather_than_printed_per_batch(self, mocker: MockerFixture) -> None:
+        """One report per refused commit is one per line the application logs; the stderr it takes must not grow with that."""
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        export_filter = GcpExportPathFilter(report_interval_seconds=0.5)
+
+        for batch_number in range(3):
+            export_filter.filter(_library_record(level=logging.ERROR, msg=f"Failed to submit batch {batch_number}"))
+        assert [record.getMessage() for record in stderr.records] == ["Failed to submit batch 0"]
+
+        time.sleep(0.6)
+        export_filter.filter(_library_record(level=logging.ERROR, msg="Failed to submit batch 3"))
+        assert [record.getMessage() for record in stderr.records] == [
+            "Failed to submit batch 0",
+            "The gcp log sink's transport reported 2 more export failures since the last one printed",
+            "Failed to submit batch 3",
+        ]
+
+    def test_a_count_left_when_the_failures_stop_is_printed_once_its_window_has_passed(self, mocker: MockerFixture) -> None:
+        """An outage that ends leaves its count behind, and no later failure comes to print it."""
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        export_filter = GcpExportPathFilter(report_interval_seconds=0.5)
+
+        for batch_number in range(3):
+            export_filter.filter(_library_record(level=logging.ERROR, msg=f"Failed to submit batch {batch_number}"))
+        assert export_filter.filter(_application_record())
+        assert [record.getMessage() for record in stderr.records] == ["Failed to submit batch 0"]
+
+        time.sleep(0.6)
+        assert export_filter.filter(_application_record())
+        assert [record.getMessage() for record in stderr.records] == [
+            "Failed to submit batch 0",
+            "The gcp log sink's transport reported 2 more export failures since the last one printed",
+        ]
+
+    def test_the_handler_prints_the_count_left_at_close_including_what_the_closing_drain_adds(self, mocker: MockerFixture) -> None:
+        """The close drains the queue, and a refusal met there is counted inside a window nothing else would close."""
+        stderr = CapturingHandler()
+        mocker.patch.object(logging, "lastResort", stderr)
+        transport = FailingCloseTransport()
+        handler = GcpLogSink(transport=transport, project=PROJECT).make_handler()
+        transport.handler = handler
+
+        handler.handle(_library_record(level=logging.ERROR, msg="Failed to submit batch 0"))
+        handler.close()
+
+        assert [record.getMessage() for record in stderr.records] == [
+            "Failed to submit batch 0",
+            "The gcp log sink's transport reported 1 more export failures since the last one printed",
+        ]
+
+
+def _application_record() -> logging.LogRecord:
+    """A record the application logs, which the filter passes."""
+    return logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="an ordinary line", args=(), exc_info=None)
+
+
+def _library_record(*, level: int, msg: str) -> logging.LogRecord:
+    """A record as the client library's transport logger emits it."""
+    return logging.LogRecord(
+        name="google.cloud.logging_v2.handlers.transports.background_thread", level=level, pathname="", lineno=0, msg=msg, args=(), exc_info=None
+    )

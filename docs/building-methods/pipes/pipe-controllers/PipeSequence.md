@@ -61,12 +61,14 @@ type = "PipeLLM"
 description = "Summarize text"
 inputs = { extracted_text = "Page[]" }
 output = "Text"
+prompt = "Summarize this text:\n@extracted_text"
 
 [pipe.translate_to_french]
 type = "PipeLLM"
 description = "Translate text to French"
 inputs = { english_summary = "Text" }
 output = "Text"
+prompt = "Translate this summary to French:\n@english_summary"
 
 
 [pipe.image_to_french_summary]
@@ -83,7 +85,7 @@ steps = [
 
 ## Related Documentation
 
-- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline using PipeSequence
-- [Write Tweet Example](../../../cookbook/write-tweet.md) - Multi-step tweet generation workflow
-- [Table Extraction Example](../../../cookbook/extract-table.md) - Extract and correct tables from images
-- [Gantt Extraction Example](../../../cookbook/extract-gantt.md) - Extract Gantt chart data from documents
+- [Invoice extraction](https://github.com/Pipelex/methods/tree/main/methods/invoice_extraction) - A method in the method library that classifies each page, then extracts structured invoice data
+- [Tweet optimizer](https://github.com/Pipelex/methods/tree/main/methods/tweet_optimizer) - A method in the method library that scores a draft tweet and rewrites it in your style
+- [Table extraction](https://github.com/Pipelex/methods/tree/main/methods/table_extraction) - A method in the method library that extracts a table from a screenshot into HTML, then reviews it against the image
+- [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) - A cookbook method that returns every task and milestone of a Gantt chart image with their dates

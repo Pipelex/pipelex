@@ -1,7 +1,6 @@
 import base64
 from pathlib import Path
 
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_bytes
 
@@ -15,14 +14,6 @@ async def load_binary_as_base64(path: Path) -> str:
 async def make_base64_url_from_path(path: Path) -> str:
     """Create a data: URL from a local file path."""
     raw_bytes = await load_binary_async(path=path)
-    base64_data = base64.b64encode(raw_bytes).decode("ascii")
-    file_type = detect_file_type_from_bytes(raw_bytes=raw_bytes)
-    return make_base64_url(base64_data=base64_data, file_type=file_type)
-
-
-async def make_base64_url_from_http_url(url: str) -> str:
-    """Fetch a URL and create a data: URL from its contents."""
-    raw_bytes = await fetch_file_from_url_httpx(url=url)
     base64_data = base64.b64encode(raw_bytes).decode("ascii")
     file_type = detect_file_type_from_bytes(raw_bytes=raw_bytes)
     return make_base64_url(base64_data=base64_data, file_type=file_type)

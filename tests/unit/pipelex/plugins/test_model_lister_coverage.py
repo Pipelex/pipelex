@@ -40,7 +40,7 @@ EXPECTED_LISTER_SDKS: list[str] = [
     "mistral",
     "google",
     "bedrock",
-    "bedrock_aioboto3",
+    "bedrock_aioboto",
 ]
 
 

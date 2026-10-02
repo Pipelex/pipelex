@@ -13,7 +13,7 @@ This section explains how we, the maintainers of Pipelex, read the license, so t
 
 ### What does the license cover?
 
-The Elastic License 2.0 is a source-available license: you may use, copy, distribute, modify and build on the software, within the limitations and conditions it sets. It applies to `pipelex` (the Python runtime), `pipelex-api` (the runner API server) and `@pipelex/mcp` (the MCP server), for every version released after 2026-09-14. Every earlier version of them stays under the MIT license it was released with.
+The Elastic License 2.0 is a source-available license: you may use, copy, distribute, modify and build on the software, within the limitations and conditions it sets. It applies to `pipelex` (the Python runtime) from v0.58.0 onward, to `pipelex-api` (the runner API server) from v0.24.0 onward and to `@pipelex/mcp` (the MCP server) from v0.15.0 onward — the three versions released on 2026-09-14. Every earlier version of them stays under the MIT license it was released with: `pipelex` up to and including v0.57.0, `pipelex-api` up to and including v0.23.0, and `@pipelex/mcp` up to and including v0.14.0.
 
 The other Pipelex repositories, such as the SDKs, the starters and the plugins, keep their own licenses, and so does the MTHDS language standard.
 

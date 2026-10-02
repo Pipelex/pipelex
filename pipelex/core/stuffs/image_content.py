@@ -1,9 +1,6 @@
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic import Field, model_validator
-from rich.console import Group
-from rich.markdown import Markdown
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -11,9 +8,12 @@ from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.templating.text_format import TextFormat
 from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_uri
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class ImageContent(StuffContent):
@@ -90,7 +90,12 @@ class ImageContent(StuffContent):
         return f"[Image {image_index + 1}]"
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.markdown import Markdown
+        from rich.text import Text
+
         group = Group()
 
         # title indicating it's an image:

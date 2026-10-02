@@ -1,0 +1,92 @@
+####################################################################################################
+# Custom Telemetry Configuration
+####################################################################################################
+#
+# This file controls YOUR custom telemetry settings for observability and analytics.
+# Configure your own PostHog, Langfuse, or OTLP-compatible backends here.
+#
+# NOTE: When using Pipelex Gateway, identified telemetry is automatically enabled
+# (tied to your Gateway API key, hashed for security). This allows us to monitor
+# service quality, enforce fair usage, and provide you with better support.
+# Gateway telemetry operates independently from your settings below - you can have both!
+#
+# To disable all telemetry, set the DO_NOT_TRACK=1 environment variable.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PostHog Configuration (Event tracking + AI span tracing)
+# ──────────────────────────────────────────────────────────────────────────────
+
+[custom_posthog]
+mode = "off" # Values: "off" | "anonymous" | "identified"
+# user_id = "your_user_id"                                  # Required when mode = "identified"
+endpoint = "${POSTHOG_ENDPOINT}" # Default: https://us.i.posthog.com (or https://eu.i.posthog.com for EU)
+api_key = "${POSTHOG_API_KEY}" # Get from PostHog Project Settings
+geoip = true # Enable GeoIP lookup
+debug = false # Enable PostHog debug mode
+redact_properties = [
+  "prompt",
+  "system_prompt",
+  "response",
+  "file_path",
+  "url",
+] # Event properties to redact
+
+# AI span tracing to YOUR PostHog (does NOT affect Langfuse/OTLP - they receive full data)
+[custom_posthog.tracing]
+enabled = false # Send AI spans to your PostHog
+
+# Privacy controls for data sent to YOUR PostHog only
+[custom_posthog.tracing.capture]
+content = false # Capture prompt/completion content
+# content_max_length = 1000                                 # Max length for captured content (omit for unlimited)
+pipe_codes = false         # Include pipe codes in span names/attributes
+output_class_names = false # Include output class names in span names/attributes
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Portkey SDK Configuration
+# ──────────────────────────────────────────────────────────────────────────────
+
+[custom_portkey]
+force_debug_enabled = false
+force_tracing_enabled = false
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Langfuse Integration
+# Note: Langfuse receives FULL span data (no redaction)
+# ──────────────────────────────────────────────────────────────────────────────
+
+[langfuse]
+enabled = false
+# endpoint = "https://cloud.langfuse.com"                    # Override for self-hosted Langfuse
+# public_key = "${LANGFUSE_PUBLIC_KEY}"                      # Langfuse public key
+# secret_key = "${LANGFUSE_SECRET_KEY}"                      # Langfuse secret key
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Additional OTLP Exporters (array for multiple)
+# Note: OTLP exporters receive FULL span data (no redaction)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# [[otlp]]
+# name = "my-collector"                                     # Identifier for logging
+# endpoint = "https://..."                                  # OTLP endpoint URL
+# headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" } # Headers for OTLP export
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom Telemetry Allowed Modes
+# Controls which integration modes can use custom telemetry settings above.
+# ──────────────────────────────────────────────────────────────────────────────
+
+[telemetry_allowed_modes]
+ci = false     # CI environments don't use custom telemetry
+cli = true     # CLI usage allows custom telemetry
+docker = true  # Docker deployments allow custom telemetry
+fastapi = true # FastAPI integrations allow custom telemetry
+mcp = true     # MCP integrations allow custom telemetry
+n8n = true     # n8n integrations allow custom telemetry
+pytest = false # Tests don't use custom telemetry
+python = false # Direct Python SDK usage doesn't use custom telemetry by default

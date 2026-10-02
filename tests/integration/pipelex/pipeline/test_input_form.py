@@ -666,6 +666,7 @@ class TestKindAssignmentTable:
                 {"one": {"name": "widget"}},
                 input_specs=take_one_pipe.inputs,
                 concept_provider=get_concept_library(),
+                read_scope=None,
             )
             content = working_memory.root["one"].content
             assert not isinstance(content, ListContent), "the runtime frames a `[1]` slot as the item, never a one-item list"
@@ -674,7 +675,7 @@ class TestKindAssignmentTable:
             # And it refuses a list there on the same grounds a bare declaration does.
             list_payload = cast("PipelineInputs", {"one": [{"name": "widget"}]})
             with pytest.raises(ListWhereSingularError):
-                InputShaper.shape(list_payload, input_specs=take_one_pipe.inputs, concept_provider=get_concept_library())
+                InputShaper.shape(list_payload, input_specs=take_one_pipe.inputs, concept_provider=get_concept_library(), read_scope=None)
         finally:
             _teardown_validation_library(outer_library_id)
 

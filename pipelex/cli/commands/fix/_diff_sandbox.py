@@ -67,7 +67,10 @@ class PreviewSandbox(NamedTuple):
     def to_original(self, path_str: str) -> str:
         """Map a sandbox file path back to the original it mirrors.
 
-        Paths outside the sandbox (ambient-resolved files) pass through resolved-as-is.
+        Absolute paths outside the sandbox (ambient-resolved files) pass through resolved-as-is. Every path the
+        sandbox mirrors is absolute, so a relative name outside it passes through exactly as given: it is either
+        a file relative to the working directory, which the preview shares, or not a path at all, such as a
+        dependency's bundle named by its package's address, which resolving would turn into a made-up file.
         """
         resolved = Path(path_str).resolve()
         entry_copy, entry_original = self.entry_mapping
@@ -76,6 +79,8 @@ class PreviewSandbox(NamedTuple):
         for copy_root, original_root in self.dir_mappings:
             if resolved.is_relative_to(copy_root):
                 return str(original_root / resolved.relative_to(copy_root))
+        if not Path(path_str).is_absolute():
+            return path_str
         return str(resolved)
 
 

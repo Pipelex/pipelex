@@ -43,7 +43,6 @@ from pipelex.system.pipelex_service.remote_config_fetcher import (
 )
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import IntegrationMode
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerNoOp
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -177,11 +176,16 @@ class TestSetupWithCache:
             Pipelex.teardown_if_needed()
             log.reset()
 
+    @pytest.mark.usefixtures("gateway_telemetry_reachable")
     def test_telemetry_disabled_when_source_cached(self, mocker: MockerFixture) -> None:
-        """``Pipelex.make(needs_inference=True)`` with a cached gateway config → telemetry
-        manager is the no-op variant. Stale specs imply stale model identities; phoning home
+        """``Pipelex.make(needs_inference=True)`` with a cached gateway config → the Gateway
+        telemetry stream is off. Stale specs imply stale model identities; phoning home
         about pipe runs in that state would pollute metrics, so the guard is stricter than
         the plain ``needs_inference and gateway_enabled`` check.
+
+        The boot is a deployment's: ``PYTHON`` mode with the test run mode neutralised, because
+        either test-harness signal would turn the stream off by itself and leave the cache
+        condition unguarded.
         """
         Pipelex.teardown_if_needed()
 
@@ -208,14 +212,16 @@ class TestSetupWithCache:
             return_value=False,
         )
         mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", return_value=cached_result)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.runtime_manager", is_unit_testing=False)
 
         try:
-            pipelex_instance = Pipelex.make(
-                integration_mode=IntegrationMode.PYTEST,
+            telemetry_manager = Pipelex.make(
+                integration_mode=IntegrationMode.PYTHON,
                 needs_inference=True,
-            )
-            assert isinstance(pipelex_instance.telemetry_manager, TelemetryManagerNoOp), (
-                "cached gateway config must downgrade telemetry to no-op, even when needs_inference=True"
+            ).telemetry_manager
+            assert telemetry_manager is not None
+            assert not telemetry_manager.is_pipelex_telemetry_enabled, (
+                "cached gateway config must turn the Gateway telemetry stream off, even when needs_inference=True"
             )
         finally:
             Pipelex.teardown_if_needed()

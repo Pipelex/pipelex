@@ -54,7 +54,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize to storage
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
 
         # Verify the URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("user_image")
@@ -102,7 +102,8 @@ class TestUserProvidedImageStorage:
         """Test that HTTP URLs are passed through when fetch is disabled.
 
         When is_fetch_remote_content_enabled=False, HTTP URLs should not be
-        fetched and stored. They should be passed through unchanged.
+        fetched and stored. They should be passed through unchanged, the URL
+        becoming the image's own public_url.
         """
         # Create ImageContent with HTTP URL
         http_url = URLs.png_example_1
@@ -115,12 +116,13 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize (should not change HTTP URLs when fetch is disabled)
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
 
         # Verify URL was NOT changed
         normalized_stuff = normalized_memory.get_stuff("remote_image")
         assert isinstance(normalized_stuff.content, ImageContent)
         assert normalized_stuff.content.url == http_url
+        assert normalized_stuff.content.public_url == http_url
 
     @pytest.mark.usefixtures("mock_upload_local_content_enabled")
     async def test_user_image_local_file_to_storage_when_upload_enabled(self) -> None:
@@ -139,7 +141,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize - should upload the local file to storage
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
 
         # Verify the URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("local_image")
@@ -178,7 +180,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize (should not change local paths when upload is disabled)
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
 
         # Verify URL was NOT changed
         normalized_stuff = normalized_memory.get_stuff("local_image")

@@ -42,6 +42,7 @@ _NON_PIPELEX_ERROR_KEYS: frozenset[str] = frozenset(
         "PipeValidationError",  # subclass of ValueError, not of PipelexError
         "ClientAuthenticationError",  # mthds API client package
         "PipelineRequestError",  # mthds API client package
+        "ApiResponseError",  # mthds API client package
         "ArgumentError",  # synthetic error_type label
         "BinaryNotFoundError",  # synthetic error_type label
         "FixBundleError",  # synthetic error_type label

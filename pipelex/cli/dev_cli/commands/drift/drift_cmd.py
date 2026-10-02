@@ -17,13 +17,16 @@ import typer
 from rich.markup import escape
 
 from pipelex.cli.dev_cli.commands.drift.core import (
+    RATIONALE_TEMPLATE,
     ContractPlanPacket,
     DriftIssue,
     DriftIssueKind,
+    DriftVerdict,
     build_plan_packets,
     compute_current_digest,
     find_issues,
     match_files,
+    read_rationale_verdict,
 )
 from pipelex.cli.dev_cli.commands.drift.exceptions import DriftAckError, DriftError, DriftGitError
 from pipelex.cli.dev_cli.commands.drift.git_adapter import (
@@ -132,7 +135,7 @@ def _render_packet_markdown(packet: ContractPlanPacket) -> str:
     if packet.contract.verify_commands:
         lines.extend(["", "**Verify commands (run by ack):**", ""])
         lines.extend(f"- {command}" for command in packet.contract.verify_commands)
-    ack_invocation = f'make drift-ack CONTRACT={packet.contract_id} RATIONALE="…"'
+    ack_invocation = f'make drift-ack CONTRACT={packet.contract_id} RATIONALE="{RATIONALE_TEMPLATE}"'
     lines.extend(
         [
             "",
@@ -239,6 +242,13 @@ def drift_ack_cmd(contract_id: str, *, rationale: str, reviewed_by_override: str
     if not rationale.strip():
         msg = "An ack requires a non-empty --rationale: it is the on-the-record review decision"
         raise DriftAckError(msg)
+    if read_rationale_verdict(rationale=rationale) is None:
+        verdicts = ", ".join(f"`{verdict}`" for verdict in DriftVerdict)
+        msg = (
+            f"The --rationale must open with its verdict — one of {verdicts} — then a colon and what was reviewed, "
+            'e.g. "clean-pass: reviewed the config pages, nothing was stale". Nothing was written'
+        )
+        raise DriftAckError(msg)
     reviewed_by = reviewed_by_override or get_git_user_name(resolved_root)
     if reviewed_by is None:
         msg = "Cannot resolve the reviewer identity: set `git config user.name` or pass --by"
@@ -300,7 +310,14 @@ def check_command(
 @drift_app.command("ack", help="Run the contract's verify commands, then record the review ack")
 def ack_command(
     contract: Annotated[str, typer.Argument(help="Contract id to acknowledge")],
-    rationale: Annotated[str, typer.Option("--rationale", "-r", help="The on-the-record review decision (required)")],
+    rationale: Annotated[
+        str,
+        typer.Option(
+            "--rationale",
+            "-r",
+            help="The on-the-record review decision, opening with its verdict: `real-catch: …`, `clean-pass: …` or `friction: …`",
+        ),
+    ],
     by: Annotated[str | None, typer.Option("--by", help="Reviewer identity (default: git config user.name)")] = None,
 ) -> None:
     """Record a fulfilled review for one contract."""

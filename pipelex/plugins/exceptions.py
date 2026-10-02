@@ -28,13 +28,18 @@ class InferenceBackendNotFoundError(PluginError):
 
     Raised by the family worker factories on a registry-lookup miss — typically a
     model whose backend plugin is not installed or was disabled via
-    ``runtime.plugins.disabled``.
+    ``runtime.plugins.disabled``, or a backend file still naming an sdk handle a
+    release renamed, which the plugin that serves it no longer registers.
     """
 
     def __init__(self, *, family: str, sdk: str):
         self.family = family
         self.sdk = sdk
-        message = f"No inference backend registered for sdk '{sdk}' in the {family} family. Is its plugin installed and enabled?"
+        message = (
+            f"No inference backend registered for sdk '{sdk}' in the {family} family. Is its plugin installed and enabled? "
+            f"If it is, '{sdk}' may be a handle a release renamed: `pipelex migrate` reports each backend file "
+            "that still sets a retired handle."
+        )
         super().__init__(message)
 
 
@@ -119,6 +124,48 @@ class DuplicateSecretsProviderError(PluginError):
         message = (
             f"Secrets provider for method '{method}' is registered by both plugin "
             f"'{first_plugin}' and plugin '{second_plugin}'. Each method must have a single provider."
+        )
+        super().__init__(message)
+
+
+class DuplicateLogSinkError(PluginError):
+    """Two plugins registered a log sink for the same method."""
+
+    def __init__(self, *, method: str, first_plugin: str, second_plugin: str):
+        self.method = method
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Log sink for method '{method}' is registered by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            "Each method must have a single sink."
+        )
+        super().__init__(message)
+
+
+class DuplicateInternalModelError(PluginError):
+    """Two plugins declared a model of the same name in the internal backend."""
+
+    def __init__(self, *, name: str, first_plugin: str, second_plugin: str):
+        self.name = name
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Internal model '{name}' is declared by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            "Each internal model must be declared by a single plugin."
+        )
+        super().__init__(message)
+
+
+class DuplicateDocGenDefaultError(PluginError):
+    """Two plugins declared the model deck's default document engine for the same format and source."""
+
+    def __init__(self, *, choice_key: str, first_plugin: str, second_plugin: str):
+        self.choice_key = choice_key
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"The default document engine for '{choice_key}' is declared by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            "Each format and source must have its default declared by a single plugin; a user sets their own in an x_custom_*.toml deck file."
         )
         super().__init__(message)
 
@@ -369,5 +416,30 @@ class UnknownSecretsMethodError(PluginError):
         message = (
             f"No secrets provider is registered for method '{method}'. Registered methods: {available}. "
             "Check runtime.secrets.method, or install/enable the plugin that provides that method."
+        )
+        super().__init__(message)
+
+
+class UnknownLogSinkError(PluginError):
+    """A configured log sink has no registered factory.
+
+    ``runtime.log.sink`` selects a sink from the registry the built-in ``LogSinkPlugin`` (and any
+    external plugin contributing one) populates. When the token names no registered factory — a typo,
+    or an external plugin that is not installed or was disabled via ``runtime.plugins.disabled`` — boot
+    fails loud here rather than starting with its records going nowhere. The message lists the
+    registered sinks so the fix is obvious.
+    """
+
+    # The message describes the caller's own input (the configured sink) and lists the registered
+    # ones; it is fully actionable, so keep it verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, method: str, registered_methods: list[str]):
+        self.method = method
+        self.registered_methods = registered_methods
+        available = ", ".join(sorted(registered_methods)) or "(none)"
+        message = (
+            f"No log sink is registered for '{method}'. Registered sinks: {available}. "
+            "Check runtime.log.sink, or install/enable the plugin that provides that sink."
         )
         super().__init__(message)

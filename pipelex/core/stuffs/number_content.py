@@ -1,6 +1,7 @@
 import json
+import math
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -10,6 +11,15 @@ class NumberContent(StuffContent):
     """A number"""
 
     number: int | float = Field(description="The number")
+
+    @field_validator("number")
+    @classmethod
+    def check_finite(cls, value: float) -> int | float:
+        # NaN and the infinities are not JSON numbers: serialization would turn them into null.
+        if isinstance(value, float) and not math.isfinite(value):
+            msg = f"number must be finite, got {value}"
+            raise ValueError(msg)
+        return value
 
     @property
     @override

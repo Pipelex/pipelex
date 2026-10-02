@@ -24,8 +24,8 @@ Get your Gateway API key at [app.pipelex.com](https://app.pipelex.com/) or [join
 
 Direct integration with major providers using your own API keys:
 
-- **OpenAI** — GPT-4o, GPT-4.1, o1, o3, o4-mini, etc.
-- **Anthropic** — Claude Sonnet 4, Claude Haiku, etc.
+- **OpenAI** — GPT-4o, GPT-5.4, GPT-5.5, GPT-5.6, GPT-6, etc.
+- **Anthropic** — Claude Opus 5, Claude Fable 5, Claude Sonnet 5, etc.
 - **Google** — Gemini 2.5 Pro, Gemini 2.5 Flash, etc.
 - **Mistral** — Mistral Large, Mistral Medium, etc.
 - **Azure OpenAI** — Azure-hosted OpenAI models

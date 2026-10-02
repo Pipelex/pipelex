@@ -37,6 +37,7 @@ from pipelex.pipeline.input_form import (
     InputFormField,
     InputFormItem,
     ListItem,
+    ObjectItem,
     PipeInputFormDescriptor,
 )
 
@@ -61,22 +62,29 @@ TIME_CONTENT_KEY = "time"
 
 NATIVE_PREFIX = "native."
 
-# The natives the runtime's input shaper cannot build top-down: their light form keeps the whole
-# `{concept, content}` envelope, because a bare value at one of these positions is not re-shapable.
-# The vocabulary is the standard's closed native set (`mthds/docs/spec/native-concepts.md`), which is
-# why a projection may consult it: it reads an identity the descriptor states, never sniffs a shape.
+# The open natives whose light form keeps the whole `{concept, content}` envelope: a bare value at
+# one of these positions either has no reading every runtime shares or, for `Anything`, would
+# misstate what the slot takes — its bare placeholder `{}` reads as "send an object", while the
+# envelope names the concept that says any value goes. The vocabulary is the standard's closed native
+# set (`mthds/docs/spec/native-concepts.md`), which is why a projection may consult it: it reads an
+# identity the descriptor states, never sniffs a shape.
 OUT_OF_MATRIX_NATIVES = frozenset(
     {
         "Anything",
         "Composite",
         "Dynamic",
         "Html",
-        "JSON",
         "Page",
         "SearchResult",
         "TextAndImages",
     }
 )
+
+# `native.JSON`'s light form is the JSON object itself: the descriptor states the content form, an
+# object holding one `json_obj`, and the compact projection unwraps it, since the shaper reads a bare
+# object at a `JSON` position literally.
+NATIVE_JSON = "JSON"
+JSON_CONTENT_KEY = "json_obj"
 
 # `native.Number`'s content is a number union, and the runtime placeholders it as `1` rather than as
 # the `0` / `0.0` a plain `type = "number"` structure field takes. The descriptor states `kind =
@@ -113,7 +121,7 @@ def keeps_envelope(*, node: InputFormItem) -> bool:
     beside its required `date` makes the rendered form an object.
     """
     code = native_code(node=node)
-    if code is None:
+    if code is None or code == NATIVE_JSON:
         return False
     return code in OUT_OF_MATRIX_NATIVES or node.kind is FieldKind.OBJECT
 
@@ -234,11 +242,25 @@ def _slot_content(*, node: InputFormItem, name: str) -> Any:
 
 
 def _light_value(*, node: InputFormItem, name: str) -> Any:
-    """One slot's (or one slot element's) light value: a scalar unwraps, everything else keeps its dict."""
+    """One slot's (or one slot element's) light value: a scalar unwraps, a `JSON` object unwraps its
+    `json_obj`, and everything else keeps its dict.
+    """
     content_key = slot_content_key(node=node)
     if content_key is not None:
         return _leaf_placeholder(node=node, name=content_key)
+    if native_code(node=node) == NATIVE_JSON:
+        return _json_object(node=node)
     return project_value(node=node, name=name)
+
+
+def _json_object(*, node: InputFormItem) -> Any:
+    """The object a `JSON` node carries under `json_obj`, which its light form is."""
+    if isinstance(node, ObjectItem):
+        for field in node.fields:
+            if field.name == JSON_CONTENT_KEY:
+                return project_value(node=field, name=JSON_CONTENT_KEY)
+    msg = f"A '{NATIVE_PREFIX}{NATIVE_JSON}' node must be an object carrying a '{JSON_CONTENT_KEY}' field, got a '{node.kind}' node"
+    raise ValueError(msg)
 
 
 def _compact_slot(*, field: InputFormField) -> Any:

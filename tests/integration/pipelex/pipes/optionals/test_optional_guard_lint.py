@@ -113,7 +113,7 @@ class TestOptionalGuardLint:
         assert wrapped.error_type == PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
 
     def test_presence_branching_idiom_is_accepted(self, load_empty_library: Callable[[], None]):
-        """The design §15 idiom: branch on presence with an `is defined` inline conditional."""
+        """The documented idiom: branch on presence with an `is defined` inline conditional."""
         load_empty_library()
         condition = PipeFactory[PipeCondition].make_from_blueprint(
             domain_code=_DOMAIN_CODE,
@@ -231,9 +231,13 @@ class TestOptionalGuardLint:
         exactly once. When PipeCompose stored the already-preprocessed template instead, the
         lint's own `rewrite_template_sigils` ran a second time and resurrected the escaped
         literal (`$$maybe_note` → `$maybe_note` → `{{ maybe_note|format() }}`), wrongly raising
-        OPTIONAL_INPUT_UNGUARDED on a pipe that never references the optional input.
+        OPTIONAL_INPUT_UNGUARDED on a pipe whose only unguarded mention of the optional input is the literal.
+
+        The template also reads the input under a guard, since a declared input no template reads is
+        refused on its own account; the only reference outside the guard is the escaped literal.
         """
         load_empty_library()
+        template = "The literal token is $$maybe_note here.{% if maybe_note %} Note: {{ maybe_note }}{% endif %}"
         compose = PipeFactory[PipeCompose].make_from_blueprint(
             domain_code=_DOMAIN_CODE,
             pipe_code="guard_lint_compose_escaped",
@@ -241,9 +245,9 @@ class TestOptionalGuardLint:
                 description="Compose whose template escapes a literal `$` before an optional input's name",
                 inputs={"maybe_note": "Text?"},
                 output="Text",
-                template="The literal token is $$maybe_note here.",
+                template=template,
             ),
         )
         assert compose.code == "guard_lint_compose_escaped"
         # The stored template stays authored (escaped), so a single downstream rewrite keeps it literal.
-        assert compose.template == "The literal token is $$maybe_note here."
+        assert compose.template == template

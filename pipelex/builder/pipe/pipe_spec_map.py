@@ -1,6 +1,7 @@
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.builder.pipe.pipe_doc_gen_spec import PipeDocGenSpec
 from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
@@ -23,6 +24,7 @@ pipe_type_to_spec_class: dict[str, type[PipeSpec]] = {
     "PipeExtract": PipeExtractSpec,
     "PipeSearch": PipeSearchSpec,
     "PipeStructure": PipeStructureSpec,
+    "PipeDocGen": PipeDocGenSpec,
     "PipeBatch": PipeBatchSpec,
     "PipeCondition": PipeConditionSpec,
     "PipeParallel": PipeParallelSpec,

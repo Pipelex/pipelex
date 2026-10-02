@@ -1,0 +1,19 @@
+services:
+  pipelex-api:
+    image: pipelex/pipelex-api:latest
+    container_name: pipelex-api
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # Optional: mount your own Pipelex configuration to override the defaults
+    # baked into the image. See docs/configuration.md for details.
+    # volumes:
+    #   - ./.pipelex:/root/.pipelex:ro

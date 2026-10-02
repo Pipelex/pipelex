@@ -78,8 +78,8 @@ even when the release carries nothing this engine uses.
 ## The cascade is narrow — say so rather than hunting for it
 
 `pipelex/` is the only repo in this workspace that names kajson in a
-`pyproject.toml`. Everyone else — `pipelex-sdk-python`, every `pipelex-server`
-member, every user install — receives kajson **transitively, through this exact
+`pyproject.toml`. Everyone else — the Python SDK in `pipelex-sdk/python/`, every
+`pipelex-server` member, every user install — receives kajson **transitively, through this exact
 pin**. Confirm it rather than trusting this sentence, because a new direct
 dependent would change the conclusion:
 

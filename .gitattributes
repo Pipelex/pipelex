@@ -6,8 +6,8 @@
 # `newline` argument, so on Windows Python translates every "\n" to CRLF and the whole set churns in version
 # control with no change of content. The gates would not notice: they all compare with universal-newline
 # reads, which fold CRLF back to LF before the comparison. This file closes that class for tracked files
-# regardless of which writer produced them; see wip/line-endings-writer-sweep.md for the writer-by-writer
-# half, which is the structural fix and is tracked separately.
+# regardless of which writer produced them; the writer-by-writer half, which is the structural fix, is
+# L-260930-c911e7.
 #
 # `text=auto` leaves git to detect text from binary, so images and other binaries are untouched. No tracked
 # file contained CRLF when this landed, so it introduces no renormalisation diff — it pins the invariant.

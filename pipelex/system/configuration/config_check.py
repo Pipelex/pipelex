@@ -1,5 +1,3 @@
-from rich.panel import Panel
-
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import CONFIG_NAME, config_manager
 from pipelex.tools.misc.file_utils import path_exists
@@ -20,7 +18,9 @@ def check_is_initialized(*, print_warning_if_not: bool = True) -> bool:
     is_initialized = config_exists and backends_exists and routing_exists
 
     if not is_initialized and print_warning_if_not:
+        # The warning panel is the one thing here that needs Rich, the `cli` extra: the check itself does not.
         console = get_console()
+        from rich.panel import Panel
 
         # Build a descriptive message about what's missing
         issues: list[str] = []

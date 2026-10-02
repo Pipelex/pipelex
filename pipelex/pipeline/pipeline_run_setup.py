@@ -29,7 +29,13 @@ from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE
+from pipelex.system.run_extras import validate_run_extras
+from pipelex.system.storage_scope import (
+    LOCAL_STORAGE_SCOPE,
+    validate_read_scope,
+    validate_storage_scope,
+    validate_storage_scope_within_read_scope,
+)
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -57,9 +63,12 @@ async def pipeline_run_setup(
     is_mock_usage: bool = False,
     user_id: str,
     storage_scope: str,
+    read_scope: str | None,
+    extras: dict[str, str] | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -123,6 +132,23 @@ async def pipeline_run_setup(
         Opaque prefix under which every byte this run writes must land. REQUIRED,
         validated at ``JobMetadata`` construction. See
         :mod:`pipelex.system.storage_scope`.
+    read_scope:
+        Opaque prefix every storage key this run reads must lie under, which also
+        forbids the run any read from the local disk. REQUIRED, and ``None`` is
+        the explicit statement that the run is unscoped: a local run, or a server
+        with a single tenant. A set read scope must contain ``storage_scope``, so
+        a host that passes one also passes its own storage scope rather than the
+        local sentinel. See :mod:`pipelex.system.storage_scope` and
+        :mod:`pipelex.tools.uri.uri_read_scope`.
+    extras:
+        Opaque, host-supplied mapping of labels about this run — the hosted
+        platform sends its organization, a single-user deployment sends nothing.
+        Never read by name here; telemetry forwards it whole as the groups of
+        each capture. Validated
+        at the TOP of this function, above the pipeline registration and above
+        the trace-start event, so a malformed mapping registers nothing and
+        emits nothing. Optional, and omitting it leaves the telemetry group facet empty.
+        See :mod:`pipelex.system.run_extras`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -131,19 +157,30 @@ async def pipeline_run_setup(
         Optional inbound ``X-Request-ID`` from the dispatcher (the value the
         external HTTP caller can use to correlate every log line and every
         ``ErrorReport`` back to its originating request). Threaded onto
-        :class:`pipelex.system.job_metadata.JobMetadata.request_id` so it
+        :attr:`pipelex.system.job_metadata.RunMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
     inputs_base_dir:
         Directory that bare *relative local* file paths in ``inputs`` resolve against (Smart
         Inputs D3) — the inputs file's parent when a CLI file-loaded the inputs. ``None`` for
         API/SDK callers (they pass absolute urls / storage uris). Only the shaper's file-ish /
         CSV arms consult it.
+    library_dirs_are_callers:
+        Whether ``library_dirs`` are the caller's own, as on a local CLI run, so a refusal while
+        loading them is the caller's invalid bundle. ``False`` (a host's own directories) loads them
+        untranslated. The ``mthds_contents`` are always the caller's: a refusal while loading them is
+        always the ``ValidateBundleError`` verdict. See :func:`acquire_library`.
 
     Returns:
     -------
     tuple[PipeJob, str, str]
         A tuple containing the pipe job ready for execution, the pipeline run ID,
         and the library ID.
+
+    Raises:
+    -------
+    ValidateBundleError
+        The bundle was refused while it loaded, before any pipe ran: the same verdict, with the same
+        located ``validation_errors``, that validating the bundle gives.
 
     """
     # NO `user_id or DEFAULT_USER_ID` HERE, DELIBERATELY.
@@ -162,6 +199,49 @@ async def pipeline_run_setup(
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
+
+    # Validate the extras HERE, before this function causes anything observable.
+    #
+    # `RunMetadata` validates them too, and `prepare_pipe_job` validates them at
+    # its own top — but BOTH run below `add_new_pipeline` and the open tracer, so
+    # a malformed mapping used to abort a run that had already registered itself
+    # and opened a library and a tracer. The teardown below releases that state.
+    # What it could not take back was the trace-start event, which this seam
+    # emitted from up there too until the emission moved below the job build.
+    #
+    # This is the same lesson `storage_scope` learned one seam lower, and the
+    # same cure: ordering, not absence, was the defect.
+    extras = validate_run_extras(value=extras or {})
+
+    # And the scope, for the same reason and with more at stake.
+    #
+    # `prepare_pipe_job` gates it too, and that gate stays — but it runs below
+    # everything listed above, so until now the OPAQUE mapping was refused
+    # earlier than the field that decides where a tenant's bytes land. A scope
+    # carrying `..` registered a pipeline and opened a library and a tracer
+    # before anything looked at it.
+    #
+    # ADDITIVE, never a move: the value validated here is the caller's raw one,
+    # and the sentinel below rebinds it to something else that only the lower
+    # gate sees. `LOCAL_STORAGE_SCOPE` passes this gate unharmed — it is itself
+    # a valid one-segment scope — so the sentinel is not disturbed.
+    storage_scope = validate_storage_scope(value=storage_scope)
+
+    # And the read scope beside it, with its relation to the storage scope, still
+    # above everything this function causes. A run with a read scope reads only
+    # under it, and it reads its own outputs back, so its storage scope must lie
+    # under it. The local sentinel is refused outright beside a read scope rather
+    # than checked after the swap below: it becomes the run id, which lies under
+    # no host's prefix, and a host that scopes reads scopes writes too.
+    if read_scope is not None:
+        read_scope = validate_read_scope(value=read_scope)
+        if storage_scope == LOCAL_STORAGE_SCOPE:
+            msg = (
+                "A run with a read_scope must pass its own storage_scope: the local storage scope becomes the run id, "
+                "which lies under no read_scope, and the run could not read what it writes."
+            )
+            raise ValueError(msg)
+        validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
 
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
@@ -189,7 +269,13 @@ async def pipeline_run_setup(
     # Keyed on the sentinel EXACTLY, never a prefix test: a host that serves more
     # than one tenant passes its own scope and is untouched here.
     if storage_scope == LOCAL_STORAGE_SCOPE:
-        storage_scope = pipeline_run_id
+        # The rebound value is caller data too: `pipeline_run_id` is a parameter
+        # of this function, so a caller passing the sentinel alongside its own id
+        # chooses the storage scope through the back door. The gate above saw
+        # only the sentinel, so this is the first look at what the scope has
+        # actually become — and it still sits above the library, the tracer and
+        # the trace-start.
+        storage_scope = validate_storage_scope(value=pipeline_run_id)
 
     if not library_id:
         library_id = pipeline_run_id
@@ -211,6 +297,7 @@ async def pipeline_run_setup(
             library_dirs=library_dirs,
             mthds_contents=mthds_contents,
             bundle_uris=bundle_uris,
+            library_dirs_are_callers=library_dirs_are_callers,
         )
         library_acquired = True
 
@@ -309,9 +396,6 @@ async def pipeline_run_setup(
                 trace_name_redacted=trace_name_redacted,
                 span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
             )
-            # Emit trace start event immediately to establish trace name in PostHog
-            # This must happen before any pipe spans are created/exported
-            get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
         # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
         pipe_job = await prepare_pipe_job(
@@ -323,6 +407,8 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             storage_scope=storage_scope,
+            read_scope=read_scope,
+            extras=extras,
             inputs=inputs,
             search_scope=search_scope,
             trace_context=trace_context,
@@ -334,11 +420,34 @@ async def pipeline_run_setup(
             inputs_base_dir=inputs_base_dir,
         )
 
+        # Emit the trace start event to establish the trace name in the backend. It
+        # must arrive before any pipe span, which is comfortably satisfied here: the
+        # pipe has not run yet, and no span is created until it does.
+        #
+        # It sits BELOW `prepare_pipe_job` deliberately, although nothing between the
+        # two emits anything. That seam is where the run's `RunMetadata` is built, and
+        # the trace-start has to be attributed to the same person its spans will be —
+        # so the event waits for the one object that says who that is, rather than a
+        # second one assembled here from the same parameters. Waiting also means a
+        # failure inside that seam no longer announces a trace for a run that never
+        # started, which is the event that cannot be unsent.
+        if otel_context is not None:
+            get_telemetry_manager().handle_trace_start(
+                trace_name=otel_context.trace_name,
+                trace_name_redacted=otel_context.trace_name_redacted,
+                trace_id=otel_context.trace_id,
+                run_metadata=pipe_job.job_metadata.run_metadata,
+            )
+
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe.pipe_type,
         }
-        get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
+        get_telemetry_manager().track_event(
+            event_name=EventName.PIPELINE_EXECUTE,
+            properties=properties,
+            run_metadata=pipe_job.job_metadata.run_metadata,
+        )
 
         success = True
         return pipe_job, pipeline_run_id, library_id

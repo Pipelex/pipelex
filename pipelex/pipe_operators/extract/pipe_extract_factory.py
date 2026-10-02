@@ -49,9 +49,10 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             document_stuff_name = input_name
         else:
             msg = (
-                f"The input concept {input_requirement.concept.concept_ref} is not compatible "
-                f"with the required concept {get_native_concept(native_concept=NativeConceptCode.IMAGE).concept_ref} or "
-                f"{get_native_concept(native_concept=NativeConceptCode.DOCUMENT).concept_ref}"
+                f"The input '{input_name}' of PipeExtract '{pipe_code}' is a {input_requirement.concept.concept_ref}, "
+                f"which is not compatible with the required concept {get_native_concept(native_concept=NativeConceptCode.IMAGE).concept_ref} or "
+                f"{get_native_concept(native_concept=NativeConceptCode.DOCUMENT).concept_ref}. "
+                "Declare this input as an Image or a Document, or as a concept that refines one of them."
             )
             raise PipeExtractFactoryError(msg)
 

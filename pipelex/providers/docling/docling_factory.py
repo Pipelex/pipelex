@@ -20,6 +20,10 @@ class DoclingFactory:
     ) -> ExtractOutput:
         """Convert a Docling document to ExtractOutput with markdown text per page.
 
+        A document with no pages, which is every format that is not laid out on pages (HTML,
+        Markdown, CSV, AsciiDoc), becomes a single page holding the whole document: serialized
+        page by page, it would come back empty.
+
         Args:
             doc: The Docling document from conversion result.
 
@@ -30,6 +34,10 @@ class DoclingFactory:
         from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams  # ruff: ignore[import-outside-top-level]
 
         pages: dict[int, Page] = {}
+
+        if not doc.pages:
+            pages[0] = Page(text=MarkdownDocSerializer(doc=doc).serialize().text)
+            return ExtractOutput(pages=pages)
 
         # doc.pages is a dictionary where keys are page numbers (1-based in Docling)
         for page_no in sorted(doc.pages.keys()):

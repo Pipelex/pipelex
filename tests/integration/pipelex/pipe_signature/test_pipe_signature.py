@@ -102,7 +102,9 @@ class TestPipeSignature:
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed)
         await runtime.run_pipe(
             job_metadata=JobMetadata(
-                run_metadata=RunMetadata(storage_scope="test/scope", user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
+                run_metadata=RunMetadata(
+                    storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED
+                )
             ),
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
@@ -123,7 +125,9 @@ class TestPipeSignature:
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed)
         await runtime.run_pipe(
             job_metadata=JobMetadata(
-                run_metadata=RunMetadata(storage_scope="test/scope", user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
+                run_metadata=RunMetadata(
+                    storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED
+                )
             ),
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
@@ -146,7 +150,9 @@ class TestPipeSignature:
         with pytest.raises(PipeSignatureNotExecutableError) as exc_info:
             await runtime._live_run_pipe(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 job_metadata=JobMetadata(
-                    run_metadata=RunMetadata(storage_scope="test/scope", user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED)
+                    run_metadata=RunMetadata(
+                        storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED
+                    )
                 ),
                 working_memory=working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
@@ -169,7 +175,9 @@ class TestPipeSignature:
         with pytest.raises(PipeSignatureNotExecutableError) as exc_info:
             await runtime.run_pipe(
                 job_metadata=JobMetadata(
-                    run_metadata=RunMetadata(storage_scope="test/scope", user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED)
+                    run_metadata=RunMetadata(
+                        storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED
+                    )
                 ),
                 working_memory=working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
