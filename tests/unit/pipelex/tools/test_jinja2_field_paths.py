@@ -1,8 +1,12 @@
 import pytest
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
-from pipelex.tools.jinja2.jinja2_field_paths import LIST_ITEM_SEGMENT, detect_template_field_paths
+from pipelex.tools.jinja2.jinja2_field_paths import detect_template_field_paths
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.jinja2_scopes import LIST_ITEM_SEGMENT
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from tests.unit.pipelex.tools.test_jinja2_required_variables import TestData as RequiredVariablesData
 
 
 def _paths(template_source: str) -> list[tuple[str, ...]]:
@@ -41,6 +45,61 @@ class TestDetectTemplateFieldPaths:
     def test_what_cannot_be_followed_gives_no_path_through_it(self, topic: str, template_source: str) -> None:
         paths = _paths(template_source)
         assert not any("nosuch" in path or "index" in path for path in paths), f"{topic}: {paths}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source"),
+        [
+            ("set_in_every_branch_rebinds_an_input", "{% if f %}{% set invoice = a %}{% else %}{% set invoice = b %}{% endif %}{{ invoice.nosuch }}"),
+            (
+                "loop_target_rebound_in_every_branch",
+                (
+                    "{% for item in invoice.line_items %}{% if f %}{% set item = a %}{% else %}{% set item = b %}{% endif %}"
+                    "{{ item.nosuch }}{% endfor %}"
+                ),
+            ),
+            ("set_in_a_call_block_body", "{% call m() %}{% set invoice = a %}{{ invoice.nosuch }}{% endcall %}"),
+            ("set_in_a_filter_block_body", "{% filter upper %}{% set invoice = a %}{{ invoice.nosuch }}{% endfilter %}"),
+            ("macro_default_reads_an_earlier_argument", "{% macro show(invoice, total=invoice.nosuch) %}{{ total }}{% endmacro %}"),
+        ],
+    )
+    def test_a_name_jinja_binds_gives_no_path(self, topic: str, template_source: str) -> None:
+        paths = _paths(template_source)
+        assert not any("nosuch" in path for path in paths), f"{topic}: {paths}"
+
+    def test_a_called_global_gives_no_path(self) -> None:
+        assert _paths("{% for i in range(3) %}{{ dict(a=i).a }}{% endfor %}") == []
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_path"),
+        [
+            ("set_in_some_branches", "{% if f %}{% set invoice = other %}{% endif %}{{ invoice.nosuch }}", ("invoice", "nosuch")),
+            (
+                "loop_target_rebound_in_some_branches",
+                "{% for item in invoice.line_items %}{% if f %}{% set item = other %}{% endif %}{{ item.nosuch }}{% endfor %}",
+                ("invoice", "line_items", LIST_ITEM_SEGMENT, "nosuch"),
+            ),
+            ("set_does_not_escape_a_loop", "{% for x in xs %}{% set invoice = x %}{% endfor %}{{ invoice.nosuch }}", ("invoice", "nosuch")),
+        ],
+    )
+    def test_a_name_read_where_jinja_reads_the_input_keeps_its_path(self, topic: str, template_source: str, expected_path: tuple[str, ...]) -> None:
+        assert expected_path in _paths(template_source), f"{topic}: {_paths(template_source)}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        RequiredVariablesData.JINJA_SCOPE_RULES,
+    )
+    def test_roots_match_the_required_variables(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],  # ruff: ignore[unused-method-argument]
+    ) -> None:
+        """The field paths and the required variables walk the same scopes, so they start from the same inputs."""
+        field_path_roots = {
+            field_path.root for field_path in detect_template_field_paths(template_source=template_source, template_category=TemplateCategory.HTML)
+        }
+        required = detect_jinja2_required_variables(template_category=TemplateCategory.HTML, template_source=template_source)
+        assert field_path_roots == {get_root_from_dotted_path(path) for path in required}, f"Failed for topic: {topic}"
 
     def test_a_subscript_is_not_followed(self) -> None:
         assert _paths("{{ invoice['customer'].name }}") == [("invoice",)]

@@ -6048,14 +6048,6 @@ rationale = "Factory from source: builds the result from the template_category; 
 param = "template_category"
 rationale = "Factory from source: builds the result from the template_category; single operand."
 
-["pipelex/tools/jinja2/jinja2_field_paths.py::_chain"]
-param = "node"
-rationale = "Reads the attribute chain of one Jinja node."
-
-["pipelex/tools/jinja2/jinja2_field_paths.py::_target_names"]
-param = "target"
-rationale = "Lists the names one assignment target binds."
-
 ["pipelex/tools/jinja2/jinja2_filters.py::escape_script_tag"]
 param = "value"
 rationale = "Transforms the value; single operand."
@@ -6143,6 +6135,26 @@ rationale = "Extracts/derives from the node; single operand."
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::_names_assigned_by_statements"]
+param = "statements"
+rationale = "Noun-named derivation: the names a statement list binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::assigned_target_names"]
+param = "target"
+rationale = "Lists the names one assignment target binds."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::attribute_chain"]
+param = "node"
+rationale = "Reads the attribute chain of one Jinja node."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::definitely_assigned_names"]
+param = "statement"
+rationale = "Noun-named derivation: the names one statement binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::frame_bound_names"]
+param = "statement"
+rationale = "Noun-named derivation: the names one statement binds in the frame it opens; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.is_loaded"]
 param = "name"

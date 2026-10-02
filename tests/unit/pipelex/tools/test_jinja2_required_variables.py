@@ -1,13 +1,43 @@
-from typing import ClassVar
+from collections.abc import Iterator
+from typing import Any, ClassVar
 
 import pytest
+from jinja2 import Environment, UndefinedError
+from typing_extensions import override
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import (
     detect_jinja2_required_variables,
     detect_jinja2_variable_references,
 )
+from pipelex.tools.jinja2.jinja2_undefined import PresenceProbingStrictUndefined
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+
+
+class _PermissiveValue:
+    """A context value any template shape can read: every attribute and call gives itself back."""
+
+    def __init__(self, *, is_truthy: bool) -> None:
+        self.is_truthy = is_truthy
+
+    def __getattr__(self, name: str) -> "_PermissiveValue":
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return self
+
+    def __call__(self, *_args: Any, **_kwargs: Any) -> "_PermissiveValue":
+        return self
+
+    def __iter__(self) -> Iterator["_PermissiveValue"]:
+        return iter([self] if self.is_truthy else [])
+
+    def __bool__(self) -> bool:
+        return self.is_truthy
+
+    @override
+    def __str__(self) -> str:
+        return "value"
 
 
 class TestData:
@@ -216,6 +246,76 @@ Best regards,
         ("read_after_set", "{% set note = 'x' %}{{ note }}", set()),
         ("read_after_block_set", "{% set note %}{{ body }}{% endset %}{{ note }}", {"body"}),
         ("macro_reads_a_later_set", "{{ x }}{% macro m() %}[{{ g }}]{% endmacro %}{% set g = 'y' %}{{ m() }}", {"x"}),
+    ]
+
+    # Where Jinja binds a name a template sets. An `if` opens no frame, and after it a name every branch sets, the
+    # `else` included, is bound, while a name only some branches set is the input of that name on the paths where
+    # none ran. A loop body, a loop's `else`, a macro, a call, filter or set block, a `with` and `autoescape` each
+    # open a frame, so a set inside one stays inside it
+    JINJA_SCOPE_RULES: ClassVar[list[tuple[str, str, set[str]]]] = [
+        ("set_read_later_in_its_if_branch", "{% if x %}{% set y = 1 %}{{ y }}{% endif %}", {"x"}),
+        ("set_in_both_branches", "{% if x %}{% set y = 1 %}{% else %}{% set y = 2 %}{% endif %}{{ y }}", {"x"}),
+        (
+            "set_in_every_branch_with_elifs",
+            "{% if a %}{% set y = 1 %}{% elif b %}{% set y = 2 %}{% else %}{% set y = 3 %}{% endif %}{{ y }}",
+            {"a", "b"},
+        ),
+        ("set_in_some_branches", "{% if x %}{% set y = 1 %}{% endif %}{{ y }}", {"x", "y"}),
+        ("set_in_every_branch_but_no_else", "{% if a %}{% set y = 1 %}{% elif b %}{% set y = 2 %}{% endif %}{{ y }}", {"a", "b", "y"}),
+        ("set_missing_from_an_elif", "{% if a %}{% set y = 1 %}{% elif b %}-{% else %}{% set y = 3 %}{% endif %}{{ y }}", {"a", "b", "y"}),
+        ("else_does_not_see_the_body_set", "{% if x %}{% set y = 1 %}{% else %}{{ y }}{% endif %}", {"x", "y"}),
+        ("elif_test_does_not_see_the_body_set", "{% if x %}{% set y = 1 %}{% elif y %}-{% endif %}", {"x", "y"}),
+        (
+            "nested_ifs_set_in_every_branch",
+            "{% if a %}{% if b %}{% set y = 1 %}{% else %}{% set y = 2 %}{% endif %}{% else %}{% set y = 3 %}{% endif %}{{ y }}",
+            {"a", "b"},
+        ),
+        ("nested_if_without_else", "{% if a %}{% if b %}{% set y = 1 %}{% endif %}{% else %}{% set y = 3 %}{% endif %}{{ y }}", {"a", "b", "y"}),
+        ("set_before_the_if_and_in_a_branch", "{% set y = 1 %}{% if x %}{% set y = 2 %}{% endif %}{{ y }}", {"x"}),
+        ("read_before_set_in_a_branch", "{% if x %}{{ y }}{% set y = 1 %}{% endif %}", {"x", "y"}),
+        ("set_read_later_in_a_loop_body", "{% for i in items %}{% set day = i.d %}{{ day }}{% endfor %}", {"items"}),
+        ("read_before_set_in_a_loop_body", "{% for i in items %}[{{ y }}]{% set y = i %}{% endfor %}", {"items", "y"}),
+        ("set_in_some_branches_inside_a_loop", "{% for i in items %}{% if i %}{% set y = i %}{% endif %}{{ y }}{% endfor %}", {"items", "y"}),
+        ("set_in_a_loop_else", "{% for i in items %}-{% else %}{% set y = 1 %}{{ y }}{% endfor %}", {"items"}),
+        ("set_in_a_with_body", "{% with %}{% set y = 1 %}{{ y }}{% endwith %}", set()),
+        ("set_in_a_macro_body", "{% macro m() %}{% set y = 1 %}{{ y }}{% endmacro %}{{ m() }}", set()),
+        ("set_in_a_call_block_body", "{% macro m() %}{{ caller() }}{% endmacro %}{% call m() %}{% set y = 1 %}{{ y }}{% endcall %}", set()),
+        ("set_in_a_filter_block_body", "{% filter upper %}{% set y = 'a' %}{{ y }}{% endfilter %}", set()),
+        ("set_in_a_set_block_body", "{% set z %}{% set y = 'a' %}{{ y }}{% endset %}{{ z }}", set()),
+        ("set_in_an_autoescape_block", "{% autoescape true %}{% set y = 1 %}{{ y }}{% endautoescape %}", set()),
+        ("set_does_not_escape_a_loop", "{% for i in items %}{% set y = i %}{% endfor %}{{ y }}", {"items", "y"}),
+        ("set_does_not_escape_a_loop_else", "{% for i in items %}-{% else %}{% set y = 1 %}{% endfor %}{{ y }}", {"items", "y"}),
+        ("set_does_not_escape_a_with", "{% with %}{% set y = 1 %}{% endwith %}{{ y }}", {"y"}),
+        ("set_does_not_escape_a_macro", "{% macro m() %}{% set y = 1 %}{% endmacro %}{{ m() }}{{ y }}", {"y"}),
+        ("set_does_not_escape_a_call_block", "{% macro m() %}{{ caller() }}{% endmacro %}{% call m() %}{% set y = 1 %}{% endcall %}{{ y }}", {"y"}),
+        ("set_does_not_escape_a_filter_block", "{% filter upper %}{% set y = 'a' %}{% endfilter %}{{ y }}", {"y"}),
+        ("set_does_not_escape_a_set_block", "{% set z %}{% set y = 'a' %}{% endset %}{{ z }}{{ y }}", {"y"}),
+        ("set_does_not_escape_an_autoescape_block", "{% autoescape true %}{% set y = 1 %}{% endautoescape %}{{ y }}", {"y"}),
+        ("with_target", "{% with y = 1 %}{{ y }}{% endwith %}", set()),
+        ("with_value_reads_outside_the_with", "{% with a = 1, b = a %}{{ b }}{% endwith %}", {"a"}),
+        ("tuple_target", "{% set a, b = 1, 2 %}{{ a }}{{ b }}", set()),
+        ("nested_tuple_target", "{% set a, (b, c) = 1, (2, 3) %}{{ a }}{{ c }}", set()),
+        ("nested_tuple_loop_target", "{% for k, (a, b) in [(1, (2, 3))] %}{{ k }}{{ b }}{% endfor %}", set()),
+        (
+            "namespace_attribute_set_in_an_if",
+            "{% set ns = namespace(found=false) %}{% for i in items %}{% if i %}{% set ns.found = true %}{% endif %}{% endfor %}{{ ns.found }}",
+            {"items"},
+        ),
+        (
+            "macro_reads_a_name_every_branch_sets",
+            "{% if a %}{% set g = 1 %}{% else %}{% set g = 2 %}{% endif %}{% macro m() %}{{ g }}{% endmacro %}{{ m() }}",
+            {"a"},
+        ),
+        ("macro_reads_a_name_some_branches_set", "{% if a %}{% set g = 1 %}{% endif %}{% macro m() %}{{ g }}{% endmacro %}{{ m() }}", {"a", "g"}),
+        (
+            "macro_in_a_loop_reads_a_later_set",
+            "{% for i in items %}{% macro m() %}{{ y }}{% endmacro %}{% set y = i %}{{ m() }}{% endfor %}",
+            {"items"},
+        ),
+        ("macro_called_before_its_definition", "{{ m() }}{% macro m() %}-{% endmacro %}", {"m"}),
+        ("macro_default_reads_an_earlier_argument", "{% macro m(a, b=a) %}{{ b }}{% endmacro %}{{ m(1) }}", set()),
+        ("call_block_arguments", "{% macro m() %}{{ caller(1) }}{% endmacro %}{% call(a) m() %}{{ a }}{% endcall %}", set()),
+        ("filter_block_filter_reads_its_body_set", "{% filter replace('a', y) %}{% set y = 'b' %}a{% endfilter %}", set()),
     ]
 
     # Names Jinja provides, and the scope a loop opens, are never inputs
@@ -629,6 +729,51 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
+        TestData.JINJA_SCOPE_RULES,
+    )
+    def test_jinja_scope_rules(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],
+    ):
+        """A name the template sets is no input where Jinja binds it, and is the input of that name everywhere else."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_variables, f"Failed for topic: {topic}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
+        TestData.JINJA_SCOPE_RULES,
+    )
+    @pytest.mark.parametrize("is_truthy", [True, False])
+    def test_jinja_reads_nothing_beyond_the_required_variables(
+        self,
+        topic: str,
+        template_source: str,
+        expected_variables: set[str],  # ruff: ignore[unused-method-argument]
+        is_truthy: bool,
+    ):
+        """Jinja itself renders each case with only the required roots in its context, so the walk never takes a read of the context for a local.
+
+        Every root is given a value that answers any attribute or call with itself, and that is truthy and iterates once,
+        or falsy and iterates not at all, so that both sides of every `if` and every loop's `else` run.
+        """
+        required = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        context = {get_root_from_dotted_path(path): _PermissiveValue(is_truthy=is_truthy) for path in required}
+        template = Environment(undefined=PresenceProbingStrictUndefined).from_string(template_source)
+        try:
+            template.render(context)
+        except UndefinedError as undefined_error:
+            pytest.fail(f"{topic}: Jinja read '{undefined_error}' from the context, but the walk reported only {sorted(required)}")
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_variables"),
         TestData.SCOPES,
     )
     def test_scopes(
@@ -807,7 +952,7 @@ class TestDetectJinja2VariableReferences:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_paths"),
-        TestData.REFERENCE_SCOPES,
+        TestData.REFERENCE_SCOPES + TestData.JINJA_SCOPE_RULES,
     )
     def test_scopes_match_required_variables(
         self,
