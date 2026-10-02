@@ -113,6 +113,20 @@ class StuffFactory:
         return the_stuff
 
     @classmethod
+    def _make_text_content(cls, *, concept: Concept, text: str) -> TextContent:
+        """A string under a Text-compatible concept, held in the concept's own class when that class is a text one.
+
+        So `{"concept": "Markdown", "content": "..."}` holds a `MarkdownContent`, which the views format, and a
+        concept refining Text or Markdown keeps its generated class, as the YesNo and Date arms keep theirs. A
+        concept that is Text-compatible through its shape alone, or whose class is not registered, gets a
+        `TextContent`, as every Text-compatible concept did before.
+        """
+        the_class = get_class_registry().get_class(name=concept.structure_class_name)
+        if isinstance(the_class, type) and issubclass(the_class, TextContent):
+            return the_class(text=text)
+        return TextContent(text=text)
+
+    @classmethod
     def combine_stuffs(
         cls,
         stuff_contents: dict[str, StuffContent],
@@ -303,12 +317,13 @@ class StuffFactory:
 
         Case 2: Dict with 'concept' AND 'content' keys (can be plain dict or DictStuff instance)
             2.1/2.1b: {"concept": "Text"/"native.Text", "content": str} → TextContent with Text concept
-            2.1c: {"concept": "domain.Concept", "content": str} → TextContent with that concept (if compatible)
+            2.1c: {"concept": "Markdown"/"domain.Concept", "content": str} → that concept's text class, e.g. MarkdownContent
+                  (if Text-compatible; TextContent when the class is not a TextContent subclass)
             2.1d: {"concept": "YesNo"/"domain.Concept", "content": bool} → YesNoContent (if YesNo-compatible)
             2.1e: {"concept": "Date"/"domain.Concept", "content": date/datetime obj} → DateContent (if Date-compatible)
             2.1f: {"concept": "Date"/"domain.Concept", "content": ISO str} → DateContent (if Date-compatible, checked after Text)
             2.1g: {"concept": "Time"/"domain.Concept", "content": time obj or ISO str} → TimeContent (if Time-compatible)
-            2.2/2.2b: {"concept": "...", "content": list[str]} → ListContent[TextContent]
+            2.2/2.2b: {"concept": "...", "content": list[str]} → ListContent of the concept's text class, as in 2.1c
             2.3: {"concept": "...", "content": StuffContent} → Use the StuffContent
             2.4: {"concept": "...", "content": list[StuffContent]} → ListContent[StuffContent]
             2.5: {"concept": "...", "content": dict} → Create StuffContent from dict
@@ -531,7 +546,7 @@ class StuffFactory:
             if concept_provider.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
-                    content=TextContent(text=content),
+                    content=cls._make_text_content(concept=concept, text=content),
                     name=name,
                     code=code,
                 )
@@ -667,7 +682,7 @@ class StuffFactory:
 
                 text_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT)
                 if concept_provider.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
-                    items = [TextContent(text=item) for item in list_content_2]
+                    items = [cls._make_text_content(concept=concept, text=item) for item in list_content_2]
                     return cls.make_stuff(
                         concept=concept,
                         content=ListContent(items=items),

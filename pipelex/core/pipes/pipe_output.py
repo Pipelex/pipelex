@@ -9,6 +9,7 @@ from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -138,6 +139,11 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     def main_stuff_as_html(self) -> HtmlContent:
         """Get main stuff content as HtmlContent if applicable."""
         return self.working_memory.main_stuff_as_html
+
+    @property
+    def main_stuff_as_markdown(self) -> MarkdownContent:
+        """Get main stuff content as MarkdownContent if applicable."""
+        return self.working_memory.main_stuff_as_markdown
 
     @property
     def main_stuff_as_mermaid(self) -> MermaidContent:

@@ -54,6 +54,10 @@ CsvFlatnessError | CSV flatness error | https://docs.pipelex.com/latest/errors/c
 CsvReadError | CSV read error | https://docs.pipelex.com/latest/errors/csv-read-error/
 DateContentError | Date content | https://docs.pipelex.com/latest/errors/date-content-error/
 DeliveryError | Delivery | https://docs.pipelex.com/latest/errors/delivery-error/
+DocGenEngineMissingError | Doc gen engine missing | https://docs.pipelex.com/latest/errors/doc-gen-engine-missing-error/
+DocGenHandleNotFoundError | Doc gen handle not found | https://docs.pipelex.com/latest/errors/doc-gen-handle-not-found-error/
+DocGenModelCapabilityError | Doc gen model capability | https://docs.pipelex.com/latest/errors/doc-gen-model-capability-error/
+DocGenRenderError | Doc gen render | https://docs.pipelex.com/latest/errors/doc-gen-render-error/
 DomainCodeError | Domain code | https://docs.pipelex.com/latest/errors/domain-code-error/
 DomainFactoryError | Domain factory | https://docs.pipelex.com/latest/errors/domain-factory-error/
 DomainLibraryError | Domain library | https://docs.pipelex.com/latest/errors/domain-library-error/
@@ -67,8 +71,10 @@ DryRunGraphNotProducedError | Dry run graph not produced | https://docs.pipelex.
 DryRunMockBuildError | Dry run mock build | https://docs.pipelex.com/latest/errors/dry-run-mock-build-error/
 DryRunObjectFidelityError | Dry run object fidelity | https://docs.pipelex.com/latest/errors/dry-run-object-fidelity-error/
 DuplicateBundleValidatorError | Duplicate bundle validator | https://docs.pipelex.com/latest/errors/duplicate-bundle-validator-error/
+DuplicateDocGenDefaultError | Duplicate doc gen default | https://docs.pipelex.com/latest/errors/duplicate-doc-gen-default-error/
 DuplicateHttpErrorMapperError | Duplicate http error mapper | https://docs.pipelex.com/latest/errors/duplicate-http-error-mapper-error/
 DuplicateInferenceBackendError | Duplicate inference backend | https://docs.pipelex.com/latest/errors/duplicate-inference-backend-error/
+DuplicateInternalModelError | Duplicate internal model | https://docs.pipelex.com/latest/errors/duplicate-internal-model-error/
 DuplicateLogSinkError | Duplicate log sink | https://docs.pipelex.com/latest/errors/duplicate-log-sink-error/
 DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/
 DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
@@ -217,6 +223,10 @@ PipeComposeFactoryError | Pipe compose factory | https://docs.pipelex.com/latest
 PipeConditionFactoryError | Pipe condition factory | https://docs.pipelex.com/latest/errors/pipe-condition-factory-error/
 PipeControllerError | Pipe controller | https://docs.pipelex.com/latest/errors/pipe-controller-error/
 PipeControllerOutputConceptMismatchError | Pipe controller output concept mismatch | https://docs.pipelex.com/latest/errors/pipe-controller-output-concept-mismatch-error/
+PipeDocGenFactoryError | Pipe doc gen factory | https://docs.pipelex.com/latest/errors/pipe-doc-gen-factory-error/
+PipeDocGenRunError | Pipe doc gen run | https://docs.pipelex.com/latest/errors/pipe-doc-gen-run-error/
+PipeDocGenTemplateCheckError | Pipe doc gen template check | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-check-error/
+PipeDocGenUndefinedValueError | Pipe doc gen undefined value | https://docs.pipelex.com/latest/errors/pipe-doc-gen-undefined-value-error/
 PipeExecutionError | Pipe execution | https://docs.pipelex.com/latest/errors/pipe-execution-error/
 PipeExtractFactoryError | Pipe extract factory | https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/
 PipeFactoryError | Pipe factory | https://docs.pipelex.com/latest/errors/pipe-factory-error/
@@ -266,6 +276,7 @@ PluginApiVersionMismatchError | Plugin api version mismatch | https://docs.pipel
 PluginDeclaredInMultipleGroupsError | Plugin declared in multiple groups | https://docs.pipelex.com/latest/errors/plugin-declared-in-multiple-groups-error/
 PluginError | Plugin error | https://docs.pipelex.com/latest/errors/plugin-error/
 PluginLayerViolationError | Plugin layer violation | https://docs.pipelex.com/latest/errors/plugin-layer-violation-error/
+PluginModelDeclarationError | Plugin model declaration | https://docs.pipelex.com/latest/errors/plugin-model-declaration-error/
 PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/errors/portkey-credentials-error/
 PortkeyError | Portkey | https://docs.pipelex.com/latest/errors/portkey-error/
 PortkeyFactoryError | Portkey factory | https://docs.pipelex.com/latest/errors/portkey-factory-error/
@@ -329,7 +340,6 @@ UnknownSecretsMethodError | Unknown secrets method | https://docs.pipelex.com/la
 UnknownStorageMethodError | Unknown storage method | https://docs.pipelex.com/latest/errors/unknown-storage-method-error/
 UnknownVarPrefixError | Unknown var prefix | https://docs.pipelex.com/latest/errors/unknown-var-prefix-error/
 UnsafeSchemaError | Unsafe schema | https://docs.pipelex.com/latest/errors/unsafe-schema-error/
-UnusedInputError | Unused input | https://docs.pipelex.com/latest/errors/unused-input-error/
 UriReadRefusedError | Read outside the run's scope refused | https://docs.pipelex.com/latest/errors/uri-read-refused-error/
 ValidateBundleError | Validate bundle | https://docs.pipelex.com/latest/errors/validate-bundle-error/
 VarFallbackPatternError | Var fallback pattern | https://docs.pipelex.com/latest/errors/var-fallback-pattern-error/

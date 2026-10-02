@@ -125,8 +125,10 @@ class FuncRegistryUtils:
         runner/worker from ever executing customer code.
 
         Discovery mirrors ``register_funcs_in_folder`` (same ``find_files_in_dir`` + ``excluded_dirs``)
-        so the captured set matches what the local path would have imported. Both PipeFunc bodies and
-        structure classes are captured, since the sandbox needs the customer's real classes too.
+        so the captured set matches what the local path would have imported. Every file is captured,
+        PipeFunc bodies and their helpers alike. A structure class never travels: the sandbox-hosted load
+        scans this very mapping and refuses a library that declares one before keeping any of it
+        (``ensure_no_structured_content_in_library_sources``).
 
         Args:
             folder_path: Path to the folder containing Python files.

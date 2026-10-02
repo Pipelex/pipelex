@@ -1,0 +1,10 @@
+domain      = "prompt_input_mismatch"
+description = "The prompt references a variable that is not a declared input"
+main_pipe   = "greet_person"
+
+[pipe.greet_person]
+type        = "PipeLLM"
+description = "Greeting whose prompt uses an undeclared variable ($city)"
+inputs      = { name = "Text" }
+output      = "Text"
+prompt      = "Write a greeting for $name who lives in $city."

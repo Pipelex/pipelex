@@ -93,12 +93,14 @@ type = "PipeLLM"
 description = "Extract features from text"
 inputs = { description = "ProductDescription" }
 output = "ProductFeatures"
+prompt = "Extract the product features from this description:\n@description"
 
 [pipe.analyze_sentiment]
 type = "PipeLLM"
 description = "Analyze sentiment of text"
 inputs = { description = "ProductDescription" }
 output = "ProductSentiment"
+prompt = "Analyze the sentiment of this product description:\n@description"
 
 # The PipeParallel definition
 [pipe.analyze_product_in_parallel]

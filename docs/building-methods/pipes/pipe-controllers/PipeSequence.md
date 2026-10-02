@@ -61,12 +61,14 @@ type = "PipeLLM"
 description = "Summarize text"
 inputs = { extracted_text = "Page[]" }
 output = "Text"
+prompt = "Summarize this text:\n@extracted_text"
 
 [pipe.translate_to_french]
 type = "PipeLLM"
 description = "Translate text to French"
 inputs = { english_summary = "Text" }
 output = "Text"
+prompt = "Translate this summary to French:\n@english_summary"
 
 
 [pipe.image_to_french_summary]

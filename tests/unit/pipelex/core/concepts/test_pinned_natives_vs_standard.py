@@ -57,6 +57,10 @@ pytestmark = pytest.mark.skipif(
     ),
 )
 
+# A native Pipelex defines ahead of the standard has no definition on the page yet, so only the natives
+# the standard pins are held to it.
+_STANDARD_NATIVES = [native_code for native_code in NativeConceptCode if native_code.is_pinned_by_the_standard]
+
 _DISAGREEMENT_REMEDY = (
     "if this change did not touch the pinned set, the MTHDS standard moved and this repo is behind it — "
     "that red is not this PR's fault; bring pinned_blueprints.py and the matching runtime content class "
@@ -111,11 +115,11 @@ class TestPinnedNativesAgreeWithTheStandard:
 
     def test_pins_the_same_natives_in_the_pages_own_section_order(self):
         page_codes = [code for code, _ in read_spec_definitions()]
-        assert page_codes == [code.value for code in NativeConceptCode], (
+        assert page_codes == [code.value for code in _STANDARD_NATIVES], (
             f"the standard's page and this repo's pinned set disagree on which natives exist, or in what order — {_DISAGREEMENT_REMEDY}"
         )
 
-    @pytest.mark.parametrize("native_code", list(NativeConceptCode))
+    @pytest.mark.parametrize("native_code", _STANDARD_NATIVES)
     def test_transcribes_the_definition_exactly_as_the_page_states_it(self, native_code: NativeConceptCode):
         """Deep equality, definition for definition and field for field, descriptions included.
 
@@ -130,7 +134,7 @@ class TestPinnedNativesAgreeWithTheStandard:
             f"native.{native_code.value}: the pinned blueprint disagrees with the standard's page — {_DISAGREEMENT_REMEDY}"
         )
 
-    @pytest.mark.parametrize("native_code", list(NativeConceptCode))
+    @pytest.mark.parametrize("native_code", _STANDARD_NATIVES)
     def test_keeps_the_structure_fields_in_the_pages_order(self, native_code: NativeConceptCode):
         """Field order is normative (it governs the crate's emitted encodings), and dict equality cannot see it."""
         page_definition: dict[str, Any] = dict(read_spec_definitions()).get(native_code.value) or {}

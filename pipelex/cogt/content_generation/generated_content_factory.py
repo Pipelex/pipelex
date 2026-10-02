@@ -6,6 +6,7 @@ from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.config import get_config
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -112,6 +113,27 @@ class GeneratedContentFactory:
             return raw_bytes, media_type
         return raw_bytes, None
 
+    async def make_document_content(
+        self,
+        *,
+        storage_scope: str,
+        data: bytes,
+        mime_type: str,
+        filename: str,
+    ) -> DocumentContent:
+        """Store a produced file's bytes and return the `DocumentContent` that points at them.
+
+        The key is `{storage_scope}/generated/{hash}/{filename}`: the hash keeps two different files with the
+        same name apart, and ending in the human filename means every backend's URL, and so every download, is
+        called `invoice-INV-2026-0142.pdf` rather than a hash. The caller owns the filename's safety: it must be
+        one path segment.
+        """
+        hash_digest = hashlib.sha256(data).hexdigest()[:16]
+        storage_key = f"{storage_scope}/{GENERATED_CONTENT_LEAF}/{hash_digest}/{filename}"
+        url = await self.storage_provider.store(data=data, key=storage_key, content_type=mime_type)
+        public_url = await self.storage_provider.public_url(uri=url)
+        return DocumentContent(url=url, public_url=public_url, mime_type=mime_type, filename=filename)
+
     async def make_image_content(
         self,
         storage_scope: str,
@@ -192,10 +214,13 @@ class GeneratedContentFactory:
         public_url: str | None
         if is_remote_url and get_config().runtime.storage.is_fetch_remote_content_enabled:
             try:
-                # `RemoteFileFetchError` is the ONLY exception this can raise: the fetch
-                # helper converts every httpx failure into it. Catching the httpx classes
-                # here, as this used to, caught nothing — a 404 or a timeout on a remote
-                # image escaped and failed the whole pipe instead of degrading to the URL.
+                # The fetch helper converts every httpx failure into `RemoteFileFetchError`,
+                # so a 404 or a timeout on a remote image degrades to keeping the URL.
+                # `SsrfBlockedError` is left to fail the pipe on purpose: a provider URL that
+                # resolves to a private address is not a flaky download, and degrading to
+                # keeping the URL would report a refused destination as a success. With
+                # `is_fetch_remote_content_enabled` off, nothing here connects to the URL,
+                # so there is nothing to refuse and the URL is kept as it came.
                 actual_bytes, fetched_mime_type = await self._fetch_remote_content(url=url)
             except RemoteFileFetchError as exc:
                 log.warning(f"Failed to fetch a remote image: {exc}")

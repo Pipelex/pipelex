@@ -1,4 +1,4 @@
-"""PipeCondition's `continue` outcome resolves the declared output as ABSENT (design §14, breaking).
+"""PipeCondition's `continue` outcome resolves the declared output as ABSENT (breaking).
 
 Phase-1 semantics: `continue` records a declared-absent AbsenceRecord for the declared output and
 returns success — memory otherwise unchanged (a previous main stuff stays under its own name but no

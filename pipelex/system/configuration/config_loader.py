@@ -310,11 +310,12 @@ class ConfigLoader:
 
         copy_directory_structure(src_dir=config_template_dir, dst_dir=global_dir)
 
-        # Stamp the deck manifest so the boot-time staleness check has a baseline.
+        # Stamp the kit manifests of the deck and of backends/internal.toml so the boot-time staleness
+        # check and `pipelex update` have a baseline.
         # Imported lazily to avoid a circular import — config_loader is loaded very early.
-        from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest  # ruff: ignore[import-outside-top-level]
+        from pipelex.cogt.models.deck_manifest import stamp_kit_manifests  # ruff: ignore[import-outside-top-level]
 
-        write_manifest(compute_kit_manifest(), deck_dir=global_dir / "inference" / "deck")
+        stamp_kit_manifests(inference_dir=global_dir / "inference")
 
     @classmethod
     def _override_files_for_dir(cls, config_dir: Path, *, include_run_mode: bool) -> list[Path]:

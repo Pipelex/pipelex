@@ -39,6 +39,7 @@ type = "PipeLLM"
 description = "Extract key terms from a contract"
 inputs = { contract = "Contract" }  # Clear what type of document is expected
 output = "ContractTerms"
+prompt = "Extract the key terms from this contract:\n@contract"
 ```
 
 ### 3. Domain-Specific Methods
@@ -326,12 +327,14 @@ output = "Page[]"
 type = "PipeLLM"
 inputs = { invoice = "Invoice" }
 output = "InvoiceData"
+prompt = "Extract the invoice data:\n@invoice"
 
 # This pipe accepts Contract (and any concept that refines Contract)
 [pipe.process_contract]
 type = "PipeLLM"
 inputs = { contract = "Contract" }
 output = "ContractData"
+prompt = "Extract the contract data:\n@contract"
 ```
 
 In this setup:

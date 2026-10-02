@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 from typer.testing import CliRunner
 
+from pipelex.cli.dev_cli.commands.drift.core import DriftVerdict
 from pipelex.cli.dev_cli.commands.drift.drift_cmd import drift_ack_cmd, drift_app, drift_check_cmd
 from pipelex.cli.dev_cli.commands.drift.exceptions import DriftAckError, DriftGitError
 from pipelex.cli.dev_cli.commands.drift.git_adapter import read_staged_files
@@ -51,9 +52,9 @@ class TestDriftAckCmd:
     def test_ack_round_trip_then_check_green(self, git_repo: GitRepo, drift_console: Console) -> None:
         """Stage → ack → check green, with a passing verify command in the loop."""
         _seed_repo(git_repo, verify_commands=[PASSING_VERIFY])
-        drift_ack_cmd("demo-docs", rationale="Initial review, docs match.", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Initial review, docs match.", repo_root=git_repo.root)
         acks = load_all_acks(git_repo.root)
-        assert acks["demo-docs"].rationale == "Initial review, docs match."
+        assert acks["demo-docs"].rationale == "clean-pass: Initial review, docs match."
         assert acks["demo-docs"].reviewed_by == "Test User"
         assert "src/demo.py" in acks["demo-docs"].trigger_files
         drift_check_cmd(repo_root=git_repo.root)
@@ -61,7 +62,7 @@ class TestDriftAckCmd:
 
     def test_ack_then_staged_edit_invalidates(self, git_repo: GitRepo) -> None:
         _seed_repo(git_repo)
-        drift_ack_cmd("demo-docs", rationale="Initial review.", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Initial review.", repo_root=git_repo.root)
         git_repo.write("src/demo.py", content="x = 2\n")
         git_repo.add("src/demo.py")
         with pytest.raises(SystemExit):
@@ -70,7 +71,7 @@ class TestDriftAckCmd:
     def test_verify_failure_aborts_without_writing(self, git_repo: GitRepo, drift_console: Console) -> None:
         _seed_repo(git_repo, verify_commands=[FAILING_VERIFY])
         with pytest.raises(DriftAckError, match="exit 3"):
-            drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
+            drift_ack_cmd("demo-docs", rationale="clean-pass: Should not be written.", repo_root=git_repo.root)
         assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
         assert "boom output" in drift_console.export_text()
 
@@ -79,13 +80,42 @@ class TestDriftAckCmd:
         second_command = f'{PYTHON} -c \'open("second_ran.txt", "w").write("ran")\''
         _seed_repo(git_repo, verify_commands=[FAILING_VERIFY, second_command])
         with pytest.raises(DriftAckError):
-            drift_ack_cmd("demo-docs", rationale="nope", repo_root=git_repo.root)
+            drift_ack_cmd("demo-docs", rationale="clean-pass: nope", repo_root=git_repo.root)
         assert not marker.exists()
 
     def test_empty_rationale_rejected(self, git_repo: GitRepo) -> None:
         _seed_repo(git_repo)
         with pytest.raises(DriftAckError, match="rationale"):
             drift_ack_cmd("demo-docs", rationale="   ", repo_root=git_repo.root)
+
+    @pytest.mark.parametrize(
+        "rationale",
+        [
+            "Reviewed the demo docs, nothing stale.",
+            "clean pass: the verdict is misspelt.",
+            "Clean-Pass: the verdict is miscased.",
+            "clean-pass - no colon after the verdict.",
+            "reviewed the docs. clean-pass: the verdict is not first.",
+            "clean-pass:",
+            "clean-pass:   ",
+        ],
+    )
+    def test_rationale_without_verdict_rejected_and_nothing_written(self, git_repo: GitRepo, rationale: str) -> None:
+        """The verdict is the only record of how a review ended, so an ack refuses a rationale that does not open with one."""
+        marker = git_repo.root / "verify_ran.txt"
+        marker_command = f'{PYTHON} -c \'open("verify_ran.txt", "w").write("ran")\''
+        _seed_repo(git_repo, verify_commands=[marker_command])
+        with pytest.raises(DriftAckError, match="must open with its verdict"):
+            drift_ack_cmd("demo-docs", rationale=rationale, repo_root=git_repo.root)
+        assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
+        assert not marker.exists()
+
+    @pytest.mark.parametrize("verdict", list(DriftVerdict))
+    def test_each_verdict_is_accepted_and_recorded_verbatim(self, git_repo: GitRepo, verdict: DriftVerdict) -> None:
+        _seed_repo(git_repo)
+        rationale = f"  {verdict}: reviewed docs/demo.md against src/demo.py.  "
+        drift_ack_cmd("demo-docs", rationale=rationale, repo_root=git_repo.root)
+        assert load_all_acks(git_repo.root)["demo-docs"].rationale == rationale
 
     def test_missing_rationale_option_rejected_by_cli(self, git_repo: GitRepo, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(git_repo.root)
@@ -96,12 +126,12 @@ class TestDriftAckCmd:
 
     def test_reviewed_by_defaults_from_git_config(self, git_repo: GitRepo) -> None:
         _seed_repo(git_repo)
-        drift_ack_cmd("demo-docs", rationale="Default reviewer.", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Default reviewer.", repo_root=git_repo.root)
         assert load_all_acks(git_repo.root)["demo-docs"].reviewed_by == "Test User"
 
     def test_by_overrides_git_config(self, git_repo: GitRepo) -> None:
         _seed_repo(git_repo)
-        drift_ack_cmd("demo-docs", rationale="Agent review.", reviewed_by_override="claude/session-42", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Agent review.", reviewed_by_override="claude/session-42", repo_root=git_repo.root)
         assert load_all_acks(git_repo.root)["demo-docs"].reviewed_by == "claude/session-42"
 
     def test_unset_user_name_without_by_is_hard_error(self, git_repo: GitRepo, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -110,19 +140,19 @@ class TestDriftAckCmd:
         monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
         git_repo.git("config", "--unset", "user.name")
         with pytest.raises(DriftAckError, match="--by"):
-            drift_ack_cmd("demo-docs", rationale="No identity.", repo_root=git_repo.root)
+            drift_ack_cmd("demo-docs", rationale="clean-pass: No identity.", repo_root=git_repo.root)
         assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
 
     def test_unknown_contract_is_hard_error(self, git_repo: GitRepo) -> None:
         _seed_repo(git_repo)
         with pytest.raises(DriftAckError, match="no-such-contract"):
-            drift_ack_cmd("no-such-contract", rationale="nope", repo_root=git_repo.root)
+            drift_ack_cmd("no-such-contract", rationale="clean-pass: nope", repo_root=git_repo.root)
 
     def test_ack_permitted_with_dirty_tree_elsewhere(self, git_repo: GitRepo, drift_console: Console) -> None:
         """A clean tree is not required — only the trigger files' staged state matters."""
         _seed_repo(git_repo)
         git_repo.write("docs/demo.md", content="# Demo edited, unstaged\n")
-        drift_ack_cmd("demo-docs", rationale="Dirty elsewhere is fine.", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Dirty elsewhere is fine.", repo_root=git_repo.root)
         drift_check_cmd(repo_root=git_repo.root)
         assert "PASSED" in drift_console.export_text()
 
@@ -130,7 +160,7 @@ class TestDriftAckCmd:
         _seed_repo(git_repo)
         staged_oid = read_staged_files(git_repo.root)["src/demo.py"]
         git_repo.write("src/demo.py", content="x = 999  # unstaged\n")
-        drift_ack_cmd("demo-docs", rationale="Covers staged content only.", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Covers staged content only.", repo_root=git_repo.root)
         output = drift_console.export_text()
         assert "unstaged modifications" in output
         assert load_all_acks(git_repo.root)["demo-docs"].trigger_files["src/demo.py"] == staged_oid
@@ -138,7 +168,7 @@ class TestDriftAckCmd:
     def test_untracked_trigger_file_warns(self, git_repo: GitRepo, drift_console: Console) -> None:
         _seed_repo(git_repo)
         git_repo.write("src/brand_new.py", content="new = True\n")
-        drift_ack_cmd("demo-docs", rationale="Untracked file present.", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Untracked file present.", repo_root=git_repo.root)
         output = drift_console.export_text()
         assert "untracked file matches triggers" in output
         assert "src/brand_new.py" not in load_all_acks(git_repo.root)["demo-docs"].trigger_files
@@ -146,7 +176,7 @@ class TestDriftAckCmd:
     def test_ack_file_is_auto_staged(self, git_repo: GitRepo) -> None:
         """The ack lands in the same index `drift check` reads — no forgot-to-add false green."""
         _seed_repo(git_repo)
-        drift_ack_cmd("demo-docs", rationale="Initial review.", repo_root=git_repo.root)
+        drift_ack_cmd("demo-docs", rationale="clean-pass: Initial review.", repo_root=git_repo.root)
         staged_paths = git_repo.git("diff", "--cached", "--name-only").splitlines()
         assert ".drift/acks/demo-docs.toml" in staged_paths
 
@@ -157,7 +187,7 @@ class TestDriftAckCmd:
         _seed_repo(git_repo, verify_commands=[marker_command])
         git_repo.write("src/demo.py", content="x = 2  # unstaged\n")
         with pytest.raises(DriftAckError, match="verify commands"):
-            drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
+            drift_ack_cmd("demo-docs", rationale="clean-pass: Should not be written.", repo_root=git_repo.root)
         assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
         assert not marker.exists()
 
@@ -165,7 +195,7 @@ class TestDriftAckCmd:
         _seed_repo(git_repo, verify_commands=[PASSING_VERIFY])
         git_repo.write("src/brand_new.py", content="new = True\n")
         with pytest.raises(DriftAckError, match="verify commands"):
-            drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
+            drift_ack_cmd("demo-docs", rationale="clean-pass: Should not be written.", repo_root=git_repo.root)
         assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
 
     def test_verify_that_dirties_a_trigger_fails_after_verify(self, git_repo: GitRepo) -> None:
@@ -174,7 +204,7 @@ class TestDriftAckCmd:
         _seed_repo(git_repo, verify_commands=[rewrite_trigger])
         # The tree is clean before verify (pre-check passes); the verify command then dirties the trigger.
         with pytest.raises(DriftAckError, match="verify commands"):
-            drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
+            drift_ack_cmd("demo-docs", rationale="clean-pass: Should not be written.", repo_root=git_repo.root)
         assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
 
     def test_stage_failure_removes_written_ack(self, git_repo: GitRepo, mocker: MockerFixture) -> None:
@@ -185,7 +215,7 @@ class TestDriftAckCmd:
             side_effect=DriftGitError("git index locked"),
         )
         with pytest.raises(DriftAckError, match="staging"):
-            drift_ack_cmd("demo-docs", rationale="Staging will fail.", repo_root=git_repo.root)
+            drift_ack_cmd("demo-docs", rationale="clean-pass: Staging will fail.", repo_root=git_repo.root)
         assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
         with pytest.raises(SystemExit):
             drift_check_cmd(repo_root=git_repo.root)

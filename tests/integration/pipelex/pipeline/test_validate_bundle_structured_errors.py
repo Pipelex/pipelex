@@ -20,6 +20,7 @@ categorized pipe-blueprint items (the loc key is ``pipe``, not ``pipes``).
 """
 
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
@@ -133,6 +134,74 @@ description = "Produce a wrapper."
 inputs = { text = "Text" }
 output = "Wrapper"
 prompt = "Describe $text"
+"""
+
+
+_COMPOSE_UNREAD_INPUT_MTHDS = """
+domain = "structured_compose_unread"
+main_pipe = "render_note"
+
+[pipe.render_note]
+type = "PipeCompose"
+description = "Compose that declares an input its template never reads."
+inputs = { topic = "Text", unused = "Text" }
+output = "Text"
+template = "A note about $topic"
+"""
+
+_COMPOSE_UNDECLARED_VARIABLE_MTHDS = """
+domain = "structured_compose_undeclared"
+main_pipe = "render_note"
+
+[pipe.render_note]
+type = "PipeCompose"
+description = "Compose whose template reads a variable no input declares."
+inputs = { topic = "Text" }
+output = "Text"
+template = "A note about $topic for $audience"
+"""
+
+_SEARCH_UNREAD_INPUT_MTHDS = """
+domain = "structured_search_unread"
+main_pipe = "find_news"
+
+[pipe.find_news]
+type = "PipeSearch"
+description = "Search that declares an input its prompt never reads."
+inputs = { topic = "Text", unused = "Text" }
+output = "SearchResult"
+prompt = "Latest news on $topic"
+"""
+
+_IMG_GEN_UNREAD_INPUT_MTHDS = """
+domain = "structured_img_gen_unread"
+main_pipe = "generate_thumbnail"
+
+[pipe.generate_thumbnail]
+type = "PipeImgGen"
+description = "Image generation that declares an image its prompt never reads."
+inputs = { image = "Image" }
+output = "Image"
+prompt = "A small square thumbnail"
+"""
+
+_SEQUENCE_OVER_UNREAD_INPUT_MTHDS = """
+domain = "structured_sequence_unread"
+main_pipe = "seq"
+
+[pipe.seq]
+type = "PipeSequence"
+description = "Sequence whose step declares an input it never reads."
+inputs = { topic = "Text" }
+output = "Text"
+steps = [{ pipe = "render_note", result = "note" }]
+
+[pipe.render_note]
+type = "PipeCompose"
+description = "Compose that declares an input its template never reads."
+inputs = { topic = "Text", unused = "Text" }
+output = "Text"
+template = "A note about $topic"
 """
 
 
@@ -292,3 +361,80 @@ class TestValidateBundleStructuredErrors:
         for reported in items:
             if reported.pipe_code is not None:
                 assert reported.domain_code is not None, f"item {reported.error_type} carries pipe_code without domain_code"
+
+    @pytest.mark.parametrize(
+        ("mthds_contents", "pipe_code", "domain_code", "unread_input"),
+        [
+            (_COMPOSE_UNREAD_INPUT_MTHDS, "render_note", "structured_compose_unread", "unused"),
+            (_SEARCH_UNREAD_INPUT_MTHDS, "find_news", "structured_search_unread", "unused"),
+            (_IMG_GEN_UNREAD_INPUT_MTHDS, "generate_thumbnail", "structured_img_gen_unread", "image"),
+        ],
+        ids=["compose", "search", "img_gen"],
+    )
+    async def test_unread_input_is_a_located_extraneous_input_item(
+        self,
+        load_empty_library: Callable[[], str],
+        tmp_path: Path,
+        mthds_contents: str,
+        pipe_code: str,
+        domain_code: str,
+        unread_input: str,
+    ) -> None:
+        """PipeCompose, PipeSearch and PipeImgGen refuse a declared input they never read, as PipeLLM does,
+        with the input named plainly and the item located on its pipe, domain and source file.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text(mthds_contents)
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+        items = exc_info.value.to_error_report().validation_errors
+        assert items, "Every invalid verdict must carry a non-empty validation_errors[]"
+        extraneous_items = [item for item in items if item.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE]
+        assert extraneous_items, f"Expected an extraneous_input_variable item, got {[(i.category, i.error_type) for i in items]}"
+        item = extraneous_items[0]
+        assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
+        assert item.variable_names == [unread_input]
+        assert item.pipe_code == pipe_code
+        assert item.domain_code == domain_code
+        assert item.source == str(bundle_path)
+        assert item.suggested_fix is None
+
+    async def test_compose_undeclared_variable_is_a_categorized_missing_input_item(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A PipeCompose template reading an undeclared variable carries its error_type and the variable's name."""
+        load_empty_library()
+        items = await _validation_errors_for(_COMPOSE_UNDECLARED_VARIABLE_MTHDS)
+        missing_items = [item for item in items if item.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE]
+        assert missing_items, f"Expected a missing_input_variable item, got {[(i.category, i.error_type) for i in items]}"
+        item = missing_items[0]
+        assert item.pipe_code == "render_note"
+        assert item.variable_names == ["audience"]
+
+    async def test_unread_input_is_refused_on_the_step_not_spread_to_its_controller(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """The step is refused for its unread input before its controller is asked to supply it, so no
+        fix proposes widening the sequence's inputs with an input nothing reads.
+        """
+        load_empty_library()
+        items = await _validation_errors_for(_SEQUENCE_OVER_UNREAD_INPUT_MTHDS)
+        extraneous_items = [item for item in items if item.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE]
+        assert extraneous_items, f"Expected an extraneous_input_variable item, got {[(i.category, i.error_type) for i in items]}"
+        assert extraneous_items[0].pipe_code == "render_note"
+        assert extraneous_items[0].variable_names == ["unused"]
+        assert all(item.suggested_fix is None for item in items), [item.suggested_fix for item in items]
+
+    async def test_llm_unread_inputs_are_named_without_quotes(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """The extraneous item's variable_names are the input names, never fragments of a quoted message."""
+        load_empty_library()
+        items = await _validation_errors_for(_EXTRANEOUS_INPUT_MTHDS)
+        extraneous_items = [item for item in items if item.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE]
+        assert extraneous_items
+        assert extraneous_items[0].variable_names == ["unused_thing"]

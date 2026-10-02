@@ -18,6 +18,8 @@ _MIME_OVERRIDES: Final[dict[str, str]] = {
     "image/jpeg": "jpeg",
     "image/jpg": "jpeg",
     "text/plain": "txt",
+    # Python 3.11's default table has no entry for Markdown; 3.12 added `.md`
+    "text/markdown": "md",
     "application/json": "json",
 }
 

@@ -79,6 +79,24 @@ jobs:
       - name: Run mypy merge check (Python ${{ matrix.python-version }}, fresh)
         run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-mypy
 
+      # The API server (`api/`), checked the same way in its own environment: `Lint (api)` in
+      # lint-check.yml checks it on the floor version on every pull request, and this leg adds the
+      # version this matrix row names, so the versions its classifiers claim are the ones checked.
+      - name: Install the API server's environment
+        run: PYTHON_VERSION=3.11 make -C api install
+
+      - name: Run the API server's ruff merge checks
+        run: make -C api merge-check-ruff-format merge-check-ruff-lint
+
+      - name: Run the API server's pyright merge check (Python ${{ matrix.python-version }})
+        run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make -C api merge-check-pyright
+
+      - name: Run the API server's mypy merge check (Python ${{ matrix.python-version }}, fresh)
+        run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make -C api merge-check-mypy
+
+      - name: Run the API server's drift checks
+        run: make -C api openapi-check kit-check
+
 # --------------------------------------------------------------------------
 #  Aggregator — single required status check for the gate.
 # --------------------------------------------------------------------------

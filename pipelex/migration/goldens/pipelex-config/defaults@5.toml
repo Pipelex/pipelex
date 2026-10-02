@@ -28,6 +28,9 @@ bucket_name = ""
 project_id = ""
 signed_urls_lifespan_seconds = 3600
 
+[runtime.network]
+is_fetch_ssrf_guard_enabled = true
+
 [runtime.secrets]
 method = "env" # env (built-in); an external plugin may add e.g. vault
 

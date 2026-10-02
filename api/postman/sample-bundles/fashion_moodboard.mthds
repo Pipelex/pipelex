@@ -1,0 +1,134 @@
+domain      = "fashion_moodboard"
+description = "From a fashion market and season, generate 5 inspiration-driven composite moodboard images"
+main_pipe   = "create_collection_moodboards"
+
+[concept.MoodboardPrompt]
+description = "A single image generation prompt for one moodboard panel"
+refines     = "Text"
+
+[concept.FashionInspiration]
+description = "A single fashion aesthetic direction or inspiration brief"
+refines     = "Text"
+
+[concept.FashionTarget]
+description = "A fashion market and season target, e.g. Women Spring/Summer 2027 or Men FW27"
+refines     = "Text"
+
+[pipe.create_collection_moodboards]
+type = "PipeSequence"
+description = "From a fashion target, research trends then generate distinct inspiration-driven moodboards"
+inputs = { fashion_target = "FashionTarget" }
+output = "Image[]"
+steps = [
+  { pipe = "search_trends", result = "trends" },
+  { pipe = "generate_inspirations", result = "inspirations" },
+  { pipe = "create_moodboards", result = "moodboards" },
+]
+
+[pipe.search_trends]
+type        = "PipeSearch"
+description = "Search the web for current and upcoming fashion trends matching the target"
+inputs      = { fashion_target = "FashionTarget" }
+output      = "SearchResult"
+prompt      = "current and upcoming fashion trends, runway reports, and editorial coverage for $fashion_target"
+from_date   = "2026-01-01"
+
+[pipe.generate_inspirations]
+type = "PipeLLM"
+description = "Generate distinct fashion inspiration directions grounded in researched trends"
+inputs = { fashion_target = "FashionTarget", trends = "SearchResult" }
+output = "FashionInspiration[5]"
+prompt = """
+You are a fashion trend forecaster. Your target is:
+$fashion_target
+
+Interpret shorthand like SS/FW and gender codes (e.g. "Men FW27" = Men Fall/Winter 2027).
+
+Researched trend signals:
+@trends
+
+Grounded in these signals, propose exactly 5 distinct, compelling fashion aesthetic directions that could each anchor a separate moodboard.
+Each inspiration should be a short paragraph (3-5 sentences) capturing a unique mood, silhouette direction, color story, and cultural reference. Make the directions feel meaningfully different — different moods, palettes, and references.
+"""
+
+[pipe.create_moodboards]
+type             = "PipeBatch"
+description      = "Create one moodboard image per inspiration"
+inputs           = { inspirations = "FashionInspiration[]", fashion_target = "FashionTarget" }
+output           = "Image[]"
+branch_pipe_code = "create_moodboard"
+input_list_name  = "inspirations"
+input_item_name  = "inspiration"
+
+[pipe.create_moodboard]
+type = "PipeSequence"
+description = "Create a fashion moodboard from inspiration"
+inputs = { inspiration = "FashionInspiration", fashion_target = "FashionTarget" }
+output = "Image"
+steps = [
+  { pipe = "craft_prompts", result = "prompts" },
+  { pipe = "craft_moodboard_prompt", result = "moodboard_prompt" },
+  { pipe = "generate_moodboard", result = "moodboard_image" },
+]
+
+[pipe.craft_prompts]
+type = "PipeLLM"
+description = "Generate diverse moodboard image prompts from fashion inspiration"
+inputs = { inspiration = "FashionInspiration", fashion_target = "FashionTarget" }
+output = "MoodboardPrompt[]"
+model = "@default-small-creative"
+prompt = """
+You are a fashion art director creating a moodboard for the following target:
+$fashion_target
+
+Given the fashion inspiration below, generate exactly 5 distinct image generation prompts. Each prompt should capture a different visual facet of the aesthetic.
+
+The 5 facets:
+1. A hero outfit or look
+2. A texture or fabric close-up
+3. A color palette scene
+4. A setting or environment that evokes the mood
+5. An accessory or detail shot
+
+Fashion inspiration:
+@inspiration
+
+For each prompt, write a vivid, detailed image generation prompt that would produce a beautiful moodboard panel. Focus on colors, textures, lighting, and composition.
+"""
+
+[pipe.craft_moodboard_prompt]
+type = "PipeLLM"
+description = "Synthesize element descriptions into a single moodboard image prompt"
+inputs = { prompts = "MoodboardPrompt[]", fashion_target = "FashionTarget" }
+output = "Text"
+model = "@default-small-creative"
+prompt = """
+You are a fashion art director composing a single moodboard image for the following target:
+$fashion_target.
+
+You previously identified these visual elements:
+@prompts
+
+Now write ONE image generation prompt that combines all these elements into a single cohesive moodboard composition in 16:9 landscape format. Preserve any market/season references already present in the elements above — do not strip them out. The image should be a collage-style moodboard that includes:
+- The key outfit/look
+- Texture and fabric details
+- The color palette
+- The mood/setting atmosphere
+- Accessory details
+
+Also overlay 1 or 2 short words or expressions (like a fashion editorial tagline) that capture the feeling of this aesthetic. These words should feel handwritten or editorial.
+
+Write only the image generation prompt, nothing else.
+"""
+
+[pipe.generate_moodboard]
+type = "PipeImgGen"
+description = "Generate the final composite moodboard image in 16:9"
+inputs = { moodboard_prompt = "Text", fashion_target = "FashionTarget" }
+output = "Image"
+model = "nano-banana-2"
+prompt = """
+Target: $fashion_target.
+$moodboard_prompt
+"""
+aspect_ratio = "landscape_16_9"

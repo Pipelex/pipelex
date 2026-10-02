@@ -124,6 +124,8 @@ A plugin is any object with a `name`, a `targets_api` and a `register` method. `
 
 `add_model_lister` is optional. It registers the callable behind `pipelex show models`, which Pipelex awaits when you list the models of a backend whose models use the `hello` token.
 
+The registrar offers two more menu methods, which this plugin does not need: `add_internal_model` declares a model in the `internal` backend, and `add_doc_gen_default` declares the model deck's default document engine for a format and source. A document engine uses them to ship its models with its code rather than in a backend file, as [Document Engine Plugins](document-engine-plugins.md#registering-an-engine) describes. The hello model stays in a backend file of its own, which Step 5 writes.
+
 ## Step 3: Write the worker
 
 `hello_llm_worker.py` holds the model itself:

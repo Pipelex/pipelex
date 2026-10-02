@@ -108,63 +108,6 @@ def _main_pipe_strip_is_safe(*, offending_code: str, stripped_code: str, bluepri
     return (offending_code in pipe_keys) != (stripped_code in pipe_keys)
 
 
-def _extract_variable_names_from_message(message: str) -> list[str] | None:
-    """Extract variable names from error messages like 'Missing input variable(s): var1, var2.'"""
-    # Pattern to match variable names after the colon
-    match = re.search(r"variable\(s\):\s*([^.]+)\.", message)
-    if match:
-        vars_str = match.group(1)
-        return [var.strip() for var in vars_str.split(",")]
-    return None
-
-
-def _categorize_input_validation_error(
-    message: str,
-    *,
-    domain: str | None,
-    source: str | None,
-    pipe_code: str | None,
-) -> PipelexBundleBlueprintValidationErrorData | None:
-    """Categorize input validation errors (missing or unused inputs).
-
-    Args:
-        message: The error message from the validation
-        domain: Domain code
-        source: Source file path
-        pipe_code: Pipe code being validated
-
-    Returns:
-        Categorized error data, or None if not an input validation error
-    """
-    message_lower = message.lower()
-
-    # Detect missing input variables
-    if "missing input variable" in message_lower:
-        variable_names = _extract_variable_names_from_message(message)
-        return PipelexBundleBlueprintValidationErrorData(
-            error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-            domain_code=domain,
-            source=source,
-            pipe_code=pipe_code,
-            message=message,
-            variable_names=variable_names,
-        )
-
-    # Detect unused/extraneous input variables
-    if "unused input variable" in message_lower:
-        variable_names = _extract_variable_names_from_message(message)
-        return PipelexBundleBlueprintValidationErrorData(
-            error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-            domain_code=domain,
-            source=source,
-            pipe_code=pipe_code,
-            message=message,
-            variable_names=variable_names,
-        )
-
-    return None
-
-
 def _categorize_typeless_pipe_error(
     message: str,
     *,
@@ -388,8 +331,9 @@ def categorize_blueprint_validation_error(
         pipe_code = str(loc[1])
 
     # A blueprint-stage ``PipeValidationError`` (e.g. the PipeBatch ``input_item_name`` ==
-    # ``input_list_name`` collision raised by ``PipeBatchBlueprint.validate_inputs``, or the SubPipe
-    # ``batch_over`` == ``batch_as`` collision raised by ``SubPipeBlueprint.validate_batch_params``) is
+    # ``input_list_name`` collision raised by ``PipeBatchBlueprint.validate_inputs``, the SubPipe
+    # ``batch_over`` == ``batch_as`` collision raised by ``SubPipeBlueprint.validate_batch_params``, or a
+    # missing or unread input raised by the operators' shared ``check_inputs_match_variables``) is
     # raised *inside* a pydantic model validator, so pydantic wraps it as a ``value_error`` with the
     # original exception in ``ctx["error"]``. Unwrap it — mirroring the pipe categorizer's
     # ``extract_wrapped_pipe_validation_error`` (one shared helper) — so its structured ``error_type``
@@ -498,16 +442,6 @@ def categorize_blueprint_validation_error(
     )
     if missing_type_error:
         return missing_type_error
-
-    # Try to categorize input validation errors (missing/unused inputs)
-    input_error = _categorize_input_validation_error(
-        message=message,
-        domain=domain,
-        source=source,
-        pipe_code=pipe_code,
-    )
-    if input_error:
-        return input_error
 
     # Try to categorize syntax validation errors (invalid pipe code, main_pipe)
     syntax_error = _categorize_syntax_validation_error(

@@ -32,13 +32,21 @@ from pipelex.cogt.exceptions import (
     InferenceBackendLibraryValidationError,
     ModelDeckNotFoundError,
     ModelDeckValidationError,
+    PluginModelDeclarationError,
     RoutingProfileDisabledBackendError,
     RoutingProfileLibraryError,
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory, BackendCredentialsReport
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
-from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, compute_deck_sync_report, status_rich_label
+from pipelex.cogt.models.deck_manifest import (
+    MANAGED_BACKEND_FILENAME,
+    DeckFileStatus,
+    DeckSyncReport,
+    KitManagedArea,
+    compute_sync_report,
+    status_rich_label,
+)
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.validation import MIGRATE_COMMAND, raise_config_setup_error, report_validation_error
@@ -80,6 +88,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from pipelex.cogt.model_backends.gateway_config import GatewayConfig
+    from pipelex.plugins.registrar import PluginRegistrar
     from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 
@@ -676,6 +685,9 @@ def display_health_report(
     deck_healthy: bool,
     deck_message: str,
     deck_report: DeckSyncReport,
+    internal_backend_healthy: bool,
+    internal_backend_message: str,
+    internal_backend_report: DeckSyncReport,
     config_location: ConfigLocationInfo,
     fix_mode: bool = False,
     models_skipped: bool = False,
@@ -699,6 +711,9 @@ def display_health_report(
         deck_healthy: Whether the model deck is in sync with the kit shipped by this pipelex version
         deck_message: Summary message about deck sync status
         deck_report: Per-file sync status report (used to render the per-file detail when not healthy)
+        internal_backend_healthy: Whether backends/internal.toml is in sync with the kit, like the deck
+        internal_backend_message: Summary message about its sync status
+        internal_backend_report: Its sync status report, rendered like the deck's
         config_location: Resolved configuration location information
         fix_mode: Whether we're in interactive fix mode (--fix flag)
         models_skipped: True when check_models was bypassed because config is broken — render
@@ -718,6 +733,7 @@ def display_health_report(
         and backends_healthy
         and models_healthy
         and deck_healthy
+        and internal_backend_healthy
         and log_sink_healthy
         and plugins_healthy
     )
@@ -851,18 +867,10 @@ def display_health_report(
                         console.print(f"    [dim]{escape(error_lines[0][:100])}[/dim]")
     console.print()
 
-    # Model Deck section
+    # Model Deck section: the files `pipelex update` manages, the deck and backends/internal.toml
     console.print("[bold]Model Deck[/bold]")
-    if deck_healthy:
-        console.print(f"  [green]✓[/green] {escape(deck_message)}")
-    else:
-        console.print(f"  [yellow]⚠[/yellow]  {escape(deck_message)}")
-        # Per-file detail when there are pending actions
-        actionable_statuses = {name: status for name, status in deck_report.files.items() if status != DeckFileStatus.UP_TO_DATE}
-        if actionable_statuses:
-            for filename in sorted(actionable_statuses):
-                status = actionable_statuses[filename]
-                console.print(f"    [dim]{escape(filename)}[/dim] — {status_rich_label(status)}")
+    _print_kit_sync_row(healthy=deck_healthy, message=deck_message, report=deck_report)
+    _print_kit_sync_row(healthy=internal_backend_healthy, message=internal_backend_message, report=internal_backend_report)
     console.print()
 
     # Recommended actions
@@ -895,7 +903,7 @@ def display_health_report(
                 has_custom_backend_issues = any(not report.has_kit_template for report in invalid_backends.values())
 
         # Determine if we have any recommendations to show
-        has_deck_drift = not deck_healthy
+        has_deck_drift = not deck_healthy or not internal_backend_healthy
         has_recommendations = (
             can_auto_fix_config
             or not log_sink_healthy
@@ -944,7 +952,7 @@ def display_health_report(
                 console.print(f"  • Fix validation errors in [cyan]{escape(config_location.config_dir)}/telemetry.toml[/cyan]")
 
             if has_deck_drift:
-                console.print("  • Run [cyan]pipelex update[/cyan] to refresh the model deck from the current kit")
+                console.print("  • Run [cyan]pipelex update[/cyan] to refresh the model deck and backends/internal.toml from the current kit")
 
             if not plugins_healthy:
                 console.print(
@@ -1010,6 +1018,18 @@ def display_health_report(
             console.print()
 
 
+def _print_kit_sync_row(*, healthy: bool, message: str, report: DeckSyncReport) -> None:
+    """Render one kit-managed area's sync row, with the per-file detail when files need action."""
+    console = get_console()
+    if healthy:
+        console.print(f"  [green]✓[/green] {escape(message)}")
+        return
+    console.print(f"  [yellow]⚠[/yellow]  {escape(message)}")
+    actionable_statuses = {name: status for name, status in report.files.items() if status != DeckFileStatus.UP_TO_DATE}
+    for filename in sorted(actionable_statuses):
+        console.print(f"    [dim]{escape(filename)}[/dim] — {status_rich_label(actionable_statuses[filename])}")
+
+
 def _print_pending_migrations(*, check: PendingMigrationsCheck) -> None:
     """Render the configuration-migration row: the verdict, then the files it is about.
 
@@ -1050,20 +1070,47 @@ def check_deck_sync(*, config_dir: Path | None = None) -> tuple[bool, DeckSyncRe
         # since the missing-init advisory is handled by the config_files / backends checks above.
         return True, DeckSyncReport(kit_version="", installed_kit_version=None, manifest_present=False, files={}), "Deck directory not present"
 
-    report = compute_deck_sync_report(deck_dir)
+    report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
+    healthy, message = _summarize_kit_sync(report=report, subject="Deck", file_noun="deck file(s)")
+    return healthy, report, message
+
+
+def check_internal_backend_sync(*, config_dir: Path | None = None) -> tuple[bool, DeckSyncReport, str]:
+    """Check whether the installed ``backends/internal.toml`` is in sync with the kit shipped by this pipelex version.
+
+    The one backend file ``pipelex update`` manages, reported the way the deck is: it declares the software-only
+    models open Pipelex ships, so an installation that has not refreshed it lacks the ones a release added.
+
+    Args:
+        config_dir: Explicit config directory override. If None, uses layered resolution.
+
+    Returns:
+        Tuple of (is_healthy, sync_report, summary_message)
+    """
+    # The backends directory boot actually reads, resolved on its own as it is at boot.
+    backends_dir = Path(config_dir) / "inference" / "backends" if config_dir is not None else config_manager.backends_dir_path
+
+    if not backends_dir.exists():
+        # As for the deck: an uninitialized area is the config checks' to report.
+        return True, DeckSyncReport(kit_version="", installed_kit_version=None, manifest_present=False, files={}), "Backends directory not present"
+
+    report = compute_sync_report(backends_dir, area=KitManagedArea.BACKENDS)
+    healthy, message = _summarize_kit_sync(report=report, subject=f"backends/{MANAGED_BACKEND_FILENAME}", file_noun="internal backend file(s)")
+    return healthy, report, message
+
+
+def _summarize_kit_sync(*, report: DeckSyncReport, subject: str, file_noun: str) -> tuple[bool, str]:
+    """Whether one kit-managed area is in sync, and the sentence the report says about it."""
     if report.is_clean():
-        return True, report, f"Deck is up to date with pipelex {report.kit_version}"
+        return True, f"{subject} is up to date with pipelex {report.kit_version}"
 
     actionable = [name for name, status in report.files.items() if status.needs_action]
     if not report.manifest_present:
-        return False, report, "Deck manifest missing — run `pipelex update` to materialize a baseline"
+        return False, f"{subject} manifest missing — run `pipelex update` to materialize a baseline"
     if report.installed_kit_version != report.kit_version:
-        return (
-            False,
-            report,
-            f"Deck installed for pipelex {report.installed_kit_version}, current is {report.kit_version} ({len(actionable)} file(s) need action)",
-        )
-    return False, report, f"{len(actionable)} deck file(s) need action"
+        versions = f"installed for pipelex {report.installed_kit_version}, current is {report.kit_version}"
+        return False, f"{subject} {versions} ({len(actionable)} file(s) need action)"
+    return False, f"{len(actionable)} {file_noun} need action"
 
 
 class LogSinkCheck(BaseModel):
@@ -1165,6 +1212,24 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
     return LogSinkCheck(is_healthy=True, message=f"Log sink '{log_config.sink}' installed")
 
 
+def build_doctor_registrar() -> PluginRegistrar:
+    """Discover the plugins the way a full boot does, with no boot orchestrator.
+
+    Pure and safe to run more than once, like ``build_registrar`` itself: the doctor runs it for the log sink row and
+    again for the models row, which needs the internal models and deck defaults the plugins declare.
+
+    Raises:
+        PluginError: a plugin could not be discovered or registered.
+    """
+    return build_registrar(
+        config=get_config(),
+        boot_orchestrator=None,
+        builtin_plugins=BUILTIN_PLUGINS,
+        core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+        entry_point_groups=ENTRY_POINT_GROUPS,
+    )
+
+
 def discover_plugins_and_install_doctor_log_sink(*, log_config: LogConfig) -> DoctorRuntimeSetup:
     """Discover the plugins the way boot does, then install the configured sink, each a row rather than the end of the report.
 
@@ -1173,13 +1238,7 @@ def discover_plugins_and_install_doctor_log_sink(*, log_config: LogConfig) -> Do
     a configuration error and which the doctor exists to diagnose rather than die on.
     """
     try:
-        registrar = build_registrar(
-            config=get_config(),
-            boot_orchestrator=None,
-            builtin_plugins=BUILTIN_PLUGINS,
-            core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
-            entry_point_groups=ENTRY_POINT_GROUPS,
-        )
+        registrar = build_doctor_registrar()
     except PluginError as exc:
         return DoctorRuntimeSetup(
             plugins=PluginsCheck(is_healthy=False, message=f"The plugin registry did not build: {exc.message}"),
@@ -1327,6 +1386,17 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
     routing_profile_override = config_manager.routing_profiles_file_paths(config_dir=config_dir) if config_dir is not None else None
     deck_dir_override = str(config_dir / "inference" / "deck") if config_dir is not None else None
 
+    # The plugins' internal models and deck defaults are part of the deck boot builds, so the check builds it with them.
+    # A registry that does not build is the Plugins row's to report; here it only means the deck cannot be checked.
+    try:
+        plugin_model_declarations = build_doctor_registrar().make_model_declarations()
+    except PluginError as exc:
+        return (
+            False,
+            f"Error checking models: the plugin registry did not build, so the model deck cannot be checked: {exc.message}",
+            backend_file_reports,
+        )
+
     models_manager = ModelManager()
     secrets_provider = EnvSecretsProvider()
     try:
@@ -1334,6 +1404,7 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
             secrets_provider=secrets_provider,
             managed_gateway_configs=managed_gateway_configs,
             gateway_config_source=gateway_config_source,
+            plugin_model_declarations=plugin_model_declarations,
             backends_library_paths=backends_library_override,
             backends_dir_path=backends_dir_override,
             routing_profile_library_paths=routing_profile_override,
@@ -1360,6 +1431,7 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
         ModelDeckValidationError,
         InferenceBackendCredentialsError,
         GatewayUnknownModelError,
+        PluginModelDeclarationError,
     ) as exc:
         return False, f"Error checking models: {exc}", backend_file_reports
 
@@ -1452,6 +1524,7 @@ def do_doctor_cmd(
         models_skipped = True
 
     deck_healthy, deck_report, deck_message = check_deck_sync()
+    internal_backend_healthy, internal_backend_report, internal_backend_message = check_internal_backend_sync()
 
     # Display report
     display_health_report(
@@ -1470,6 +1543,9 @@ def do_doctor_cmd(
         deck_healthy=deck_healthy,
         deck_message=deck_message,
         deck_report=deck_report,
+        internal_backend_healthy=internal_backend_healthy,
+        internal_backend_message=internal_backend_message,
+        internal_backend_report=internal_backend_report,
         config_location=config_location,
         fix_mode=fix,
         log_sink_check=log_sink_check,
@@ -1483,6 +1559,7 @@ def do_doctor_cmd(
         and backends_healthy
         and models_healthy
         and deck_healthy
+        and internal_backend_healthy
         and (log_sink_check is None or log_sink_check.is_healthy)
         and (plugins_check is None or plugins_check.is_healthy)
     )
@@ -1506,7 +1583,10 @@ def do_doctor_cmd(
         fixable_backends = [(name, report) for name, report in invalid_backends if report.has_kit_template]
         can_fix_backends = len(fixable_backends) > 0
 
-    can_fix_deck = not deck_healthy and deck_report.kit_version != ""
+    # `pipelex update` refreshes both kit-managed areas, so either one out of sync is the same fix.
+    can_fix_deck = (not deck_healthy and deck_report.kit_version != "") or (
+        not internal_backend_healthy and internal_backend_report.kit_version != ""
+    )
 
     has_auto_fixable_issues = can_fix_config or can_fix_migrations or can_fix_telemetry or can_fix_backends or can_fix_deck
 
@@ -1567,11 +1647,11 @@ def do_doctor_cmd(
 
         # Fix outdated model deck
         if can_fix_deck:
-            if Confirm.ask("[bold]Update the model deck now?[/bold]", default=True):
+            if Confirm.ask("[bold]Update the model deck and backends/internal.toml now?[/bold]", default=True):
                 try:
                     console.print()
                     update_cmd(yes=True)
-                    console.print("[green]✓[/green] Model deck updated")
+                    console.print("[green]✓[/green] Model deck and backends/internal.toml updated")
                 except Exception as exc:  # ruff: ignore[blind-except]
                     # Doctor --fix handler: wraps the whole update_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to update deck: {escape(str(exc))}[/red]")

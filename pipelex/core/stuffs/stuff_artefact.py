@@ -15,17 +15,25 @@ Templates render under the Pipelex sandbox (`pipelex/tools/jinja2/jinja2_sandbox
 template read public data and call methods of plain values only. StuffArtefact declares its template
 surface: the dict-like accessors a template may call, and the metadata fields it may read although
 they start with an underscore.
+
+Printed as it is, `{{ my_stuff }}`, an artefact is its content's plain rendering, which an HTML template
+escapes. The exception is a content that knows its own HTML (`HtmlRenderable`, markupsafe's `__html__`),
+such as a Markdown stuff: the artefact answers `__html__` for it, so HTML autoescaping inserts the content's
+converted HTML instead. A template never calls `__html__` itself, since the sandbox refuses every
+underscore name; markupsafe does, when it escapes.
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 from typing_extensions import override
 
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.tools.jinja2.html_renderable import HtmlRenderable
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
+from pipelex.tools.jinja2.renderable_dispatch import type_implements
 from pipelex.tools.jinja2.template_surface import TemplateSurface
 from pipelex.tools.templating.text_format import TextFormat
 
@@ -94,6 +102,22 @@ def _get_template_value(*, stuff: Stuff, key: str) -> Any:
             raise KeyError(key)
 
 
+_HTML_DUNDER = "__html__"
+
+
+def _get_content_html(*, stuff: Stuff) -> Callable[[], str]:
+    """The `__html__` of the stuff's content, when the content's class defines it (`HtmlRenderable`).
+
+    Raises AttributeError otherwise, so that `hasattr(artefact, "__html__")` is False and markupsafe escapes
+    the artefact's plain rendering, as it always has. Decided from the content's class, never from the
+    instance, like every renderable the filters dispatch on (`renderable_dispatch.py`).
+    """
+    content = stuff.content
+    if isinstance(content, HtmlRenderable) and type_implements(value=content, protocol=HtmlRenderable):
+        return content.__html__
+    raise AttributeError(_HTML_DUNDER)
+
+
 # Attributes that should NOT be intercepted and delegated to content
 _PASSTHROUGH_ATTRS = frozenset(
     {
@@ -149,6 +173,7 @@ class StuffArtefact:
         - TagRenderable protocol (render_for_tag_async, default_tag_name)
         - TextFormatRenderable protocol (rendered_for_template_async)
         - ImageRenderable protocol (render_with_images)
+        - HtmlRenderable protocol (`__html__`), only when its content does: see `_get_content_html`
 
     Attributes:
         _stuff: The underlying Stuff object being wrapped.
@@ -170,6 +195,17 @@ class StuffArtefact:
             stuff: The Stuff object to wrap.
         """
         object.__setattr__(self, "_stuff", stuff)
+
+    @property
+    def __html__(self) -> Callable[[], str]:
+        """Markupsafe's `__html__`, present only for a content that knows its own HTML (a Markdown stuff).
+
+        HTML autoescaping then inserts that HTML, and escapes every other artefact's plain rendering as before:
+        for any other content this raises AttributeError, so `hasattr(artefact, "__html__")` is False. It is a
+        property of the class rather than an answer of `__getattr__` so that the filters, which license a call
+        by the value's class (`renderable_dispatch.py`), see it too.
+        """
+        return _get_content_html(stuff=self._stuff)
 
     # -------------------------------------------------------------------------
     # Attribute access for Jinja2 templates

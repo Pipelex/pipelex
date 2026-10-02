@@ -26,6 +26,7 @@ Here are all the native concepts you can use out of the box:
 | Concept | Description | Content Class Name |
 |-----------------|-------------|---------------------|
 | `Text` | A text | `TextContent` |
+| `Markdown` | A text written in Markdown, which refines `Text` | `MarkdownContent` |
 | `Image` | An image | `ImageContent` |
 | `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
@@ -85,6 +86,51 @@ class TextContent(StuffContent):
 ```
 
 **Use for:** Plain text outputs, summaries, descriptions, etc.
+
+### MarkdownContent
+
+A text written in Markdown. `Markdown` refines `Text`, and its content class keeps the single field of `TextContent`, which holds the Markdown source:
+
+```python
+class MarkdownContent(TextContent):
+    text: str
+```
+
+What sets it apart from `Text` is how it is shown: the HTML view, an HTML template and a PDF laid out without a template format a `Markdown` value and show a `Text` value as it is, so a stray `#` or `1.` in a plain text never turns into a heading or a list there. The terminal's pretty view is the exception: it renders both through Markdown.
+
+As a `PipeLLM` output, `output = "Markdown"` gives a report whose headings, bold text, lists, tables and links are formatted downstream. The LLM writes free text, exactly as it does for `Text`:
+
+```toml
+[pipe.write_inspection_report]
+type = "PipeLLM"
+description = "Write site notes up as an inspection report"
+inputs = { notes = "Text" }
+output = "Markdown"
+prompt = """
+Write these site notes up as an inspection report in Markdown, with a heading for each area inspected.
+
+@notes
+"""
+```
+
+Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.text`.
+
+**Refinement.** A `Markdown` value is accepted wherever a `Text` is: a pipe whose input is `Text` takes a `Markdown` report, and its prompt receives the source. The reverse does not hold: a `Text` value, or a concept that refines `Text`, is not accepted where a `Markdown` is required, since nothing says it was written as Markdown. To name a specific kind of report, declare a concept with `refines = "Markdown"`.
+
+**As an input**, `Markdown` takes a string, as `Text` does: `"report": "# Roof\n\n- two cracked tiles"`, or the envelope form `{"concept": "Markdown", "content": "# Roof"}`.
+
+**How it renders:**
+
+- In a prompt, and in the plain and Markdown views, it is its source as it is. `pipelex run --save-main-stuff` writes that source verbatim as `main_stuff.md`.
+- Its HTML view converts the Markdown to HTML rather than escaping it, so `main_stuff.html` and the HTML tab of `main_stuff_viewer.html` show the formatted report. Raw HTML inside the source is shown as text rather than passed through, and only URLs with a scheme, such as `https://example.com`, become links, so a file name like `README.md` stays text.
+- The pretty view in the terminal renders it as Markdown.
+- Its JSON form is `{"text": "..."}`, the same as a `Text`.
+
+**Inside an HTML template**, such as a `PipeCompose` template with `category = "html"`, `{{ report }}` prints a `Markdown` value as its converted HTML with no filter, while a `Text` value keeps being escaped. A `Markdown` field of a structure converts the same way, as in `{{ digest.summary }}`. `{{ report.text }}` is the Markdown source, escaped like any string. The `$report` sigil and `{{ report | format }}` print the converted HTML too, unless the template names another format, as in `{{ report | format("plain") }}`, which prints the Markdown source, escaped. The `@report` sigil wraps the source in tags for a prompt and is not meant for HTML templates.
+
+**In a document**, a [`PipeDocGen`](../pipes/pipe-operators/PipeDocGen.md) step that prints a PDF without a template formats a `Markdown` value, with its headings, lists, tables, code and links, and prints a `Text` value as plain paragraphs.
+
+**Use for:** Reports, summaries and write-ups an LLM writes to be read formatted, in an HTML page or a PDF.
 
 ### ImageContent
 

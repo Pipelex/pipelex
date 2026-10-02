@@ -16,7 +16,7 @@ Two shapes sit outside it, both because the crate genuinely cannot see what they
 floor): a concept backed by a hand-written Python class, and one refining a target the crate does not
 carry (a cross-package base leaves `structureless=True` *with* `base_ref` set, so it lands on the root
 rather than on this module's structureless arm). Neither is gated here, and neither is a defect this
-module can settle — see `wip/parity/structureless-concept-with-registered-class.md`.
+module can settle; the first is the open decision L-260930-3074fe.
 """
 
 from pathlib import Path

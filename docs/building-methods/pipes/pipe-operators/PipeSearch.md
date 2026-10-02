@@ -15,6 +15,8 @@ The output is a `SearchResult` (or a concept that refines it), which contains:
 -   `answer`: The synthesized answer text from the search
 -   `sources`: A list of sources, each with a `title`, `url`, and optional `snippet`
 
+Every input the pipe declares must be read by the `prompt`, and every variable the prompt reads must be declared in `inputs`. Validation refuses an input the prompt never reads as `extraneous_input_variable`, naming the input, so you either reference it in the prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+
 ## Configuration
 
 `PipeSearch` is configured in your pipeline's `.mthds` file.

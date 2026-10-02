@@ -17,6 +17,7 @@ from pipelex.providers.openai.openai_plugin import OpenAIPlugin
 from pipelex.providers.openrouter.openrouter_plugin import OpenRouterPlugin
 from pipelex.providers.portkey.portkey_plugin import PortkeyPlugin
 from pipelex.providers.pypdfium2.pypdfium2_plugin import Pypdfium2Plugin
+from pipelex.providers.reportlab.reportlab_plugin import ReportlabDocGenPlugin
 from pipelex.providers.secrets.secrets_plugin import SecretsPlugin
 from pipelex.providers.storage.storage_plugin import StoragePlugin
 
@@ -54,6 +55,7 @@ KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
     DoclingPlugin(),
     Pypdfium2Plugin(),
     LinkupPlugin(),
+    ReportlabDocGenPlugin(),
 ]
 
 # Kernel-layer built-ins that core requires unconditionally — naming one in ``runtime.plugins.disabled`` is a

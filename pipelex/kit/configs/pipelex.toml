@@ -68,6 +68,17 @@ project_id = ""
 signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
 
 ####################################################################################################
+# Network Config
+####################################################################################################
+
+[runtime.network]
+# Whether fetching a document or image URL refuses private, loopback, link-local and cloud-metadata
+# destinations, on the first request and on every redirect hop. Keep it on unless your documents live
+# on an intranet host or your only way out is an HTTP proxy: with the guard on, fetches connect
+# directly and ignore HTTP_PROXY / HTTPS_PROXY. Webhook delivery is guarded whatever this says.
+is_fetch_ssrf_guard_enabled = true
+
+####################################################################################################
 # Secrets Config
 ####################################################################################################
 

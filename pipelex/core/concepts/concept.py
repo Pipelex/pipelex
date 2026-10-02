@@ -156,8 +156,10 @@ class Concept(ConceptAbstract):
                 if resolved is not None and resolved.concept_ref == concept_2.concept_ref:
                     return True
 
-        # If both concepts refine the same concept, they are compatible
-        if concept_1.refines is not None and concept_2.refines is not None:
+        # If both concepts refine the same concept, they are compatible — unless the wanted one is a native.
+        # A native is reached only through its own lineage: a concept beside `native.Markdown`, refining
+        # `native.Text` as it does, is a text but not a Markdown.
+        if concept_1.refines is not None and concept_2.refines is not None and not cls.is_native_concept(concept=concept_2):
             refines_1 = concept_1.refines
             refines_2 = concept_2.refines
             # Resolve cross-package refines through the resolver

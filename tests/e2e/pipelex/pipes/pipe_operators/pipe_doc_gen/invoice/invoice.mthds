@@ -1,0 +1,76 @@
+domain      = "invoice_rendering"
+description = "One invoice generated as a PDF laid out from its structure"
+main_pipe   = "invent_and_render_invoice"
+
+[concept.LineItem]
+description = "One line of an invoice"
+
+[concept.LineItem.structure]
+description = { type = "text", description = "What was sold", required = true }
+quantity    = { type = "integer", description = "How many units", required = true }
+unit_price  = { type = "number", description = "The price of one unit, before tax", required = true }
+amount      = { type = "number", description = "The quantity times the unit price", required = true }
+
+[concept.Customer]
+description = "The customer an invoice is addressed to"
+
+[concept.Customer.structure]
+name    = { type = "text", description = "The customer's company name", required = true }
+address = { type = "text", description = "The customer's postal address, on one line", required = true }
+
+[concept.Invoice]
+description = "An invoice with its customer and line items"
+
+[concept.Invoice.structure]
+number     = { type = "text", description = "The invoice number, such as INV-2026-0142", required = true }
+issue_date = { type = "date", description = "The day the invoice was issued", required = true }
+due_date   = { type = "date", description = "The day payment is due", required = true }
+customer   = { type = "concept", concept_ref = "invoice_rendering.Customer", description = "Who the invoice is addressed to", required = true }
+currency   = { type = "text", description = "The ISO currency code, such as EUR", required = true }
+line_items = { type = "list", item_type = "concept", item_concept_ref = "invoice_rendering.LineItem", description = "What was sold", required = true }
+total      = { type = "number", description = "The sum of the line items' amounts", required = true }
+notes      = { type = "text", description = "Payment terms and remarks", required = false }
+
+[concept.InvoicePdf]
+description = "The invoice laid out as a printable PDF"
+refines     = "Document"
+
+########################################################################################################################
+# End to end: an LLM invents the invoice, the last step prints it
+########################################################################################################################
+
+[pipe.invent_and_render_invoice]
+type = "PipeSequence"
+description = "Invent a plausible invoice from a one-line brief, then print it as a PDF"
+inputs = { brief = "Text" }
+output = "InvoicePdf"
+steps = [
+  { pipe = "invent_invoice", result = "invoice" },
+  { pipe = "render_invoice_pdf", result = "invoice_pdf" },
+]
+
+[pipe.invent_invoice]
+type = "PipeLLM"
+description = "Invent a plausible invoice from a one-line brief"
+inputs = { brief = "Text" }
+output = "Invoice"
+model = "$writing-factual-cheap"
+prompt = """
+Invent a plausible invoice for this brief:
+
+@brief
+
+Use between five and twelve line items. Each amount is the quantity times the unit price, and the total is the sum of the amounts. Write the notes as two short sentences on the payment terms.
+"""
+
+########################################################################################################################
+# The PDF, laid out from the invoice's structure with no template
+########################################################################################################################
+
+[pipe.render_invoice_pdf]
+type        = "PipeDocGen"
+description = "Lay out the invoice as a paginated PDF from its structure alone"
+inputs      = { invoice = "Invoice" }
+output      = "InvoicePdf"
+format      = "pdf"
+filename    = "invoice-{{ invoice.number }}"
