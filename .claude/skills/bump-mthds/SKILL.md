@@ -335,9 +335,11 @@ ones harder to spot.
   breaking or not, puts a consumer that installs both this package and the
   `pipelex-sdk` distribution into an unsatisfiable resolve until `pipelex-sdk`
   moves to the same version. Check where it stands
-  (`grep mthds ../pipelex-sdk/python/pyproject.toml`) and say so in your report. Neither repo is yours to edit from here: file it
-  (`ledger new --owner <repo> …`) with the version that moved and, when there
-  was one, the symbol. The `ledger` skill has the full gesture.
+  (`grep mthds ../pipelex-sdk/python/pyproject.toml`) and say so in your report.
+  Neither repo is yours to edit from here: file it against the member that
+  holds the pin (`ledger new --owner pipelex-sdk/python …`, and
+  `--owner pipelex-server/<member>` for a server pin) with the version that
+  moved and, when there was one, the symbol. The `ledger` skill has the full gesture.
 - **File the reverse direction if you moved the wire.** `mthds-python` commits
   protocol parity fixtures captured *from this engine*, so a change here that
   alters emitted output means those fixtures need recapturing — an item owned by
