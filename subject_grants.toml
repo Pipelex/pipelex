@@ -6128,9 +6128,9 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
-["pipelex/tools/jinja2/jinja2_required_variables.py::_build_full_path"]
+["pipelex/tools/jinja2/jinja2_required_variables.py::_dotted_path"]
 param = "node"
-rationale = "Extracts/derives from the node; single operand."
+rationale = "Noun-named derivation: the dotted path of the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
