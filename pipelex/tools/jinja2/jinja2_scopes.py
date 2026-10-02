@@ -15,6 +15,9 @@ argument) does not, from where Jinja binds it, and the rule is stated here once,
   `set`'s own right-hand side (`{% set topic = topic|trim %}`), read the input.
 - A macro body runs where the macro is called, which the walk cannot place among the statements, so it sees the
   names the statement list it is defined in binds for certain, wherever they stand in it.
+- A `{% block %}` runs as a function of its own. Without `scoped` it reads only the template context, which holds
+  what the top level has set for certain before it, and none of the names a loop, a macro or any other frame around
+  it binds; a scoped block reads the names bound where it stands, and the blocks nested in it read those too.
 
 The walk hands every node that may read a variable to a handler, with the bindings where the node stands. A
 binding maps a name to the input path it stands for when that can be followed, which is a loop target over an
@@ -45,7 +48,7 @@ def assigned_target_names(target: nodes.Node) -> list[str]:
     return []
 
 
-def _names_assigned_by_statements(statements: list[nodes.Node]) -> set[str]:
+def names_assigned_by_statements(statements: list[nodes.Node]) -> set[str]:
     names: set[str] = set()
     for statement in statements:
         names |= definitely_assigned_names(statement)
@@ -70,11 +73,11 @@ def definitely_assigned_names(statement: nodes.Node) -> set[str]:
     if isinstance(statement, nodes.If):
         if not statement.else_:
             return set()
-        body_names = _names_assigned_by_statements(statement.body)
+        body_names = names_assigned_by_statements(statement.body)
         other_branches = [*(elif_branch.body for elif_branch in statement.elif_), statement.else_]
-        return body_names.intersection(*(_names_assigned_by_statements(branch) for branch in other_branches))
+        return body_names.intersection(*(names_assigned_by_statements(branch) for branch in other_branches))
     if isinstance(statement, nodes.ScopedEvalContextModifier):
-        return _names_assigned_by_statements(statement.body)
+        return names_assigned_by_statements(statement.body)
     return set()
 
 
@@ -143,34 +146,39 @@ class _ReadWalk:
         self.global_names = global_names
         self.handle_read = handle_read
 
-    def walk_statements(self, *, statements: list[nodes.Node], bindings: ScopeBindings) -> ScopeBindings:
+    def walk_statements(self, *, statements: list[nodes.Node], bindings: ScopeBindings, context: ScopeBindings | None) -> ScopeBindings:
         """Walk a statement list in the frame it runs in, and return the bindings after it.
 
         Each statement sees what the statements before it bound for certain; a macro sees what the whole list binds.
+        `context` is what the template context holds where the frame runs, and None in the top-level frame, whose
+        names the context takes on as they are set.
         """
-        names_bound_by_the_list = _names_assigned_by_statements(statements)
+        names_bound_by_the_list = names_assigned_by_statements(statements)
         scope = dict(bindings)
         for statement in statements:
             if isinstance(statement, nodes.Macro):
-                self.walk(node=statement, bindings=_with_unfollowed(bindings=scope, names=names_bound_by_the_list))
+                self.walk(node=statement, bindings=_with_unfollowed(bindings=scope, names=names_bound_by_the_list), context=context)
             else:
-                self.walk(node=statement, bindings=scope)
+                self.walk(node=statement, bindings=scope, context=context)
             scope = _with_unfollowed(bindings=scope, names=definitely_assigned_names(statement))
         return scope
 
-    def walk(self, *, node: nodes.Node, bindings: ScopeBindings) -> None:
+    def walk(self, *, node: nodes.Node, bindings: ScopeBindings, context: ScopeBindings | None) -> None:
+        # What the template context holds in a frame opened here: from the top level, what is bound where it opens
+        frame_context = bindings if context is None else context
+
         if isinstance(node, nodes.If):
             # Every branch, and every `elif` test, starts from the bindings before the `if`
             for branch in (node, *node.elif_):
-                self.walk(node=branch.test, bindings=bindings)
-                self.walk_statements(statements=branch.body, bindings=bindings)
-            self.walk_statements(statements=node.else_, bindings=bindings)
+                self.walk(node=branch.test, bindings=bindings, context=context)
+                self.walk_statements(statements=branch.body, bindings=bindings, context=context)
+            self.walk_statements(statements=node.else_, bindings=bindings, context=context)
             return
 
         if isinstance(node, nodes.For):
             # The iterable is read outside the loop, the loop filter and the body inside it, and the `else` branch in
             # a frame of its own. A single loop target over an attribute chain reads an item of that chain's list
-            self.walk(node=node.iter, bindings=bindings)
+            self.walk(node=node.iter, bindings=bindings, context=context)
             loop_bindings = _with_unfollowed(bindings=bindings, names=frame_bound_names(node))
             iterated_chain = attribute_chain(node.iter)
             if isinstance(node.target, nodes.Name) and iterated_chain is not None:
@@ -179,50 +187,58 @@ class _ReadWalk:
                 if iterated_path is not None:
                     loop_bindings[node.target.name] = (*iterated_path, LIST_ITEM_SEGMENT)
             if node.test is not None:
-                self.walk(node=node.test, bindings=loop_bindings)
-            self.walk_statements(statements=node.body, bindings=loop_bindings)
-            self.walk_statements(statements=node.else_, bindings=bindings)
+                self.walk(node=node.test, bindings=loop_bindings, context=frame_context)
+            self.walk_statements(statements=node.body, bindings=loop_bindings, context=frame_context)
+            self.walk_statements(statements=node.else_, bindings=bindings, context=frame_context)
             return
 
         if isinstance(node, nodes.With):
             # The values are read outside the `with`, before its targets are bound
             for value in node.values:
-                self.walk(node=value, bindings=bindings)
-            self.walk_statements(statements=node.body, bindings=_with_unfollowed(bindings=bindings, names=frame_bound_names(node)))
+                self.walk(node=value, bindings=bindings, context=context)
+            with_bindings = _with_unfollowed(bindings=bindings, names=frame_bound_names(node))
+            self.walk_statements(statements=node.body, bindings=with_bindings, context=frame_context)
             return
 
         if isinstance(node, (nodes.Macro, nodes.CallBlock)):
             if isinstance(node, nodes.CallBlock):
                 # The call is made from the enclosing frame; the block's body is the macro it passes as `caller`
-                self.walk(node=node.call, bindings=bindings)
+                self.walk(node=node.call, bindings=bindings, context=context)
             macro_bindings = _with_unfollowed(bindings=bindings, names=frame_bound_names(node))
             # A default is evaluated in the macro's frame, where the arguments are bound
             for default in node.defaults:
-                self.walk(node=default, bindings=macro_bindings)
-            self.walk_statements(statements=node.body, bindings=macro_bindings)
+                self.walk(node=default, bindings=macro_bindings, context=frame_context)
+            self.walk_statements(statements=node.body, bindings=macro_bindings, context=frame_context)
             return
 
         if isinstance(node, (nodes.FilterBlock, nodes.AssignBlock)):
             # The body runs in a frame of its own, and the filter is applied in that frame once the body has run
-            body_bindings = self.walk_statements(statements=node.body, bindings=bindings)
+            body_bindings = self.walk_statements(statements=node.body, bindings=bindings, context=frame_context)
             if node.filter is not None:
-                self.walk(node=node.filter, bindings=body_bindings)
+                self.walk(node=node.filter, bindings=body_bindings, context=frame_context)
             return
 
-        if isinstance(node, (nodes.Scope, nodes.Block)):
-            self.walk_statements(statements=node.body, bindings=bindings)
+        if isinstance(node, nodes.Scope):
+            self.walk_statements(statements=node.body, bindings=bindings, context=frame_context)
+            return
+
+        if isinstance(node, nodes.Block):
+            # A block is called with the template context, or, when scoped, with one derived from the names bound where
+            # it stands, which is then the context of the blocks nested in it
+            block_bindings = bindings if node.scoped else frame_context
+            self.walk_statements(statements=node.body, bindings=block_bindings, context=block_bindings)
             return
 
         if isinstance(node, nodes.OverlayScope):
-            self.walk(node=node.context, bindings=bindings)
-            self.walk_statements(statements=node.body, bindings=bindings)
+            self.walk(node=node.context, bindings=bindings, context=context)
+            self.walk_statements(statements=node.body, bindings=bindings, context=frame_context)
             return
 
         if isinstance(node, nodes.ScopedEvalContextModifier):
             # Its statements run in the frame it stands in, the scope Jinja wraps an `autoescape` in
             for option in node.options:
-                self.walk(node=option, bindings=bindings)
-            self.walk_statements(statements=node.body, bindings=bindings)
+                self.walk(node=option, bindings=bindings, context=context)
+            self.walk_statements(statements=node.body, bindings=bindings, context=context)
             return
 
         if isinstance(node, nodes.Name) and node.ctx != "load":
@@ -234,14 +250,14 @@ class _ReadWalk:
             # name (`{{ range }}`, `range.low`) reads the input of that name, which shadows the global when rendered
             for child in node.iter_child_nodes():
                 if child is not node.node:
-                    self.walk(node=child, bindings=bindings)
+                    self.walk(node=child, bindings=bindings, context=context)
             return
 
         if self.handle_read(node=node, bindings=bindings):
             return
 
         for child in node.iter_child_nodes():
-            self.walk(node=child, bindings=bindings)
+            self.walk(node=child, bindings=bindings, context=context)
 
 
 def walk_template_reads(*, template: nodes.Template, global_names: set[str], handle_read: ReadHandler) -> None:
@@ -255,4 +271,4 @@ def walk_template_reads(*, template: nodes.Template, global_names: set[str], han
         global_names: The environment's globals (`range`, `namespace`, `dict`...)
         handle_read: What to do with a node that may read a variable
     """
-    _ReadWalk(global_names=global_names, handle_read=handle_read).walk_statements(statements=template.body, bindings={})
+    _ReadWalk(global_names=global_names, handle_read=handle_read).walk_statements(statements=template.body, bindings={}, context=None)

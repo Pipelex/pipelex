@@ -316,6 +316,52 @@ Best regards,
         ("macro_default_reads_an_earlier_argument", "{% macro m(a, b=a) %}{{ b }}{% endmacro %}{{ m(1) }}", set()),
         ("call_block_arguments", "{% macro m() %}{{ caller(1) }}{% endmacro %}{% call(a) m() %}{{ a }}{% endcall %}", set()),
         ("filter_block_filter_reads_its_body_set", "{% filter replace('a', y) %}{% set y = 'b' %}a{% endfilter %}", set()),
+        # A block runs as a function of its own. Without `scoped` it reads the template context, which holds what the top
+        # level has set for certain before it and nothing of a loop, a macro or any other frame around it; a scoped
+        # block reads the names bound where it stands, and so do the blocks nested in it
+        ("set_in_a_block_body", "{% block b %}{% set y = 1 %}{{ y }}{% endblock %}", set()),
+        ("set_does_not_escape_a_block", "{% block b %}{% set y = 1 %}{% endblock %}{{ y }}", {"y"}),
+        ("top_level_set_reaches_a_block", "{% set y = 1 %}{% block b %}{{ y }}{% endblock %}", set()),
+        ("top_level_set_after_a_block", "{% block b %}{{ y }}{% endblock %}{% set y = 1 %}", {"y"}),
+        (
+            "set_in_every_top_level_branch_reaches_a_block",
+            "{% if x %}{% set y = 1 %}{% else %}{% set y = 2 %}{% endif %}{% block b %}{{ y }}{% endblock %}",
+            {"x"},
+        ),
+        ("set_in_some_top_level_branches_before_a_block", "{% if x %}{% set y = 1 %}{% endif %}{% block b %}{{ y }}{% endblock %}", {"x", "y"}),
+        ("set_earlier_in_a_top_level_branch_reaches_a_block", "{% if x %}{% set y = 1 %}{% block b %}{{ y }}{% endblock %}{% endif %}", {"x"}),
+        ("top_level_macro_reaches_a_block", "{% macro m() %}-{% endmacro %}{% block b %}{{ m() }}{% endblock %}", set()),
+        (
+            "loop_target_does_not_reach_a_block",
+            "{% for item in items %}{% block b %}{{ item.name }}{% endblock %}{% endfor %}",
+            {"items", "item.name"},
+        ),
+        ("loop_set_does_not_reach_a_block", "{% for i in items %}{% set y = i %}{% block b %}{{ y }}{% endblock %}{% endfor %}", {"items", "y"}),
+        (
+            "top_level_set_reaches_a_block_in_a_loop",
+            "{% set y = 1 %}{% for i in items %}{% set y = i %}{% block b %}{{ y }}{% endblock %}{% endfor %}",
+            {"items"},
+        ),
+        ("with_target_does_not_reach_a_block", "{% with y = 1 %}{% block b %}{{ y }}{% endblock %}{% endwith %}", {"y"}),
+        ("macro_argument_does_not_reach_a_block", "{% macro m(a) %}{% block b %}{{ a }}{% endblock %}{% endmacro %}{{ m(1) }}", {"a"}),
+        (
+            "call_block_argument_does_not_reach_a_block",
+            "{% macro m() %}{{ caller(1) }}{% endmacro %}{% call(y) m() %}{% block b %}{{ y }}{% endblock %}{% endcall %}",
+            {"y"},
+        ),
+        ("autoescape_set_does_not_reach_a_block", "{% autoescape true %}{% set y = 1 %}{% block b %}{{ y }}{% endblock %}{% endautoescape %}", {"y"}),
+        ("block_set_does_not_reach_a_nested_block", "{% block outer %}{% set z = 1 %}{% block inner %}{{ z }}{% endblock %}{% endblock %}", {"z"}),
+        ("scoped_block_sees_the_loop", "{% for item in items %}{% block b scoped %}{{ item.name }}{% endblock %}{% endfor %}", {"items"}),
+        (
+            "block_nested_in_a_scoped_block_sees_its_call_site",
+            "{% for item in items %}{% block outer scoped %}{% block inner %}{{ item.name }}{% endblock %}{% endblock %}{% endfor %}",
+            {"items"},
+        ),
+        (
+            "scoped_block_set_does_not_reach_a_nested_block",
+            "{% for i in items %}{% block outer scoped %}{% set z = i %}{% block inner %}{{ z }}{% endblock %}{% endblock %}{% endfor %}",
+            {"items", "z"},
+        ),
     ]
 
     # Names Jinja provides, and the scope a loop opens, are never inputs

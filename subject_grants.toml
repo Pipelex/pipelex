@@ -6124,10 +6124,6 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
 
-["pipelex/tools/jinja2/jinja2_scopes.py::_names_assigned_by_statements"]
-param = "statements"
-rationale = "Noun-named derivation: the names a statement list binds for certain; single operand."
-
 ["pipelex/tools/jinja2/jinja2_scopes.py::assigned_target_names"]
 param = "target"
 rationale = "Lists the names one assignment target binds."
@@ -6147,6 +6143,10 @@ rationale = "Noun-named derivation: the dotted path of the node; single operand.
 ["pipelex/tools/jinja2/jinja2_scopes.py::frame_bound_names"]
 param = "statement"
 rationale = "Noun-named derivation: the names one statement binds in the frame it opens; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::names_assigned_by_statements"]
+param = "statements"
+rationale = "Noun-named derivation: the names a statement list binds for certain; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.is_loaded"]
 param = "name"

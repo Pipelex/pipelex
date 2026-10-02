@@ -79,6 +79,16 @@ class TestDetectTemplateFieldPaths:
                 ("invoice", "line_items", LIST_ITEM_SEGMENT, "nosuch"),
             ),
             ("set_does_not_escape_a_loop", "{% for x in xs %}{% set invoice = x %}{% endfor %}{{ invoice.nosuch }}", ("invoice", "nosuch")),
+            (
+                "loop_target_in_a_block",
+                "{% for invoice in invoices.all %}{% block b %}{{ invoice.nosuch }}{% endblock %}{% endfor %}",
+                ("invoice", "nosuch"),
+            ),
+            (
+                "loop_target_in_a_scoped_block",
+                "{% for item in invoice.line_items %}{% block b scoped %}{{ item.nosuch }}{% endblock %}{% endfor %}",
+                ("invoice", "line_items", LIST_ITEM_SEGMENT, "nosuch"),
+            ),
         ],
     )
     def test_a_name_read_where_jinja_reads_the_input_keeps_its_path(self, topic: str, template_source: str, expected_path: tuple[str, ...]) -> None:

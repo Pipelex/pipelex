@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **A name a template sets is read where Jinja binds it (Breaking)**: the input check of `PipeLLM`, `PipeCompose`, `PipeSearch`, `PipeImgGen` and `PipeDocGen`, `PipeDocGen`'s field check and the optional-input guard now treat a `{% set %}` name as the template's own inside the loop, macro or block that sets it and after an `{% if %}` every branch of which sets it, so a template setting a name in a loop body or in each branch of an `if` and reading it there is no longer refused as reading an undeclared input. A name only some branches set is still read from the input of that name. Newly refused: an input declared only so that such a set would load, which is now never read, a macro called before its `{% macro %}`, and an optional input read unguarded in a macro argument's default.
+- **A name a template sets is read where Jinja binds it (Breaking)**: the input check of `PipeLLM`, `PipeCompose`, `PipeSearch`, `PipeImgGen` and `PipeDocGen`, `PipeDocGen`'s field check and the optional-input guard now treat a `{% set %}` name as the template's own inside the loop, macro or block that sets it and after an `{% if %}` every branch of which sets it, so a template setting a name in a loop body or in each branch of an `if` and reading it there is no longer refused as reading an undeclared input. A name only some branches set is still read from the input of that name. Newly refused: an input declared only so that such a set would load, which is now never read, a macro called before its `{% macro %}`, an optional input read unguarded in a macro argument's default, and a name a loop or a macro binds read inside a `{% block %}` without `scoped`, which Jinja reads from the input of that name.
 
 ### Changed
 
