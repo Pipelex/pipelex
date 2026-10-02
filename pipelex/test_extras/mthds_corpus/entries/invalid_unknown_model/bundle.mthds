@@ -1,0 +1,12 @@
+domain      = "tide_tables"
+description = "Write the note telling harbour users when the tide turns"
+main_pipe   = "write_tide_note"
+
+# The model named here is one no model deck defines, so the pipe is refused when it is built.
+[pipe.write_tide_note]
+type        = "PipeLLM"
+description = "Write the tide note for the harbour board"
+inputs      = { tide_times = "Text" }
+output      = "Text"
+model       = "no-such-model-handle"
+prompt      = "Write a short note for the harbour board from these tide times: $tide_times"

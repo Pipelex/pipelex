@@ -8,6 +8,7 @@ from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
@@ -34,6 +35,7 @@ class CoreRegistryModels(RegistryModels):
 
     STUFF: ClassVar[list[ModelType]] = [
         TextContent,
+        MarkdownContent,
         NumberContent,
         YesNoContent,
         DateContent,

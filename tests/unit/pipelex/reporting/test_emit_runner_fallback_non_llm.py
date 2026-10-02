@@ -78,7 +78,7 @@ def _trace_context(run_id: str, tracer_key: str) -> TraceContext:
 def _job_metadata(run_id: str, tracer_key: str) -> JobMetadata:
     now = datetime.now(UTC)
     return JobMetadata(
-        run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id=run_id),
+        run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="test-user", pipeline_run_id=run_id),
         trace_context=_trace_context(run_id, tracer_key),
         started_at=now,
         completed_at=now + timedelta(seconds=1),

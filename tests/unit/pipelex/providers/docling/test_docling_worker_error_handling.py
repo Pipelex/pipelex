@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory
 from pipelex.providers.docling.docling_extract_worker import DoclingExtractWorker
-from pipelex.tools.uri.prepared_file import PreparedFileLocalPath
 from tests.unit.pipelex.providers.docling.test_data import DoclingErrorHandlingTestData
 
 
@@ -59,13 +58,6 @@ class TestDoclingWorkerErrorHandling:
             "pipelex.providers.docling.docling_extract_worker.asyncio.to_thread",
             side_effect=sdk_exc,
         )
-        # Mock prepare_file_from_uri to return a local path that the match statement can handle
-        mock_prepared_file = PreparedFileLocalPath(path="/tmp/test.pdf")  # ruff: ignore[hardcoded-temp-file]
-        mocker.patch(
-            "pipelex.providers.docling.docling_extract_worker.prepare_file_from_uri",
-            new_callable=mocker.AsyncMock,
-            return_value=mock_prepared_file,
-        )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
             await worker._extract_from_source(source_uri="/tmp/test.pdf")  # ruff: ignore[private-member-access, hardcoded-temp-file]  # pyright: ignore[reportPrivateUsage]
@@ -84,12 +76,6 @@ class TestDoclingWorkerErrorHandling:
             "pipelex.providers.docling.docling_extract_worker.asyncio.to_thread",
             side_effect=sdk_exc,
         )
-        mock_prepared_file = PreparedFileLocalPath(path="/tmp/test.pdf")  # ruff: ignore[hardcoded-temp-file]
-        mocker.patch(
-            "pipelex.providers.docling.docling_extract_worker.prepare_file_from_uri",
-            new_callable=mocker.AsyncMock,
-            return_value=mock_prepared_file,
-        )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
             await worker._extract_from_source(source_uri="/tmp/test.pdf")  # ruff: ignore[private-member-access, hardcoded-temp-file]  # pyright: ignore[reportPrivateUsage]
@@ -107,12 +93,6 @@ class TestDoclingWorkerErrorHandling:
         mocker.patch(
             "pipelex.providers.docling.docling_extract_worker.asyncio.to_thread",
             side_effect=sdk_exc,
-        )
-        mock_prepared_file = PreparedFileLocalPath(path="/tmp/test.pdf")  # ruff: ignore[hardcoded-temp-file]
-        mocker.patch(
-            "pipelex.providers.docling.docling_extract_worker.prepare_file_from_uri",
-            new_callable=mocker.AsyncMock,
-            return_value=mock_prepared_file,
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:

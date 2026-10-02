@@ -1,0 +1,10 @@
+domain      = "bad_pipe_type"
+description = "Uses a pipe type that does not exist"
+main_pipe   = "mystery"
+
+[pipe.mystery]
+type        = "PipeWizardry"
+description = "Not a real pipe type"
+inputs      = { text = "Text" }
+output      = "Text"
+prompt      = "Do something magical with $text"

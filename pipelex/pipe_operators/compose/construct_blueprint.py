@@ -18,7 +18,7 @@ from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintTyp
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
-from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.misc.string_utils import find_private_path_segment, get_root_from_dotted_path
 
 
 class ConstructFieldMethod(StrEnum):
@@ -160,10 +160,21 @@ class ConstructFieldBlueprint(BaseModel):
                 if not isinstance(from_value, str):
                     msg = "'from' value must be a string path"
                     raise ConstructFieldBlueprintTypeError(msg)
+                if private_segment := find_private_path_segment(path=from_value):
+                    msg = (
+                        f"'from' path '{from_value}' reads '{private_segment}', a name starting with an underscore: "
+                        "a path reads the public fields of an input only."
+                    )
+                    raise ConstructFieldBlueprintValueError(msg)
                 list_to_dict_keyed_by = raw_dict.get("list_to_dict_keyed_by")
                 if list_to_dict_keyed_by is not None and not isinstance(list_to_dict_keyed_by, str):
                     msg = "'list_to_dict_keyed_by' value must be a string attribute name"
                     raise ConstructFieldBlueprintTypeError(msg)
+                if list_to_dict_keyed_by is not None and find_private_path_segment(path=list_to_dict_keyed_by):
+                    msg = (
+                        f"'list_to_dict_keyed_by' names '{list_to_dict_keyed_by}', a name starting with an underscore: it names a public field only."
+                    )
+                    raise ConstructFieldBlueprintValueError(msg)
                 return cls(
                     method=ConstructFieldMethod.FROM_VAR,
                     from_path=from_value,
@@ -220,16 +231,51 @@ class ConstructBlueprint(BaseModel):
         """Return list of all top-level field names."""
         return list(self.fields.keys())
 
-    def get_required_variables(self) -> set[str]:
-        """Extract all variable names/paths required to compose this construct.
-
-        This includes:
-        - All 'from' paths (variable references)
-        - All variables used in templates (base names only, e.g., 'deal' from 'deal.amount')
-        - Variables from nested constructs (recursively)
+    def field_templates(self) -> list[tuple[str, str]]:
+        """Return every template of this construct, nested constructs included, with its dotted field path.
 
         Returns:
-            Set of variable names/paths needed from working memory
+            (field_path, template) pairs, in field order, a nested construct's fields after its own path.
+        """
+        templates: list[tuple[str, str]] = []
+        for field_name, field_blueprint in self.fields.items():
+            match field_blueprint.method:
+                case ConstructFieldMethod.TEMPLATE:
+                    if field_blueprint.template:
+                        templates.append((field_name, field_blueprint.template))
+                case ConstructFieldMethod.NESTED:
+                    if field_blueprint.nested:
+                        templates.extend(
+                            (f"{field_name}.{nested_path}", nested_template)
+                            for nested_path, nested_template in field_blueprint.nested.field_templates()
+                        )
+                case ConstructFieldMethod.FROM_VAR | ConstructFieldMethod.FIXED:
+                    pass
+        return templates
+
+    def get_required_variables(self) -> set[str]:
+        """Extract the root names of every variable this construct reads from working memory.
+
+        For example, 'deal' for both `from = "deal.amount"` and a template reading `$deal.customer_name`.
+
+        Returns:
+            Set of root variable names needed from working memory
+        """
+        return {get_root_from_dotted_path(variable_path) for variable_path in self.get_required_variable_paths()}
+
+    def get_required_variable_paths(self) -> set[str]:
+        """Extract the full dotted path of every variable this construct reads from working memory.
+
+        This includes:
+        - All 'from' paths, as written
+        - All variable paths read by templates, internal and special names excluded
+        - The paths read by nested constructs (recursively)
+
+        The input check matches these paths against the declared inputs, so that a dotted input name
+        (`page.page_view`), declared next to its root `page`, counts as read by the path it names.
+
+        Returns:
+            Set of full dotted variable paths read from working memory
         """
         required: set[str] = set()
 
@@ -237,9 +283,7 @@ class ConstructBlueprint(BaseModel):
             match field_blueprint.method:
                 case ConstructFieldMethod.FROM_VAR:
                     if field_blueprint.from_path:
-                        # Also only the base variable name for input validation
-                        base_var = get_root_from_dotted_path(field_blueprint.from_path)
-                        required.add(base_var)
+                        required.add(field_blueprint.from_path)
 
                 case ConstructFieldMethod.TEMPLATE:
                     if field_blueprint.template:
@@ -253,16 +297,15 @@ class ConstructBlueprint(BaseModel):
                         except Jinja2DetectVariablesError as exc:
                             msg = f"Error detecting required variables in construct template: {exc}"
                             raise ValueError(msg) from exc
-                        # Extract root names and filter out internal variables (same approach as template mode)
+                        # Filter out internal and special variables by their root (same approach as template mode)
                         for var in template_vars:
                             root_var = get_root_from_dotted_path(var)
                             if not root_var.startswith("_") and root_var != "place_holder":
-                                required.add(root_var)
+                                required.add(var)
 
                 case ConstructFieldMethod.NESTED:
                     if field_blueprint.nested:
-                        nested_vars = field_blueprint.nested.get_required_variables()
-                        required.update(nested_vars)
+                        required.update(field_blueprint.nested.get_required_variable_paths())
 
                 case ConstructFieldMethod.FIXED:
                     # Fixed values don't require any variables

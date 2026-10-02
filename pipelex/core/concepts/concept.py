@@ -118,9 +118,11 @@ class Concept(ConceptAbstract):
     ) -> bool:
         """Whether the two concepts' *declarations* establish that `concept_1` satisfies `concept_2`.
 
-        This is the string tier of compatibility: dynamic short-circuits, ref equality, declared
-        structure-class-name equality, and `refines` chains — the last resolved through
-        `concept_resolver` when a refinement crosses a package boundary (`dep->domain.Code`).
+        This is the string tier of compatibility: dynamic short-circuits, the structureless top of
+        the lattice (every concept satisfies `native.Anything`, which declares no structure class,
+        while `Anything` satisfies nothing narrower), ref equality, declared structure-class-name
+        equality, and `refines` chains — the last resolved through `concept_resolver` when a
+        refinement crosses a package boundary (`dep->domain.Code`).
 
         The two verdicts are asymmetric, deliberately. `True` means "established by the
         declarations". `False` means "*not established at this tier*" — NOT "incompatible": two
@@ -134,6 +136,10 @@ class Concept(ConceptAbstract):
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_1.code):
             return True
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_2.code):
+            return True
+        if not concept_2.declares_a_structure_class:
+            # `native.Anything` promises no structure, so any value satisfies it; the reverse is
+            # never established here, since an `Anything` value is not known to be anything narrower.
             return True
         if concept_1.concept_ref == concept_2.concept_ref:
             return True
@@ -150,8 +156,10 @@ class Concept(ConceptAbstract):
                 if resolved is not None and resolved.concept_ref == concept_2.concept_ref:
                     return True
 
-        # If both concepts refine the same concept, they are compatible
-        if concept_1.refines is not None and concept_2.refines is not None:
+        # If both concepts refine the same concept, they are compatible — unless the wanted one is a native.
+        # A native is reached only through its own lineage: a concept beside `native.Markdown`, refining
+        # `native.Text` as it does, is a text but not a Markdown.
+        if concept_1.refines is not None and concept_2.refines is not None and not cls.is_native_concept(concept=concept_2):
             refines_1 = concept_1.refines
             refines_2 = concept_2.refines
             # Resolve cross-package refines through the resolver
@@ -220,13 +228,13 @@ class Concept(ConceptAbstract):
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for a concept that declares no structure class (`native.Anything`).
 
-        The SCHEMA arm publishes the permissive schema: no constraint keywords, only the concept's
-        identity annotations (`title` = concept ref, `description` = authored description) —
-        semantically the empty schema, "any JSON value", which is what an untyped vehicle means,
-        while keeping the invariant that every rendered input schema carries its concept's
-        identity. The JSON arm renders the empty mapping `{}` — the escape hatch's only honest
-        example value. Multiplicity wraps exactly as for class-backed concepts. PYTHON is refused:
-        there is no class to instantiate.
+        The SCHEMA arm publishes the concept's identity annotations (`title` = concept ref,
+        `description` = authored description) and one constraint: the value is not an array and
+        not null. An untyped vehicle takes any other JSON value, but a list is the multiplicity's
+        to express (`Anything[]`), never a single value's, and null is never an input. The
+        multiplicity wraps exactly as for class-backed concepts, so every item of `Anything[]`
+        carries the same exclusion. The JSON arm renders the empty mapping `{}` — the escape
+        hatch's only honest example value. PYTHON is refused: there is no class to instantiate.
 
         Returns:
             Tuple of (representation dict with "concept" and "content" keys, empty imports set)
@@ -236,7 +244,11 @@ class Concept(ConceptAbstract):
         """
         match output_format:
             case ConceptRepresentationFormat.SCHEMA:
-                json_schema: dict[str, Any] = {"title": self.concept_ref, "description": self.description}
+                json_schema: dict[str, Any] = {
+                    "title": self.concept_ref,
+                    "description": self.description,
+                    "not": {"type": ["array", "null"]},
+                }
                 content = self._wrap_schema_for_multiplicity(json_schema=json_schema, multiplicity=multiplicity)
                 return {"concept": self.concept_ref, "content": content}, set()
             case ConceptRepresentationFormat.JSON:

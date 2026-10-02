@@ -1,10 +1,9 @@
 import asyncio
-from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Sequence
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 # TypedDict from typing_extensions, not typing: pydantic rejects typing.TypedDict as a model
 # field on Python < 3.12, and ValidatedPipeEntry is a field of PipelexValidationReport.
@@ -12,9 +11,7 @@ from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.pipes.exceptions import PipeFactoryError, PipeRunError, PipeValidationError
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
@@ -22,22 +19,15 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError, PipeNotFoundError
-from pipelex.mthds_parsing.exceptions import MthdsParserError
-from pipelex.mthds_parsing.handle_pipe_errors import (
-    categorize_pipe_factory_error,
-    categorize_pipe_validation_error,
-    categorize_pipe_validation_with_libraries_error,
-)
+from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
-from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.system.registries.exceptions import FuncRegistryError
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
+from pipelex.system.caller_identity import CallerIdentity
 
 
 class ValidateBundleResult(BaseModel):
@@ -91,122 +81,6 @@ def build_pending_signatures(pipes_by_ref: dict[str, PipeAbstract]) -> list[str]
     return sorted(pipe.pipe_ref for ref_key, pipe in pipes_by_ref.items() if pipe.is_signature and not QualifiedRef.has_cross_package_prefix(ref_key))
 
 
-def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
-    """Backfill ``file_path`` on a pipe-channel error from the library manager's pipe-source map.
-
-    Raise sites (``PipeAbstract`` input checks, ``PipeSequence`` output checks) don't know their
-    file — pipes deliberately carry no source; provenance lives in the crate's ``source_map``,
-    mirrored into the current library's source map during load, *before* ``validate_library``
-    runs. Intercepting once at this catch boundary covers every raise site, present and future.
-
-    Lookup is by the full ``domain.pipe_code`` ref only — never the bare-code suffix fallback
-    (under the strict own-domain resolution rule, a bare-code suffix match would guess a file
-    where the qualified ref did not resolve). A miss leaves ``file_path`` as ``None``: the fix stays source-less and
-    falls under the conservative single-file rule, which is the safe direction.
-    """
-    if pipe_error.file_path is not None:
-        return
-    if pipe_error.domain_code is None or pipe_error.pipe_code is None:
-        return
-    source = get_library_manager().get_pipe_source(f"{pipe_error.domain_code}.{pipe_error.pipe_code}")
-    if source is not None:
-        # Compatibility boundary: injected managers written against the previous protocol may
-        # still return ``Path``. Normalize before assigning to the string-only error model.
-        pipe_error.file_path = str(source)
-
-
-@contextmanager
-def translate_to_validate_bundle_error() -> Generator[None, None, None]:
-    """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
-
-    Single source of truth for the bundle-loading error cascade, shared by the
-    bundle-loading entry points: ``validate_bundle``, ``validate_bundles_from_directory``,
-    and ``pipelex.pipeline.resolve_bundle.resolve_crate_from_contents``.
-    A ``MthdsParserError`` becomes a ``ValidateBundleError`` carrying the
-    blueprint validation errors, a ``PipeFactoryError`` carries the categorized
-    factory error, etc. Sharing one source of truth means a new handler only
-    needs to be added once.
-    """
-    try:
-        yield
-    except MthdsParserError as parser_error:
-        raise ValidateBundleError(
-            message=parser_error.message,
-            pipelex_bundle_blueprint_validation_errors=parser_error.validation_errors,
-        ) from parser_error
-    except PipeFactoryError as factory_error:
-        factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
-        raise ValidateBundleError(
-            message=f"Pipe factory error: {factory_error}",
-            pipe_factory_errors=[factory_error_data],
-        ) from factory_error
-    # Cascade order: ``except PipeValidationError`` must precede
-    # ``except ValidationError``. Their sibling-under-``ValueError``
-    # relationship (``PipeValidationError(ValueError)``, not a subclass of
-    # ``pydantic.ValidationError``) is pinned by
-    # ``tests/unit/pipelex/pipeline/test_validate_bundle_helper.py``.
-    except PipeValidationError as pipe_error:
-        _backfill_pipe_error_source(pipe_error)
-        pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
-        raise ValidateBundleError(
-            message=f"Pipe validation failed: {pipe_error}",
-            pipe_validation_errors=[pipe_error_data],
-        ) from pipe_error
-    except ValidationError as validation_error:
-        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(validation_error=validation_error).message
-        msg = f"Could not load blueprints because of: {validation_error_msg}"
-        raise ValidateBundleError(
-            message=msg,
-            pipe_validation_errors=pipe_validation_errors,
-        ) from validation_error
-    except PipeNotFoundError:
-        # The base class on purpose: the slice miss raised by ``_pipes_to_dry_run`` is the
-        # INPUT-domained ``EntryPipeNotFoundError`` subclass, and this arm must let it through raw,
-        # domain and all. PipeNotFoundError is a PipeLibraryError (hence a LibraryError), but it is
-        # NOT a bundle merge/load failure: it means a requested --pipe slice names a pipe absent from
-        # the bundle. It has its own dedicated CLI handler (execute_validate's
-        # `except PipeNotFoundError`), so it must propagate raw rather than be folded into a
-        # ValidateBundleError by the arm below.
-        raise
-    except LibraryError as library_error:
-        # Library merge / load failures that are NOT pydantic ValidationErrors: undeclared
-        # cross-file concept references (ConceptLibraryError), signature/concrete contract
-        # mismatches and duplicate concept/pipe refs (ConceptLibraryError / PipeLibraryError), and
-        # the structured LibraryLoadingError aggregate (concept cycles, reserved-domain
-        # violations, factory failures). Surface them as a clean ValidateBundleError instead of a
-        # raw traceback. LibraryLoadingError carries blueprint- and pipe/concept-validation errors;
-        # forward them so the CLI renders the same structured detail it does for the other arms.
-        if isinstance(library_error, LibraryLoadingError):
-            blueprint_validation_errors = library_error.blueprint_validation_errors
-            pipe_concept_validation_errors = library_error.pipe_concept_validation_errors
-        else:
-            blueprint_validation_errors = None
-            pipe_concept_validation_errors = None
-        raise ValidateBundleError(
-            message=library_error.message,
-            pipelex_bundle_blueprint_validation_errors=blueprint_validation_errors,
-            pipe_validation_errors=pipe_concept_validation_errors,
-        ) from library_error
-    except FuncRegistryError as func_registry_error:
-        # A duplicate @pipe_func name across the scanned library dirs. Raised while loading the
-        # library, so it lands here rather than on the PipeFunc field validator's ValueError path.
-        # It is caller-fixable input (rename one with @pipe_func(name=...)), so it must produce a
-        # verdict — `is_valid: false` — not the "no verdict could be produced" exit 2 / 5xx an
-        # untranslated error would give.
-        raise ValidateBundleError(message=func_registry_error.message) from func_registry_error
-    except PipeRunError as pipe_run_error:
-        raise ValidateBundleError(
-            message=pipe_run_error.message,
-            dry_run_error_message=pipe_run_error.message,
-        ) from pipe_run_error
-    except DryRunError as dry_run_error:
-        raise ValidateBundleError(
-            message=dry_run_error.message,
-            dry_run_error_message=dry_run_error.message,
-        ) from dry_run_error
-
-
 def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
     """Select which loaded pipes to dry-run.
 
@@ -247,7 +121,22 @@ async def validate_bundle(
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
+    caller_identity: CallerIdentity | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> ValidateBundleResult:
+    """Load one bundle into a fresh library and dry-run its pipes.
+
+    ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
+    sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
+    inherits the caller already in scope, and with none the sweep belongs to nobody.
+
+    ``library_dirs_are_callers`` says whose library directories are loaded beside submitted
+    ``mthds_contents``, as it does on the run path (``acquire_library``). By default they are a
+    host's, so the verdict names none of their files (``withholding_host_library_files``); a
+    caller validating content against its own directories passes True and keeps every path. A
+    bundle file is validated on the caller's own disk, among the caller's own directories, and
+    keeps every path whatever this says.
+    """
     provided_params = sum(
         [
             mthds_contents is not None,
@@ -293,8 +182,17 @@ async def validate_bundle(
 
         loaded_pipes: list[PipeAbstract] | None = None
         loaded_blueprints: list[PipelexBundleBlueprint] | None = None
+        # Beside submitted content, a host's library directories are withheld from the verdict: their files are paths
+        # on the host. The caller's own directories, and every directory of a bundle file, keep their paths.
+        host_library_withholding: AbstractContextManager[None]
+        if mthds_contents is not None and not library_dirs_are_callers:
+            host_library_withholding = withholding_host_library_files(
+                library_dirs=effective_dirs, caller_sources=[source for source in mthds_sources or [] if source is not None]
+            )
+        else:
+            host_library_withholding = nullcontext()
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
-        with translate_to_validate_bundle_error():
+        with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
                 library_manager.load_libraries(
@@ -314,6 +212,11 @@ async def validate_bundle(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
                     library_id=library_id,
                     allow_signatures=allow_signatures,
+                    caller_identity=caller_identity,
+                    # Submitted content beside a host's library directories: only its own pipes name their file,
+                    # never a pipe of the host's directories, which would put a path on the host into the
+                    # caller's verdict. Beside the caller's own directories, every failure names its file.
+                    source_pipe_refs=None if library_dirs_are_callers else frozenset(pipe.pipe_ref for pipe in loaded_pipes),
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -341,6 +244,10 @@ async def validate_bundle(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
                     library_id=library_id,
                     allow_signatures=allow_signatures,
+                    caller_identity=caller_identity,
+                    # A file on the caller's own disk: every failure names its file, a sibling file of the
+                    # same method included, since the library directories are the caller's own too.
+                    source_pipe_refs=None,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,

@@ -80,17 +80,18 @@ async def run_extract(
     when the source is a single image — so there is no multiplicity fork here as there is on the LLM
     and image-generation paths.
     """
-    page_contents = await get_content_generator().make_extract_pages(
-        extract_input=extract_input,
-        cogt_run_params=cogt_run_params,
-        extract_handle=extract_setting.model,
-        job_metadata=job_metadata,
-        extract_job_params=extract_job_params,
-        extract_job_config=ExtractJobConfig(),
-    )
-    content: ListContent[PageContent] = ListContent(items=page_contents)
-    return ExtractResult(
-        memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
-        content=content,
-        extract_setting=extract_setting,
-    )
+    with job_metadata.log_context():
+        page_contents = await get_content_generator().make_extract_pages(
+            extract_input=extract_input,
+            cogt_run_params=cogt_run_params,
+            extract_handle=extract_setting.model,
+            job_metadata=job_metadata,
+            extract_job_params=extract_job_params,
+            extract_job_config=ExtractJobConfig(),
+        )
+        content: ListContent[PageContent] = ListContent(items=page_contents)
+        return ExtractResult(
+            memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
+            content=content,
+            extract_setting=extract_setting,
+        )

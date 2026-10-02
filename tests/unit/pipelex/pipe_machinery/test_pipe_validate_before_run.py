@@ -114,7 +114,7 @@ class TestPipeValidateBeforeRun:
 
         # Provide only one input
         working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-            pipeline_inputs={"topic": "Python programming"}, concept_provider=get_concept_library()
+            pipeline_inputs={"topic": "Python programming"}, concept_provider=get_concept_library(), read_scope=None
         )
         pipe_run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
 

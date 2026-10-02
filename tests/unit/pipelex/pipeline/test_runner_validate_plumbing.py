@@ -20,12 +20,14 @@ the artifact builders and asserts nothing about the returned report.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pytest
 
 from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity
+from pipelex.system.storage_scope import LOCAL_USER_ID
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture, MockType
@@ -77,9 +79,9 @@ class TestRunnerValidatePlumbing:
         )
 
     async def test_library_dirs_converted_to_paths_and_allow_signatures_passthrough(self, mocker: MockerFixture) -> None:
-        """Constructor library_dirs strings reach validate_bundle as Path objects; allow_signatures forwarded verbatim."""
+        """Constructor library_dirs strings reach validate_bundle as Path objects; allow_signatures and their ownership forwarded verbatim."""
         env = self._patch_env(mocker, library_ids=[None, "val-lib"])
-        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"])
+        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"], library_dirs_are_callers=True)
 
         await runner.validate(mthds_contents=["bundle-content"], allow_signatures=True)
 
@@ -88,10 +90,11 @@ class TestRunnerValidatePlumbing:
             mthds_sources=None,
             library_dirs=[Path("dir_alpha"), Path("nested/dir_beta")],
             allow_signatures=True,
+            library_dirs_are_callers=True,
         )
 
     async def test_no_library_dirs_passes_none_and_strict_default(self, mocker: MockerFixture) -> None:
-        """Without constructor library_dirs, validate_bundle receives None and the strict default."""
+        """Without constructor library_dirs, validate_bundle receives None, the strict default and a host's directories."""
         env = self._patch_env(mocker, library_ids=[None, "val-lib"])
         runner = PipelexMTHDSProtocol()
 
@@ -102,7 +105,28 @@ class TestRunnerValidatePlumbing:
             mthds_sources=None,
             library_dirs=None,
             allow_signatures=False,
+            library_dirs_are_callers=False,
         )
+
+    async def test_validation_runs_with_the_protocols_caller_in_scope(self, mocker: MockerFixture) -> None:
+        """A validation is not a run, so the caller reaches its telemetry as the ambient one."""
+        env = self._patch_env(mocker, library_ids=[None, "val-lib"])
+        callers_seen: list[CallerIdentity | None] = []
+
+        def record_caller(**_kwargs: Any) -> Any:
+            callers_seen.append(get_current_caller_identity())
+            return mocker.MagicMock(name="validate_bundle_result")
+
+        env.validate_bundle_mock.side_effect = record_caller
+        runner = PipelexMTHDSProtocol(user_id="caller-7", extras={"organization": "org_caller"})
+
+        await runner.validate(mthds_contents=["bundle-content"])
+
+        assert callers_seen == [CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})]
+        assert get_current_caller_identity() is None
+
+    async def test_a_local_protocol_states_the_local_caller(self) -> None:
+        assert PipelexMTHDSProtocol().caller_identity == CallerIdentity(user_id=LOCAL_USER_ID, extras={})
 
     @pytest.mark.parametrize(
         ("prev_library_id", "validation_library_id", "expect_set_prev", "expect_clear", "expect_teardown"),

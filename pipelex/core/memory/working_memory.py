@@ -19,6 +19,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -28,6 +29,7 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
+from pipelex.tools.misc.string_utils import find_private_path_segment
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
@@ -316,6 +318,12 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         """
         # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
+            # The path is walked with `attrgetter`, which follows any name: refuse the private ones.
+            if private_segment := find_private_path_segment(path=name):
+                raise WorkingMemoryStuffAttributeNotFoundError(
+                    variable_name=name,
+                    message=f"Attribute path '{name}' reads '{private_segment}', which starts with an underscore: a path reads public fields only",
+                )
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]
             attr_path_str = parts[1]  # Keep the rest as a dot-separated string
@@ -556,6 +564,11 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         return self.get_stuff_as_html(name=MAIN_STUFF_NAME)
 
     @property
+    def main_stuff_as_markdown(self) -> MarkdownContent:
+        """Get main stuff content as MarkdownContent if applicable."""
+        return self.main_stuff_as(content_type=MarkdownContent)
+
+    @property
     def main_stuff_as_mermaid(self) -> MermaidContent:
         """Get main stuff content as MermaidContent if applicable."""
         return self.get_stuff_as_mermaid(name=MAIN_STUFF_NAME)
@@ -609,6 +622,11 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                     # only exist in a per-workflow ClassRegistry.
                     serialized_items.append(_encode_content_with_class_markers(item))
                 raw_root[stuff_name]["content"] = serialized_items
+            elif not stuff.concept.declares_a_structure_class and stuff_name in raw_root:
+                # A structureless concept (`native.Anything`) names no content class, so the
+                # hydrator cannot find one through the concept: a single content carries its own
+                # class markers, exactly as a list item does.
+                raw_root[stuff_name]["content"] = _encode_content_with_class_markers(cast("StuffContent", content))
             elif isinstance(content, CompositeContent) and stuff_name in raw_root:
                 # Composite components are extra="allow" fields: a plain model_dump loses
                 # their classes, so stamp each component with the same pipelex-private

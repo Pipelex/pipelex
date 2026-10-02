@@ -69,7 +69,7 @@ class _Shared:
     @staticmethod
     def make_job_metadata() -> JobMetadata:
         return JobMetadata(
-            run_metadata=RunMetadata(storage_scope="test/scope", user_id="user_test", pipeline_run_id=_Shared.PIPELINE_RUN_ID),
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user_test", pipeline_run_id=_Shared.PIPELINE_RUN_ID),
             pipe_code="test_pipe",
             unit_job_id=UnitJobId.LLM_GEN_TEXT,
             job_category=JobCategory.LLM_JOB,
@@ -280,7 +280,7 @@ class TestTraceEvents:
         assert restored.metrics == {}
 
     def test_io_spec_survives_round_trip_within_event(self) -> None:
-        """IOSpec fields (digest, preview, concept) are preserved through event serialization."""
+        """IOSpec fields (digest, preview, concept, multiplicity) are preserved through event serialization."""
         io_spec = IOSpec(
             name="complex_stuff",
             concept="StructuredData",
@@ -288,6 +288,7 @@ class TestTraceEvents:
             preview='{"key": "value"}',
             size=16,
             digest="sha256_abc",
+            multiplicity=True,
             extra={"custom_field": "custom_value"},
         )
         event = PipeStartEvent(
@@ -306,6 +307,7 @@ class TestTraceEvents:
         assert restored_io.name == "complex_stuff"
         assert restored_io.concept == "StructuredData"
         assert restored_io.digest == "sha256_abc"
+        assert restored_io.multiplicity is True
         assert restored_io.extra == {"custom_field": "custom_value"}
 
     def test_error_spec_survives_round_trip_within_event(self) -> None:

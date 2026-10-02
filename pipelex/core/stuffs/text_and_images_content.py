@@ -1,16 +1,17 @@
+from typing import TYPE_CHECKING
+
 from pydantic import Field
-from rich.console import Group
-from rich.markdown import Markdown
-from rich.table import Table
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.templating.text_format import TextFormat
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class TextAndImagesContent(StuffContent):
@@ -90,7 +91,13 @@ class TextAndImagesContent(StuffContent):
         return "\n".join(parts)
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.markdown import Markdown
+        from rich.table import Table
+        from rich.text import Text
+
         # If neither text nor images are present
         if not self.text and not self.images:
             return Text("(empty)", style="dim italic")

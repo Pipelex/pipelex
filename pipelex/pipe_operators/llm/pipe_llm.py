@@ -8,6 +8,7 @@ from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
+from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -28,7 +29,7 @@ from pipelex.kernel.llm_ops import (
     run_llm_text,
 )
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_machinery.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -62,8 +63,14 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     @override
     def validate_inputs_static(self):
         if self.llm_choices:
-            for llm_choice_ref in self.llm_choices.list_choice_references():
-                check_llm_choice_with_deck(llm_choice=llm_choice_ref)
+            # Checked field by field, in declaration order, so a refusal names the field the author wrote
+            # the reference in: `for_text` comes from the blueprint's `model`, `for_object` from its
+            # `model_to_structure`. An inline setting table is not a reference and is not looked up.
+            for field_name, llm_choice in (("model", self.llm_choices.for_text), ("model_to_structure", self.llm_choices.for_object)):
+                if not isinstance(llm_choice, ModelReference):
+                    continue
+                with self.locating_model_choice(field_name=field_name):
+                    check_llm_choice_with_deck(llm_choice=llm_choice)
 
         needed_inputs = self.needed_inputs()
         required_variable_paths = self.required_variables()
@@ -95,14 +102,14 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     explanation=f"Variable '{variable_path}' is used in prompt/system_prompt but not declared in inputs.",
                 )
 
-        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
         for template_blueprint, template_label in [
             (self.llm_prompt_spec.prompt_blueprint, "prompt"),
             (self.llm_prompt_spec.system_prompt_blueprint, "system_prompt"),
         ]:
             if template_blueprint is None:
                 continue
-            lint_optional_input_guards(
+            lint_authored_template(
                 pipe_code=self.code,
                 domain_code=self.domain_code,
                 inputs=self.inputs,
@@ -269,6 +276,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             except ValidationError as exc:
+                # Not classified as the caller's fault, here or on the object path below, where an
+                # output the model could not fit to the structure surfaces as `LLMCompletionError`:
+                # whether a model's output fits depends on what the model produced this time.
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = format_pydantic_validation_error(exc)
                 msg = f"Error generating text content in PipeLLM {location}: {error_details}"

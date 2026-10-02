@@ -1,11 +1,11 @@
 from abc import abstractmethod
 from typing import Protocol
 
-from pipelex.cogt.exceptions import CogtError
-from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
-from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipe_run.pipe_job import PipeJob
 
 
@@ -56,27 +56,64 @@ class PipeRouterProtocol(Protocol):
 
         try:
             pipe_output = await self._run_pipe_job(pipe_job)
-        except (CogtError, PipeRunError) as exc:
+        except Exception as exc:
+            # Case (2), unbounded code: a pipe's run reaches user functions, plugin routers and
+            # provider SDKs. Nothing is swallowed: every failure is re-raised, located.
+            #
             # Direct (non-Temporal) execution is a single pipeline-level attempt — there is no
-            # retry here. This handler is error propagation, not retry: a PipeRunError wraps into
-            # PipeRouterError (preserving the pipe location context); a raw CogtError is re-raised
-            # as-is so its cause chain is preserved. Resilience is the Temporal track's job.
+            # retry here. This handler is error propagation, not retry, and it is the one place a
+            # pipe's failure gets its location: whatever the pipe's run raised leaves as a
+            # PipeRouterError naming this pipe and its stack, chained to the failure, whose report
+            # is the failure's root fault. Resilience is the Temporal track's job.
             await self._after_failing_run(pipe_job, error=exc)
-            if isinstance(exc, PipeRunError):
-                raise PipeRouterError(
-                    message=exc.message,
-                    run_mode=pipe_job.pipe_run_params.run_mode,
-                    pipe_code=pipe_job.pipe.code,
-                    output_name=pipe_job.output_name,
-                    # run_pipe() has already popped the failed pipe's own frame; re-append
-                    # its code so the reported stack still ends with the pipe that failed.
-                    pipe_stack=[*pipe_job.pipe_run_params.pipe_stack, pipe_job.pipe.code],
-                ) from exc
-            raise
+            if find_failure_location(error=exc) is not None:
+                # A router below already located it: the innermost location is the one reported.
+                raise
+            failure = self._as_pipelex_failure(error=exc)
+            if failure is None:
+                raise
+            if find_failure_location(error=failure) is not None:
+                # The host rebuilt the location its transport carried: it is not located again, and the
+                # chain it built down to the recovered report is kept (a `from exc` would cut it off).
+                raise failure from failure.__cause__
+            raise PipeRouterError.make_located(
+                failure=failure,
+                run_mode=pipe_job.pipe_run_params.run_mode,
+                pipe_code=pipe_job.pipe.code,
+                output_name=pipe_job.output_name,
+                # run_pipe() has already popped the failed pipe's own frame; re-append
+                # its code so the reported stack still ends with the pipe that failed.
+                pipe_stack=[*pipe_job.pipe_run_params.pipe_stack, pipe_job.pipe.code],
+            ) from failure
 
         await self._after_successful_run(pipe_job, pipe_output=pipe_output)
 
         return pipe_output
+
+    def _as_pipelex_failure(self, *, error: Exception) -> PipelexError | None:
+        """Return the `PipelexError` this router locates for `error`, or `None` to let `error` through untouched.
+
+        A `PipelexError` stands for itself, and that includes one carrying a report recovered
+        across a transport boundary, whose report then becomes the located failure's root fault.
+        Any other exception is foreign to Pipelex: it is wrapped into a `PipelexUnexpectedError`
+        that names its class and is never caller-facing, so it no longer escapes the runner raw.
+
+        A host router overrides this for the exceptions its own transport raises, and returns `None`
+        for a control-flow exception its runtime must see unchanged, such as a cancellation. A
+        transport failure carrying a recovered report is converted according to what the far side
+        packed, which must never be a report that is already located, since this router would
+        locate it again:
+
+        - the root fault's own report alone (`find_root_fault(...).to_error_report()`): return a
+          `PipelexError` carrying it, and this router locates it at the pipe it ran;
+        - that report together with the location the far side found (`find_failure_location(...)`,
+          its `pipe_code` and `pipe_stack`): return `PipeRouterError.make_located(...)` over a
+          `PipelexError` carrying the report, chained to it. It already names its pipe, so this
+          router raises it untouched, and the report reads exactly as the local run's.
+        """
+        if isinstance(error, PipelexError):
+            return error
+        return make_unexpected_failure(error=error)
 
     async def run_batch_branch(
         self,

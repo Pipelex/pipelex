@@ -120,11 +120,20 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             # make: the declaration tier's silence is the whole answer.
             return False
 
-        return are_structure_classes_compatible(
-            class_1=self.get_structure_class(concept=tested_concept),
-            class_2=self.get_structure_class(concept=wanted_concept),
-            strict=strict,
-        )
+        tested_class = self.get_structure_class(concept=tested_concept)
+        wanted_class = self.get_structure_class(concept=wanted_concept)
+        if self._is_native_refining_a_native(concept=wanted_concept):
+            # `native.Markdown` refines `native.Text` and its class has Text's shape by construction, so
+            # shape says nothing about being one: only its lineage does. A plain Text, or any text concept,
+            # is refused where a Markdown is wanted; a concept refining Markdown, at any depth, is accepted.
+            return issubclass(tested_class, wanted_class)
+        return are_structure_classes_compatible(class_1=tested_class, class_2=wanted_class, strict=strict)
+
+    @staticmethod
+    def _is_native_refining_a_native(*, concept: Concept) -> bool:
+        if not Concept.is_native_concept(concept=concept):
+            return False
+        return NativeConceptCode(concept.code).refined_native is not None
 
     @override
     def get_structure_class(self, *, concept: Concept) -> type[StuffContent]:
@@ -201,8 +210,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         """Resolve a concept string a **human** supplied — an input payload's `concept` field, a CLI argument.
 
         Entry-shaped lookup, the concept twin of `PipeLibrary.get_optional_entry_pipe` — kept a
-        deliberate near-copy rather than a shared helper (see
-        wip/pipe-refs/entry-affordance-share-vs-duplicate.md). Natives resolve first, per the
+        deliberate near-copy rather than a shared helper: the concept side has steps the pipe side
+        cannot have (natives first, then the scope preference), so a shared helper would carry dead
+        branches. Natives resolve first, per the
         standard's own step 1. A fully-specified ref (`domain.Concept`, `alias->domain.Concept`)
         is a direct hit or a miss. A bare code prefers `search_scope` — the entry pipe's own
         domain, carried as `alias->domain` when the entry pipe came from a dependency package —

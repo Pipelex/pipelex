@@ -63,7 +63,6 @@
       "required": false,
       "enum_members": [
         "img_gen",
-        "judgment",
         "llm",
         "search",
         "text_extractor"

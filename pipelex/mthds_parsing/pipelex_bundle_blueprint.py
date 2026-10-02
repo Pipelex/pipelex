@@ -19,6 +19,7 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 from pipelex.pipe_machinery.pipe_blueprint import normalize_typeless_signature_section
 from pipelex.pipe_machinery.validation import is_pipe_code_valid
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
+from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
@@ -61,6 +62,7 @@ PipeBlueprintUnion = Annotated[
     | PipeExtractBlueprint
     | PipeSearchBlueprint
     | PipeStructureBlueprint
+    | PipeDocGenBlueprint
     | PipeBatchBlueprint
     | PipeConditionBlueprint
     | PipeParallelBlueprint

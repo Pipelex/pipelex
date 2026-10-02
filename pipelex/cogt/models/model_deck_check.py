@@ -2,6 +2,7 @@
 
 from typing import NoReturn
 
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
@@ -220,6 +221,68 @@ def check_search_choice_with_deck(search_choice: SearchModelChoice) -> None:
                 msg,
                 model_deck=model_deck,
                 model_type=ModelType.SEARCH,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.HANDLE,
+                available_options=list(model_deck.inference_models.keys()),
+            )
+
+
+def check_doc_gen_choice_with_deck(*, doc_gen_choice: DocGenModelChoice) -> None:
+    if isinstance(doc_gen_choice, DocGenSetting):
+        return
+
+    model_deck = get_model_deck()
+    ref = ensure_model_reference(doc_gen_choice)
+
+    match ref.kind:
+        case ModelReferenceKind.PRESET:
+            if ref.name in model_deck.doc_gen_presets:
+                return
+            msg = f"Doc gen preset '{ref.name}' was not found in the model deck"
+            _raise_model_choice_not_found(
+                msg,
+                model_deck=model_deck,
+                model_type=ModelType.DOC_GEN,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.PRESET,
+                available_options=list(model_deck.doc_gen_presets.keys()),
+            )
+        case ModelReferenceKind.ALIAS:
+            if ref.name in model_deck.doc_gen_aliases:
+                return
+            msg = f"Alias '{ref.name}' was not found in the model deck"
+            _raise_model_choice_not_found(
+                msg,
+                model_deck=model_deck,
+                model_type=ModelType.DOC_GEN,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.ALIAS,
+                available_options=list(model_deck.doc_gen_aliases.keys()),
+            )
+        case ModelReferenceKind.WATERFALL:
+            if ref.name in model_deck.doc_gen_waterfalls:
+                return
+            msg = f"Waterfall '{ref.name}' was not found in the model deck"
+            _raise_model_choice_not_found(
+                msg,
+                model_deck=model_deck,
+                model_type=ModelType.DOC_GEN,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.WATERFALL,
+                available_options=list(model_deck.doc_gen_waterfalls.keys()),
+            )
+        case ModelReferenceKind.HANDLE:
+            if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.DOC_GEN):
+                return
+            msg = f"Model handle '{ref.name}' was not found in the model deck"
+            _raise_model_choice_not_found(
+                msg,
+                model_deck=model_deck,
+                model_type=ModelType.DOC_GEN,
                 raw_choice=ref.raw,
                 name=ref.name,
                 reference_kind=ModelReferenceKind.HANDLE,

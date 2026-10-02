@@ -413,3 +413,137 @@ Extract information from the following text:
         ("Nested unions complex", NESTED_UNIONS_COMPLEX, "ConceptWithNestedUnions"),
         ("Nested unions mixed", NESTED_UNIONS_MIXED, "ConceptWithNestedUnions"),
     ]
+
+
+class ValidationDetailBundles:
+    """Bundles whose validation used to lose detail before the verdict reached the reader."""
+
+    DOMAIN = "idea_board"
+    SOURCE = "idea_board.mthds"
+
+    # A misspelled field (`promtp`, which no categorizer knows) in one pipe, an undeclared prompt variable
+    # (`$language`) in another: two errors, each its own item.
+    TYPO_BESIDE_UNDECLARED_VARIABLE = """
+domain      = "idea_board"
+description = "Summarize and translate the notes pinned on the idea board"
+main_pipe   = "summarize_notes"
+
+[pipe.summarize_notes]
+type        = "PipeLLM"
+description = "Summarize the notes pinned on the board"
+inputs      = { notes = "Text" }
+output      = "Text"
+promtp      = "Summarize these notes"
+prompt      = "Summarize these notes for the weekly meeting: $notes"
+
+[pipe.translate_notes]
+type        = "PipeLLM"
+description = "Translate the notes for the visiting team"
+inputs      = { notes = "Text" }
+output      = "Text"
+prompt      = "Translate these notes into $language: $notes"
+"""
+
+    # The parallel `analyze_topic` combines a plural branch (`Idea[]`) into the single field `ideas` of
+    # `IdeaReport`, so its dry run fails at the combine. The sequence `run_workshop` runs it as its second
+    # step, so its own dry run fails for the same cause.
+    NESTED_PARALLEL_MISMATCH = """
+domain      = "idea_board"
+description = "Run a small ideation workshop on a topic"
+main_pipe   = "run_workshop"
+
+[concept]
+Idea        = "One idea proposed during the workshop"
+IdeaSummary = "A short summary of the workshop's direction"
+
+[concept.IdeaReport]
+description = "The workshop's report: its ideas and its summary"
+
+[concept.IdeaReport.structure]
+ideas   = { type = "concept", concept_ref = "Idea", description = "The ideas", required = true }
+summary = { type = "concept", concept_ref = "IdeaSummary", description = "The summary", required = true }
+
+[pipe.run_workshop]
+type        = "PipeSequence"
+description = "Frame the topic, then analyze it"
+inputs      = { topic = "Text" }
+output      = "IdeaReport"
+steps = [
+  { pipe = "frame_topic", result = "framed_topic" },
+  { pipe = "analyze_topic", result = "report" },
+]
+
+[pipe.frame_topic]
+type        = "PipeLLM"
+description = "Restate the topic as a question for the workshop"
+inputs      = { topic = "Text" }
+output      = "Text"
+prompt      = "Restate this topic as one open question: $topic"
+
+[pipe.propose_ideas]
+type        = "PipeLLM"
+description = "Propose ideas on the framed topic"
+inputs      = { framed_topic = "Text" }
+output      = "Idea[]"
+prompt      = "Propose ideas answering: $framed_topic"
+
+[pipe.summarize_direction]
+type        = "PipeLLM"
+description = "Summarize the direction the ideas take"
+inputs      = { framed_topic = "Text" }
+output      = "IdeaSummary"
+prompt      = "Summarize the direction a workshop on this question should take: $framed_topic"
+
+[pipe.analyze_topic]
+type        = "PipeParallel"
+description = "Propose ideas and summarize the direction at once"
+inputs      = { framed_topic = "Text" }
+output      = "IdeaReport"
+branches = [
+  { pipe = "propose_ideas", result = "ideas" },
+  { pipe = "summarize_direction", result = "summary" },
+]
+"""
+
+    # The string opened on line 2 is never closed: the parser stops at the line's end, column 38.
+    TOML_SYNTAX_ERROR = """domain = "idea_board"
+description = "An unterminated string
+"""
+
+    # `IdeaRanking` is declared nowhere, while the domain declares `Idea` and `IdeaSummary`.
+    UNRESOLVED_CONCEPT = """
+domain      = "idea_board"
+description = "Rank the ideas pinned on the board"
+
+[concept]
+Idea        = "One idea pinned on the board"
+IdeaSummary = "A short summary of the board"
+
+[pipe.rank_ideas]
+type        = "PipeLLM"
+description = "Rank the ideas pinned on the board"
+inputs      = { notes = "Text" }
+output      = "IdeaRanking"
+prompt      = "Rank the ideas in these notes: $notes"
+"""
+
+    # What a dry-run item must never carry again: the sweep's internal record, dumped as a Python repr.
+    RECORD_REPR_MARKERS: ClassVar[tuple[str, ...]] = ("pipe_ref=", "status=", "DryRunStatus", "error_message=")
+
+    # A caller's bundle whose sequence runs the failing parallel from a library directory the host loads.
+    # ``NESTED_PARALLEL_MISMATCH`` stands in for that library: its ``analyze_topic`` fails its dry run.
+    CALLER_OF_LIBRARY_PARALLEL = """
+domain      = "workshop"
+description = "A caller's bundle that runs the library's analysis"
+main_pipe   = "run_library_analysis"
+
+[pipe.run_library_analysis]
+type        = "PipeSequence"
+description = "Analyze the framed topic with the library's pipe"
+inputs      = { framed_topic = "Text" }
+output      = "idea_board.IdeaReport"
+steps = [
+  { pipe = "idea_board.analyze_topic", result = "report" },
+]
+"""
+    CALLER_SOURCE = "api://bundle-0.mthds"

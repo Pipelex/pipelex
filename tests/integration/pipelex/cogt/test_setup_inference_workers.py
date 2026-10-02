@@ -1,3 +1,4 @@
+from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.runtime_hub import get_inference_manager, get_model_deck
 
@@ -16,3 +17,8 @@ class TestSetupInferenceWorkers:
                     _ = inference_manager.get_img_gen_worker(img_gen_handle=model_handle)
                 case ModelType.SEARCH | ModelType.JUDGMENT:
                     pass
+                case ModelType.DOC_GEN:
+                    # Every document engine the deck serves has a worker: the kit declares only the built-in one, and a
+                    # plugin that declares an engine also registers its worker.
+                    doc_gen_worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model)
+                    assert doc_gen_worker.inference_model == inference_model

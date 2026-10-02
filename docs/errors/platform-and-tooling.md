@@ -29,10 +29,12 @@ own page. Classes are grouped by subsystem.
 - [`CsvFlatnessError`](csv-flatness-error.md) — CSV flatness error
 - [`CsvReadError`](csv-read-error.md) — CSV read error
 - [`FileTypeError`](file-type-error.md) — File type
+- [`GcpLogSinkCredentialsError`](gcp-log-sink-credentials-error.md) — Log sink credentials missing or refused
 - [`Jinja2ContextError`](jinja2-context-error.md) — Jinja 2 context
 - [`Jinja2DetectVariablesError`](jinja2-detect-variables-error.md) — Jinja 2 detect variables
 - [`Jinja2StuffError`](jinja2-stuff-error.md) — Jinja 2 stuff
 - [`Jinja2TemplateRenderError`](jinja2-template-render-error.md) — Jinja 2 template render
+- [`Jinja2TemplateSecurityError`](jinja2-template-security-error.md) — Jinja 2 template security
 - [`Jinja2TemplateSyntaxError`](jinja2-template-syntax-error.md) — Jinja 2 template syntax
 - [`JsonTypeError`](json-type-error.md) — Json type
 - [`ModuleFileError`](module-file-error.md) — Module file
@@ -51,6 +53,7 @@ own page. Classes are grouped by subsystem.
 - [`StorageS3Error`](storage-s3-error.md) — S3 storage error
 - [`TomlError`](toml-error.md) — TOML parse error
 - [`UnknownVarPrefixError`](unknown-var-prefix-error.md) — Unknown var prefix
+- [`UriReadRefusedError`](uri-read-refused-error.md) — Read outside the run's scope refused
 - [`VarFallbackPatternError`](var-fallback-pattern-error.md) — Var fallback pattern
 - [`VarNotFoundError`](var-not-found-error.md) — Var not found
 

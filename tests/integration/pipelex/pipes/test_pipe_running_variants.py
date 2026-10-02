@@ -8,6 +8,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.interpreter_hub import get_pipe_router, get_required_entry_pipe
+from pipelex.pipe_run.located_failure import find_root_fault
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeStackOverflowError
@@ -110,7 +111,8 @@ class TestPipeRunningVariants:
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
-        with pytest.raises(PipeStackOverflowError) as exc:
+        # The router locates the overflow at the pipe whose frame did not fit, chained to it.
+        with pytest.raises(exception) as exc:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_entry_pipe(pipe_code=pipe_code),
@@ -122,4 +124,5 @@ class TestPipeRunningVariants:
                 ),
             )
         pretty_print(exc.value, title="exception")
+        assert isinstance(find_root_fault(error=exc.value), PipeStackOverflowError)
         assert expected_error_message in str(exc.value)

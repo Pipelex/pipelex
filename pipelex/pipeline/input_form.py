@@ -392,7 +392,8 @@ class InputFormDeriver:
         node_ref = concept_ref or native_code.concept_ref
         text = description or pinned.description
         match native_code:
-            case NativeConceptCode.TEXT:
+            case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
+                # A Markdown input is prose too: its source is typed as text, and only the views format it.
                 return ProseField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
             case NativeConceptCode.NUMBER:
                 return NumberField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, integer=False)
@@ -783,12 +784,12 @@ def _recast_text_kind(*, node: InputFormField, hints: dict[str, str], to_prose: 
 def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     """The node's site value-kind for intent applicability (spec: intent-hints.md, Applicability).
 
-    Recomputed from node facts, mirroring the lint's structural judgment (the known divergences are
-    recorded in wip/engine-hints/deferred.md): `number` nodes come only from `integer`/`number`
+    Recomputed from node facts, mirroring the lint's structural judgment: `number` nodes come only from `integer`/`number`
     fields and `native.Number` chains, so the kind IS the judgment; `text`/`prose` nodes are
     text-valued EXCEPT a time-formatted text (`type = "time"` is neither). A `native.Html` chain
     derives an `object` node since the standard put it on the object arm, so it never reaches the
-    text-valued case.
+    text-valued case. One divergence is open (L-260930-173b03): a class-backed `RootModel` over a
+    scalar derives its root value's node here, while the lint classifies every non-native class OTHER.
     """
     match node:
         case NumberField():

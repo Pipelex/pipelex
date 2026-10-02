@@ -1,0 +1,41 @@
+####################################################################################################
+# Pipelex Model Deck - Document Generation Configuration
+####################################################################################################
+#
+# This file defines the default engine a PipeDocGen step prints with, for each format and source,
+# when the step names none with `model`. A source is where the document comes from: "layout" is the
+# auto-layout of the step's inputs, "html" an HTML template, "template_file" an office template file.
+#
+# Open Pipelex prints a pdf from the auto-layout, on its built-in engine reportlab-pdf, so that is
+# the one default this file sets. The Pipelex document generation plugin, pipelex-doc-gen, declares
+# the defaults for a pdf from a template and for xlsx, docx and pptx itself when it loads. You can
+# still set any default yourself, for any format and source, in an x_custom_*.toml file, which
+# overrides both this file and the plugin.
+#
+# Managed by `pipelex update`. To customize without conflict, create an
+# x_custom_*.toml file in this directory — pipelex never tracks or
+# overwrites x_custom_* files. Local edits to this file are backed up
+# to <file>.bak.<timestamp> on update but will not survive future runs.
+#
+# Model Reference Syntax:
+# - Preset:    $preset_name or preset:preset_name
+# - Alias:     @alias_name or alias:alias_name
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# Document Generation Default Choices, keyed "<format>.<source>"
+####################################################################################################
+
+[doc_gen.choice_defaults]
+"pdf.layout" = "@default-pdf"
+
+####################################################################################################
+# Aliases
+####################################################################################################
+
+[doc_gen.aliases]
+default-pdf = "reportlab-pdf"

@@ -128,6 +128,7 @@ class TestKernelUsageParity:
         try:
             kernel = PipelexKernel.make(
                 storage_scope="test/scope",
+                read_scope=None,
                 run_mode=PipeRunMode.DRY,
                 user_id="kernel-usage-parity",
                 is_mock_usage=True,

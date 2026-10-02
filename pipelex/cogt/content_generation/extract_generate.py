@@ -1,6 +1,7 @@
 from pipelex.cogt.content_generation.assignment_models import ExtractAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_extract_page_contents
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.core.stuffs.page_content import PageContent
@@ -8,6 +9,7 @@ from pipelex.runtime_hub import get_extract_worker
 
 
 async def extract_gen_pages(extract_assignment: ExtractAssignment) -> ExtractOutput:
+    authorize_assignment_reads(job_metadata=extract_assignment.job_metadata, uri_references=extract_assignment.referenced_uris())
     extract_worker = get_extract_worker(extract_handle=extract_assignment.extract_handle)
     extract_job = ExtractJobFactory.make_extract_job(
         extract_input=extract_assignment.extract_input,
@@ -27,8 +29,10 @@ async def extract_gen_pages_and_store(
 
     The DRY branch sits at the ``*_and_store`` layer, above the raw provider leaf, so a dry run
     performs no storage IO — see the ``dry_mock`` module docstring (eng review D10). Do not
-    "unify" it downward into the raw leaf.
+    "unify" it downward into the raw leaf. The read scope is authorized above that branch, so a dry
+    run refuses what a live one would; the raw leaf authorizes again, for a caller that reaches it directly.
     """
+    authorize_assignment_reads(job_metadata=extract_assignment.job_metadata, uri_references=extract_assignment.referenced_uris())
     if extract_assignment.cogt_run_params.run_mode.is_dry:
         return dry_extract_page_contents(extract_assignment)
     extract_output = await extract_gen_pages(extract_assignment)

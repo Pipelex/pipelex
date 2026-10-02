@@ -25,13 +25,8 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
         output: StuffSpec,
         blueprint: PipeConditionBlueprint,
     ) -> PipeCondition:
-        # Compute expression from expression_template or expression in blueprint
-        expression: str | None = None
-        if blueprint.expression_template:
-            expression = blueprint.expression_template
-        elif blueprint.expression:
-            expression = "{{ " + blueprint.expression + " }}"
-        else:
+        expression = blueprint.runtime_expression
+        if expression is None:
             msg = "PipeCondition must have either expression_template or expression"
             raise PipeConditionFactoryError(msg)
 

@@ -132,6 +132,7 @@ class PipeType(StrEnum):
     PIPE_EXTRACT = "PipeExtract"
     PIPE_SEARCH = "PipeSearch"
     PIPE_STRUCTURE = "PipeStructure"
+    PIPE_DOC_GEN = "PipeDocGen"
     # Pipe Controller
     PIPE_BATCH = "PipeBatch"
     PIPE_CONDITION = "PipeCondition"
@@ -158,6 +159,8 @@ class PipeType(StrEnum):
             case PipeType.PIPE_SEARCH:
                 return PipeCategory.PIPE_OPERATOR
             case PipeType.PIPE_STRUCTURE:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_DOC_GEN:
                 return PipeCategory.PIPE_OPERATOR
             case PipeType.PIPE_BATCH:
                 return PipeCategory.PIPE_CONTROLLER

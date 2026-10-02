@@ -16,7 +16,7 @@ class SampleOutputModel(BaseModel):
 
 
 def _make_stub_job_metadata() -> JobMetadata:
-    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"))
+    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="test-user", pipeline_run_id="test-run"))
 
 
 def _make_stub_llm_assignment() -> LLMAssignment:

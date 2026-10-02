@@ -1,0 +1,20 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(make:*)",
+			"Bash(python3:*)",
+			"Bash(source ~/.zshrc:*)",
+			"Bash(git diff:*)",
+			"Bash(git log:*)",
+			"Bash(git status:*)",
+			"Bash(gh pr view:*)",
+			"Bash(gh pr diff:*)",
+			"Bash(curl -s http://127.0.0.1:8081/*)",
+			"Bash(curl -s -X POST http://127.0.0.1:8081/*)",
+			"Bash(curl -s -H *api.getpostman.com/*)",
+			"Bash(curl -s -X PUT *api.getpostman.com/*)",
+			"Bash(curl -s -X POST *api.getpostman.com/*)",
+			"Bash(rm -f /tmp/postman_*)"
+		]
+	}
+}

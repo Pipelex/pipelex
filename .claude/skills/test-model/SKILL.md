@@ -24,7 +24,7 @@ Gather from the user (or infer from context):
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| **Model name** | The model handle as it appears in backend TOMLs | `gpt-5.2-codex` |
+| **Model name** | The model handle as it appears in backend TOMLs | `gpt-5.6-sol` |
 | **Backend** | Which backend to test on | `pipelex_gateway` |
 | **Model type** | `llm`, `img_gen`, `extract`, or `search` | `llm` |
 

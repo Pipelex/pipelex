@@ -26,7 +26,9 @@ class TestWorkingMemoryFactory:
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+            pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library(), read_scope=None
+        )
 
         assert working_memory is not None
         assert "text_item" in working_memory.root
@@ -62,7 +64,9 @@ class TestWorkingMemoryFactory:
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+            pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library(), read_scope=None
+        )
 
         assert working_memory is not None
         assert "complex_page" in working_memory.root
@@ -111,7 +115,9 @@ class TestWorkingMemoryFactory:
         """Test deserialization of empty compact memory."""
         pipeline_inputs: PipelineInputs = {}
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+            pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library(), read_scope=None
+        )
 
         assert working_memory is not None
         assert len(working_memory.root) == 0
@@ -130,7 +136,9 @@ class TestWorkingMemoryFactory:
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+            pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library(), read_scope=None
+        )
 
         assert working_memory is not None
         assert len(working_memory.root) == 2
@@ -155,7 +163,7 @@ class TestWorkingMemoryFactory:
         pipeline_inputs: dict[str, Any] = {"greeting": "hello"}
 
         working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-            pipeline_inputs=pipeline_inputs, input_specs=None, concept_provider=get_concept_library()
+            pipeline_inputs=pipeline_inputs, input_specs=None, concept_provider=get_concept_library(), read_scope=None
         )
 
         stuff = working_memory.root["greeting"]
@@ -173,7 +181,7 @@ class TestWorkingMemoryFactory:
         pipeline_inputs: dict[str, Any] = {"count": 42}
 
         working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-            pipeline_inputs=pipeline_inputs, input_specs=input_specs, concept_provider=get_concept_library()
+            pipeline_inputs=pipeline_inputs, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None
         )
 
         stuff = working_memory.root["count"]

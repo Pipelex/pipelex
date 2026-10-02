@@ -13,6 +13,7 @@ in-process arm and the boundary arm would be the same function, and there is not
 
 from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_judgment_gen_answers
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.judgment.judgment_job_factory import JudgmentJobFactory
 from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
@@ -41,6 +42,7 @@ def _make_judgment_job(judgment_assignment: JudgmentAssignment) -> JudgmentJob:
 
 
 async def judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentAnswer]:
+    authorize_assignment_reads(job_metadata=judgment_assignment.job_metadata, uri_references=judgment_assignment.referenced_uris())
     if judgment_assignment.cogt_run_params.run_mode.is_dry:
         return dry_judgment_gen_answers(judgment_assignment)
     worker = _make_judgment_worker(judgment_assignment)

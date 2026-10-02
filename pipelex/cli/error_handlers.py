@@ -9,12 +9,12 @@ from rich.console import Console
 from rich.markup import escape
 from rich.traceback import Traceback
 
-from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem, error_domain_is_input, iter_cause_chain
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes
+from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, suggested_fix_label, validation_item_title
 from pipelex.runtime_hub import get_console
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -124,8 +124,9 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: Err
     Args:
         exc: The model choice error exception
         context: Context for the error message
-        exit_code: Process exit code. The validate surface passes 2 (a no-verdict
-            setup/config error per its 0/1/2 policy); other contexts keep the default 1.
+        exit_code: Process exit code; the default is 1. The validate surface never reaches
+            this handler: an unknown model is an invalid verdict there, rendered by
+            :func:`handle_validate_bundle_error`.
     """
     console = get_console()
     print_traceback_if_requested(console=console)
@@ -157,8 +158,9 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
     Args:
         exc: The model availability error exception
         context: Context for the error message
-        exit_code: Process exit code. The validate surface passes 2 (a no-verdict
-            setup/config error per its 0/1/2 policy); other contexts keep the default 1.
+        exit_code: Process exit code. The validate surface passes 2: a model the deck defines
+            but no enabled backend serves is a setup fault of this machine, so no verdict, unlike
+            an unknown model, which is an invalid verdict there. Other contexts keep the default 1.
     """
     console = get_console()
     print_traceback_if_requested(console=console)
@@ -173,9 +175,27 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
     if len(exc.pipe_stack) > 1:
         stack_str = " [dim]→[/dim] ".join([f"[yellow]{escape(stacked_pipe)}[/yellow]" for stacked_pipe in exc.pipe_stack])
         fields.append(("Pipe Stack", stack_str))
-    tip = report.user_action_detail() or (
-        f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
+    # The local-deck remedy is given here and nowhere else: the model error's own message reaches
+    # every surface, hosted ones included, whose readers have no local deck to refresh.
+    local_deck_remedy = (
+        "Your local model deck may be out of date: new aliases and presets are added to Pipelex over time, and existing "
+        "'.pipelex/inference/deck/*.toml' files are not refreshed automatically. To pick up the latest definitions, delete "
+        "your local deck files under '.pipelex/inference/deck/' (or the whole '.pipelex/inference/' directory) and run "
+        "'pipelex init inference' to regenerate them.\n"
+        "If that does not resolve it, make sure the handle is defined in one of '.pipelex/inference/deck/*.toml', that the "
+        "backend it routes to (see '.pipelex/inference/routing_profiles.toml') is enabled in '.pipelex/inference/backends.toml', "
+        "and that you have the necessary credentials"
     )
+    user_action_detail = report.user_action_detail()
+    tip: str
+    if user_action_detail is None:
+        tip = f"{local_deck_remedy}, or specify a different model in the '{exc.pipe_code}' pipe."
+    elif error_domain_is_input(report.error_domain):
+        # The method named a model no entry of the deck names, and the lookup's next step is to
+        # change it. A local deck can also be what lacks that model, so the local remedy follows.
+        tip = f"{user_action_detail}\n{local_deck_remedy}."
+    else:
+        tip = user_action_detail
     display_error_panel(
         console=console,
         title=f"{context} failed because a model wasn't available",
@@ -188,6 +208,21 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
         ],
     )
     raise typer.Exit(exit_code) from exc
+
+
+def handle_dedicated_failure_panel(*, error: BaseException, context: ErrorContext) -> None:
+    """Render the dedicated panel of the first error on `error`'s cause chain that has one, and exit.
+
+    A run failure reaches the CLI as a `PipelineExecutionError` around the located failure, so a
+    handler written for the model errors never matches it directly: this walks the cause chain for
+    them, and the panel then names the pipe that failed, the model and the stack. Returns without
+    printing anything when no error on the chain has a dedicated panel.
+    """
+    for node in iter_cause_chain(error):
+        if isinstance(node, PipeOperatorModelAvailabilityError):
+            handle_model_availability_error(node, context=context)
+        if isinstance(node, PipeOperatorModelChoiceError):
+            handle_model_choice_error(node, context=context)
 
 
 def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, context: ErrorContext) -> NoReturn:
@@ -254,13 +289,12 @@ def _validation_category_header(category: ValidationErrorCategory) -> str:
         case ValidationErrorCategory.PIPE_VALIDATION:
             return "Pipe Validation Errors:"
         case ValidationErrorCategory.DRY_RUN:
-            return "Dry Run Error:"
+            return "Dry Run Errors:"
 
 
 def _display_validation_error_item(*, console: Console, item: ValidationErrorItem, error_index: int) -> None:
     """Render one structured validation-error item: title, identity fields, message, fix, locators."""
-    error_type_display = item.error_type.replace("_", " ").title() if item.error_type else "Validation Error"
-    console.print(f"[bold yellow]{error_index}. {error_type_display}[/bold yellow]")
+    console.print(f"[bold yellow]{error_index}. {escape(validation_item_title(item=item))}[/bold yellow]")
 
     if item.pipe_code:
         console.print(f"   [cyan]Pipe:[/cyan] [yellow]{escape(item.pipe_code)}[/yellow]")
@@ -284,7 +318,11 @@ def _display_validation_error_item(*, console: Console, item: ValidationErrorIte
     console.print(f"   [cyan]→[/cyan] {escape(item.message)}")
 
     if item.suggested_fix is not None:
-        console.print(f"   [green]💡 Suggested fix:[/green] {escape(item.suggested_fix.description)}")
+        # The words carry the safety, so the colour only echoes them: an unsafe fix is yellow because
+        # it needs the reader's confirmation, a safe one green because `pipelex fix bundle` applies it.
+        fix_style = "green" if item.suggested_fix.safety.is_safe else "yellow"
+        fix_label = escape(suggested_fix_label(fix=item.suggested_fix))
+        console.print(f"   [{fix_style}]💡 {fix_label}:[/{fix_style}] {escape(item.suggested_fix.description)}")
 
     if item.field_path:
         console.print(f"   [dim]└─ Path: {escape(item.field_path)}[/dim]")
@@ -311,15 +349,10 @@ def display_validation_error_items(*, console: Console, items: list[ValidationEr
         if not category_items:
             continue
         console.print(f"[bold cyan]{_validation_category_header(category)}[/bold cyan]\n")
-        match category:
-            case ValidationErrorCategory.DRY_RUN:
-                # The dry-run residual is a single graph-level message with no identity fields —
-                # keep its historical plain rendering rather than a numbered item.
-                for item in category_items:
-                    console.print(f"[yellow]{escape(item.message)}[/yellow]\n")
-            case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
-                for error_index, item in enumerate(category_items, 1):
-                    _display_validation_error_item(console=console, item=item, error_index=error_index)
+        # Every category, dry run included, renders numbered items: a dry-run item is located on its
+        # failing pipe like any other, so it names the pipe, the domain and the source.
+        for error_index, item in enumerate(category_items, 1):
+            _display_validation_error_item(console=console, item=item, error_index=error_index)
 
 
 def handle_validate_bundle_error(
@@ -350,13 +383,6 @@ def handle_validate_bundle_error(
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]\n")
 
     display_validation_error_items(console=console, items=items)
-
-    # The shared items builder projects the dry-run channel only when it is the sole failure
-    # channel (the wire's structured-info invariant); the human surface keeps printing it
-    # alongside categorized errors so no diagnostic is lost.
-    if exc.dry_run_error_message and not any(item.category.is_dry_run for item in items):
-        console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
-        console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
 
     # A hint needs an action behind it: when fixes exist, the actionable footer replaces the
     # generic tip (two stacked 💡 tips would be noise).

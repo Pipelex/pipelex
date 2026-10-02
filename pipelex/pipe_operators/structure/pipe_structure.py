@@ -55,7 +55,8 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
     @override
     def validate_inputs_static(self):
         if self.llm_choice is not None and not isinstance(self.llm_choice, LLMSetting):
-            check_llm_choice_with_deck(llm_choice=self.llm_choice)
+            with self.locating_model_choice(field_name="model"):
+                check_llm_choice_with_deck(llm_choice=self.llm_choice)
 
     @override
     def validate_inputs_with_library(self):

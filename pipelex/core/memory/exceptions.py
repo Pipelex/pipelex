@@ -28,6 +28,9 @@ class WorkingMemoryStuffAttributeNotFoundError(WorkingMemoryVariableError):
 
 
 class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
+    # Not classified as the caller's fault: a step that names a variable nothing produces, a batch
+    # over one included, is refused when the bundle loads, so a miss at run time is the runtime's own
+    # bookkeeping going wrong, not a mistake in the caller's method.
     def __init__(self, message: str, variable_name: str, pipe_code: str | None = None, concept_code: str | None = None):
         super().__init__(message, variable_name)
         self.pipe_code = pipe_code
@@ -133,7 +136,9 @@ class StructureValidationError(InputShapingError):
 
     Covers a structured-concept dict missing a required field, a malformed ``{"url": ...}`` for a
     file concept, a non-ISO string for a Date concept — any value that is the right JSON kind but
-    does not build into the declared content class.
+    does not build into the declared content class. It also covers a value an input reading bare
+    values by their own shape has no reading for — a list of plain objects at a ``Dynamic`` or
+    ``Html`` input — where the fix is usually the input's declaration rather than the value (R8).
     """
 
     @classmethod
@@ -149,6 +154,37 @@ class StructureValidationError(InputShapingError):
         user_action = UserAction(
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Fix input '{variable_name}' so it matches the expected shape for '{declared_concept_ref}'.",
+        )
+        return cls(message, variable_name=variable_name, user_action=user_action)
+
+    @classmethod
+    def make_for_unreadable_bare_value(
+        cls,
+        *,
+        variable_name: str,
+        declared_concept_ref: str,
+        provided_description: str,
+        suggested_declaration: str,
+        expected_shape: str,
+    ) -> "StructureValidationError":
+        """The refusal for a bare value that an input of this concept, which reads a value by its own shape, cannot read.
+
+        The advice names the declaration to change rather than an envelope, because the person who
+        sent the value usually also declared the input, and an envelope helps only a caller who knows
+        a concept both compatible with the input and able to hold the value. `suggested_declaration`
+        is the one that reads this value: `'JSON'` for an object, `'JSON[]'` for a list of objects,
+        `'Anything'` or `'Anything[]'` for anything else.
+        """
+        message = (
+            f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
+            f"and an input of this concept reads a bare value by its own shape, with no reading for this one.\nExpected shape:\n{expected_shape}"
+        )
+        user_action = UserAction(
+            kind=UserActionKind.CHANGE_INPUT,
+            detail=(
+                f"Declare input '{variable_name}' in the method as {suggested_declaration}, "
+                "or as a concept with a structure that describes the value."
+            ),
         )
         return cls(message, variable_name=variable_name, user_action=user_action)
 

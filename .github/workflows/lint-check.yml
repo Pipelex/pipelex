@@ -156,7 +156,60 @@ jobs:
         run: make check-hub-layering
 
 # --------------------------------------------------------------------------
-# 6.  Drift contracts — single job, version-independent
+# 6.  Rich imports — single job, version-independent. Rich is the `cli` extra,
+#     so no module outside pipelex/cli/ may import it at module level.
+# --------------------------------------------------------------------------
+  lint-rich-imports:
+    name: Lint (rich imports)
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Run Rich import check
+        run: make check-rich-imports
+
+# --------------------------------------------------------------------------
+# 6b. Actions allowlist — single job, version-independent. GitHub rejects a
+#     whole workflow at startup when one of its actions is outside the
+#     organization's Actions policy, and the release workflows never run on a
+#     pull request, so this job reads every workflow against the policy's
+#     mirror in .github/actions-allowlist.toml.
+# --------------------------------------------------------------------------
+  lint-actions-allowlist:
+    name: Lint (actions allowlist)
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Run Actions allowlist check
+        run: make check-actions-allowlist
+
+# --------------------------------------------------------------------------
+# 7.  Drift contracts — single job, version-independent
 #     BLOCKING, but through the ruleset rather than through lint-all: `Lint
 #     (drift-contracts)` is named as a required status check on both `dev` and
 #     `main`, so an open contract already stops the merge. It stays out of
@@ -185,7 +238,7 @@ jobs:
         run: make drift-check
 
 # --------------------------------------------------------------------------
-# 7.  Agent rules sync — single job, version-independent
+# 8.  Agent rules sync — single job, version-independent
 # --------------------------------------------------------------------------
   lint-agent-rules:
     name: Lint (agent-rules)
@@ -209,16 +262,61 @@ jobs:
         run: make check-rules
 
 # --------------------------------------------------------------------------
-# 8.  Aggregator job — the required status check that covers every lint job,
+# 9.  The API server (`api/`, the `pipelex-api` workspace member) — its own
+#     ruff, pyright and mypy, and the drift checks of its committed OpenAPI
+#     artifact and of its vendored inference tree, in its own environment
+#     (`api/.venv`) against the pipelex of this commit. No path filter: the
+#     server runs the library of the same commit, so a library change can break
+#     it, move its wire or leave its inference tree behind, and this pull
+#     request is where that is found. Floor Python only, as for the library; the
+#     pre-main gate (`lint-fresh-check.yml`) checks every supported version.
+# --------------------------------------------------------------------------
+  lint-api:
+    name: Lint (api)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install the server's environment
+        run: PYTHON_VERSION=3.11 make -C api install
+
+      - name: Run ruff format merge check
+        run: make -C api merge-check-ruff-format
+
+      - name: Run ruff lint merge check
+        run: make -C api merge-check-ruff-lint
+
+      - name: Run pyright merge check
+        run: make -C api merge-check-pyright
+
+      - name: Run mypy merge check
+        run: make -C api merge-check-mypy
+
+      - name: Check the committed OpenAPI artifact for drift
+        run: make -C api openapi-check
+
+      - name: Check the vendored inference tree for drift
+        run: make -C api kit-check
+
+# --------------------------------------------------------------------------
+# 10. Aggregator job — the required status check that covers every lint job,
 #     including the ones the rulesets do not name individually
-#     (`Lint (hub layering)`, `Lint (agent-rules)`). It is not the only
-#     required lint check: the rulesets name several of the jobs above by
-#     name as well. Anything added to `needs` becomes blocking through here.
+#     (`Lint (hub layering)`, `Lint (rich imports)`, `Lint (actions allowlist)`,
+#     `Lint (agent-rules)`, `Lint (api)`). It is not the only required lint check: the rulesets name
+#     several of the jobs above by name as well. Anything added to `needs`
+#     becomes blocking through here.
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-agent-rules]
+    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-rich-imports, lint-actions-allowlist, lint-agent-rules, lint-api]
     if: always()
 
     steps:
@@ -229,7 +327,10 @@ jobs:
              [ "${{ needs.lint-config-sync.result }}" != "success" ] || \
              [ "${{ needs.lint-keyword-only.result }}" != "success" ] || \
              [ "${{ needs.lint-hub-layering.result }}" != "success" ] || \
-             [ "${{ needs.lint-agent-rules.result }}" != "success" ]; then
+             [ "${{ needs.lint-rich-imports.result }}" != "success" ] || \
+             [ "${{ needs.lint-actions-allowlist.result }}" != "success" ] || \
+             [ "${{ needs.lint-agent-rules.result }}" != "success" ] || \
+             [ "${{ needs.lint-api.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."
             exit 1
           fi

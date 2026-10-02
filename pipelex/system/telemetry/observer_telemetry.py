@@ -16,7 +16,11 @@ class ObserverTelemetry(ObserverProtocol):
             EventProperty.PIPELINE_RUN_ID: payload[PayloadKey.PIPELINE_RUN_ID],
             EventProperty.PIPE_TYPE: pipe_job.pipe_type,
         }
-        self.telemetry_manager.track_event(event_name=EventName.PIPE_RUN, properties=properties)
+        self.telemetry_manager.track_event(
+            event_name=EventName.PIPE_RUN,
+            properties=properties,
+            run_metadata=pipe_job.job_metadata.run_metadata,
+        )
 
     @override
     async def observe_after_successful_run(self, payload: PayloadType) -> None:
@@ -26,7 +30,11 @@ class ObserverTelemetry(ObserverProtocol):
             EventProperty.PIPE_TYPE: pipe_job.pipe_type,
             EventProperty.PIPE_RUN_OUTCOME: Outcome.SUCCESS,
         }
-        self.telemetry_manager.track_event(event_name=EventName.PIPE_COMPLETE, properties=properties)
+        self.telemetry_manager.track_event(
+            event_name=EventName.PIPE_COMPLETE,
+            properties=properties,
+            run_metadata=pipe_job.job_metadata.run_metadata,
+        )
 
     @override
     async def observe_after_failing_run(
@@ -39,4 +47,8 @@ class ObserverTelemetry(ObserverProtocol):
             EventProperty.PIPE_TYPE: pipe_job.pipe_type,
             EventProperty.PIPE_RUN_OUTCOME: Outcome.FAILURE,
         }
-        self.telemetry_manager.track_event(event_name=EventName.PIPE_COMPLETE, properties=properties)
+        self.telemetry_manager.track_event(
+            event_name=EventName.PIPE_COMPLETE,
+            properties=properties,
+            run_metadata=pipe_job.job_metadata.run_metadata,
+        )

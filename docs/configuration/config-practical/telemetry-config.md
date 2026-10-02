@@ -101,7 +101,7 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `mode` | string | `"off"` | Telemetry mode: `"off"`, `"anonymous"`, or `"identified"` |
-| `user_id` | string | (none) | Required when `mode = "identified"` |
+| `user_id` | string | (none) | Required when `mode = "identified"`. The identity for events that have no run — a run reports under its own caller |
 | `endpoint` | string | `"https://us.i.posthog.com"` | PostHog endpoint URL |
 | `api_key` | string | (required) | Your PostHog project API key |
 | `geoip` | boolean | `true` | Enable GeoIP lookup for location data |
@@ -111,8 +111,10 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 #### Mode Options
 
 - **`"off"`**: No events sent to your PostHog
-- **`"anonymous"`**: Events sent without user identification
-- **`"identified"`**: Events sent with your `user_id` for cross-session tracking
+- **`"anonymous"`**: Events sent without user identification. This covers your users too, and yourself: a run's own caller is never identified, its `extras` are never sent as groups, and a `user_id` left in the file is not sent either
+- **`"identified"`**: Events and spans produced during a run are attributed to that run's caller, with its `extras` attached as groups. Your `user_id` is what everything else reports under — an event outside any run, and a run that names no distinguishable caller, which is every run on your own machine. The extras ride either way: a run may carry them without naming a caller
+
+See [Telemetry Setup](../../setup/telemetry.md) for how a run supplies its caller and its groups.
 
 ### `[custom_posthog.tracing]` Settings
 
@@ -247,7 +249,7 @@ set DO_NOT_TRACK=1
 When set, this disables:
 
 - All custom telemetry (PostHog, Langfuse, OTLP)
-- Gateway telemetry (note: Gateway won't work without telemetry)
+- Gateway telemetry (note: outside a test run, Gateway won't work without telemetry — see [Telemetry Setup](../../setup/telemetry.md#1-gateway-telemetry-pipelex-controlled))
 
 ---
 

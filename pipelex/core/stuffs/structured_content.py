@@ -1,8 +1,6 @@
 import html as html_module
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from rich.pretty import Pretty
-from rich.table import Table
 from typing_extensions import override
 
 from pipelex.core.stuffs.html_rendering import render_value_html
@@ -10,9 +8,12 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
-from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
+from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrinter, require_rich_for_rendering
 from pipelex.tools.templating.text_format import TextFormat
 from pipelex.tools.typing.pydantic_utils import clean_model_to_dict
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class StructuredContent(StuffContent):
@@ -124,7 +125,11 @@ class StructuredContent(StuffContent):
     # -------------------------------------------------------------------------
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.pretty import Pretty
+        from rich.table import Table
+
         # Check if we've exceeded maximum depth - fall back to Pretty rendering
         # Pretty shows the Python object structure beautifully, just like when calling pretty_print(stuff)
         if depth >= MAX_RENDER_DEPTH:

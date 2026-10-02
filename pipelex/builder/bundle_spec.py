@@ -1,9 +1,6 @@
 from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import ConfigDict, Field, ValidationError, field_validator, model_validator
-from rich.console import Group
-from rich.table import Table
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -16,8 +13,11 @@ from pipelex.mthds_parsing.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS, normalize_typeless_signature_section
 from pipelex.pipe_machinery.validation import is_pipe_code_valid
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -161,7 +161,12 @@ class PipelexBundleSpec(StructuredContent):
             raise PipelexBundleSpecBlueprintError(msg) from exc
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.table import Table
+        from rich.text import Text
+
         bundle_group = Group()
 
         # Bundle header info

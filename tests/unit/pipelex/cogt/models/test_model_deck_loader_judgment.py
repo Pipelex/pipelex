@@ -1,7 +1,7 @@
 """A deck installed before the judgment family existed still loads.
 
 ``pipelex update`` is the only thing that installs a new deck file, and nothing runs it at boot,
-so every project and global deck predating ``5_judgment_deck.toml`` reaches the loader without a
+so every project and global deck predating ``6_judgment_deck.toml`` reaches the loader without a
 ``judgment`` section. That absence has to read as "no judgment model", which is what the kit's own
 empty section says, rather than fail every boot.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.kit.paths import get_kit_configs_dir
 
-JUDGMENT_DECK_FILE_NAME = "5_judgment_deck.toml"
+JUDGMENT_DECK_FILE_NAME = "6_judgment_deck.toml"
 
 
 class TestModelDeckLoaderJudgment:

@@ -4,6 +4,8 @@ from typing import Any, ParamSpec, Protocol, TypeVar
 
 from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment, SearchAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
@@ -11,6 +13,7 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
@@ -128,6 +131,17 @@ class ContentGeneratorProtocol(Protocol):
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
     ) -> Coroutine[Any, Any, list[ImageContent]]: ...
+
+    def make_rendered_document(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
+        composition: DocumentComposition,
+        doc_gen_setting: DocGenSetting,
+    ) -> Coroutine[Any, Any, DocumentContent]:
+        """Print a `PipeDocGen` step's composed document on the engine `doc_gen_setting` names and store it: the step's print stage."""
+        ...
 
     def make_extract_pages(
         self,

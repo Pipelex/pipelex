@@ -22,8 +22,10 @@ class StuffContentFactory:
         # which rejects a bare bool. Covers native YesNoContent and the subclasses generated for concepts refining YesNo.
         if isinstance(value, bool) and issubclass(stuff_content_subclass, YesNoContent):
             return stuff_content_subclass(yes_no=value)
-        if isinstance(value, str) and stuff_content_subclass == TextContent:
-            return TextContent(text=value)
+        # A string under a Text-family class is its text: native Text, native Markdown, and the classes generated
+        # for concepts refining either, so a refining class is honored rather than flattened to TextContent.
+        if isinstance(value, str) and issubclass(stuff_content_subclass, TextContent):
+            return stuff_content_subclass(text=value)
         # A date/datetime object or an ISO string under a Date-family class builds via the split constructor;
         # a dict ({"date","time"}) still rides model_validate below. Covers native Date and concepts refining it.
         if issubclass(stuff_content_subclass, DateContent) and isinstance(value, (datetime.date, str)):
