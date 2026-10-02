@@ -1,0 +1,25 @@
+{
+  "answers": {
+    "enterprise": {
+      "noul": 0.98,
+      "type": "noul"
+    },
+    "many_customers": {
+      "noul": 0.53,
+      "type": "noul"
+    },
+    "paying": {
+      "noul": 0.83,
+      "type": "noul"
+    },
+    "prior_incidents": {
+      "noul": 0.31,
+      "type": "noul"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 421,
+    "output_tokens": 74
+  }
+}

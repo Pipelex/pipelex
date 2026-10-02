@@ -1,0 +1,18 @@
+{
+  "answers": {
+    "q": {
+      "choice": "payments",
+      "confidence": 1.0,
+      "probabilities": {
+        "payments": 1.0,
+        "shipping": 0.0
+      },
+      "type": "choice"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 340,
+    "output_tokens": 31
+  }
+}

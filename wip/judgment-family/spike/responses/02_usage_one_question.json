@@ -1,0 +1,13 @@
+{
+  "answers": {
+    "is_urgent": {
+      "noul": 0.98,
+      "type": "noul"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 354,
+    "output_tokens": 23
+  }
+}

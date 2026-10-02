@@ -1,0 +1,18 @@
+{
+  "answers": {
+    "q": {
+      "choice": "other",
+      "confidence": 0.57,
+      "probabilities": {
+        "": 0.21,
+        "other": 0.79
+      },
+      "type": "choice"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 349,
+    "output_tokens": 31
+  }
+}
