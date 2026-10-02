@@ -1,0 +1,363 @@
+<title>Per-request Gateway key</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F3F5F7;
+    --surface: #FFFFFF;
+    --ink: #18212B;
+    --muted: #5C6B79;
+    --rule: #D5DDE4;
+    --accent: #0E7A84;
+    --accent-soft: #DCEFF1;
+    --amber: #B07A1C;
+    --amber-soft: #F6ECD6;
+    --code-bg: #E9EEF2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F151B;
+      --surface: #171F27;
+      --ink: #E4E9EE;
+      --muted: #97A5B2;
+      --rule: #29343E;
+      --accent: #4EB5BE;
+      --accent-soft: #14343A;
+      --amber: #E0A93B;
+      --amber-soft: #3A2E15;
+      --code-bg: #1F2A34;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F151B;
+    --surface: #171F27;
+    --ink: #E4E9EE;
+    --muted: #97A5B2;
+    --rule: #29343E;
+    --accent: #4EB5BE;
+    --accent-soft: #14343A;
+    --amber: #E0A93B;
+    --amber-soft: #3A2E15;
+    --code-bg: #1F2A34;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 68ch;
+    margin: 0 auto;
+    padding: 56px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+  h1, h2, h3 {
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-weight: 500;
+    line-height: 1.15;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1 { font-size: 2.6rem; letter-spacing: -0.01em; }
+  h2 { font-size: 1.45rem; }
+  h3 { font-size: 1.1rem; font-weight: 600; }
+  p { margin: 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.35em;
+    border-radius: 3px;
+  }
+  .eyebrow {
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  header { display: flex; flex-direction: column; gap: 14px; }
+  .dek { font-size: 1.12rem; color: var(--muted); max-width: 60ch; }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .facts div { background: var(--surface); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .facts .k { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .facts .v { font-size: 0.92rem; }
+  .facts code { font-size: 0.8rem; word-break: break-all; }
+
+  .pointer {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pointer strong { font-weight: 600; }
+
+  section { display: flex; flex-direction: column; gap: 16px; }
+  section > p { max-width: 65ch; }
+
+  /* request path diagram */
+  .path-wrap { overflow-x: auto; padding-bottom: 6px; }
+  .path {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: 640px;
+  }
+  .node {
+    flex: 1 1 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .node .who { font-weight: 600; font-size: 0.9rem; }
+  .node .what { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+  .node.hot { border-color: var(--accent); background: var(--accent-soft); }
+  .node.hot .what { color: var(--ink); }
+  .arrow {
+    flex: 0 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+  }
+  .arrow svg { width: 14px; height: 14px; }
+  .legend { font-size: 0.85rem; color: var(--muted); }
+  .legend .swatch {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+    background: var(--accent-soft); border: 1px solid var(--accent); vertical-align: -1px; margin-right: 6px;
+  }
+
+  /* deliverables */
+  .rows { display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+  .row {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 18px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .row .where { display: flex; flex-direction: column; gap: 4px; }
+  .row .where strong { font-weight: 600; font-size: 0.95rem; }
+  .row .where code { font-size: 0.78rem; align-self: flex-start; }
+  .row ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 5px; font-size: 0.95rem; }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: 8px; } }
+
+  .contract { display: flex; flex-direction: column; gap: 10px; }
+  .contract li { font-size: 0.95rem; }
+  ul.plain { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 8px; }
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 0.95rem;
+  }
+  .callout p { max-width: none; }
+
+  /* decisions */
+  ol.decisions { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; counter-reset: d; }
+  ol.decisions li {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+  ol.decisions li::before {
+    counter-increment: d;
+    content: "§6." counter(d);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding-top: 3px;
+  }
+  .decision { display: flex; flex-direction: column; gap: 6px; }
+  .decision .q { font-weight: 600; }
+  .chip {
+    display: inline-block;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--amber);
+    background: var(--amber-soft);
+    padding: 2px 8px;
+    border-radius: 999px;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+
+  ul.done { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  ul.done li { display: grid; grid-template-columns: 1.4rem 1fr; gap: 6px; font-size: 0.95rem; }
+  ul.done li::before {
+    content: "";
+    width: 14px; height: 14px; margin-top: 4px;
+    border: 1.5px solid var(--muted); border-radius: 3px;
+  }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 20px;
+    font-size: 0.88rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  footer code { font-size: 0.8rem; }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Handoff · pipelex-server · hosted plane</span>
+    <h1>Per-request Gateway key</h1>
+    <p class="dek">Give every hosted run the Portkey key of the tenant who asked for it — on the runner or on any Temporal worker — instead of the one key the whole environment shares today.</p>
+    <div class="facts">
+      <div><span class="k">Status</span><span class="v">Spec written; five decisions open (below)</span></div>
+      <div><span class="k">Runtime side</span><span class="v"><code>pipelex</code> branch <code>feature/API-key-per-request</code></span></div>
+      <div><span class="k">Checked against</span><span class="v"><code>pipelex-server</code> dev <code>f0fd3d4</code>, 2026-08-18</span></div>
+    </div>
+    <div class="pointer">
+      <strong>This page is the skim.</strong>
+      <span>The full spec — contract, deliverables, tests, decisions with their trade-offs — is in this branch at <code>wip/api_keys/pipelex-server-per-request-gateway-key-handoff.md</code>. Section numbers below (§) point into it. The design and its rationale are beside it in <code>gateway-per-request-key-under-temporal.md</code>.</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>The idea in one breath</h2>
+    <p>The platform stamps an opaque <code>gateway_key_ref</code> on each run it dispatches. The runtime carries it through Temporal on <code>JobMetadata</code> — a reference, never key material. A small hosted resolver plugin turns it into the tenant's Portkey key on whichever worker runs the inference call. Nothing is cached per credential; the shared SDK clients stay exactly as they are. Portkey then attributes usage, budgets and rate limits per tenant with no work on our side.</p>
+    <div class="path-wrap">
+      <div class="path" role="img" aria-label="Request path: API Gateway, then platform which stamps the reference, then runner which puts it on JobMetadata, then Temporal, then worker which resolves it, then Portkey gateway">
+        <div class="node"><span class="who">API Gateway</span><span class="what">authorizer; <code>/v1/*</code> → platform. Unchanged.</span></div>
+        <div class="arrow"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg></div>
+        <div class="node hot"><span class="who">platform</span><span class="what"><strong>stamps the reference</strong> from the authenticated org/user, on both runner hops</span></div>
+        <div class="arrow"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg></div>
+        <div class="node"><span class="who">runner</span><span class="what">opaque field → <code>JobMetadata</code></span></div>
+        <div class="arrow"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg></div>
+        <div class="node"><span class="who">Temporal</span><span class="what">rides on every workflow and activity payload</span></div>
+        <div class="arrow"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg></div>
+        <div class="node hot"><span class="who">worker</span><span class="what"><strong>resolver plugin</strong> → tenant's key, per call, TTL-cached</span></div>
+        <div class="arrow"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg></div>
+        <div class="node"><span class="who">Portkey</span><span class="what"><code>x-portkey-api-key</code> = that tenant's key</span></div>
+      </div>
+    </div>
+    <p class="legend"><span class="swatch"></span>Where pipelex-server does its work. Everything else is the runtime's job (§2).</p>
+  </section>
+
+  <section>
+    <h2>What pipelex-server builds</h2>
+    <div class="rows">
+      <div class="row">
+        <div class="where"><strong>Stamp the reference</strong><code>platform/</code></div>
+        <ul>
+          <li>Run dispatch: <code>payload["gateway_key_ref"]</code> in <code>services/pipeline_runner.py</code>, the same way the org-scoped storage plan carries <code>storage_scope</code>.</li>
+          <li>Tooling proxy: the platform <em>sets</em> <code>X-Gateway-Key-Ref</code> on <code>/build/*</code> hops in <code>runner_proxy.py</code>; a client-supplied value is never passed through.</li>
+          <li>Small matching change in public <code>pipelex-api</code>: a body field plus one trusted-proxy header, both opaque, threaded to <code>JobMetadata</code>. No API Gateway change. (§4.1)</li>
+        </ul>
+      </div>
+      <div class="row">
+        <div class="where"><strong>Resolve it</strong><code>gateway-keys/</code> (new member)</div>
+        <ul>
+          <li>A plugin lib like <code>temporal/</code> or <code>transport/</code>: pins <code>pipelex==X.Y.Z</code>, installed by <strong>both</strong> <code>api-hosted/</code> and <code>worker/</code>, contributes a <code>GatewayKeyResolver</code> via entry point.</li>
+          <li>Reads the tenant's key row with <code>boto3</code> directly (neither image installs <code>pipelex-shared</code>). Never provisions. Never logs the key.</li>
+          <li>One process-scoped cache keyed on the reference: positive TTL, shorter negative TTL, LRU cap. The positive TTL <em>is</em> the revocation SLA. On any failure it raises; the fallback decision belongs to the runtime's policy switch. (§4.2)</li>
+        </ul>
+      </div>
+      <div class="row">
+        <div class="where"><strong>Provision keys</strong><code>platform/</code> + order webhook</div>
+        <ul>
+          <li>Per-user Portkey keys already exist (<code>provision_gateway_key</code>, race-safe, shared) and now carry paid top-up credit. Provisioning stays where the Portkey admin credential is.</li>
+          <li>Because the platform fronts dispatch, it can provision-on-dispatch, so a fresh tenant never hits fail-closed. Which row holds the key depends on §6.1. (§4.3)</li>
+        </ul>
+      </div>
+      <div class="row">
+        <div class="where"><strong>Config, IAM, deploy</strong><code>api-hosted/</code> <code>worker/</code> <code>infra/</code></div>
+        <ul>
+          <li>Fail-closed missing-reference policy in both images' <code>.pipelex/pipelex_{env}.toml</code>; local stack keeps the fallback.</li>
+          <li>Read grant on <code>worker_task_role</code> and <code>api_task_role</code> for the key row (plus <code>kms:Decrypt</code> if the plaintext moves under envelope encryption). Every worker needs it — the shared queue can't route tenants.</li>
+          <li>Table env var on runner and worker; version bumps across <code>api-hosted</code>, <code>worker</code>, <code>platform</code> and the new member — <code>make deploy-plan</code> must select all three deployables. (§4.4)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Built against — the runtime contract</h2>
+    <ul class="plain contract">
+      <li><code>JobMetadata.gateway_key_ref: str | None</code> — opaque, printable-ASCII, bounded; travels for free through every Temporal hop.</li>
+      <li><code>GatewayKeyResolver.resolve(gateway_key_ref) -> str</code> — plugin-contributed, consulted only by the gateway plugin, inside activity execution. Default returns the boot key.</li>
+      <li>A missing-reference policy switch: fall back to the boot key (OSS default) or fail the call (hosted).</li>
+      <li>All six gateway handles honour the resolved key per request; a retry re-resolves on whichever worker takes it. The hosted plane re-implements none of this. (§2)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Two corrections to the design doc</h2>
+    <div class="callout">
+      <p><strong>The runner never sees <code>X-Org-Id</code>.</strong> Every <code>/v1/*</code> route goes to the platform, which handles <code>/start</code> and <code>/execute</code> itself and proxies the tooling routes, forwarding only <code>X-User-Id</code>. <code>api-hosted/</code> has no source of its own. So the reference is stamped by the platform, one hop later than the design assumed, and API Gateway is untouched.</p>
+      <p><strong>Per-tenant Portkey keys already exist — per user, and money-bearing.</strong> The credit top-up work that just merged lands purchased credit on the user's own Portkey key. That makes the "user or org?" question a product decision (see §6.1), not the technical afterthought the design treated it as.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Decide before starting</h2>
+    <ol class="decisions">
+      <li><div class="decision"><span class="q">User or organization as the v1 reference?</span><span>Is hosted usage meant to consume the credit a user buys? Yes → user id, existing key, nothing new to provision. No → org id, a new per-org key beside the per-user one. The resolver is indifferent; the product is not.</span><span class="chip">Product call</span></div></li>
+      <li><div class="decision"><span class="q">Where the plaintext lives.</span><span>On the tenant's DynamoDB row as today, or behind envelope encryption now (which turns the read grant into a fleet-wide KMS decrypt grant).</span><span class="chip">Recommend: row for v1</span></div></li>
+      <li><div class="decision"><span class="q">Cache numbers.</span><span>Positive TTL, negative TTL, entry cap. The positive TTL is the revocation SLA — write it down as one.</span><span class="chip">Needs numbers</span></div></li>
+      <li><div class="decision"><span class="q">Fail-closed in the hosted plane?</span><span>Only shippable once <em>both</em> platform hops stamp and the legacy direct-to-runner routes are gone or accepted as failing.</span><span class="chip">Recommend: yes</span></div></li>
+      <li><div class="decision"><span class="q">Ride the org-scoped storage change?</span><span>It threads <code>storage_scope</code> through the same sites (<code>pipelex</code>, <code>pipelex-api</code>, platform, transport, temporal). Doing both at once saves a second runner/worker rebuild and a second <code>pipelex</code> version move.</span><span class="chip">Recommend: together</span></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Done when</h2>
+    <ul class="done">
+      <li>Two tenants running the same method on the same worker fleet show two distinct Portkey attributions, and no run touched <code>PIPELEX_GATEWAY_API_KEY</code>.</li>
+      <li>A run that reaches the runner without a reference fails at the inference call, on the execute path and on the build path.</li>
+      <li>Revoking a tenant's key stops that tenant's runs within the stated TTL on every worker.</li>
+      <li>The local stack still runs end to end for a developer holding only the shared key.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Not touched by this work: <code>SdkClientRegistry</code>, <code>InferenceManager</code>, <code>ModelHandle</code>, the <code>instructor</code> wrappers, any Temporal workflow, activity or converter, any non-gateway backend, tenant-supplied keys.</span>
+    <span>Full spec: <code>wip/api_keys/pipelex-server-per-request-gateway-key-handoff.md</code> · design: <code>gateway-per-request-key-under-temporal.md</code> · SDK survey: <code>sdk-per-request-key-survey.md</code> — all on <code>feature/API-key-per-request</code>.</span>
+  </footer>
+</main>
