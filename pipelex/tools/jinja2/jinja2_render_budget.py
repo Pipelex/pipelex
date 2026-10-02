@@ -91,8 +91,11 @@ _POINTER_UNITS: Final = 8
 # The exact types that are never lazy and never awaitable, checked first on the hot paths.
 EAGER_TYPES: Final[frozenset[type]] = frozenset({str, Markup, int, float, bool, type(None), list, tuple, dict, set, frozenset, range})
 
-# The containers a template can build or fill, whose elements a walk visits.
-_CONTAINER_TYPES: Final[tuple[type, ...]] = (list, tuple, dict, set, frozenset, Namespace)
+# The key, value and item views of a dict, which print every element they show.
+_DICT_VIEW_TYPES: Final[tuple[type, ...]] = (type(_EMPTY_DICT.keys()), type(_EMPTY_DICT.values()), type(_EMPTY_DICT.items()))
+
+# The containers a template can build, fill or read a view of, whose elements a walk visits.
+_CONTAINER_TYPES: Final[tuple[type, ...]] = (list, tuple, dict, set, frozenset, Namespace, *_DICT_VIEW_TYPES)
 
 _ElementT = TypeVar("_ElementT")
 
@@ -295,6 +298,11 @@ def _children(*, value: Any) -> Iterator[object] | None:
         return _dict_children(value=cast("dict[Any, Any]", value))
     if isinstance(value, (list, tuple, set, frozenset)):
         return iter(cast("Collection[Any]", value))
+    if isinstance(value, _DICT_VIEW_TYPES):
+        # An item view's pairs are temporaries a walk could not remember by identity: walk its dict.
+        if isinstance(value, type(_EMPTY_DICT.items())):
+            return _dict_children(value=cast("dict[Any, Any]", cast("Any", value).mapping))
+        return iter(cast("Collection[Any]", value))
     if isinstance(value, Namespace):
         # A namespace prints as `<Namespace {...}>`, the dict of what the template stored in it.
         # A namespace answers any name with what was stored under it, except its own store.
@@ -401,6 +409,9 @@ def _repr_container_size(value: Any) -> int:
     kind = type(cast("object", value))
     if isinstance(value, Namespace):
         return 13
+    if isinstance(value, _DICT_VIEW_TYPES):
+        # `dict_items([('k', 'v')])`: the view's name and brackets, and a pair's parentheses and separators.
+        return 16 + 6 * len(cast("Sized", value))
     if not isinstance(value, (list, tuple, dict, set, frozenset)):
         return 0
     length = len(cast("Sized", value))

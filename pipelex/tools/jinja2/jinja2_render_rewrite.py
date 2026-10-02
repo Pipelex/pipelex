@@ -1,11 +1,12 @@
 """Rewrite a parsed template so that what no sandbox hook reaches is charged to the render's budget.
 
-Five constructs compile to plain Python, with no hook the sandbox could use to charge them:
+Six constructs compile to plain Python, with no hook the sandbox could use to charge them:
 
 - iterating a `{% for %}` loop, which an empty loop body makes free;
 - joining with `~`;
 - comparing (`==`, `<`, `in` and the rest);
 - slicing (`value[a:b]`), which bypasses the sandbox's `getitem`;
+- writing out a list, a tuple or a dict (`[a, b]`, `(a, b)`, `{k: v}`), which a loop rebuilds;
 - emitting the template's own static text, which a loop repeats.
 
 `PipelexTemplateEnvironment._generate`, the hook Jinja documents for this, runs the parsed template
@@ -23,7 +24,14 @@ from jinja2 import nodes
 from jinja2.visitor import NodeTransformer
 from typing_extensions import override
 
-from pipelex.tools.jinja2.jinja2_render_charging import COMPARE_FILTER, COMPARED_FILTER, CONCAT_FILTER, ITERATE_FILTER, SLICED_FILTER
+from pipelex.tools.jinja2.jinja2_render_charging import (
+    COMPARE_FILTER,
+    COMPARED_FILTER,
+    CONCAT_FILTER,
+    ITERATE_FILTER,
+    LITERAL_FILTER,
+    SLICED_FILTER,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -38,7 +46,7 @@ def _is_charging_filter(*, node: nodes.Node, name: str) -> bool:
 
 
 class _RenderBudgetRewriter(NodeTransformer):
-    """Route loops, `~`, comparisons, slices and static text through the budget's charging filters."""
+    """Route loops, `~`, comparisons, slices, literals and static text through the budget's charging filters."""
 
     @override
     def get_visitor(self, node: nodes.Node) -> Callable[..., Any] | None:
@@ -55,6 +63,11 @@ class _RenderBudgetRewriter(NodeTransformer):
                 return self._rewrite_filter
             case nodes.Output():
                 return self._rewrite_output
+            case nodes.List() | nodes.Dict():
+                return self._rewrite_literal
+            case nodes.Tuple():
+                # A tuple is also what a `for` loop or a `set` unpacks into, which builds nothing.
+                return self._rewrite_literal if node.ctx == "load" else None
             case _:
                 return None
 
@@ -88,9 +101,15 @@ class _RenderBudgetRewriter(NodeTransformer):
             return _charging_filter(node=node, name=SLICED_FILTER)
         return node
 
+    def _rewrite_literal(self, node: nodes.List | nodes.Tuple | nodes.Dict) -> nodes.Node:
+        self.generic_visit(node)
+        return _charging_filter(node=node, name=LITERAL_FILTER)
+
     def _rewrite_filter(self, node: nodes.Filter) -> nodes.Node:
-        if node.name == SLICED_FILTER and isinstance(node.node, nodes.Getitem):
-            # A slice already wrapped: visit what it slices, not the slice again.
+        if (node.name == SLICED_FILTER and isinstance(node.node, nodes.Getitem)) or (
+            node.name in {LITERAL_FILTER, CONCAT_FILTER} and isinstance(node.node, (nodes.List, nodes.Tuple, nodes.Dict))
+        ):
+            # A construct already wrapped: visit what it holds, not the construct again.
             self.generic_visit(node.node)
             node.args = [self.visit(argument) for argument in node.args]
             return node

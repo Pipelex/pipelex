@@ -280,10 +280,17 @@ def charged_call(*, context: Context, obj: Any, args: tuple[Any, ...], kwargs: d
     estimate = 0
     if isinstance(obj, SandboxedStrFormat):
         return _finish(budget=budget, result=obj.format_charged(args=args, kwargs=kwargs, budget=budget), operation=operation)
+    if cost.work is not None:
+        inputs = CostInputs(value=bound_value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=False, environment=context.environment)
+        budget.charge(units=cost.work(inputs=inputs), operation=operation)
     if cost.estimate is not None:
-        estimate = cost.estimate(inputs=CostInputs(value=bound_value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=False))
+        inputs = CostInputs(value=bound_value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=False, environment=context.environment)
+        estimate = cost.estimate(inputs=inputs)
     elif obj is generate_lorem_ipsum:
-        estimate = lipsum_units(inputs=CostInputs(value=None, args=args, kwargs=kwargs, limit=budget.remaining, escaping=False))
+        # Spent rather than only checked: every paragraph is generated, whatever text it ends with.
+        budget.charge(
+            units=lipsum_units(inputs=CostInputs(value=None, args=args, kwargs=kwargs, limit=budget.remaining, escaping=False)), operation=operation
+        )
     elif obj is safe_range:
         for bound in (*args, *kwargs.values()):
             if isinstance(bound, int):
@@ -411,10 +418,10 @@ def charged_filter(*, name: str, function: Callable[..., Any]) -> Callable[..., 
     def apply(*, context: Context, budget: RenderBudget, value: Any, args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         escaping = bool(context.eval_ctx.autoescape)
         if cost.work is not None:
-            inputs = CostInputs(value=value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=escaping)
+            inputs = CostInputs(value=value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=escaping, environment=context.environment)
             budget.charge(units=cost.work(inputs=inputs), operation=operation)
         if cost.estimate is not None:
-            inputs = CostInputs(value=value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=escaping)
+            inputs = CostInputs(value=value, args=args, kwargs=kwargs, limit=budget.remaining, escaping=escaping, environment=context.environment)
             budget.afford(units=cost.estimate(inputs=inputs), operation=operation)
         result = function(*_first_argument(pass_arg=pass_arg, context=context), value, *args, **kwargs)
         if not cost.reads_value:
@@ -529,6 +536,7 @@ CONCAT_FILTER: Final = "_pipelex_charged_concat"
 COMPARE_FILTER: Final = "_pipelex_charged_comparison"
 COMPARED_FILTER: Final = "_pipelex_charged_operand"
 SLICED_FILTER: Final = "_pipelex_charged_slice"
+LITERAL_FILTER: Final = "_pipelex_charged_literal"
 
 _COMPARISONS: Final[dict[str, Callable[[Any, Any], Any]]] = {
     "eq": operator.eq,
@@ -588,10 +596,32 @@ def charged_slice(context: Context, value: Any) -> Any:
     return value
 
 
+@pass_context
+def charged_literal(context: Context, value: Any) -> Any:
+    """A list, tuple or dict a template writes out (`[a, b]`, `(a, b)`, `{k: v}`), charged once built.
+
+    A literal holds as many elements as the template's source writes, so it is charged after it is
+    built, for its storage and its elements, and a dict also for hashing its tuple keys, which Python
+    does again at every build, since a tuple does not keep its hash.
+    """
+    budget = render_budget_of(context)
+    units = STEP_UNITS + produced_size(value)
+    budget.charge(units=units + tuple_keys_weight(literal=value, limit=budget.remaining), operation="building a list, a tuple or a dict")
+    return value
+
+
+def tuple_keys_weight(*, literal: object, limit: int) -> int:
+    """What hashing a dict's tuple keys costs: every element, nested ones included, at every hash."""
+    if not isinstance(literal, dict):
+        return 0
+    return sum(compare_weight(key, limit=limit) for key in cast("dict[object, object]", literal) if isinstance(key, tuple))
+
+
 INTERNAL_FILTERS: Final[dict[str, Callable[..., Any]]] = {
     ITERATE_FILTER: charged_iteration,
     CONCAT_FILTER: charged_concat,
     COMPARE_FILTER: charged_comparison,
     COMPARED_FILTER: charged_operand,
     SLICED_FILTER: charged_slice,
+    LITERAL_FILTER: charged_literal,
 }

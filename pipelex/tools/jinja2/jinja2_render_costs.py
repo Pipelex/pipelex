@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Final, NamedTuple, Protocol, cast
 
 import jinja2.filters
 import jinja2.tests
+from jinja2.runtime import Undefined
 from markupsafe import Markup
 from pydantic import BaseModel
 
@@ -37,7 +38,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
 from pipelex.tools.jinja2.jinja2_with_images_filter import with_images
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
 
 
 class CostInputs(NamedTuple):
@@ -45,7 +46,8 @@ class CostInputs(NamedTuple):
 
     `value` is the value the operation applies to: a filter's input, or the value a method is bound
     to. `escaping` says whether the operation escapes what it inserts. `limit` is what is left of the
-    budget, past which a walk may stop counting.
+    budget, past which a walk may stop counting. `environment` is the render's, when the operation reads
+    an attribute of its items the way a filter does (`sort(attribute=...)`).
     """
 
     value: Any
@@ -53,6 +55,7 @@ class CostInputs(NamedTuple):
     kwargs: dict[str, Any]
     limit: int
     escaping: bool
+    environment: Any = None
 
     def arg(self, *, index: int, name: str, default: Any = None) -> Any:
         """An argument passed either at `index` or by `name`."""
@@ -110,9 +113,72 @@ def _digits_value(*, digits: str, limit: int) -> int:
 # Format strings: `%`, the `format` filter and `str.format`
 ########################################################################################
 
-_PERCENT_SPEC: Final = re.compile(
-    r"%(?:\((?P<key>[^)]*)\))?[#0\- +]*(?P<width>\*|\d+)?(?:\.(?P<precision>\*|\d+))?[hlL]?(?P<conversion>.)", re.DOTALL
-)
+
+class _PercentDirective(NamedTuple):
+    key: str | None
+    width: str | None
+    precision: str | None
+    conversion: str
+
+
+def _digits_at(*, template: str, start: int) -> int:
+    end = start
+    while end < len(template) and template[end].isdigit():
+        end += 1
+    return end
+
+
+def _percent_directives(*, template: str) -> Iterator[_PercentDirective]:
+    """The directives of a `%` format string, read in one pass the way Python reads them.
+
+    A mapping key ends at the parenthesis that closes the one opening it, so `%(a(b))5s` is one directive
+    with the key `a(b)` and a width of 5. A directive left unfinished ends the scan, since formatting it
+    raises.
+    """
+    length = len(template)
+    position = template.find("%")
+    while 0 <= position < length - 1:
+        cursor = position + 1
+        key: str | None = None
+        if template[cursor] == "(":
+            depth = 1
+            key_start = cursor + 1
+            cursor = key_start
+            while cursor < length and depth:
+                if template[cursor] == "(":
+                    depth += 1
+                elif template[cursor] == ")":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                return
+            key = template[key_start : cursor - 1]
+        while cursor < length and template[cursor] in "#0- +":
+            cursor += 1
+        width: str | None = None
+        if cursor < length and template[cursor] == "*":
+            width = "*"
+            cursor += 1
+        else:
+            end = _digits_at(template=template, start=cursor)
+            width = template[cursor:end] or None
+            cursor = end
+        precision: str | None = None
+        if cursor < length and template[cursor] == ".":
+            cursor += 1
+            if cursor < length and template[cursor] == "*":
+                precision = "*"
+                cursor += 1
+            else:
+                end = _digits_at(template=template, start=cursor)
+                precision = template[cursor:end] or None
+                cursor = end
+        if cursor < length and template[cursor] in "hlL":
+            cursor += 1
+        if cursor >= length:
+            return
+        yield _PercentDirective(key=key, width=width, precision=precision, conversion=template[cursor])
+        position = template.find("%", cursor + 1)
 
 
 def percent_format_units(*, template: str, arguments: Any, limit: int, escaping: bool) -> int:
@@ -123,18 +189,18 @@ def percent_format_units(*, template: str, arguments: Any, limit: int, escaping:
     total = len(template)
     position = 0
     memo: dict[int, int] = {}
-    for spec in _PERCENT_SPEC.finditer(template):
-        if spec["conversion"] == "%":
+    for spec in _percent_directives(template=template):
+        if spec.conversion == "%":
             continue
-        for part in (spec["width"], spec["precision"]):
+        for part in (spec.width, spec.precision):
             if part == "*":
                 star = positional[position] if position < len(positional) else 0
                 position += 1
                 total += abs(star) if isinstance(star, int) else 0
             elif part:
                 total += _digits_value(digits=part, limit=limit)
-        if spec["key"] is not None:
-            argument = mapping.get(spec["key"])
+        if spec.key is not None:
+            argument = mapping.get(spec.key)
         else:
             argument = positional[position] if position < len(positional) else None
             position += 1
@@ -302,11 +368,14 @@ def _split_lines(*, inputs: CostInputs) -> int:
     return len(inputs.value) + ELEMENT_UNITS * pieces
 
 
-def _stripped_tags(*, inputs: CostInputs) -> int:
-    # markupsafe's `striptags` rebuilds the whole string for every comment and every tag it removes.
-    text = inputs.value if isinstance(inputs.value, str) else ""
-    length = text_size(inputs.value, limit=inputs.limit)
-    return length * (1 + text.count("<")) if text else length * (1 + length)
+def _stripping_tags_work(*, inputs: CostInputs) -> int:
+    # markupsafe's `striptags` rebuilds the whole string for every comment and every tag it removes, so
+    # this is spent at every call rather than only checked. A value that is not text is converted first,
+    # as the filter converts it.
+    text = _value_text(value=inputs.value, limit=inputs.limit)
+    if text is None:
+        return inputs.limit + 1
+    return len(text) * (1 + text.count("<"))
 
 
 def _formatted_time(*, inputs: CostInputs) -> int:
@@ -391,6 +460,15 @@ _FROZENSET_METHOD_COSTS: Final[dict[str, OperationCost]] = {
     **dict.fromkeys(("difference", "intersection", "isdisjoint", "issubset", "issuperset", "symmetric_difference", "union"), _SET_OPERATION_COST),
 }
 
+
+def _search_work(*, inputs: CostInputs) -> int:
+    # `count` and `index` compare their argument with every element, as `in` does.
+    needle = inputs.arg(index=0, name="value")
+    return comparison_units(operator="in", left=needle, right=inputs.value, limit=inputs.limit)
+
+
+_SEARCH_COST: Final = OperationCost(work=_search_work)
+
 _MUTATES: Final = "it changes the value in place"
 
 # The methods a template may call on an instance of each plain value type, with their cost. A method
@@ -398,7 +476,7 @@ _MUTATES: Final = "it changes the value in place"
 # table is read, since they are bound to no instance.
 PLAIN_VALUE_METHOD_COSTS: Final[dict[type, dict[str, OperationCost]]] = {
     str: _STR_METHOD_COSTS,
-    Markup: {**_STR_METHOD_COSTS, "striptags": OperationCost(estimate=_stripped_tags), "unescape": LINEAR},
+    Markup: {**_STR_METHOD_COSTS, "striptags": OperationCost(work=_stripping_tags_work), "unescape": LINEAR},
     int: _INT_METHOD_COSTS,
     bool: _INT_METHOD_COSTS,
     float: dict.fromkeys(("as_integer_ratio", "conjugate", "hex", "is_integer"), LINEAR),
@@ -467,8 +545,8 @@ PLAIN_VALUE_METHOD_COSTS: Final[dict[type, dict[str, OperationCost]]] = {
     },
     time: _TIME_METHOD_COSTS,
     timedelta: {"total_seconds": LINEAR},
-    list: dict.fromkeys(("copy", "count", "index"), LINEAR),
-    tuple: dict.fromkeys(("count", "index"), LINEAR),
+    list: {"copy": LINEAR, **dict.fromkeys(("count", "index"), _SEARCH_COST)},
+    tuple: dict.fromkeys(("count", "index"), _SEARCH_COST),
     dict: {"copy": LINEAR, **dict.fromkeys(("get", "items", "keys", "values"), CONSTANT)},
     set: _FROZENSET_METHOD_COSTS,
     frozenset: _FROZENSET_METHOD_COSTS,
@@ -618,20 +696,35 @@ def _indented(*, inputs: CostInputs) -> int:
     return text + lines * max(indentation, 0)
 
 
+def _wrap_width(*, inputs: CostInputs) -> int:
+    width = inputs.arg(index=0, name="width", default=79)
+    return max(width, 1) if isinstance(width, int) else 79
+
+
 def _wrapped(*, inputs: CostInputs) -> int:
     if not isinstance(inputs.value, str):
         return text_size(inputs.value, limit=inputs.limit)
-    width = inputs.arg(index=0, name="width", default=79)
-    break_long_words = inputs.arg(index=1, name="break_long_words", default=True)
+    width = _wrap_width(inputs=inputs)
     wrap_string = inputs.arg(index=2, name="wrapstring")
-    width = max(width, 1) if isinstance(width, int) else 79
     separator_length = len(wrap_string) if isinstance(wrap_string, str) else 1
     lines = len(inputs.value) // width + inputs.value.count("\n") + 1
-    total = len(inputs.value) + lines * separator_length
-    if break_long_words and width < len(inputs.value):
-        # textwrap cuts a word longer than the width one piece at a time, copying the rest each time.
-        for word in re.finditer(rf"\S{{{width + 1},}}", inputs.value):
-            word_length = word.end() - word.start()
+    return len(inputs.value) + lines * separator_length
+
+
+_WORD: Final = re.compile(r"\S+")
+
+
+def _wrapping_work(*, inputs: CostInputs) -> int:
+    # textwrap cuts a word longer than the width one piece at a time, copying the rest each time, so this
+    # is spent at every call rather than only checked.
+    text = inputs.value
+    width = _wrap_width(inputs=inputs)
+    if not isinstance(text, str) or not inputs.arg(index=1, name="break_long_words", default=True) or width >= len(text):
+        return 0
+    total = 0
+    for word in _WORD.finditer(text):
+        word_length = word.end() - word.start()
+        if word_length > width:
             total += word_length * (word_length // width)
             if total > inputs.limit:
                 return total
@@ -675,18 +768,31 @@ def _sliced(*, inputs: CostInputs) -> int:
     return ELEMENT_UNITS * (_length(value=inputs.value) + 2 * max(slices if isinstance(slices, int) else 0, 0))
 
 
-def _summed(*, inputs: CostInputs) -> int:
+def _summed_elements(*, inputs: CostInputs) -> int | None:
+    """How many elements summing sequences ends with, or None when the sum is of numbers."""
     start = inputs.arg(index=1, name="start", default=0)
     value = inputs.value
-    length = _length(value=value)
     if isinstance(start, (int, float)) or not isinstance(value, Collection):
-        return ELEMENT_UNITS * length
-    items = cast("Collection[Any]", value)
-    # Adding sequences copies the running total at every step: the square of their length.
+        return None
     total = _length(value=start)
-    for item in items:
+    for item in cast("Collection[Any]", value):
         total += _length(value=item)
-    return 8 * total * (length + 1)
+    return total
+
+
+def _summed(*, inputs: CostInputs) -> int:
+    elements = _summed_elements(inputs=inputs)
+    if elements is None:
+        return ELEMENT_UNITS * _length(value=inputs.value)
+    return (8 + ELEMENT_UNITS) * elements
+
+
+def _summing_work(*, inputs: CostInputs) -> int:
+    # Adding sequences copies the running total at every step: the square of their length.
+    elements = _summed_elements(inputs=inputs)
+    if elements is None:
+        return 0
+    return 8 * elements * (_length(value=inputs.value) + 1)
 
 
 def _url_linked(*, inputs: CostInputs) -> int:
@@ -704,10 +810,11 @@ def _counted_words(*, inputs: CostInputs) -> int:
     return text + ELEMENT_UNITS * (text // 2 + 1)
 
 
-def _attribute_of(*, value: Any, attribute: Any) -> Any:
-    """What `value.attribute` holds, read without running any code: a dict's item, a list's element or a
-    pydantic model's field, down a dotted path. Anything else stands for itself, which weighs at least
-    as much as any attribute of it.
+def _attribute_of(*, value: Any, attribute: Any, environment: Any) -> Any:
+    """What `value.attribute` holds, down a dotted path: a dict's item, a list's element or a pydantic
+    model's field, read without running any code, and anything else read the way the filter itself reads
+    it, through the environment's `getitem`, which applies the sandbox's checks. Without an environment, or
+    where nothing is found, the value stands for itself.
     """
     current: object = value
     for part in str(attribute).split("."):
@@ -720,6 +827,10 @@ def _attribute_of(*, value: Any, attribute: Any) -> Any:
             found = sequence[key] if key < len(sequence) else _MISSING
         elif isinstance(current, BaseModel):
             found = vars(current).get(part, _MISSING)
+        elif environment is not None:
+            found = environment.getitem(current, key)
+            if isinstance(found, Undefined):
+                found = _MISSING
         if found is _MISSING:
             return cast("object", current)
         current = found
@@ -729,7 +840,7 @@ def _attribute_of(*, value: Any, attribute: Any) -> Any:
 _MISSING: Final = object()
 
 
-def _ordering_units(*, items: Any, attribute: Any, case_sensitive: Any, comparisons: Callable[..., int], limit: int) -> int:
+def _ordering_units(*, items: Any, attribute: Any, case_sensitive: Any, comparisons: Callable[..., int], limit: int, environment: Any = None) -> int:
     """What ordering `items` costs: `comparisons(n)` comparisons, each weighing the heaviest key.
 
     Keys that are not compared case-sensitively are lowered first, one copy each.
@@ -742,7 +853,7 @@ def _ordering_units(*, items: Any, attribute: Any, case_sensitive: Any, comparis
     lowered = 0
     weights: dict[int, int] = {}
     for item in collection:
-        key = item if attribute is None else _attribute_of(value=item, attribute=attribute)
+        key = item if attribute is None else _attribute_of(value=item, attribute=attribute, environment=environment)
         weight = weights.get(id(key))
         if weight is None:
             weight = compare_weight(key, limit=limit)
@@ -776,6 +887,7 @@ def _sorting_work(*, inputs: CostInputs) -> int:
         case_sensitive=inputs.arg(index=1, name="case_sensitive", default=False),
         comparisons=_sorting_comparisons,
         limit=inputs.limit,
+        environment=inputs.environment,
     )
 
 
@@ -792,6 +904,7 @@ def _dict_sorting_work(*, inputs: CostInputs) -> int:
         case_sensitive=inputs.arg(index=0, name="case_sensitive", default=False),
         comparisons=_sorting_comparisons,
         limit=inputs.limit,
+        environment=inputs.environment,
     )
 
 
@@ -803,6 +916,7 @@ def _grouping_work(*, inputs: CostInputs) -> int:
         case_sensitive=inputs.arg(index=2, name="case_sensitive", default=False),
         comparisons=_grouping_comparisons,
         limit=inputs.limit,
+        environment=inputs.environment,
     )
 
 
@@ -814,6 +928,20 @@ def _extremum_work(*, inputs: CostInputs) -> int:
         case_sensitive=inputs.arg(index=0, name="case_sensitive", default=False),
         comparisons=_scanning_comparisons,
         limit=inputs.limit,
+        environment=inputs.environment,
+    )
+
+
+def _deduplicating_work(*, inputs: CostInputs) -> int:
+    # `unique(case_sensitive, attribute)`: every key is lowered unless the case counts, then hashed and
+    # compared with the keys already seen, once each.
+    return _ordering_units(
+        items=inputs.value,
+        attribute=inputs.arg(index=1, name="attribute"),
+        case_sensitive=inputs.arg(index=0, name="case_sensitive", default=False),
+        comparisons=_scanning_comparisons,
+        limit=inputs.limit,
+        environment=inputs.environment,
     )
 
 
@@ -834,13 +962,17 @@ def _rendered_with_images(*, inputs: CostInputs) -> int:
 
 _FILTERS: Final = cast("dict[str, Callable[..., Any]]", jinja2.filters.FILTERS)
 
+# A filter that converts its value to text (`str(value)`) before working on it, estimated on that text so
+# that a container is refused before it is converted.
+_CONVERTS_TO_TEXT: Final = OperationCost(estimate=_text)
+
 # The cost of every filter the environment can register, keyed by the filter function itself: Pipelex
 # registers its own `format` under the name Jinja's has.
 FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     _FILTERS["abs"]: LINEAR,
     _FILTERS["attr"]: CONSTANT,
     _FILTERS["batch"]: OperationCost(estimate=_batched),
-    _FILTERS["capitalize"]: LINEAR,
+    _FILTERS["capitalize"]: _CONVERTS_TO_TEXT,
     _FILTERS["center"]: OperationCost(estimate=_centered),
     # `count` is `length`, and `len` reads no element.
     _FILTERS["count"]: CONSTANT,
@@ -859,7 +991,7 @@ FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     _FILTERS["join"]: OperationCost(estimate=_joined_filter, materializes=True),
     _FILTERS["last"]: CONSTANT,
     _FILTERS["list"]: OperationCost(estimate=_materialized),
-    _FILTERS["lower"]: LINEAR,
+    _FILTERS["lower"]: _CONVERTS_TO_TEXT,
     _FILTERS["map"]: LINEAR,
     _FILTERS["max"]: OperationCost(work=_extremum_work, materializes=True),
     _FILTERS["min"]: OperationCost(work=_extremum_work, materializes=True),
@@ -876,23 +1008,24 @@ FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     _FILTERS["slice"]: OperationCost(estimate=_sliced),
     _FILTERS["sort"]: OperationCost(estimate=_materialized, work=_sorting_work, materializes=True),
     _FILTERS["string"]: OperationCost(estimate=_text),
-    _FILTERS["striptags"]: OperationCost(estimate=_stripped_tags),
-    _FILTERS["sum"]: OperationCost(estimate=_summed, materializes=True),
-    _FILTERS["title"]: LINEAR,
+    _FILTERS["striptags"]: OperationCost(estimate=_text, work=_stripping_tags_work),
+    _FILTERS["sum"]: OperationCost(estimate=_summed, work=_summing_work, materializes=True),
+    _FILTERS["title"]: _CONVERTS_TO_TEXT,
     _FILTERS["tojson"]: OperationCost(estimate=_tojson),
-    _FILTERS["trim"]: LINEAR,
+    _FILTERS["trim"]: _CONVERTS_TO_TEXT,
     _FILTERS["truncate"]: LINEAR,
-    _FILTERS["unique"]: OperationCost(estimate=_materialized),
-    _FILTERS["upper"]: LINEAR,
+    _FILTERS["unique"]: OperationCost(estimate=_materialized, work=_deduplicating_work, materializes=True),
+    _FILTERS["upper"]: _CONVERTS_TO_TEXT,
     _FILTERS["urlencode"]: OperationCost(estimate=_url_encoded_text),
     _FILTERS["urlize"]: OperationCost(estimate=_url_linked),
     _FILTERS["wordcount"]: OperationCost(estimate=_counted_words),
-    _FILTERS["wordwrap"]: OperationCost(estimate=_wrapped),
+    _FILTERS["wordwrap"]: OperationCost(estimate=_wrapped, work=_wrapping_work),
     _FILTERS["xmlattr"]: OperationCost(estimate=_escaped_text),
     text_format: LINEAR,
-    tag: LINEAR,
-    # The conversion charges itself, by its source and its output (`markdown_parser.py`).
-    markdown_to_html: LINEAR,
+    tag: _CONVERTS_TO_TEXT,
+    # The conversion charges itself, by its source and its output (`markdown_parser.py`), once the value
+    # is converted to the text it reads.
+    markdown_to_html: _CONVERTS_TO_TEXT,
     escape_script_tag: OperationCost(estimate=_script_tag_escaped),
     with_images: OperationCost(estimate=_rendered_with_images),
 }
@@ -956,9 +1089,13 @@ TEST_COSTS: Final[dict[Callable[..., Any], TestCost]] = {
 
 
 def lipsum_units(*, inputs: CostInputs) -> int:
-    """Estimate `lipsum(n, html, min, max)`: `n` paragraphs of up to `max` words of a dozen characters."""
+    """Estimate `lipsum(n, html, min, max)`: `n` paragraphs of up to `max` words of a dozen characters.
+
+    Every paragraph costs a step even when its bounds leave it no word, and the call spends the estimate
+    rather than only checking it, since generating the text is work as well as an allocation.
+    """
     paragraphs = inputs.arg(index=0, name="n", default=5)
     fewest = inputs.arg(index=2, name="min", default=20)
     most = inputs.arg(index=3, name="max", default=100)
-    words = max(fewest if isinstance(fewest, int) else 0, most if isinstance(most, int) else 0)
+    words = max(fewest if isinstance(fewest, int) else 0, most if isinstance(most, int) else 0, 0)
     return max(paragraphs if isinstance(paragraphs, int) else 0, 0) * (16 * words + ELEMENT_UNITS)

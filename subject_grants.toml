@@ -6168,6 +6168,10 @@ rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor r
 param = "node"
 rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
 
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_literal"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
 ["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_loop"]
 param = "node"
 rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."

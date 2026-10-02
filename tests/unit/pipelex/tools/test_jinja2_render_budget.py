@@ -28,6 +28,7 @@ from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateBudgetError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.jinja2_filters import markdown_to_html
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, RenderBudgetExceededError, active_render_budget
 from pipelex.tools.jinja2.jinja2_render_charging import CHARGED_MARK, INTERNAL_FILTERS
@@ -80,6 +81,8 @@ def _refused_render_peak_bytes(render: Callable[[], object]) -> int:
 
 # Single steps whose result would be enormous, each refused before it runs, under the default budget.
 _AMPLIFIERS = [
+    pytest.param("{{ '%(a(b))1000000000s' % {'a(b)': 'x'} }}", id="percent_width_after_a_nested_key"),
+    pytest.param("{{ lipsum(n=1000000000, min=-100, max=-99) }}", id="lipsum_negative_bounds"),
     pytest.param("{{ 'x' * (10 ** 9) }}", id="repeat_string"),
     pytest.param("{{ ([0] * (10 ** 9)) | length }}", id="repeat_list"),
     pytest.param("{{ 2 ** (10 ** 9) }}", id="power"),
@@ -137,6 +140,15 @@ _AMPLIFIERS = [
 # Steps that are cheap one at a time and overdraw a small budget when repeated. Each is sized so that
 # only the charge it exercises can overdraw: its loop alone, at 64 units an element, stays well inside.
 _REPEATED_STEPS = [
+    pytest.param("{% for i in range(100) %}{% set v = [" + ", ".join(["i"] * 1000) + "] %}{% endfor %}", id="list_literal_in_loop"),
+    pytest.param("{% for i in range(100) %}{% set v = (" + ", ".join(["i"] * 1000) + ") %}{% endfor %}", id="tuple_literal_in_loop"),
+    pytest.param("{% set t = ((1,) * 200,) * 200 %}{% for i in range(30) %}{% set d = {t: i} %}{% endfor %}", id="dict_literal_hashing_a_tuple"),
+    pytest.param("{% set t = ((1,) * 200,) * 200 %}{% set d = {} %}{% for i in range(30) %}{{ d[t] }}{% endfor %}", id="item_read_hashing_a_tuple"),
+    pytest.param("{% set x = '<>' * 200 %}{% for i in range(500) %}{% set s = x | striptags %}{% endfor %}", id="striptags_in_loop"),
+    pytest.param("{% set x = ('<>' * 200) | safe %}{% for i in range(500) %}{% set s = x.striptags() %}{% endfor %}", id="markup_striptags_in_loop"),
+    pytest.param("{% set x = 'a' * 400 %}{% for i in range(100) %}{% set s = x | wordwrap(1) %}{% endfor %}", id="wordwrap_in_loop"),
+    pytest.param("{% set ll = [[0]] * 100 %}{% for i in range(50) %}{% set s = ll | sum(start=[]) %}{% endfor %}", id="sum_in_loop"),
+    pytest.param("{% for i in range(5) %}{% set s = lipsum(n=10000, min=-100, max=-99) %}{% endfor %}", id="lipsum_in_loop"),
     pytest.param(
         "{% set ns = namespace(s='x') %}{% for i in range(40) %}{% set ns.s = ns.s ~ ns.s %}{% endfor %}{{ ns.s | length }}", id="doubling_namespace"
     ),
@@ -208,6 +220,9 @@ _DATA_AMPLIFIERS = [
 
 # Ordering filters over long strings that share a prefix: few elements, each comparison scans them all.
 _ORDERINGS = [
+    pytest.param("{{ same | unique | list | length }}", id="unique"),
+    pytest.param("{{ docs | sort(attribute='text') | length }}", id="sort_by_an_object_attribute"),
+    pytest.param("{{ docs | sort(attribute='text', case_sensitive=true) | length }}", id="sort_by_an_object_attribute_case_sensitive"),
     pytest.param("{{ items | sort | length }}", id="sort"),
     pytest.param("{{ items | min | length }}", id="min"),
     pytest.param("{{ items | max(case_sensitive=true) | length }}", id="max"),
@@ -361,6 +376,13 @@ def _render_html(template_source: str, *, is_async: bool, **context: Any) -> str
     return cast("str", template.render(**context))
 
 
+class _Document:
+    """An object of the run's data whose text is an attribute, read the way a filter reads it."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
 class _Opaque:
     """An object of the run's data whose `repr` fails, as nothing a template does should call it."""
 
@@ -405,7 +427,13 @@ class TestRenderBudget:
     @pytest.mark.parametrize("template_source", _ORDERINGS)
     def test_ordering_is_charged_for_its_comparisons(self, template_source: str) -> None:
         items = ["x" * 100_000 + str(index) for index in range(100)]
-        context: dict[str, Any] = {"items": items, "keyed": dict.fromkeys(items, 1), "rows": [{"k": item} for item in items]}
+        context: dict[str, Any] = {
+            "items": items,
+            "keyed": dict.fromkeys(items, 1),
+            "rows": [{"k": item} for item in items],
+            "docs": [_Document(item) for item in items],
+            "same": ["X" * 100_000] * 100,
+        }
         with pytest.raises(RenderBudgetExceededError):
             _render(template_source, budget=_SMALL_BUDGET, **context)
 
@@ -520,6 +548,47 @@ class TestRenderBudget:
         with pytest.raises(RenderBudgetExceededError):
             _render_html("{{ ('**a ' * 100000) | markdown }}", is_async=False)
         assert active_render_budget() is None
+
+    @pytest.mark.parametrize("method", ["count", "index"])
+    @pytest.mark.parametrize("container", ["list", "tuple"])
+    def test_searching_a_sequence_is_charged_for_its_comparisons(self, method: str, container: str) -> None:
+        # Two equal strings that are distinct objects compare character by character.
+        needle = "".join(["x" * 1000, "y"])
+        items = ["x" * 1000 + "y" for _ in range(999)] + [needle]
+        sequence: Any = items if container == "list" else tuple(items)
+        with pytest.raises(RenderBudgetExceededError):
+            _render(
+                f"{{% for i in range(20) %}}{{% set c = seq.{method}(needle) %}}{{% endfor %}}", budget=_SMALL_BUDGET, seq=sequence, needle=needle
+            )
+
+    @pytest.mark.parametrize(
+        "template_source", ["{{ big.values() }}", "{{ big.items() }}", "{{ 'a' ~ big.values() }}", "{{ big.values() | string }}"]
+    )
+    def test_a_dict_view_is_estimated_before_it_is_printed(self, template_source: str) -> None:
+        big = {"k": ["x" * 1000] * 5000, **{f"k{index}": "y" * 1000 for index in range(2000)}}
+        template = PipelexTemplateEnvironment(render_budget_units=_SMALL_BUDGET).from_string(template_source)
+        assert _refused_render_peak_bytes(lambda: template.render(big=big)) < 4 * _SMALL_BUDGET
+
+    @pytest.mark.parametrize("filter_name", ["upper", "lower", "capitalize", "title", "trim", "markdown"])
+    def test_a_container_is_estimated_before_a_filter_converts_it(self, filter_name: str) -> None:
+        env = PipelexTemplateEnvironment(autoescape=True, render_budget_units=_SMALL_BUDGET)
+        env.filters["markdown"] = markdown_to_html
+        template = env.from_string(f"{{{{ items | {filter_name} }}}}")
+        assert _refused_render_peak_bytes(lambda: template.render(items=["x" * 1000] * 5000)) < 4 * _SMALL_BUDGET
+
+    def test_a_percent_key_left_open_is_read_in_one_pass(self) -> None:
+        # A quadratic scan of `%(` would take minutes here; Python refuses the format string at once.
+        with pytest.raises(ValueError, match="incomplete format key"):
+            _render("{{ ('%(' * 200000) % {} }}")
+
+    def test_a_long_word_under_its_width_is_read_in_one_pass(self) -> None:
+        # A run of non-space characters one short of the width is rescanned from every start by a pattern.
+        template_source = "{{ (('a' * 199999 ~ ' ') * 2) | wordwrap(199999) | length }}"
+        assert _render(template_source) == _render_stock(template_source)
+
+    def test_stripping_tags_from_a_data_object_reads_its_text(self) -> None:
+        text = "word " * 2400
+        assert _render("{{ doc | striptags }}", doc=_text_content(text)) == _render("{{ text | striptags }}", text=text)
 
     def test_budget_error_is_the_caller_s_and_caller_facing(self) -> None:
         report = Jinja2TemplateBudgetError("refused by the render budget").to_error_report()

@@ -62,7 +62,7 @@ from jinja2.utils import Cycler, Joiner, Namespace, generate_lorem_ipsum
 from markupsafe import Markup
 from typing_extensions import override
 
-from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS
+from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, active_render_budget, compare_weight
 from pipelex.tools.jinja2.jinja2_render_charging import (
     INTERNAL_FILTERS,
     BudgetedContext,
@@ -297,6 +297,12 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
             and not _declares_private_name(obj=obj, name=argument)
         ):
             self.unsafe_undefined(obj, argument)
+        key: object = argument
+        if isinstance(key, tuple):
+            # Reading with a tuple key hashes every element of it again, nested ones included.
+            budget = active_render_budget()
+            if budget is not None:
+                budget.charge(units=compare_weight(key, limit=budget.remaining), operation="reading an item by a tuple key")
         return super().getitem(obj, argument)
 
     @override
