@@ -6100,6 +6100,90 @@ rationale = "Noun-named derivation: the full dotted path of the node; single ope
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
+["pipelex/tools/jinja2/jinja2_render_budget.py::_compare_container_units"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each container positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::_compare_leaf_units"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each element positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::_repr_container_size"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each container positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::_repr_leaf_size"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each element positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::compare_weight"]
+param = "value"
+rationale = "Estimates what comparing the value costs; the limit stays keyword."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::escaped_length"]
+param = "text"
+rationale = "Measures the text it is given."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::is_lazy"]
+param = "value"
+rationale = "Predicate on the value it is given."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::json_string_length"]
+param = "text"
+rationale = "Measures the text it is given."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::produced_size"]
+param = "value"
+rationale = "Measures the value an operation produced."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::size_of"]
+param = "value"
+rationale = "Measures the value it is given; a hot path of every render."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::text_size"]
+param = "value"
+rationale = "Estimates the printed length of the value; the limit stays keyword."
+
+["pipelex/tools/jinja2/jinja2_render_charging.py::render_budget_of"]
+param = "context"
+rationale = "Reads the budget off the render context it is given."
+
+["pipelex/tools/jinja2/jinja2_render_costs.py::escaped_text_size"]
+param = "value"
+rationale = "Estimates the escaped length of the value, also passed as a positional measure; the limit stays keyword."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_comparison"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_concat"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_filter"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_item"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_literal"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_loop"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_output"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::rewrite_for_render_budget"]
+param = "template"
+rationale = "Rewrites the parsed template it is given."
+
 ["pipelex/tools/jinja2/jinja2_rendering.py::_add_to_templating_context"]
 param = "templating_context"
 rationale = "Transforms the templating_context; single operand."
@@ -6247,6 +6331,10 @@ rationale = "Logs the content; single operand (formatting keyword-only)."
 ["pipelex/tools/log/log_formatter.py::emoji_for_channel"]
 param = "channel_name"
 rationale = "Renders the channel_name; single operand."
+
+["pipelex/tools/markdown/markdown_parser.py::_join_text_fragments"]
+param = "state"
+rationale = "markdown-it rule callback: the inline ruler calls each rule with its state positionally."
 
 ["pipelex/tools/markdown/markdown_parser.py::render_markdown_as_html"]
 param = "markdown_text"
