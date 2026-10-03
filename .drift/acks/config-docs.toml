@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:221695eb00df07b60294e9e411b118f1ab7fc00589a0103738c2c4ee0d16b476"
+digest = "sha256:5463c426f182dfc580d84505a36eed593388135d626dba5b9843de45dfa12472"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-03T13:28:19Z"
-rationale = "real-catch: the trigger edits are docstrings in log_config.py and comments in pipelex.toml, no field, default or validator moved, so the migration ledgers and configs.py owe nothing; logging-config.md still said credentials_file_path is a plain value because the sink is resolved ahead of the secrets provider, now rewritten for the new order, with the otlp headers and gcp key path documented as accepting  placeholders, a Secrets in Sink Settings section and the credential-free production default; a sweep of docs/configuration for other ordering or placeholder-scope claims found none (telemetry-config.md's syntax table matches substitute_vars)."
+reviewed_at = "2026-10-03T14:00:06Z"
+rationale = "real-catch: the review found that logging-config.md said resolved sink values exist only in the exporter or the Cloud Logging client, and log_config.py said the resolved key path goes to the client alone, while the gcp credential errors deliberately quote the resolved path beside its placeholder; both sentences now say where each resolved value goes, and the page says the doctor quotes a provider's or a sink's failure redacted with the configured extra_patterns. No config key, default or model field moved, so the migration ledgers, configs.py and config_cogt.py are unaffected."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -21,7 +21,7 @@ rationale = "real-catch: the trigger edits are docstrings in log_config.py and c
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:7070951a6d3e4c10cb7d59822ce168c6590c53be"
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
-"pipelex/tools/log/log_config.py" = "blob:8921780c45d9573a03c6b3a5f5bff690aa42a669"
+"pipelex/tools/log/log_config.py" = "blob:63dd9f81fdbafc1a095aec6cde1b047d0ebdd2d4"
 "pipelex/tools/network/network_config.py" = "blob:e12d1d0e4a40d04859f10a77addeaf8fe2b00414"
 "pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
 "pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"

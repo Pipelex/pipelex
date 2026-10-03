@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:aead81993d85c001471bd0b3f5e4284490da1495cf7e44f9ef8e147ae714fa5f"
+digest = "sha256:f8dc04078b4b33237dd9f19650011b520a61e52d77b836a9d97699ab558d5583"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-03T13:41:42Z"
-rationale = "clean-pass: the doctor's DoctorRuntimeSetup holder became a NamedTuple so a secrets provider no longer makes it publish an opaque serialization schema, and an import moved under TYPE_CHECKING; no command, flag, row, key or message moved, and neither docs/tools/cli/ nor pipelex/cli/agent_cli/CLAUDE.md names the holder or its fields."
+reviewed_at = "2026-10-03T14:01:23Z"
+rationale = "real-catch: the doctor's secrets_provider and log_sink rows now quote a failure scrubbed with the log redaction patterns, the configured extra_patterns included, and pipelex/cli/agent_cli/CLAUDE.md said the log_sink message says what the sink raised with no word of redaction; it now says both messages are scrubbed and why. docs/tools/cli/ names neither row, so nothing there went stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "clean-pass: the doctor's DoctorRuntimeSetup holder became a NamedTu
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:48bfc01b7cb1631f3f4f1c677de9aac36a6769e3"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:cca81bac5f03943ced92c4e9b84d2c8c072c82fb"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:d39c0df92b95567f74881deb01f8c1b3119fc8ef"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:dac7056fcaf50210c910e4cad1ba14328b7f8adc"

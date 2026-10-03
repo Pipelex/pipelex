@@ -93,8 +93,8 @@ class GcpLogSinkConfig(ConfigModel):
 
     The path may be a ``${…}`` placeholder, ``"${GCP_CREDENTIALS_FILE_PATH}"`` being the secret the
     ``gcp`` storage provider reads. The sink's factory resolves it through the secrets provider, which
-    boot builds before the sink, and hands the resolved path to the client alone: this model keeps
-    the placeholder.
+    boot builds before the sink, and hands the resolved path to the client and to the credential errors,
+    which quote it beside the placeholder: this model keeps the placeholder.
     """
 
     log_name: str

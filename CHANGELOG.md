@@ -23,6 +23,7 @@
 ### Security
 
 - **Every template render spends from a budget (Breaking)**: a render is charged for what it reads, allocates and prints, and an operation that would overdraw its budget, such as `'x' * 10 ** 9`, a huge format width, `lipsum(n=10 ** 9)`, nested empty loops or a runaway recursive macro, is refused before it allocates and raises `Jinja2TemplateBudgetError`. Converting Markdown to HTML, with the `markdown` filter or by printing a Markdown value in an HTML template, is charged for every character and table cell of its source, so one render converts at most about 65,000 characters of Markdown. Template arithmetic stops at 64-bit integers, and a template can no longer call `str.encode` or `int.to_bytes`. A filter or test registered on a template environment needs a cost in the render budget's tables, or the first compile raises a `TypeError` naming it, and Pipelex now requires `jinja2` below 3.2.
+- **`pipelex doctor` redacts the failures its rows quote**: the log-sink row printed a sink's failure as raised, so a credential an exporter or a client quoted in its error reached the terminal and the JSON of `pipelex-agent doctor`. That row and the new Secrets Provider row now scrub the text with the patterns the log redaction uses, the configured `extra_patterns` included.
 
 ## [v0.71.1] - 2026-10-01
 

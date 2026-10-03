@@ -77,6 +77,7 @@ from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFet
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_redaction import redaction_patterns, scrub_secrets
 from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.exceptions import TomlError
@@ -1207,6 +1208,17 @@ def _install_fallback_log_sink(*, log_config: LogConfig) -> str:
     return FALLBACK_LOG_SINK_NOTE
 
 
+def redacted_failure(*, exc: Exception, log_config: LogConfig) -> str:
+    """An exception's text as a report row may print it, scrubbed with the patterns the log sink's redaction uses.
+
+    A row reaches the console and the agent's JSON and Markdown without passing through any sink, so the
+    redaction a log line gets has to be applied here. The failures the rows quote are the ones most likely
+    to carry a credential: a vault's connection error quoting its token, a sink factory's error quoting a
+    setting resolved from a secret.
+    """
+    return scrub_secrets(text=str(exc), patterns=redaction_patterns(config=log_config.redaction))
+
+
 def install_doctor_log_sink(
     *, registry: LogSinkRegistry | None, log_config: LogConfig, secrets_provider: SecretsProviderAbstract | None
 ) -> LogSinkCheck:
@@ -1253,10 +1265,12 @@ def install_doctor_log_sink(
         # A factory or a handler that raises on this configuration, a console target no sink writes
         # to or a dependency the sink needs: the row says so, and the report goes on.
         if log.sink is not None:
-            failure = f"was installed but then failed while the records held since logging was configured were replayed through it: {exc}"
+            replay_failure = redacted_failure(exc=exc, log_config=log_config)
+            failure = f"was installed but then failed while the records held since logging was configured were replayed through it: {replay_failure}"
             return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' {failure}")
         note = _install_fallback_log_sink(log_config=log_config)
-        return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' could not be installed: {exc}; {note}")
+        install_failure = redacted_failure(exc=exc, log_config=log_config)
+        return LogSinkCheck(is_healthy=False, message=f"The log sink '{log_config.sink}' could not be installed: {install_failure}; {note}")
     return LogSinkCheck(is_healthy=True, message=f"Log sink '{log_config.sink}' installed")
 
 
@@ -1278,13 +1292,16 @@ def build_doctor_registrar() -> PluginRegistrar:
     )
 
 
-def build_doctor_secrets_provider(*, registrar: PluginRegistrar | None) -> tuple[SecretsProviderCheck, SecretsProviderAbstract | None]:
+def build_doctor_secrets_provider(
+    *, registrar: PluginRegistrar | None, log_config: LogConfig
+) -> tuple[SecretsProviderCheck, SecretsProviderAbstract | None]:
     """Build the secrets provider ``[runtime.secrets] method`` selects, the way boot does, or say in a row what stopped it.
 
     Boot stops on a registry that did not build, on an unregistered method and on a factory that raises,
     which only an external secrets plugin can do. The doctor reports each instead, and hands back
     ``None`` so that the rows needing the provider say they could not run rather than run against
-    secrets the configuration does not use.
+    secrets the configuration does not use. A factory's failure is quoted redacted, with the patterns
+    ``log_config`` carries.
     """
     method = get_config().runtime.secrets.method
     if registrar is None:
@@ -1303,7 +1320,8 @@ def build_doctor_secrets_provider(*, registrar: PluginRegistrar | None) -> tuple
     except Exception as exc:  # ruff: ignore[blind-except]
         # A third-party factory can fail in any way it likes, a vault that cannot be reached for one: the
         # row says so, and the report goes on.
-        return SecretsProviderCheck(is_healthy=False, message=f"The secrets provider '{method}' could not be built: {exc}"), None
+        failure = redacted_failure(exc=exc, log_config=log_config)
+        return SecretsProviderCheck(is_healthy=False, message=f"The secrets provider '{method}' could not be built: {failure}"), None
     return SecretsProviderCheck(is_healthy=True, message=f"Secrets provider '{method}' built"), secrets_provider
 
 
@@ -1326,7 +1344,7 @@ def discover_doctor_runtime(*, log_config: LogConfig, installs_log_sink: bool) -
         plugins_check = PluginsCheck(is_healthy=False, message=f"The plugin registry did not build: {exc.message}")
     else:
         plugins_check = PluginsCheck(is_healthy=True, message="Plugins discovered and registered")
-    secrets_provider_check, secrets_provider = build_doctor_secrets_provider(registrar=registrar)
+    secrets_provider_check, secrets_provider = build_doctor_secrets_provider(registrar=registrar, log_config=log_config)
     if installs_log_sink:
         log_sink_check = install_doctor_log_sink(
             registry=LogSinkRegistry(registrar.log_sinks) if registrar is not None else None,
