@@ -14,6 +14,8 @@ import pytest
 
 from pipelex.cli.commands.doctor_cmd import BackendFileReport, check_models
 from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
     InferenceBackendLibraryError,
     InferenceBackendLibraryValidationError,
     ModelDeckValidationError,
@@ -299,8 +301,11 @@ class TestCheckModels:
     @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
     def test_a_credentials_error_quoting_the_providers_text_is_redacted_in_the_row(self, models_manager: Any) -> None:
         """The loader copies a provider's not-found text into its own error, so the row scrubs a Pipelex error too."""
-        models_manager.setup.side_effect = ModelDeckValidationError(
-            f"Could not get variable 'KEY': vault said no to Authorization: Bearer {VAULT_TOKEN}"
+        models_manager.setup.side_effect = InferenceBackendCredentialsError(
+            credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+            backend_name="openai",
+            key_name="api_key",
+            message=f"Could not get variable 'OPENAI_API_KEY': vault said no to Authorization: Bearer {VAULT_TOKEN}",
         )
 
         healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
