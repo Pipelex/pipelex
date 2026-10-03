@@ -44,7 +44,7 @@ sink = "console"
 ```
 
 - Names the registered log sink boot installs on the root logger, the way `runtime.storage.method` names a storage backend
-- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the `json` alternative
+- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering. It needs Rich, which the `cli` extra (`pipelex[cli]`) declares, and a boot that selects it without Rich installed stops, naming the extra and the `json` alternative. The core dependencies `typer` and `instructor` install Rich anyway, so that refusal does not fire on an ordinary install: a server that forgot to select `json` boots on this sink
 - `"json"`: one JSON object per line, for a server behind a log agent
 - `"otlp"`: the OpenTelemetry logs signal, for a collector
 - `"gcp"`: Google Cloud Logging through the client library, for a process that must write to it directly
@@ -68,10 +68,10 @@ pretty_print_mode = "rich"
 ```
 
 - Controls the panels that `pretty_print(...)` renders, such as the "Output of pipe" panel shown after every operator pipe
-- `"rich"`: Rich tables and panels on the console print target. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the two modes below
+- `"rich"`: Rich tables and panels on the console print target. It needs Rich, which the `cli` extra (`pipelex[cli]`) declares, and a boot that selects it without Rich installed stops, naming the extra and the two modes below; as with the `console` sink, the core dependencies install Rich anyway, so that refusal does not fire on an ordinary install
 - `"poor"`: plain text in a drawn frame on stderr, with no Rich panel and no Rich import; a pipe's output prints as its plain rendering
 - `"silent"`: nothing is printed and no renderable is built, for a host with no console or one that must not spend time rendering on the thread that runs pipes
-- Default: `"rich"`. The agent CLI forces `"silent"`, and a server installed without the `cli` extra sets `"poor"` or `"silent"` beside `sink = "json"`
+- Default: `"rich"`. The agent CLI forces `"silent"`, and a server sets `"poor"` or `"silent"` beside `sink = "json"` in its own configuration, since nothing at boot sets either for it
 - Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to the mode the process held before that boot
 
 ### JSON Formatting
