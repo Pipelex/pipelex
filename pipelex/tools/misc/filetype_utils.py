@@ -192,6 +192,11 @@ _FORMAT_KEY_DESCRIPTIONS: Final[dict[str, str]] = {
     "xlsx": "an Excel workbook",
     "xls": "an Excel 97-2003 workbook",
     "html": "an HTML page",
+    "md": "a Markdown file",
+    "csv": "a CSV file",
+    "txt": "a plain-text file",
+    "vtt": "a WebVTT caption file",
+    "eml": "an email message",
     IMAGE_FORMAT_KEY: "an image",
 }
 
@@ -206,6 +211,11 @@ _FORMAT_KEY_LIST_NAMES: Final[dict[str, str]] = {
     "xlsx": "Excel (.xlsx)",
     "xls": "Excel 97-2003 (.xls)",
     "html": "HTML",
+    "md": "Markdown (.md)",
+    "csv": "CSV (.csv)",
+    "txt": "plain text (.txt)",
+    "vtt": "WebVTT (.vtt)",
+    "eml": "email (.eml)",
     IMAGE_FORMAT_KEY: "images",
     "web_page": "web pages",
 }
@@ -238,7 +248,7 @@ def format_key_from_mime_type(*, mime_type: str | None) -> str | None:
 
 
 def describe_format_key(*, format_key: str) -> str:
-    """A format key in plain words, for a message: `docx` → `a Word document`, `md` → `a .md file`.
+    """A format key in plain words, for a message: `docx` → `a Word document`, `json` → `a .json file`.
 
     The words carry no type: a message adds the extension or the MIME type that tells two keys apart.
     """
@@ -255,7 +265,7 @@ def describe_file_format(*, format_key: str, mime_type: str | None) -> str:
     """
     description = _FORMAT_KEY_DESCRIPTIONS.get(format_key)
     if description is None:
-        # `a .md file` already names its extension.
+        # `a .json file` already names its extension.
         return describe_format_key(format_key=format_key)
     if format_key == IMAGE_FORMAT_KEY:
         return f"{description} ({mime_type})" if mime_type else description

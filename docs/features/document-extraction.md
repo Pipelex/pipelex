@@ -31,7 +31,7 @@ Each extract model declares the file formats it reads, and a `PipeExtract` step 
 | Extract model | Reads |
 |---------------|-------|
 | `pypdfium2-extract-pdf` | PDF |
-| `docling-extract-text` | PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), HTML and images |
+| `docling-extract-text` | PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), HTML, Markdown (`.md`), CSV, plain text (`.txt`), WebVTT captions (`.vtt`), email messages (`.eml`) and images |
 | Mistral OCR (`mistral-ocr` and its versions) | PDF and images |
 | `azure-document-intelligence` (Pipelex Gateway) | PDF and images |
 | `deepseek-ocr` (Pipelex Gateway) | Images |

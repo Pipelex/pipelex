@@ -1,7 +1,7 @@
 """A model spec's `inputs` names the file formats the model reads, with the same keys every format check compares.
 
-An extractor's readable formats are its declared `pdf`, `docx`, `pptx`, `xlsx`, `html` and `image`;
-`web_page` is not a file format, since a web-page model fetches its page itself. An LLM's readable
+An extractor's readable formats are its declared `pdf`, `docx`, `pptx`, `xlsx`, `html`, `md`, `csv`,
+`txt`, `vtt`, `eml` and `image`; `web_page` is not a file format, since a web-page model fetches its page itself. An LLM's readable
 document types are its declared `pdf`, `docx`, `pptx`, `xlsx` and `html`; its vision flag stays `images`.
 """
 
@@ -35,6 +35,7 @@ class TestModelSpecReadableFormats:
         [
             (["pdf", "image"], {"pdf", "image"}),
             (["pdf", "docx", "pptx", "xlsx", "html", "image"], {"pdf", "docx", "pptx", "xlsx", "html", "image"}),
+            (["md", "csv", "txt", "vtt", "eml", "text"], {"md", "csv", "txt", "vtt", "eml"}),
             (["web_page"], set[str]()),
             (["pdf", "web_page", "captions"], {"pdf"}),
             ([], set[str]()),

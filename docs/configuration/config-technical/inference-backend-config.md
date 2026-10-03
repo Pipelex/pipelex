@@ -332,7 +332,7 @@ The `[defaults]` table applies to every model of the file, and a model table ove
 `inputs` lists what a model reads. For files, its entries are format keys, the same keys the runtime derives from a file's MIME type to check, before a run starts, that every file reaches a model able to read it: every image type is the `image` family, and any other type is its extension.
 
 - **LLMs** declare `images` to read images (vision), and the document formats they read among `pdf`, `docx`, `pptx`, `xlsx` and `html`.
-- **Extract models** declare the file formats they read among `pdf`, `docx`, `pptx`, `xlsx`, `html` and `image`, and `web_page` when they fetch a web page from its URL themselves.
+- **Extract models** declare the file formats they read among `pdf`, `docx`, `pptx`, `xlsx`, `html`, `md`, `csv`, `txt`, `vtt`, `eml` and `image`, and `web_page` when they fetch a web page from its URL themselves.
 
 ```toml
 # internal.toml
@@ -340,7 +340,7 @@ The `[defaults]` table applies to every model of the file, and a model table ove
 model_type = "text_extractor"
 sdk = "docling_sdk"
 model_id = "extract-text"
-inputs = ["pdf", "docx", "pptx", "xlsx", "html", "image"]
+inputs = ["pdf", "docx", "pptx", "xlsx", "html", "md", "csv", "txt", "vtt", "eml", "image"]
 outputs = ["pages"]
 costs = {}
 ```

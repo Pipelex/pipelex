@@ -222,6 +222,30 @@ class TestPipelineRunSetupConsumerCheck:
             with pytest.raises(PipelineInputFormatUnsupportedError, match=re.escape(expected_refusal)):
                 await setup
 
+    @pytest.mark.parametrize(
+        ("mime_type", "raw_bytes"),
+        [
+            ("text/markdown", b"# Reading List\n\nBooks the team recommends.\n"),
+            ("text/csv", b"team,score\nNorthwind,78\n"),
+            ("message/rfc822", b"From: ada@example.com\nSubject: Hi\n\nBody.\n"),
+        ],
+    )
+    async def test_a_declared_text_document_passes_setup_into_docling(self, mime_type: str, raw_bytes: bytes):
+        """Docling reads Markdown, CSV and email files, so a document declared as one passes setup into it."""
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
+
+        pipe_job, _pipeline_run_id, _ = await pipeline_run_setup(
+            storage_scope="test/scope",
+            read_scope=None,
+            user_id="test-user",
+            execution_config=execution_config,
+            mthds_contents=[_SINGLE_TRANSCRIPT_MTHDS],
+            pipe_code="extract_with_word_model",
+            inputs={"transcript": _data_url(mime_type=mime_type, raw_bytes=raw_bytes)},
+        )
+
+        assert pipe_job.pipe.code == "extract_with_word_model"
+
     async def test_a_consumer_behind_a_condition_lets_the_run_start_and_the_operator_refuses(self):
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
 

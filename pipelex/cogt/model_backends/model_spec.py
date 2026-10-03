@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 # The file formats a model spec's `inputs` may declare, as the format keys every format check compares
 # (see `format_key_from_mime_type`). An LLM's vision flag stays spelled `images`, outside this vocabulary.
-_EXTRACT_FILE_FORMATS: Final[frozenset[str]] = frozenset({"pdf", "docx", "pptx", "xlsx", "html", IMAGE_FORMAT_KEY})
+_EXTRACT_FILE_FORMATS: Final[frozenset[str]] = frozenset({"pdf", "docx", "pptx", "xlsx", "html", "md", "csv", "txt", "vtt", "eml", IMAGE_FORMAT_KEY})
 _LLM_DOCUMENT_FORMATS: Final[frozenset[str]] = frozenset({"pdf", "docx", "pptx", "xlsx", "html"})
 
 
@@ -76,7 +76,7 @@ class InferenceModelSpec(ConfigModel):
 
     @property
     def readable_formats_for_extract(self) -> set[str]:
-        """The file formats this extractor reads, as format keys: its declared pdf, docx, pptx, xlsx, html and image.
+        """The file formats this extractor reads, as format keys: its declared pdf, docx, pptx, xlsx, html, md, csv, txt, vtt, eml and image.
 
         `web_page` is not among them: a web-page model fetches its page itself, from a URL, so it is
         not a format a file is checked against.

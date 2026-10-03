@@ -43,7 +43,19 @@ costs = {}
 model_type = "text_extractor"
 sdk = "docling_sdk"
 model_id = "extract-text"
-inputs = ["pdf", "docx", "pptx", "xlsx", "html", "image"]
+inputs = [
+  "pdf",
+  "docx",
+  "pptx",
+  "xlsx",
+  "html",
+  "md",
+  "csv",
+  "txt",
+  "vtt",
+  "eml",
+  "image",
+]
 outputs = ["pages"]
 costs = {}
 

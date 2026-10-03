@@ -173,7 +173,9 @@ class TestFileFormatKeys:
             ("pdf", "application/pdf", "a PDF document (.pdf)"),
             ("docx", DOCX_MIME, "a Word document (.docx)"),
             ("image", "image/png", "an image (image/png)"),
-            ("md", "text/markdown", "a .md file"),
+            ("md", "text/markdown", "a Markdown file (.md)"),
+            ("eml", "message/rfc822", "an email message (.eml)"),
+            ("json", "application/json", "a .json file"),
             ("zip", "application/zip", "a .zip file"),
         ],
     )
@@ -187,7 +189,8 @@ class TestFileFormatKeys:
             ({"image", "pdf"}, "PDF and images"),
             ({"html", "xlsx", "pptx", "docx", "pdf"}, "PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx) and HTML"),
             ({"web_page"}, "web pages"),
-            ({"md", "pdf"}, "PDF and .md"),
+            ({"md", "pdf"}, "PDF and Markdown (.md)"),
+            ({"json", "pdf"}, "PDF and .json"),
             (set[str](), "no file format"),
         ],
     )

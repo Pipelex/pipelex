@@ -1,9 +1,10 @@
-"""Docling, as the internal backend declares it, extracts Word, PowerPoint, Excel and HTML files.
+"""Docling, as the internal backend declares it, extracts every format it declares beside PDF and images.
 
-`docling-extract-text` declares `docx`, `pptx`, `xlsx` and `html` beside `pdf` and `image`, so a file
-of those formats passes the extract worker's format check, and this proves Docling then reads it.
-Docling converts these formats with its declarative backends, which need no model download and run
-offline, so this runs with the rest of the suite rather than behind the inference markers.
+`docling-extract-text` declares Word, PowerPoint, Excel, HTML, Markdown, CSV, plain text, WebVTT and
+email files beside `pdf` and `image`, so a file of those formats passes the extract worker's format
+check, and this proves Docling then reads it. Docling converts these formats with its declarative
+backends, which need no model download and run offline, so this runs with the rest of the suite
+rather than behind the inference markers.
 """
 
 import pytest

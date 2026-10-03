@@ -26,7 +26,7 @@ from pipelex.system.registries.func_registry import func_registry
 
 PDF_ONLY_MODEL = "pypdfium2-extract-pdf"
 DOCLING_MODEL = "docling-extract-text"
-DOCLING_FORMATS = frozenset({"pdf", "docx", "pptx", "xlsx", "html", "image"})
+DOCLING_FORMATS = frozenset({"pdf", "docx", "pptx", "xlsx", "html", "md", "csv", "txt", "vtt", "eml", "image"})
 
 _EXTRACTORS_MTHDS = f"""
 [pipe.extract_pdf]

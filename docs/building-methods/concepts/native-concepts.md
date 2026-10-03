@@ -28,7 +28,7 @@ Here are all the native concepts you can use out of the box:
 | `Text` | A text | `TextContent` |
 | `Markdown` | A text written in Markdown, which refines `Text` | `MarkdownContent` |
 | `Image` | An image file | `ImageContent` |
-| `Document` | A document: PDF, Office (Word, PowerPoint, Excel) or web page | `DocumentContent` |
+| `Document` | A document: PDF, Office (Word, PowerPoint, Excel), web page, or a text file such as Markdown or CSV | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
 | `YesNo` | The answer to a yes/no question | `YesNoContent` |
@@ -165,7 +165,7 @@ An `Image` must hold an image file, such as PNG, JPEG or WebP. A run whose `Imag
 
 ### DocumentContent
 
-Represents a document: a PDF, an Office file (Word, PowerPoint, Excel) or a web page.
+Represents a document: a PDF, an Office file (Word, PowerPoint, Excel), a web page, or a text file such as Markdown, CSV, plain text, WebVTT captions or an email message.
 
 ```python
 class DocumentContent(StuffContent):
