@@ -81,7 +81,7 @@ Nothing a server needs. What needs Rich stops as early as it can, naming the ext
 | The stuff viewer page | The Pretty tab shows the JSON rendering. |
 | The `pipelex`, `pipelex-agent` and `pipelex-dev` commands | Would fail at import with a bare `ImportError`. Not reachable on a documented install, since `typer` and `instructor` keep Rich installed; a launcher that names the extra belongs with the work that removes them from the closure. |
 
-The boot checks the sink and the pretty-print mode together, in `runtime_boot.py`, so a server that forgot either setting fails at startup rather than at the first pipe that logs or prints its output.
+The boot checks the sink and the pretty-print mode together, in `runtime_boot.py`, so a process without Rich that selected either Rich surface fails at startup rather than at the first pipe that logs or prints its output. Since every install carries Rich, as described above, a server that forgot either setting passes that check and boots on the Rich surface: its configuration is the only thing that keeps it on `json` and a Rich-free mode.
 
 ## Enforcement
 

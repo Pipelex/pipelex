@@ -20,7 +20,7 @@ RICH_TABLE_MISSING_MESSAGE = "This listing prints its result in a Rich table."
 def require_rich(*, message: str) -> None:
     """Import Rich, or raise ``MissingDependencyError`` naming the ``cli`` extra.
 
-    Called before a lazy ``from rich… import …``, so a process without the extra is told what to
+    Called before a lazy ``from rich… import …``, so a process without Rich is told what to
     install, and what to select instead, rather than handed a bare ``ModuleNotFoundError``.
 
     Args:

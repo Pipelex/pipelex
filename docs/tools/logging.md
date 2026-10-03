@@ -201,7 +201,7 @@ Logging is configured in two steps at boot. `log.configure` sets the levels and 
 
 ## Console rendering
 
-The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install and a server leaves out. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. A server without the extra also sets `pretty_print_mode` to `"poor"` or `"silent"`, since the `"rich"` panels are refused at boot the same way (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. That refusal is not what keeps a server off the console: `typer` and `instructor`, both core dependencies, require Rich, so it is installed even where the extra is not, and a server that forgot to select `json` boots on the `console` sink. A server therefore selects `json` in its own configuration, and sets `pretty_print_mode` to `"poor"` or `"silent"` beside it, since the boot makes neither choice for it (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
 
 ### Rich Formatting
 
