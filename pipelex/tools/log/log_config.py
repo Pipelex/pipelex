@@ -71,6 +71,11 @@ class OtlpLogSinkConfig(ConfigModel):
     ``OTEL_EXPORTER_OTLP_LOGS_ENDPOINT``, then ``OTEL_EXPORTER_OTLP_ENDPOINT`` with the ``/v1/logs``
     path, then the collector default on localhost. Empty ``headers`` likewise leave
     ``OTEL_EXPORTER_OTLP_HEADERS`` in charge.
+
+    A header value may name a secret with the ``${…}`` placeholders the inference backends use, a
+    collector's bearer token written ``"Bearer ${OTLP_AUTH_TOKEN}"`` for one. The sink's factory
+    resolves them through the secrets provider, which boot builds before the sink, and hands the
+    resolved values to the exporter alone: this model keeps the placeholders.
     """
 
     endpoint: str | None = None
@@ -86,10 +91,10 @@ class GcpLogSinkConfig(ConfigModel):
     Application Default Credentials, which is what a process already running on Google Cloud has; a
     path names a service-account JSON file to build the client from instead.
 
-    The path is a plain config value rather than a secret id resolved through the secrets provider,
-    because the log sink is the first capability boot resolves — ahead of the secrets provider, so
-    that every later line of the boot goes through the sink the configuration chose — and there is no
-    provider on the hub to ask at the moment this section is read.
+    The path may be a ``${…}`` placeholder, ``"${GCP_CREDENTIALS_FILE_PATH}"`` being the secret the
+    ``gcp`` storage provider reads. The sink's factory resolves it through the secrets provider, which
+    boot builds before the sink, and hands the resolved path to the client alone: this model keeps
+    the placeholder.
     """
 
     log_name: str

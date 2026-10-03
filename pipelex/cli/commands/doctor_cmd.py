@@ -57,6 +57,7 @@ from pipelex.migration.run import config_directories_to_migrate, migrate_config_
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.exceptions import PluginError
 from pipelex.plugins.log_sink_registry import LogSinkRegistry
+from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
 from pipelex.runtime_hub import RuntimeHub, get_console, set_runtime_hub
 from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager, pydantic_error_behind
 from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID, TELEMETRY_CONFIG_SURFACE_ID, strip_reserved_meta
@@ -82,7 +83,7 @@ from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_base_and_overrides, load_toml_from_path
-from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -566,10 +567,14 @@ def _is_error_about_backend(*, exc: BaseException, backend_name: str, backend_fi
     return backend_file_path in str(exc)
 
 
-def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
+def check_backend_files(
+    *, secrets_provider: SecretsProviderAbstract, config_dir: Path | None = None
+) -> tuple[bool, dict[str, BackendFileReport], str]:
     """Check individual backend configuration files for validity.
 
     Args:
+        secrets_provider: The provider the configuration selects, which the backends' credentials resolve
+            through, as they do at boot.
         config_dir: Explicit config directory override (e.g. for --global).
             If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
@@ -624,7 +629,6 @@ def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[s
 
         try:
             # Create a temporary backend library and try to load this backend
-            secrets_provider = EnvSecretsProvider()
             temp_library = InferenceBackendLibrary.make_empty()
 
             # This row reports on file shape, so the load is lenient: a backend whose gateway
@@ -693,6 +697,7 @@ def display_health_report(
     models_skipped: bool = False,
     log_sink_check: LogSinkCheck | None = None,
     plugins_check: PluginsCheck | None = None,
+    secrets_provider_check: SecretsProviderCheck | None = None,
 ) -> None:
     """Display a comprehensive health report.
 
@@ -723,9 +728,12 @@ def display_health_report(
             setup never ran, in which case the row is not rendered.
         plugins_check: What the runtime setup found when it discovered the plugins; None when it
             never did, in which case the row is not rendered.
+        secrets_provider_check: What the runtime setup found when it built the secrets provider;
+            None when it never did, in which case the row is not rendered.
     """
     log_sink_healthy = log_sink_check is None or log_sink_check.is_healthy
     plugins_healthy = plugins_check is None or plugins_check.is_healthy
+    secrets_provider_healthy = secrets_provider_check is None or secrets_provider_check.is_healthy
     all_healthy = (
         config_healthy
         and pending_migrations_check.is_healthy
@@ -736,6 +744,7 @@ def display_health_report(
         and internal_backend_healthy
         and log_sink_healthy
         and plugins_healthy
+        and secrets_provider_healthy
     )
 
     # Overall status panel
@@ -796,6 +805,16 @@ def display_health_report(
             console.print(f"  [green]✓[/green] {escape(plugins_check.message)}")
         else:
             console.print(f"  [red]✗[/red] {escape(plugins_check.message)}")
+        console.print()
+
+    # Secrets Provider section: built before the sink, as at boot, because the sink's settings and the
+    # backends' credentials resolve through it.
+    if secrets_provider_check is not None:
+        console.print("[bold]Secrets Provider[/bold]")
+        if secrets_provider_check.is_healthy:
+            console.print(f"  [green]✓[/green] {escape(secrets_provider_check.message)}")
+        else:
+            console.print(f"  [red]✗[/red] {escape(secrets_provider_check.message)}")
         console.print()
 
     # Log Sink section: where this very report's lines go, so a token nobody registered is a row
@@ -908,6 +927,7 @@ def display_health_report(
             can_auto_fix_config
             or not log_sink_healthy
             or not plugins_healthy
+            or not secrets_provider_healthy
             or can_auto_fix_telemetry
             or can_migrate
             or migrations_need_a_look
@@ -957,6 +977,12 @@ def display_health_report(
             if not plugins_healthy:
                 console.print(
                     "  • Fix, upgrade or uninstall the plugin named in the Plugins row, or take a core plugin out of runtime.plugins.disabled"
+                )
+
+            if not secrets_provider_healthy:
+                console.print(
+                    f"  • Set [cyan]method[/cyan] in {escape('[runtime.secrets]')} to a registered secrets provider, "
+                    "or fix what the Secrets Provider row says stopped it"
                 )
 
             if not log_sink_healthy:
@@ -1131,17 +1157,29 @@ class PluginsCheck(BaseModel):
     message: str
 
 
-class DoctorRuntimeSetup(BaseModel):
-    """What ``setup_doctor_runtime`` found on its way to a configured logger, one row each.
-
-    ``plugins`` is ``None`` when logging was already configured in this process, since the doctor then
-    keeps the sink in place and never discovers the plugins.
-    """
+class SecretsProviderCheck(BaseModel):
+    """What the doctor found about ``[runtime.secrets] method``: the configured provider built, or what stopped it."""
 
     model_config = ConfigDict(frozen=True)
 
+    is_healthy: bool
+    message: str
+
+
+class DoctorRuntimeSetup(BaseModel):
+    """What ``setup_doctor_runtime`` found on its way to a configured logger, one row each, and the secrets provider it built.
+
+    ``built_secrets_provider`` is the provider the configuration selects, the one boot would build: the
+    log sink, the backend-file probe and the models check resolve credentials through it. It is ``None``
+    when it did not build, and the ``secrets_provider`` row says why.
+    """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    plugins: PluginsCheck
+    secrets_provider: SecretsProviderCheck
     log_sink: LogSinkCheck
-    plugins: PluginsCheck | None
+    built_secrets_provider: SecretsProviderAbstract | None
 
 
 FALLBACK_LOG_SINK_NOTE = f"this report goes through the '{LogSinkMethod.CONSOLE}' sink on stderr instead"
@@ -1170,11 +1208,14 @@ def _install_fallback_log_sink(*, log_config: LogConfig) -> str:
     return FALLBACK_LOG_SINK_NOTE
 
 
-def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: LogConfig) -> LogSinkCheck:
+def install_doctor_log_sink(
+    *, registry: LogSinkRegistry | None, log_config: LogConfig, secrets_provider: SecretsProviderAbstract | None
+) -> LogSinkCheck:
     """Install the configured sink, or the console sink on stderr with a finding when it cannot be.
 
-    Boot stops on an unregistered token, on a factory that raises and on a registry that did not
-    build. The doctor must not, since where its own lines go is one of the things it diagnoses: it
+    Boot stops on an unregistered token, on a factory that raises, a ``${…}`` placeholder in the sink's
+    settings that does not resolve among them, on a registry that did not build and on a secrets
+    provider that did not build. The doctor must not, since where its own lines go is one of the things it diagnoses: it
     installs the console sink on stderr instead and reports why in a row of its own, so the rest of
     the report is still produced. The retry is usually safe because ``log.install_sink`` builds the
     handler before it touches the root logger, so a sink that failed to build left nothing installed —
@@ -1193,6 +1234,14 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
             is_healthy=False,
             message=f"The log sink '{log_config.sink}' could not be resolved because the plugin registry did not build; {note}",
         )
+    if secrets_provider is None:
+        # Boot hands the sink the provider it built, so trying the sink against a stand-in would answer a
+        # question about a configuration nobody wrote.
+        note = _install_fallback_log_sink(log_config=log_config)
+        return LogSinkCheck(
+            is_healthy=False,
+            message=f"The log sink '{log_config.sink}' was not checked because the secrets provider did not build; {note}",
+        )
     if not registry.has(method=log_config.sink):
         note = _install_fallback_log_sink(log_config=log_config)
         return LogSinkCheck(
@@ -1200,7 +1249,7 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
             message=(f"No log sink is registered for '{log_config.sink}' in [runtime.log]; {note}. Registered sinks: {', '.join(registry.methods)}"),
         )
     try:
-        log.install_sink(registry.get_required(method=log_config.sink)(log_config))
+        log.install_sink(registry.get_required(method=log_config.sink)(log_config, secrets_provider=secrets_provider))
     except Exception as exc:  # ruff: ignore[blind-except]
         # A factory or a handler that raises on this configuration, a console target no sink writes
         # to or a dependency the sink needs: the row says so, and the report goes on.
@@ -1215,8 +1264,8 @@ def install_doctor_log_sink(*, registry: LogSinkRegistry | None, log_config: Log
 def build_doctor_registrar() -> PluginRegistrar:
     """Discover the plugins the way a full boot does, with no boot orchestrator.
 
-    Pure and safe to run more than once, like ``build_registrar`` itself: the doctor runs it for the log sink row and
-    again for the models row, which needs the internal models and deck defaults the plugins declare.
+    Pure and safe to run more than once, like ``build_registrar`` itself: the doctor runs it for the secrets provider and
+    log sink rows and again for the models row, which needs the internal models and deck defaults the plugins declare.
 
     Raises:
         PluginError: a plugin could not be discovered or registered.
@@ -1230,23 +1279,68 @@ def build_doctor_registrar() -> PluginRegistrar:
     )
 
 
-def discover_plugins_and_install_doctor_log_sink(*, log_config: LogConfig) -> DoctorRuntimeSetup:
-    """Discover the plugins the way boot does, then install the configured sink, each a row rather than the end of the report.
+def build_doctor_secrets_provider(*, registrar: PluginRegistrar | None) -> tuple[SecretsProviderCheck, SecretsProviderAbstract | None]:
+    """Build the secrets provider ``[runtime.secrets] method`` selects, the way boot does, or say in a row what stopped it.
+
+    Boot stops on a registry that did not build, on an unregistered method and on a factory that raises,
+    which only an external secrets plugin can do. The doctor reports each instead, and hands back
+    ``None`` so that the rows needing the provider say they could not run rather than run against
+    secrets the configuration does not use.
+    """
+    method = get_config().runtime.secrets.method
+    if registrar is None:
+        return (
+            SecretsProviderCheck(
+                is_healthy=False, message=f"The secrets provider '{method}' could not be resolved because the plugin registry did not build"
+            ),
+            None,
+        )
+    registry = SecretsProviderRegistry(registrar.secrets_providers)
+    if not registry.has(method=method):
+        message = f"No secrets provider is registered for '{method}' in [runtime.secrets]. Registered methods: {', '.join(registry.methods)}"
+        return SecretsProviderCheck(is_healthy=False, message=message), None
+    try:
+        secrets_provider = registry.get_required(method=method)(get_config().runtime.secrets)
+    except Exception as exc:  # ruff: ignore[blind-except]
+        # A third-party factory can fail in any way it likes, a vault that cannot be reached for one: the
+        # row says so, and the report goes on.
+        return SecretsProviderCheck(is_healthy=False, message=f"The secrets provider '{method}' could not be built: {exc}"), None
+    return SecretsProviderCheck(is_healthy=True, message=f"Secrets provider '{method}' built"), secrets_provider
+
+
+def discover_doctor_runtime(*, log_config: LogConfig, installs_log_sink: bool) -> DoctorRuntimeSetup:
+    """Discover the plugins, build the secrets provider and install the sink, in boot's order, each a row rather than the end of the report.
 
     ``build_registrar`` is fail-loud: a plugin built against another plugin API, a broken third-party
     module or a core plugin named in ``runtime.plugins.disabled`` raises a ``PluginError``, which is not
     a configuration error and which the doctor exists to diagnose rather than die on.
+
+    The secrets provider comes before the sink, as at boot, because the sink's settings may name
+    secrets. It is built even when ``installs_log_sink`` is false, logging having been configured before
+    the doctor ran, since the models row resolves the backends' credentials through it.
     """
+    registrar: PluginRegistrar | None
     try:
         registrar = build_doctor_registrar()
     except PluginError as exc:
-        return DoctorRuntimeSetup(
-            plugins=PluginsCheck(is_healthy=False, message=f"The plugin registry did not build: {exc.message}"),
-            log_sink=install_doctor_log_sink(registry=None, log_config=log_config),
+        registrar = None
+        plugins_check = PluginsCheck(is_healthy=False, message=f"The plugin registry did not build: {exc.message}")
+    else:
+        plugins_check = PluginsCheck(is_healthy=True, message="Plugins discovered and registered")
+    secrets_provider_check, secrets_provider = build_doctor_secrets_provider(registrar=registrar)
+    if installs_log_sink:
+        log_sink_check = install_doctor_log_sink(
+            registry=LogSinkRegistry(registrar.log_sinks) if registrar is not None else None,
+            log_config=log_config,
+            secrets_provider=secrets_provider,
         )
+    else:
+        log_sink_check = LogSinkCheck(is_healthy=True, message="Logging was already configured in this process, and its sink stays")
     return DoctorRuntimeSetup(
-        plugins=PluginsCheck(is_healthy=True, message="Plugins discovered and registered"),
-        log_sink=install_doctor_log_sink(registry=LogSinkRegistry(registrar.log_sinks), log_config=log_config),
+        plugins=plugins_check,
+        secrets_provider=secrets_provider_check,
+        log_sink=log_sink_check,
+        built_secrets_provider=secrets_provider,
     )
 
 
@@ -1271,13 +1365,15 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
 
     ``log.configure`` is invoked through ``configure_if_unset`` so that if a library
     embedding or interleaved test has already configured logging, this call no-ops
-    instead of raising the once-per-process ``RuntimeError``. When it does apply, the
-    sink is selected the way boot selects it: the pure ``build_registrar`` discovery,
-    then the ``runtime.log.sink`` lookup — the doctor bypasses ``Pipelex.make`` but not
-    the configuration's choice of where its own lines go. Where boot would stop, on a
-    registry that does not build, a token nobody registered or a sink that fails to
-    install, the doctor installs the console sink on stderr and says so in the rows it
-    returns.
+    instead of raising the once-per-process ``RuntimeError``. Either way the plugins are
+    discovered with the pure ``build_registrar`` and the secrets provider is built from
+    ``runtime.secrets.method``, since the models row needs it. When the configure does
+    apply, the sink is then selected the way boot selects it, from ``runtime.log.sink``
+    and handed that provider — the doctor bypasses ``Pipelex.make`` but not the
+    configuration's choice of where its own lines go. Where boot would stop, on a
+    registry that does not build, a secrets provider that does not build, a token nobody
+    registered or a sink that fails to install, the doctor installs the console sink on
+    stderr and says so in the rows it returns.
 
     Args:
         log_config_overrides: Optional mapping of ``LogConfig`` field names → values to
@@ -1286,10 +1382,10 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
             project/global layering is bypassed and only this directory is read.
 
     Returns:
-        The plugins row and the log sink row. The log sink row is healthy when the configured
-        sink was installed, or when logging was already configured and its sink stays; not
-        healthy when the console sink on stderr stands in, and the message says why. The
-        plugins row is ``None`` when logging was already configured.
+        The plugins, secrets provider and log sink rows, and the secrets provider built. The
+        log sink row is healthy when the configured sink was installed, or when logging was
+        already configured and its sink stays; not healthy when the console sink on stderr
+        stands in, and the message says why.
 
     Raises:
         PipelexConfigError: If config validation fails. Translation of
@@ -1312,33 +1408,40 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
         deep_update(merged, updates=log_config_overrides)
         log_config = LogConfig.model_validate(merged)
     runtime_hub.set_console_print_target(target=log_config.console_print_target)
-    runtime_setup = DoctorRuntimeSetup(
-        log_sink=LogSinkCheck(is_healthy=True, message="Logging was already configured in this process, and its sink stays"),
-        plugins=None,
-    )
-    if log.configure_if_unset(log_config=log_config):
-        runtime_setup = discover_plugins_and_install_doctor_log_sink(log_config=log_config)
+    # Configured before the discovery, so that what discovery and the secrets provider log is held for the sink, as at boot.
+    installs_log_sink = log.configure_if_unset(log_config=log_config)
+    runtime_setup = discover_doctor_runtime(log_config=log_config, installs_log_sink=installs_log_sink)
     runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
     if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
         log.warning(stale_warning)
     return runtime_setup
 
 
-def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
+def check_models(
+    *, secrets_provider: SecretsProviderAbstract | None, config_dir: Path | None = None
+) -> tuple[bool, str, dict[str, BackendFileReport]]:
     """Check if models are valid, including backend file validation.
 
     Assumes ``setup_doctor_runtime`` has already run — the function reads from the
     active hub and relies on ``log`` being configured.
 
     Args:
+        secrets_provider: The provider ``setup_doctor_runtime`` built from the configuration, which the
+            backends' credentials resolve through as they do at boot; ``None`` when it did not build, and
+            then nothing here can be checked.
         config_dir: Explicit config directory override (e.g. for --global).
             If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
     Returns:
         Tuple of (is_healthy, message, backend_file_reports)
     """
+    # The backends resolve their credentials through the configured provider, so without it no backend
+    # loads the way boot would load it; the secrets provider row already says why it did not build.
+    if secrets_provider is None:
+        return False, "Error checking models: the secrets provider did not build, so the backends and the model deck cannot be checked", {}
+
     # First check backend files individually
-    backend_files_healthy, backend_file_reports, _ = check_backend_files(config_dir=config_dir)
+    backend_files_healthy, backend_file_reports, _ = check_backend_files(secrets_provider=secrets_provider, config_dir=config_dir)
 
     # If backend files have issues, report that immediately
     if not backend_files_healthy:
@@ -1398,7 +1501,6 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
         )
 
     models_manager = ModelManager()
-    secrets_provider = EnvSecretsProvider()
     try:
         models_manager.setup(
             secrets_provider=secrets_provider,
@@ -1505,12 +1607,14 @@ def do_doctor_cmd(
     backend_file_reports: dict[str, BackendFileReport]
     log_sink_check: LogSinkCheck | None = None
     plugins_check: PluginsCheck | None = None
+    secrets_provider_check: SecretsProviderCheck | None = None
     if config_healthy:
         try:
             runtime_setup = setup_doctor_runtime()
             log_sink_check = runtime_setup.log_sink
             plugins_check = runtime_setup.plugins
-            models_healthy, models_message, backend_file_reports = check_models()
+            secrets_provider_check = runtime_setup.secrets_provider
+            models_healthy, models_message, backend_file_reports = check_models(secrets_provider=runtime_setup.built_secrets_provider)
             models_skipped = False
         except PipelexConfigError as exc:
             models_healthy = False
@@ -1550,6 +1654,7 @@ def do_doctor_cmd(
         fix_mode=fix,
         log_sink_check=log_sink_check,
         plugins_check=plugins_check,
+        secrets_provider_check=secrets_provider_check,
     )
 
     all_healthy = (
@@ -1562,6 +1667,7 @@ def do_doctor_cmd(
         and internal_backend_healthy
         and (log_sink_check is None or log_sink_check.is_healthy)
         and (plugins_check is None or plugins_check.is_healthy)
+        and (secrets_provider_check is None or secrets_provider_check.is_healthy)
     )
 
     # Exit code: 0 if healthy, 1 if issues found

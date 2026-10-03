@@ -211,11 +211,11 @@ Configuration section: `[runtime.log.otlp]`, read only when `sink = "otlp"`.
 ```toml
 [runtime.log.otlp]
 endpoint = "http://collector:4318/v1/logs"
-headers = { Authorization = "Bearer ..." }
+headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 ```
 
 - `endpoint`: The collector's logs URL. Left unset, the exporter follows the OpenTelemetry environment conventions: `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`, then `OTEL_EXPORTER_OTLP_ENDPOINT` with the `/v1/logs` path, then the collector default on localhost
-- `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge
+- `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge. A value may name a secret rather than carry it, as the example's bearer token does, and the keys are taken as written: see [Secrets in Sink Settings](#secrets-in-sink-settings). This is the spelling `telemetry.toml` uses for the trace exporter's headers, so the two OTLP exporters of one process name the same credential the same way
 - The records are exported in batches on the OTLP HTTP protocol, with the same service identity as the spans the runtime already exports, so a collector files the two together
 - Each record carries the trace context of OpenTelemetry's current span, your own code's, so a collector files the record under your span; a record logged where no current span names a trace carries none. The Pipelex span active at the log call, the pipe's own or the LLM call's during a run, rides as the `pipelex.trace_id` and `pipelex.span_id` attributes, in hex. Pipelex never makes its own spans current in the process's OpenTelemetry context, so your own instrumentation is never re-parented under them
 - The keys the sink writes itself — the source location `code.file.path`, `code.function.name` and `code.line.number`, `pipelex.trace_id` and `pipelex.span_id`, and the `exception.*` keys — are reserved on every record whether or not it carries an exception or a Pipelex span, exactly as the `json` sink reserves its own keys: a field named like one of them is carried under the same `field_` prefix, so nothing is overwritten and a field keeps one wire name whichever sink is selected
@@ -235,12 +235,12 @@ Configuration section: `[runtime.log.gcp]`, read only when `sink = "gcp"`. The s
 [runtime.log.gcp]
 log_name = "pipelex"
 project_id = "my-project"
-credentials_file_path = "gcp_credentials.json"
+credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
 ```
 
 - `log_name`: the Cloud Logging log the entries land under. Default: `"pipelex"`
 - `project_id`: the project to write to. Left unset, the client library resolves it from the credentials or from the metadata server of the machine the process runs on
-- `credentials_file_path`: a service-account JSON file to build the client from. Left unset, authentication is Application Default Credentials, which is what a process already running on Google Cloud has. This is a plain config value rather than a secret id read through the secrets provider, because the log sink is the first capability boot resolves — deliberately ahead of the secrets provider, so that every later line of the boot goes through the sink the configuration chose — and there is no provider to ask when this section is read
+- `credentials_file_path`: a service-account JSON file to build the client from. Left unset, authentication is Application Default Credentials, which is what a process already running on Google Cloud has. The path may be written as it is, `"gcp_credentials.json"`, or name a secret, as the example does with `GCP_CREDENTIALS_FILE_PATH`, the secret the `gcp` storage provider reads, so that one secret serves both: see [Secrets in Sink Settings](#secrets-in-sink-settings). When the path came from a placeholder, the credential errors below name the placeholder beside the resolved path, so you know to fix the secret rather than the TOML
 
 ### Credentials are checked at boot
 
@@ -261,6 +261,17 @@ Each record becomes one Cloud Logging entry with a JSON payload:
 - The entries leave through the client library's background-thread transport, which batches them off the thread that logged, so no record costs an API round trip on the calling thread. The teardown flushes and closes it, and the flush carries a deadline of its own, five seconds, because the library's does not. A flush that runs out of time says so on stderr, that the transport was still writing and that what it still holds is lost unless it sends it while it closes, followed by what a fresh refresh of the credentials answers, a refresh given five seconds of its own, so such a flush returns within ten and the close then gives the transport the client library's own grace period: refused, with Google's answer, which is why the write is held; unreachable; or still accepted, in which case the Cloud Logging API or the network is what holds it. A handler that has closed does not flush again when the process exits
 - What the export path logs never leaves through the sink: the library reports a refused batch through a logger of its own, and a report exported through the pipeline it reports on would fail with it and be reported again. The handler rejects those records, and every record emitted on the library's export thread, before its lock is taken — the same guard the `otlp` sink carries, against the same deadlock at exit. What the sink's own credentials check logs while a teardown's flush waits on it is rejected the same way and printed on stderr, so the check still answers when the process's exit holds the handler's lock
 - A refused write is still said: the library marks a refused batch done, so the flush succeeds and nothing else would report it, and the entries in it are lost. The export path's warnings and errors are printed on stderr instead, the first one in each window of time with its traceback and the ones after it counted in a single line once that window has passed — with the next failure, on the next line the process logs, or at the teardown at the latest — so a process whose writes Cloud Logging refuses says so without printing once per line it logs
+
+## Secrets in Sink Settings
+
+The values of the `otlp` sink's `headers` and the `gcp` sink's `credentials_file_path` accept the `${…}` placeholders the [inference backends](../config-technical/inference-backend-config.md) use, resolved through the secrets provider `[runtime.secrets]` selects. Boot builds that provider before it installs the sink for this reason, and hands it to the sink's factory.
+
+- `${NAME}` and `${secret:NAME}` read `NAME` from the secrets provider, which with the default `env` method is the environment variable of that name
+- `${env:NAME}` reads the environment variable whatever the secrets method
+- `${env:NAME|secret:OTHER}` tries each in turn
+- A placeholder can sit inside a longer value, `"Bearer ${OTLP_AUTH_TOKEN}"`, and the rest of the value is kept as written
+
+The resolved values exist only in the exporter or the Cloud Logging client: the configuration keeps the placeholders, so nothing that prints the configuration can print a credential. A placeholder that does not resolve stops the boot with `LogSinkVariableError`, whose message names the section, the key and the variable, never a value, rather than sending the placeholder to the collector as if it were the token and losing every record while the boot reports success; `pipelex doctor` reports the same message in its log-sink row. There is no escape syntax, so a header value that genuinely contains `${` cannot be written. A secrets provider that fails to build stops the boot before any sink exists, and the lines logged until then are written to stderr, redacted, as they are for any boot that dies before its sink.
 
 ## Example Configuration
 
@@ -325,7 +336,8 @@ Two of those keys chose a behaviour their deletion undoes, and no operation in t
 
 2. **Production Environment**:
 
-    - Select the `json` sink behind a log agent, the `otlp` sink in front of a collector, or the `gcp` sink for a process that must write to Google Cloud Logging directly
+    - Prefer a sink that holds no credential: the `json` sink on stderr, shipped by a collector or by the platform's log agent, which authenticates on the process's behalf with the platform's own identity. Nothing in the process then holds a logging credential, and a misconfigured one cannot lose its records
+    - Select the `otlp` sink in front of a collector that needs a token, or the `gcp` sink for a process that must write to Google Cloud Logging directly, only when no agent can ship the lines; their credentials then belong in the secrets provider, named in [their settings](#secrets-in-sink-settings) rather than written there
     - Disable caller info for performance
     - Use INFO or higher log levels
 

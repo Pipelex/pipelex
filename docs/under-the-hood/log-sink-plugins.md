@@ -9,7 +9,7 @@ Every record the runtime emits, a `log.info(...)` in a pipe operator, a warning 
 
 Core names no sink by import or by string. The built-in sinks (`json`, `console`, `otlp`, `gcp`) are a plugin too, the always-on `LogSinkPlugin`, riding the exact same seam an out-of-tree package would. This page documents that seam, the contract a plugin registers, what a sink reads off a record, and how to write one.
 
-This is the third application of the mechanism the [storage provider](storage-provider-plugins.md) seam introduced and the [secrets provider](secrets-provider-plugins.md) seam reused; the three pages describe the same shape with the nouns swapped, and this one adds what is particular to logging: the sink is resolved after logging is already configured, and every sink shares one record contract.
+This is the third application of the mechanism the [storage provider](storage-provider-plugins.md) seam introduced and the [secrets provider](secrets-provider-plugins.md) seam reused; the three pages describe the same shape with the nouns swapped, and this one adds what is particular to logging: the sink is resolved after logging is already configured, it is handed the secrets provider built just before it, and every sink shares one record contract.
 
 ---
 
@@ -34,8 +34,9 @@ RuntimeBoot.setup
        └─ for each installed entry point in the requested groups
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_log_sink(method=…, factory=…)
+  └─ secrets_provider = …                  # setup()'s argument, else the runtime.secrets.method factory
   └─ LogSinkRegistry(registrar.log_sinks)
-  └─ sink = registry.get_required(method=runtime.log.sink)(runtime.log)
+  └─ sink = registry.get_required(method=runtime.log.sink)(runtime.log, secrets_provider=secrets_provider)
   └─ log.install_sink(sink)                # the sink's handler replaces the holding handler,
                                            # which replays what it held through it, in order
 teardown
@@ -46,9 +47,11 @@ teardown
 
 Logging is configured as soon as the configuration is read, in `RuntimeBoot.__init__`, so that everything the boot says afterwards is a record on a module-named logger at the configured level. The sink, though, is a plugin capability, and plugin discovery runs a little later, in `setup()`, once the boot knows which built-ins and which entry-point groups it reads. Rather than choose a default renderer for that window, `configure` installs a **holding handler** that keeps every record, and `install_sink` replays them through the selected sink's handler the moment it is installed, in the order they were emitted. A boot's own lines are therefore rendered by the sink the configuration chose, never dropped and never written in a shape nothing chose.
 
-The sink is the first capability resolved out of the registrar, ahead of secrets and storage, precisely so that every later line of the boot goes through it. A boot that dies before that point, on the gateway terms gate for instance, releases its process globals through `log.reset()`, which closes the holding handler: what it still holds gets the stdlib's last-resort treatment: every held record reaches stderr, since each passed the level the configuration set, and the redaction processor runs over each one first, behind the guard a sink's handler would have put it behind.
+The sink is the second capability resolved out of the registrar, right after the secrets provider and ahead of telemetry and storage, so that every later line of the boot goes through it while its own settings can still name a secret: an OTLP collector's bearer token, the path of the service-account key the `gcp` sink reads. Building the provider first costs nothing in kind, because the holding handler already covers the window: what the provider logs is held like every line before it, and the remote-config fetch and plugin discovery were in that window already. A boot that dies before the sink is installed, on the gateway terms gate or on a secrets provider that cannot be built for instance, releases its process globals through `log.reset()`, which closes the holding handler: what it still holds gets the stdlib's last-resort treatment: every held record reaches stderr, since each passed the level the configuration set, and the redaction processor runs over each one first, behind the guard a sink's handler would have put it behind. The only built-in secrets provider, `env`, does no I/O and logs nothing, so in practice only an external secrets plugin can fail there.
 
-`pipelex doctor`, which deliberately bypasses `Pipelex.make` to diagnose a broken configuration, selects its sink the same way: the pure `build_registrar` discovery, then the `runtime.log.sink` lookup. Where boot stops on a token nobody registered, the doctor installs the console sink instead and reports the token in a row of its own, naming the registered sinks, so the report it exists to produce is still produced.
+This is the usual order elsewhere. Spring Boot resolves its configuration, vault-backed properties included, before it initialises logging and replays what was logged meanwhile; ASP.NET Core reads Key Vault as a configuration source before logging is configured, with a bootstrap logger covering the gap.
+
+`pipelex doctor`, which deliberately bypasses `Pipelex.make` to diagnose a broken configuration, selects its sink the same way: the pure `build_registrar` discovery, the secrets provider `runtime.secrets.method` selects, then the `runtime.log.sink` lookup. Where boot stops on a token nobody registered, on a sink that fails to build or on a secrets provider that fails to build, the doctor installs the console sink instead and reports what stopped it in a row of its own, so the report it exists to produce is still produced. When the secrets provider does not build, the doctor does not try the sink against a stand-in: its row says it was not checked.
 
 ---
 
@@ -56,13 +59,18 @@ The sink is the first capability resolved out of the registrar, ahead of secrets
 
 ### `LogSinkFactoryFn`
 
-A sink is produced by a typed **callable**, whole log config in, sink out (`pipelex/plugins/log_sink_registry.py`):
+A sink is produced by a typed **callable**, whole log config and the boot's secrets provider in, sink out (`pipelex/plugins/log_sink_registry.py`):
 
 ```python
-LogSinkFactoryFn = Callable[[LogConfig], LogSink]
+class LogSinkFactoryFn(Protocol):
+    def __call__(self, config: LogConfig, /, *, secrets_provider: SecretsProviderAbstract) -> LogSink: ...
 ```
 
-Passing the whole `LogConfig` is deliberate: a factory reads whatever it needs, the stream target, its own settings section, at the boot apply-point, never at registration. A plugin contributes one factory per method it serves by calling the registrar menu in its `register`, passing the token as a raw string:
+Passing the whole `LogConfig` is deliberate: a factory reads whatever it needs, the stream target, its own settings section, at the boot apply-point, never at registration. The secrets provider is passed rather than read off the hub, because boot sets it on the hub only after the sink is installed: the keyword is the one way a factory reaches a secret, so the order is one the type checker enforces, and a factory that calls `get_secrets_provider()` instead fails loud at boot. A sink whose settings name no secret accepts the keyword and ignores it, as the built-in `json` and `console` factories do. The built-in `otlp` and `gcp` factories resolve the `${…}` placeholders in their header values and key path through it, on a copy of their settings, so the configuration keeps the placeholders; a placeholder that does not resolve raises `LogSinkVariableError`, naming the section, the key and the variable. `config` is positional-only in the protocol, so an implementation names its first parameter as it likes.
+
+The keyword arrived with plugin API version 5. A factory written against version 4 would be called with a keyword it does not accept, so discovery refuses a plugin still declaring `targets_api = 4` with `PluginApiVersionMismatchError`, naming it, rather than letting the boot fail on a bare `TypeError`.
+
+A plugin contributes one factory per method it serves by calling the registrar menu in its `register`, passing the token as a raw string:
 
 ```python
 registrar.add_log_sink(method="gcp", factory=_make_gcp_log_sink)
@@ -156,6 +164,7 @@ An external sink has no settings section of its own in `LogConfig`, whose sub-mo
 |-----------|-------|
 | `runtime.log.sink` names no registered sink | `UnknownLogSinkError` (lists the registered tokens) |
 | the selected sink's package is not installed | `MissingDependencyError` (package + `pipelex[<extra>]` hint), raised at install, at boot |
+| a `${…}` placeholder in the `otlp` sink's headers or the `gcp` sink's key path does not resolve | `LogSinkVariableError` (names the section, the key and the variable, never a value) |
 | two plugins register the same `method` | `DuplicateLogSinkError` (names both plugins) |
 | `name` (`"log_sinks"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
 | published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` |
@@ -170,8 +179,9 @@ The duplicate detection is the same fail-loud `_add` helper the storage and secr
 A third-party log sink plugin is a distribution that:
 
 1. implements a `LogSink` subclass whose `make_handler` builds the handler and performs whatever SDK import the handler needs, so the module stays import-light; the handler reads the record through `carried_attributes`, serializes on emit, and never raises;
-2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_log_sink(method="<token>", factory=...)` and nothing else;
-3. advertises itself under the `pipelex.plugins.kernel` entry-point group, a log sink being a kernel-layer capability (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means):
+2. defines a factory matching `LogSinkFactoryFn`, which takes the log config positionally and the secrets provider as the `secrets_provider` keyword, the way to read a credential the sink needs; `substitute_vars` in `pipelex/tools/secrets/secrets_utils.py` resolves a `${…}` placeholder through it with the syntax the built-in sinks accept;
+3. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_log_sink(method="<token>", factory=...)` and nothing else;
+4. advertises itself under the `pipelex.plugins.kernel` entry-point group, a log sink being a kernel-layer capability (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means):
 
 ```toml
 # pyproject.toml of your plugin package

@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
     from pipelex.plugins.registrar import PluginRegistrar
     from pipelex.tools.log.log_config import LogConfig
+    from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 EXTERNAL_SINK_METHOD = "test_sink"
 EXTERNAL_PLUGIN_NAME = "test_log_sink_ext"
@@ -61,7 +62,7 @@ class _RecordingLogSink(LogSink):
         return self.recording_handler
 
 
-def _make_fake_external_sink(_config: LogConfig) -> LogSink:
+def _make_fake_external_sink(_config: LogConfig, /, *, secrets_provider: SecretsProviderAbstract) -> LogSink:  # ruff: ignore[unused-function-argument] - the LogSinkFactoryFn shape
     return _RecordingLogSink()
 
 

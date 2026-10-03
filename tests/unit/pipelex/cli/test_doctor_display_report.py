@@ -14,6 +14,7 @@ from pipelex.cli.commands.doctor_cmd import (
     PendingMigrationsCheck,
     PendingMigrationsFinding,
     PluginsCheck,
+    SecretsProviderCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     display_health_report,
@@ -129,6 +130,25 @@ class TestDoctorDisplayReport:
         assert "Plugins" in output
         assert "Plugin 'storage' is required by core" in output
         assert "plugin named in the Plugins row" in output
+
+    def test_a_secrets_provider_that_did_not_build_is_a_row_of_its_own_and_flags_the_report(self, console: Console) -> None:
+        kwargs = _healthy_report_kwargs()
+        kwargs["secrets_provider_check"] = SecretsProviderCheck(
+            is_healthy=False, message="The secrets provider 'vault' could not be built: the vault did not answer"
+        )
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Overall Status: ⚠️  Issues Found" in output
+        assert "Secrets Provider" in output
+        assert "the vault did not answer" in output
+        assert "Set method in [runtime.secrets] to a registered secrets provider" in output
+
+    def test_without_a_runtime_setup_there_is_no_secrets_provider_row(self, console: Console) -> None:
+        display_health_report(**_healthy_report_kwargs())
+
+        assert "Secrets Provider" not in console.export_text()
 
     def test_without_a_plugin_discovery_there_is_no_plugins_row(self, console: Console) -> None:
         display_health_report(**_healthy_report_kwargs())

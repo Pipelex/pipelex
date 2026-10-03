@@ -38,6 +38,7 @@ own page. Classes are grouped by subsystem.
 - [`Jinja2TemplateSecurityError`](jinja2-template-security-error.md) — Jinja 2 template security
 - [`Jinja2TemplateSyntaxError`](jinja2-template-syntax-error.md) — Jinja 2 template syntax
 - [`JsonTypeError`](json-type-error.md) — Json type
+- [`LogSinkVariableError`](log-sink-variable-error.md) — Log sink variable did not resolve
 - [`ModuleFileError`](module-file-error.md) — Module file
 - [`PyPdfium2RendererError`](py-pdfium2-renderer-error.md) — Py pdfium 2 renderer
 - [`RemoteFileFetchError`](remote-file-fetch-error.md) — Remote file could not be fetched
