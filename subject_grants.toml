@@ -6108,14 +6108,6 @@ rationale = "Factory from source: builds the result from the template_category; 
 param = "template_category"
 rationale = "Factory from source: builds the result from the template_category; single operand."
 
-["pipelex/tools/jinja2/jinja2_field_paths.py::_chain"]
-param = "node"
-rationale = "Reads the attribute chain of one Jinja node."
-
-["pipelex/tools/jinja2/jinja2_field_paths.py::_target_names"]
-param = "target"
-rationale = "Lists the names one assignment target binds."
-
 ["pipelex/tools/jinja2/jinja2_filters.py::escape_script_tag"]
 param = "value"
 rationale = "Transforms the value; single operand."
@@ -6123,10 +6115,6 @@ rationale = "Transforms the value; single operand."
 ["pipelex/tools/jinja2/jinja2_filters.py::markdown_to_html"]
 param = "value"
 rationale = "Jinja filter: Jinja passes the filtered value positionally."
-
-["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._assign_target_names"]
-param = "target"
-rationale = "Noun-named derivation: the assigned names of the target node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._guard_vars"]
 param = "test_node"
@@ -6144,6 +6132,10 @@ rationale = "Verb-object: records the path; single operand."
 param = "body_nodes"
 rationale = "Visitor: walks the body nodes; guard sets stay keyword."
 
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_if"]
+param = "node"
+rationale = "Verb-object walk over one if node, like the walker's other walk methods; single operand."
+
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_test"]
 param = "test_node"
 rationale = "Visitor: walks the test node; guard sets stay keyword."
@@ -6151,10 +6143,6 @@ rationale = "Visitor: walks the test node; guard sets stay keyword."
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker.walk"]
 param = "node"
 rationale = "Visitor: walks the node; guard sets stay keyword."
-
-["pipelex/tools/jinja2/jinja2_optional_guards.py::_build_full_path"]
-param = "node"
-rationale = "Noun-named derivation: the full dotted path of the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_parsing.py::check_jinja2_parsing"]
 param = "template_source"
@@ -6280,13 +6268,45 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
-["pipelex/tools/jinja2/jinja2_required_variables.py::_build_full_path"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::_frame_level_parts"]
+param = "statement"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::_loaded_names"]
+param = "expression"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::assigned_target_names"]
+param = "target"
+rationale = "Lists the names one assignment target binds."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::attribute_chain"]
+param = "node"
+rationale = "Reads the attribute chain of one Jinja node."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::definitely_assigned_names"]
+param = "statement"
+rationale = "Noun-named derivation: the names one statement binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::dotted_attribute_path"]
+param = "node"
+rationale = "Noun-named derivation: the dotted path of the node; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::frame_bound_names"]
+param = "statement"
+rationale = "Noun-named derivation: the names one statement binds in the frame it opens; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::names_assigned_by_statements"]
+param = "statements"
+rationale = "Noun-named derivation: the names a statement list binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::names_read_before_bound"]
+param = "statements"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.is_loaded"]
 param = "name"

@@ -77,8 +77,9 @@ class TestPipeDocGenLoadRefusals:
             ('format = "pdf"\ntemplate = "{% for line in invoice.line_items %}{{ line.amout }}{% endfor %}"', "amout"),
             ('format = "pdf"\nfilename = "invoice-{{ invoice.nmber }}"', "nmber"),
             ('format = "pdf"\ntemplate = "<h1>{{ invoice._stuff }}</h1>"', "_stuff"),
+            ('format = "pdf"\ntemplate = "{% if invoice.number %}{% set invoice = \'none\' %}{% endif %}<h1>{{ invoice.nosuch }}</h1>"', "nosuch"),
         ],
-        ids=["misspelled_field", "misspelled_field_through_a_loop", "misspelled_field_in_the_filename", "private_name"],
+        ids=["misspelled_field", "misspelled_field_through_a_loop", "misspelled_field_in_the_filename", "private_name", "set_in_only_some_branches"],
     )
     async def test_a_template_mistake_is_refused_at_load(self, step_fields: str, expected: str) -> None:
         """A field a template or the filename names is checked against the input's concept, through loop variables too."""

@@ -18,7 +18,7 @@ For structured outputs, you have two options:
 
 If you already have text from elsewhere (a PDF extraction, a search result, an upstream pipe), call [`PipeStructure`](./PipeStructure.md) directly — there's no need to wrap a `PipeLLM` around it.
 
-Every input the pipe declares must be read by `prompt` or `system_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither prompt reads as `extraneous_input_variable`, naming the input, so you either reference it in a prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+Every input the pipe declares must be read by `prompt` or `system_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither prompt reads as `extraneous_input_variable`, naming the input, so you either reference it in a prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`. A name a prompt sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 ## Working with Images (Vision Language Models)
 
