@@ -24,6 +24,21 @@ Unlike LLM APIs (partly standardized around OpenAI's completions API), the OCR l
 | **Deepseek-OCR** | Gateway | Open-source model optimized for markdown extraction from images |
 | **Linkup Fetch** | Cloud API | Web page content extraction — fetches and extracts text from web URLs |
 
+## Formats Each Extractor Reads
+
+Each extract model declares the file formats it reads, and a `PipeExtract` step can only extract a file in one of those formats.
+
+| Extract model | Reads |
+|---------------|-------|
+| `pypdfium2-extract-pdf` | PDF |
+| `docling-extract-text` | PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), HTML and images |
+| Mistral OCR (`mistral-ocr` and its versions) | PDF and images |
+| `azure-document-intelligence` (Pipelex Gateway) | PDF and images |
+| `deepseek-ocr` (Pipelex Gateway) | Images |
+| `linkup-fetch` (Pipelex Gateway) | Web pages, fetched from their URL |
+
+A file in a format the step's model does not read is refused before the run starts, with an input error that names the input, its format, the step, the model and the formats that model reads. Give the file in a format the model reads, or choose a model that reads it. When the step can only be reached through a condition, the run starts, and the step refuses the file the same way when it gets to it. See [File formats are checked before the run](../building-methods/concepts/native-concepts.md#file-formats-are-checked-before-the-run).
+
 ## Key Capabilities
 
 - **Page view generation** — High-fidelity image rendering of extracted pages via pypdfium2

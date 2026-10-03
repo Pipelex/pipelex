@@ -327,6 +327,26 @@ costs = { input = 0.04, output = 0.0 }
 
 The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
 
+#### Input formats
+
+`inputs` lists what a model reads. For files, its entries are format keys, the same keys the runtime derives from a file's MIME type to check, before a run starts, that every file reaches a model able to read it: every image type is the `image` family, and any other type is its extension.
+
+- **LLMs** declare `images` to read images (vision), and the document formats they read among `pdf`, `docx`, `pptx`, `xlsx` and `html`.
+- **Extract models** declare the file formats they read among `pdf`, `docx`, `pptx`, `xlsx`, `html` and `image`, and `web_page` when they fetch a web page from its URL themselves.
+
+```toml
+# internal.toml
+[docling-extract-text]
+model_type = "text_extractor"
+sdk = "docling_sdk"
+model_id = "extract-text"
+inputs = ["pdf", "docx", "pptx", "xlsx", "html", "image"]
+outputs = ["pages"]
+costs = {}
+```
+
+A file whose format the consuming model does not declare is refused with an input error that names the input, the model and the formats it reads. A file whose format is unknown, with no type or the generic `application/octet-stream`, is left to the provider. Declare a format only once the model is known to read it.
+
 #### Structure methods
 
 `structure_method` says how a model is asked for structured output. A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and so is `instructor/openai_structured_outputs`, which sends OpenAI a non-strict tool schema; `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through the Gateway's OpenAI-compatible SDKs.
