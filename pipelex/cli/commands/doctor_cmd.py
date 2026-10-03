@@ -7,7 +7,7 @@ import io
 import sys
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from rich.markup import escape
@@ -83,7 +83,6 @@ from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_base_and_overrides, load_toml_from_path
-from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -91,6 +90,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.gateway_config import GatewayConfig
     from pipelex.plugins.registrar import PluginRegistrar
     from pipelex.system.pipelex_service.types import RemoteConfigSource
+    from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
 class ConfigLocationInfo(BaseModel):
@@ -1166,15 +1166,14 @@ class SecretsProviderCheck(BaseModel):
     message: str
 
 
-class DoctorRuntimeSetup(BaseModel):
+class DoctorRuntimeSetup(NamedTuple):
     """What ``setup_doctor_runtime`` found on its way to a configured logger, one row each, and the secrets provider it built.
 
     ``built_secrets_provider`` is the provider the configuration selects, the one boot would build: the
     log sink, the backend-file probe and the models check resolve credentials through it. It is ``None``
-    when it did not build, and the ``secrets_provider`` row says why.
+    when it did not build, and the ``secrets_provider`` row says why. A provider is no pydantic type,
+    which is why this holder is a ``NamedTuple``: it never travels, so it needs no schema.
     """
-
-    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     plugins: PluginsCheck
     secrets_provider: SecretsProviderCheck

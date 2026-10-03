@@ -106,6 +106,9 @@ keywords_to_hilight = []
 # (for instance "http://localhost:4318/v1/logs"); left unset, the exporter follows the OpenTelemetry
 # environment conventions: OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, then OTEL_EXPORTER_OTLP_ENDPOINT, then
 # the collector default on localhost. Empty headers likewise leave OTEL_EXPORTER_OTLP_HEADERS in charge.
+# A header value may name a secret rather than carry it, a collector's bearer token written
+# "Bearer ${OTLP_AUTH_TOKEN}" for one: it is resolved through the secrets provider [runtime.secrets]
+# selects, which boot builds before the sink, and a variable that does not resolve stops the boot.
 [runtime.log.otlp]
 headers = {}
 
@@ -116,6 +119,8 @@ headers = {}
 # Cloud Logging log the entries land under. A project_id key names the project when it is not the
 # ambient one the credentials or the metadata server declare, and a credentials_file_path key names a
 # service-account JSON file when Application Default Credentials are not what the process should use.
+# The path may be a secret too, "${GCP_CREDENTIALS_FILE_PATH}" being the one the gcp storage provider
+# reads, resolved through the secrets provider the way the otlp headers are.
 [runtime.log.gcp]
 log_name = "pipelex"
 
