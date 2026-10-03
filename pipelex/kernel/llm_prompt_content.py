@@ -229,7 +229,11 @@ async def assemble_llm_prompt(
     ############################################################
     # The registry contains all images (direct + nested) in the correct order,
     # already deduplicated by URL. This ensures [Image N] tokens match positions.
-    all_images: list[PromptImage] = [PromptImageFactory.make_prompt_image(uri=registry_image.url) for registry_image in image_registry.images]
+    # Each keeps the format its preparation established, the way a document does, so the worker checks
+    # the format instead of guessing it again.
+    all_images: list[PromptImage] = [
+        PromptImageFactory.make_prompt_image(uri=registry_image.url, mime_type=registry_image.mime_type) for registry_image in image_registry.images
+    ]
 
     ############################################################
     # Collect all documents

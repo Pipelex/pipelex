@@ -11,7 +11,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.exceptions import PipelineInputContentError
-from pipelex.pipeline.input_normalizer import NormalizableContent, normalize_data_urls_to_storage
+from pipelex.pipeline.input_normalizer import NormalizableContent, prepare_file_inputs
 from pipelex.tools.storage.exceptions import StorageInvalidUriError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -20,6 +20,8 @@ FRESH_SIGNED_URL = "https://pipelex-app-dev.s3.us-west-2.amazonaws.com/org/uploa
 STALE_SIGNED_URL = "https://pipelex-app-dev.s3.us-west-2.amazonaws.com/org/uploads/moodboard.png?X-Amz-Signature=expired"
 HTTP_INPUT_URL = "https://example.com/moodboard.png"
 CALLER_PUBLIC_URL = "https://cdn.example.com/moodboard.png"
+# The leading bytes of a PNG file, which is what the stored moodboard's head read returns.
+STORED_INPUT_HEAD = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
 
 CONTENT_CLASSES = [ImageContent, DocumentContent]
 
@@ -35,7 +37,7 @@ def _memory_with_content(content: NormalizableContent) -> WorkingMemory:
 
 
 async def _normalized_content(content: NormalizableContent) -> Any:
-    memory = await normalize_data_urls_to_storage(_memory_with_content(content), storage_scope="test/scope", read_scope=None)
+    memory = await prepare_file_inputs(_memory_with_content(content), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
     return memory.get_stuff("visual").content
 
 
@@ -45,6 +47,7 @@ class TestInputNormalizerPublicUrl:
     def mock_storage(self, mocker: MockerFixture) -> Any:
         """A storage provider whose signing returns a fresh link, installed where the normalizer looks it up."""
         storage = mocker.Mock(spec=StorageProviderAbstract)
+        storage.load_head = mocker.AsyncMock(return_value=STORED_INPUT_HEAD)
         storage.public_url = mocker.AsyncMock(return_value=FRESH_SIGNED_URL)
         mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=storage)
         return storage

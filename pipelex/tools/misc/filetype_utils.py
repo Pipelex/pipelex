@@ -156,3 +156,107 @@ def mime_type_to_extension(mime_type: str) -> str:
 
     # Remove leading dot
     return ext.removeprefix(".")
+
+
+#####################################################################################################
+# Identifying a file input's format, and the format keys the format checks compare
+#####################################################################################################
+
+# How many leading bytes identify a file: exactly what `filetype` reads, so a head read of this
+# size identifies a stored file as well as loading all of it would.
+FILE_HEAD_NB_BYTES: Final[int] = 8192
+
+# A declaration that says nothing: a file with this type, or with none, has no known format.
+_GENERIC_MIME_TYPES: Final[frozenset[str]] = frozenset({"application/octet-stream"})
+
+# A zip container the sniffer recognised without recognising what it contains, and the declared
+# types that name a more precise zip-based format. An Office Open XML or OpenDocument file is a
+# zip, and `filetype` names it only when its identifying entry sits among the first few, so a
+# declared Office type refines a sniffed bare zip instead of being overruled by it.
+_ZIP_MIME_TYPE: Final[str] = "application/zip"
+_ZIP_BASED_DOCUMENT_MIME_PREFIXES: Final[tuple[str, ...]] = (
+    "application/vnd.openxmlformats-officedocument.",
+    "application/vnd.oasis.opendocument.",
+)
+
+# The family every image type belongs to, which is how models declare that they read images.
+IMAGE_FORMAT_KEY: Final[str] = "image"
+
+_FORMAT_KEY_DESCRIPTIONS: Final[dict[str, str]] = {
+    "pdf": "a PDF document",
+    "docx": "a Word document (.docx)",
+    "doc": "a Word 97-2003 document (.doc)",
+    "pptx": "a PowerPoint presentation (.pptx)",
+    "ppt": "a PowerPoint 97-2003 presentation (.ppt)",
+    "xlsx": "an Excel workbook (.xlsx)",
+    "xls": "an Excel 97-2003 workbook (.xls)",
+    "html": "an HTML page",
+    IMAGE_FORMAT_KEY: "an image",
+}
+
+
+def _base_mime_type(*, mime_type: str) -> str:
+    """The MIME type without its parameters, lowercased: `Text/Plain; charset=utf-8` → `text/plain`."""
+    return mime_type.split(";", 1)[0].strip().lower()
+
+
+def format_key_from_mime_type(*, mime_type: str | None) -> str | None:
+    """The format key a file of this MIME type has, which is what every format check compares.
+
+    Every `image/*` type is the `image` family, the key models declare to say they read images. Any
+    other identified type is its extension (`pdf`, `docx`, `pptx`, `xlsx`, `doc`, `html`, `md`…). No
+    type, the generic `application/octet-stream`, and a type the MIME database does not know have no
+    key: the format is unknown, and a check leaves an unknown format to the provider.
+    """
+    if mime_type is None:
+        return None
+    base = _base_mime_type(mime_type=mime_type)
+    if not base or base in _GENERIC_MIME_TYPES:
+        return None
+    if base.startswith("image/"):
+        return IMAGE_FORMAT_KEY
+    extension = mime_type_to_extension(base)
+    if extension == UNKNOWN_FILE_TYPE:
+        return None
+    return extension
+
+
+def describe_format_key(*, format_key: str) -> str:
+    """A format key in plain words, for a message: `docx` → `a Word document (.docx)`."""
+    if description := _FORMAT_KEY_DESCRIPTIONS.get(format_key):
+        return description
+    return f"a .{format_key} file"
+
+
+def guess_file_type_from_bytes(*, raw_bytes: bytes) -> FileType | None:
+    """The type the leading bytes identify, or `None` when they identify none.
+
+    Unlike `detect_file_type_from_bytes`, which raises, this is the form for a caller that has a
+    fallback: text formats (plain text, Markdown, CSV, JSON, HTML) carry no signature to sniff.
+    """
+    if not raw_bytes:
+        return None
+    kind = filetype.guess(raw_bytes[:FILE_HEAD_NB_BYTES])  # pyright: ignore[reportUnknownMemberType]
+    if kind is None:
+        return None
+    return FileType(extension=f"{kind.extension}", mime=f"{kind.mime}")
+
+
+def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None) -> str | None:
+    """The MIME type that describes a file, from its leading bytes and what the caller declared.
+
+    The bytes are the truth: when they identify a type, it replaces any declared one, so a
+    `data:image/png` URL holding a PDF is a PDF. When they identify none, which is the case for text
+    formats, the declared type stands. A declared zip-based Office type refines a sniffed bare zip.
+    No head (a file that was not read) keeps the declared type. `None` means the format is unknown.
+    """
+    sniffed = guess_file_type_from_bytes(raw_bytes=head) if head else None
+    if sniffed is None:
+        return declared_mime_type
+    if (
+        sniffed.mime == _ZIP_MIME_TYPE
+        and declared_mime_type is not None
+        and _base_mime_type(mime_type=declared_mime_type).startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES)
+    ):
+        return declared_mime_type
+    return sniffed.mime

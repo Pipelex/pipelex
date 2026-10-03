@@ -19,7 +19,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
+from pipelex.pipeline.input_normalizer import prepare_file_inputs
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
 
@@ -47,6 +47,8 @@ def _memory_with_image_list(urls: list[str]) -> WorkingMemory:
 
 def _patch_storage_and_config(mocker: MockerFixture, *, is_upload_local_content_enabled: bool) -> Any:
     storage = mocker.Mock(spec=StorageProviderAbstract)
+    # The leading bytes of a PNG file: every stored reference is identified by a head read.
+    storage.load_head = mocker.AsyncMock(return_value=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
     storage.public_url = mocker.AsyncMock(return_value="https://signed.example/link")
     storage.store = mocker.AsyncMock(return_value="pipelex-storage://org_abc/mt_1/run_1/assets/x.png")
     mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=storage)
@@ -68,7 +70,9 @@ class TestInputNormalizerReadScope:
         local_file.write_bytes(b"\x89PNG\r\n\x1a\n")
 
         with pytest.raises(UriReadRefusedError) as exc_info:
-            await normalize_data_urls_to_storage(_memory_with_image(str(local_file)), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE)
+            await prepare_file_inputs(
+                _memory_with_image(str(local_file)), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, is_relocation_enabled=True
+            )
 
         assert exc_info.value.reason == UriReadRefusalReason.LOCAL_PATH
         assert "input 'photo'" in str(exc_info.value)
@@ -78,14 +82,19 @@ class TestInputNormalizerReadScope:
     async def test_a_scoped_run_refuses_a_file_uri(self, mocker: MockerFixture) -> None:
         _patch_storage_and_config(mocker, is_upload_local_content_enabled=True)
         with pytest.raises(UriReadRefusedError):
-            await normalize_data_urls_to_storage(_memory_with_image("file:///etc/passwd"), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE)
+            await prepare_file_inputs(
+                _memory_with_image("file:///etc/passwd"), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, is_relocation_enabled=True
+            )
 
     async def test_a_scoped_run_refuses_to_sign_a_foreign_storage_reference(self, mocker: MockerFixture) -> None:
         storage = _patch_storage_and_config(mocker, is_upload_local_content_enabled=True)
 
         with pytest.raises(UriReadRefusedError) as exc_info:
-            await normalize_data_urls_to_storage(
-                _memory_with_image("pipelex-storage://org_other/assets/secret.png"), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE
+            await prepare_file_inputs(
+                _memory_with_image("pipelex-storage://org_other/assets/secret.png"),
+                storage_scope=STORAGE_SCOPE,
+                read_scope=READ_SCOPE,
+                is_relocation_enabled=True,
             )
 
         assert exc_info.value.reason == UriReadRefusalReason.FOREIGN_STORAGE_KEY
@@ -94,18 +103,22 @@ class TestInputNormalizerReadScope:
     async def test_a_foreign_reference_inside_a_list_is_refused_too(self, mocker: MockerFixture) -> None:
         _patch_storage_and_config(mocker, is_upload_local_content_enabled=True)
         with pytest.raises(UriReadRefusedError) as exc_info:
-            await normalize_data_urls_to_storage(
+            await prepare_file_inputs(
                 _memory_with_image_list(["pipelex-storage://org_abc/assets/ok.png", "pipelex-storage://org_other/assets/secret.png"]),
                 storage_scope=STORAGE_SCOPE,
                 read_scope=READ_SCOPE,
+                is_relocation_enabled=True,
             )
-        assert "input 'album'" in str(exc_info.value)
+        assert "input 'album[1]'" in str(exc_info.value)
 
     async def test_a_scoped_run_signs_an_in_scope_reference(self, mocker: MockerFixture) -> None:
         storage = _patch_storage_and_config(mocker, is_upload_local_content_enabled=True)
 
-        working_memory = await normalize_data_urls_to_storage(
-            _memory_with_image("pipelex-storage://org_abc/assets/photo.png"), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE
+        working_memory = await prepare_file_inputs(
+            _memory_with_image("pipelex-storage://org_abc/assets/photo.png"),
+            storage_scope=STORAGE_SCOPE,
+            read_scope=READ_SCOPE,
+            is_relocation_enabled=True,
         )
 
         storage.public_url.assert_awaited_once_with(uri="pipelex-storage://org_abc/assets/photo.png")
@@ -114,16 +127,18 @@ class TestInputNormalizerReadScope:
 
     async def test_a_scoped_run_keeps_a_data_url_and_an_https_url(self, mocker: MockerFixture) -> None:
         _patch_storage_and_config(mocker, is_upload_local_content_enabled=True)
-        await normalize_data_urls_to_storage(
-            _memory_with_image("data:image/png;base64,iVBORw0KGgo="), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE
+        await prepare_file_inputs(
+            _memory_with_image("data:image/png;base64,iVBORw0KGgo="), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, is_relocation_enabled=True
         )
-        await normalize_data_urls_to_storage(_memory_with_image("https://example.com/photo.png"), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE)
+        await prepare_file_inputs(
+            _memory_with_image("https://example.com/photo.png"), storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, is_relocation_enabled=True
+        )
 
     async def test_an_unscoped_run_uploads_a_local_path_as_before(self, mocker: MockerFixture, tmp_path: Path) -> None:
         storage = _patch_storage_and_config(mocker, is_upload_local_content_enabled=True)
         local_file = tmp_path / "photo.png"
         local_file.write_bytes(b"\x89PNG\r\n\x1a\n")
 
-        await normalize_data_urls_to_storage(_memory_with_image(str(local_file)), storage_scope="run_1", read_scope=None)
+        await prepare_file_inputs(_memory_with_image(str(local_file)), storage_scope="run_1", read_scope=None, is_relocation_enabled=True)
 
         storage.store.assert_awaited_once()

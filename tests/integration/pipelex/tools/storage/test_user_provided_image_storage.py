@@ -1,6 +1,6 @@
 """Integration tests for user-provided images with storage providers.
 
-These tests verify the flow: User Input -> normalize_data_urls_to_storage -> Storage -> Retrieval
+These tests verify the flow: User Input -> prepare_file_inputs -> Storage -> Retrieval
 
 Future storage implementations (S3, GCP) must pass these tests to ensure
 compatibility with user-provided image handling.
@@ -18,7 +18,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
+from pipelex.pipeline.input_normalizer import prepare_file_inputs
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.uri.prepared_file import PreparedFileBase64
 from pipelex.urls import URLs
@@ -30,7 +30,7 @@ from tests.cases import ImageTestCases
 class TestUserProvidedImageStorage:
     """Integration tests for user-provided images with storage providers.
 
-    These tests verify the flow: User Input -> normalize_data_urls_to_storage -> Storage -> Retrieval
+    These tests verify the flow: User Input -> prepare_file_inputs -> Storage -> Retrieval
 
     Future storage implementations (S3, GCP) must pass these tests to ensure
     compatibility with user-provided image handling.
@@ -41,7 +41,7 @@ class TestUserProvidedImageStorage:
 
         Flow:
         1. User provides ImageContent with data:// URL
-        2. normalize_data_urls_to_storage converts to pipelex-storage:// URI
+        2. prepare_file_inputs converts to pipelex-storage:// URI
         3. Image can be retrieved via PromptImageFactory -> PreparedImage
         """
         # Create ImageContent with data URL (simulating user input)
@@ -54,7 +54,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize to storage
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
+        normalized_memory = await prepare_file_inputs(working_memory, storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
         # Verify the URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("user_image")
@@ -116,7 +116,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize (should not change HTTP URLs when fetch is disabled)
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
+        normalized_memory = await prepare_file_inputs(working_memory, storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
         # Verify URL was NOT changed
         normalized_stuff = normalized_memory.get_stuff("remote_image")
@@ -141,7 +141,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize - should upload the local file to storage
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
+        normalized_memory = await prepare_file_inputs(working_memory, storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
         # Verify the URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("local_image")
@@ -180,7 +180,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize (should not change local paths when upload is disabled)
-        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope", read_scope=None)
+        normalized_memory = await prepare_file_inputs(working_memory, storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
         # Verify URL was NOT changed
         normalized_stuff = normalized_memory.get_stuff("local_image")
