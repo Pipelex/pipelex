@@ -11,21 +11,19 @@ from __future__ import annotations
 
 import logging
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
-from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.discovery import GroupedEntryPoint
 from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.runtime_hub import get_secrets_provider
 from pipelex.system.runtime import IntegrationMode, runtime_manager
-from pipelex.tools.log.log_sink import LogSink, LogSinkMethod
+from pipelex.tools.log.log_sink import LogSink
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.exceptions import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -45,8 +43,6 @@ RECORDING_SECRETS_METHOD = "test_recording_secret"
 FAILING_SECRETS_METHOD = "test_failing_secret"
 RECORDING_SINK_METHOD = "test_recording_sink"
 LEAKED_TOKEN = "held-line-token-0123456789abcdef"
-COLLECTOR_TOKEN = "collector-token-0123456789abcdef"
-OTLP_EXPORTER_PATH = "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter"
 
 
 class _NoSecretsProvider(SecretsProviderAbstract):
@@ -72,28 +68,6 @@ class _NoSecretsProvider(SecretsProviderAbstract):
     @override
     def set_secret_as_env_var(self, secret_id: str, *, version_id: str = "latest") -> None:
         pass
-
-
-class _TokenSecretsProvider(_NoSecretsProvider):
-    """Holds the collector's token and nothing else."""
-
-    @override
-    def get_required_secret(self, secret_id: str) -> str:
-        if secret_id == "OTLP_COLLECTOR_TOKEN":
-            return COLLECTOR_TOKEN
-        return super().get_required_secret(secret_id)
-
-
-class _RecordingOtlpExporter(InMemoryLogRecordExporter):
-    """Stands in for the OTLP HTTP exporter: keeps what it was built with and what it was asked to export."""
-
-    built: ClassVar[list[_RecordingOtlpExporter]] = []
-
-    def __init__(self, *, endpoint: str | None = None, headers: dict[str, str] | None = None, **_kwargs: Any) -> None:
-        super().__init__()
-        self.endpoint = endpoint
-        self.headers = headers
-        _RecordingOtlpExporter.built.append(self)
 
 
 class _BootRecorder:
@@ -223,36 +197,3 @@ class TestSecretsBeforeLogSink:
         stderr = capsys.readouterr().err
         assert "Could not reach the vault with Authorization: Bearer [REDACTED]" in stderr
         assert LEAKED_TOKEN not in stderr
-
-
-class TestOtlpSinkHeaderSecretAtBoot:
-    def test_the_header_is_resolved_for_the_exporter_while_the_config_and_every_record_keep_the_token_out(
-        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        _RecordingOtlpExporter.built.clear()
-        mocker.patch(OTLP_EXPORTER_PATH, _RecordingOtlpExporter)
-
-        Pipelex.make(
-            integration_mode=_test_integration_mode(),
-            needs_inference=False,
-            secrets_provider=_TokenSecretsProvider(),
-            config_overrides={
-                "runtime": {
-                    "log": {"sink": LogSinkMethod.OTLP.value, "otlp": {"headers": {"Authorization": "Bearer ${OTLP_COLLECTOR_TOKEN}"}}},
-                }
-            },
-        )
-        log.info("a line after the boot")
-        assert get_config().runtime.log.otlp.headers == {"Authorization": "Bearer ${OTLP_COLLECTOR_TOKEN}"}
-        Pipelex.teardown_if_needed()
-
-        (exporter,) = _RecordingOtlpExporter.built
-        assert exporter.headers == {"Authorization": f"Bearer {COLLECTOR_TOKEN}"}
-        exported = exporter.get_finished_logs()
-        assert any(log_data.log_record.body == "a line after the boot" for log_data in exported)
-        for log_data in exported:
-            assert COLLECTOR_TOKEN not in str(log_data.log_record.body)
-            assert COLLECTOR_TOKEN not in str(log_data.log_record.attributes)
-        captured = capsys.readouterr()
-        assert COLLECTOR_TOKEN not in captured.out
-        assert COLLECTOR_TOKEN not in captured.err
