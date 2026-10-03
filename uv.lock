@@ -2738,7 +2738,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.18.0"
+version = "0.19.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2747,9 +2747,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/48/ba/a9b2a7902ccea184c4589f7c9eedeef66aa46a9bd1c8f099a7240669f833/mthds-0.18.0.tar.gz", hash = "sha256:589dfde53672966030b454f099979f91dcc1bd67958585c46ed6c8f89bf0e08c", size = 275816, upload-time = "2026-10-03T15:44:22.98Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/dc/b793c0e03a1a7599bd35d876f46cb801dfe7d83f8f1685beb48672eb6a47/mthds-0.19.0.tar.gz", hash = "sha256:bf49afce9ae9302c524929b00ba4697959a3ffc8bc059d89d6de1e42ec60106a", size = 281433, upload-time = "2026-10-03T22:58:58.201Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/b0/9868dba5ca03b23ba54b7636ebd194e8c16b2eb90a5631f8ad2cb19a5947/mthds-0.18.0-py3-none-any.whl", hash = "sha256:a2778e43b943b9aa3d3ab4f0422d57a6dc1245abe4ce84435c821f26a4d3f599", size = 111480, upload-time = "2026-10-03T15:44:21.441Z" },
+    { url = "https://files.pythonhosted.org/packages/61/f6/332fc128ea66f91996bdd0de9cf1aa779604ec423a29c4bca9285cc89732/mthds-0.19.0-py3-none-any.whl", hash = "sha256:42e0894c063bf2f47b4695e63a4f80429beefe388f20e3d88ffc9d4485c60e0e", size = 111462, upload-time = "2026-10-03T22:58:56.838Z" },
 ]
 
 [[package]]
@@ -3707,7 +3707,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = "==0.18.0" },
+    { name = "mthds", specifier = "==0.19.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },

@@ -53,9 +53,9 @@ SCALAR_ARM_CASES: list[tuple[str, str, Any, str, StuffContent]] = [
         "shaper_test.ShaperInvoice",
         ShaperInvoice(invoice_number="INV-001", amount=1250.0),
     ),
-    # D5 Dynamic and the out-of-matrix natives: bottom-up passthrough.
+    # D5 Dynamic: bottom-up passthrough, whatever the value builds. An out-of-matrix native refuses a
+    # bare value its own shape does not read (see the error cases).
     ("dynamic-str-bottom-up", "native.Dynamic", "hi", "native.Text", TextContent(text="hi")),
-    ("html-out-of-matrix-bottom-up", "native.Html", "hi", "native.Text", TextContent(text="hi")),
     # R1 Anything: the slot keeps its declared concept, and the content is the natural one for the
     # value's JSON type. Nothing is guessed from a string's text: a URL or an ISO date stays text.
     ("anything-string", "native.Anything", "hi", "native.Anything", TextContent(text="hi")),

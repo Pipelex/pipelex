@@ -229,7 +229,7 @@ class InputShaper:
                 # The signature genuinely does not know how to shape this — hand the whole raw value
                 # to the bottom-up factory (today's behavior, including its own list handling).
                 try:
-                    return StuffFactory.make_stuff_from_stuff_content_or_data(
+                    stuff = StuffFactory.make_stuff_from_stuff_content_or_data(
                         stuff_content_or_data=value,
                         concept_provider=concept_provider,
                         name=variable_name,
@@ -257,6 +257,19 @@ class InputShaper:
                         suggested_declaration=suggested_declaration,
                         expected_shape=expected_shape,
                     ) from exc
+                if not NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code) and not concept_provider.is_compatible(
+                    tested_concept=stuff.concept, wanted_concept=declared_concept
+                ):
+                    # The factory reads a bare value by its own shape alone, so a string at an input of a
+                    # native read bottom-up builds a `Text`. Only a `Dynamic` input takes whatever it builds.
+                    raise StructureValidationError.make_for_bare_value_of_another_concept(
+                        variable_name=variable_name,
+                        declared_concept_ref=declared_concept.concept_ref,
+                        provided_description=cls._describe_value(value),
+                        built_concept_ref=stuff.concept.concept_ref,
+                        expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
+                    )
+                return stuff
             case (
                 InputKind.TEXT
                 | InputKind.NUMBER

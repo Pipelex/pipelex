@@ -5,7 +5,7 @@ duplication, and preserved-content riding.
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.pipeline.input_form import FieldKind, InputFormDeriver, NumberField
+from pipelex.pipeline.input_form import FieldKind, FormPosition, InputFormDeriver, NumberField
 from tests.helpers.input_form import as_kind, as_list, fields_by_name
 
 _CONCEPTS: dict[str, ConceptBlueprint | str] = {
@@ -38,7 +38,7 @@ _CONCEPTS: dict[str, ConceptBlueprint | str] = {
 
 
 def _deriver() -> InputFormDeriver:
-    return InputFormDeriver(concepts=dict(_CONCEPTS))
+    return InputFormDeriver(concepts=dict(_CONCEPTS), position=FormPosition.INPUT)
 
 
 class TestConceptEffectiveHints:
@@ -115,6 +115,6 @@ class TestHintFreeByteIdentity:
                 structure={"note": ConceptStructureBlueprint(description="a note", type=ConceptStructureBlueprintFieldType.TEXT)},
             )
         }
-        node = InputFormDeriver(concepts=concepts).derive_concept(name="plain", concept_ref="docs.Plain")
+        node = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="plain", concept_ref="docs.Plain")
         assert "hints" not in node.model_dump()
         assert all("hints" not in field for field in node.model_dump()["fields"])

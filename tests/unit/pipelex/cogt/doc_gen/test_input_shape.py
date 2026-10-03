@@ -5,11 +5,14 @@ from typing import Literal
 from pydantic import Field
 
 from pipelex.cogt.doc_gen.input_shape import InputShape, InputShapeKind, shape_of_class, shape_of_input
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
 class _LineItem(StructuredContent):
@@ -79,6 +82,9 @@ class TestInputShape:
     def test_native_contents_are_leaves(self) -> None:
         assert shape_of_class(TextContent).kind == InputShapeKind.TEXT
         assert shape_of_class(MarkdownContent).kind == InputShapeKind.MARKDOWN
+        assert shape_of_class(YesNoContent).kind == InputShapeKind.BOOLEAN
+        assert shape_of_class(ChoiceContent).kind == InputShapeKind.TEXT
+        assert shape_of_class(RatingContent).kind == InputShapeKind.NUMBER
         assert "url" in shape_of_class(ImageContent).fields
 
     def test_a_recursive_structure_stops_where_it_repeats(self) -> None:

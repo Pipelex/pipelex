@@ -187,6 +187,8 @@ Conversion matrix:
 
 When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
 
+`Choice` and `Rating` are not in the matrix: reach their verdict by path, `{ from = "team.choice" }` or `{ from = "severity.level" }`. A `YesNo` converts to its boolean and leaves its probability behind, so copy `{ from = "approved.probability" }` into a `number` field when you need it.
+
 One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp. The same guard applies per item when copying a `Date[]` into a list of `date` items.
 
 `Time` needs no such guard, and the asymmetry is deliberate: a `Time` is a single value that carries its UTC offset inside the time itself, so copying it into a `time` field is lossless and nothing can be dropped. In the other direction, a whole `Date` does not convert into a `time` field at all — that would drop the date. Use a dotted path instead, `{ from = "deadline.time" }`, to take the time of day out of a `Date`.

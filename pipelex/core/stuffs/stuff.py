@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.exceptions import StuffContentTypeError, StuffContentValidationError
@@ -18,6 +19,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -101,6 +103,14 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     @property
     def is_yes_no(self) -> bool:
         return isinstance(self.content, YesNoContent)
+
+    @property
+    def is_choice(self) -> bool:
+        return isinstance(self.content, ChoiceContent)
+
+    @property
+    def is_rating(self) -> bool:
+        return isinstance(self.content, RatingContent)
 
     @property
     def is_date(self) -> bool:
@@ -237,6 +247,16 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     def as_yes_no(self) -> YesNoContent:
         """Get content as YesNoContent if applicable."""
         return self.content_as(content_type=YesNoContent)
+
+    @property
+    def as_choice(self) -> ChoiceContent:
+        """Get content as ChoiceContent if applicable."""
+        return self.content_as(content_type=ChoiceContent)
+
+    @property
+    def as_rating(self) -> RatingContent:
+        """Get content as RatingContent if applicable."""
+        return self.content_as(content_type=RatingContent)
 
     @property
     def as_date(self) -> DateContent:

@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from pydantic import Field
 from typing_extensions import override
@@ -13,6 +14,9 @@ class YesNoContent(StuffContent):
     # "yes"/"true"/"1"/0/1 into a bool on the dict-content path (model_validate), silently bypassing
     # the no-cross-kind-coercion contract the scalar envelope arm enforces. Only a real bool is accepted.
     yes_no: bool = Field(description="Whether the answer is yes (true) or no (false).", strict=True)
+    probability: float | None = Field(
+        default=None, ge=0, le=1, description="The probability that the answer is yes, from 0 to 1, when the producer reports one."
+    )
 
     @property
     @override
@@ -33,4 +37,8 @@ class YesNoContent(StuffContent):
 
     @override
     def rendered_json(self) -> str:
-        return json.dumps({"yes_no": self.yes_no})
+        # The rendering a prompt reads: the verdict, and the probability only when one was reported.
+        rendered: dict[str, Any] = {"yes_no": self.yes_no}
+        if self.probability is not None:
+            rendered["probability"] = self.probability
+        return json.dumps(rendered)

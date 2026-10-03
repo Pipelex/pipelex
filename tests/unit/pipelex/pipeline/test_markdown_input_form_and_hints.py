@@ -5,7 +5,7 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipeline.hint_warnings import build_hint_warnings
-from pipelex.pipeline.input_form import FieldKind, InputFormDeriver
+from pipelex.pipeline.input_form import FieldKind, FormPosition, InputFormDeriver
 
 _CONCEPTS: dict[str, ConceptBlueprint | str] = {
     # A report refining native Markdown, which refines Text: text-valued, so `label` applies.
@@ -18,7 +18,7 @@ _CONCEPTS: dict[str, ConceptBlueprint | str] = {
 class TestMarkdownInputFormAndHints:
     def test_native_markdown_is_prose(self):
         """A Markdown input is typed as its source, like a Text one: a `prose` node."""
-        node = InputFormDeriver(concepts={}).derive_concept(name="report", concept_ref="native.Markdown")
+        node = InputFormDeriver(concepts={}, position=FormPosition.INPUT).derive_concept(name="report", concept_ref="native.Markdown")
         assert node.kind is FieldKind.PROSE
         assert node.concept_ref == "native.Markdown"
 
@@ -31,7 +31,7 @@ class TestMarkdownInputFormAndHints:
     )
     def test_markdown_chains_are_text_valued_sites(self, concept_ref: str, expected_kind: FieldKind):
         """An intent word applies to a Markdown-backed concept, in the descriptor and in the lint alike."""
-        node = InputFormDeriver(concepts=dict(_CONCEPTS)).derive_concept(name="field", concept_ref=concept_ref)
+        node = InputFormDeriver(concepts=dict(_CONCEPTS), position=FormPosition.INPUT).derive_concept(name="field", concept_ref=concept_ref)
         assert node.kind is expected_kind
 
         crate = LibraryCrate(

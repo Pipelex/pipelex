@@ -188,6 +188,33 @@ class StructureValidationError(InputShapingError):
         )
         return cls(message, variable_name=variable_name, user_action=user_action)
 
+    @classmethod
+    def make_for_bare_value_of_another_concept(
+        cls,
+        *,
+        variable_name: str,
+        declared_concept_ref: str,
+        provided_description: str,
+        built_concept_ref: str,
+        expected_shape: str,
+    ) -> "StructureValidationError":
+        """The refusal for a bare value the bottom-up fallback reads as a concept the input does not accept.
+
+        An input of a native read bottom-up (`Html`, `Page`, `SearchResult`, `Choice`, `Rating`) takes
+        its value in its envelope, so a bare string there reads as a `Text`, which is no such native.
+        The value is right in substance and wrong in form, so the advice is the expected shape, not a
+        different declaration.
+        """
+        message = (
+            f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
+            f"which reads as '{built_concept_ref}', and a '{built_concept_ref}' is not a '{declared_concept_ref}'.\nExpected shape:\n{expected_shape}"
+        )
+        user_action = UserAction(
+            kind=UserActionKind.CHANGE_INPUT,
+            detail=f"Send input '{variable_name}' in the expected shape, which names its concept and spells out its content.",
+        )
+        return cls(message, variable_name=variable_name, user_action=user_action)
+
 
 class ExplicitConceptIncompatibleError(InputShapingError):
     """An explicit envelope/object names a concept incompatible with the declared one (D6).
