@@ -5,6 +5,7 @@ for document understanding. Follows the same pattern as PromptImage.
 """
 
 import base64
+import binascii
 from functools import cached_property
 from typing import Annotated, Literal, Union
 
@@ -17,6 +18,7 @@ from pipelex.tools.misc.filetype_utils import (
     FileType,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
+    guess_file_type_from_bytes,
     mime_type_to_extension,
 )
 from pipelex.tools.misc.hash_utils import hash_sha256
@@ -68,6 +70,10 @@ class PromptDocumentUri(BaseModel):
             return mime_type_to_extension(self.mime_type)
         return UNKNOWN_FILE_TYPE
 
+    def known_mime_type(self) -> str | None:
+        """The MIME type this document is known to have, without loading it: the one run setup stamped, if any."""
+        return self.mime_type
+
     def get_content_hash(self, *, length: int | None = None) -> str:
         """Return a hash of the document content."""
         return hash_sha256(self.uri, length=length)
@@ -87,6 +93,15 @@ class PromptDocumentBase64(BaseModel):
 
     def get_decoded_bytes(self) -> bytes:
         return base64.b64decode(self.base64_data)
+
+    def known_mime_type(self) -> str | None:
+        """The MIME type the bytes identify, or `None` when they identify none or do not decode."""
+        try:
+            raw_bytes = self.get_decoded_bytes()
+        except binascii.Error:
+            return None
+        file_type = guess_file_type_from_bytes(raw_bytes=raw_bytes)
+        return file_type.mime if file_type else None
 
     @override
     def __str__(self) -> str:
@@ -125,6 +140,11 @@ class PromptDocumentBinary(BaseModel):
 
     def get_mime_type(self) -> str:
         return self.get_file_type().mime
+
+    def known_mime_type(self) -> str | None:
+        """The MIME type the bytes identify, or `None` when they identify none."""
+        file_type = guess_file_type_from_bytes(raw_bytes=self.raw_bytes)
+        return file_type.mime if file_type else None
 
     @override
     def __str__(self) -> str:

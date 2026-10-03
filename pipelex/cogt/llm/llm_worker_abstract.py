@@ -9,7 +9,7 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, PromptImageFormatError
+from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, PromptDocumentFormatError, PromptImageFormatError
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
@@ -28,7 +28,12 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
-from pipelex.tools.misc.filetype_utils import IMAGE_FORMAT_KEY, UNKNOWN_FILE_TYPE, describe_format_key, format_key_from_mime_type
+from pipelex.tools.misc.filetype_utils import (
+    IMAGE_FORMAT_KEY,
+    describe_file_format,
+    describe_format_keys,
+    format_key_from_mime_type,
+)
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -444,7 +449,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                     continue
                 msg = (
                     f"Prompt image {image_index} given to model '{self.inference_model.name}' is "
-                    f"{describe_format_key(format_key=format_key)} ({mime_type}), not an image."
+                    f"{describe_file_format(format_key=format_key, mime_type=mime_type)}, not an image."
                 )
                 raise PromptImageFormatError(msg)
 
@@ -456,16 +461,21 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             msg = f"LLM Engine '{self.inference_model.tag}' does not support documents."
             raise LLMCapabilityError(msg)
 
-        # Check each document's type is supported
+        # Each document's known format must be one the model reads. The file is the caller's and
+        # changes from run to run, so a format the model does not read is an input error; an unknown
+        # format is left to the provider.
         supported = self.inference_model.supported_document_types
-        for doc in llm_job.llm_prompt.user_documents:
-            doc_type = doc.get_document_type()
-            # Skip validation for unknown types - let the provider handle it
-            if doc_type == UNKNOWN_FILE_TYPE:
+        for document_index, prompt_document in enumerate(llm_job.llm_prompt.user_documents, start=1):
+            mime_type = prompt_document.known_mime_type()
+            format_key = format_key_from_mime_type(mime_type=mime_type)
+            if format_key is None or format_key in supported:
                 continue
-            if doc_type not in supported:
-                msg = f"LLM Engine '{self.inference_model.tag}' does not support {doc_type} documents."
-                raise LLMCapabilityError(msg)
+            msg = (
+                f"Prompt document {document_index} given to model '{self.inference_model.name}' is "
+                f"{describe_file_format(format_key=format_key, mime_type=mime_type)}, which it does not read: "
+                f"it reads {describe_format_keys(format_keys=supported)}."
+            )
+            raise PromptDocumentFormatError(msg)
 
     async def gen_text(
         self,

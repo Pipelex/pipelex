@@ -12,7 +12,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputFormatError, PipelineInputNotAnImageError
 
 NOT_AN_IMAGE_MESSAGE = (
-    "Input 'referral_letter' expects an image, but the file is a PDF document (application/pdf). Give an image file such as PNG, JPEG or WebP."
+    "Input 'referral_letter' expects an image, but the file is a PDF document (.pdf). Give an image file such as PNG, JPEG or WebP."
 )
 
 

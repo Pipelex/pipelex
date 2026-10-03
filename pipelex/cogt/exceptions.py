@@ -411,6 +411,17 @@ class PromptDocumentFactoryError(CogtError):
     error_category = InferenceErrorCategory.CONTENT
 
 
+class PromptDocumentFormatError(CogtError):
+    """A prompt document's known format is one the LLM does not read.
+
+    A content error, and so in the input domain: the model is fixed by the method and reads the
+    formats it declares, while the file changes from run to run. A model that reads no documents at
+    all is the author's choice of model, which stays an `LLMCapabilityError`.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+
+
 class ImgGenModelNotFoundError(ModelNotFoundError):
     pass
 
@@ -433,6 +444,17 @@ class ImgGenGeneratedTypeError(ImgGenGenerationError):
 
 class ExtractCapabilityError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
+
+
+class ExtractInputFormatError(CogtError):
+    """The file given to an extraction has a known format that the extract model does not read.
+
+    A content error, and so in the input domain: the model is fixed by the method and reads the
+    formats it declares, while the file changes from run to run, and the person who can act is the
+    one supplying it.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class ExtractJobFailureError(CogtError):

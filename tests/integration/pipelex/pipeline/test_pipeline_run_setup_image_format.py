@@ -71,7 +71,7 @@ class TestPipelineRunSetupImageFormat:
         assert report.error_domain == ErrorDomain.INPUT
         assert error_domain_to_http_status(report.error_domain) == 422
         assert report.http_status == 422
-        assert f"Input '{refused_input}' expects an image, but the file is a PDF document (application/pdf)" in report.message
+        assert f"Input '{refused_input}' expects an image, but the file is a PDF document (.pdf)" in report.message
 
     async def test_images_pass_setup(self):
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)

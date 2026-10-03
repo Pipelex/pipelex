@@ -49,7 +49,7 @@ from pipelex.tools.misc.filetype_utils import (
     FILE_HEAD_NB_BYTES,
     IMAGE_FORMAT_KEY,
     UNKNOWN_FILE_TYPE,
-    describe_format_key,
+    describe_file_format,
     format_key_from_mime_type,
     guess_file_type_from_bytes,
     identify_mime_type,
@@ -541,7 +541,7 @@ def _identify_file_input(*, content: NormalizableContent, head: bytes | None, de
     if format_key is None or format_key == IMAGE_FORMAT_KEY:
         return mime_type
     msg = (
-        f"Input '{input_name}' expects an image, but the file is {describe_format_key(format_key=format_key)} ({mime_type}). "
+        f"Input '{input_name}' expects an image, but the file is {describe_file_format(format_key=format_key, mime_type=mime_type)}. "
         "Give an image file such as PNG, JPEG or WebP."
     )
     raise PipelineInputNotAnImageError(msg)

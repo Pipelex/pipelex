@@ -96,7 +96,7 @@ class TestLLMWorkerPromptImageFormat:
         with pytest.raises(PromptImageFormatError) as exc_info:
             await worker.gen_text(llm_job=_make_llm_job(user_images=[png_image, pdf_image]))
 
-        assert str(exc_info.value) == ("Prompt image 2 given to model 'gpt-vision-test' is a PDF document (application/pdf), not an image.")
+        assert str(exc_info.value) == ("Prompt image 2 given to model 'gpt-vision-test' is a PDF document (.pdf), not an image.")
         assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
         assert worker.nb_provider_calls == 0
 

@@ -28,7 +28,6 @@ from pipelex.pipeline.exceptions import PipelineInputNotAnImageError
 from pipelex.pipeline.input_normalizer import prepare_file_inputs
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 
-DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 DOCX_BYTES = Path("tests/data/documents/CV-ELIAS-THORNE.docx").read_bytes()
 PDF_BYTES = Path("tests/data/documents/solar_system.pdf").read_bytes()
 PNG_BYTES = Path("tests/data/images/logo-tiny.png").read_bytes()
@@ -91,8 +90,7 @@ class TestInputNormalizerImageCheck:
             await prepare_file_inputs(memory, storage_scope=STORAGE_SCOPE, read_scope=None, is_relocation_enabled=is_relocation_enabled)
 
         assert str(exc_info.value) == (
-            "Input 'referral_letter' expects an image, but the file is a PDF document (application/pdf). "
-            "Give an image file such as PNG, JPEG or WebP."
+            "Input 'referral_letter' expects an image, but the file is a PDF document (.pdf). Give an image file such as PNG, JPEG or WebP."
         )
         assert not (tmp_path / "storage").exists() or _stored_keys(root=tmp_path / "storage") == set()
 
@@ -101,7 +99,7 @@ class TestInputNormalizerImageCheck:
 
         with pytest.raises(
             PipelineInputNotAnImageError,
-            match=re.escape(f"Input 'photo' expects an image, but the file is a Word document ({DOCX_MIME})"),
+            match=re.escape("Input 'photo' expects an image, but the file is a Word document (.docx)."),
         ):
             await prepare_file_inputs(_memory(photo=ImageContent(url=uri)), storage_scope=STORAGE_SCOPE, read_scope=None, is_relocation_enabled=True)
 

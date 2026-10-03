@@ -12,7 +12,9 @@ import pytest
 
 from pipelex.tools.misc.filetype_utils import (
     FILE_HEAD_NB_BYTES,
+    describe_file_format,
     describe_format_key,
+    describe_format_keys,
     format_key_from_mime_type,
     guess_file_type_from_bytes,
     identify_mime_type,
@@ -118,3 +120,29 @@ class TestFileFormatKeys:
     )
     def test_describes_a_key_in_plain_words(self, format_key: str, expected: str):
         assert describe_format_key(format_key=format_key) == expected
+
+    @pytest.mark.parametrize(
+        ("format_key", "mime_type", "expected"),
+        [
+            ("pdf", "application/pdf", "a PDF document (.pdf)"),
+            ("docx", DOCX_MIME, "a Word document (.docx)"),
+            ("image", "image/png", "an image (image/png)"),
+            ("md", "text/markdown", "a .md file (.md)"),
+        ],
+    )
+    def test_describes_a_file_with_the_type_that_tells_it_apart(self, format_key: str, mime_type: str, expected: str):
+        assert describe_file_format(format_key=format_key, mime_type=mime_type) == expected
+
+    @pytest.mark.parametrize(
+        ("format_keys", "expected"),
+        [
+            ({"pdf"}, "PDF"),
+            ({"image", "pdf"}, "PDF and images"),
+            ({"html", "xlsx", "pptx", "docx", "pdf"}, "PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx) and HTML"),
+            ({"web_page"}, "web pages"),
+            ({"md", "pdf"}, "PDF and .md"),
+            (set[str](), "no file format"),
+        ],
+    )
+    def test_describes_a_set_of_readable_formats_in_a_stable_order(self, format_keys: set[str], expected: str):
+        assert describe_format_keys(format_keys=format_keys) == expected

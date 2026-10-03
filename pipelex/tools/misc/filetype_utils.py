@@ -1,6 +1,7 @@
 import base64
 import binascii
 import mimetypes
+from collections.abc import Collection
 from pathlib import Path
 from typing import Final
 
@@ -195,6 +196,21 @@ _FORMAT_KEY_DESCRIPTIONS: Final[dict[str, str]] = {
 }
 
 
+# How a list of readable formats names each key, in the order it lists them: `PDF and images`.
+_FORMAT_KEY_LIST_NAMES: Final[dict[str, str]] = {
+    "pdf": "PDF",
+    "docx": "Word (.docx)",
+    "doc": "Word 97-2003 (.doc)",
+    "pptx": "PowerPoint (.pptx)",
+    "ppt": "PowerPoint 97-2003 (.ppt)",
+    "xlsx": "Excel (.xlsx)",
+    "xls": "Excel 97-2003 (.xls)",
+    "html": "HTML",
+    IMAGE_FORMAT_KEY: "images",
+    "web_page": "web pages",
+}
+
+
 def _base_mime_type(*, mime_type: str) -> str:
     """The MIME type without its parameters, lowercased: `Text/Plain; charset=utf-8` → `text/plain`."""
     return mime_type.split(";", 1)[0].strip().lower()
@@ -229,6 +245,30 @@ def describe_format_key(*, format_key: str) -> str:
     if description := _FORMAT_KEY_DESCRIPTIONS.get(format_key):
         return description
     return f"a .{format_key} file"
+
+
+def describe_file_format(*, format_key: str, mime_type: str | None) -> str:
+    """A file's format in plain words with the type that tells it apart: `a Word document (.docx)`.
+
+    An image is told apart by its MIME type, since every image shares the `image` key:
+    `an image (image/png)`.
+    """
+    description = describe_format_key(format_key=format_key)
+    if format_key == IMAGE_FORMAT_KEY:
+        return f"{description} ({mime_type})" if mime_type else description
+    return f"{description} (.{format_key})"
+
+
+def describe_format_keys(*, format_keys: Collection[str]) -> str:
+    """A set of readable formats in plain words, in a stable order: `PDF, Word (.docx) and images`."""
+    known_keys = [format_key for format_key in _FORMAT_KEY_LIST_NAMES if format_key in format_keys]
+    other_keys = sorted(set(format_keys) - set(_FORMAT_KEY_LIST_NAMES))
+    names = [_FORMAT_KEY_LIST_NAMES[format_key] for format_key in known_keys] + [f".{format_key}" for format_key in other_keys]
+    if not names:
+        return "no file format"
+    if len(names) == 1:
+        return names[0]
+    return f"{', '.join(names[:-1])} and {names[-1]}"
 
 
 def guess_file_type_from_bytes(*, raw_bytes: bytes) -> FileType | None:

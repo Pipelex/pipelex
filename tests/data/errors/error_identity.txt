@@ -92,6 +92,7 @@ ExplicitConceptIncompatibleError | Explicit concept incompatible | https://docs.
 ExtractCapabilityError | Extract capability | https://docs.pipelex.com/latest/errors/extract-capability-error/
 ExtractHandleNotFoundError | Extract handle not found | https://docs.pipelex.com/latest/errors/extract-handle-not-found-error/
 ExtractInputError | Extract input | https://docs.pipelex.com/latest/errors/extract-input-error/
+ExtractInputFormatError | Extract input format | https://docs.pipelex.com/latest/errors/extract-input-format-error/
 ExtractJobFailureError | Extract job failure | https://docs.pipelex.com/latest/errors/extract-job-failure-error/
 ExtractModelNotFoundError | Extract model not found | https://docs.pipelex.com/latest/errors/extract-model-not-found-error/
 ExtractOutputError | Extract output | https://docs.pipelex.com/latest/errors/extract-output-error/
@@ -287,6 +288,7 @@ PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/
 PortkeyError | Portkey | https://docs.pipelex.com/latest/errors/portkey-error/
 PortkeyFactoryError | Portkey factory | https://docs.pipelex.com/latest/errors/portkey-factory-error/
 PromptDocumentFactoryError | Prompt document factory | https://docs.pipelex.com/latest/errors/prompt-document-factory-error/
+PromptDocumentFormatError | Prompt document format | https://docs.pipelex.com/latest/errors/prompt-document-format-error/
 PromptImageFactoryError | Prompt image factory | https://docs.pipelex.com/latest/errors/prompt-image-factory-error/
 PromptImageFormatError | Prompt image format | https://docs.pipelex.com/latest/errors/prompt-image-format-error/
 PyPdfium2RendererError | Py pdfium 2 renderer | https://docs.pipelex.com/latest/errors/py-pdfium2-renderer-error/
