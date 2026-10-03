@@ -64,6 +64,7 @@
       "enum_members": [
         "doc_gen",
         "img_gen",
+        "judgment",
         "llm",
         "search",
         "text_extractor"

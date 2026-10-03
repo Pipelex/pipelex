@@ -72,16 +72,19 @@ def _make_fake_model_deck() -> Any:
         extract_presets = TestData.EXTRACT_PRESETS
         img_gen_presets = TestData.IMG_GEN_PRESETS
         search_presets: ClassVar[dict[str, Any]] = {}
+        judgment_presets: ClassVar[dict[str, Any]] = {}
 
         llm_aliases = TestData.LLM_ALIASES
         extract_aliases = TestData.EXTRACT_ALIASES
         img_gen_aliases = TestData.IMG_GEN_ALIASES
         search_aliases: ClassVar[dict[str, str]] = {}
+        judgment_aliases: ClassVar[dict[str, str]] = {}
 
         llm_waterfalls = TestData.LLM_WATERFALLS
         extract_waterfalls = TestData.EXTRACT_WATERFALLS
         img_gen_waterfalls = TestData.IMG_GEN_WATERFALLS
         search_waterfalls: ClassVar[dict[str, list[str]]] = {}
+        judgment_waterfalls: ClassVar[dict[str, list[str]]] = {}
 
         def get_optional_inference_model(self, model_handle: str, model_type: ModelType) -> _FakeInferenceModelSpec | None:
             entry = TestData.INFERENCE_MAP.get(model_handle)

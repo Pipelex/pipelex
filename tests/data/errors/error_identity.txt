@@ -143,11 +143,16 @@ InputStuffSpecsFactoryError | Input stuff specs factory | https://docs.pipelex.c
 Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/jinja2-context-error/
 Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
 Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/
+Jinja2TemplateBudgetError | Template render budget exceeded | https://docs.pipelex.com/latest/errors/jinja2-template-budget-error/
 Jinja2TemplateRenderError | Jinja 2 template render | https://docs.pipelex.com/latest/errors/jinja2-template-render-error/
 Jinja2TemplateSecurityError | Jinja 2 template security | https://docs.pipelex.com/latest/errors/jinja2-template-security-error/
 Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/
 JobMetadataError | Job metadata | https://docs.pipelex.com/latest/errors/job-metadata-error/
 JsonTypeError | Json type | https://docs.pipelex.com/latest/errors/json-type-error/
+JudgmentAnswerMismatchError | Judgment answer mismatch | https://docs.pipelex.com/latest/errors/judgment-answer-mismatch-error/
+JudgmentHandleNotFoundError | Judgment handle not found | https://docs.pipelex.com/latest/errors/judgment-handle-not-found-error/
+JudgmentJobFailureError | Judgment job failure | https://docs.pipelex.com/latest/errors/judgment-job-failure-error/
+JudgmentModelNotFoundError | Judgment model not found | https://docs.pipelex.com/latest/errors/judgment-model-not-found-error/
 KitError | Kit | https://docs.pipelex.com/latest/errors/kit-error/
 KitIndexLoadingError | Kit index loading | https://docs.pipelex.com/latest/errors/kit-index-loading-error/
 LLMAssignmentError | LLM assignment | https://docs.pipelex.com/latest/errors/llm-assignment-error/
@@ -331,6 +336,9 @@ TemplateSigilSyntaxError | Template sigil syntax | https://docs.pipelex.com/late
 TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error/
 ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
+TypesafeError | Typesafe | https://docs.pipelex.com/latest/errors/typesafe-error/
+TypesafeJudgmentResponseError | Typesafe judgment response | https://docs.pipelex.com/latest/errors/typesafe-judgment-response-error/
+TypesafeQuestionUnsupportedError | Typesafe question unsupported | https://docs.pipelex.com/latest/errors/typesafe-question-unsupported-error/
 UnknownBootOrchestratorError | Unknown boot orchestrator | https://docs.pipelex.com/latest/errors/unknown-boot-orchestrator-error/
 UnknownInputNameError | Unknown input name | https://docs.pipelex.com/latest/errors/unknown-input-name-error/
 UnknownLogSinkError | Unknown log sink | https://docs.pipelex.com/latest/errors/unknown-log-sink-error/

@@ -6818,6 +6818,7 @@ components:
       - huggingface
       - gateway
       - linkup
+      - typesafe
       - docling
       - pypdfium2
       title: ProviderName

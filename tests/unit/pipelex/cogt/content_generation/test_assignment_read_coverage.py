@@ -20,6 +20,7 @@ from pipelex.cogt.content_generation import assignment_models
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
+    JudgmentAssignment,
     LLMAssignment,
     ObjectAssignment,
     RenderDocumentAssignment,
@@ -62,6 +63,7 @@ URL_FIELD_INVENTORY: dict[type[BaseModel], set[str]] = {
     RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url"},
     SearchAssignment: set(),
     SearchObjectAssignment: set(),
+    JudgmentAssignment: set(),
 }
 
 

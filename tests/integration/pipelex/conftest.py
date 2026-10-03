@@ -7,6 +7,7 @@ This conftest.py imports fixtures from organized modules, making them available 
 from .fixtures.combo_fixtures import (
     extract_combo,
     img_gen_combo,
+    judgment_combo,
     llm_combo,
     search_combo,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "img_gen_combo",
     "extract_combo",
     "search_combo",
+    "judgment_combo",
     # Model handle fixtures
     "model_handle_for_openai",
     "model_handle_for_anthropic",

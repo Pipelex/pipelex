@@ -15,6 +15,8 @@ from pipelex.cogt.exceptions import (
     ExtractModelNotFoundError,
     ImgGenGenerationError,
     ImgGenModelNotFoundError,
+    JudgmentJobFailureError,
+    JudgmentModelNotFoundError,
     LLMCompletionError,
     LLMModelNotFoundError,
     ModelNotFoundError,
@@ -39,6 +41,7 @@ class InferenceErrorFamily(StrEnum):
     IMG_GEN = "img_gen"
     EXTRACT = "extract"
     SEARCH = "search"
+    JUDGMENT = "judgment"
 
 
 # Generic failure error class per family — used when the error is not a missing model.
@@ -47,6 +50,7 @@ _FAILURE_CLASSES: dict[InferenceErrorFamily, type[CogtError]] = {
     InferenceErrorFamily.IMG_GEN: ImgGenGenerationError,
     InferenceErrorFamily.EXTRACT: ExtractJobFailureError,
     InferenceErrorFamily.SEARCH: SearchJobFailureError,
+    InferenceErrorFamily.JUDGMENT: JudgmentJobFailureError,
 }
 
 # Model-not-found error class per family — used when ``is_model_not_found`` is set.
@@ -55,6 +59,7 @@ _NOT_FOUND_CLASSES: dict[InferenceErrorFamily, type[ModelNotFoundError]] = {
     InferenceErrorFamily.IMG_GEN: ImgGenModelNotFoundError,
     InferenceErrorFamily.EXTRACT: ExtractModelNotFoundError,
     InferenceErrorFamily.SEARCH: SearchModelNotFoundError,
+    InferenceErrorFamily.JUDGMENT: JudgmentModelNotFoundError,
 }
 
 

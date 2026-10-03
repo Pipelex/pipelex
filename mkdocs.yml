@@ -368,6 +368,7 @@ plugins:
         - contribute/actions-allowlist.md: "Actions Allowlist"
         - contribute/test-duration-map.md: "Test Duration Map"
         - contribute/registration-surface.md: "Registration Surface"
+        - contribute/inference-family-surface.md: "Inference Family Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
         - contribute/mthds-test-corpus.md: "MTHDS Test Corpus"
         - contribute/trace-input-semantics.md: "Tracing Input Semantics"
@@ -620,6 +621,7 @@ nav:
     - Actions Allowlist: contribute/actions-allowlist.md
     - Test Duration Map: contribute/test-duration-map.md
     - Registration Surface: contribute/registration-surface.md
+    - Inference Family Surface: contribute/inference-family-surface.md
     - Drift Contracts: contribute/drift-contracts.md
     - MTHDS Test Corpus: contribute/mthds-test-corpus.md
     - Tracing Input Semantics: contribute/trace-input-semantics.md
