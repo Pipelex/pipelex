@@ -4604,6 +4604,10 @@ rationale = "Verb-object: loads the given library dirs; options stay keyword."
 param = "pipe"
 rationale = "Verb-object: prepares the job for the pipe; job fields stay keyword."
 
+["pipelex/pipeline/file_input_consumers.py::collect_file_input_consumers"]
+param = "entry_pipe"
+rationale = "Collects the file input consumers of the entry pipe, its single operand."
+
 ["pipelex/pipeline/fixes/applicability.py::is_safe_fix_for_load_scope"]
 param = "fix"
 rationale = "Predicate on the fix; is_single_file is context."

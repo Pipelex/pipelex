@@ -46,7 +46,8 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
-from pipelex.pipeline.input_normalizer import prepare_file_inputs
+from pipelex.pipeline.file_input_consumers import check_file_inputs_against_consumers
+from pipelex.pipeline.input_normalizer import collect_file_inputs, prepare_file_inputs
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
@@ -339,6 +340,9 @@ async def prepare_pipe_job(
             read_scope=read_scope,
             is_relocation_enabled=execution_config.is_normalize_data_urls_to_storage,
         )
+        # Refuse the run now, rather than at the step that would fail mid-run, when a file input is
+        # certain to reach a pipe whose model cannot read its format.
+        check_file_inputs_against_consumers(entry_pipe=pipe, file_inputs=collect_file_inputs(working_memory))
 
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(

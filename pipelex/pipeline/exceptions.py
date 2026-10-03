@@ -444,6 +444,22 @@ class PipelineInputNotAnImageError(PipelineInputFormatError):
     )
 
 
+class PipelineInputFormatUnsupportedError(PipelineInputFormatError):
+    """A file input is certain to reach a pipe whose model cannot read its format.
+
+    Raised at run setup by the pre-run consumer check, which walks the entry pipe to find the
+    operators each input reaches. It refuses only a consumer that is certain to run, reached through
+    no condition and no liftable step, and resolved to a model that does not read the file's known
+    format. One error lists every violation, each naming the input, the format, the pipe, the model
+    and the formats that model reads.
+    """
+
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Give each file input in a format the model of the pipe that consumes it reads.",
+    )
+
+
 class PipelineInputUrlMissingError(PipelineInputContentError):
     """An Image/Document input carries a blank url.
 

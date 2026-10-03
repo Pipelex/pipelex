@@ -33,6 +33,7 @@ own page. Classes are grouped by subsystem.
 - [`PipelineExecutionError`](pipeline-execution-error.md) — Pipeline execution
 - [`PipelineInputContentError`](pipeline-input-content-error.md) — Pipeline input content
 - [`PipelineInputFormatError`](pipeline-input-format-error.md) — Pipeline input format
+- [`PipelineInputFormatUnsupportedError`](pipeline-input-format-unsupported-error.md) — Pipeline input format unsupported
 - [`PipelineInputNotAnImageError`](pipeline-input-not-an-image-error.md) — Pipeline input not an image
 - [`PipelineInputUrlInvalidError`](pipeline-input-url-invalid-error.md) — Pipeline input url invalid
 - [`PipelineInputUrlMissingError`](pipeline-input-url-missing-error.md) — Pipeline input url missing

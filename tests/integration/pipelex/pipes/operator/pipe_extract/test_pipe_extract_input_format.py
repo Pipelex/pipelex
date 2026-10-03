@@ -30,6 +30,7 @@ type = "PipeExtract"
 description = "Extract the transcript"
 inputs = { transcript = "Document" }
 output = "Page[]"
+model = "docling-extract-text"
 
 [pipe.extract_scan]
 type = "PipeExtract"

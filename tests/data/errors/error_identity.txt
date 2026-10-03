@@ -274,6 +274,7 @@ PipelexUnexpectedError | Unexpected internal error | https://docs.pipelex.com/la
 PipelineExecutionError | Pipeline execution | https://docs.pipelex.com/latest/errors/pipeline-execution-error/
 PipelineInputContentError | Pipeline input content | https://docs.pipelex.com/latest/errors/pipeline-input-content-error/
 PipelineInputFormatError | Pipeline input format | https://docs.pipelex.com/latest/errors/pipeline-input-format-error/
+PipelineInputFormatUnsupportedError | Pipeline input format unsupported | https://docs.pipelex.com/latest/errors/pipeline-input-format-unsupported-error/
 PipelineInputNotAnImageError | Pipeline input not an image | https://docs.pipelex.com/latest/errors/pipeline-input-not-an-image-error/
 PipelineInputUrlInvalidError | Pipeline input url invalid | https://docs.pipelex.com/latest/errors/pipeline-input-url-invalid-error/
 PipelineInputUrlMissingError | Pipeline input url missing | https://docs.pipelex.com/latest/errors/pipeline-input-url-missing-error/
