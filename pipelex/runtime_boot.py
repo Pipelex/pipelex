@@ -557,9 +557,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         log_config = get_config().runtime.log
         log_sink_registry = LogSinkRegistry(plugin_registrar.log_sinks)
         log.install_sink(log_sink_registry.get_required(method=log_config.sink)(log_config))
-        # The pretty-print mode is checked beside the sink, for the same reason: Rich is the ``cli`` extra,
-        # and a process asking for the ``rich`` panels without it stops here, naming the extra and the
-        # Rich-free modes, rather than failing at the first pipe that prints its output.
+        # The pretty-print mode is checked beside the sink, for the same reason: a process asking for the
+        # ``rich`` panels without Rich installed stops here, naming the ``cli`` extra and the Rich-free modes,
+        # rather than failing at the first pipe that prints its output. The check asks whether Rich imports,
+        # not whether the extra was named, and ``typer`` and ``instructor`` install Rich anyway.
         if log_config.pretty_print_mode is PrettyPrintMode.RICH:
             require_rich_for_rendering()
 
