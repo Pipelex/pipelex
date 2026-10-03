@@ -192,9 +192,11 @@ def build_output_form(pipes: Sequence[PipeAbstract], *, qualified_crate: Qualifi
     """Derive the `output_form` descriptors of loaded pipes — what each pipe RESOLVES TO, described.
 
     The twin of `build_input_form`, iterating the same pipes in the same order so all three
-    validate artifacts share one key set, and reusing the same deriver: an output is a concept ref
-    exactly like an input is, so its kinds, its nesting and its constraints are the same questions
-    with the same answers. `derive_concept` is the entry point that describes a concept on its own,
+    validate artifacts share one key set, and reusing the same derivation told its position: an
+    output is a concept ref exactly like an input is, so its kinds, its nesting and its constraints
+    are the same questions with the same answers, except for `YesNo`, which the output position
+    states as an `object` carrying its probability where the input position takes the bare boolean.
+    `derive_concept` is the entry point that describes a concept on its own,
     which is precisely what an output is — a node belonging to no slot. It is not a new code path
     either: it is what runs for every nested concept field of every input.
 
