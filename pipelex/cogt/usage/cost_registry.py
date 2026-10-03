@@ -1,16 +1,15 @@
 import csv
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, assert_never
 
 from pydantic import Field, RootModel
-from rich import box
-from rich.table import Table
 
 from pipelex import log
 from pipelex.cogt.exceptions import CostRegistryError
 from pipelex.cogt.extract.extract_report import ExtractTokenCostReport, ExtractTokenCostReportField, ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokenCostReport, ImgGenTokenCostReportField, ImgGenTokensUsage
+from pipelex.cogt.judgment.judgment_report import JudgmentTokenCostReport, JudgmentTokenCostReportField, JudgmentTokensUsage
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage
 from pipelex.cogt.search.search_report import SearchTokenCostReport, SearchTokenCostReportField, SearchTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
@@ -19,8 +18,8 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.runtime_hub import get_console
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
-TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage
-TokenCostReport = LLMTokenCostReport | ImgGenTokenCostReport | ExtractTokenCostReport | SearchTokenCostReport
+TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage | JudgmentTokensUsage
+TokenCostReport = LLMTokenCostReport | ImgGenTokenCostReport | ExtractTokenCostReport | SearchTokenCostReport | JudgmentTokenCostReport
 CostRegistryRoot = list[TokenCostReport]
 
 
@@ -158,8 +157,18 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             msg = "Empty report aggregation by model name"
             raise CostRegistryError(msg)
 
+        # The CSV report is written first because it is the output that does not need Rich, the `cli` extra.
+        # Rendering the console table ahead of it would make a process without the extra lose both: the caller
+        # downgrades the missing-dependency error to a warning, so the loss would be silent.
+        if cost_report_file_path:
+            cls.save_to_csv(records, file_path=cost_report_file_path)
+
         if print_to_console:
+            # The console table is the one output here that needs Rich.
             console = get_console()
+            from rich import box
+            from rich.table import Table
+
             title = f"Costs by model for pipeline '{pipeline_run_id}'"
             table = Table(title=title, box=box.ROUNDED)
 
@@ -223,9 +232,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             console.print(table)
             console.print(" [dim]Note: some costs might be missing or not up-to-date.[/dim]")
 
-        if cost_report_file_path:
-            cls.save_to_csv(records, file_path=cost_report_file_path)
-
     @staticmethod
     def save_to_csv(records: list[dict[str, Any]], *, file_path: Path) -> None:
         """Save records to CSV file."""
@@ -271,7 +277,8 @@ class CostRegistry(RootModel[CostRegistryRoot]):
                 record.get(report_field.LLM_NAME)
                 or record.get(ImgGenTokenCostReportField.IMG_GEN_NAME)
                 or record.get(ExtractTokenCostReportField.EXTRACT_NAME)
-                or record.get(SearchTokenCostReportField.SEARCH_NAME, "unknown")
+                or record.get(SearchTokenCostReportField.SEARCH_NAME)
+                or record.get(JudgmentTokenCostReportField.JUDGMENT_NAME, "unknown")
             )
             model_types[model_name] = record.get(report_field.MODEL_TYPE, "llm")
             if model_name not in grouped_by_model:
@@ -355,41 +362,60 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             )
             costs_by_token_category[token_type.to_cost_category] = cost_per_token * nb_tokens
 
-        if isinstance(tokens_usage, LLMTokensUsage):
-            return LLMTokenCostReport(
-                model_type=tokens_usage.model_type,
-                job_metadata=tokens_usage.job_metadata,
-                inference_model_name=tokens_usage.inference_model_name,
-                platform_model_id=tokens_usage.inference_model_id,
-                nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
-                costs_by_token_category=costs_by_token_category,
-            )
-        if isinstance(tokens_usage, ImgGenTokensUsage):
-            return ImgGenTokenCostReport(
-                model_type=tokens_usage.model_type,
-                job_metadata=tokens_usage.job_metadata,
-                inference_model_name=tokens_usage.inference_model_name,
-                platform_model_id=tokens_usage.inference_model_id,
-                nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
-                costs_by_token_category=costs_by_token_category,
-            )
-        if isinstance(tokens_usage, SearchTokensUsage):
-            return SearchTokenCostReport(
-                model_type=tokens_usage.model_type,
-                job_metadata=tokens_usage.job_metadata,
-                inference_model_name=tokens_usage.inference_model_name,
-                platform_model_id=tokens_usage.inference_model_id,
-                nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
-                costs_by_token_category=costs_by_token_category,
-            )
-        return ExtractTokenCostReport(
-            model_type=tokens_usage.model_type,
-            job_metadata=tokens_usage.job_metadata,
-            inference_model_name=tokens_usage.inference_model_name,
-            platform_model_id=tokens_usage.inference_model_id,
-            nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
-            costs_by_token_category=costs_by_token_category,
-        )
+        # A match over the usage classes rather than an if-chain ending in a bare return, and the
+        # difference is the last arm. The dispatch used to let everything it did not recognise fall
+        # through to an extract report, so a new family's usage silently billed as an extraction,
+        # under the wrong model-type label. The trailing `case _` is not a catch-all that hides a
+        # missing arm — it is the opposite: `assert_never` fails the type check the day the union
+        # grows an arm this match does not handle, which is how the fallthrough is now impossible.
+        match tokens_usage:
+            case LLMTokensUsage():
+                return LLMTokenCostReport(
+                    model_type=tokens_usage.model_type,
+                    job_metadata=tokens_usage.job_metadata,
+                    inference_model_name=tokens_usage.inference_model_name,
+                    platform_model_id=tokens_usage.inference_model_id,
+                    nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
+                    costs_by_token_category=costs_by_token_category,
+                )
+            case ImgGenTokensUsage():
+                return ImgGenTokenCostReport(
+                    model_type=tokens_usage.model_type,
+                    job_metadata=tokens_usage.job_metadata,
+                    inference_model_name=tokens_usage.inference_model_name,
+                    platform_model_id=tokens_usage.inference_model_id,
+                    nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
+                    costs_by_token_category=costs_by_token_category,
+                )
+            case SearchTokensUsage():
+                return SearchTokenCostReport(
+                    model_type=tokens_usage.model_type,
+                    job_metadata=tokens_usage.job_metadata,
+                    inference_model_name=tokens_usage.inference_model_name,
+                    platform_model_id=tokens_usage.inference_model_id,
+                    nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
+                    costs_by_token_category=costs_by_token_category,
+                )
+            case JudgmentTokensUsage():
+                return JudgmentTokenCostReport(
+                    model_type=tokens_usage.model_type,
+                    job_metadata=tokens_usage.job_metadata,
+                    inference_model_name=tokens_usage.inference_model_name,
+                    platform_model_id=tokens_usage.inference_model_id,
+                    nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
+                    costs_by_token_category=costs_by_token_category,
+                )
+            case ExtractTokensUsage():
+                return ExtractTokenCostReport(
+                    model_type=tokens_usage.model_type,
+                    job_metadata=tokens_usage.job_metadata,
+                    inference_model_name=tokens_usage.inference_model_name,
+                    platform_model_id=tokens_usage.inference_model_id,
+                    nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
+                    costs_by_token_category=costs_by_token_category,
+                )
+            case _:
+                assert_never(tokens_usage)
 
     @classmethod
     def complete_cost_report(cls, tokens_usage: TokensUsage) -> TokenCostReport:

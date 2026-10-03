@@ -17,6 +17,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Reasoning Controls** - How reasoning effort/budget flows to each provider's SDK
 - **Error Model** - How errors are classified, carried across every layer, and reported to humans, agents, and HTTP APIs
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
+- **Template Sandbox** - What a method's templates may read and call, and how everything else is refused
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Init CLI Flows** - How `pipelex init` sets up the configuration directory
@@ -42,6 +43,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
 - [:material-brain: Reasoning Controls](./reasoning-controls.md){ .md-button }
 - [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md){ .md-button }
+- [:material-shield-lock: Template Sandbox](./template-sandbox.md){ .md-button }
 - [:material-test-tube: Test Profile Configuration](./test-profile-configuration.md){ .md-button }
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }

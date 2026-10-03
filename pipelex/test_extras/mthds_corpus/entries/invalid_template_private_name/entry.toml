@@ -1,0 +1,12 @@
+name = "invalid_template_private_name"
+description = "An intake summary whose prompt reaches past the triage note's fields for the object that wraps it"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.template_private_name",
+]
+
+expected_error = "template_private_name"

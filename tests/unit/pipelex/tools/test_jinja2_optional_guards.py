@@ -97,7 +97,7 @@ class TestDetectUnguardedOptionalReferences:
         assert findings[0].path == "assessment"
 
     def test_expression_category_supported(self):
-        """The PipeCondition presence-branching idiom (design §15) lints clean."""
+        """The PipeCondition presence-branching idiom lints clean."""
         findings = detect_unguarded_optional_references(
             template_category=TemplateCategory.EXPRESSION,
             template_source="{{ 'present' if penalty_clause is defined else 'absent' }}",

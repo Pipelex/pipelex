@@ -8,18 +8,18 @@ any dispatch logic so they can be referenced (e.g. by the orchestrator SPI /
 import cycle: pydantic, the orchestration/delivery types, stdlib typing only.
 """
 
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
 # Import-light by design (see module docstring): `storage_scope` and
-# `analytics_groups` each pull in `re` and nothing else, so validating here
+# `extras` each pull in `re` and nothing else, so validating here
 # costs the boundary nothing.
-from pipelex.system.analytics_groups import validate_analytics_groups
-from pipelex.system.storage_scope import validate_storage_scope
+from pipelex.system.run_extras import validate_run_extras
+from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
 
 
 class PipelexPipeRunInput(BaseModel):
@@ -52,15 +52,36 @@ class PipelexPipeRunInput(BaseModel):
         """
         return validate_storage_scope(value=value)
 
-    # The opaque groups this run's telemetry belongs to. Unlike the two fields
-    # above it DEFAULTS: a host with no groups to send invents nothing by
-    # staying silent, whereas a missing identity or scope used to be invented
-    # for it. See `pipelex.system.analytics_groups`.
-    analytics_groups: dict[str, str] = Field(default_factory=dict)
+    # The prefix every storage key the run reads must lie under, which also
+    # forbids it any read from the local disk; `None` says the run is unscoped.
+    # REQUIRED like the two above, and for the same reason: a host that forgot it
+    # would otherwise run unscoped, which reads every key, without a word. See
+    # `pipelex.tools.uri.uri_read_scope`.
+    read_scope: str | None
 
-    @field_validator("analytics_groups")
+    @field_validator("read_scope")
     @classmethod
-    def _validate_analytics_groups(cls, value: dict[str, str]) -> dict[str, str]:
+    def _validate_read_scope(cls, value: str | None) -> str | None:
+        """Refuse an unusable read scope at the WIRE, for the storage scope's reason."""
+        if value is None:
+            return None
+        return validate_read_scope(value=value)
+
+    @model_validator(mode="after")
+    def _validate_storage_scope_within_read_scope(self) -> Self:
+        """Refuse, at the WIRE, a run that could not read what it writes."""
+        validate_storage_scope_within_read_scope(storage_scope=self.storage_scope, read_scope=self.read_scope)
+        return self
+
+    # The opaque labels the host attaches to this run. Unlike the two fields
+    # above it DEFAULTS: a host with no labels to send invents nothing by
+    # staying silent, whereas a missing identity or scope used to be invented
+    # for it. See `pipelex.system.run_extras`.
+    extras: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("extras")
+    @classmethod
+    def _validate_run_extras(cls, value: dict[str, str]) -> dict[str, str]:
         """Refuse a malformed mapping at the WIRE, not inside a telemetry capture.
 
         Declaring the field `dict[str, str]` says nothing about its contents,
@@ -70,7 +91,7 @@ class PipelexPipeRunInput(BaseModel):
         carried it. Validating at construction makes it a decoding error naming
         the field.
         """
-        return validate_analytics_groups(value=value)
+        return validate_run_extras(value=value)
 
     library_crate_dump: dict[str, Any] | None = None
     # Two orthogonal axes: which orchestrator runs the pipe (open token, defaults to the

@@ -1,8 +1,8 @@
 # The MTHDS Test Corpus
 
-The MTHDS Test Corpus is one canonical, tagged set of `.mthds` methods that every repo in the workspace draws its language-level fixtures from. It lives at `pipelex/test_extras/mthds_corpus/`, ships in the wheel, and is gated on both sides: the corpus must cover every feature the runtime registers, and each consumer must exercise every entry in the slice it declares.
+The MTHDS Test Corpus is one canonical, tagged set of `.mthds` methods that every repository building on the MTHDS language — this runtime and the tools and services around it — draws its language-level fixtures from. It lives at `pipelex/test_extras/mthds_corpus/`, ships in the wheel, and is gated on both sides: the corpus must cover every feature the runtime registers, and each consumer must exercise every entry in the slice it declares.
 
-The cross-repo contract — the one other repos are written against — is the workspace-root spec `docs/specs/mthds-test-corpus.md`. This page is the pipelex-side working guide: where things are, how to add an entry, and what each gate is telling you when it goes red.
+This page is both the pipelex-side working guide — where things are, how to add an entry, and what each gate is telling you when it goes red — and the contract other repositories are written against: the entry layout, the `entry.toml` manifest, the closed tag vocabulary with its `fails_at` field, the conformance tiers, and the two ways a consumer reaches the corpus.
 
 !!! note "Why it exists"
 
@@ -29,7 +29,7 @@ An entry directory holds either exactly one `.mthds` file, or several with a `bu
 
 ## Adding an entry
 
-1. **Pick an ordinary-world subject.** An entry's subject matter is never AI, machine learning, language models, agents, prompting or embeddings, and never MTHDS's own vocabulary either. The corpus *uses* `PipeLLM` constantly; it never *talks about* it. The reason is legibility under failure: an entry exists so a red gate can be narrated in one sentence, and *"the model output the model"* is not a sentence anyone can act on. Train timetables, invoices, recipes, weather observations, shipping manifests all work. The full rule, including the carve-out that lets an invalid entry be named for the defect it triggers, is in the spec.
+1. **Pick an ordinary-world subject.** An entry's subject matter is never AI, machine learning, language models, agents, prompting or embeddings, and never MTHDS's own vocabulary either. The corpus *uses* `PipeLLM` constantly; it never *talks about* it. The reason is legibility under failure: an entry exists so a red gate can be narrated in one sentence, and *"the model output the model"* is not a sentence anyone can act on. Train timetables, invoices, recipes, weather observations, shipping manifests all work. The rule governs what a method reasons about, never the operators it uses: a `PipeLLM` that judges whether a delivery is late is exemplary, one that judges whether a prompt is well engineered is not, and the two run the identical operator. It covers the directory name, `entry.toml`'s `name` and `description`, the bundle's `domain`, its concept and pipe names, its prompt text and `inputs.json`. One carve-out, so nobody "fixes" it later: an *invalid* entry is named and described for the defect it triggers — `invalid_llm_output_cannot_be_image` is a correct name — while its bundle still gets an ordinary-world domain. The rule is enforced at review and has no mechanical gate, deliberately: a keyword denylist was measured against real entries, and it both fired on correct names (an entry is named for the axis it covers, so `operator_structure_opening_hours` is right) and missed real violations whose subject carried no banned word.
 
 2. **Create the directory** under `entries/`, named in `snake_case`, and write the bundle.
 
@@ -48,7 +48,7 @@ An entry directory holds either exactly one `.mthds` file, or several with a `bu
     ]
     ```
 
-4. **Name no model.** Presets and aliases are resolved by the validation engine, not only at run time, so an entry pinning one fails validation outright on any consumer whose deck does not define it — which turns an entry about a language feature into an entry about model selection. Leave the choice to each consumer's deck.
+4. **Name no model.** Presets and aliases are resolved by the validation engine, not only at run time, so an entry pinning one fails validation outright on any consumer whose deck does not define it — which turns an entry about a language feature into an entry about model selection. Leave the choice to each consumer's deck. The one entry that names a model is `invalid_unknown_model`, whose defect is exactly that: it names a handle no deck defines, so it fails with `unknown_model` on every consumer.
 
 5. **Validate it locally** — against the local runtime, never the hosted API, which lags it:
 
@@ -98,13 +98,26 @@ No native concept is excluded — every one of them turned out to support a real
 
 An `error.*` tag that is *not* excluded carries one more field: `fails_at`, either `schema` or `runtime`. It names the earliest layer of checking that rejects a bundle carrying the fault. `schema` means a pass over the raw document's shape already catches it — a section missing a required key, a value outside a closed set — so a JSON-Schema validator, an editor diagnostic, or `plxt lint` reports it without ever interpreting the document. `runtime` means the document has to be *interpreted* to notice: an unresolved reference, an input the flow never supplies, an output whose concept does not fit.
 
-**The consumer rule is one sentence: a structural sweep expects a diagnostic on an entry exactly when its tag says `fails_at = "schema"`, and expects silence on every other entry.** That is what the field exists for. Before it, a consumer running a schema checker over the corpus had to hardcode which faults it thought were structural — a second, downstream reading of `pipelex`'s own registry, guaranteed to drift from it. Now the corpus being swept carries the answer.
+**The consumer rule is one sentence: a structural sweep expects a diagnostic on an entry exactly when its tag says `fails_at = "schema"`, and expects silence on every other entry.** That is what the field exists for. Never branch on `validity` instead: most invalid entries carry a semantic fault — an unresolved reference, a missing input — that a structural checker cannot see, and the few whose fault it can see are its only probe for a schema that quietly stopped rejecting something. Before it, a consumer running a schema checker over the corpus had to hardcode which faults it thought were structural — a second, downstream reading of `pipelex`'s own registry, guaranteed to drift from it. Now the corpus being swept carries the answer.
 
 A `schema` fault is still rejected by the runtime; the field names where a fault is caught *first*, not who is allowed to catch it. That is why a schema-fault entry declares the same `expected_error` as any other invalid entry — the runtime's diagnostic is what the entry pins. The two spellings line up on purpose, too: `schema` is also `plxt`'s own `error[schema]` diagnostic category, so a consumer branching on the field and a human reading a linter's output use one word for one thing.
 
 Only non-excluded tags carry it, for the same reason exclusion reasons are measured: an excluded tag has no entry, so there is nothing to have measured on, and a value invented for one would be an argument dressed as a measurement.
 
 **And it stays measured, because this repo consumes it first.** `.pipelex/plxt.toml` excludes the corpus's schema-fault entries from `plxt lint` — they *should* produce a diagnostic, which is the entry's whole point — and lints every other invalid entry like any ordinary `.mthds` file. That exclusion list is not hand-maintained: `tests/unit/pipelex/test_extras/test_mthds_corpus_plxt_exclusions.py` fails when it disagrees with the vocabulary. The config is gated rather than generated because `plxt` is a static binary reading a static file, with nothing to hook a generation step onto — but the loop still closes in the direction that matters. Declare a fault `runtime` when the schema in fact rejects it, and its entry stays linted, so `make plxt-lint` goes red naming it.
+
+## Conformance tiers
+
+Not every consumer can afford to run every entry, but every consumer can afford something. An entry's `tier` is the cheapest level at which it is meaningful, and a consumer running at a tier runs every entry of that tier or a cheaper one.
+
+| Tier | What it does | pipelex pytest markers |
+|---|---|---|
+| `static` | Parse and validate the bundle | none — runs in the default suite |
+| `dry` | Build the execution graph and run it in dry mode, without inference | none — runs in the default suite |
+| `offline` | Execute for real without inference — deterministic operators only | none — runs in the default suite |
+| `inference` | Execute fully, with live inference calls | `inference`, plus the operator-specific `llm`, `img_gen`, `extract` or `search` |
+
+The tier governs execution, never validation: the entry-validation gate below parses and validates every entry whatever its tier, so an `inference`-tier entry that broke is caught without spending a token.
 
 ## The gates, and what a red one means
 
@@ -134,6 +147,14 @@ for entry in iter_entries(tier=EntryTier.DRY):
 `iter_entries()` filters compose conjunctively and each is optional: `tags` (the entry covers **all** of them), `tier` (a ceiling — the entry's tier is that one or cheaper), `validity`, `granularity`. Ordering is entry-name lexicographic and stable, so parametrized test ids do not churn.
 
 The same two calls are how a **consumer outside this repo** reaches the corpus: it ships as package data in the wheel, so anything that already depends on `pipelex` — our own hosted services, most immediately — reads it with no vendored copy and no drift, in lockstep with its pinned version. Paths handed out are real filesystem paths, resolved through `importlib.resources.files`; wheels install unzipped, and a zip-imported distribution is not supported.
+
+**A consumer that cannot import `pipelex`** — one written in another language, or a suite that must stay independent of the runtime it checks — takes a vendored copy of the slice of entries it declares, refreshed from a released `pipelex`. The corpus carries no version of its own: it versions with the runtime, so a copy is only meaningful relative to a `pipelex` release. Three rules keep such a copy honest:
+
+- **The copy is generated, never authored.** An entry that needs fixing is fixed here, where the vocabulary, exhaustivity and entry-validation gates run, and the copy is refreshed. A copy edited in place is a fork, so a consumer says so where its copy lives.
+- **The consumer discovers entries by recursion over its copy**, never from a hand-kept list, so a newly synced entry is exercised with no wiring change.
+- **The copy feeds a suite that stores no expectations** — a parse, a build, a comparison of two implementations on the same input. A snapshot suite pinning per-entry output would turn every upstream edit into a regeneration in the consumer's repository, for signal the derived checks already carry.
+
+A consumer copies only entry sources and canonical inputs; whatever it generates from an entry stays its own, keyed by entry name.
 
 The corpus is the single source for language-level `.mthds` methods in this repo, and this repo's own tests are consumers of it like any other: a growing number of trees under `tests/e2e/pipelex/pipes/` call `get_entry(...)` for their bundle rather than keeping a local copy. `grep -rl mthds_corpus tests/` is the current list — the enumeration is deliberately not written down here, since it moves with every migration.
 

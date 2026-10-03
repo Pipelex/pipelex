@@ -1,0 +1,35 @@
+domain      = "building_inspections"
+description = "Write a building inspector's site notes up as a formatted report, then log it in one line"
+main_pipe   = "report_and_log"
+
+[pipe.report_and_log]
+type = "PipeSequence"
+description = "Writes the formatted inspection report, then the one-line entry for the site log"
+inputs = { notes = "Text" }
+output = "Text"
+steps = [
+  { pipe = "write_inspection_report", result = "report" },
+  { pipe = "log_report", result = "log_entry" },
+]
+
+[pipe.write_inspection_report]
+type = "PipeLLM"
+description = "Writes the site notes up as a report with a heading per area and a list of the defects found"
+inputs = { notes = "Text" }
+output = "Markdown"
+prompt = """
+Write these site notes up as an inspection report in Markdown: a heading for each area inspected, and a bulleted list of the defects found there.
+
+@notes
+"""
+
+[pipe.log_report]
+type = "PipeLLM"
+description = "Sums up an inspection report in one line for the site log"
+inputs = { report = "Text" }
+output = "Text"
+prompt = """
+Sum up this inspection report in one line for the site log.
+
+@report
+"""

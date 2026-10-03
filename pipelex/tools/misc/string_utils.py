@@ -352,6 +352,22 @@ def get_root_from_dotted_path(dotted_path: str) -> str:
     return dotted_path.split(".", 1)[0]
 
 
+def find_private_path_segment(*, path: str) -> str | None:
+    """Return the first segment of a dotted path that starts with an underscore, or None.
+
+    A method author writes dotted paths (a construct field's `from`, a batch's list, an image reference)
+    that the runtime walks with `getattr`. A segment starting with an underscore is how such a walk
+    reaches Python internals (`__class__.__init__.__globals__`), so every such walk refuses one.
+
+    Examples:
+        >>> find_private_path_segment(path="deal.customer_name") is None
+        True
+        >>> find_private_path_segment(path="note.__class__.__init__")
+        '__class__'
+    """
+    return next((segment for segment in path.split(".") if segment.startswith("_")), None)
+
+
 def pluralize(*, count: int, singular: str, plural: str | None = None) -> str:
     """Pick the singular or plural form of a word based on a count.
 

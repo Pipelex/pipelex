@@ -1,4 +1,4 @@
-"""DNS-rebinding-safe httpx transport for caller-supplied outbound URLs.
+"""DNS-rebinding-safe httpx transport for outbound URLs the runtime did not choose.
 
 A request-time literal-IP check (``is_disallowed_host``) cannot stop SSRF via DNS
 rebinding: ``https://attacker.example/cb`` passes validation, but its A record can
@@ -89,7 +89,8 @@ class SsrfGuardedBackend(httpcore.AsyncNetworkBackend):
     """Wraps another network backend, vetting the destination IP before connecting.
 
     Only ``connect_tcp`` carries the guard — it is the sole DNS-resolving entry
-    point for the http(s) origins webhooks use. ``connect_unix_socket`` / ``sleep``
+    point for http(s) origins, and httpcore calls it for every new connection, so
+    each redirect hop to a new origin is vetted too. ``connect_unix_socket`` / ``sleep``
     delegate unchanged.
     """
 
@@ -151,9 +152,15 @@ class SsrfGuardedBackend(httpcore.AsyncNetworkBackend):
 class SsrfGuardedTransport(httpx.AsyncHTTPTransport):
     """An :class:`httpx.AsyncHTTPTransport` that vets every destination IP at connect.
 
-    Use for any outbound request to a caller-supplied URL (webhook delivery). The
+    Use for any outbound request to a URL the runtime did not choose: webhook
+    delivery, and the fetch helper that reads the bytes behind a value's URL. The
     transport re-resolves the host at connect time and refuses private/metadata
-    destinations, raising :class:`SsrfBlockedError`.
+    destinations, raising :class:`SsrfBlockedError`. Because the check runs per
+    connection, a client that follows redirects has every new-origin hop vetted.
+
+    Passing a transport to an httpx client turns off its ``HTTP(S)_PROXY``
+    handling. The guard needs that: through a proxy it would only ever see the
+    proxy's own address.
     """
 
     def __init__(self) -> None:

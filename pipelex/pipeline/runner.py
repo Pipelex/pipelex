@@ -26,12 +26,13 @@ from pipelex.interpreter_hub import (
     get_pipeline_manager,
     set_current_library,
 )
-from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
+from pipelex.system.caller_identity import CallerIdentity
+from pipelex.system.job_metadata import validate_request_id
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -115,32 +116,54 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         is_mock_usage: bool = False,
         # A local run has exactly one user and no tenancy, so these say "local"
         # rather than being derived from each other or defaulted deep in the
-        # call stack. A multi-tenant host passes its own; it cannot reach these
-        # by omission, because `pipeline_run_setup` requires both explicitly.
+        # call stack. `pipeline_run_setup` requires both, but this protocol
+        # always forwards its own, so a multi-tenant host building it must pass
+        # its own identity here, and its read scope below.
         user_id: str = LOCAL_USER_ID,
         storage_scope: str = LOCAL_STORAGE_SCOPE,
-        # Opaque groups the host attaches to every run this protocol starts.
+        # Unscoped reads, which is the truth on a laptop: the run may read any
+        # stored key and any local file. A host that serves more than one tenant
+        # passes its own prefix, beside its own storage scope.
+        read_scope: str | None = None,
+        # Opaque labels the host attaches to every run this protocol starts.
         # No local default: a laptop belongs to no organization, and inventing
-        # a group here would put every such run into one shared entity.
-        analytics_groups: dict[str, str] | None = None,
+        # a label here would put every such run into one shared entity.
+        extras: dict[str, str] | None = None,
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
         inputs_base_dir: Path | None = None,
+        # Whose `library_dirs` are: the caller's own on a local CLI run, so a refusal while loading
+        # them is the caller's invalid bundle; a host's own otherwise, loaded untranslated. See
+        # `acquire_library`.
+        library_dirs_are_callers: bool = False,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
+        self.library_dirs_are_callers = library_dirs_are_callers
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
         self.is_mock_usage = is_mock_usage
         self.user_id = user_id
         self.storage_scope = storage_scope
-        self.analytics_groups = analytics_groups
+        self.read_scope = read_scope
+        self.extras = extras
         self.execution_config = execution_config
         self._pipe_run = pipe_run
         # Directory that bare relative local file paths in `inputs` resolve against (Smart Inputs
         # D3). Set by a CLI to the inputs file's parent; None for API/SDK callers (absolute urls).
         self.inputs_base_dir = inputs_base_dir
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
+
+    @property
+    def caller_identity(self) -> CallerIdentity:
+        """The caller this protocol works for: the user and the groups every run it starts states.
+
+        What a validation is attributed to, since a validation is not a run and has no
+        `RunMetadata` of its own to carry them. A local runtime states `LOCAL_USER_ID`,
+        which telemetry never attributes to a person, so a local validation still reports
+        under the stream's fallback.
+        """
+        return CallerIdentity.make_from_host(user_id=self.user_id, extras=self.extras)
 
     @override
     async def execute(
@@ -153,6 +176,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
+        request_id: str | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a pipeline and wait for its completion.
 
@@ -188,6 +212,14 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         delivery_assignment:
             Internal delivery hook used by the API layer (in-process, not a
             wire extension).
+        request_id:
+            The inbound request id the host is serving, put on the run's
+            ``RunMetadata.request_id`` so every log line of the run, on
+            whichever worker runs it, and the run's error reports carry it.
+            An in-process host hook, like ``delivery_assignment``, not a wire
+            extension. It must be one to 128 printable ASCII characters: any
+            other value is the host's bug, refused with a ``ValueError``
+            before the run is set up.
 
         Returns:
         -------
@@ -201,6 +233,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         if extra:
             msg = f"The local runtime defines no extension args; got {sorted(extra)}."
             raise PipelineRequestError(msg)
+        # Refused here, before the `try`: `RunMetadata` would refuse it inside the setup, where the
+        # `ValidationError` arm below would report the host's bug as the caller's invalid input.
+        if request_id is not None:
+            validate_request_id(value=request_id)
 
         created_at = datetime.now(UTC).isoformat()
 
@@ -235,37 +271,17 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 is_mock_usage=self.is_mock_usage,
                 user_id=self.user_id,
                 storage_scope=self.storage_scope,
-                analytics_groups=self.analytics_groups,
+                read_scope=self.read_scope,
+                extras=self.extras,
                 inputs_base_dir=self.inputs_base_dir,
+                library_dirs_are_callers=self.library_dirs_are_callers,
+                request_id=request_id,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
             pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
-        except PipeRouterError as exc:
-            # PipeRouterError can only be raised by get_pipe_run().run(), so pipe_job is guaranteed to exist
-            assert pipe_job is not None  # for type checker
-            properties = {
-                EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
-                EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
-                EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
-            }
-            get_telemetry_manager().track_event(
-                event_name=EventName.PIPELINE_COMPLETE,
-                properties=properties,
-                run_metadata=pipe_job.job_metadata.run_metadata,
-            )
-            raise PipelineExecutionError(
-                message=exc.message,
-                run_mode=pipe_job.pipe_run_params.run_mode,
-                pipe_code=pipe_job.pipe.code,
-                output_name=pipe_job.output_name,
-                # The live pipe_stack has fully unwound by now; PipeRouterError carries the
-                # snapshot taken where the failure occurred.
-                pipe_stack=exc.pipe_stack,
-            ) from exc
         except PipelexError as exc:
-            # Catch other Pipelex errors that bypass the router's PipeRunError handling
-            # (e.g., PipeRunInputsError raised directly from pipe_abstract.py)
-            # If pipe_job is None, the error occurred during pipeline_run_setup before pipe_job was created
+            # If pipe_job is None, the error occurred during pipeline_run_setup, before the job existed:
+            # it is not a run failure, and it propagates untouched.
             if pipe_job is None:
                 raise
             properties = {
@@ -278,12 +294,15 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 properties=properties,
                 run_metadata=pipe_job.job_metadata.run_metadata,
             )
-            raise PipelineExecutionError(
-                message=exc.message,
+            # Every failure of the run, whether a pipe's (located by its router as a PipeRouterError)
+            # or one raised around the pipes (a bridge, a delivery), wrapped into the one class hosts
+            # catch. The location comes from the failure's cause chain: the live pipe_stack has
+            # fully unwound by now.
+            raise PipelineExecutionError.make_for_run_failure(
+                failure=exc,
                 run_mode=pipe_job.pipe_run_params.run_mode,
-                pipe_code=pipe_job.pipe.code,
+                entry_pipe_code=pipe_job.pipe.code,
                 output_name=pipe_job.output_name,
-                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
             ) from exc
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)
@@ -442,6 +461,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             allow_signatures=allow_signatures,
             graph_pipe_code=graph_pipe_code,
             log_context="Protocol validate",
+            caller_identity=self.caller_identity,
+            # The same ownership a run of this runtime reads: the caller's own directories keep their paths.
+            library_dirs_are_callers=self.library_dirs_are_callers,
         )
 
     @override
@@ -455,7 +477,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         them would silently drop entries on collision.
 
         Args:
-            category: Optional deck filter (`llm`, `extract`, `img_gen`, `search`).
+            category: Optional deck filter, one of the protocol's own categories.
 
         Returns:
             PipelexModelDeck with the flat model list and the category-keyed
@@ -468,6 +490,13 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         aliases_by_category: dict[str, dict[str, str]] = deck_raw["aliases"]
         waterfalls_by_category: dict[str, dict[str, list[str]]] = deck_raw["waterfalls"]
         for category_key, category_presets in presets_by_category.items():
+            if category_key not in MthdsModelCategory.__members__.values():
+                # A category this runtime serves that the standard's flat list has no word for —
+                # `judgment` today. Its presets are left out of `models` rather than raising, because
+                # one unrepresentable category must not take the whole deck down; its aliases and
+                # waterfalls still travel under the category-keyed routing extensions below. This
+                # branch disappears when the protocol's `ModelCategory` learns the member.
+                continue
             for preset in category_presets:
                 models.append(MthdsModelInfo(name=preset["name"], type=MthdsModelCategory(category_key)))
         return PipelexModelDeck(models=models, aliases=aliases_by_category, waterfalls=waterfalls_by_category)

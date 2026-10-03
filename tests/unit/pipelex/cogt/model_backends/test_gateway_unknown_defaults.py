@@ -10,11 +10,11 @@ see `test_gateway_unknown_per_model_keys.py`. A local backend file gets the stri
 rules — see `test_backend_library_leniency.py`.
 """
 
+import logging
 from typing import Any, cast
 
-from pytest_mock import MockerFixture
+import pytest
 
-from pipelex import log
 from pipelex.cogt.model_backends.gateway_config import drop_unknown_gateway_defaults
 from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs, InferenceModelSpecBlueprint
 
@@ -50,16 +50,24 @@ class TestGatewayUnknownDefaults:
 
         assert drop_unknown_gateway_defaults(gateway_model_specs=specs) is specs
 
-    def test_pruning_does_not_need_the_log_hub(self, mocker: MockerFixture) -> None:
-        """It runs on the success path of every gateway load, including ones that precede runtime_hub.set_config().
+    def test_pruning_emits_no_record(self, caplog: pytest.LogCaptureFixture) -> None:
+        """`drop_unknown_gateway_defaults` is documented as deliberately silent, and this is what holds it to that.
 
-        The served config really does carry an unknown key today, so this is the ordinary path, not a corner.
+        It runs on the success path of every gateway-backend load, including loads that precede
+        `runtime_hub.set_config()`. A log call here would turn a plain data transform into a boot-order
+        dependency: before the dispatch is configured a line takes the stdlib's default handling, so a
+        warning about the served payload would read differently depending on when the load happened to run.
+        The guard this replaces asserted that an unconfigured dispatch raised, which is no longer true — a
+        log call before `configure` is now handled rather than fatal — so nothing fails loudly of its own
+        accord if a line appears here. Asserting the silence directly is what survives that change.
         """
-        mocker.patch.object(log.log_dispatch, "_log_config_instance", None)
+        specs = self._specs(defaults={"max_tokens": 4096, "a_field_we_removed": "anthropic"})
 
-        pruned = drop_unknown_gateway_defaults(gateway_model_specs=self._specs(defaults={"max_tokens": 4096, "a_field_we_removed": "anthropic"}))
+        with caplog.at_level(logging.NOTSET):
+            pruned = drop_unknown_gateway_defaults(gateway_model_specs=specs)
 
         assert pruned["defaults"] == {"max_tokens": 4096}
+        assert caplog.records == []
 
     def test_per_model_unknown_keys_are_untouched(self) -> None:
         """This function is scoped to `defaults`; the per-model rule is the loader's, tested in `test_gateway_unknown_per_model_keys.py`."""

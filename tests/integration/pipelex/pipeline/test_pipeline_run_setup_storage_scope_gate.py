@@ -58,6 +58,7 @@ class TestPipelineRunSetupStorageScopeGate:
         with pytest.raises(ValueError, match="storage_scope"):
             await pipeline_run_setup(
                 storage_scope="../evil",
+                read_scope=None,
                 user_id="test-user",
                 execution_config=execution_config,
                 mthds_contents=[_MINIMAL_MTHDS],
@@ -84,6 +85,7 @@ class TestPipelineRunSetupStorageScopeGate:
         with pytest.raises(ValueError, match="storage_scope"):
             await pipeline_run_setup(
                 storage_scope=LOCAL_STORAGE_SCOPE,
+                read_scope=None,
                 pipeline_run_id="../escape",
                 user_id="test-user",
                 execution_config=execution_config,
@@ -104,6 +106,7 @@ class TestPipelineRunSetupStorageScopeGate:
 
         pipe_job, pipeline_run_id, _ = await pipeline_run_setup(
             storage_scope=LOCAL_STORAGE_SCOPE,
+            read_scope=None,
             user_id="test-user",
             execution_config=execution_config,
             mthds_contents=[_MINIMAL_MTHDS],

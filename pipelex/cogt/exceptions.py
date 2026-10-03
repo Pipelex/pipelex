@@ -195,7 +195,11 @@ class SdkTypeError(CogtError):
 
 
 class ModelChoiceNotFoundError(CogtError):
-    """Error raised when a model choice cannot be found in the model deck.
+    """Raised when a model reference names a handle, alias, preset or waterfall the model deck does not define:
+    by the deck check a pipe runs when it is built, and by the deck when a run resolves a reference. When a
+    pipe is built, the pipe operator raises it again as a ``PipeOperatorModelChoiceError`` located on the pipe
+    and the field, so a bundle naming an unknown model is an invalid validation verdict (error type
+    ``unknown_model``), never a failure of the validator.
 
     Includes available options and migration hints in error message.
     """
@@ -210,6 +214,11 @@ class ModelChoiceNotFoundError(CogtError):
     # local ``.mthds`` file. An operator-side deck fault surfaces as
     # ``ModelDeckPresetValidatonError`` instead, which keeps the derived ``CONFIG``.
     error_domain = ErrorDomain.INPUT
+    # The message is caller-facing copy for the same reason: it names only the caller's own model
+    # reference and the deck's public handles (suggestions, sigil hints, available options). Without
+    # the flag, STRICT disclosure on the hosted API replaced it with the generic placeholder, so a
+    # method naming an unknown model failed its dry run with no hint of which model or what to use.
+    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -340,6 +349,24 @@ class SearchHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
+class DocGenHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
+
+
+class JudgmentHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
+
+
 class ExtractOutputError(CogtError):
     pass
 
@@ -424,6 +451,18 @@ class SearchModelNotFoundError(ModelNotFoundError):
     pass
 
 
+class JudgmentJobFailureError(CogtError):
+    pass
+
+
+class JudgmentAnswerMismatchError(CogtError):
+    """A judgment worker answered questions nobody asked, or answered one in the wrong shape."""
+
+
+class JudgmentModelNotFoundError(ModelNotFoundError):
+    pass
+
+
 class RoutingProfileLibraryNotFoundError(CogtError):
     pass
 
@@ -490,6 +529,22 @@ class RoutingProfileDisabledBackendError(CogtError):
 
 class ModelManagerError(CogtError):
     pass
+
+
+class PluginModelDeclarationError(CogtError):
+    """A model a plugin declares, or a model deck default it sets, cannot be merged into this installation's inference configuration.
+
+    The model manager validates the plugins' declarations when it merges them at boot, since a plugin's ``register``
+    only stores them: a model whose name the installation's ``internal.toml`` already declares, a table that is not a
+    valid model spec, or a default for a format and source no step composes. The message names the plugin, and the
+    file when one is involved.
+    """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, *, plugin: str):
+        self.plugin = plugin
+        super().__init__(message)
 
 
 class ModelListingUnsupportedError(CogtError):

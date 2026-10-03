@@ -25,12 +25,17 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
-from pipelex.system.analytics_groups import validate_analytics_groups
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, validate_storage_scope
+from pipelex.system.run_extras import validate_run_extras
+from pipelex.system.storage_scope import (
+    LOCAL_STORAGE_SCOPE,
+    validate_read_scope,
+    validate_storage_scope,
+    validate_storage_scope_within_read_scope,
+)
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -58,10 +63,12 @@ async def pipeline_run_setup(
     is_mock_usage: bool = False,
     user_id: str,
     storage_scope: str,
-    analytics_groups: dict[str, str] | None = None,
+    read_scope: str | None,
+    extras: dict[str, str] | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -125,14 +132,23 @@ async def pipeline_run_setup(
         Opaque prefix under which every byte this run writes must land. REQUIRED,
         validated at ``JobMetadata`` construction. See
         :mod:`pipelex.system.storage_scope`.
-    analytics_groups:
-        Opaque, host-supplied mapping of group type to group key that this run's
-        telemetry belongs to — the hosted platform sends its organization, a
-        single-user deployment sends nothing. Never read by name here. Validated
+    read_scope:
+        Opaque prefix every storage key this run reads must lie under, which also
+        forbids the run any read from the local disk. REQUIRED, and ``None`` is
+        the explicit statement that the run is unscoped: a local run, or a server
+        with a single tenant. A set read scope must contain ``storage_scope``, so
+        a host that passes one also passes its own storage scope rather than the
+        local sentinel. See :mod:`pipelex.system.storage_scope` and
+        :mod:`pipelex.tools.uri.uri_read_scope`.
+    extras:
+        Opaque, host-supplied mapping of labels about this run — the hosted
+        platform sends its organization, a single-user deployment sends nothing.
+        Never read by name here; telemetry forwards it whole as the groups of
+        each capture. Validated
         at the TOP of this function, above the pipeline registration and above
         the trace-start event, so a malformed mapping registers nothing and
-        emits nothing. Optional, and omitting it leaves the group facet empty.
-        See :mod:`pipelex.system.analytics_groups`.
+        emits nothing. Optional, and omitting it leaves the telemetry group facet empty.
+        See :mod:`pipelex.system.run_extras`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -141,19 +157,30 @@ async def pipeline_run_setup(
         Optional inbound ``X-Request-ID`` from the dispatcher (the value the
         external HTTP caller can use to correlate every log line and every
         ``ErrorReport`` back to its originating request). Threaded onto
-        :class:`pipelex.system.job_metadata.JobMetadata.request_id` so it
+        :attr:`pipelex.system.job_metadata.RunMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
     inputs_base_dir:
         Directory that bare *relative local* file paths in ``inputs`` resolve against (Smart
         Inputs D3) — the inputs file's parent when a CLI file-loaded the inputs. ``None`` for
         API/SDK callers (they pass absolute urls / storage uris). Only the shaper's file-ish /
         CSV arms consult it.
+    library_dirs_are_callers:
+        Whether ``library_dirs`` are the caller's own, as on a local CLI run, so a refusal while
+        loading them is the caller's invalid bundle. ``False`` (a host's own directories) loads them
+        untranslated. The ``mthds_contents`` are always the caller's: a refusal while loading them is
+        always the ``ValidateBundleError`` verdict. See :func:`acquire_library`.
 
     Returns:
     -------
     tuple[PipeJob, str, str]
         A tuple containing the pipe job ready for execution, the pipeline run ID,
         and the library ID.
+
+    Raises:
+    -------
+    ValidateBundleError
+        The bundle was refused while it loaded, before any pipe ran: the same verdict, with the same
+        located ``validation_errors``, that validating the bundle gives.
 
     """
     # NO `user_id or DEFAULT_USER_ID` HERE, DELIBERATELY.
@@ -173,7 +200,7 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
 
-    # Validate the groups HERE, before this function causes anything observable.
+    # Validate the extras HERE, before this function causes anything observable.
     #
     # `RunMetadata` validates them too, and `prepare_pipe_job` validates them at
     # its own top — but BOTH run below `add_new_pipeline` and the open tracer, so
@@ -184,7 +211,7 @@ async def pipeline_run_setup(
     #
     # This is the same lesson `storage_scope` learned one seam lower, and the
     # same cure: ordering, not absence, was the defect.
-    analytics_groups = validate_analytics_groups(value=analytics_groups or {})
+    extras = validate_run_extras(value=extras or {})
 
     # And the scope, for the same reason and with more at stake.
     #
@@ -199,6 +226,22 @@ async def pipeline_run_setup(
     # gate sees. `LOCAL_STORAGE_SCOPE` passes this gate unharmed — it is itself
     # a valid one-segment scope — so the sentinel is not disturbed.
     storage_scope = validate_storage_scope(value=storage_scope)
+
+    # And the read scope beside it, with its relation to the storage scope, still
+    # above everything this function causes. A run with a read scope reads only
+    # under it, and it reads its own outputs back, so its storage scope must lie
+    # under it. The local sentinel is refused outright beside a read scope rather
+    # than checked after the swap below: it becomes the run id, which lies under
+    # no host's prefix, and a host that scopes reads scopes writes too.
+    if read_scope is not None:
+        read_scope = validate_read_scope(value=read_scope)
+        if storage_scope == LOCAL_STORAGE_SCOPE:
+            msg = (
+                "A run with a read_scope must pass its own storage_scope: the local storage scope becomes the run id, "
+                "which lies under no read_scope, and the run could not read what it writes."
+            )
+            raise ValueError(msg)
+        validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
 
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
@@ -254,6 +297,7 @@ async def pipeline_run_setup(
             library_dirs=library_dirs,
             mthds_contents=mthds_contents,
             bundle_uris=bundle_uris,
+            library_dirs_are_callers=library_dirs_are_callers,
         )
         library_acquired = True
 
@@ -363,7 +407,8 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             storage_scope=storage_scope,
-            analytics_groups=analytics_groups,
+            read_scope=read_scope,
+            extras=extras,
             inputs=inputs,
             search_scope=search_scope,
             trace_context=trace_context,

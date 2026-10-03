@@ -65,8 +65,8 @@ tests against the version it demands, with no gap for a consumer to fall into.
 
 **The standing policy is to move the pin to the latest release, every time**,
 even when the new release carries nothing this engine uses. The cost is real and
-worth naming when you report: everyone downstream — `pipelex-sdk-python`,
-`pipelex-server`, every user install — is forced onto that exact `mthds`, and a
+worth naming when you report: everyone downstream — the Python SDK in
+`pipelex-sdk/python/`, `pipelex-server`, every user install — is forced onto that exact `mthds`, and a
 consumer that also depends on `mthds` directly must now move in step with
 pipelex rather than resolving its own. Say so in the changelog when the bump is
 otherwise uneventful, because for a consumer "pipelex now requires mthds
@@ -120,7 +120,7 @@ ledger list --origin mthds-python --status open
 
 The second query is the targeted one — every item `mthds-python` filed, wherever
 it landed — and it is worth reading past the rows owned by this repo, because a
-row owned by `pipelex-sdk-python` or by `mthds` is a piece of the same cascade
+row owned by `pipelex-sdk` or by `mthds` is a piece of the same cascade
 you will be filing into at step 10.
 
 An item that describes the adaptation you are about to do should be claimed
@@ -330,14 +330,16 @@ ones harder to spot.
   changed, and the check that went green. `Closes <id>` goes in the PR body when
   the user opens one.
 - **File the cascade, and note that the exact pin makes it sharper.**
-  `pipelex-sdk-python` pins `mthds` exactly too, and `pipelex-server` pins
-  `pipelex` exactly at several sites — so any bump here, breaking or not, puts
-  a consumer that installs both this package and `pipelex-sdk-python` into an
-  unsatisfiable resolve until that repo moves to the same version. Check where
-  it stands (`grep mthds ../pipelex-sdk-python/pyproject.toml`) and say so in
-  your report. Neither repo is yours to edit from here: file it
-  (`ledger new --owner <repo> …`) with the version that moved and, when there
-  was one, the symbol. The `ledger` skill has the full gesture.
+  The Python SDK in `pipelex-sdk/python/` pins `mthds` exactly too, and
+  `pipelex-server` pins `pipelex` exactly at several sites — so any bump here,
+  breaking or not, puts a consumer that installs both this package and the
+  `pipelex-sdk` distribution into an unsatisfiable resolve until `pipelex-sdk`
+  moves to the same version. Check where it stands
+  (`grep mthds ../pipelex-sdk/python/pyproject.toml`) and say so in your report.
+  Neither repo is yours to edit from here: file it against the member that
+  holds the pin (`ledger new --owner pipelex-sdk/python …`, and
+  `--owner pipelex-server/<member>` for a server pin) with the version that
+  moved and, when there was one, the symbol. The `ledger` skill has the full gesture.
 - **File the reverse direction if you moved the wire.** `mthds-python` commits
   protocol parity fixtures captured *from this engine*, so a change here that
   alters emitted output means those fixtures need recapturing — an item owned by

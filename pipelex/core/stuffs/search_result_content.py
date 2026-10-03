@@ -1,15 +1,16 @@
 import html as html_module
+from typing import TYPE_CHECKING
 
 from pydantic import Field
-from rich.console import Group
-from rich.markdown import Markdown
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class SearchResultContent(StuffContent):
@@ -53,7 +54,12 @@ class SearchResultContent(StuffContent):
         return result
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.markdown import Markdown
+        from rich.text import Text
+
         group = Group()
 
         # Title

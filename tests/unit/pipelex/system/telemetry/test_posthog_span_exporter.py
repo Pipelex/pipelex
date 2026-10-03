@@ -122,7 +122,7 @@ class TestPostHogSpanExporter:
                     span_category=SpanCategory.PIPE,
                     attributes={
                         PipelexSpanAttr.RUN_USER_ID: "user-42",
-                        PipelexSpanAttr.RUN_ANALYTICS_GROUPS: '{"organization": "org_acme"}',
+                        PipelexSpanAttr.RUN_EXTRAS: '{"organization": "org_acme"}',
                     },
                 )
             ]
@@ -155,7 +155,7 @@ class TestPostHogSpanExporter:
                     span_category=SpanCategory.PIPE,
                     attributes={
                         PipelexSpanAttr.RUN_USER_ID: "user-42",
-                        PipelexSpanAttr.RUN_ANALYTICS_GROUPS: '{"organization": "org_acme"}',
+                        PipelexSpanAttr.RUN_EXTRAS: '{"organization": "org_acme"}',
                     },
                 )
             ]
@@ -176,7 +176,7 @@ class TestPostHogSpanExporter:
                     span_category=SpanCategory.INFERENCE,
                     attributes={
                         PipelexSpanAttr.RUN_USER_ID: "user-42",
-                        PipelexSpanAttr.RUN_ANALYTICS_GROUPS: '{"organization": "org_acme"}',
+                        PipelexSpanAttr.RUN_EXTRAS: '{"organization": "org_acme"}',
                     },
                 )
             ]

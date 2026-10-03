@@ -12,6 +12,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
@@ -28,7 +29,8 @@ class TestPipeLLMModelNotFoundReroute:
     ) -> None:
         """A provider 404 raised as LLMModelNotFoundError from the content generator escapes PipeLLM's
         `except LLMCompletionError`, reaches `except ModelNotFoundError` in PipeOperator._live_run_pipe,
-        and surfaces from the router as PipeOperatorModelAvailabilityError carrying the model_handle.
+        and surfaces from the router as a PipeRouterError located at the pipe, chained to the
+        PipeOperatorModelAvailabilityError carrying the model_handle.
         """
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
 
@@ -59,10 +61,13 @@ class TestPipeLLMModelNotFoundReroute:
             job_metadata=job_metadata,
         )
 
-        with pytest.raises(PipeOperatorModelAvailabilityError) as exc_info:
+        # The router locates the failure at the pipe that raised it, chained to the availability error.
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(pipe_job=pipe_job)
+        assert exc_info.value.pipe_code == pipe.code
 
-        availability_error = exc_info.value
+        availability_error = exc_info.value.__cause__
+        assert isinstance(availability_error, PipeOperatorModelAvailabilityError)
         assert availability_error.model_handle == "gpt-not-a-real-model"
         assert availability_error.fallback_list is None
         assert availability_error.pipe_type == "PipeLLM"

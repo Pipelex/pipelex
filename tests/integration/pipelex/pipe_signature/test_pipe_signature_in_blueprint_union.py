@@ -156,8 +156,8 @@ class TestPipeSignatureBlueprintUnion:
         """A typeless section whose keys are all contract-legal but that omits a REQUIRED contract
         field (here `output`) is normalized to a signature and then fails the signature's own
         required-field validation. The safety invariant holds: it is never silently accepted as a
-        mock, and the missing field is named. (Categorizing this bare pydantic residual into a
-        structured item is a deferred, pre-existing general gap — see wip/pipe-signature-not-a-type.md.)
+        mock, and the missing field is named. (The categorizer keeps this residual as an item of its
+        own, naming the pipe and the field path.)
         """
         with pytest.raises(ValidationError) as exc_info:
             PipelexBundleBlueprint.model_validate(

@@ -12,7 +12,9 @@ Pipelex supports two independent telemetry streams that serve different purposes
 
 When you use **Pipelex Gateway** as your inference backend, identified telemetry is **automatically enabled**. This telemetry is tied to your Gateway API key (hashed for security) and operates independently from your `telemetry.toml` settings.
 
-A run that names a caller of its own is attributed to that caller on this stream too: the run's `user_id` is sent as the `distinct_id` exactly as you supplied it, and its `analytics_groups` ride the capture as groups. Anything that names no caller reports under your key's hash.
+Test runs are the exception, and either of two signals marks one. The first is the `pytest` or `ci` integration mode. The second is a test run mode, which Pipelex's shared pytest plugin (`pipelex.test_extras.shared_pytest_plugins`) sets for every session that loads it, when pytest configures and before it collects anything, so a suite booting with `Pipelex.make()` in the default mode is covered too, whether it boots in a fixture, at test-module import or in a pytest hook that runs after `pytest_configure`. What it cannot reach is anything pytest runs before it configures: the body of every `conftest.py` loaded at startup, which means the ones along the paths given on the command line or in `testpaths` and not only the one that loads the plugin, and the hooks that run before `pytest_configure`, such as `pytest_addoption` or `pytest_cmdline_main`. Boot in a fixture there. In a test run the Gateway stream stays off, so a project's test suite sends nothing to Pipelex even with the Gateway enabled: the boot does not look for `PIPELEX_GATEWAY_API_KEY` on the stream's behalf, and `DO_NOT_TRACK` does not conflict with the Gateway. The Gateway's Portkey request logging and trace correlation follow the stream, so the `debug` setting on the `pipelex_gateway` backend and the `[pipelex_gateway.portkey]` force flags in `telemetry.toml` have no effect in a test run either, even where your own custom stream is allowed in that mode.
+
+A run that names a caller of its own is attributed to that caller on this stream too: the run's `user_id` is sent as the `distinct_id` exactly as you supplied it, and its `extras` ride the capture as groups. Anything that names no caller reports under your key's hash.
 
 **What we collect:**
 
@@ -46,6 +48,15 @@ Custom telemetry is configured in `.pipelex/telemetry.toml` and allows you to se
 - **OTLP**: Send spans to any OpenTelemetry-compatible backend (receives full span data)
 
 Custom telemetry is completely independent from Gateway telemetry—you can use both, either, or neither.
+
+### Pipelex's spans in your process
+
+Either stream makes Pipelex trace a run: the Gateway stream whenever it is on, and yours when AI span tracing is enabled on your PostHog. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **Pipelex never makes its spans current in your process's OpenTelemetry context**:
+
+- Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
+- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
+- The standard trace fields of a log line, `trace_id` and `span_id` in the `json` sink, the record's trace context in the `otlp` sink and the entry's `trace` in the `gcp` sink, name your current span, inside a Pipelex run as outside one, so your log backend files a line under your own trace. The Pipelex span a line was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, rides beside them as `pipelex.trace_id` and `pipelex.span_id`, as [Logging](../tools/logging.md#the-trace-context) describes.
+- If you export Pipelex's spans to your own backend, through your PostHog or an OTLP destination, they arrive in a trace of their own, not yours, so a line inside a run joins them on `pipelex.trace_id` and `pipelex.span_id` rather than on the standard fields, which a backend's trace view follows by itself.
 
 ## Quick Setup
 
@@ -98,27 +109,43 @@ export DO_NOT_TRACK=1
 
 When set, this disables:
 
-- Gateway telemetry (but note: Gateway won't work without telemetry)
+- Gateway telemetry (but note: outside a test run, Gateway won't work without telemetry)
 - All custom telemetry destinations
 
 !!! warning "Gateway Requires Telemetry"
-    If you set `DO_NOT_TRACK=1` while using Pipelex Gateway, the Gateway will not function. Use direct provider backends instead if you need to disable all telemetry.
+    If you set `DO_NOT_TRACK=1` while using Pipelex Gateway, the Gateway will not function, except in a test run, where the Gateway stream is off anyway. Use direct provider backends instead if you need to disable all telemetry.
 
-## Attaching your own groups to a run
+## Attaching your own labels to a run
 
 A host that runs Pipelex for more than one customer usually wants a run's telemetry to belong to the entities *it* cares about — an organization, a workspace, a tenant. Pipelex carries those labels for you without ever learning what they mean.
 
-The run-level metadata every run carries (`RunMetadata`) has an `analytics_groups` field: an opaque mapping of **group type** to **group key** that you supply when you start the run, beside `user_id` and `storage_scope`.
+The run-level metadata every run carries (`RunMetadata`) has an `extras` field: an opaque mapping of string keys to string values that you supply when you start the run, beside `user_id` and `storage_scope`. Pipelex never reads a key by name; the telemetry layer forwards the whole mapping as the **groups** of each capture, each key being a group type and its value a group key. Keys are lowercase snake_case starting with a letter (at most 32 characters), values use only letters, digits, `_` and `-` (1 to 128 characters), and a run carries at most five entries; anything else is refused before the run starts.
 
 ```python
-analytics_groups = {"organization": "org_acme"}
+extras = {"organization": "org_acme"}
 ```
 
-On **your own** PostHog stream, every span and every event the run produces is then captured under that run's `user_id`, with the groups attached through PostHog's own groups facet — so a generation made for one of your customers appears on that customer's timeline and inside their organization, instead of under one identity per deployment. The same values reach every OpenTelemetry exporter as the span attributes `pipelex.run.user_id` and `pipelex.run.analytics_groups`, and Langfuse receives the user id in the field it reserves for it. Pipelex's own Gateway stream receives the same `user_id` and groups, as described above.
+On **your own** PostHog stream, every span and every event the run produces is then captured under that run's `user_id`, with its extras attached through PostHog's own groups facet — so a generation made for one of your customers appears on that customer's timeline and inside their organization, instead of under one identity per deployment. The same values reach every OpenTelemetry exporter as the span attributes `pipelex.run.user_id` and `pipelex.run.extras`, and Langfuse receives the user id in the field it reserves for it. Pipelex's own Gateway stream receives the same `user_id` and groups, as described above.
 
 Anything that names no caller of its own keeps reporting under the `user_id` you configured in `telemetry.toml`, which is what that setting now means: the identity of everything that is not one caller's run. That covers an event outside any run — a CLI command listing your pipes — and a run whose caller is not a distinguishable person either: a run on your own machine is attributed to the literal `local`, the same string on every machine, so Pipelex declines it as an identity and uses your configured id instead. The same goes for `single-tenant`, which pipelex-api states for every run when it is deployed with no users. Per-run attribution is for a host that passes a real `user_id` per run.
 
-The groups do not depend on that. A run that leaves `user_id` at its default still carries its `analytics_groups` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
+The extras do not depend on that. A run that leaves `user_id` at its default still carries its `extras` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
+
+The extras also travel with the run's inference calls when they go through Pipelex Manifold. Every request the Manifold backend makes carries one `x-pipelex-metadata` header: a flat JSON object holding the run's extras as they are, plus the run's `user_id` and `pipeline_run_id` and the step's `pipe_run_id`, `pipe_code` and `content_generation_job_id` when it has them, so the service can attribute and log each call. If an extras key has the same name as one of those ids, the run's own value is the one sent, since the extras are yours to set and must not be able to restate whose run it is. No other backend receives this header: a provider you reach directly with your own key gets none of your labels.
+
+```text
+x-pipelex-metadata: {"org_id":"org_acme","user_id":"user_42","pipeline_run_id":"run_abc","pipe_run_id":"0123456789abcdef","pipe_code":"summarize_doc"}
+```
+
+### Work that is not a run, and crashes
+
+A run is not the only thing a host does on a caller's behalf. Validating a bundle dry-runs its pipes without being a run, and an unhandled exception reaches PostHog through the interpreter's exception hook, which is handed nothing but the error. Both are still attributed to the caller when one is known, so your configured `user_id` stands only for work that truly belongs to nobody:
+
+- **Validation.** The validate entry points take a `caller_identity` — the `user_id` and `extras` you would state on a run, as a `CallerIdentity`. `PipelexMTHDSProtocol.validate` passes the caller the protocol was built for, `validate_bundles_in_process`, `validate_bundle` and `BundleValidator` accept one directly, and the `BundleValidatorProtocol` seam requires one (`None` meaning "nobody"). The `pipe_dry_run` event and every dry run the validation performs are then attributed to that caller. A CLI validation on your own machine names nobody and keeps reporting under your configured id.
+- **Crashes inside a run.** Every pipe runs with its run's caller in scope, and an exception that escapes the pipe carries that caller with it — through any error a host raises `from` it — so an `$exception` captured once the error reaches the interpreter lands on the person whose run failed, with their groups. An exception raised outside every run reports under your configured id.
+- **Anything else with no run in hand.** An event emitted without a run but while a caller is in scope reads that caller. A host can open such a scope around its own work with `scoped_caller_identity(caller_identity=...)` from `pipelex.system.caller_identity`.
+
+The same rules apply to all of these as to a run: a placeholder such as `local` names nobody, `mode = "anonymous"` identifies nobody, and the caller never becomes an event property.
 
 !!! note "Anonymous mode covers your users too"
     With `mode = "anonymous"`, the runtime identifies nobody on your stream: no run's `user_id` is applied, no groups are sent, and the `user_id` you configured is not sent either — a mode that identifies nobody would not be one that still named you. Leaving a `user_id` in `telemetry.toml` while switching to `anonymous` therefore changes nothing. Per-run attribution needs `mode = "identified"`.

@@ -82,6 +82,7 @@ from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.exceptions import UnknownBootOrchestratorError
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+from pipelex.plugins.log_sink_registry import LogSinkRegistry
 from pipelex.plugins.model_lister_registry import ModelListerRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
@@ -123,6 +124,7 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
+from pipelex.tools.misc.pretty import PrettyPrintMode, require_rich_for_rendering
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.urls import URLs
@@ -340,6 +342,56 @@ Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 """
 
+    @classmethod
+    def should_enable_pipelex_telemetry(
+        cls,
+        *,
+        integration_mode: IntegrationMode,
+        is_unit_testing: bool,
+        is_gateway_enabled: bool,
+        needs_inference: bool,
+        is_gateway_config_cached: bool,
+    ) -> bool:
+        """Decide whether this boot sends the Pipelex Gateway telemetry stream.
+
+        The stream is disabled when:
+
+        - the legacy gateway backend is not enabled, OR
+        - inference is not needed (no live runs to track), OR
+        - the gateway config came from the cache (stale specs imply potentially stale model
+          identities; phoning home about pipe runs in that state would pollute metrics), OR
+        - the runtime is booted by a test harness: its runs are not usage, and its fixture user ids must
+          not become persons in the production analytics project. Two signals say so, and either one is
+          enough. The integration mode (`CI` or `PYTEST`) is what a harness booting without our pytest
+          plugin states, such as the pipelex-js conformance scripts. The run mode is what the shared
+          pytest plugin sets for every session that loads it, which covers the suites that boot in the
+          default `PYTHON` mode, as the plugin's own recipe does.
+
+        **The first condition asks about `pipelex_gateway` specifically, not about managed backends
+        in general**, and the distinct id is why: it is derived from `PIPELEX_GATEWAY_API_KEY`, which
+        a manifold backend neither has nor can stand in for — its own key is, for the private beta,
+        one token shared by every participant, so keying on it would produce a single indistinguishable
+        user rather than an identity. Asked the general way, a manifold-only installation would be
+        required to hold a gateway key it has no other use for and would fail to boot without one.
+        The common beta case is unaffected: a participant who keeps `pipelex_gateway` enabled has a
+        real gateway key, and their manifold runs are tracked under it like everything else.
+
+        The per-mode `telemetry_allowed_modes` table does not take part: it governs only the
+        operator's custom stream, which the telemetry factory gates by itself.
+
+        Args:
+            integration_mode: The mode the runtime is booted in.
+            is_unit_testing: Whether the run mode is a test mode, as `RuntimeManager.is_unit_testing` says.
+            is_gateway_enabled: Whether the `pipelex_gateway` backend is enabled.
+            needs_inference: Whether this boot runs live inference.
+            is_gateway_config_cached: Whether the gateway config came from the cache rather than a fresh fetch.
+
+        Returns:
+            True when the Gateway telemetry stream should be sent.
+        """
+        is_test_harness = integration_mode.is_test_harness or is_unit_testing
+        return is_gateway_enabled and needs_inference and not is_gateway_config_cached and not is_test_harness
+
     def setup(
         self,
         *,
@@ -497,6 +549,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if boot_orchestrator is not None and boot_orchestrator not in plugin_registrar.registered_plugin_names:
             raise UnknownBootOrchestratorError(requested=boot_orchestrator)
 
+        # The log sink: the first capability resolved out of the registrar, because every line the rest
+        # of this boot emits should be rendered by the sink the configuration chose. ``log.configure``
+        # ran in ``__init__``, before discovery could, and has held every record since; installing the
+        # sink replays them through it. The built-in LogSinkPlugin supplies every shipped sink, so there
+        # is no separate core default, and an unknown token fails loud here listing the registered ones.
+        log_config = get_config().runtime.log
+        log_sink_registry = LogSinkRegistry(plugin_registrar.log_sinks)
+        log.install_sink(log_sink_registry.get_required(method=log_config.sink)(log_config))
+        # The pretty-print mode is checked beside the sink, for the same reason: Rich is the ``cli`` extra,
+        # and a process asking for the ``rich`` panels without it stops here, naming the extra and the
+        # Rich-free modes, rather than failing at the first pipe that prints its output.
+        if log_config.pretty_print_mode is PrettyPrintMode.RICH:
+            require_rich_for_rendering()
+
         # Secrets provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
         # Resolved here because the telemetry factory just below (and the model setup further down) consume it.
@@ -506,28 +572,22 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             secrets_config = get_config().runtime.secrets
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
-        # Disable Pipelex telemetry when:
-        # - the legacy gateway backend is not enabled, OR
-        # - inference is not needed (no live runs to track), OR
-        # - the gateway config came from the cache (stale specs imply potentially stale model
-        #   identities; phoning home about pipe runs in that state would pollute metrics).
+        # Whether the Pipelex Gateway telemetry stream is sent: the conditions, and why each one is
+        # there, are in `should_enable_pipelex_telemetry`.
         #
-        # **The first condition asks about `pipelex_gateway` specifically, not about managed backends
-        # in general**, and the distinct id is why: it is derived from `PIPELEX_GATEWAY_API_KEY`, which
-        # a manifold backend neither has nor can stand in for — its own key is, for the private beta,
-        # one token shared by every participant, so keying on it would produce a single indistinguishable
-        # user rather than an identity. Asked the general way, a manifold-only installation would be
-        # required to hold a gateway key it has no other use for and would fail to boot without one.
-        # The common beta case is unaffected: a participant who keeps `pipelex_gateway` enabled has a
-        # real gateway key, and their manifold runs are tracked under it like everything else.
-        #
-        # Read off the mapping computed above rather than by asking the document a second time. The
-        # two answers are the same one — the gateway resolves to a section whenever it is enabled —
-        # and a second read would be a second chance for an unparseable file to escape the clause
-        # that frames it as a backend-library refusal.
+        # The gateway's enablement is read off the mapping computed above rather than by asking the
+        # document a second time. The two answers are the same one — the gateway resolves to a section
+        # whenever it is enabled — and a second read would be a second chance for an unparseable file
+        # to escape the clause that frames it as a backend-library refusal.
         gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
         is_gateway_enabled = PipelexBackend.GATEWAY in managed_gateway_sections
-        is_pipelex_telemetry_enabled = is_gateway_enabled and needs_inference and not gateway_source_is_cached
+        is_pipelex_telemetry_enabled = self.should_enable_pipelex_telemetry(
+            integration_mode=integration_mode,
+            is_unit_testing=runtime_manager.is_unit_testing,
+            is_gateway_enabled=is_gateway_enabled,
+            needs_inference=needs_inference,
+            is_gateway_config_cached=gateway_source_is_cached,
+        )
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
@@ -596,10 +656,18 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # typed as, and which is a public injection point. Widening that interface is a decision of
             # its own, so the gap is documented rather than half-closed. The docstrings say exactly
             # this; do not read ``config_dir`` as "only this directory is read" for inference.
+            #
+            # The interface WAS widened once, for ``plugin_model_declarations``, and that decision is
+            # the reason it is required rather than optional: a plugin that ships a document engine
+            # declares the engine's model and its deck defaults on the registrar, and the model deck
+            # is built here, so an implementation that could be set up without them would boot a deck
+            # missing every plugin engine and refuse those steps with a misleading "not installed".
+            # The registrar was built above, before any of this, so its declarations are final here.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
                 managed_gateway_configs=managed_gateway_configs,
                 gateway_config_source=gateway_config_source,
+                plugin_model_declarations=plugin_registrar.make_model_declarations(),
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:

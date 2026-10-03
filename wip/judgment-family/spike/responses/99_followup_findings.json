@@ -1,0 +1,138 @@
+[
+  {
+    "label": "model 'jev-1.13.0' accepted",
+    "value": "{\"reported\": \"jev-1.13.0\"}"
+  },
+  {
+    "label": "model 'jev-1.13'",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-1.13\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97ade0f749fb8b54e303bdd9467\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-1.13 (request_id=req_01a0b97ade0f749fb8b54e303bdd9467)\"}"
+  },
+  {
+    "label": "model 'jev-1'",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev-1\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97adec779e78b8b69e76d5ad134\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev-1 (request_id=req_01a0b97adec779e78b8b69e76d5ad134)\"}"
+  },
+  {
+    "label": "model 'jev'",
+    "value": "{\"body\": {\"detail\": {\"error_type\": \"api_usage_error\", \"message\": \"Unknown model: jev\"}}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97adf81711ea473ad3b20c8c757\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Unknown model: jev (request_id=req_01a0b97adf81711ea473ad3b20c8c757)\"}"
+  },
+  {
+    "label": "no model named (SDK default)",
+    "value": "{\"reported\": \"jev-1.13.0\"}"
+  },
+  {
+    "label": "ambiguous noul values",
+    "value": "[0.11, 0.12]"
+  },
+  {
+    "label": "ambiguous noul spread",
+    "value": "0.01"
+  },
+  {
+    "label": "ambiguous noul stdev",
+    "value": "0.003"
+  },
+  {
+    "label": "ambiguous choice verdicts",
+    "value": "[\"reports\"]"
+  },
+  {
+    "label": "ambiguous choice verdict stable",
+    "value": "true"
+  },
+  {
+    "label": "ambiguous choice confidence range",
+    "value": "[0.94, 0.97]"
+  },
+  {
+    "label": "ambiguous score values",
+    "value": "[1.0]"
+  },
+  {
+    "label": "ambiguous score spread",
+    "value": "0.0"
+  },
+  {
+    "label": "ambiguous responses bit-identical",
+    "value": "false"
+  },
+  {
+    "label": "reworded instruction, noul",
+    "value": "0.32"
+  },
+  {
+    "label": "true_and_false",
+    "value": "{\"noul\": 0.11, \"type\": \"noul\"}"
+  },
+  {
+    "label": "false_only",
+    "value": "{\"noul\": 0.14, \"type\": \"noul\"}"
+  },
+  {
+    "label": "unknown_key",
+    "value": "{\"noul\": 0.11, \"type\": \"noul\"}"
+  },
+  {
+    "label": "criteria_only_no_instructions",
+    "value": "{\"noul\": 0.27, \"type\": \"noul\"}"
+  },
+  {
+    "label": "empty_criteria",
+    "value": "{\"noul\": 0.11, \"type\": \"noul\"}"
+  },
+  {
+    "label": "empty_instructions",
+    "value": "{\"body\": {\"detail\": \"Noul question must have criteria or instructions: q\"}, \"class\": \"TypeSafeBadRequestError\", \"request_id\": \"req_01a0b97aea227d749f050819707ddda4\", \"status\": 400, \"str\": \"POST https://api.typesafe.ai/v1/systemone: 400 Noul question must have criteria or instructions: q (request_id=req_01a0b97aea227d749f050819707ddda4)\"}"
+  },
+  {
+    "label": "structured_instructions",
+    "value": "{\"noul\": 0.36, \"type\": \"noul\"}"
+  },
+  {
+    "label": "keys_with_spaces",
+    "value": "{\"choice\": \"needs triage\", \"confidence\": 0.88, \"probabilities\": {\"needs triage\": 0.94, \"no action\": 0.06}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "keys_with_dots",
+    "value": "{\"choice\": \"team.reports\", \"confidence\": 0.83, \"probabilities\": {\"team.performance\": 0.08, \"team.reports\": 0.92}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "unicode_keys",
+    "value": "{\"choice\": \"rapport\", \"confidence\": 0.96, \"probabilities\": {\"rapport\": 0.98, \"r\\u00e9seau\": 0.02}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "empty_string_key",
+    "value": "{\"choice\": \"other\", \"confidence\": 0.57, \"probabilities\": {\"\": 0.21, \"other\": 0.79}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "duplicate_after_strip",
+    "value": "{\"choice\": \"A\", \"confidence\": 0.53, \"probabilities\": {\"A\": 0.76, \"a\": 0.24}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "empty_string_description",
+    "value": "{\"choice\": \"reports\", \"confidence\": 0.98, \"probabilities\": {\"other\": 0.01, \"reports\": 0.99}, \"type\": \"choice\"}"
+  },
+  {
+    "label": "1 questions",
+    "value": "{\"answers\": 1, \"input_tokens\": 323, \"latency_s\": 0.306, \"output_tokens\": 22}"
+  },
+  {
+    "label": "5 questions",
+    "value": "{\"answers\": 5, \"input_tokens\": 387, \"latency_s\": 0.233, \"output_tokens\": 94}"
+  },
+  {
+    "label": "20 questions",
+    "value": "{\"answers\": 20, \"input_tokens\": 637, \"latency_s\": 0.239, \"output_tokens\": 364}"
+  },
+  {
+    "label": "50 questions",
+    "value": "{\"answers\": 50, \"input_tokens\": 1147, \"latency_s\": 0.351, \"output_tokens\": 904}"
+  },
+  {
+    "label": "40 concurrent requests, elapsed_s",
+    "value": "0.742"
+  },
+  {
+    "label": "failures",
+    "value": "none"
+  }
+]

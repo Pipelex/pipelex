@@ -35,9 +35,9 @@ def bedrock_list_available_models(
     try:
         import boto3  # ruff: ignore[import-outside-top-level]
     except ImportError as exc:
-        lib_name = "boto3,aioboto3"
+        lib_name = "boto3,aiobotocore"
         lib_extra_name = "bedrock"
-        msg = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
+        msg = "The boto3 and aiobotocore SDKs are required to use Bedrock models."
         raise MissingDependencyError(
             lib_name,
             lib_extra_name,

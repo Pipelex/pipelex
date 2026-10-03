@@ -7,10 +7,11 @@ Two pure-ish building blocks composed by both the single-run wrapper
 - :func:`acquire_library` — set the current library, open it, and load
   directories + blueprints into it. Owns its own load-failure teardown (open,
   then load under a ``try``; on failure restore the caller's outer
-  current-library and tear the just-opened library down). Returns the
-  ``library_id`` plus the bundle's qualified ``main_pipe`` (when an
-  ``mthds_contents`` bundle declares one), leaving pipe resolution to the
-  caller.
+  current-library and tear the just-opened library down). A refusal of the
+  bundle while it loads is the ``ValidateBundleError`` verdict, as on the
+  validate path. Returns the ``library_id`` plus the bundle's qualified
+  ``main_pipe`` (when an ``mthds_contents`` bundle declares one), leaving pipe
+  resolution to the caller.
 - :func:`prepare_pipe_job` — build a :class:`PipeJob` against an already-open
   library: working memory (user inputs, mock inputs, data-url normalization),
   run params, job metadata, and the library crate. **Pure**: no pipeline-manager
@@ -19,6 +20,7 @@ Two pure-ish building blocks composed by both the single-run wrapper
 """
 
 from collections.abc import Sequence
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,11 +47,12 @@ from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
-from pipelex.system.analytics_groups import validate_analytics_groups
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.storage_scope import validate_storage_scope
+from pipelex.system.run_extras import validate_run_extras
+from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
@@ -63,6 +66,7 @@ def acquire_library(
     library_dirs: list[str] | None = None,
     mthds_contents: list[str] | None = None,
     bundle_uris: list[str] | None = None,
+    library_dirs_are_callers: bool = False,
 ) -> tuple[str, str | None]:
     """Set the current library, open it, and load dirs + blueprints into it.
 
@@ -71,6 +75,25 @@ def acquire_library(
     restore the caller's outer current-library and tear the just-opened library
     down before re-raising — so a failed load never leaks a ``Library``. On
     success the library is left open and current for the caller to use.
+
+    **A refusal of the bundle is the validation verdict.** The parse of ``mthds_contents`` and their
+    load run inside ``translate_to_validate_bundle_error``, the one translation the validate path
+    uses, so a run on an invalid bundle is refused before any pipe runs with the ``ValidateBundleError``
+    and the same located ``validation_errors`` validating that bundle gives, instead of the raw class
+    of whichever check refused it. What the translation leaves raw stays raw: a fault of the tool or
+    its environment, a security refusal, and a ``PipeNotFoundError``. No source is threaded onto the
+    contents here, so their items carry none: a hosted run request names no file, and giving a
+    blueprint a source also changes where its address-based dependencies are searched for. A package
+    the bundle depends on by address still loads from its install directory inside this translation,
+    exactly as on the in-memory validate path, and its refusals name its bundles by the package's
+    address and their path inside it, never by that directory. Beside a host's library directories,
+    the verdict names none of their files either (``withholding_host_library_files``).
+
+    ``library_dirs_are_callers`` says whose ``library_dirs`` are. On a local run they are the
+    caller's own (a CLI's ``-L``, the directory of the bundle being run), so a refusal while loading
+    them is the caller's invalid bundle too, reported as ``validate`` reports it. On a host they are
+    the host's (installed libraries, a temporary directory of shipped Python): a fault there is not
+    the caller's to fix and its paths are not the caller's to read, so by default they load untranslated.
 
     Returns the ``library_id`` and the bundle's qualified ``main_pipe`` ref
     (``domain.pipe_code``) when an ``mthds_contents`` bundle declares one, else
@@ -91,31 +114,40 @@ def acquire_library(
             log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}):")
             for index_dir, dir_path in enumerate(effective_dirs):
                 log.verbose(f"  [{index_dir + 1}] {dir_path}")
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            library_dirs_translation: AbstractContextManager[None] = (
+                translate_to_validate_bundle_error() if library_dirs_are_callers else nullcontext()
+            )
+            with library_dirs_translation:
+                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
         else:
             log.verbose(f"No library directories to load ({source_label})")
 
         qualified_main_pipe: str | None = None
         if mthds_contents:
-            all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+            # Beside a host's library directories, the verdict names none of their files, which are paths on the host.
+            host_library_withholding: AbstractContextManager[None] = (
+                nullcontext() if library_dirs_are_callers else withholding_host_library_files(library_dirs=effective_dirs)
+            )
+            with host_library_withholding, translate_to_validate_bundle_error():
+                all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
-            # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH).
-            blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
-            if bundle_uris:
-                current_library = library_manager.get_library(library_id=library_id)
-                blueprints_to_load = []
-                for blueprint, uri in zip(all_blueprints, bundle_uris, strict=True):
-                    try:
-                        resolved_uri = Path(uri).resolve()
-                    except (OSError, RuntimeError):
-                        resolved_uri = Path(uri)
-                    if resolved_uri in current_library.loaded_mthds_paths:
-                        log.verbose(f"Bundle '{uri}' already loaded from library directories, skipping")
-                    else:
-                        blueprints_to_load.append(blueprint)
+                # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH).
+                blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
+                if bundle_uris:
+                    current_library = library_manager.get_library(library_id=library_id)
+                    blueprints_to_load = []
+                    for blueprint, uri in zip(all_blueprints, bundle_uris, strict=True):
+                        try:
+                            resolved_uri = Path(uri).resolve()
+                        except (OSError, RuntimeError):
+                            resolved_uri = Path(uri)
+                        if resolved_uri in current_library.loaded_mthds_paths:
+                            log.verbose(f"Bundle '{uri}' already loaded from library directories, skipping")
+                        else:
+                            blueprints_to_load.append(blueprint)
 
-            if blueprints_to_load:
-                library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
+                if blueprints_to_load:
+                    library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
 
             # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with
             # the same code — via the one shared selection rule (first declaring main_pipe, else first).
@@ -165,7 +197,8 @@ async def prepare_pipe_job(
     pipeline_run_id: str,
     user_id: str,
     storage_scope: str,
-    analytics_groups: dict[str, str] | None = None,
+    read_scope: str | None,
+    extras: dict[str, str] | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     search_scope: str | None = None,
     trace_context: "TraceContext | None" = None,
@@ -194,6 +227,11 @@ async def prepare_pipe_job(
     submitter exercises the real distribution machinery at zero spend. The flag is resolved by
     ``PipeRunParamsFactory.make_run_params`` (the single writer of ``run_mode``), so it covers
     every entry point that builds run params, not just this one.
+
+    ``read_scope`` bounds what the run may read (see :mod:`pipelex.tools.uri.uri_read_scope`). It is
+    required, ``None`` for an unscoped run, and it rides the job metadata to every leaf. Here it also
+    gates the two reads the input seam makes itself: a CSV input read while shaping, and a local file
+    uploaded by the normalization, which on a scoped run is refused instead, naming the input.
     """
     # Validate the scope HERE, before anything composes a storage key from it.
     #
@@ -207,13 +245,20 @@ async def prepare_pipe_job(
     # This is deliberately not a "second gate": it is the FIRST one on this path.
     storage_scope = validate_storage_scope(value=storage_scope)
 
-    # And the groups beside it, for the same reason: `RunMetadata` is built at
+    # The read scope too, and its relation to the storage scope, for the same
+    # reason: the shaping and the normalization below read on its authority,
+    # and `RunMetadata` is only built after them.
+    if read_scope is not None:
+        read_scope = validate_read_scope(value=read_scope)
+    validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
+
+    # And the extras beside it, for the same reason: `RunMetadata` is built at
     # the bottom of this function, below the data-url normalization that writes
     # to real storage, so validating only there refuses a malformed mapping
     # after the run has already put bytes in a bucket. `pipeline_run_setup`
     # validates earlier still — this is the first gate for the callers that
     # reach this seam directly (`bundle_validator`, `dry_run_in_process`).
-    analytics_groups = validate_analytics_groups(value=analytics_groups or {})
+    extras = validate_run_extras(value=extras or {})
 
     working_memory: WorkingMemory | None = None
 
@@ -232,6 +277,7 @@ async def prepare_pipe_job(
                 input_specs=pipe.inputs,
                 search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
+                read_scope=read_scope,
             )
 
     # If mock inputs is enabled, generate mock data for missing required inputs.
@@ -283,20 +329,21 @@ async def prepare_pipe_job(
                 )
             )
 
-    # Normalize data URLs to pipelex-storage:// URIs if configured.
+    # Normalize data URLs to pipelex-storage:// URIs, and give every image and document input a public_url, if configured.
     if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
-        working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope)
+        working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope, read_scope=read_scope)
 
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(
             user_id=user_id,
             storage_scope=storage_scope,
+            read_scope=read_scope,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
             # Already normalized to a mapping and validated at the top of this
             # function; the parameter stays nullable only so every existing call
             # site can keep omitting it.
-            analytics_groups=analytics_groups,
+            extras=extras,
         ),
         otel_context=otel_context,
         trace_context=trace_context,

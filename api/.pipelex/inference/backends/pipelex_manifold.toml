@@ -1,0 +1,56 @@
+################################################################################
+# Pipelex Manifold Local Overrides
+################################################################################
+#
+# PRIVATE BETA:
+#
+# Pipelex Manifold is the Pipelex-operated inference service. It is in private
+# beta, it ships disabled in backends.toml, and this file does nothing until you
+# enable it there and set PIPELEX_MANIFOLD_ENDPOINT and PIPELEX_MANIFOLD_API_KEY.
+#
+################################################################################
+#
+# TELEMETRY NOTICE:
+#
+# Enabling pipelex_gateway alongside this backend enables identified telemetry
+# from your machine, tied to your Pipelex Gateway API key (hashed for security).
+# This is independent from your telemetry.toml settings.
+#
+# That client-side telemetry follows the gateway key and nothing else, so an
+# installation running Pipelex Manifold ALONE sends none of it. Manifold is a
+# Pipelex-operated service, though, so your usage of it is recorded server-side
+# the way any hosted platform records the calls it serves.
+#
+# Either way we collect only technical data (model names, token counts, latency,
+# error rates). We do NOT collect prompts, completions, pipe codes, or business
+# data.
+#
+# This allows us to monitor service quality, enforce fair usage, and support you.
+#
+################################################################################
+#
+# WARNING: USE AT YOUR OWN RISK!
+#
+# The actual model configuration is fetched remotely from Pipelex servers.
+# Any override in this file may cause unexpected behavior or failures,
+# as the remote configuration may change at any time.
+#
+# If you must override, you may ONLY use these keys per model:
+#   - sdk
+#   - structure_method
+#
+# All other keys will be ignored.
+#
+# If you need custom configurations, consider using your own API keys
+# with direct provider backends (openai, anthropic, etc.) instead.
+#
+# Documentation:
+# https://docs.pipelex.com/latest/configuration/config-technical/inference-backend-config/
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+# Per-model overrides example:
+# [gpt-4o]
+# sdk = "manifold_completions"
+# structure_method = "instructor/openai_tools"

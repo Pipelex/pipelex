@@ -5,7 +5,7 @@ serializable ``SearchAssignment`` / ``SearchObjectAssignment``, rebuild the ``Se
 worker from the model handle, and run it. The direct ``ContentGenerator`` calls them inline; the Temporal
 ``act_search_*`` activity calls them inside an activity so the result is recorded in workflow history and
 any failure is converted to a terminal ``ApplicationError`` (instead of running inline on the workflow
-loop, which left search failures hanging the submitter — see ``wip/`` brief).
+loop, which left search failures hanging the submitter).
 
 The structured search has two entry points rather than one nullable parameter, because its two arms
 genuinely return different things: in-process the caller's class travels down and an instance of it
@@ -25,6 +25,7 @@ from pipelex.cogt.content_generation.dry_mock import (
     dry_search_gen_structured_object,
 )
 from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_data
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.search.search_job import SearchJob
@@ -58,6 +59,7 @@ def _make_search_job(search_assignment: SearchAssignment) -> SearchJob:
 
 
 async def search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
+    authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
         return dry_search_gen_sourced_answer(search_assignment)
     worker = _make_search_worker(search_assignment)
@@ -77,6 +79,7 @@ async def search_gen_structured(search_object_assignment: SearchObjectAssignment
     the stack, and handing it down is what keeps its validators and schema hints from being lost.
     """
     search_assignment = search_object_assignment.search_assignment
+    authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_object_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
         return dry_search_gen_structured(search_object_assignment)
     boundary_class = SchemaToModelFactory.make_from_json_schema(
@@ -103,6 +106,7 @@ async def search_gen_structured_object(
     submitter. The two arms of this module therefore differ in return type on purpose — a dict is the
     wire's shape, an instance is the caller's.
     """
+    authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
         return dry_search_gen_structured_object(search_assignment, output_class=output_class)
     result_dict = await _run_structured_search(search_assignment, schema=output_class)

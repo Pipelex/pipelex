@@ -280,6 +280,7 @@ llm_models = ["gpt-4o-mini"]
 img_gen_models = []
 extract_models = []
 search_models = []
+judgment_models = []
 
 ################################################################################
 # Dev Profile
@@ -296,6 +297,7 @@ llm_models = [
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf", "linkup-fetch"]
 search_models = ["linkup-standard"]
+judgment_models = []
 
 ################################################################################
 # Manifold Profile
@@ -321,6 +323,7 @@ llm_models = [
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["azure-document-intelligence", "linkup-fetch"]
 search_models = ["linkup-standard"]
+judgment_models = []
 
 ################################################################################
 # Coverage Profile
@@ -337,6 +340,7 @@ llm_models = [
 img_gen_models = ["gpt-image-1", "nano-banana"]
 extract_models = ["pypdfium2-extract-pdf"]
 search_models = ["linkup-standard"]
+judgment_models = []
 
 ################################################################################
 # Claude Latest Profile
@@ -348,6 +352,7 @@ llm_models = ["claude-4.5-*"]
 img_gen_models = []
 extract_models = []
 search_models = []
+judgment_models = []
 
 ################################################################################
 # GPT No Codex Profile
@@ -359,6 +364,7 @@ llm_models = ["gpt-*", "!*-codex", "!*-codex-*"]
 img_gen_models = ["gpt-image-*"]
 extract_models = []
 search_models = []
+judgment_models = []
 
 ################################################################################
 # All Backends Profile - Test across all backends with select models
@@ -370,6 +376,7 @@ llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf"]
 search_models = ["@linkup"]
+judgment_models = []
 
 ################################################################################
 # Full Profile - All available models (use with caution)
@@ -404,3 +411,4 @@ extract_models = [
 search_models = [
   "linkup-standard",
 ]
+judgment_models = []

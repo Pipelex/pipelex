@@ -2,7 +2,12 @@
 
 Verifies that async filters are excluded from sync environments to prevent
 silent corruption (coroutine objects rendered as strings instead of actual content).
+Every registered filter is wrapped to charge the render budget, so the checks unwrap it.
 """
+
+import inspect
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -11,6 +16,11 @@ from pipelex.tools.jinja2.jinja2_filters import tag as async_tag_filter
 from pipelex.tools.jinja2.jinja2_filters import text_format as async_text_format_filter
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
 from pipelex.tools.jinja2.template_category import TemplateCategory
+
+
+def _unwrapped(function: Callable[..., Any] | None) -> Callable[..., Any] | None:
+    return None if function is None else inspect.unwrap(function)
+
 
 CATEGORIES_WITH_ASYNC_FILTERS = [
     TemplateCategory.BASIC,
@@ -31,8 +41,8 @@ class TestJinja2EnvironmentFilterRegistration:
             template_category=template_category,
             enable_async=True,
         )
-        assert jinja2_env.filters[Jinja2FilterName.TAG] is async_tag_filter
-        assert jinja2_env.filters[Jinja2FilterName.FORMAT] is async_text_format_filter
+        assert _unwrapped(jinja2_env.filters[Jinja2FilterName.TAG]) is async_tag_filter
+        assert _unwrapped(jinja2_env.filters[Jinja2FilterName.FORMAT]) is async_text_format_filter
 
     @pytest.mark.parametrize("template_category", CATEGORIES_WITH_ASYNC_FILTERS)
     def test_async_filters_excluded_when_async_disabled(self, template_category: TemplateCategory) -> None:
@@ -43,7 +53,7 @@ class TestJinja2EnvironmentFilterRegistration:
         )
         assert Jinja2FilterName.TAG not in jinja2_env.filters
         # "format" is a built-in Jinja2 filter, so check it's NOT our async one
-        assert jinja2_env.filters.get(Jinja2FilterName.FORMAT) is not async_text_format_filter
+        assert _unwrapped(jinja2_env.filters.get(Jinja2FilterName.FORMAT)) is not async_text_format_filter
 
     def test_sync_filters_registered_when_async_disabled(self) -> None:
         """Sync filters (escape_script_tag) should be registered regardless of enable_async."""
@@ -73,4 +83,4 @@ class TestJinja2EnvironmentFilterRegistration:
                 enable_async=enable_async,
             )
             assert Jinja2FilterName.TAG not in jinja2_env.filters
-            assert jinja2_env.filters.get(Jinja2FilterName.FORMAT) is not async_text_format_filter
+            assert _unwrapped(jinja2_env.filters.get(Jinja2FilterName.FORMAT)) is not async_text_format_filter

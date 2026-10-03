@@ -42,8 +42,11 @@ def drop_unknown_gateway_defaults(*, gateway_model_specs: BackendModelSpecs) -> 
 
     Deliberately pure, and deliberately silent: it runs on the success path of every gateway-backend
     load, including loads that happen before `runtime_hub.set_config()` has configured the log
-    dispatch. A `log` call here would turn a plain data transform into a boot-order dependency and
-    crash the caller with `LogConfig is not set`.
+    dispatch. A `log` call here would turn a plain data transform into a boot-order dependency: a line
+    emitted before the dispatch is configured goes to the stdlib's default handling, where an `info`
+    is dropped and a warning lands on stderr unformatted, ahead of the console the boot is about to
+    configure, so a warning about the served payload would read differently depending on when the
+    load happened to run.
     """
     known_fields = InferenceModelSpecBlueprint.model_fields.keys()
     defaults = gateway_model_specs.get("defaults")

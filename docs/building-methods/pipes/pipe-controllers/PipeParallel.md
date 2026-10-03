@@ -32,6 +32,14 @@ A branch result may legitimately be **absent** at run time: the branch pipe decl
 -   **Structured output, non-required field**: the absence is absorbed as the field's default (`null` unless the field declares another default).
 -   **Structured output, required field**: this is rejected **statically** at validation time (`optional_branch_required_field`) — a required field cannot be fed by a maybe-absent branch. Make the field non-required, or sink the absence upstream with a `?` input on the branch path.
 
+### A branch and its field must agree on multiplicity
+
+A branch that produces a list, such as a `PipeBatch` whose output is `Idea[]`, fills a field that holds a list, and a branch that produces one item fills a field that holds one item. When they disagree, the combine refuses the branch results, in the dry run of `pipelex validate` as in a run, and the refusal names the branch, its result and the field, and says which of the two to change; when the branch's multiplicity comes from its own `nb_output`, `multiple_output` or `batch_over` in `branches`, the refusal names that setting instead of the pipe's output. The advice is given only when the branch's concept fits the field, and whatever else the combine refused is reported beside it. The refusal is a fault in your method, so a hosted run answers it with HTTP 422 and keeps its message under STRICT disclosure, with the change to make as its next step:
+
+```text
+PipeParallel 'analyze_topics' cannot combine its branch results into its output 'TopicReview'. Branch 'draft_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'TopicReview' holds a single item. Declare the field as a list in the structure of 'TopicReview', with type 'list', item_type 'concept' and item_concept_ref 'Idea', or make branch 'draft_ideas' output a single 'Idea'.
+```
+
 ## Configuration
 
 `PipeParallel` is configured in your pipeline's `.mthds` file.
@@ -85,12 +93,14 @@ type = "PipeLLM"
 description = "Extract features from text"
 inputs = { description = "ProductDescription" }
 output = "ProductFeatures"
+prompt = "Extract the product features from this description:\n@description"
 
 [pipe.analyze_sentiment]
 type = "PipeLLM"
 description = "Analyze sentiment of text"
 inputs = { description = "ProductDescription" }
 output = "ProductSentiment"
+prompt = "Analyze the sentiment of this product description:\n@description"
 
 # The PipeParallel definition
 [pipe.analyze_product_in_parallel]
@@ -114,7 +124,7 @@ How this works:
 5.  A new structured object of type `ProductAnalysis` is created and populated with the results, like `{"features": ..., "sentiment": ...}`. This object becomes the main output of the `analyze_product_in_parallel` pipe.
 6.  Because `add_each_output` is `true`, `features` and `sentiment` are also available individually in the working memory for downstream pipes.
 
-If you don't want to declare a `ProductAnalysis` concept, set `output = "Composite"` instead: the combined object then holds the same `{"features": ..., "sentiment": ...}` shape as an untyped composition.
+If you don't want to declare a `ProductAnalysis` concept, set `output = "Composite"` instead: the combined object then holds the same `{"features": ..., "sentiment": ...}` shape as an untyped composition. A later template reads each part by name, as it would read a field: `{{ analysis.features }}`.
 
 ## Related Documentation
 

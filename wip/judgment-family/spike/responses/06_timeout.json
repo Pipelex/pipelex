@@ -1,0 +1,14 @@
+{
+  "class": "TypeSafeAPITimeoutError",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "TypeSafeAPIConnectionError",
+    "TypeSafeError",
+    "ConnectionError",
+    "TimeoutError",
+    "OSError",
+    "Exception",
+    "BaseException"
+  ],
+  "str": "Request timed out (timeout=0.001)."
+}

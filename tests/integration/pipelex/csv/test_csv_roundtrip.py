@@ -52,7 +52,7 @@ class TestCsvRoundtrip:
 
     def test_csv_input_builds_typed_list(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(people_inputs(), concept_provider=get_concept_library())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(people_inputs(), concept_provider=get_concept_library(), read_scope=None)
 
         people = working_memory.get_stuff("people").content
         assert isinstance(people, ListContent)

@@ -14,8 +14,7 @@ payload. Mistral's exception hierarchy differs from OpenAI/Anthropic:
 from __future__ import annotations
 
 import httpx
-from mistralai import MistralError
-from mistralai.models import NoResponseError
+from mistralai.client.errors import MistralError, NoResponseError
 
 from pipelex.cogt.inference.error_classification import extract_mistral_metadata
 

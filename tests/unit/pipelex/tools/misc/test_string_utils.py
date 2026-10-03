@@ -4,6 +4,7 @@ from pipelex.tools.misc.string_utils import (
     camel_to_snake_case,
     can_inject_text,
     count_with_noun,
+    find_private_path_segment,
     get_root_from_dotted_path,
     is_none_or_has_text,
     is_not_none_and_has_text,
@@ -256,6 +257,21 @@ def test_is_pascal_case(word: str, expected: bool) -> None:
 )
 def test_get_root_from_dotted_path(dotted_path: str, expected: str) -> None:
     assert get_root_from_dotted_path(dotted_path) == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("deal.customer_name", None),
+        ("deal", None),
+        ("deal.items.first_name", None),
+        ("note.__class__.__init__", "__class__"),
+        ("note.content._private", "_private"),
+        ("_root", "_root"),
+    ],
+)
+def test_find_private_path_segment(path: str, expected: str | None) -> None:
+    assert find_private_path_segment(path=path) == expected
 
 
 @pytest.mark.parametrize(

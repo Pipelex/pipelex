@@ -217,6 +217,27 @@ class TestOutOfMatrixNatives:
         projected = project_inputs_template(descriptor=_descriptor(date_slot), explicit=False)["date_in"]
         assert projected == {"concept": "native.Date", "content": {"date": "2026-01-01", "time": "12:00:00"}}
 
+    def test_a_json_slot_unwraps_to_its_object_in_the_compact_shape(self):
+        """`native.JSON` is not out of matrix: the shaper reads a bare object there literally, so the
+        compact shape is the object its `json_obj` holds, and the explicit shape keeps the content form.
+        """
+        json_node: dict[str, Any] = {
+            "kind": "object",
+            "concept_ref": "native.JSON",
+            "required": True,
+            "fields": [{"kind": "unknown", "name": "json_obj", "required": True}],
+        }
+        single = {**json_node, "name": "payload"}
+        plural = {"kind": "list", "name": "records", "concept_ref": "native.JSON", "required": True, "item": json_node}
+        descriptor = _descriptor(single, plural)
+
+        compact = project_inputs_template(descriptor=descriptor, explicit=False)
+        explicit = project_inputs_template(descriptor=descriptor, explicit=True)
+
+        assert compact == {"payload": {}, "records": [{}]}
+        assert explicit["payload"] == {"concept": "native.JSON", "content": {"json_obj": {}}}
+        assert explicit["records"] == {"concept": "native.JSON", "content": [{"json_obj": {}}]}
+
     def test_a_nested_field_naming_a_native_holds_that_native_s_content_object(self):
         """A nested `native.Text` is a `TextContent`, so the payload carries `{"text": ...}` there —
         where an authored `type = "text"` field beside it carries the bare value. The descriptor

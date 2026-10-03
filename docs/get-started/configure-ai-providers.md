@@ -158,6 +158,8 @@ By default, this creates the global `~/.pipelex/` directory with:
     │   ├── 2_img_gen_deck.toml        # Image generation config
     │   ├── 3_extract_deck.toml        # Document extraction config
     │   ├── 4_search_deck.toml         # Search config
+    │   ├── 5_doc_gen_deck.toml        # Document engines, by format and source
+    │   ├── 6_judgment_deck.toml       # Judgment config
     │   ├── x_custom_llm_deck.toml     # Custom LLM configurations
     │   └── x_custom_extract_deck.toml # Custom extract configurations
     └── routing_profiles.toml # Model routing configuration

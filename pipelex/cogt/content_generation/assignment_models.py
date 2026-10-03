@@ -4,10 +4,14 @@ from pydantic import BaseModel, Field
 from typing_extensions import override
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.cogt.judgment.judgment_models import JudgmentQuestion, JudgmentState
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -15,6 +19,7 @@ from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
+from pipelex.tools.uri.uri_read_scope import UriReference
 
 
 class LLMAssignment(BaseModel):
@@ -63,6 +68,10 @@ class LLMAssignment(BaseModel):
     def llm_handle(self) -> str:
         return self.llm_setting.model
 
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment, which it authorizes against the run's read scope."""
+        return self.llm_prompt.referenced_uris()
+
     @property
     def llm_job_params(self) -> LLMJobParams:
         return self.llm_setting.make_llm_job_params()
@@ -82,6 +91,10 @@ class ObjectAssignment(BaseModel):
     def cogt_run_params(self) -> CogtRunParams:
         """Delegates to the nested LLM assignment — single copy, no duplication."""
         return self.llm_assignment_for_object.cogt_run_params
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment: those of the nested LLM assignment."""
+        return self.llm_assignment_for_object.referenced_uris()
 
     @staticmethod
     def make_for_class(
@@ -107,6 +120,10 @@ class ImgGenAssignment(BaseModel):
     img_gen_job_config: ImgGenJobConfig
     nb_images: int
 
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment, which it authorizes against the run's read scope."""
+        return self.img_gen_prompt.referenced_uris()
+
 
 class TemplatingAssignment(BaseModel):
     job_metadata: JobMetadata
@@ -115,6 +132,10 @@ class TemplatingAssignment(BaseModel):
     template: str
     templating_style: TemplatingStyle | None = None
     category: TemplateCategory
+
+    def referenced_uris(self) -> list[UriReference]:
+        """None: rendering a template reads no URL, whatever the context carries."""
+        return []
 
 
 class ExtractAssignment(BaseModel):
@@ -125,12 +146,36 @@ class ExtractAssignment(BaseModel):
     extract_job_params: ExtractJobParams
     extract_job_config: ExtractJobConfig
 
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment, which it authorizes against the run's read scope."""
+        return self.extract_input.referenced_uris()
+
 
 class RenderPageViewsAssignment(BaseModel):
     job_metadata: JobMetadata
     cogt_run_params: CogtRunParams
     document_uri: str
     page_views_dpi: int
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URL the leaf reads for this assignment: the document whose pages it renders."""
+        return [UriReference(uri=self.document_uri, position="the document to render as page views")]
+
+
+class RenderDocumentAssignment(BaseModel):
+    """Serializable unit for a single document print: the composed document and the engine that prints it.
+
+    ``doc_gen_setting.model`` is the resolved handle of the ``doc_gen`` model, which is also the routing key.
+    """
+
+    job_metadata: JobMetadata
+    cogt_run_params: CogtRunParams
+    composition: DocumentComposition
+    doc_gen_setting: DocGenSetting
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment: the images the composed document names."""
+        return self.composition.referenced_uris()
 
 
 class SearchAssignment(BaseModel):
@@ -155,6 +200,10 @@ class SearchAssignment(BaseModel):
     def search_handle(self) -> str:
         return self.search_setting.model
 
+    def referenced_uris(self) -> list[UriReference]:
+        """None: a web search reads no URL a value carries; the provider fetches what it finds."""
+        return []
+
 
 class SearchObjectAssignment(BaseModel):
     """Structured-search counterpart of ``ObjectAssignment``.
@@ -173,6 +222,10 @@ class SearchObjectAssignment(BaseModel):
         """Delegates to the nested search assignment — single copy, no duplication."""
         return self.search_assignment.cogt_run_params
 
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment: those of the nested search assignment, which are none."""
+        return self.search_assignment.referenced_uris()
+
     @staticmethod
     def make_for_class(
         output_class: type[BaseModel],
@@ -184,3 +237,30 @@ class SearchObjectAssignment(BaseModel):
             output_class_schema=output_class.model_json_schema(),
             search_assignment=search_assignment,
         )
+
+
+class JudgmentAssignment(BaseModel):
+    """Serializable unit for a single judgment leaf call.
+
+    Carries everything the framework-agnostic ``judgment_generate`` core needs to rebuild the
+    ``JudgmentJob`` on the other side of a distributed boundary: the state the questions are asked
+    over, the questions themselves, and the fully resolved ``judgment_setting`` (its ``model`` is the
+    resolved provider handle, also the routing key). Mirrors ``SearchAssignment`` for the search leaf.
+
+    Unlike the structured-search leaf, there is no schema to ship and no dynamic class to rebuild:
+    a judgment's answers are plain models of this package's own, so they cross a boundary as they are.
+    """
+
+    job_metadata: JobMetadata
+    cogt_run_params: CogtRunParams
+    state: JudgmentState
+    questions: dict[str, JudgmentQuestion] = Field(min_length=1)
+    judgment_setting: JudgmentSetting
+
+    @property
+    def judgment_handle(self) -> str:
+        return self.judgment_setting.model
+
+    def referenced_uris(self) -> list[UriReference]:
+        """None: a judgment hands its state to the provider as data and reads no URL the state carries."""
+        return []

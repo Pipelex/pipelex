@@ -7,14 +7,17 @@ from pipelex import log, pretty_print
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import (
     Deadline,
     Exhibit,
+    Payload,
     Photo,
     Priority,
     Question,
@@ -50,10 +53,54 @@ SCALAR_ARM_CASES: list[tuple[str, str, Any, str, StuffContent]] = [
         "shaper_test.ShaperInvoice",
         ShaperInvoice(invoice_number="INV-001", amount=1250.0),
     ),
-    # D5 Dynamic/Anything/out-of-matrix natives: bottom-up passthrough (today's behavior).
+    # D5 Dynamic and the out-of-matrix natives: bottom-up passthrough.
     ("dynamic-str-bottom-up", "native.Dynamic", "hi", "native.Text", TextContent(text="hi")),
-    ("anything-str-bottom-up", "native.Anything", "hi", "native.Text", TextContent(text="hi")),
     ("html-out-of-matrix-bottom-up", "native.Html", "hi", "native.Text", TextContent(text="hi")),
+    # R1 Anything: the slot keeps its declared concept, and the content is the natural one for the
+    # value's JSON type. Nothing is guessed from a string's text: a URL or an ISO date stays text.
+    ("anything-string", "native.Anything", "hi", "native.Anything", TextContent(text="hi")),
+    ("anything-url-string-stays-text", "native.Anything", "photo.jpg", "native.Anything", TextContent(text="photo.jpg")),
+    ("anything-iso-string-stays-text", "native.Anything", "2026-07-07", "native.Anything", TextContent(text="2026-07-07")),
+    ("anything-int", "native.Anything", 3, "native.Anything", NumberContent(number=3)),
+    ("anything-float", "native.Anything", 3.5, "native.Anything", NumberContent(number=3.5)),
+    ("anything-zero-is-a-number", "native.Anything", 0, "native.Anything", NumberContent(number=0)),
+    # A boolean is never a number, although bool subclasses int.
+    ("anything-true", "native.Anything", True, "native.Anything", YesNoContent(yes_no=True)),
+    ("anything-false", "native.Anything", False, "native.Anything", YesNoContent(yes_no=False)),
+    # The published fill-in template's value, `{}`, shapes.
+    ("anything-empty-object", "native.Anything", {}, "native.Anything", JSONContent(json_obj={})),
+    (
+        "anything-nested-object",
+        "native.Anything",
+        {"a": {"b": [1, "two", None]}},
+        "native.Anything",
+        JSONContent(json_obj={"a": {"b": [1, "two", None]}}),
+    ),
+    # An object is read literally: `json_obj` is JSONContent's field name, not something a caller spells.
+    (
+        "anything-json-obj-key-taken-literally",
+        "native.Anything",
+        {"json_obj": {"a": 1}},
+        "native.Anything",
+        JSONContent(json_obj={"json_obj": {"a": 1}}),
+    ),
+    # R7 JSON: a bare object is the JSON object itself, read literally.
+    ("json-object", "native.JSON", {"a": 1}, "native.JSON", JSONContent(json_obj={"a": 1})),
+    ("json-empty-object", "native.JSON", {}, "native.JSON", JSONContent(json_obj={})),
+    ("json-nested-object", "native.JSON", {"a": {"b": [1, {"c": None}]}}, "native.JSON", JSONContent(json_obj={"a": {"b": [1, {"c": None}]}})),
+    ("json-obj-key-taken-literally", "native.JSON", {"json_obj": {"a": 1}}, "native.JSON", JSONContent(json_obj={"json_obj": {"a": 1}})),
+    # A concept refining JSON is built through its own class.
+    ("json-refining", "shaper_test.Payload", {"order_id": 7}, "shaper_test.Payload", Payload(json_obj={"order_id": 7})),
+    # TOML temporal literals (inputs files only).
+    ("anything-toml-date", "native.Anything", datetime.date(2026, 7, 7), "native.Anything", DateContent(date=datetime.date(2026, 7, 7))),
+    (
+        "anything-toml-datetime",
+        "native.Anything",
+        datetime.datetime(2026, 7, 7, 15, 40),
+        "native.Anything",
+        DateContent(date=datetime.date(2026, 7, 7), time=datetime.time(15, 40)),
+    ),
+    ("anything-toml-time", "native.Anything", datetime.time(15, 40), "native.Anything", TimeContent(time=datetime.time(15, 40))),
 ]
 
 
@@ -73,7 +120,9 @@ class TestInputShaperScalarArms:
         log.info(f"Testing scalar arm case: {test_name}")
         input_specs = build_input_specs([("my_input", concept_ref, None)])
 
-        working_memory = InputShaper.shape({"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape(
+            {"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None
+        )
 
         stuff = working_memory.root["my_input"]
         pretty_print(stuff, title=f"Result for {test_name}")

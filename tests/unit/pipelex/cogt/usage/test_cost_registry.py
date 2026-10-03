@@ -3,13 +3,21 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.llm.llm_report import LLMTokenCostReportField, LLMTokensUsage
+from pipelex.cogt.extract.extract_report import ExtractTokenCostReport
+from pipelex.cogt.img_gen.img_gen_report import ImgGenTokenCostReport
+from pipelex.cogt.judgment.judgment_report import JudgmentTokenCostReport, JudgmentTokenCostReportField
+from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage
+from pipelex.cogt.search.search_report import SearchTokenCostReport
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.reporting.reporting_types import AnyTokensUsage
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata
+from tests.unit.pipelex.cogt.usage.test_data import UsageFixtures
 
 
 class TestCostRegistry:
@@ -365,7 +373,8 @@ class TestCostRegistry:
         """Test that unit scaling is applied correctly to cost display."""
         # Mock console to avoid output during tests
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mocker.MagicMock())
-        mock_table_class = mocker.patch("pipelex.cogt.usage.cost_registry.Table")
+        # Rich is imported where the table is built, so the class is patched where it is defined.
+        mock_table_class = mocker.patch("rich.table.Table")
         mock_table = mock_table_class.return_value
 
         # Create test data
@@ -499,6 +508,41 @@ class TestCostRegistry:
         assert len(rows) == 1
         assert rows[0][LLMTokenCostReportField.LLM_NAME] == "test-model"
 
+    def test_the_csv_is_written_even_when_the_console_table_cannot_render(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
+        """Rich is the `cli` extra, and the CSV report does not need it: a console that cannot render loses only itself.
+
+        The shipped default prints to the console, and the caller downgrades a `PipelexError` to a warning, so a
+        console table that raises used to take the CSV report with it silently.
+        """
+        mocker.patch(
+            "pipelex.cogt.usage.cost_registry.get_console",
+            side_effect=MissingDependencyError(dependency_name="rich", extra_name="cli", message="no console here"),
+        )
+
+        llm_tokens_usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={CostCategory.INPUT: 1000, CostCategory.OUTPUT: 2000},
+        )
+
+        csv_file = tmp_path / "costs_without_rich.csv"
+        with pytest.raises(MissingDependencyError):
+            CostRegistry.generate_report(
+                pipeline_run_id="test-pipeline",
+                tokens_usages=[llm_tokens_usage],
+                unit_scale=1.0,
+                cost_report_file_path=csv_file,
+                print_to_console=True,
+            )
+
+        assert csv_file.exists(), "the CSV report is the output that does not need Rich"
+        with open(csv_file, encoding="utf-8") as file:
+            rows = list(csv.DictReader(file))
+        assert len(rows) == 1
+        assert rows[0][LLMTokenCostReportField.LLM_NAME] == "test-model"
+
     def test_aggregate_costs_totals_and_reportability(self, job_metadata: JobMetadata):
         """One aggregation pass yields the run total and the reportable-work flag.
 
@@ -595,3 +639,35 @@ class TestCostRegistry:
         )
 
         assert CostRegistry.build_cost_summary([dry]) is None
+
+    @pytest.mark.parametrize(
+        ("tokens_usage", "expected_report_class"),
+        [
+            (UsageFixtures.llm_usage(), LLMTokenCostReport),
+            (UsageFixtures.img_gen_usage(), ImgGenTokenCostReport),
+            (UsageFixtures.extract_usage(), ExtractTokenCostReport),
+            (UsageFixtures.search_usage(), SearchTokenCostReport),
+            (UsageFixtures.judgment_usage(), JudgmentTokenCostReport),
+        ],
+        ids=["llm", "img_gen", "extract", "search", "judgment"],
+    )
+    def test_every_family_gets_its_own_cost_report(self, tokens_usage: AnyTokensUsage, expected_report_class: type[BaseModel]):
+        """No family falls through to an extract report.
+
+        The dispatch used to end in a bare extract return, so any usage it did not recognise billed
+        as an extraction — silently, and with the wrong model-type label on the wire. This is the
+        runtime half of the guarantee; the static half is the ``assert_never`` that closes the match.
+        """
+        cost_report = CostRegistry.compute_cost_report(tokens_usage=tokens_usage)
+
+        assert isinstance(cost_report, expected_report_class)
+        assert cost_report.model_type == tokens_usage.model_type
+
+    def test_a_judgment_cost_report_names_its_model_in_the_flat_record(self):
+        """The grouping key reads the family's own name field, so a judgment is not grouped as 'unknown'."""
+        cost_report = CostRegistry.complete_cost_report(tokens_usage=UsageFixtures.judgment_usage())
+        aggregated = CostRegistry.aggregate_costs(tokens_usages=[UsageFixtures.judgment_usage()])
+
+        assert cost_report.as_flat_dictionary()[JudgmentTokenCostReportField.JUDGMENT_NAME] == "jev"
+        assert "jev" in aggregated.grouped_by_model
+        assert aggregated.model_types["jev"] == "judgment"

@@ -41,4 +41,4 @@ Include PDFs directly in your prompts using `@variable` syntax. PipeLLM automati
 ## Related Documentation
 
 - [PipeExtract](../building-methods/pipes/pipe-operators/PipeExtract.md) - Operator reference and MTHDS fields
-- [Generic Document Extraction Example](../cookbook/extract-generic.md) - Extract markdown from complex PDFs using vision
+- [Generic document extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_generic) - A cookbook method that returns each page of any document as Markdown, including the text inside its images and diagrams

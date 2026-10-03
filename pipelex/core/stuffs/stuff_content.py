@@ -1,13 +1,15 @@
-from typing import Any, TypeVar, final
+from typing import TYPE_CHECKING, Any, TypeVar, final
 
 from kajson import kajson
 from mthds.protocol.stuff import StuffContentAbstract
-from rich.json import JSON
 from typing_extensions import override
 
-from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, PrettyPrintMode, PrettyRenderable, pretty_print
+from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode, PrettyRenderable, pretty_print, require_rich_for_rendering
 from pipelex.tools.templating.text_format import TextFormat
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
@@ -122,13 +124,16 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
     # -------------------------------------------------------------------------
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
         """Render content for pretty printing.
 
         Args:
             title: Optional title for the rendering
             depth: Current nesting depth, used to prevent nesting too many sub-tables which would end up too narrow in the console
         """
+        require_rich_for_rendering()
+        from rich.json import JSON
+
         json_data = self.smart_dump()
         return JSON.from_data(json_data, indent=4)
 

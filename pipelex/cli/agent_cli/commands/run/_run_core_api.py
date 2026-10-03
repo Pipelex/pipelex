@@ -35,7 +35,9 @@ async def run_pipeline_core_api(
         Dictionary with execution results suitable for JSON serialization.
 
     Raises:
-        ClientAuthenticationError: If API credentials are invalid or missing.
+        ClientAuthenticationError: If the API key or the runner's base URL is missing.
+        ApiResponseError: If the runner answers non-2xx, a refused bundle or a failed run among them,
+            with the members of its problem document typed.
         PipelineRequestError: If the pipeline request is malformed.
     """
     async with MthdsAPIClient() as runner:

@@ -7,6 +7,8 @@ single collect-all aggregate (no per-pipe early abort), and the per-sweep teleme
 is exercised by the integration suite.
 """
 
+from typing import Any
+
 import pytest
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
@@ -15,10 +17,20 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipe_run.exceptions import DryRunError
+from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
+from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity, scoped_caller_identity
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty
+
+_CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
+
+
+def _failing_refs(dry_run_error: DryRunError) -> list[str]:
+    """The ``domain.code`` refs of the pipes a ``DryRunError`` reports as failing, in order."""
+    return [f"{failure.domain_code}.{failure.pipe_code}" for failure in dry_run_error.failures]
 
 
 class TestBundleValidator:
@@ -26,6 +38,7 @@ class TestBundleValidator:
         pipe = mocker.MagicMock()
         pipe.code = code
         pipe.pipe_ref = pipe_ref
+        pipe.domain_code = pipe_ref.rsplit(".", maxsplit=1)[0]
         pipe.is_signature = is_signature
         pipe.pipe_dependencies.return_value = set()
         pipe.validate_with_libraries.return_value = None
@@ -117,7 +130,7 @@ class TestBundleValidator:
 
         with pytest.raises(DryRunError) as exc_info:
             await validator.validate_pipes([pipe], library_id="lib-1")
-        assert "dom.allowed_pipe" in str(exc_info.value)
+        assert _failing_refs(exc_info.value) == ["dom.allowed_pipe"]
 
     @pytest.mark.asyncio
     async def test_unexpected_validation_error_raises_dry_run_error(self, mocker: MockerFixture) -> None:
@@ -135,7 +148,7 @@ class TestBundleValidator:
 
         with pytest.raises(DryRunError) as exc_info:
             await validator.validate_pipes([pipe], library_id="lib-1")
-        assert "dom.bad_pipe" in str(exc_info.value)
+        assert _failing_refs(exc_info.value) == ["dom.bad_pipe"]
 
     @pytest.mark.asyncio
     async def test_widening_non_dependency_error_does_not_abort_remaining_pipes(self, mocker: MockerFixture) -> None:
@@ -152,8 +165,7 @@ class TestBundleValidator:
 
         # The second pipe ran (no abort) — both were executed before the aggregate raise.
         assert pipe_run.run.call_count == 2
-        assert "dom.boom_pipe" in str(exc_info.value)
-        assert "dom.ok_pipe" not in str(exc_info.value)
+        assert _failing_refs(exc_info.value) == ["dom.boom_pipe"]
 
     @pytest.mark.asyncio
     async def test_collect_all_unexpected_failures_reported(self, mocker: MockerFixture) -> None:
@@ -166,9 +178,7 @@ class TestBundleValidator:
 
         with pytest.raises(DryRunError) as exc_info:
             await validator.validate_pipes([pipe_a, pipe_b], library_id="lib-1")
-        message = str(exc_info.value)
-        assert "dom.a_pipe" in message
-        assert "dom.b_pipe" in message
+        assert _failing_refs(exc_info.value) == ["dom.a_pipe", "dom.b_pipe"]
 
     @pytest.mark.asyncio
     async def test_strict_mode_excludes_signature_pipes_from_sweep(self, mocker: MockerFixture) -> None:
@@ -194,6 +204,23 @@ class TestBundleValidator:
 
         assert results["dom.sig_pipe"].status.is_success
         prepare_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_foreign_exception_located_by_the_router_propagates(self, mocker: MockerFixture) -> None:
+        """A programming bug a pipe raised, located by the router, is not recorded as the bundle's failure."""
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        unexpected_failure = make_unexpected_failure(error=KeyError("foo"))
+        located = PipeRouterError.make_located(
+            failure=unexpected_failure, run_mode=PipeRunMode.DRY, pipe_code="buggy_pipe", output_name=None, pipe_stack=["buggy_pipe"]
+        )
+        located.__cause__ = unexpected_failure
+        pipe_run.run = mocker.AsyncMock(side_effect=located)
+        pipe = self._make_pipe(mocker, code="buggy_pipe", pipe_ref="dom.buggy_pipe")
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert exc_info.value is located
 
     @pytest.mark.asyncio
     async def test_wiring_error_propagates(self, mocker: MockerFixture) -> None:
@@ -234,3 +261,66 @@ class TestBundleValidator:
 
         threaded_id = prepare.call_args.kwargs["pipeline_run_id"]
         assert threaded_id.startswith("dry_run_")
+
+    def _patch_caller_env(self, mocker: MockerFixture):
+        telemetry_manager = mocker.patch("pipelex.pipeline.bundle_validator.get_telemetry_manager").return_value
+        callers_seen_by_the_event: list[CallerIdentity | None] = []
+
+        def record_caller(**_kwargs: Any) -> None:
+            callers_seen_by_the_event.append(get_current_caller_identity())
+
+        telemetry_manager.track_event.side_effect = record_caller
+        mocker.patch("pipelex.pipeline.bundle_validator.get_config").return_value.inference.dry_run.allowed_to_fail_pipes = []
+        prepare_mock = mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
+        prepare_mock.return_value = mocker.MagicMock(name="pipe_job")
+        pipe_run = mocker.MagicMock(name="pipe_run")
+        pipe_run.run = mocker.AsyncMock(return_value=mocker.MagicMock(name="pipe_output"))
+        mocker.patch("pipelex.pipeline.bundle_validator.PipeRun", return_value=pipe_run)
+        pipe = mocker.MagicMock()
+        pipe.code = "p"
+        pipe.pipe_ref = "dom.p"
+        pipe.is_signature = False
+        return BundleValidator(), callers_seen_by_the_event, prepare_mock, pipe
+
+    @pytest.mark.asyncio
+    async def test_the_sweep_event_is_emitted_inside_the_callers_scope(self, mocker: MockerFixture) -> None:
+        validator, callers_seen_by_the_event, _prepare, pipe = self._patch_caller_env(mocker)
+
+        await validator.validate_pipes([pipe], library_id="lib-1", caller_identity=_CALLER)
+
+        assert callers_seen_by_the_event == [_CALLER]
+        assert get_current_caller_identity() is None
+
+    @pytest.mark.asyncio
+    async def test_each_dry_run_states_the_caller_in_its_job_metadata(self, mocker: MockerFixture) -> None:
+        validator, _callers, prepare_mock, pipe = self._patch_caller_env(mocker)
+
+        await validator.validate_pipes([pipe], library_id="lib-1", caller_identity=_CALLER)
+
+        prepare_kwargs = prepare_mock.call_args.kwargs
+        assert prepare_kwargs["user_id"] == "caller-7"
+        assert prepare_kwargs["extras"] == {"organization": "org_caller"}
+        # A dry run still stores nothing, whoever it is done for.
+        assert prepare_kwargs["storage_scope"] == DRY_RUN_STORAGE_SCOPE
+
+    @pytest.mark.asyncio
+    async def test_a_sweep_with_no_caller_inherits_the_one_in_scope(self, mocker: MockerFixture) -> None:
+        validator, callers_seen_by_the_event, prepare_mock, pipe = self._patch_caller_env(mocker)
+
+        with scoped_caller_identity(caller_identity=_CALLER):
+            await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert callers_seen_by_the_event == [_CALLER]
+        assert prepare_mock.call_args.kwargs["user_id"] == "caller-7"
+
+    @pytest.mark.asyncio
+    async def test_a_sweep_that_belongs_to_nobody_states_the_dry_run_placeholder(self, mocker: MockerFixture) -> None:
+        """The local CLI case: no caller, so the event reports under the stream's fallback as before."""
+        validator, callers_seen_by_the_event, prepare_mock, pipe = self._patch_caller_env(mocker)
+
+        await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert callers_seen_by_the_event == [None]
+        prepare_kwargs = prepare_mock.call_args.kwargs
+        assert prepare_kwargs["user_id"] == DRY_RUN_USER_ID
+        assert prepare_kwargs["extras"] is None

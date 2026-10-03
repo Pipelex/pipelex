@@ -8,16 +8,24 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from mthds.protocol.exceptions import PipelineRequestError
+from mthds.runners.api.exceptions import ApiResponseError, ClientAuthenticationError
 from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_error_api_response,
+    agent_success_formatted,
+    run_failure_fields,
+    set_agent_cli_error_format,
+)
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -123,9 +131,6 @@ def run_pipe_cmd(
             if mock_inputs:
                 agent_error("--mock-inputs is not supported with --runner api", error_type="ArgumentError")
 
-            from mthds.protocol.exceptions import PipelineRequestError  # ruff: ignore[import-outside-top-level]
-            from mthds.runners.api.exceptions import ClientAuthenticationError  # ruff: ignore[import-outside-top-level]
-
             try:
                 result = asyncio.run(
                     run_pipeline_core_api(
@@ -140,6 +145,10 @@ def run_pipe_cmd(
 
             except ClientAuthenticationError as exc:
                 agent_error(str(exc), error_type="ClientAuthenticationError", cause=exc)
+
+            except ApiResponseError as exc:
+                # The runner answered non-2xx: its problem document says why, where, and what to do next.
+                agent_error_api_response(error=exc)
 
             except PipelineRequestError as exc:
                 agent_error(str(exc), error_type="PipelineRequestError", cause=exc)
@@ -170,24 +179,7 @@ def run_pipe_cmd(
                 )
 
             except PipelineExecutionError as exc:
-                extra_fields: dict[str, Any] = {
-                    "pipe_code": exc.pipe_code,
-                    "pipe_stack": exc.pipe_stack,
-                }
-                if exc.__cause__:
-                    extra_fields["cause_type"] = type(exc.__cause__).__name__
-                    extra_fields["cause_message"] = str(exc.__cause__)
-                agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **extra_fields)
-
-            except PipeOperatorModelChoiceError as exc:
-                agent_error(
-                    exc.message,
-                    error_type="PipeOperatorModelChoiceError",
-                    cause=exc,
-                    pipe_code=exc.pipe_code,
-                    model_type=str(exc.model_type),
-                    model_choice=str(exc.model_choice),
-                )
+                agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **run_failure_fields(error=exc))
 
             except PipeOperatorModelAvailabilityError as exc:
                 availability_extra: dict[str, Any] = {

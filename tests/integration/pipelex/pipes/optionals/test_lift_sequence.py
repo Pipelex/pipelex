@@ -250,6 +250,7 @@ class TestLiftSequence:
 
         pipe_job = await prepare_pipe_job(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             pipe=sequence,
             library_id=library_id,

@@ -3,11 +3,9 @@ from __future__ import annotations
 import importlib.util
 from typing import Any
 
-from rich import box
-from rich.table import Table
-
 from pipelex.runtime_hub import get_console
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.misc.rich_extra import RICH_TABLE_MISSING_MESSAGE, require_rich
 
 
 def list_mistral_models(
@@ -74,6 +72,10 @@ def _display_mistral_models_table(
     backend_name: str,
 ) -> None:
     """Display Mistral models in table format."""
+    require_rich(message=RICH_TABLE_MISSING_MESSAGE)
+    from rich import box
+    from rich.table import Table
+
     table = Table(
         title=f"Available Models for Backend '{backend_name}' (SDK: {sdk})",
         show_header=True,

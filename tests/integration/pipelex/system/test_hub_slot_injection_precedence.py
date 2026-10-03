@@ -19,6 +19,7 @@ from pipelex.interpreter_plugins.pipe_func.pipe_func_plugin import PipeFuncPlugi
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.registrar import HubSlot, PluginOrigin, PluginRegistrar
+from pipelex.providers.log_sinks.log_sink_plugin import LogSinkPlugin
 from pipelex.runtime_hub import get_content_generator
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
@@ -43,13 +44,15 @@ def _test_integration_mode() -> IntegrationMode:
 def _fake_registrar(mocker: MockerFixture) -> PluginRegistrar:
     """A registrar with empty registries (boot stores them but doesn't consume them during setup).
 
-    Storage, secrets, and pipe_func are the exceptions: boot *does* select each from the registrar
-    during setup. Every boot below passes an explicit ``storage_provider`` and ``secrets_provider``
-    (each wins ahead of the empty registry), and the built-in ``PipeFuncPlugin`` is registered here so
-    the default ``direct`` execution mode resolves — keeping this suite focused on hub slots rather
-    than provider/executor selection.
+    Storage, secrets, the log sink and pipe_func are the exceptions: boot *does* select each from the
+    registrar during setup. Every boot below passes an explicit ``storage_provider`` and
+    ``secrets_provider`` (each wins ahead of the empty registry), and the built-in ``LogSinkPlugin`` and
+    ``PipeFuncPlugin`` are registered here so the configured sink and the default ``direct`` execution
+    mode resolve — keeping this suite focused on hub slots rather than provider/executor selection.
     """
     registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False))))
+    registrar.begin_plugin(name="log_sinks", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
+    LogSinkPlugin().register(registrar)
     registrar.begin_plugin(name="pipe_func", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
     PipeFuncPlugin().register(registrar)
     mocker.patch("pipelex.runtime_boot.build_registrar", return_value=registrar)
