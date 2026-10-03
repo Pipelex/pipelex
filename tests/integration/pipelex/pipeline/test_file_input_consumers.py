@@ -115,6 +115,72 @@ function_name = "file_consumers_replace_transcript"
 
         assert consumers.get("transcript", []) == []
 
+    @pytest.mark.parametrize(
+        ("domain", "main_inputs", "converter_pipe"),
+        [
+            (
+                "fic_nested_overwrite",
+                'transcript = "Document"',
+                """
+[pipe.convert_transcript]
+type = "PipeSequence"
+description = "Convert the transcript in place"
+inputs = { transcript = "Document" }
+output = "Document"
+steps = [{ pipe = "replace_transcript", result = "transcript" }]
+""",
+            ),
+            (
+                "fic_condition_overwrite",
+                'transcript = "Document", mode = "Text"',
+                """
+[pipe.convert_transcript]
+type = "PipeCondition"
+description = "Convert the transcript in place when asked to"
+inputs = { transcript = "Document", mode = "Text" }
+output = "Document"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.convert_transcript.outcomes]
+convert = "convert_in_place"
+
+[pipe.convert_in_place]
+type = "PipeSequence"
+description = "Convert the transcript in place"
+inputs = { transcript = "Document" }
+output = "Document"
+steps = [{ pipe = "replace_transcript", result = "transcript" }]
+""",
+            ),
+        ],
+    )
+    def test_a_slot_a_nested_controller_overwrites_is_not_followed(
+        self, load_empty_library: Callable[[], str], domain: str, main_inputs: str, converter_pipe: str
+    ):
+        """A nested sequence or a condition outcome runs on the caller's working memory, so what its steps write overwrites the caller's slots."""
+        pipes = f"""
+[pipe.main]
+type = "PipeSequence"
+description = "Convert the transcript, then extract it"
+inputs = {{ {main_inputs} }}
+output = "Page[]"
+steps = [
+    {{ pipe = "convert_transcript", result = "converted" }},
+    {{ pipe = "extract_pdf", result = "pages" }},
+]
+{converter_pipe}
+[pipe.replace_transcript]
+type = "PipeFunc"
+description = "Replace the transcript with another document"
+inputs = {{ transcript = "Document" }}
+output = "Document"
+function_name = "file_consumers_replace_transcript"
+"""
+        consumers = _consumers(load_empty_library=load_empty_library, domain=domain, pipes=pipes)
+
+        assert consumers.get("transcript", []) == []
+
     def test_a_batch_step_maps_the_list_slot_to_its_item_slot(self, load_empty_library: Callable[[], str]):
         pipes = """
 [pipe.main]

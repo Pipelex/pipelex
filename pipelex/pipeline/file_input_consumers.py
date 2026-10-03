@@ -5,8 +5,11 @@ that cannot read its format. The walk starts from the entry pipe's input slots a
 name through the controllers, the way the absence-taint analysis does (`PipeSequence.analyze_taint`),
 resolving sub-pipes through the hub:
 
-- **Sequence.** Steps are visited in order, and a slot a step's output overwrites stops being
-  followed after that step. A step's batch parameters map the list slot to its item slot.
+- **Sequence.** Steps are visited in order, and a slot a step overwrites stops being followed after
+  that step. A step overwrites its result's name, and also whatever a nested sequence or condition
+  outcome writes, since those run on the caller's memory; after a step that may write a name the
+  walk cannot know, nothing more is followed. A step's batch parameters map the list slot to its
+  item slot.
 - **Parallel.** Every branch is visited.
 - **Batch.** The list slot maps to the item slot, and the branch pipe is visited.
 - **Condition.** Every outcome is visited, and whatever is found below it is conditional.
@@ -319,12 +322,76 @@ def _visit_sequence(
         )
         # Whatever the step writes into the flow overwrites the slot of that name: later steps read
         # the step's result there, not the input, so it stops being followed.
-        if sub_pipe.output_name:
-            step_frame.pop(sub_pipe.output_name, None)
-        if isinstance(step_pipe, PipeParallel) and step_pipe.add_each_output:
-            for branch in step_pipe.parallel_sub_pipes:
-                if branch.output_name:
-                    step_frame.pop(branch.output_name, None)
+        step_writes = _sub_pipe_writes(sub_pipe=sub_pipe, step_pipe=step_pipe, visiting=frozenset())
+        if step_writes.may_write_any:
+            return
+        for written_name in step_writes.names:
+            step_frame.pop(written_name, None)
+
+
+class _Writes(NamedTuple):
+    """The names a step may write into the working memory of the sequence that runs it."""
+
+    names: frozenset[str]
+    may_write_any: bool
+    """Whether it may write a name the walk cannot know statically, after which nothing is followed."""
+
+
+_NO_WRITES: Final[_Writes] = _Writes(names=frozenset(), may_write_any=False)
+_ANY_WRITES: Final[_Writes] = _Writes(names=frozenset(), may_write_any=True)
+
+
+def _sub_pipe_writes(*, sub_pipe: SubPipe, step_pipe: PipeAbstract | None, visiting: frozenset[str]) -> _Writes:
+    """What a controller's step writes into the memory it runs on: its result, and whatever its pipe writes there.
+
+    A batched step runs every item on a copy of the memory, and only its result comes back.
+    """
+    result_names = frozenset({sub_pipe.output_name}) if sub_pipe.output_name else frozenset[str]()
+    if sub_pipe.batch_params:
+        return _Writes(names=result_names, may_write_any=False)
+    if step_pipe is None:
+        return _ANY_WRITES
+    pipe_writes = _pipe_writes(pipe=step_pipe, visiting=visiting)
+    return _Writes(names=result_names | pipe_writes.names, may_write_any=pipe_writes.may_write_any)
+
+
+def _pipe_writes(*, pipe: PipeAbstract, visiting: frozenset[str]) -> _Writes:
+    """What a pipe writes into the memory it runs on, besides its own result, which its caller names.
+
+    A sequence runs its steps on that memory and a condition runs its outcome on it, so what they
+    write lands in the caller's memory too. A parallel runs its branches on copies and writes back
+    only its branch results, when it adds each of them. A batch runs on copies. An operator writes
+    only its result.
+    """
+    if pipe.pipe_ref in visiting:
+        return _NO_WRITES
+    visiting |= {pipe.pipe_ref}
+    if isinstance(pipe, PipeSequence):
+        return _merge_writes(
+            writes=[
+                _sub_pipe_writes(sub_pipe=sub_pipe, step_pipe=get_optional_pipe(pipe_code=sub_pipe.pipe_code), visiting=visiting)
+                for sub_pipe in pipe.sequential_sub_pipes
+            ]
+        )
+    if isinstance(pipe, PipeCondition):
+        # The alias a condition adds is named after the value its expression renders to.
+        if pipe.add_alias_from_expression_to:
+            return _ANY_WRITES
+        outcome_writes: list[_Writes] = []
+        for outcome_pipe_code in pipe.pipe_dependencies():
+            outcome_pipe = get_optional_pipe(pipe_code=outcome_pipe_code)
+            outcome_writes.append(_pipe_writes(pipe=outcome_pipe, visiting=visiting) if outcome_pipe else _ANY_WRITES)
+        return _merge_writes(writes=outcome_writes)
+    if isinstance(pipe, PipeParallel) and pipe.add_each_output:
+        return _Writes(names=frozenset(branch.output_name for branch in pipe.parallel_sub_pipes if branch.output_name), may_write_any=False)
+    return _NO_WRITES
+
+
+def _merge_writes(*, writes: list[_Writes]) -> _Writes:
+    return _Writes(
+        names=frozenset[str]().union(*(step_writes.names for step_writes in writes)),
+        may_write_any=any(step_writes.may_write_any for step_writes in writes),
+    )
 
 
 def _visit_sub_pipe(
