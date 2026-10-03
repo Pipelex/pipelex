@@ -124,6 +124,7 @@ def _make_extract_job(mocker: MockerFixture) -> Any:
     job = mocker.MagicMock()
     job.extract_input.image_uri = None
     job.extract_input.document_uri = None
+    job.extract_input.mime_type = None
     job.job_params.should_caption_images = False
     return job
 

@@ -13,7 +13,7 @@ Two pure-ish building blocks composed by both the single-run wrapper
   ``main_pipe`` (when an ``mthds_contents`` bundle declares one), leaving pipe
   resolution to the caller.
 - :func:`prepare_pipe_job` — build a :class:`PipeJob` against an already-open
-  library: working memory (user inputs, mock inputs, data-url normalization),
+  library: working memory (user inputs, mock inputs, file-input preparation),
   run params, job metadata, and the library crate. **Pure**: no pipeline-manager
   registration, no report-registry open, no telemetry, no graph-tracer open, no
   library mutation.
@@ -46,7 +46,8 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
-from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
+from pipelex.pipeline.file_input_consumers import check_file_inputs_against_consumers
+from pipelex.pipeline.input_normalizer import collect_file_inputs, prepare_file_inputs
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
@@ -213,7 +214,7 @@ async def prepare_pipe_job(
     """Build a :class:`PipeJob` for ``pipe`` against an already-open library.
 
     Pure: assembles working memory (user inputs, mock inputs when
-    ``execution_config.is_mock_inputs``, optional data-url normalization), run
+    ``execution_config.is_mock_inputs``, file-input identification and optional relocation), run
     params, job metadata, and the library crate. Performs no pipeline-manager
     registration, no report-registry open, no telemetry, no graph-tracer open,
     and no library mutation. ``trace_context`` / ``otel_context`` are created by
@@ -231,7 +232,7 @@ async def prepare_pipe_job(
     ``read_scope`` bounds what the run may read (see :mod:`pipelex.tools.uri.uri_read_scope`). It is
     required, ``None`` for an unscoped run, and it rides the job metadata to every leaf. Here it also
     gates the two reads the input seam makes itself: a CSV input read while shaping, and a local file
-    uploaded by the normalization, which on a scoped run is refused instead, naming the input.
+    read or uploaded by the file-input preparation, which on a scoped run is refused instead, naming the input.
     """
     # Validate the scope HERE, before anything composes a storage key from it.
     #
@@ -329,9 +330,19 @@ async def prepare_pipe_job(
                 )
             )
 
-    # Normalize data URLs to pipelex-storage:// URIs, and give every image and document input a public_url, if configured.
-    if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
-        working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope, read_scope=read_scope)
+    # Establish the format of every image and document input, which runs whether or not relocation is
+    # configured, and relocate them to storage with a public_url when it is. Mock inputs are skipped:
+    # they are placeholders, not files.
+    if working_memory and not execution_config.is_mock_inputs:
+        working_memory = await prepare_file_inputs(
+            working_memory,
+            storage_scope=storage_scope,
+            read_scope=read_scope,
+            is_relocation_enabled=execution_config.is_normalize_data_urls_to_storage,
+        )
+        # Refuse the run now, rather than at the step that would fail mid-run, when a file input is
+        # certain to reach a pipe whose model cannot read its format.
+        check_file_inputs_against_consumers(entry_pipe=pipe, file_inputs=collect_file_inputs(working_memory))
 
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(

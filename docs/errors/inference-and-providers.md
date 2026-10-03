@@ -23,6 +23,7 @@ own page. Classes are grouped by subsystem.
 - [`ExtractCapabilityError`](extract-capability-error.md) — Extract capability
 - [`ExtractHandleNotFoundError`](extract-handle-not-found-error.md) — Extract handle not found
 - [`ExtractInputError`](extract-input-error.md) — Extract input
+- [`ExtractInputFormatError`](extract-input-format-error.md) — Extract input format
 - [`ExtractJobFailureError`](extract-job-failure-error.md) — Extract job failure
 - [`ExtractModelNotFoundError`](extract-model-not-found-error.md) — Extract model not found
 - [`ExtractOutputError`](extract-output-error.md) — Extract output
@@ -69,6 +70,7 @@ own page. Classes are grouped by subsystem.
 - [`OutputStructureSchemaError`](output-structure-schema-error.md) — Output structure schema
 - [`PluginModelDeclarationError`](plugin-model-declaration-error.md) — Plugin model declaration
 - [`PromptDocumentFactoryError`](prompt-document-factory-error.md) — Prompt document factory
+- [`PromptDocumentFormatError`](prompt-document-format-error.md) — Prompt document format
 - [`PromptImageFactoryError`](prompt-image-factory-error.md) — Prompt image factory
 - [`PromptImageFormatError`](prompt-image-format-error.md) — Prompt image format
 - [`ReportingManagerError`](reporting-manager-error.md) — Reporting manager
