@@ -4,8 +4,9 @@ The values are read through ``substitute_vars``, the syntax the inference backen
 ``${secret:X}`` ask the secrets provider, ``${env:X}`` the environment, ``${env:X|secret:Y}`` one then the
 other, and a partial value such as ``"Bearer ${X}"`` keeps its literal part. Header keys are never touched. A
 variable that does not resolve stops the boot with ``LogSinkVariableError``, naming the section, the key and
-the variable and never a value. The settings the factory was handed keep their placeholders: only the
-exporter holds the resolved value.
+the variable and never a value. A resolved value holding a line break, which no HTTP header can carry, stops
+the boot with ``LogSinkHeaderValueError``, naming the key and never the value. The settings the factory was
+handed keep their placeholders: only the exporter holds the resolved value.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import pytest
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 
-from pipelex.tools.log.exceptions import LogSinkVariableError
+from pipelex.tools.log.exceptions import LogSinkHeaderValueError, LogSinkVariableError
 from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.log.otlp_log_sink import OtlpLogSink
 from tests.helpers.log_sink_variables import DictSecretsProvider, builtin_log_sink_factory, sink_settings_log_config
@@ -139,5 +140,19 @@ class TestOtlpHeaderVariables:
         assert "[runtime.log.otlp]" in message
         assert variable in message
         assert "'json' sink" in message
+        assert TOKEN not in message
+        assert _RecordingOtlpExporter.built == []
+
+    @pytest.mark.parametrize("secret", [f"{TOKEN}\n", f"{TOKEN}\r\n", f"{TOKEN}\rX-Injected: 1"])
+    def test_a_header_value_resolving_to_a_line_break_stops_the_boot_naming_the_key_alone(self, otlp_factory: LogSinkFactoryFn, secret: str) -> None:
+        provider = DictSecretsProvider(secrets={"OTLP_TOKEN": secret})
+
+        with pytest.raises(LogSinkHeaderValueError) as exc_info:
+            otlp_factory(sink_settings_log_config(otlp_headers={"Authorization": "Bearer ${OTLP_TOKEN}"}), secrets_provider=provider)
+
+        message = str(exc_info.value)
+        assert "headers.Authorization" in message
+        assert "[runtime.log.otlp]" in message
+        assert "line break" in message
         assert TOKEN not in message
         assert _RecordingOtlpExporter.built == []

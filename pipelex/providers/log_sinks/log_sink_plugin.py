@@ -5,7 +5,7 @@ from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
-from pipelex.tools.log.exceptions import LogSinkVariableError
+from pipelex.tools.log.exceptions import LogSinkHeaderValueError, LogSinkVariableError
 from pipelex.tools.log.gcp_log_sink import make_gcp_log_sink
 from pipelex.tools.log.json_log_sink import JsonLogSink
 from pipelex.tools.log.log_config import LogConfig
@@ -82,6 +82,11 @@ def _make_otlp_log_sink(config: LogConfig, *, secrets_provider: SecretsProviderA
         )
         for name, value in config.otlp.headers.items()
     }
+    # The exporter takes any string and fails only at export, on a thread whose failures the sink filters out
+    # of its own stream, so a header no HTTP request can carry is refused here, while the boot can still say so.
+    for name, value in headers.items():
+        if "\r" in value or "\n" in value:
+            raise LogSinkHeaderValueError(sink_method=LogSinkMethod.OTLP, section=OTLP_SECTION, key=f"headers.{name}")
     # ``None`` for an absent endpoint or empty headers leaves the exporter to the OTEL_EXPORTER_OTLP_*
     # environment conventions, the way a collector-side deployment is configured.
     exporter = OTLPLogExporter(endpoint=config.otlp.endpoint, headers=headers or None)
