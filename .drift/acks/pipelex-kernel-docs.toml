@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:3ef90940ed68b1c1c7f772cf97bcda3fc3d3d81bad30805cdc93ed5966350b2a"
+digest = "sha256:3fde64b7f78e5a662bebb1f86757336c3dc437bee2e48dfa9d25b4d74865df8c"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-29T01:36:33Z"
-rationale = "PipelexKernel.make and shape_inputs gained a required read_scope; the kernel doc now passes it in every example, documents the read scope beside storage_scope, and lists it among the run-constant fields of RunMetadata."
+reviewed_at = "2026-10-03T09:31:38Z"
+rationale = "clean-pass: assemble_llm_prompt now passes each registry image's mime_type into its prompt image, the way documents already carried theirs; the kernel doc describes the assemble functions' responsibilities and signatures, which are unchanged, so no doc change is needed."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -17,7 +17,7 @@ rationale = "PipelexKernel.make and shape_inputs gained a required read_scope; t
 "pipelex/kernel/img_gen_prompt.py" = "blob:e4f72040561929aa0d96ad5f00b1c4af652d3f77"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/llm_ops.py" = "blob:64a6d3d77a165f4f70614ced69876f56d873a8c7"
-"pipelex/kernel/llm_prompt_content.py" = "blob:82c34283dacd2bfd9a2c263915e744736d399875"
+"pipelex/kernel/llm_prompt_content.py" = "blob:3fade4a660226e63ad4f916952ee37d34e7d2bbd"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"
 "pipelex/kernel/pipelex_kernel.py" = "blob:5dec4e68d517d5ab1d7e9cbb91d836f37b10e713"

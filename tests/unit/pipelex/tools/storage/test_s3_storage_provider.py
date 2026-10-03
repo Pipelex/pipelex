@@ -446,3 +446,54 @@ class TestS3StorageProvider:
 
         assert first_call_count == 1
         assert second_call_count == 1  # Session should only be created once
+
+    async def test_load_head_sends_a_ranged_get(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """A head read asks S3 for the first bytes only, through an inclusive Range header."""
+        mock_aiobotocore["stream"].read = mocker.AsyncMock(return_value=b"%PDF-1.7")
+
+        head = await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf", nb_bytes=8192)
+
+        assert head == b"%PDF-1.7"
+        mock_aiobotocore["client"].get_object.assert_called_once_with(Bucket=S3_TEST_BUCKET, Key="test/file.pdf", Range="bytes=0-8191")
+
+    async def test_load_head_of_an_empty_object_is_empty(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """S3 answers a range over an empty object with InvalidRange, which is an empty head and not a failure."""
+        invalid_range = ClientError({"Error": {"Code": "InvalidRange", "Message": "The requested range is not satisfiable"}}, "GetObject")
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=invalid_range)
+
+        head = await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/empty.bin", nb_bytes=8192)
+
+        assert head == b""
+
+    async def test_load_head_of_a_missing_object_raises_not_found(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=mock_aiobotocore["exceptions"].NoSuchKey("Key not found"))
+
+        with pytest.raises(StorageFileNotFoundError, match=r"missing/file\.pdf"):
+            await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf", nb_bytes=8192)
+
+    async def test_load_head_maps_other_client_errors(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        access_denied = ClientError({"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}, "GetObject")
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=access_denied)
+
+        with pytest.raises(StorageS3Error, match="AccessDenied"):
+            await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf", nb_bytes=8192)
