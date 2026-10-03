@@ -313,6 +313,28 @@ Best regards,
             {"items"},
         ),
         ("macro_called_before_its_definition", "{{ m() }}{% macro m() %}-{% endmacro %}", {"m"}),
+        # A frame that reads a name before setting it starts its own copy from the input, which a macro called before
+        # the set then reads
+        ("macro_reads_a_name_its_frame_reads_before_setting", "{{ a }}{% macro m() %}{{ a.x }}{% endmacro %}{{ m() }}{% set a = 1 %}", {"a", "a.x"}),
+        (
+            "macro_in_a_loop_reads_a_name_the_loop_reads_before_setting",
+            "{% for i in items %}{% if a is defined %}-{% endif %}{% macro m() %}{{ a.x }}{% endmacro %}{{ m() }}{% set a = i %}{% endfor %}",
+            {"items", "a", "a.x"},
+        ),
+        # An `if` opens no frame, so a macro defined in one of its branches sees what its frame sets
+        (
+            "macro_in_an_if_branch_reads_a_later_set",
+            "{% if c %}{% macro m() %}{{ a }}{% endmacro %}{% else %}{% macro m() %}x{% endmacro %}{% endif %}{% set a = 1 %}{{ m() }}",
+            {"c"},
+        ),
+        (
+            "macro_in_an_if_branch_in_a_loop_reads_a_later_set",
+            (
+                "{% for i in items %}{% if c %}{% macro m() %}{{ a }}{% endmacro %}{% else %}{% macro m() %}x{% endmacro %}{% endif %}"
+                "{% set a = i %}{{ m() }}{% endfor %}"
+            ),
+            {"items", "c"},
+        ),
         ("macro_default_reads_an_earlier_argument", "{% macro m(a, b=a) %}{{ b }}{% endmacro %}{{ m(1) }}", set()),
         ("call_block_arguments", "{% macro m() %}{{ caller(1) }}{% endmacro %}{% call(a) m() %}{{ a }}{% endcall %}", set()),
         ("filter_block_filter_reads_its_body_set", "{% filter replace('a', y) %}{% set y = 'b' %}a{% endfilter %}", set()),

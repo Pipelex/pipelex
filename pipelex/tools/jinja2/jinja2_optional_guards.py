@@ -27,7 +27,13 @@ from pydantic.dataclasses import dataclass
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.jinja2.jinja2_scopes import definitely_assigned_names, dotted_attribute_path, frame_bound_names, names_assigned_by_statements
+from pipelex.tools.jinja2.jinja2_scopes import (
+    definitely_assigned_names,
+    dotted_attribute_path,
+    frame_bound_names,
+    names_assigned_by_statements,
+    names_read_before_bound,
+)
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -120,19 +126,26 @@ class _GuardWalker:
         guarded: frozenset[str],
         declared: frozenset[str],
         context_declared: frozenset[str] | None,
+        look_ahead: frozenset[str] | None = None,
     ) -> frozenset[str]:
         """Walk a statement body sequentially, and return the names declared after it.
 
         What a statement binds for certain (a `{% set %}`, a `{% macro %}`, a name every branch of an
         `if` sets) is declared for SUBSEQUENT statements only — a read occurring before the assignment
         still refers to the (possibly undefined) context value and must be classified against it. A
-        macro runs where it is called, so it sees what the whole body binds for certain.
+        macro runs where it is called, so it also sees `look_ahead`, what its frame binds for certain
+        wherever it stands, but for the names the frame reads before binding them, whose copy Jinja
+        starts from the input; it is computed from the body when the body is a frame of its own, and
+        given for the branches of an `if`.
         `context_declared` is what the template context holds where the body runs, and None at the top
         level, whose names the context takes on as they are set.
         """
-        names_bound_by_the_body = frozenset(names_assigned_by_statements(body_nodes))
+        if look_ahead is None:
+            look_ahead = frozenset(names_assigned_by_statements(body_nodes) - names_read_before_bound(body_nodes))
         for body_node in body_nodes:
-            if isinstance(body_node, nodes.Assign):
+            if isinstance(body_node, nodes.If):
+                self._walk_if(body_node, guarded=guarded, declared=declared, context_declared=context_declared, look_ahead=look_ahead)
+            elif isinstance(body_node, nodes.Assign):
                 # The assignment's right-hand side is evaluated against the current scope; the
                 # target is a store, never a read.
                 self.walk(body_node.node, guarded=guarded, declared=declared, context_declared=context_declared)
@@ -145,11 +158,27 @@ class _GuardWalker:
                 if body_node.filter is not None:
                     self.walk(body_node.filter, guarded=guarded, declared=body_declared, context_declared=frame_context)
             elif isinstance(body_node, nodes.Macro):
-                self.walk(body_node, guarded=guarded, declared=declared | names_bound_by_the_body, context_declared=context_declared)
+                self.walk(body_node, guarded=guarded, declared=declared | look_ahead, context_declared=context_declared)
             else:
                 self.walk(body_node, guarded=guarded, declared=declared, context_declared=context_declared)
             declared |= definitely_assigned_names(body_node)
         return declared
+
+    def _walk_if(
+        self,
+        node: nodes.If,
+        *,
+        guarded: frozenset[str],
+        declared: frozenset[str],
+        context_declared: frozenset[str] | None,
+        look_ahead: frozenset[str],
+    ) -> None:
+        """An `if` opens no frame: each branch, and each `elif` test, starts from what is declared before it."""
+        for branch in (node, *node.elif_):
+            self._walk_test(branch.test, guarded=guarded, declared=declared, context_declared=context_declared)
+            branch_guarded = guarded | self._guard_vars(branch.test)
+            self._walk_body(branch.body, guarded=branch_guarded, declared=declared, context_declared=context_declared, look_ahead=look_ahead)
+        self._walk_body(node.else_, guarded=guarded, declared=declared, context_declared=context_declared, look_ahead=look_ahead)
 
     def walk(
         self,
@@ -164,15 +193,6 @@ class _GuardWalker:
 
         if isinstance(node, nodes.Template):
             self._walk_body(node.body, guarded=guarded, declared=declared, context_declared=context_declared)
-            return
-
-        if isinstance(node, nodes.If):
-            body_guarded = guarded | self._guard_vars(node.test)
-            self._walk_test(node.test, guarded=guarded, declared=declared, context_declared=context_declared)
-            self._walk_body(node.body, guarded=body_guarded, declared=declared, context_declared=context_declared)
-            for elif_node in node.elif_:
-                self.walk(elif_node, guarded=guarded, declared=declared, context_declared=context_declared)
-            self._walk_body(node.else_, guarded=guarded, declared=declared, context_declared=context_declared)
             return
 
         if isinstance(node, nodes.For):

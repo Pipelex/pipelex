@@ -61,6 +61,13 @@ class TestDetectUnguardedOptionalReferences:
                 "{% for i in items %}{% if assessment %}{% block b %}{{ assessment.amount }}{% endblock %}{% endif %}{% endfor %}",
             ),
             (
+                "macro_in_an_if_branch_reads_a_later_set",
+                (
+                    "{% if topic %}{% macro show() %}{{ assessment.amount }}{% endmacro %}{% else %}{% macro show() %}x{% endmacro %}"
+                    "{% endif %}{% set assessment = 'x' %}{{ show() }}"
+                ),
+            ),
+            (
                 "scoped_block_sees_the_loop_target",
                 "{% for assessment in items %}{% block b scoped %}{{ assessment.amount }}{% endblock %}{% endfor %}",
             ),
@@ -108,6 +115,14 @@ class TestDetectUnguardedOptionalReferences:
             (
                 "macro_reads_a_name_set_in_some_branches",
                 "{% macro show() %}{{ assessment.amount }}{% endmacro %}{% if topic %}{% set assessment = 'x' %}{% endif %}{{ show() }}",
+                "assessment.amount",
+            ),
+            (
+                "macro_reads_an_optional_its_frame_reads_before_setting",
+                (
+                    "{% if assessment %}{{ assessment }}{% endif %}"
+                    "{% macro show() %}{{ assessment.amount }}{% endmacro %}{{ show() }}{% set assessment = 'x' %}"
+                ),
                 "assessment.amount",
             ),
             (

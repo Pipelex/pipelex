@@ -80,6 +80,11 @@ class TestDetectTemplateFieldPaths:
             ),
             ("set_does_not_escape_a_loop", "{% for x in xs %}{% set invoice = x %}{% endfor %}{{ invoice.nosuch }}", ("invoice", "nosuch")),
             (
+                "macro_reads_a_name_its_frame_reads_before_setting",
+                "{{ invoice }}{% macro m() %}{{ invoice.nosuch }}{% endmacro %}{{ m() }}{% set invoice = other %}",
+                ("invoice", "nosuch"),
+            ),
+            (
                 "loop_target_in_a_block",
                 "{% for invoice in invoices.all %}{% block b %}{{ invoice.nosuch }}{% endblock %}{% endfor %}",
                 ("invoice", "nosuch"),

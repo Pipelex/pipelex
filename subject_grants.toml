@@ -6136,6 +6136,10 @@ rationale = "Verb-object: records the path; single operand."
 param = "body_nodes"
 rationale = "Visitor: walks the body nodes; guard sets stay keyword."
 
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_if"]
+param = "node"
+rationale = "Verb-object walk over one if node, like the walker's other walk methods; single operand."
+
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_test"]
 param = "test_node"
 rationale = "Visitor: walks the test node; guard sets stay keyword."
@@ -6272,6 +6276,14 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
 
+["pipelex/tools/jinja2/jinja2_scopes.py::_frame_level_parts"]
+param = "statement"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::_loaded_names"]
+param = "expression"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
+
 ["pipelex/tools/jinja2/jinja2_scopes.py::assigned_target_names"]
 param = "target"
 rationale = "Lists the names one assignment target binds."
@@ -6295,6 +6307,10 @@ rationale = "Noun-named derivation: the names one statement binds in the frame i
 ["pipelex/tools/jinja2/jinja2_scopes.py::names_assigned_by_statements"]
 param = "statements"
 rationale = "Noun-named derivation: the names a statement list binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::names_read_before_bound"]
+param = "statements"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.is_loaded"]
 param = "name"

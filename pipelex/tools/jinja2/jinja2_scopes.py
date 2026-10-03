@@ -14,7 +14,9 @@ argument) does not, from where Jinja binds it, and the rule is stated here once,
 - Within a frame, a name is bound from the statement that binds it on: a read placed before a `set`, and the
   `set`'s own right-hand side (`{% set topic = topic|trim %}`), read the input.
 - A macro body runs where the macro is called, which the walk cannot place among the statements, so it sees the
-  names the statement list it is defined in binds for certain, wherever they stand in it.
+  names its frame binds for certain, wherever they stand in it, an `if` branch it is defined in opening no frame of
+  its own. A name the frame reads before binding it is the exception: Jinja starts the frame's copy of it from the
+  input, so a macro called before the binding reads the input.
 - A `{% block %}` runs as a function of its own. Without `scoped` it reads only the template context, which holds
   what the top level has set for certain before it, and none of the names a loop, a macro or any other frame around
   it binds; a scoped block reads the names bound where it stands, and the blocks nested in it read those too.
@@ -79,6 +81,59 @@ def definitely_assigned_names(statement: nodes.Node) -> set[str]:
     if isinstance(statement, nodes.ScopedEvalContextModifier):
         return names_assigned_by_statements(statement.body)
     return set()
+
+
+def _frame_level_parts(statement: nodes.Node) -> list[nodes.Node]:
+    """The expressions of a statement Jinja reads in the frame the statement stands in."""
+    if isinstance(statement, nodes.Output):
+        return list(statement.nodes)
+    if isinstance(statement, (nodes.Assign, nodes.ExprStmt)):
+        return [statement.node]
+    if isinstance(statement, nodes.For):
+        return [statement.iter]
+    if isinstance(statement, nodes.With):
+        return list(statement.values)
+    if isinstance(statement, nodes.CallBlock):
+        return [statement.call]
+    if isinstance(statement, nodes.FilterBlock):
+        return [statement.filter]
+    if isinstance(statement, nodes.OverlayScope):
+        return [statement.context]
+    if isinstance(statement, (nodes.Import, nodes.FromImport)):
+        return [statement.template]
+    return []
+
+
+def _loaded_names(expression: nodes.Node) -> set[str]:
+    names = [expression, *expression.find_all(nodes.Name)]
+    return {name.name for name in names if isinstance(name, nodes.Name) and name.ctx == "load"}
+
+
+def _collect_reads_before_bound(*, statements: list[nodes.Node], bound: set[str], read: set[str]) -> None:
+    bound = set(bound)
+    for statement in statements:
+        if isinstance(statement, nodes.If):
+            for branch in (statement, *statement.elif_):
+                read |= _loaded_names(branch.test) - bound
+                _collect_reads_before_bound(statements=branch.body, bound=bound, read=read)
+            _collect_reads_before_bound(statements=statement.else_, bound=bound, read=read)
+        elif isinstance(statement, nodes.ScopedEvalContextModifier):
+            _collect_reads_before_bound(statements=statement.body, bound=bound, read=read)
+        else:
+            for part in _frame_level_parts(statement):
+                read |= _loaded_names(part) - bound
+        bound |= definitely_assigned_names(statement)
+
+
+def names_read_before_bound(statements: list[nodes.Node]) -> set[str]:
+    """The names a frame reads at its own level before it binds them for certain.
+
+    Jinja starts the frame's copy of such a name from the input of that name, so a macro the frame defines reads the
+    input when it is called before the binding.
+    """
+    read: set[str] = set()
+    _collect_reads_before_bound(statements=statements, bound=set(), read=read)
+    return read
 
 
 def frame_bound_names(statement: nodes.Node) -> set[str]:
@@ -146,34 +201,45 @@ class _ReadWalk:
         self.global_names = global_names
         self.handle_read = handle_read
 
-    def walk_statements(self, *, statements: list[nodes.Node], bindings: ScopeBindings, context: ScopeBindings | None) -> ScopeBindings:
+    def walk_statements(
+        self,
+        *,
+        statements: list[nodes.Node],
+        bindings: ScopeBindings,
+        context: ScopeBindings | None,
+        look_ahead: set[str] | None = None,
+    ) -> ScopeBindings:
         """Walk a statement list in the frame it runs in, and return the bindings after it.
 
-        Each statement sees what the statements before it bound for certain; a macro sees what the whole list binds.
+        Each statement sees what the statements before it bound for certain. A macro also sees `look_ahead`, what its
+        frame binds for certain wherever it stands, but for the names the frame reads before binding them; it is
+        computed from the statements when they make up a frame of their own, and given for the branches of an `if`.
         `context` is what the template context holds where the frame runs, and None in the top-level frame, whose
         names the context takes on as they are set.
         """
-        names_bound_by_the_list = names_assigned_by_statements(statements)
+        if look_ahead is None:
+            look_ahead = names_assigned_by_statements(statements) - names_read_before_bound(statements)
         scope = dict(bindings)
         for statement in statements:
-            if isinstance(statement, nodes.Macro):
-                self.walk(node=statement, bindings=_with_unfollowed(bindings=scope, names=names_bound_by_the_list), context=context)
+            if isinstance(statement, nodes.If):
+                self._walk_if(node=statement, bindings=scope, context=context, look_ahead=look_ahead)
+            elif isinstance(statement, nodes.Macro):
+                self.walk(node=statement, bindings=_with_unfollowed(bindings=scope, names=look_ahead), context=context)
             else:
                 self.walk(node=statement, bindings=scope, context=context)
             scope = _with_unfollowed(bindings=scope, names=definitely_assigned_names(statement))
         return scope
 
+    def _walk_if(self, *, node: nodes.If, bindings: ScopeBindings, context: ScopeBindings | None, look_ahead: set[str]) -> None:
+        # An `if` opens no frame: every branch, and every `elif` test, starts from the bindings before it
+        for branch in (node, *node.elif_):
+            self.walk(node=branch.test, bindings=bindings, context=context)
+            self.walk_statements(statements=branch.body, bindings=bindings, context=context, look_ahead=look_ahead)
+        self.walk_statements(statements=node.else_, bindings=bindings, context=context, look_ahead=look_ahead)
+
     def walk(self, *, node: nodes.Node, bindings: ScopeBindings, context: ScopeBindings | None) -> None:
         # What the template context holds in a frame opened here: from the top level, what is bound where it opens
         frame_context = bindings if context is None else context
-
-        if isinstance(node, nodes.If):
-            # Every branch, and every `elif` test, starts from the bindings before the `if`
-            for branch in (node, *node.elif_):
-                self.walk(node=branch.test, bindings=bindings, context=context)
-                self.walk_statements(statements=branch.body, bindings=bindings, context=context)
-            self.walk_statements(statements=node.else_, bindings=bindings, context=context)
-            return
 
         if isinstance(node, nodes.For):
             # The iterable is read outside the loop, the loop filter and the body inside it, and the `else` branch in
