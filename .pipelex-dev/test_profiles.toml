@@ -49,6 +49,7 @@ all = [
   "vertexai",
   "xai",
   "linkup",
+  "typesafe",
   "internal",
 ]
 
@@ -239,6 +240,10 @@ qwen = ["qwen-image"]
 # --- Search Models ---
 linkup = ["linkup-standard", "linkup-deep"]
 
+[collections.judgment]
+# --- Judgment Models ---
+typesafe = ["jev-1.13.0"]
+
 [collections.extract]
 # --- Web Extraction Models ---
 from_web = ["linkup-fetch"]
@@ -324,6 +329,21 @@ img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["azure-document-intelligence", "linkup-fetch"]
 search_models = ["linkup-standard"]
 judgment_models = []
+
+################################################################################
+# TypeSafe Profile
+################################################################################
+# The judgment family's live tests and nothing else. Every other model list is empty on purpose:
+# the combo fixtures route the whole deck to one backend for the duration of a run, and TypeSafe
+# serves judgments alone — a profile naming an LLM here would send it somewhere that cannot answer.
+[profiles.typesafe]
+description = "TypeSafe judgment models, for the judgment family's live tests"
+backends = ["typesafe"]
+llm_models = []
+img_gen_models = []
+extract_models = []
+search_models = []
+judgment_models = ["@typesafe"]
 
 ################################################################################
 # Coverage Profile

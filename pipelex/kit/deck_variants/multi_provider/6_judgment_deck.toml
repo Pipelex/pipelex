@@ -36,8 +36,12 @@
 #
 # A judgment alias points at a VERSIONED model id, never at a provider's `latest` alias: a verdict
 # model that changes under a method silently changes what every threshold in that method means.
+#
+# `jev-1.13.0` is TypeSafe's. Its next version is found on the provider's models page and not through
+# its API, whose model listing names only the moving aliases — moving this pin is a documentation read.
 
 [judgment.aliases]
+default-judgment = "jev-1.13.0"
 
 ####################################################################################################
 # Judgment Presets
