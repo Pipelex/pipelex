@@ -7,7 +7,9 @@ left to its consumer. A refused file is refused before it is relocated, so nothi
 """
 
 import base64
+import io
 import re
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -93,6 +95,19 @@ class TestInputNormalizerImageCheck:
             "Input 'referral_letter' expects an image, but the file is a PDF document (.pdf). Give an image file such as PNG, JPEG or WebP."
         )
         assert not (tmp_path / "storage").exists() or _stored_keys(root=tmp_path / "storage") == set()
+
+    async def test_an_archive_given_to_an_image_input_is_refused(self, storage: LocalStorageProvider):  # ruff: ignore[unused-method-argument]
+        """A bare zip has no format of its own to report, but it is not an image whatever it holds."""
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("photos/readme.txt", "not a photo")
+        memory = _memory(photo=ImageContent(url=_data_url(mime_type="image/png", raw_bytes=buffer.getvalue())))
+
+        with pytest.raises(
+            PipelineInputNotAnImageError,
+            match=re.escape("Input 'photo' expects an image, but the file is a .zip file."),
+        ):
+            await prepare_file_inputs(memory, storage_scope=STORAGE_SCOPE, read_scope=None, is_relocation_enabled=False)
 
     async def test_a_stored_word_document_given_to_an_image_input_is_refused(self, storage: LocalStorageProvider):
         uri = await storage.store(data=DOCX_BYTES, key="org/uploads/photo.png")

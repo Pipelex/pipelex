@@ -7,6 +7,8 @@ a condition is not certain, so the run starts, and the operator refuses the file
 """
 
 import base64
+import re
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -43,6 +45,25 @@ output = "Page[]"
 model = "pypdfium2-extract-pdf"
 """
 
+_SINGLE_TRANSCRIPT_MTHDS = """
+domain = "consumer_check_single"
+description = "Extract one transcript with either model"
+
+[pipe.extract_with_pdf_model]
+type = "PipeExtract"
+description = "Extract the transcript with a model reading PDF only"
+inputs = { transcript = "Document" }
+output = "Page[]"
+model = "pypdfium2-extract-pdf"
+
+[pipe.extract_with_word_model]
+type = "PipeExtract"
+description = "Extract the transcript with a model reading Word files"
+inputs = { transcript = "Document" }
+output = "Page[]"
+model = "docling-extract-text"
+"""
+
 _CONDITIONAL_MTHDS = """
 domain = "consumer_check_conditional"
 description = "Extract a transcript in one mode only"
@@ -69,6 +90,20 @@ model = "pypdfium2-extract-pdf"
 
 def _data_url(*, mime_type: str, raw_bytes: bytes) -> str:
     return f"data:{mime_type};base64,{base64.b64encode(raw_bytes).decode('ascii')}"
+
+
+def _write_late_entry_docx(*, path: Path) -> Path:
+    """Rewrite the Word fixture with a large custom part first, so the sniffer sees only a zip container."""
+    with zipfile.ZipFile(DocumentTestCases.DOCX_FILE_PATH_1) as source, zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as target:
+        entry_names = source.namelist()
+        leading = [entry_name for entry_name in entry_names if entry_name in {"[Content_Types].xml", "_rels/.rels"}]
+        for entry_name in leading:
+            target.writestr(entry_name, source.read(entry_name))
+        target.writestr("customXml/item1.xml", "<data>" + "x" * 12_000 + "</data>")
+        for entry_name in entry_names:
+            if entry_name not in leading:
+                target.writestr(entry_name, source.read(entry_name))
+    return path
 
 
 def _find_in_cause_chain(error: BaseException, *, error_class: type[BaseException]) -> BaseException | None:
@@ -148,6 +183,39 @@ class TestPipelineRunSetupConsumerCheck:
         )
 
         assert pipe_job.pipe.code == "extract_transcripts"
+
+    @pytest.mark.parametrize(
+        ("pipe_code", "expected_refusal"),
+        [
+            ("extract_with_word_model", None),
+            (
+                "extract_with_pdf_model",
+                "Input 'transcript' is a Word document (.docx): pipe 'extract_with_pdf_model' extracts it with model 'pypdfium2-extract-pdf'",
+            ),
+        ],
+    )
+    async def test_a_word_file_the_sniffer_sees_only_as_a_zip_is_known_by_its_name(
+        self, tmp_path: Path, pipe_code: str, expected_refusal: str | None
+    ):
+        """Given by path with no declared type, the file's `.docx` name says what the zip holds, so the model reading Word files takes it."""
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
+        docx_path = _write_late_entry_docx(path=tmp_path / "interview.docx")
+        setup = pipeline_run_setup(
+            storage_scope="test/scope",
+            read_scope=None,
+            user_id="test-user",
+            execution_config=execution_config,
+            mthds_contents=[_SINGLE_TRANSCRIPT_MTHDS],
+            pipe_code=pipe_code,
+            inputs={"transcript": {"concept": "native.Document", "content": {"url": str(docx_path)}}},
+        )
+
+        if expected_refusal is None:
+            pipe_job, _pipeline_run_id, _ = await setup
+            assert pipe_job.pipe.code == pipe_code
+        else:
+            with pytest.raises(PipelineInputFormatUnsupportedError, match=re.escape(expected_refusal)):
+                await setup
 
     async def test_a_consumer_behind_a_condition_lets_the_run_start_and_the_operator_refuses(self):
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)

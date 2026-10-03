@@ -194,9 +194,9 @@ Which document formats a method can take depends on the models that read them: a
 
 At the start of every run, before any pipe runs, the runtime establishes the format of each image and document input, including the items of a list and the fields of a structured input:
 
-- A file given as a `data:` URL, a local path or a `pipelex-storage://` reference is identified from its first bytes. The identified type replaces any declared one, so a `data:image/png` URL holding a PDF is a PDF.
+- A file given as a `data:` URL, a local path or a `pipelex-storage://` reference is identified from its first bytes. The identified type replaces any declared one, so a `data:image/png` URL holding a PDF is a PDF. An Office file whose bytes show only that it is a zip archive is known by its declared type or by its file name's extension (`.docx`, `.pptx`, `.xlsx`), and otherwise its format is unknown.
 - A file the bytes do not identify, such as plain text, Markdown, CSV or HTML, keeps the type it was declared with.
-- An `http(s)` URL is not fetched before the run, and keeps its declared type. Its format is checked by the step that reads it.
+- An `http(s)` URL is not fetched before the run, so its format is the type it was declared with, and only that type is checked. An `http(s)` URL with no declared type is not checked: the provider receives it as it is.
 
 The run is then refused, with an input error naming the input, when:
 

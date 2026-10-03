@@ -24,7 +24,7 @@ import base64
 import binascii
 from collections.abc import Coroutine, Sequence
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Final, NamedTuple, TypeAlias, TypeVar, cast
 
 import aiofiles
@@ -383,7 +383,8 @@ async def _prepare_url_content(
 
 def _prepare_http_url(*, content: NormalizableContent, resolved_uri: ResolvedHttpUrl, context: _PreparationContext) -> NormalizableContent:
     # Never fetched: setup makes no outbound request to a host the caller chose. The operator that
-    # consumes the input fetches it, reports a real failure, and checks the format of the bytes.
+    # consumes the input fetches it and reports a real failure. Its format is only what the caller
+    # declared: the checks compare a declared type, and leave a URL that declares none to the provider.
     if not context.is_relocation_enabled:
         return content
     # Syntax only, no network: the operator's fetch is the one honest test of a remote resource.
@@ -413,7 +414,13 @@ async def _prepare_storage_reference(
         msg = f"{type(content).__name__} input '{input_name}': the storage reference '{content.url}' cannot be read ({exc})"
         raise PipelineInputContentError(msg) from exc
     updates: dict[str, Any] = {}
-    mime_type = _identify_file_input(content=content, head=head, declared_mime_type=content.mime_type, input_name=input_name)
+    mime_type = _identify_file_input(
+        content=content,
+        head=head,
+        declared_mime_type=content.mime_type,
+        file_name=content.filename or PurePosixPath(resolved_uri.storage_uri).name,
+        input_name=input_name,
+    )
     if mime_type != content.mime_type:
         updates["mime_type"] = mime_type
 
@@ -448,7 +455,11 @@ async def _prepare_data_url(
         msg = f"{type(content).__name__} input '{input_name}': the data URL does not hold valid base64 ({exc})"
         raise PipelineInputContentError(msg) from exc
     mime_type = _identify_file_input(
-        content=content, head=raw_bytes[:FILE_HEAD_NB_BYTES], declared_mime_type=resolved_uri.mime_type or content.mime_type, input_name=input_name
+        content=content,
+        head=raw_bytes[:FILE_HEAD_NB_BYTES],
+        declared_mime_type=resolved_uri.mime_type or content.mime_type,
+        file_name=content.filename,
+        input_name=input_name,
     )
 
     if not context.is_relocation_enabled:
@@ -491,7 +502,9 @@ async def _prepare_local_path(
             head = await _load_local_head(local_path)
         except (OSError, ValueError):
             return content
-        mime_type = _identify_file_input(content=content, head=head, declared_mime_type=content.mime_type, input_name=input_name)
+        mime_type = _identify_file_input(
+            content=content, head=head, declared_mime_type=content.mime_type, file_name=content.filename or local_path.name, input_name=input_name
+        )
         if mime_type == content.mime_type:
             return content
         return content.model_copy(update={"mime_type": mime_type})
@@ -507,7 +520,11 @@ async def _prepare_local_path(
         msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
         raise PipelineInputContentError(msg) from exc
     mime_type = _identify_file_input(
-        content=content, head=raw_bytes[:FILE_HEAD_NB_BYTES], declared_mime_type=content.mime_type, input_name=input_name
+        content=content,
+        head=raw_bytes[:FILE_HEAD_NB_BYTES],
+        declared_mime_type=content.mime_type,
+        file_name=content.filename or local_path.name,
+        input_name=input_name,
     )
     extension = _storage_key_extension(raw_bytes=raw_bytes, mime_type=mime_type, fallback_suffix=local_path.suffix.removeprefix(".") or None)
     key = f"{context.storage_scope}/assets/{shortuuid.uuid()}.{extension}"
@@ -523,25 +540,33 @@ async def _prepare_local_path(
     )
 
 
-def _identify_file_input(*, content: NormalizableContent, head: bytes | None, declared_mime_type: str | None, input_name: str) -> str | None:
+def _identify_file_input(
+    *, content: NormalizableContent, head: bytes | None, declared_mime_type: str | None, file_name: str | None, input_name: str
+) -> str | None:
     """The MIME type that describes a file input, refusing an Image input whose bytes are not an image.
 
     The type comes from `identify_mime_type`: the sniffed type wins, the declared one stands when the
-    sniff fails. The refusal fires only when the bytes were identified, so an image the sniffer cannot
-    identify, an SVG for one, is left to its consumer, and so is a type the caller merely declared.
+    sniff fails, and a bare zip is narrowed by the declared type or the file's name. The refusal fires
+    only when the bytes were identified, so an image the sniffer cannot identify, an SVG for one, is
+    left to its consumer, and so is a type the caller merely declared. A bare zip is not an image
+    whatever it holds, so it is refused even when its precise format stays unknown.
 
     Raises:
         PipelineInputNotAnImageError: If the content is an ImageContent and its bytes identify a
             format other than an image.
     """
-    mime_type = identify_mime_type(head=head, declared_mime_type=declared_mime_type)
-    if not isinstance(content, ImageContent) or not head or guess_file_type_from_bytes(raw_bytes=head) is None:
+    mime_type = identify_mime_type(head=head, declared_mime_type=declared_mime_type, file_name=file_name)
+    if not isinstance(content, ImageContent) or not head:
         return mime_type
-    format_key = format_key_from_mime_type(mime_type=mime_type)
+    sniffed = guess_file_type_from_bytes(raw_bytes=head)
+    if sniffed is None:
+        return mime_type
+    mime_type_to_describe = mime_type or sniffed.mime
+    format_key = format_key_from_mime_type(mime_type=mime_type_to_describe)
     if format_key is None or format_key == IMAGE_FORMAT_KEY:
         return mime_type
     msg = (
-        f"Input '{input_name}' expects an image, but the file is {describe_file_format(format_key=format_key, mime_type=mime_type)}. "
+        f"Input '{input_name}' expects an image, but the file is {describe_file_format(format_key=format_key, mime_type=mime_type_to_describe)}. "
         "Give an image file such as PNG, JPEG or WebP."
     )
     raise PipelineInputNotAnImageError(msg)

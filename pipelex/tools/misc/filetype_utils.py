@@ -170,10 +170,10 @@ FILE_HEAD_NB_BYTES: Final[int] = 8192
 # A declaration that says nothing: a file with this type, or with none, has no known format.
 _GENERIC_MIME_TYPES: Final[frozenset[str]] = frozenset({"application/octet-stream"})
 
-# A zip container the sniffer recognised without recognising what it contains, and the declared
-# types that name a more precise zip-based format. An Office Open XML or OpenDocument file is a
-# zip, and `filetype` names it only when its identifying entry sits among the first few, so a
-# declared Office type refines a sniffed bare zip instead of being overruled by it.
+# A zip container the sniffer recognised without recognising what it contains, and the types that
+# name a more precise zip-based format. An Office Open XML or OpenDocument file is a zip, and
+# `filetype` names it only when its identifying entry sits among the first few, so a bare zip says
+# only that the file is some zip: a declared zip-based type, or the file's name, says which.
 _ZIP_MIME_TYPE: Final[str] = "application/zip"
 _ZIP_BASED_DOCUMENT_MIME_PREFIXES: Final[tuple[str, ...]] = (
     "application/vnd.openxmlformats-officedocument.",
@@ -253,7 +253,10 @@ def describe_file_format(*, format_key: str, mime_type: str | None) -> str:
     An image is told apart by its MIME type, since every image shares the `image` key:
     `an image (image/png)`.
     """
-    description = describe_format_key(format_key=format_key)
+    description = _FORMAT_KEY_DESCRIPTIONS.get(format_key)
+    if description is None:
+        # `a .md file` already names its extension.
+        return describe_format_key(format_key=format_key)
     if format_key == IMAGE_FORMAT_KEY:
         return f"{description} ({mime_type})" if mime_type else description
     return f"{description} (.{format_key})"
@@ -285,21 +288,38 @@ def guess_file_type_from_bytes(*, raw_bytes: bytes) -> FileType | None:
     return FileType(extension=f"{kind.extension}", mime=f"{kind.mime}")
 
 
-def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None) -> str | None:
-    """The MIME type that describes a file, from its leading bytes and what the caller declared.
+def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None, file_name: str | None) -> str | None:
+    """The MIME type that describes a file, from its leading bytes, what the caller declared and its name.
 
     The bytes are the truth: when they identify a type, it replaces any declared one, so a
     `data:image/png` URL holding a PDF is a PDF. When they identify none, which is the case for text
-    formats, the declared type stands. A declared zip-based Office type refines a sniffed bare zip.
-    No head (a file that was not read) keeps the declared type. `None` means the format is unknown.
+    formats, the declared type stands. No head (a file that was not read) keeps the declared type.
+
+    A sniffed bare zip is the one identification that does not settle the format: it may be an
+    Office file whose identifying entry came late. A declared zip-based type says which, and so does
+    a file name whose extension is one; otherwise the format is unknown rather than a zip, so no
+    check refuses a valid Office file for the order of its entries.
+
+    Args:
+        head: The file's leading bytes, `None` when it was not read.
+        declared_mime_type: The type the caller declared, if any.
+        file_name: The file's name or the last segment of its path, if it has one.
+
+    Returns:
+        The MIME type, `None` when the format is unknown.
     """
     sniffed = guess_file_type_from_bytes(raw_bytes=head) if head else None
     if sniffed is None:
         return declared_mime_type
-    if (
-        sniffed.mime == _ZIP_MIME_TYPE
-        and declared_mime_type is not None
-        and _base_mime_type(mime_type=declared_mime_type).startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES)
-    ):
-        return declared_mime_type
-    return sniffed.mime
+    if sniffed.mime != _ZIP_MIME_TYPE:
+        return sniffed.mime
+    named_mime_type = _MIME_DB.guess_type(file_name, strict=True)[0] if file_name else None
+    for candidate_mime_type in (declared_mime_type, named_mime_type):
+        if candidate_mime_type is not None and _is_zip_based_mime_type(mime_type=candidate_mime_type):
+            return candidate_mime_type
+    return None
+
+
+def _is_zip_based_mime_type(*, mime_type: str) -> bool:
+    base_mime_type = _base_mime_type(mime_type=mime_type)
+    return base_mime_type == _ZIP_MIME_TYPE or base_mime_type.startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES)

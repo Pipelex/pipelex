@@ -14,11 +14,12 @@ from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.filetype_utils import (
+    FILE_HEAD_NB_BYTES,
     UNKNOWN_FILE_TYPE,
     FileType,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
-    guess_file_type_from_bytes,
+    identify_mime_type,
     mime_type_to_extension,
 )
 from pipelex.tools.misc.hash_utils import hash_sha256
@@ -84,6 +85,8 @@ class PromptDocumentBase64(BaseModel):
 
     kind: Literal["base64"] = "base64"
     base64_data: str
+    mime_type: str | None = None
+    """The type run setup established or the data URL declared, which refines what the bytes alone identify."""
 
     def get_file_type(self) -> FileType:
         return detect_file_type_from_base64(self.base64_data)
@@ -95,13 +98,16 @@ class PromptDocumentBase64(BaseModel):
         return base64.b64decode(self.base64_data)
 
     def known_mime_type(self) -> str | None:
-        """The MIME type the bytes identify, or `None` when they identify none or do not decode."""
+        """The MIME type this document is known to have, identified the way run setup identifies it.
+
+        The bytes win when they identify a type, the declared type stands when they identify none or
+        do not decode, and a declared zip-based type refines bytes that show only a zip.
+        """
         try:
             raw_bytes = self.get_decoded_bytes()
         except binascii.Error:
-            return None
-        file_type = guess_file_type_from_bytes(raw_bytes=raw_bytes)
-        return file_type.mime if file_type else None
+            return self.mime_type
+        return identify_mime_type(head=raw_bytes[:FILE_HEAD_NB_BYTES], declared_mime_type=self.mime_type, file_name=None)
 
     @override
     def __str__(self) -> str:
@@ -134,6 +140,8 @@ class PromptDocumentBinary(BaseModel):
 
     kind: Literal["binary"] = "binary"
     raw_bytes: bytes
+    mime_type: str | None = None
+    """The type the caller declared, which refines what the bytes alone identify."""
 
     def get_file_type(self) -> FileType:
         return detect_file_type_from_bytes(self.raw_bytes)
@@ -142,9 +150,8 @@ class PromptDocumentBinary(BaseModel):
         return self.get_file_type().mime
 
     def known_mime_type(self) -> str | None:
-        """The MIME type the bytes identify, or `None` when they identify none."""
-        file_type = guess_file_type_from_bytes(raw_bytes=self.raw_bytes)
-        return file_type.mime if file_type else None
+        """The MIME type this document is known to have, identified the way run setup identifies it."""
+        return identify_mime_type(head=self.raw_bytes[:FILE_HEAD_NB_BYTES], declared_mime_type=self.mime_type, file_name=None)
 
     @override
     def __str__(self) -> str:

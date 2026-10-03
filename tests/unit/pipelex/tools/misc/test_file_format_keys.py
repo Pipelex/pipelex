@@ -6,6 +6,8 @@ type is its extension; no type, or the generic octet-stream, has no key.
 """
 
 import base64
+import io
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -26,6 +28,23 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 DOCUMENTS_DIR = Path("tests/data/documents")
 IMAGES_DIR = Path("tests/data/images")
+
+
+def _late_office_entry_zip_head() -> bytes:
+    """The head of a Word file whose `word/` entry comes after the entries the sniffer looks at, so it sees only a zip."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for entry_name in (
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "docProps/app.xml",
+            "docProps/core.xml",
+            "docProps/custom.xml",
+            "customXml/item1.xml",
+        ):
+            archive.writestr(entry_name, "<xml/>")
+        archive.writestr("word/document.xml", "<w:document/>")
+    return buffer.getvalue()[:FILE_HEAD_NB_BYTES]
 
 
 class TestFileFormatKeys:
@@ -76,16 +95,16 @@ class TestFileFormatKeys:
 
     def test_the_sniffed_type_wins_over_the_declared_one(self):
         pdf_head = (DOCUMENTS_DIR / "solar_system.pdf").read_bytes()[:FILE_HEAD_NB_BYTES]
-        assert identify_mime_type(head=pdf_head, declared_mime_type="image/png") == "application/pdf"
+        assert identify_mime_type(head=pdf_head, declared_mime_type="image/png", file_name=None) == "application/pdf"
 
     def test_the_declared_type_stands_when_the_sniff_fails(self):
-        assert identify_mime_type(head=b"plain words", declared_mime_type="text/markdown") == "text/markdown"
+        assert identify_mime_type(head=b"plain words", declared_mime_type="text/markdown", file_name=None) == "text/markdown"
 
     def test_no_head_keeps_the_declared_type(self):
-        assert identify_mime_type(head=None, declared_mime_type="application/pdf") == "application/pdf"
+        assert identify_mime_type(head=None, declared_mime_type="application/pdf", file_name=None) == "application/pdf"
 
     def test_nothing_known_gives_none(self):
-        assert identify_mime_type(head=b"plain words", declared_mime_type=None) is None
+        assert identify_mime_type(head=b"plain words", declared_mime_type=None, file_name=None) is None
 
     def test_a_declared_office_type_refines_a_sniffed_zip(self):
         """An Office Open XML file is a zip: when the sniffer sees only the container, the declared Office type is the more precise truth."""
@@ -93,17 +112,40 @@ class TestFileFormatKeys:
         sniffed = guess_file_type_from_bytes(raw_bytes=zip_head)
         assert sniffed is not None, "precondition: the sniffer sees a zip container"
         assert sniffed.mime == "application/zip"
-        assert identify_mime_type(head=zip_head, declared_mime_type=DOCX_MIME) == DOCX_MIME
-        assert identify_mime_type(head=zip_head, declared_mime_type="image/png") == "application/zip"
+        assert identify_mime_type(head=zip_head, declared_mime_type=DOCX_MIME, file_name=None) == DOCX_MIME
+        assert identify_mime_type(head=zip_head, declared_mime_type="application/zip", file_name=None) == "application/zip"
+
+    @pytest.mark.parametrize(
+        ("declared_mime_type", "file_name", "expected"),
+        [
+            (None, None, None),
+            ("application/octet-stream", None, None),
+            ("image/png", None, None),
+            (None, "report.docx", DOCX_MIME),
+            (None, "deck.pptx", PPTX_MIME),
+            ("application/octet-stream", "budget.xlsx", XLSX_MIME),
+            (None, "notes.txt", None),
+            (PPTX_MIME, "report.docx", PPTX_MIME),
+        ],
+    )
+    def test_a_bare_zip_is_unknown_unless_its_declared_type_or_its_name_says_what_it_holds(
+        self, declared_mime_type: str | None, file_name: str | None, expected: str | None
+    ):
+        """A sniffed bare zip may be an Office file whose identifying entry came late, so it is never a format of its own to refuse."""
+        zip_head = _late_office_entry_zip_head()
+        sniffed = guess_file_type_from_bytes(raw_bytes=zip_head)
+        assert sniffed is not None, "precondition: the sniffer sees a zip container"
+        assert sniffed.mime == "application/zip", "precondition: the sniffer does not see the Word entry"
+        assert identify_mime_type(head=zip_head, declared_mime_type=declared_mime_type, file_name=file_name) == expected
 
     def test_a_png_data_url_holding_a_pdf_is_a_pdf(self):
         pdf_bytes = (DOCUMENTS_DIR / "solar_system.pdf").read_bytes()
         decoded = base64.b64decode(base64.b64encode(pdf_bytes))
-        assert identify_mime_type(head=decoded[:FILE_HEAD_NB_BYTES], declared_mime_type="image/png") == "application/pdf"
+        assert identify_mime_type(head=decoded[:FILE_HEAD_NB_BYTES], declared_mime_type="image/png", file_name=None) == "application/pdf"
 
     def test_an_image_is_identified_as_one(self):
         png_head = (IMAGES_DIR / "logo-tiny.png").read_bytes()[:FILE_HEAD_NB_BYTES]
-        assert identify_mime_type(head=png_head, declared_mime_type=None) == "image/png"
+        assert identify_mime_type(head=png_head, declared_mime_type=None, file_name=None) == "image/png"
 
     @pytest.mark.parametrize(
         ("format_key", "expected"),
@@ -127,7 +169,8 @@ class TestFileFormatKeys:
             ("pdf", "application/pdf", "a PDF document (.pdf)"),
             ("docx", DOCX_MIME, "a Word document (.docx)"),
             ("image", "image/png", "an image (image/png)"),
-            ("md", "text/markdown", "a .md file (.md)"),
+            ("md", "text/markdown", "a .md file"),
+            ("zip", "application/zip", "a .zip file"),
         ],
     )
     def test_describes_a_file_with_the_type_that_tells_it_apart(self, format_key: str, mime_type: str, expected: str):

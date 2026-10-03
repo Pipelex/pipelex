@@ -8,12 +8,15 @@ format is left to the provider, and a document whose bytes identify nothing no l
 """
 
 import base64
+import io
+import zipfile
 
 import pytest
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentBase64, PromptDocumentBinary, PromptDocumentUri
+from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptDocumentFormatError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
@@ -30,6 +33,26 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 STORED_DOCX = "pipelex-storage://org/uploads/brief.docx"
 STORED_PDF = "pipelex-storage://org/uploads/brief.pdf"
 MARKDOWN_BYTES = b"# Brief\n\nNothing a sniffer can recognise."
+
+
+def _late_entry_docx_bytes() -> bytes:
+    """A Word file whose `word/` entry comes after the entries the sniffer looks at, so its bytes show only a zip."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for entry_name in (
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "docProps/app.xml",
+            "docProps/core.xml",
+            "docProps/custom.xml",
+            "customXml/item1.xml",
+        ):
+            archive.writestr(entry_name, "<xml/>")
+        archive.writestr("word/document.xml", "<w:document/>")
+    return buffer.getvalue()
+
+
+LATE_ENTRY_DOCX_BASE64 = base64.b64encode(_late_entry_docx_bytes()).decode("ascii")
 
 
 class _CallCountingLLMWorker(LLMWorkerAbstract):
@@ -116,5 +139,22 @@ class TestLLMWorkerDocumentFormat:
     async def test_a_readable_or_unknown_format_reaches_the_provider(self, document: PromptDocument):
         worker = _make_worker(inputs=["text", "pdf", "docx"])
 
+        assert await worker.gen_text(llm_job=_make_llm_job(user_documents=[document])) == "answer"
+        assert worker.nb_provider_calls == 1
+
+    @pytest.mark.parametrize(
+        ("uri", "mime_type"),
+        [
+            (f"data:application/octet-stream;base64,{LATE_ENTRY_DOCX_BASE64}", DOCX_MIME),
+            (f"data:{DOCX_MIME};base64,{LATE_ENTRY_DOCX_BASE64}", None),
+        ],
+        ids=["type-stamped-at-setup", "type-declared-by-the-data-url"],
+    )
+    async def test_an_inline_word_file_seen_only_as_a_zip_keeps_its_declared_type(self, uri: str, mime_type: str | None):
+        """Run setup knew this file as Word from its declared type; the worker must not re-identify it as a zip and refuse it mid-run."""
+        worker = _make_worker(inputs=["text", "pdf", "docx"])
+        document = PromptDocumentFactory.make_prompt_document(uri=uri, mime_type=mime_type)
+
+        assert document.known_mime_type() == DOCX_MIME
         assert await worker.gen_text(llm_job=_make_llm_job(user_documents=[document])) == "answer"
         assert worker.nb_provider_calls == 1
