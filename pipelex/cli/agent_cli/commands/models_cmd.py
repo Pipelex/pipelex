@@ -13,7 +13,7 @@ from pipelex.pipelex import Pipelex
 def agent_models_cmd(
     model_type: Annotated[
         list[ModelCategory] | None,
-        typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen, search"),
+        typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen, search, judgment"),
     ] = None,
     backend: Annotated[
         str | None,

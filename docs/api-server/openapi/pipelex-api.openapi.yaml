@@ -2,8 +2,8 @@
 openapi: 3.1.0
 info:
   title: Pipelex API
-  summary: The source-available Pipelex runner — implements MTHDS Protocol v0.6.0.
-  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v0.6.0 (`POST /execute`, `POST /start`, `POST
+  summary: The source-available Pipelex runner — implements MTHDS Protocol v0.7.0.
+  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v0.7.0 (`POST /execute`, `POST /start`, `POST
     /validate`, `GET /models`, `GET /version` — marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve
     and codegen (`/resolve`, `/codegen`), build tooling (`/build/*`), and editor tooling (`/lint`, `/format`). Contract layering:
     MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API. All endpoints are served under the `/v1` base path; every
@@ -1405,9 +1405,9 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
-          description: 'Filter by model category: llm, extract, img_gen, search. Single value (protocol arity).'
+          description: 'Filter by model category: llm, extract, img_gen, search, judgment. Single value (protocol arity).'
           title: Type
-        description: 'Filter by model category: llm, extract, img_gen, search. Single value (protocol arity).'
+        description: 'Filter by model category: llm, extract, img_gen, search, judgment. Single value (protocol arity).'
       responses:
         '200':
           description: Successful Response
@@ -4154,8 +4154,23 @@ components:
       - extract
       - img_gen
       - search
+      - judgment
       title: ModelCategory
-      description: Model categories accepted by the protocol's `GET /models?type=` filter.
+      description: 'The protocol''s model categories: what a deck entry''s `type` reports and the `GET /models?type=` filter
+        accepts.
+
+
+        A category is a settings family of the language — the inline settings a model
+
+        serves, and so the pipes that can name it: `llm` (`LLMSetting`, named by
+
+        `PipeLLM` and `PipeStructure`), `extract` (`ExtractSetting`, `PipeExtract`),
+
+        `img_gen` (`ImgGenSetting`, `PipeImgGen`), `search` (`SearchSetting`,
+
+        `PipeSearch`) and `judgment` (`JudgmentSetting`, `PipeJudge`). A settings
+
+        family the standard adds brings a category in the next protocol minor.'
     ModelInfo:
       properties:
         name:
@@ -4164,13 +4179,34 @@ components:
         type:
           anyOf:
           - $ref: '#/components/schemas/ModelCategory'
+          - type: string
           - type: 'null'
+          title: Type
       additionalProperties: true
       type: object
       required:
       - name
       title: ModelInfo
-      description: One entry of the model deck (`ModelDeck.models[]`) — base fields + extensions.
+      description: 'One entry of the model deck (`ModelDeck.models[]`) — base fields + extensions.
+
+
+        `type` is an open read of the entry''s category, under the protocol''s reader
+
+        rule: "A client reading a model list MUST NOT fail it because an entry carries
+
+        a category it does not recognize; it keeps that entry with its raw value or
+
+        leaves it out." This package keeps it: a category it knows reads as its
+
+        `ModelCategory` member, and one it does not — a category a runner of a later
+
+        protocol minor reports — keeps its raw string, so a consumer handles the
+
+        `str` case rather than the whole deck failing. The union is validated left to
+
+        right on purpose: pydantic''s default smart mode would keep every string,
+
+        known or not, as a plain `str`.'
     ModelReference:
       type: string
     ModelReferenceKind:

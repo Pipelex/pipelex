@@ -163,8 +163,9 @@ class TestBuildAndAgentRoutes:
         # per-category payload caused in the SDK — F2) plus this implementation's routing
         # extensions, keyed by category (the same alias name exists in several categories —
         # a flat map would silently drop entries on collision). The old raw keys (`presets`
-        # by category, `success`) are gone. The flat list speaks the protocol's categories only,
-        # while the extensions are keyed by every category this runtime serves, `judgment` included.
+        # by category, `success`) are gone. Every entry of the flat list is typed by one of the
+        # protocol's categories, `judgment` among them, and never by a value the protocol does not
+        # define; the extensions are keyed by the categories this runtime serves.
         client = _build_client()
         response = client.get("/v1/models")
         assert response.status_code == 200, response.text

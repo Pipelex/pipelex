@@ -18,7 +18,7 @@ async def get_models(
     request: Request,
     model_type: Annotated[
         str | None,
-        Query(alias="type", description="Filter by model category: llm, extract, img_gen, search. Single value (protocol arity)."),
+        Query(alias="type", description="Filter by model category: llm, extract, img_gen, search, judgment. Single value (protocol arity)."),
     ] = None,
 ) -> PipelexModelDeck:
     """List the model deck this runner can route to (MTHDS Protocol `GET /models`).
