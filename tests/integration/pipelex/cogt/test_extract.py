@@ -2,11 +2,13 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
+from pipelex.cogt.exceptions import ExtractInputFormatError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.runtime_hub import get_extract_worker
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.misc.filetype_utils import format_key_from_mime_type
 from tests.cases import DocumentTestCases, ImageTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
@@ -16,7 +18,7 @@ from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 @pytest.mark.asyncio(loop_scope="class")
 @pytest.mark.filterwarnings("ignore:Accessing the 'model_fields' attribute on the instance is deprecated:DeprecationWarning")
 class TestExtract:
-    @pytest.mark.parametrize("file_path", DocumentTestCases.DOCUMENT_FILE_PATHS)
+    @pytest.mark.parametrize("file_path", DocumentTestCases.PDF_FILE_PATHS)
     async def test_extract_pdf_path(
         self,
         generated_content_factory: GeneratedContentFactory,
@@ -47,6 +49,38 @@ class TestExtract:
         assert page_contents
         for page_index, page_content in enumerate(page_contents):
             pretty_print(page_content, title=f"Page {page_index}")
+
+    @pytest.mark.parametrize(("file_path", "mime_type", "expected_phrase"), DocumentTestCases.NON_PDF_DOCUMENT_CASES)
+    async def test_extract_non_pdf_document(
+        self,
+        job_metadata: JobMetadata,
+        extract_combo: ModelCombo,
+        extract_job_params: ExtractJobParams,
+        file_path: str,
+        mime_type: str,
+        expected_phrase: str,
+    ):
+        """A model declaring the document's format extracts it; any other refuses it before the provider call."""
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
+        if extract_job_params.should_caption_images and not extract_worker.is_caption_supported:
+            msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
+            pytest.skip(msg)
+        if not (extract_worker.is_pdf_supported or extract_worker.is_web_page_supported):
+            msg = f"Document extraction is not supported for this extract worker: '{extract_worker.desc}'"
+            pytest.skip(msg)
+        extract_job = ExtractJobFactory.make_extract_job(
+            extract_input=ExtractInput(document_uri=file_path, mime_type=mime_type, input_name="document"),
+            extract_job_params=extract_job_params,
+            job_metadata=job_metadata,
+        )
+        format_key = format_key_from_mime_type(mime_type=mime_type)
+        if format_key not in extract_worker.inference_model.readable_formats_for_extract:
+            with pytest.raises(ExtractInputFormatError, match="Input 'document' is"):
+                await extract_worker.extract_pages(extract_job=extract_job)
+            return
+        extract_output = await extract_worker.extract_pages(extract_job=extract_job)
+        extracted_text = "\n".join(page.text or "" for page in extract_output.pages.values())
+        assert expected_phrase in extracted_text
 
     @pytest.mark.parametrize("url", DocumentTestCases.DOCUMENT_URLS)
     async def test_extract_pdf_url(
@@ -163,7 +197,7 @@ class TestExtract:
         for page_index, page_content in enumerate(page_contents):
             pretty_print(page_content, title=f"Page {page_index}")
 
-    @pytest.mark.parametrize("file_path", DocumentTestCases.DOCUMENT_FILE_PATHS)
+    @pytest.mark.parametrize("file_path", DocumentTestCases.PDF_FILE_PATHS)
     async def test_extract_image_save(
         self,
         job_metadata: JobMetadata,

@@ -648,19 +648,30 @@ class GcpLogSink(LogSink):
         return handler
 
 
-def _credentials_source(*, config: GcpLogSinkConfig) -> str:
-    """The credentials the sink authenticates with, as a sentence names them."""
+def _credentials_source(*, config: GcpLogSinkConfig, credentials_file_path_placeholder: str | None) -> str:
+    """The credentials the sink authenticates with, as a sentence names them, with the placeholder the path came from."""
     if config.credentials_file_path is None:
         return "the Application Default Credentials"
+    if credentials_file_path_placeholder is not None:
+        return f"the service-account key at '{config.credentials_file_path}' (resolved from '{credentials_file_path_placeholder}')"
     return f"the service-account key at '{config.credentials_file_path}'"
 
 
-def _credentials_remedy(*, config: GcpLogSinkConfig) -> str:
-    """What renews the credentials, for the error that stops the boot."""
+def _credentials_remedy(*, config: GcpLogSinkConfig, credentials_file_path_placeholder: str | None) -> str:
+    """What renews the credentials, for the error that stops the boot.
+
+    A path that came from a placeholder is fixed where the variable is set, not in the TOML, so the
+    remedy says so.
+    """
     if config.credentials_file_path is None:
         return (
             "Renew them (`gcloud auth application-default login` on a workstation, or the service account the machine runs as "
             "on Google Cloud), or point `credentials_file_path` in [runtime.log.gcp] at a valid service-account key"
+        )
+    if credentials_file_path_placeholder is not None:
+        return (
+            f"Point the variable that `credentials_file_path` in [runtime.log.gcp] names, '{credentials_file_path_placeholder}', "
+            "at a valid service-account key where it is set"
         )
     return "Point `credentials_file_path` in [runtime.log.gcp] at a valid service-account key"
 
@@ -710,8 +721,12 @@ def confirm_credentials_at_boot(*, credentials_check: GcpCredentialsCheck, remed
     )
 
 
-def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
+def make_gcp_log_sink(*, config: GcpLogSinkConfig, credentials_file_path_placeholder: str | None = None) -> GcpLogSink:
     """Build the sink that writes to Cloud Logging through the client library's background thread.
+
+    ``config`` carries the key path already resolved; ``credentials_file_path_placeholder`` is the
+    ``${…}`` spelling it was resolved from, when it was one, which the credential errors name beside
+    the path so that a reader knows to fix the variable rather than the TOML.
 
     Where the dependency is paid for: the client library is imported here, so a process that selected
     another sink never loads it, and one that selected this sink without the extra fails here, at
@@ -750,8 +765,8 @@ def make_gcp_log_sink(*, config: GcpLogSinkConfig) -> GcpLogSink:
             message=msg,
         ) from exc
 
-    source = _credentials_source(config=config)
-    remedy = _credentials_remedy(config=config)
+    source = _credentials_source(config=config, credentials_file_path_placeholder=credentials_file_path_placeholder)
+    remedy = _credentials_remedy(config=config, credentials_file_path_placeholder=credentials_file_path_placeholder)
     client: Any
     if config.credentials_file_path is not None:
         # The key is loaded apart from the client, so that the catch covers the file and nothing else: a

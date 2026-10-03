@@ -132,6 +132,60 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         return await asyncio.to_thread(self._load_with_metadata_sync, key)
 
+    def _load_head_sync(self, key: str, *, nb_bytes: int) -> bytes:
+        """Synchronous implementation of the head read for use with to_thread.
+
+        Args:
+            key: Storage key (without scheme prefix).
+            nb_bytes: How many leading bytes to read.
+
+        Returns:
+            At most `nb_bytes` leading bytes of the object.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        bucket = self._get_bucket()
+
+        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            GoogleAPIError,
+            NotFound,
+            RequestRangeNotSatisfiable,
+        )
+
+        try:
+            blob = bucket.blob(key)
+            # The end offset is inclusive.
+            data: bytes = blob.download_as_bytes(start=0, end=nb_bytes - 1)
+            return data[:nb_bytes]
+        except NotFound as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Object not found in GCS: '{key}'"
+            raise StorageFileNotFoundError(msg) from exc
+        except RequestRangeNotSatisfiable:  # pyright: ignore[reportUnknownVariableType]
+            # GCS refuses any range over an empty object: its head is empty.
+            return b""
+        except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to load object from GCS: '{key}': {exc}"
+            raise StorageGcpError(msg) from exc
+
+    @override
+    async def _load_head(self, key: str, *, nb_bytes: int) -> bytes:
+        """Load the first bytes of a GCS object with a ranged download, instead of the whole object.
+
+        Args:
+            key: Storage key (without scheme prefix).
+            nb_bytes: How many leading bytes to read. An object shorter than this is read whole.
+
+        Returns:
+            At most `nb_bytes` leading bytes of the object.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        return await asyncio.to_thread(self._load_head_sync, key, nb_bytes=nb_bytes)
+
     def _store_sync(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Synchronous implementation of store for use with to_thread.
 

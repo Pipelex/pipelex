@@ -18,6 +18,7 @@ from pipelex.cli.commands.doctor_cmd import (
     PendingMigrationsCheck,
     PendingMigrationsFinding,
     PluginsCheck,
+    SecretsProviderCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     check_backend_credentials,
@@ -133,6 +134,12 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     if plugins_check is not None:
         lines.append(f"\n## Plugins \u2014 {_status_icon(healthy=plugins_check['healthy'])}\n")
         lines.append(plugins_check["message"])
+
+    # Secrets Provider, present only when the runtime setup ran
+    secrets_provider_check = checks.get("secrets_provider")
+    if secrets_provider_check is not None:
+        lines.append(f"\n## Secrets Provider \u2014 {_status_icon(healthy=secrets_provider_check['healthy'])}\n")
+        lines.append(secrets_provider_check["message"])
 
     # Log Sink, present only when the runtime setup ran
     log_sink_check = checks.get("log_sink")
@@ -269,11 +276,13 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
         backend_file_reports: dict[str, BackendFileReport]
         log_sink_check: LogSinkCheck | None = None
         plugins_check: PluginsCheck | None = None
+        secrets_provider_check: SecretsProviderCheck | None = None
         if config_healthy:
             try:
                 runtime_setup = setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
                 log_sink_check = runtime_setup.log_sink
                 plugins_check = runtime_setup.plugins
+                secrets_provider_check = runtime_setup.secrets_provider
                 # Pin discipline BEFORE check_models. setup_doctor_runtime uses
                 # log.configure_if_unset(), which no-ops when a prior process already configured
                 # logging (embedded reuse, interleaved tests) — in that case AGENT_CLI_STDERR_LOG_FIELDS
@@ -281,7 +290,9 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
                 # apply_agent_cli_output_discipline mutates the existing handler unconditionally via
                 # log.redirect_to_stderr, closing that window before any check fires.
                 apply_agent_cli_output_discipline()
-                models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
+                models_healthy, models_message, backend_file_reports = check_models(
+                    secrets_provider=runtime_setup.built_secrets_provider, config_dir=config_dir
+                )
             except PipelexConfigError as exc:
                 # A config can pass check_config_files's shape check and still fail full validation
                 # inside setup_doctor_runtime (e.g. a layered override file). Surface the translated
@@ -313,6 +324,7 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
         and models_healthy
         and (log_sink_check is None or log_sink_check.is_healthy)
         and (plugins_check is None or plugins_check.is_healthy)
+        and (secrets_provider_check is None or secrets_provider_check.is_healthy)
     )
 
     # Build backend credential details
@@ -376,6 +388,10 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
         recommended_actions.append(
             "Fix, upgrade or uninstall the plugin the plugins check names, or take a core plugin out of runtime.plugins.disabled"
         )
+    if secrets_provider_check is not None and not secrets_provider_check.is_healthy:
+        recommended_actions.append(
+            "Set 'method' in [runtime.secrets] to a registered secrets provider, or fix what the secrets_provider check says stopped it"
+        )
     if log_sink_check is not None and not log_sink_check.is_healthy:
         recommended_actions.append("Set 'sink' in [runtime.log] to a registered log sink, or fix what the log_sink check says stopped it")
 
@@ -416,6 +432,8 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
     }
     if plugins_check is not None:
         result["checks"]["plugins"] = {"healthy": plugins_check.is_healthy, "message": plugins_check.message}
+    if secrets_provider_check is not None:
+        result["checks"]["secrets_provider"] = {"healthy": secrets_provider_check.is_healthy, "message": secrets_provider_check.message}
     if log_sink_check is not None:
         result["checks"]["log_sink"] = {"healthy": log_sink_check.is_healthy, "message": log_sink_check.message}
 

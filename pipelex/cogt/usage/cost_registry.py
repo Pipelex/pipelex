@@ -158,7 +158,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             raise CostRegistryError(msg)
 
         # The CSV report is written first because it is the output that does not need Rich, the `cli` extra.
-        # Rendering the console table ahead of it would make a process without the extra lose both: the caller
+        # Rendering the console table ahead of it would make a process without Rich lose both: the caller
         # downgrades the missing-dependency error to a warning, so the loss would be silent.
         if cost_report_file_path:
             cls.save_to_csv(records, file_path=cost_report_file_path)

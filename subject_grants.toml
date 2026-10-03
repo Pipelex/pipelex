@@ -4608,6 +4608,10 @@ rationale = "Verb-object: loads the given library dirs; options stay keyword."
 param = "pipe"
 rationale = "Verb-object: prepares the job for the pipe; job fields stay keyword."
 
+["pipelex/pipeline/file_input_consumers.py::collect_file_input_consumers"]
+param = "entry_pipe"
+rationale = "Collects the file input consumers of the entry pipe, its single operand."
+
 ["pipelex/pipeline/fixes/applicability.py::is_safe_fix_for_load_scope"]
 param = "fix"
 rationale = "Predicate on the fix; is_single_file is context."
@@ -4776,29 +4780,21 @@ rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring bu
 param = "pipes"
 rationale = "The output twin of build_input_form; the two are called side by side and must read alike."
 
-["pipelex/pipeline/input_normalizer.py::_normalize_list"]
-param = "items"
-rationale = "Verb-object: normalizes the items; context stays keyword."
+["pipelex/pipeline/input_normalizer.py::_load_local_head"]
+param = "local_path"
+rationale = "Reads the head of the local file, its single operand."
 
-["pipelex/pipeline/input_normalizer.py::_normalize_list_content"]
-param = "list_content"
-rationale = "Verb-object: normalizes the list content; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::_normalize_structured_content"]
-param = "structured_content"
-rationale = "Verb-object: normalizes the structured content; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::_normalize_url_content"]
-param = "content"
-rationale = "Verb-object: normalizes the content; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::_normalize_value"]
-param = "value"
-rationale = "Verb-object: normalizes the value; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::normalize_data_urls_to_storage"]
+["pipelex/pipeline/input_normalizer.py::collect_file_inputs"]
 param = "working_memory"
-rationale = "Verb-object: rewrites data URLs within the working memory; single operand."
+rationale = "Reads the file inputs out of the working memory, its single operand."
+
+["pipelex/pipeline/input_normalizer.py::format_file_input_path"]
+param = "path"
+rationale = "Renders the file input path, its single operand."
+
+["pipelex/pipeline/input_normalizer.py::prepare_file_inputs"]
+param = "working_memory"
+rationale = "Verb-object: prepares the file inputs within the working memory; single operand."
 
 ["pipelex/pipeline/liftable_pipes.py::build_liftable_pipes"]
 param = "taint_analyses"
@@ -7072,6 +7068,10 @@ rationale = "Positional-Callable re.sub repl: match is the single operand re pas
 param = "key"
 rationale = "Keyed accessor by the key; single operand."
 
+["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_head_sync"]
+param = "key"
+rationale = "Keyed accessor by the storage key, called positionally through asyncio.to_thread."
+
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_with_metadata_sync"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -7096,6 +7096,10 @@ rationale = "Factory from source: builds the result from the key; single operand
 param = "key"
 rationale = "Keyed accessor by the key; single operand."
 
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_head"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand."
+
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_with_metadata"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -7109,6 +7113,10 @@ param = "uri"
 rationale = "Keyed accessor by the uri; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load"]
+param = "uri"
+rationale = "Keyed accessor by the uri; single operand."
+
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_head"]
 param = "uri"
 rationale = "Keyed accessor by the uri; single operand."
 

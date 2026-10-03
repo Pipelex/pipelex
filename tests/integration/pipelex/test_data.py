@@ -159,7 +159,7 @@ class PipeExtractTestCases:
         ImageTestCases.IMAGE_FILE_PATH_PNG_2,
         ImageTestCases.IMAGE_URL_PNG,
     ]
-    PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = DocumentTestCases.DOCUMENT_FILE_PATHS + DocumentTestCases.DOCUMENT_URLS
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = DocumentTestCases.PDF_FILE_PATHS + DocumentTestCases.DOCUMENT_URLS
 
 
 class ImageGenTestCases:

@@ -27,8 +27,8 @@ Here are all the native concepts you can use out of the box:
 |-----------------|-------------|---------------------|
 | `Text` | A text | `TextContent` |
 | `Markdown` | A text written in Markdown, which refines `Text` | `MarkdownContent` |
-| `Image` | An image | `ImageContent` |
-| `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
+| `Image` | An image file | `ImageContent` |
+| `Document` | A document: PDF, Office (Word, PowerPoint, Excel), web page, or a text file such as Markdown or CSV | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
 | `YesNo` | The answer to a yes/no question | `YesNoContent` |
@@ -155,15 +155,17 @@ class ImageContent(StuffContent):
 - `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes, passed alone, in a list or in a structured field: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
 - `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
-- `mime_type`: Optional MIME type of the image
+- `mime_type`: The MIME type of the image. For every image input, the runtime sets it at the start of the run from the file's own bytes, which win over a declared type (see [File formats are checked before the run](#file-formats-are-checked-before-the-run))
 - `width` / `height`: Pixel dimensions — present together or not at all
 - `filename`: Optional original filename
 
 **Use for:** Photos, generated images, diagrams, screenshots.
 
+An `Image` must hold an image file, such as PNG, JPEG or WebP. A run whose `Image` input, or an input of a concept refining `Image`, holds a file whose bytes say it is something else, a PDF for one, is refused before it starts. A scanned letter that arrives as a PDF belongs in a `Document` input.
+
 ### DocumentContent
 
-Represents a document (PDF, DOCX, PPTX, etc.):
+Represents a document: a PDF, an Office file (Word, PowerPoint, Excel), a web page, or a text file such as Markdown, CSV, plain text, WebVTT captions or an email message.
 
 ```python
 class DocumentContent(StuffContent):
@@ -179,12 +181,29 @@ class DocumentContent(StuffContent):
 
 - `url`: Location of the document file, storage URL, or web page URL
 - `public_url`: A URL a viewer can open, filled by the runtime for every document input it normalizes, exactly as for `ImageContent`: the storage provider's link for a stored file, which expires when signed URLs are configured, and the URL itself for an `http(s)` one
-- `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+- `mime_type`: The MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"). For every document input, the runtime sets it at the start of the run from the file's own bytes, and keeps the declared type only when the bytes do not identify the file, as for plain text, Markdown or HTML
 - `filename`: Optional filename of the document
 - `title`: Optional title of the document or source
 - `snippet`: Optional text snippet or excerpt from the document
 
 **Use for:** Contracts, invoices, reports, presentations, web pages, search source citations, any document file.
+
+Which document formats a method can take depends on the models that read them: a `PipeExtract` step reads the formats its extract model declares, and a `PipeLLM` step the document formats its model declares. A Word document works with an extract model that reads Word files, and fails with one that reads only PDF.
+
+### File formats are checked before the run
+
+At the start of every run, before any pipe runs, the runtime establishes the format of each image and document input, including the items of a list and the fields of a structured input:
+
+- A file given as a `data:` URL, a local path or a `pipelex-storage://` reference is identified from its first bytes. The identified type replaces any declared one, so a `data:image/png` URL holding a PDF is a PDF. An Office file whose bytes show only that it is a zip archive is known by its declared type or by its file name's extension (`.docx`, `.pptx`, `.xlsx`), and otherwise its format is unknown.
+- A file the bytes do not identify, such as plain text, Markdown, CSV or HTML, keeps the type it was declared with.
+- An `http(s)` URL is not fetched before the run, so its format is the type it was declared with, and only that type is checked. An `http(s)` URL with no declared type is not checked: the provider receives it as it is.
+
+The run is then refused, with an input error naming the input, when:
+
+- an `Image` input holds a file that is not an image, whatever reads it;
+- a document input is certain to reach a step whose model does not read its format: for example, Word transcripts batched into a `PipeExtract` whose extract model reads only PDF. The error names each input, its format, the step, the model and the formats that model reads.
+
+A step reached only through a `PipeCondition`, or a step that may be skipped because an optional input is absent, may never run, so the run is not refused on its account. If it does run, it refuses the file itself, with the same kind of input error. The same holds for files a run produces along the way.
 
 ### NumberContent
 

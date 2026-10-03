@@ -94,6 +94,36 @@ class StorageProviderAbstract(ABC):
             StoredData containing bytes and optional MIME type.
         """
 
+    async def load_head(self, uri: str, *, nb_bytes: int) -> bytes:
+        """Load the first bytes of a stored object, which is all identifying its format needs.
+
+        Args:
+            uri: Full URI including PIPELEX_STORAGE_SCHEME prefix.
+            nb_bytes: How many leading bytes to read. An object shorter than this is read whole.
+
+        Returns:
+            At most `nb_bytes` leading bytes of the object.
+        """
+        key = self._strip_scheme(uri)
+        return await self._load_head(key, nb_bytes=nb_bytes)
+
+    async def _load_head(self, key: str, *, nb_bytes: int) -> bytes:
+        """Load the first bytes of an object by key.
+
+        This default loads the whole object and slices it, so a provider that cannot read a byte
+        range, an external storage plugin included, keeps working unchanged. A provider that can
+        read a range overrides it.
+
+        Args:
+            key: Storage key (without scheme prefix).
+            nb_bytes: How many leading bytes to read.
+
+        Returns:
+            At most `nb_bytes` leading bytes of the object.
+        """
+        stored_data = await self._load_with_metadata(key)
+        return stored_data.data[:nb_bytes]
+
     async def store(self, data: bytes, *, key: str, content_type: str | None = None) -> str:
         """Store data and return full URI with scheme.
 

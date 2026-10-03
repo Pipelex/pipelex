@@ -189,7 +189,7 @@ class TestExecutionSeams:
         try:
             assert qualified_main_pipe is not None
             pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
-            normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
+            normalize_spy = mocker.spy(execution_seams_module, "prepare_file_inputs")
             normalize_config = (
                 get_config()
                 .interpreter.pipeline_execution.with_execution_overrides(
@@ -236,7 +236,7 @@ class TestExecutionSeams:
         try:
             assert qualified_main_pipe is not None
             pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
-            normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
+            normalize_spy = mocker.spy(execution_seams_module, "prepare_file_inputs")
             normalize_config = (
                 get_config()
                 .interpreter.pipeline_execution.with_execution_overrides(

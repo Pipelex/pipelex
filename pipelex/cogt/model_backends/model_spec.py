@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 from pydantic import Field
 
@@ -9,10 +9,17 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedCons
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.tools.misc.filetype_utils import IMAGE_FORMAT_KEY
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
 if TYPE_CHECKING:
     from instructor import Mode as InstructorMode
+
+
+# The file formats a model spec's `inputs` may declare, as the format keys every format check compares
+# (see `format_key_from_mime_type`). An LLM's vision flag stays spelled `images`, outside this vocabulary.
+_EXTRACT_FILE_FORMATS: Final[frozenset[str]] = frozenset({"pdf", "docx", "pptx", "xlsx", "html", "md", "csv", "txt", "vtt", "eml", IMAGE_FORMAT_KEY})
+_LLM_DOCUMENT_FORMATS: Final[frozenset[str]] = frozenset({"pdf", "docx", "pptx", "xlsx", "html"})
 
 
 class InferenceModelSpec(ConfigModel):
@@ -68,10 +75,18 @@ class InferenceModelSpec(ConfigModel):
         return "captions" in self.outputs
 
     @property
+    def readable_formats_for_extract(self) -> set[str]:
+        """The file formats this extractor reads, as format keys: its declared pdf, docx, pptx, xlsx, html, md, csv, txt, vtt, eml and image.
+
+        `web_page` is not among them: a web-page model fetches its page itself, from a URL, so it is
+        not a format a file is checked against.
+        """
+        return set(self.inputs) & _EXTRACT_FILE_FORMATS
+
+    @property
     def supported_document_types(self) -> set[str]:
-        """Return set of supported document types (pdf, docx, pptx) from inputs."""
-        document_types = {"pdf", "docx", "pptx"}
-        return document_types & set(self.inputs)
+        """The document formats this LLM reads, as format keys: its declared pdf, docx, pptx, xlsx and html."""
+        return set(self.inputs) & _LLM_DOCUMENT_FORMATS
 
     @property
     def is_document_supported(self) -> bool:
