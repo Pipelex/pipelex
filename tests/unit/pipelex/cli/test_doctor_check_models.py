@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 # The provider the doctor's runtime setup built from ``[runtime.secrets]``: what the backends resolve their credentials through.
 SECRETS_PROVIDER = EnvSecretsProvider()
+VAULT_TOKEN = "hvs.models-row-token-0123456789"
 
 
 class TestCheckModels:
@@ -282,3 +283,28 @@ class TestCheckModels:
         assert reports == {}
         check_backend_files.assert_not_called()
         models_manager.setup.assert_not_called()
+
+    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    def test_a_provider_failing_on_a_lookup_is_a_row_finding_quoted_redacted(self, models_manager: Any) -> None:
+        """An external provider may raise anything on a lookup: the row reports it, scrubbed, instead of the doctor stopping."""
+        models_manager.setup.side_effect = ConnectionError(f"vault unreachable; request headers had Authorization: Bearer {VAULT_TOKEN}")
+
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
+
+        assert healthy is False
+        assert message.startswith("Error checking models: the setup failed on a ConnectionError: vault unreachable")
+        assert "Authorization: Bearer [REDACTED]" in message
+        assert VAULT_TOKEN not in message
+
+    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    def test_a_credentials_error_quoting_the_providers_text_is_redacted_in_the_row(self, models_manager: Any) -> None:
+        """The loader copies a provider's not-found text into its own error, so the row scrubs a Pipelex error too."""
+        models_manager.setup.side_effect = ModelDeckValidationError(
+            f"Could not get variable 'KEY': vault said no to Authorization: Bearer {VAULT_TOKEN}"
+        )
+
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
+
+        assert healthy is False
+        assert "Authorization: Bearer [REDACTED]" in message
+        assert VAULT_TOKEN not in message

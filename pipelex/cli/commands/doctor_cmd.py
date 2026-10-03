@@ -1517,6 +1517,9 @@ def check_models(
             backend_file_reports,
         )
 
+    # The setup reaches the backends' credentials through the configured provider, so a failure it quotes may
+    # carry that provider's own text; the row quotes it scrubbed, like the secrets provider row.
+    log_config = get_config().runtime.log
     models_manager = ModelManager()
     try:
         models_manager.setup(
@@ -1539,7 +1542,7 @@ def check_models(
             if _is_error_about_backend(exc=exc, backend_name=backend_name, backend_file_path=backend_file_report.file_path):
                 backend_file_report.is_valid = False
                 backend_file_report.error_message = error_str
-        return False, f"Error checking models: {exc}", backend_file_reports
+        return False, f"Error checking models: {redacted_failure(exc=exc, log_config=log_config)}", backend_file_reports
     except (
         RoutingProfileLibraryNotFoundError,
         InferenceBackendLibraryNotFoundError,
@@ -1552,7 +1555,15 @@ def check_models(
         GatewayUnknownModelError,
         PluginModelDeclarationError,
     ) as exc:
-        return False, f"Error checking models: {exc}", backend_file_reports
+        return False, f"Error checking models: {redacted_failure(exc=exc, log_config=log_config)}", backend_file_reports
+    except Exception as exc:  # ruff: ignore[blind-except]
+        # Doctor probe: an external secrets provider may raise anything on a lookup, an unreachable vault or
+        # an SDK it imports at use. Boot stops on it; the doctor reports it in this row and goes on.
+        return (
+            False,
+            f"Error checking models: the setup failed on a {type(exc).__name__}: {redacted_failure(exc=exc, log_config=log_config)}",
+            backend_file_reports,
+        )
 
     return True, "Models are valid", backend_file_reports
 

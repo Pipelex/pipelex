@@ -83,7 +83,7 @@ registrar.add_secrets_provider(method="vault", factory=_make_vault_secrets_provi
 The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
 
 - **Import-light.** The plugin module must import no backend SDK at module load. The built-in `SecretsPlugin` needs none (the `env` provider reads environment variables); an out-of-tree `pipelex-secrets-vault` plugin must keep its `hvac`/`boto3`/etc. import *inside* the provider's methods (or its factory), never at module top-level, so discovery stays import-light even when the extra is installed.
-- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
+- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected. `pipelex doctor` resolves the backends' credentials through the provider the configuration selects, so a lookup that raises, whatever the exception, is reported in its Models row, scrubbed with the log redaction patterns, rather than stopping the report.
 
 ---
 
