@@ -413,6 +413,37 @@ class PipelineInputUrlInvalidError(PipelineInputContentError):
     )
 
 
+class PipelineInputFormatError(PipelineInputContentError):
+    """A file input's format is one its input slot, or the pipe that consumes it, cannot take.
+
+    Raised at run setup, after the setup established each file input's format from its bytes, so the
+    run is refused before any pipe spends anything on it. Caller-facing on purpose, and the flag spans
+    every child and every raise site: a message in this family carries only facts the caller supplied
+    (the input's path in the inputs, the file's identified type) or the method declares (a pipe, a
+    model, the formats that model reads), never a url, a storage key or a server-side reason.
+    """
+
+    _authors_caller_facing_message = True
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Give the input a file in a format the method can read.",
+    )
+
+
+class PipelineInputNotAnImageError(PipelineInputFormatError):
+    """An Image input holds a file whose bytes identify it as something other than an image.
+
+    Refused whatever will consume it: an Image holding a PDF is wrong for every consumer, so the check
+    needs no model. It fires only on a positive identification, so an image the sniffer cannot
+    identify, an SVG for one, is left to its consumer.
+    """
+
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Give an image file, such as PNG, JPEG or WebP, to every Image input.",
+    )
+
+
 class PipelineInputUrlMissingError(PipelineInputContentError):
     """An Image/Document input carries a blank url.
 

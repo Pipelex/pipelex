@@ -107,9 +107,10 @@ class TestFileFormatKeys:
         ("format_key", "expected"),
         [
             ("pdf", "a PDF document"),
-            ("docx", "a Word document (.docx)"),
-            ("pptx", "a PowerPoint presentation (.pptx)"),
-            ("xlsx", "an Excel workbook (.xlsx)"),
+            ("docx", "a Word document"),
+            ("pptx", "a PowerPoint presentation"),
+            ("xlsx", "an Excel workbook"),
+            ("doc", "a Word 97-2003 document"),
             ("html", "an HTML page"),
             ("image", "an image"),
             ("zip", "a .zip file"),

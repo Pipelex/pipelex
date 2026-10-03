@@ -110,12 +110,13 @@ class TestFileInputIdentification:
         full_load_spy.assert_not_called()
 
     async def test_a_png_data_url_holding_a_pdf_is_corrected_to_pdf(self, storage: LocalStorageProvider, tmp_path: Path):  # ruff: ignore[unused-method-argument]
-        memory = _memory(referral_letter=ImageContent(url=_data_url(mime_type="image/png", raw_bytes=PDF_BYTES)))
+        """In a Document slot the corrected type is stamped; in an Image slot the same file is refused (see the image check)."""
+        memory = _memory(referral_letter=DocumentContent(url=_data_url(mime_type="image/png", raw_bytes=PDF_BYTES)))
 
         await prepare_file_inputs(memory, storage_scope=STORAGE_SCOPE, read_scope=None, is_relocation_enabled=True)
 
         content = memory.get_stuff("referral_letter").content
-        assert isinstance(content, ImageContent)
+        assert isinstance(content, DocumentContent)
         assert content.mime_type == "application/pdf"
         assert content.url.startswith("pipelex-storage://test/scope/assets/")
         assert content.url.endswith(".pdf")

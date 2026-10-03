@@ -184,12 +184,12 @@ IMAGE_FORMAT_KEY: Final[str] = "image"
 
 _FORMAT_KEY_DESCRIPTIONS: Final[dict[str, str]] = {
     "pdf": "a PDF document",
-    "docx": "a Word document (.docx)",
-    "doc": "a Word 97-2003 document (.doc)",
-    "pptx": "a PowerPoint presentation (.pptx)",
-    "ppt": "a PowerPoint 97-2003 presentation (.ppt)",
-    "xlsx": "an Excel workbook (.xlsx)",
-    "xls": "an Excel 97-2003 workbook (.xls)",
+    "docx": "a Word document",
+    "doc": "a Word 97-2003 document",
+    "pptx": "a PowerPoint presentation",
+    "ppt": "a PowerPoint 97-2003 presentation",
+    "xlsx": "an Excel workbook",
+    "xls": "an Excel 97-2003 workbook",
     "html": "an HTML page",
     IMAGE_FORMAT_KEY: "an image",
 }
@@ -222,7 +222,10 @@ def format_key_from_mime_type(*, mime_type: str | None) -> str | None:
 
 
 def describe_format_key(*, format_key: str) -> str:
-    """A format key in plain words, for a message: `docx` → `a Word document (.docx)`."""
+    """A format key in plain words, for a message: `docx` → `a Word document`, `md` → `a .md file`.
+
+    The words carry no type: a message adds the extension or the MIME type that tells two keys apart.
+    """
     if description := _FORMAT_KEY_DESCRIPTIONS.get(format_key):
         return description
     return f"a .{format_key} file"

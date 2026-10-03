@@ -9,7 +9,7 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError
+from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, PromptImageFormatError
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
@@ -28,7 +28,7 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
-from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE
+from pipelex.tools.misc.filetype_utils import IMAGE_FORMAT_KEY, UNKNOWN_FILE_TYPE, describe_format_key, format_key_from_mime_type
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -433,6 +433,20 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             if nb_images > max_prompt_images:
                 msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
                 raise LLMCapabilityError(msg)
+
+            # Run setup refuses a non-image given to an Image input, but an image the run produced
+            # itself never went through setup: this is the line that catches it before the provider.
+            # Only a known format is refused; an unknown one is left to the provider.
+            for image_index, prompt_image in enumerate(llm_job.llm_prompt.user_images, start=1):
+                mime_type = prompt_image.known_mime_type()
+                format_key = format_key_from_mime_type(mime_type=mime_type)
+                if format_key is None or format_key == IMAGE_FORMAT_KEY:
+                    continue
+                msg = (
+                    f"Prompt image {image_index} given to model '{self.inference_model.name}' is "
+                    f"{describe_format_key(format_key=format_key)} ({mime_type}), not an image."
+                )
+                raise PromptImageFormatError(msg)
 
     def _check_document_support(self, llm_job: LLMJob):
         if not llm_job.llm_prompt.user_documents:
