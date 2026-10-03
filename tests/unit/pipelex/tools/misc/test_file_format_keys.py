@@ -126,6 +126,10 @@ class TestFileFormatKeys:
             ("application/octet-stream", "budget.xlsx", XLSX_MIME),
             (None, "notes.txt", None),
             (PPTX_MIME, "report.docx", PPTX_MIME),
+            ("application/zip", "report.docx", DOCX_MIME),
+            ("application/zip; charset=binary", "deck.pptx", PPTX_MIME),
+            ("application/zip", "archive.zip", "application/zip"),
+            (None, "archive.zip", "application/zip"),
         ],
     )
     def test_a_bare_zip_is_unknown_unless_its_declared_type_or_its_name_says_what_it_holds(

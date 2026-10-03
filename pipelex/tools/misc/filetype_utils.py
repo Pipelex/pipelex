@@ -296,9 +296,11 @@ def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None, fi
     formats, the declared type stands. No head (a file that was not read) keeps the declared type.
 
     A sniffed bare zip is the one identification that does not settle the format: it may be an
-    Office file whose identifying entry came late. A declared zip-based type says which, and so does
-    a file name whose extension is one; otherwise the format is unknown rather than a zip, so no
-    check refuses a valid Office file for the order of its entries.
+    Office file whose identifying entry came late. An Office or OpenDocument type says which, whether
+    it is declared or given by the file's name, and it wins over a bare zip from either source, so a
+    `report.docx` declared `application/zip` is a Word file. A bare zip, declared or named, is a zip.
+    Otherwise the format is unknown rather than a zip, so no check refuses a valid Office file for
+    the order of its entries.
 
     Args:
         head: The file's leading bytes, `None` when it was not read.
@@ -314,12 +316,11 @@ def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None, fi
     if sniffed.mime != _ZIP_MIME_TYPE:
         return sniffed.mime
     named_mime_type = _MIME_DB.guess_type(file_name, strict=True)[0] if file_name else None
-    for candidate_mime_type in (declared_mime_type, named_mime_type):
-        if candidate_mime_type is not None and _is_zip_based_mime_type(mime_type=candidate_mime_type):
+    candidate_mime_types = [mime_type for mime_type in (declared_mime_type, named_mime_type) if mime_type is not None]
+    for candidate_mime_type in candidate_mime_types:
+        if _base_mime_type(mime_type=candidate_mime_type).startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES):
+            return candidate_mime_type
+    for candidate_mime_type in candidate_mime_types:
+        if _base_mime_type(mime_type=candidate_mime_type) == _ZIP_MIME_TYPE:
             return candidate_mime_type
     return None
-
-
-def _is_zip_based_mime_type(*, mime_type: str) -> bool:
-    base_mime_type = _base_mime_type(mime_type=mime_type)
-    return base_mime_type == _ZIP_MIME_TYPE or base_mime_type.startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES)

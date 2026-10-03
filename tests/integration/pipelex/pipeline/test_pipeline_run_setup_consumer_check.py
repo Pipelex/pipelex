@@ -185,21 +185,26 @@ class TestPipelineRunSetupConsumerCheck:
         assert pipe_job.pipe.code == "extract_transcripts"
 
     @pytest.mark.parametrize(
-        ("pipe_code", "expected_refusal"),
+        ("pipe_code", "declared_mime_type", "expected_refusal"),
         [
-            ("extract_with_word_model", None),
+            ("extract_with_word_model", None, None),
+            ("extract_with_word_model", "application/zip", None),
             (
                 "extract_with_pdf_model",
+                None,
                 "Input 'transcript' is a Word document (.docx): pipe 'extract_with_pdf_model' extracts it with model 'pypdfium2-extract-pdf'",
             ),
         ],
     )
     async def test_a_word_file_the_sniffer_sees_only_as_a_zip_is_known_by_its_name(
-        self, tmp_path: Path, pipe_code: str, expected_refusal: str | None
+        self, tmp_path: Path, pipe_code: str, declared_mime_type: str | None, expected_refusal: str | None
     ):
-        """Given by path with no declared type, the file's `.docx` name says what the zip holds, so the model reading Word files takes it."""
+        """The file's `.docx` name says what the zip holds, even over a declared bare zip, so the model reading Word files takes it."""
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
         docx_path = _write_late_entry_docx(path=tmp_path / "interview.docx")
+        content: dict[str, str] = {"url": str(docx_path)}
+        if declared_mime_type is not None:
+            content["mime_type"] = declared_mime_type
         setup = pipeline_run_setup(
             storage_scope="test/scope",
             read_scope=None,
@@ -207,7 +212,7 @@ class TestPipelineRunSetupConsumerCheck:
             execution_config=execution_config,
             mthds_contents=[_SINGLE_TRANSCRIPT_MTHDS],
             pipe_code=pipe_code,
-            inputs={"transcript": {"concept": "native.Document", "content": {"url": str(docx_path)}}},
+            inputs={"transcript": {"concept": "native.Document", "content": content}},
         )
 
         if expected_refusal is None:
