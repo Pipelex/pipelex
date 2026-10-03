@@ -23,6 +23,7 @@ from pipelex.cli.commands.doctor_cmd import (
     PendingMigrationsCheck,
     PendingMigrationsFinding,
     PluginsCheck,
+    SecretsProviderCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
 )
@@ -34,6 +35,7 @@ from pipelex.tools.log.log import log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_sink import LogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
     finding=PendingMigrationsFinding.UP_TO_DATE,
@@ -43,7 +45,14 @@ NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
 
 HEALTHY_LOG_SINK = LogSinkCheck(is_healthy=True, message="Log sink 'console' installed")
 HEALTHY_PLUGINS = PluginsCheck(is_healthy=True, message="Plugins discovered and registered")
-HEALTHY_RUNTIME_SETUP = DoctorRuntimeSetup(log_sink=HEALTHY_LOG_SINK, plugins=HEALTHY_PLUGINS)
+HEALTHY_SECRETS_PROVIDER = SecretsProviderCheck(is_healthy=True, message="Secrets provider 'env' built")
+BUILT_SECRETS_PROVIDER = EnvSecretsProvider()
+HEALTHY_RUNTIME_SETUP = DoctorRuntimeSetup(
+    plugins=HEALTHY_PLUGINS,
+    secrets_provider=HEALTHY_SECRETS_PROVIDER,
+    log_sink=HEALTHY_LOG_SINK,
+    built_secrets_provider=BUILT_SECRETS_PROVIDER,
+)
 
 
 class _NullSink(LogSink):
@@ -141,6 +150,8 @@ class TestAgentDoctorCmd:
             return_value=DoctorRuntimeSetup(
                 log_sink=LogSinkCheck(is_healthy=False, message="No log sink is registered for 'jsn' in [runtime.log]; registered: console, json"),
                 plugins=HEALTHY_PLUGINS,
+                secrets_provider=HEALTHY_SECRETS_PROVIDER,
+                built_secrets_provider=BUILT_SECRETS_PROVIDER,
             ),
         )
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files", return_value=(True, 0, "All config files present"))
@@ -169,6 +180,10 @@ class TestAgentDoctorCmd:
                     is_healthy=False, message="The log sink 'json' could not be resolved because the plugin registry did not build"
                 ),
                 plugins=PluginsCheck(is_healthy=False, message="The plugin registry did not build: Plugin 'storage' is required by core"),
+                secrets_provider=SecretsProviderCheck(
+                    is_healthy=False, message="The secrets provider 'env' could not be resolved because the plugin registry did not build"
+                ),
+                built_secrets_provider=None,
             ),
         )
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files", return_value=(True, 0, "All config files present"))
@@ -186,6 +201,37 @@ class TestAgentDoctorCmd:
         assert parsed["checks"]["plugins"]["healthy"] is False
         assert "'storage'" in parsed["checks"]["plugins"]["message"]
         assert any("plugins check" in action for action in parsed["recommended_actions"])
+
+    def test_a_secrets_provider_that_did_not_build_rides_the_envelope_with_its_action(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime",
+            return_value=DoctorRuntimeSetup(
+                plugins=HEALTHY_PLUGINS,
+                secrets_provider=SecretsProviderCheck(is_healthy=False, message="The secrets provider 'vault' could not be built: unreachable"),
+                log_sink=LogSinkCheck(is_healthy=False, message="The log sink 'json' was not checked because the secrets provider did not build"),
+                built_secrets_provider=None,
+            ),
+        )
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files", return_value=(True, 0, "All config files present"))
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured"),
+        )
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials", return_value=(True, {}, "All backends healthy"))
+        mock_check_models = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_models", return_value=(True, "Models valid", {}))
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["all_healthy"] is False
+        assert parsed["checks"]["secrets_provider"] == {
+            "healthy": False,
+            "message": "The secrets provider 'vault' could not be built: unreachable",
+        }
+        assert any("[runtime.secrets]" in action for action in parsed["recommended_actions"])
+        assert mock_check_models.call_args.kwargs["secrets_provider"] is None
 
     @pytest.mark.parametrize(
         ("finding", "expected_action"),

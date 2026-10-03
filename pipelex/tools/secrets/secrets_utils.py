@@ -11,6 +11,10 @@ from pipelex.tools.secrets.exceptions import (
 )
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
+# A ``${…}`` placeholder: ``${VAR_NAME}``, ``${prefix:VAR_NAME}`` or ``${env:VAR|secret:VAR}``. Restricted so as not to
+# match across newlines, quotes or nested braces. Its one group is what sits between the braces.
+VAR_PLACEHOLDER_PATTERN = re.compile(r"\$\{([^}\n\"'$]+)\}")
+
 
 class VarPrefix(StrEnum):
     """Variable prefix types for variable substitution."""
@@ -83,10 +87,7 @@ def substitute_vars(
                 raise
             return match.group(0)  # Keep original placeholder
 
-    # Pattern matches ${VAR_NAME} or ${prefix:VAR_NAME} or ${env:VAR|secret:VAR}
-    # Restrict to not match across newlines, quotes, or nested braces
-    pattern = r"\$\{([^}\n\"'$]+)\}"
-    return re.sub(pattern, replace_var, content)
+    return VAR_PLACEHOLDER_PATTERN.sub(replace_var, content)
 
 
 def _handle_fallback_pattern(var_spec: str, *, secrets_provider: SecretsProviderAbstract) -> str:

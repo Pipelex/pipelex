@@ -196,13 +196,22 @@ def escape_control_characters(*, text: str) -> str:
     return CONTROL_CHARACTERS.sub(_escaped_control_character, text)
 
 
+def redaction_patterns(*, config: LogRedactionConfig) -> tuple[RedactionPattern, ...]:
+    """The shipped families followed by the patterns the configuration added, compiled.
+
+    The processor scrubs records with them, and so does any text that reaches a reader without passing
+    through a sink, ``pipelex doctor``'s rows for one, so that both remove the same things.
+    """
+    return SECRET_PATTERNS + tuple((re.compile(extra), REDACTED_TEXT) for extra in config.extra_patterns)
+
+
 def make_redaction_processor(*, config: LogRedactionConfig) -> LogRecordProcessor:
     """One processor for the sink seam, carrying the shipped families and whatever the configuration added.
 
     The patterns are compiled once, here, rather than on every record: a processor runs on the calling
     thread of every log call in the process.
     """
-    patterns = SECRET_PATTERNS + tuple((re.compile(extra), REDACTED_TEXT) for extra in config.extra_patterns)
+    patterns = redaction_patterns(config=config)
 
     def redact(record: logging.LogRecord) -> None:  # kw-only: ignore — the sink seam calls a processor positionally
         try:

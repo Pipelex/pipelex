@@ -171,6 +171,8 @@ LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
 LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
+LogSinkHeaderValueError | Log sink header value holds a line break | https://docs.pipelex.com/latest/errors/log-sink-header-value-error/
+LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
 ManifoldCredentialsError | Manifold credentials | https://docs.pipelex.com/latest/errors/manifold-credentials-error/
 ManifoldEndpointError | Manifold endpoint | https://docs.pipelex.com/latest/errors/manifold-endpoint-error/
 ManifoldError | Manifold | https://docs.pipelex.com/latest/errors/manifold-error/

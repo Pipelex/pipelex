@@ -512,10 +512,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # Build the plugin registrar from the fully-resolved config (pure and import-light:
         # registering the built-ins imports no backend SDK, constructs no client, touches no hub).
         # Built here — after the gateway service/terms precondition gate above (so an unaccepted-terms or
-        # first-run boot fails fast before any discovery work) and before the telemetry factory below,
-        # which is the first consumer of the secrets provider. Secrets is now a config-selected plugin
-        # seam: the built-in SecretsPlugin's factory (and any external pipelex-secrets-<backend>) is
-        # looked up from the registrar-derived SecretsProviderRegistry just below. The other registries
+        # first-run boot fails fast before any discovery work) and before the secrets provider and the log
+        # sink below, the first two capabilities resolved out of it: the built-in SecretsPlugin's factory
+        # (and any external pipelex-secrets-<backend>) is looked up from the registrar-derived
+        # SecretsProviderRegistry, then the sink from the LogSinkRegistry. The other registries
         # (inference, storage, …) are still built later at their own hub-set points, all referencing this
         # same already-built registrar; the slot-claim thunks / teardown callbacks it also accumulates are
         # applied at their ordered apply-points in later phases.
@@ -549,29 +549,36 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if boot_orchestrator is not None and boot_orchestrator not in plugin_registrar.registered_plugin_names:
             raise UnknownBootOrchestratorError(requested=boot_orchestrator)
 
-        # The log sink: the first capability resolved out of the registrar, because every line the rest
+        # The secrets provider: the first capability resolved out of the registrar, because the log sink
+        # just below may name a secret in its settings (an OTLP collector's bearer token, the path of the
+        # service-account key the ``gcp`` sink reads), and so do the telemetry factory and the model setup
+        # further down. Precedence: explicit setup() param > config-selected registry factory. The built-in
+        # SecretsPlugin supplies the "env" method, so there is no separate core default. Building it ahead
+        # of the sink costs nothing in kind: what the provider logs is held like every line before the sink,
+        # and when it fails to build, the lines held until then reach stderr redacted through the holding
+        # handler, as they do when a remote-config fetch above fails, while its exception goes up to the
+        # caller as raised. It goes on the hub only further down: until then the keyword the sink factory
+        # receives is the one way to reach it.
+        secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
+        self.runtime_hub.set_secrets_provider_registry(secrets_provider_registry)
+        if secrets_provider is None:
+            secrets_config = get_config().runtime.secrets
+            secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
+
+        # The log sink, resolved right after the secrets provider it receives, because every line the rest
         # of this boot emits should be rendered by the sink the configuration chose. ``log.configure``
         # ran in ``__init__``, before discovery could, and has held every record since; installing the
         # sink replays them through it. The built-in LogSinkPlugin supplies every shipped sink, so there
         # is no separate core default, and an unknown token fails loud here listing the registered ones.
         log_config = get_config().runtime.log
         log_sink_registry = LogSinkRegistry(plugin_registrar.log_sinks)
-        log.install_sink(log_sink_registry.get_required(method=log_config.sink)(log_config))
+        log.install_sink(log_sink_registry.get_required(method=log_config.sink)(log_config, secrets_provider=secrets_provider))
         # The pretty-print mode is checked beside the sink, for the same reason: a process asking for the
         # ``rich`` panels without Rich installed stops here, naming the ``cli`` extra and the Rich-free modes,
         # rather than failing at the first pipe that prints its output. The check asks whether Rich imports,
         # not whether the extra was named, and ``typer`` and ``instructor`` install Rich anyway.
         if log_config.pretty_print_mode is PrettyPrintMode.RICH:
             require_rich_for_rendering()
-
-        # Secrets provider precedence: explicit setup() param > config-selected registry factory.
-        # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
-        # Resolved here because the telemetry factory just below (and the model setup further down) consume it.
-        secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
-        self.runtime_hub.set_secrets_provider_registry(secrets_provider_registry)
-        if secrets_provider is None:
-            secrets_config = get_config().runtime.secrets
-            secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
         # Whether the Pipelex Gateway telemetry stream is sent: the conditions, and why each one is
         # there, are in `should_enable_pipelex_telemetry`.
@@ -617,7 +624,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.runtime_hub.set_func_registry(func_registry=self.func_registry)
         self.runtime_hub.set_secrets_provider(secrets_provider=secrets_provider)
         # Storage is selected from the config-driven StorageProviderRegistry, built from the plugin
-        # registrar (constructed above, just before the telemetry factory). Its resolution and hub-set
+        # registrar (constructed above, just before the secrets provider). Its resolution and hub-set
         # still happen later at the plugin-derived-registries block — after secrets is on the hub here,
         # so the GCP factory's secret read works.
 
@@ -706,8 +713,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(error_msg) from credentials_exc
 
         # --- Plugin-derived registries --------------------------------------------------------
-        # The plugin registrar was built earlier (with the boot-orchestrator gate checked and the
-        # config-selected secrets provider resolved) just before the telemetry factory. Turn its
+        # The plugin registrar was built earlier, with the boot-orchestrator gate checked and the
+        # config-selected secrets provider and log sink resolved out of it right after. Turn its
         # accumulated contributions into the hub registries here — after the gateway/model setup checks
         # and before the hub setup points below — the family worker factories look their backends up on
         # these at run time.

@@ -106,6 +106,18 @@ class TestFormatDoctorMarkdown:
         assert "The plugin registry did not build" in _format_doctor_markdown(with_plugins)
         assert "## Plugins" not in _format_doctor_markdown(self._HEALTHY_RESULT)
 
+    def test_secrets_provider_section_renders_only_when_the_check_ran(self) -> None:
+        with_secrets: dict[str, Any] = {
+            **self._HEALTHY_RESULT,
+            "checks": {
+                **self._HEALTHY_RESULT["checks"],
+                "secrets_provider": {"healthy": False, "message": "The secrets provider 'vault' could not be built"},
+            },
+        }
+        assert "## Secrets Provider" in _format_doctor_markdown(with_secrets)
+        assert "The secrets provider 'vault' could not be built" in _format_doctor_markdown(with_secrets)
+        assert "## Secrets Provider" not in _format_doctor_markdown(self._HEALTHY_RESULT)
+
     def test_healthy_output_has_no_recommended_actions(self) -> None:
         """Healthy result should not include a Recommended Actions section."""
         output = _format_doctor_markdown(self._HEALTHY_RESULT)

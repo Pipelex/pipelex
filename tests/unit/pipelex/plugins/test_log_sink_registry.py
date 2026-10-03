@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
     from pipelex.system.configuration.configs import PipelexConfig
     from pipelex.tools.log.log_config import LogConfig
+    from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
 def _fake_config() -> PipelexConfig:
@@ -44,7 +45,7 @@ class _NullLogSink(LogSink):
         return logging.NullHandler()
 
 
-def _fake_factory(_config: LogConfig) -> LogSink:
+def _fake_factory(_config: LogConfig, /, *, secrets_provider: SecretsProviderAbstract) -> LogSink:  # ruff: ignore[unused-function-argument] - the LogSinkFactoryFn shape
     """Stand-in factory: identity is all the registry tests assert (never actually invoked here)."""
     return _NullLogSink()
 

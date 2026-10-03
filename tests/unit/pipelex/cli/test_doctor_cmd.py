@@ -17,6 +17,7 @@ from pipelex.cli.commands.doctor_cmd import (
     PendingMigrationsCheck,
     PendingMigrationsFinding,
     PluginsCheck,
+    SecretsProviderCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     check_backend_credentials,
@@ -26,6 +27,7 @@ from pipelex.cli.commands.doctor_cmd import (
 from pipelex.cogt.models.deck_manifest import DeckSyncReport
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 # Minimal valid telemetry TOML — only [custom_posthog].mode is needed, rest defaults
 TELEMETRY_OFF = '[custom_posthog]\nmode = "off"\n'
@@ -41,7 +43,14 @@ NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
 
 HEALTHY_LOG_SINK = LogSinkCheck(is_healthy=True, message="Log sink 'console' installed")
 HEALTHY_PLUGINS = PluginsCheck(is_healthy=True, message="Plugins discovered and registered")
-HEALTHY_RUNTIME_SETUP = DoctorRuntimeSetup(log_sink=HEALTHY_LOG_SINK, plugins=HEALTHY_PLUGINS)
+HEALTHY_SECRETS_PROVIDER = SecretsProviderCheck(is_healthy=True, message="Secrets provider 'env' built")
+BUILT_SECRETS_PROVIDER = EnvSecretsProvider()
+HEALTHY_RUNTIME_SETUP = DoctorRuntimeSetup(
+    plugins=HEALTHY_PLUGINS,
+    secrets_provider=HEALTHY_SECRETS_PROVIDER,
+    log_sink=HEALTHY_LOG_SINK,
+    built_secrets_provider=BUILT_SECRETS_PROVIDER,
+)
 
 
 class TestDoctorLayeredResolution:
@@ -109,7 +118,8 @@ class TestDoctorLayeredResolution:
         mock_check_config.assert_called_once_with()
         mock_check_telemetry.assert_called_once_with()
         mock_check_backends.assert_called_once_with()
-        mock_check_models.assert_called_once_with()
+        # The models row resolves the backends' credentials through the provider the bootstrap built.
+        mock_check_models.assert_called_once_with(secrets_provider=BUILT_SECRETS_PROVIDER)
         mock_check_deck.assert_called_once_with()
         mock_check_internal_backend.assert_called_once_with()
         # The migration row takes no directory at all — it answers for `pipelex migrate`, which
