@@ -98,13 +98,9 @@ class TestRunnerProtocolSurfaces:
         assert deck.waterfalls == {"llm": {"main_chain": ["smart_llm", "cheap_llm"]}, "extract": {}}
         list_models_mock.assert_called_once_with(categories=None)
 
-    async def test_models_skips_a_category_the_protocol_has_no_word_for(self, mocker: MockerFixture) -> None:
-        """A judgment preset must not take the whole deck down.
-
-        `judgment` is a category this runtime serves and the standard's flat model list cannot yet
-        name, so its presets are left out of `models` rather than raising on the enum; the routing
-        extensions, which are keyed by plain strings, still carry it. Delete this test once the
-        protocol's `ModelCategory` learns the member.
+    async def test_models_lists_a_judgment_preset_typed_judgment(self, mocker: MockerFixture) -> None:
+        """A judgment preset is an entry of the flat list typed `judgment`, beside the other categories,
+        and its aliases still travel under the category-keyed routing extension.
         """
         payload: dict[str, Any] = {
             "presets": {"llm": [{"name": "smart_llm"}], "judgment": [{"name": "strict_verdict"}]},
@@ -116,26 +112,56 @@ class TestRunnerProtocolSurfaces:
 
         deck = await runner.models()
 
-        assert [(model_info.name, model_info.type) for model_info in deck.models] == [("smart_llm", MthdsModelCategory.LLM)]
+        assert [(model_info.name, model_info.type) for model_info in deck.models] == [
+            ("smart_llm", MthdsModelCategory.LLM),
+            ("strict_verdict", MthdsModelCategory.JUDGMENT),
+        ]
+        assert deck.model_dump(mode="json")["models"][1] == {"name": "strict_verdict", "type": "judgment"}
         assert deck.aliases["judgment"] == {"default-judgment": "strict_verdict"}
 
-    async def test_models_category_filter_translates_to_builder_enum(self, mocker: MockerFixture) -> None:
-        """A protocol-level category filter reaches list_models as the builder's enum."""
-        llm_only_payload: dict[str, Any] = {
-            "presets": {"llm": [{"name": "smart_llm"}]},
-            "aliases": {"llm": {"best": "smart_llm"}},
-            "waterfalls": {"llm": {}},
+    @pytest.mark.parametrize("builder_category", list(ModelCategory))
+    async def test_models_types_every_builder_category_by_the_protocol_member_of_its_name(
+        self,
+        mocker: MockerFixture,
+        builder_category: ModelCategory,
+    ) -> None:
+        """Every category the builder serves has a protocol category of the same name, so none of
+        its presets is left out of the flat list or typed by an invented value.
+        """
+        payload: dict[str, Any] = {
+            "presets": {builder_category: [{"name": "some_preset"}]},
+            "aliases": {builder_category: {}},
+            "waterfalls": {builder_category: {}},
         }
-        list_models_mock = mocker.patch("pipelex.pipeline.runner.list_models", return_value=llm_only_payload)
+        mocker.patch("pipelex.pipeline.runner.list_models", return_value=payload)
         runner = PipelexMTHDSProtocol()
 
-        deck = await runner.models(category=MthdsModelCategory.LLM)
+        deck = await runner.models()
 
-        list_models_mock.assert_called_once_with(categories=[ModelCategory.LLM])
+        assert [(model_info.name, model_info.type) for model_info in deck.models] == [("some_preset", MthdsModelCategory(builder_category))]
+
+    @pytest.mark.parametrize("protocol_category", list(MthdsModelCategory))
+    async def test_models_category_filter_translates_to_builder_enum(
+        self,
+        mocker: MockerFixture,
+        protocol_category: MthdsModelCategory,
+    ) -> None:
+        """Each protocol-level category filter reaches list_models as the builder's member of the same name."""
+        one_category_payload: dict[str, Any] = {
+            "presets": {protocol_category: [{"name": "some_preset"}]},
+            "aliases": {protocol_category: {"best": "some_preset"}},
+            "waterfalls": {protocol_category: {}},
+        }
+        list_models_mock = mocker.patch("pipelex.pipeline.runner.list_models", return_value=one_category_payload)
+        runner = PipelexMTHDSProtocol()
+
+        deck = await runner.models(category=protocol_category)
+
+        list_models_mock.assert_called_once_with(categories=[ModelCategory(protocol_category)])
         assert isinstance(deck, PipelexModelDeck)
-        assert [(model_info.name, model_info.type) for model_info in deck.models] == [("smart_llm", MthdsModelCategory.LLM)]
-        assert deck.aliases == {"llm": {"best": "smart_llm"}}
-        assert deck.waterfalls == {"llm": {}}
+        assert [(model_info.name, model_info.type) for model_info in deck.models] == [("some_preset", protocol_category)]
+        assert deck.aliases == {protocol_category: {"best": "some_preset"}}
+        assert deck.waterfalls == {protocol_category: {}}
 
     async def test_version_reports_installed_distribution(self, mocker: MockerFixture) -> None:
         """All three implementation version fields carry the installed pipelex version,

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:485194a5b58846f1599a2f0d12cdd4822eb920e74e971fdbedd04a49f19b871b"
-reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-03T14:26:33Z"
-rationale = "real-catch: check_models now reports a secrets provider that raises on a lookup in the models row instead of failing the command, and quotes every setup failure scrubbed with the log redaction patterns; pipelex/cli/agent_cli/CLAUDE.md said only the secrets_provider and log_sink messages were scrubbed and said nothing of a lookup failure, and now names checks.models for both. docs/tools/cli/ lists doctor in tables only and describes none of its rows, so nothing there went stale."
+digest = "sha256:ad09974548259c9bd0b110aaabf7a1c052d58dde77601936940d6e5f499d55e9"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-03T15:51:48Z"
+rationale = "clean-pass: the models --type help now names judgment beside the other categories; docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md never list the --type values, they point at pipelex-agent models -t <type>, so nothing there went stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -34,7 +34,7 @@ rationale = "real-catch: check_models now reports a secrets provider that raises
 "pipelex/cli/agent_cli/commands/inputs/pipe_cmd.py" = "blob:d109d3103b2ad851d281a9ef1a91e2822e92926e"
 "pipelex/cli/agent_cli/commands/lint_cmd.py" = "blob:91ad9cb4d618ba4c0b7da366cde2f74f38d350df"
 "pipelex/cli/agent_cli/commands/migrate_cmd.py" = "blob:ce733b78df03e65c3c8a10d46b27b57c05ec054c"
-"pipelex/cli/agent_cli/commands/models_cmd.py" = "blob:dde4c246a28eba9f54cd582f0b171c9c26194be8"
+"pipelex/cli/agent_cli/commands/models_cmd.py" = "blob:5678c00ab389b0a433c080be3454c7905e569308"
 "pipelex/cli/agent_cli/commands/pipe_cmd.py" = "blob:9bf0480fcd1164ec1120b2514724fc0f5fefd30e"
 "pipelex/cli/agent_cli/commands/plxt_passthrough.py" = "blob:a1c530d110482485ce462f199b9e79fac29f8896"
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
