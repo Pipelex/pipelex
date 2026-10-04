@@ -47,6 +47,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError, StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -64,9 +65,10 @@ class InputKind(StrEnum):
     ``native.Anything``: it takes any JSON value but an array or a null, held as the natural content
     for the value's JSON type while the stuff keeps the declared concept (R1). ``JSON`` takes a JSON
     object as it is (R7). ``DYNAMIC`` is the bottom-up fallback used for ``Dynamic`` and the natives
-    no arm reads top-down (Html, Page, TextAndImages, SearchResult, Composite) — the shape-driven
-    ``StuffFactory`` path handles the whole value there, and a value it has no reading for is
-    refused naming the input (R8).
+    no arm reads top-down (Html, Page, TextAndImages, SearchResult, Composite, Choice, Rating): the
+    shape-driven ``StuffFactory`` path reads the whole value there. Only a ``Dynamic`` input keeps
+    whatever it builds; any other is compatibility-checked, and a value with no reading, or one read
+    as a concept the input does not accept, is refused naming the input (R8).
     """
 
     TEXT = "text"
@@ -250,6 +252,15 @@ class InputShaper:
                             reason=str(exc),
                             expected_shape=expected_shape,
                         ) from exc
+                    if cls._is_content_of_declared_concept(
+                        value=value, declared_concept=declared_concept, stuff_spec=stuff_spec, concept_provider=concept_provider
+                    ):
+                        raise StructureValidationError.make_for_content_without_its_envelope(
+                            variable_name=variable_name,
+                            declared_concept_ref=declared_concept.concept_ref,
+                            provided_description=cls._describe_value(value),
+                            expected_shape=expected_shape,
+                        ) from exc
                     raise StructureValidationError.make_for_unreadable_bare_value(
                         variable_name=variable_name,
                         declared_concept_ref=declared_concept.concept_ref,
@@ -325,7 +336,7 @@ class InputShaper:
 
         # A user (non-native) concept whose structure is StructuredContent dispatches its dict
         # top-down. Everything else — the natives no arm reads top-down (Html/Page/TextAndImages/
-        # SearchResult/Composite) — falls back to bottom-up building.
+        # SearchResult/Composite/Choice/Rating) — falls back to bottom-up building.
         if not Concept.is_native_concept(concept=concept):
             if issubclass(concept_provider.get_structure_class(concept=concept), StructuredContent):
                 return InputKind.STRUCTURED
@@ -1012,6 +1023,41 @@ class InputShaper:
             provided_description=cls._describe_value(value),
             expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
         )
+
+    @classmethod
+    def _is_content_of_declared_concept(
+        cls, *, value: Any, declared_concept: Concept, stuff_spec: StuffSpec, concept_provider: ConceptProviderAbstract
+    ) -> bool:
+        """Whether a bare value the fallback has no reading for is the declared concept's own content, unwrapped.
+
+        It is when the value, or every item of a list at a multiple input, is an object whose keys are all
+        fields of the concept's structure and which validates as it. `Dynamic` and `Composite` hold any
+        object, so a value fitting them says nothing about what the caller meant, and they never answer.
+        """
+        if NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code):
+            return False
+        structure_class = concept_provider.get_structure_class(concept=declared_concept)
+        if issubclass(structure_class, CompositeContent):
+            return False
+        is_multiple, _ = cls._peel_multiplicity(stuff_spec.multiplicity)
+        if is_multiple:
+            if not isinstance(value, list) or not value:
+                return False
+            items = cast("list[Any]", value)
+        else:
+            items = [value]
+        field_names = set(structure_class.model_fields)
+        for item in items:
+            if not isinstance(item, dict) or not item:
+                return False
+            item_dict = cast("dict[Any, Any]", item)
+            if not set(item_dict) <= field_names:
+                return False
+            try:
+                structure_class.model_validate(item_dict)
+            except ValidationError:
+                return False
+        return True
 
     @classmethod
     def _declaration_suggested_for(cls, *, value: Any) -> str | None:

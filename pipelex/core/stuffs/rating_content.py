@@ -13,7 +13,7 @@ class RatingContent(StuffContent):
     # strict=True for the same reason as `YesNoContent.yes_no`: lax mode would turn "2" or 2.0 into a level.
     level: int = Field(ge=0, description="The index of the selected level, 0 being the first level declared.", strict=True)
     confidence: float | None = Field(
-        default=None, ge=0, le=1, description="The producer's confidence in the level, from 0 to 1, when it reports one."
+        default=None, ge=0, le=1, strict=True, description="The producer's confidence in the level, from 0 to 1, when it reports one."
     )
     probabilities: dict[str, UnitInterval] | None = Field(
         default=None,
@@ -23,6 +23,7 @@ class RatingContent(StuffContent):
         default=None,
         ge=0,
         allow_inf_nan=False,
+        strict=True,
         description="A continuous position on the scale, from 0 to the index of the last level, when the producer measures one.",
     )
 

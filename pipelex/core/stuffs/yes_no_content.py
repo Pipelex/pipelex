@@ -15,7 +15,11 @@ class YesNoContent(StuffContent):
     # the no-cross-kind-coercion contract the scalar envelope arm enforces. Only a real bool is accepted.
     yes_no: bool = Field(description="Whether the answer is yes (true) or no (false).", strict=True)
     probability: float | None = Field(
-        default=None, ge=0, le=1, description="The probability that the answer is yes, from 0 to 1, when the producer reports one."
+        default=None,
+        ge=0,
+        le=1,
+        strict=True,
+        description="The probability that the answer is yes, from 0 to 1, when the producer reports one.",
     )
 
     @property

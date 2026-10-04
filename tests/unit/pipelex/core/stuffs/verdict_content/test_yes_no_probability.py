@@ -36,3 +36,12 @@ class TestYesNoProbability:
 
     def test_smart_dump_writes_an_absent_probability_null(self):
         assert YesNoContent(yes_no=True).smart_dump() == {"yes_no": True, "probability": None}
+
+    @pytest.mark.parametrize("probability", [True, False, "0.9"])
+    def test_refuses_a_probability_that_is_not_a_number(self, probability: object):
+        # A stray `true` coerced to 1.0 would read as a confident yes.
+        with pytest.raises(ValidationError):
+            YesNoContent.model_validate({"yes_no": True, "probability": probability})
+
+    def test_reads_an_integer_probability_as_a_number(self):
+        assert YesNoContent.model_validate({"yes_no": True, "probability": 1}).probability == 1.0

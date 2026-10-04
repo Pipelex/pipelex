@@ -58,3 +58,16 @@ class TestRatingContent:
 
     def test_short_desc_names_the_level(self):
         assert RatingContent(level=2).short_desc == "a rating (level 2)"
+
+    @pytest.mark.parametrize(
+        "measures",
+        [{"confidence": False}, {"confidence": "0.5"}, {"probabilities": {"0": True}}, {"position": True}, {"position": "1.5"}],
+    )
+    def test_refuses_a_measure_that_is_not_a_number(self, measures: dict[str, object]):
+        with pytest.raises(ValidationError):
+            RatingContent.model_validate({"level": 1, **measures})
+
+    def test_reads_integer_measures_as_numbers(self):
+        content = RatingContent.model_validate({"level": 1, "confidence": 1, "probabilities": {"0": 0, "1": 1}, "position": 1})
+        assert content.position == 1.0
+        assert content.probabilities == {"0": 0.0, "1": 1.0}

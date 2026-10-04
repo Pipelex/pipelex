@@ -13,7 +13,7 @@ class ChoiceContent(StuffContent):
 
     choice: str = Field(description="The key of the selected option.")
     confidence: float | None = Field(
-        default=None, ge=0, le=1, description="The producer's confidence in the choice, from 0 to 1, when it reports one."
+        default=None, ge=0, le=1, strict=True, description="The producer's confidence in the choice, from 0 to 1, when it reports one."
     )
     probabilities: dict[str, UnitInterval] | None = Field(
         default=None, description="The probability of each option, keyed by option key, when the producer measures a distribution."

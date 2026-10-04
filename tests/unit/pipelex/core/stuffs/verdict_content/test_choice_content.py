@@ -56,3 +56,16 @@ class TestChoiceContent:
 
     def test_short_desc_names_the_choice(self):
         assert ChoiceContent(choice="billing").short_desc == "a choice (billing)"
+
+    @pytest.mark.parametrize(
+        "measures",
+        [{"confidence": True}, {"confidence": "0.9"}, {"probabilities": {"billing": True}}, {"probabilities": {"billing": "1"}}],
+    )
+    def test_refuses_a_measure_that_is_not_a_number(self, measures: dict[str, object]):
+        with pytest.raises(ValidationError):
+            ChoiceContent.model_validate({"choice": "billing", **measures})
+
+    def test_reads_integer_measures_as_numbers(self):
+        content = ChoiceContent.model_validate({"choice": "billing", "confidence": 1, "probabilities": {"billing": 1, "other": 0}})
+        assert content.confidence == 1.0
+        assert content.probabilities == {"billing": 1.0, "other": 0.0}
