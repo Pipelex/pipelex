@@ -217,11 +217,9 @@ paths:
                     telemetry belongs to, as a mapping of group type to group key (e.g. `{"organization": "org_acme"}`). The
                     runtime never reads a key by name: it carries the mapping on the run as its `extras` and stamps it on
                     every span as `pipelex.run.extras`, so every OpenTelemetry exporter receives it, and the deployment''s
-                    own PostHog stream, in `identified` mode, forwards it as the capture''s groups. What Pipelex''s own Gateway
-                    telemetry stream receives is the runtime''s decision, not this server''s: the pinned runtime attributes
-                    it the same way, with the run''s `user_id` and these groups. Group types are lowercase snake_case starting
-                    with a letter, at most 32 characters; group keys are 1 to 128 characters from `[A-Za-z0-9_-]`; at most
-                    five entries. Omit it and the run belongs to no group, which is right for a single-tenant deployment.'
+                    own PostHog stream, in `identified` mode, forwards it as the capture''s groups. Group types are lowercase
+                    snake_case starting with a letter, at most 32 characters; group keys are 1 to 128 characters from `[A-Za-z0-9_-]`;
+                    at most five entries. Omit it and the run belongs to no group, which is right for a single-tenant deployment.'
               additionalProperties: true
               type: object
               title: PipelexApiExecuteRequest
@@ -492,11 +490,9 @@ paths:
                     telemetry belongs to, as a mapping of group type to group key (e.g. `{"organization": "org_acme"}`). The
                     runtime never reads a key by name: it carries the mapping on the run as its `extras` and stamps it on
                     every span as `pipelex.run.extras`, so every OpenTelemetry exporter receives it, and the deployment''s
-                    own PostHog stream, in `identified` mode, forwards it as the capture''s groups. What Pipelex''s own Gateway
-                    telemetry stream receives is the runtime''s decision, not this server''s: the pinned runtime attributes
-                    it the same way, with the run''s `user_id` and these groups. Group types are lowercase snake_case starting
-                    with a letter, at most 32 characters; group keys are 1 to 128 characters from `[A-Za-z0-9_-]`; at most
-                    five entries. Omit it and the run belongs to no group, which is right for a single-tenant deployment.'
+                    own PostHog stream, in `identified` mode, forwards it as the capture''s groups. Group types are lowercase
+                    snake_case starting with a letter, at most 32 characters; group keys are 1 to 128 characters from `[A-Za-z0-9_-]`;
+                    at most five entries. Omit it and the run belongs to no group, which is right for a single-tenant deployment.'
               additionalProperties: true
               type: object
               title: PipelexApiStartRequest

@@ -381,9 +381,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
         # Which Pipelex-managed gateway backends are enabled, and which section of the published
-        # artifact each takes its model specs from. More than one can be live at once — the Portkey
-        # cloud service and the manifold one are two services, sharing this one artifact, this one
-        # fetch and its one cache, and nothing else.
+        # artifact each takes its model specs from.
         try:
             managed_gateway_sections = enabled_managed_gateway_sections()
         except BACKEND_LIBRARY_REFUSED as backends_document_exc:

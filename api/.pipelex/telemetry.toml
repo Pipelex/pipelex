@@ -5,10 +5,7 @@
 # This file controls YOUR custom telemetry settings for observability and analytics.
 # Configure your own PostHog, Langfuse, or OTLP-compatible backends here.
 #
-# NOTE: When using Pipelex Gateway, identified telemetry is automatically enabled
-# (tied to your Gateway API key, hashed for security). This allows us to monitor
-# service quality, enforce fair usage, and provide you with better support.
-# Gateway telemetry operates independently from your settings below - you can have both!
+# Everything below is off unless you turn it on, and nothing here reports to Pipelex.
 #
 # To disable all telemetry, set the DO_NOT_TRACK=1 environment variable.
 #
