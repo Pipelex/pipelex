@@ -9,7 +9,6 @@ import tomli
 
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result
 from pipelex.cli.agent_cli.commands.inputs.pipe_cmd import inputs_pipe_cmd
-from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 
 if TYPE_CHECKING:
@@ -17,6 +16,14 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 PIPE_CMD_MODULE = "pipelex.cli.agent_cli.commands.inputs.pipe_cmd"
+
+NO_INPUTS_RESULT: dict[str, Any] = {
+    "success": True,
+    "pipe_ref": "demo.my_pipe",
+    "inputs": {},
+    "concept_comments": {},
+    "no_inputs_message": "Pipe 'demo.my_pipe' declares no inputs.",
+}
 
 INPUTS_TEMPLATE: dict[str, Any] = {
     "topic": {
@@ -27,19 +34,16 @@ INPUTS_TEMPLATE: dict[str, Any] = {
 
 
 class TestAgentInputsTemplateFormatToml:
-    def _patch_inputs(self, mocker: MockerFixture, *, result: dict[str, Any] | None = None, error: Exception | None = None) -> None:
-        """Patch the pipe command's dependencies; inputs_core returns result or raises error."""
+    def _patch_inputs(self, mocker: MockerFixture, *, result: dict[str, Any]) -> None:
+        """Patch the pipe command's dependencies; inputs_core returns a copy of result."""
         mocker.patch(f"{PIPE_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{PIPE_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{PIPE_CMD_MODULE}.resolve_pipe_from_exports", return_value=[])
-        if error is not None:
-            mocker.patch(f"{PIPE_CMD_MODULE}.inputs_core", new=mocker.AsyncMock(side_effect=error))
-        else:
-            mocker.patch(f"{PIPE_CMD_MODULE}.inputs_core", new=mocker.AsyncMock(return_value=result))
+        mocker.patch(f"{PIPE_CMD_MODULE}.inputs_core", new=mocker.AsyncMock(return_value=dict(result)))
 
     def test_toml_format_prints_raw_toml(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--format toml prints the raw TOML template, not the JSON envelope."""
-        self._patch_inputs(mocker, result={"success": True, "pipe_code": "demo.my_pipe", "inputs": INPUTS_TEMPLATE})
+        self._patch_inputs(mocker, result={"success": True, "pipe_ref": "demo.my_pipe", "inputs": INPUTS_TEMPLATE})
 
         inputs_pipe_cmd("my_pipe", template_format=InputsTemplateFormat.TOML)
 
@@ -49,40 +53,37 @@ class TestAgentInputsTemplateFormatToml:
 
     def test_json_default_keeps_envelope(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """The default format keeps the structured JSON success envelope."""
-        self._patch_inputs(mocker, result={"success": True, "pipe_code": "demo.my_pipe", "inputs": INPUTS_TEMPLATE})
+        self._patch_inputs(mocker, result={"success": True, "pipe_ref": "demo.my_pipe", "inputs": INPUTS_TEMPLATE})
 
         inputs_pipe_cmd("my_pipe")
 
         envelope = json.loads(capsys.readouterr().out)
-        assert envelope["success"] is True
-        assert envelope["inputs"] == INPUTS_TEMPLATE
+        assert envelope == {"success": True, "pipe_ref": "demo.my_pipe", "inputs": INPUTS_TEMPLATE}
 
     def test_no_inputs_in_toml_mode_prints_comment(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A pipe without inputs yields a TOML comment line — valid TOML that loads as an empty dict."""
-        self._patch_inputs(mocker, error=NoInputsRequiredError("No inputs required for pipe 'demo.my_pipe'."))
+        self._patch_inputs(mocker, result=NO_INPUTS_RESULT)
 
         inputs_pipe_cmd("my_pipe", template_format=InputsTemplateFormat.TOML)
 
         captured = capsys.readouterr()
-        assert captured.out.startswith("# No inputs required")
+        assert captured.out == "# Pipe 'demo.my_pipe' declares no inputs.\n"
         assert tomli.loads(captured.out) == {}
 
     def test_no_inputs_in_json_mode_keeps_envelope(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """A pipe without inputs keeps the structured envelope in JSON mode."""
-        self._patch_inputs(mocker, error=NoInputsRequiredError("No inputs required for pipe 'demo.my_pipe'."))
+        """A pipe without inputs keeps the plain envelope in JSON mode, naming the pipe it resolved; the message stays internal."""
+        self._patch_inputs(mocker, result=NO_INPUTS_RESULT)
 
         inputs_pipe_cmd("my_pipe")
 
         envelope = json.loads(capsys.readouterr().out)
-        assert envelope["success"] is True
-        assert envelope["inputs"] == {}
-        assert "No inputs required" in envelope["message"]
+        assert envelope == {"success": True, "pipe_ref": "demo.my_pipe", "inputs": {}}
 
     def test_light_toml_carries_concept_comments(self, capsys: pytest.CaptureFixture[str]) -> None:
         """The agent-CLI TOML surface carries the same `# concept:` hints the human build inputs does."""
         result: dict[str, Any] = {
             "success": True,
-            "pipe_code": "demo.my_pipe",
+            "pipe_ref": "demo.my_pipe",
             "inputs": {"question": "text_value", "invoice": {"invoice_number": "INV-1"}},
             "concept_comments": {"question": "concept: demo.Question", "invoice": "concept: demo.Invoice"},
         }
@@ -98,7 +99,7 @@ class TestAgentInputsTemplateFormatToml:
         """concept_comments is internal plumbing — it must not leak into the JSON envelope."""
         result: dict[str, Any] = {
             "success": True,
-            "pipe_code": "demo.my_pipe",
+            "pipe_ref": "demo.my_pipe",
             "inputs": {"question": "text_value"},
             "concept_comments": {"question": "concept: demo.Question"},
         }

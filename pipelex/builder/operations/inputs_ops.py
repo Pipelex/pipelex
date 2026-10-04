@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
-from pipelex.pipe_machinery.rendering.input_renderer import build_concept_comments, render_inputs
+from pipelex.pipe_machinery.rendering.input_renderer import build_concept_comments, no_inputs_message, render_inputs
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.validate_bundle import validate_bundle
 
@@ -36,7 +38,9 @@ async def build_inputs_for_pipe(
         explicit: When True, emit the ceremonial envelope form; when False (default), the light shape.
 
     Returns:
-        Dictionary with inputs suitable for JSON serialization.
+        Dictionary with ``success``, the resolved ``pipe_ref``, the ``inputs`` template and the
+        internal ``concept_comments``. A pipe that declares no inputs answers with empty ``inputs``
+        and an internal ``no_inputs_message`` saying so.
 
     Raises:
         ValidateBundleError: If bundle validation fails.
@@ -79,7 +83,27 @@ async def build_inputs_for_pipe(
         raise ValueError(msg)
 
     the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
-    inputs_json_str = render_inputs(the_pipe, indent=2, explicit=explicit)
+    # The envelope names the pipe that was resolved, always domain-qualified, never the selector
+    # the caller typed: a bare code and an omitted one both answer with the same `pipe_ref`. A
+    # dependency pipe keeps the alias it was reached through, since only `alias->domain.code`
+    # selects it again; the pipe itself does not know its alias.
+    pipe_ref = the_pipe.pipe_ref
+    if QualifiedRef.has_cross_package_prefix(pipe_code):
+        alias, _ = QualifiedRef.split_cross_package_ref(pipe_code)
+        pipe_ref = f"{alias}->{pipe_ref}"
+    try:
+        inputs_json_str = render_inputs(the_pipe, indent=2, explicit=explicit)
+    except NoInputsRequiredError:
+        # A pipe that declares no inputs is an answer, not a failure: its template is empty. The
+        # message is rebuilt from the reported ref rather than taken from the renderer, whose ref
+        # cannot carry the dependency alias.
+        return {
+            "success": True,
+            "pipe_ref": pipe_ref,
+            "inputs": {},
+            "concept_comments": {},
+            "no_inputs_message": no_inputs_message(pipe_ref=pipe_ref),
+        }
     inputs_dict = json.loads(inputs_json_str)
 
     # concept_comments is internal plumbing for the light-TOML emitter (stripped before the JSON
@@ -87,7 +111,7 @@ async def build_inputs_for_pipe(
     # the human `build inputs --format toml` does.
     return {
         "success": True,
-        "pipe_code": pipe_code,
+        "pipe_ref": pipe_ref,
         "inputs": inputs_dict,
         "concept_comments": build_concept_comments(the_pipe.inputs),
     }

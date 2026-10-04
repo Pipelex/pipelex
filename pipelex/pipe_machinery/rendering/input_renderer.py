@@ -18,6 +18,11 @@ class InputsTemplateFormat(StrEnum):
     TOML = "toml"
 
 
+def no_inputs_message(*, pipe_ref: str) -> str:
+    """The sentence every inputs surface answers with for a pipe that declares no inputs."""
+    return f"Pipe '{pipe_ref}' declares no inputs."
+
+
 def build_inputs_template(the_pipe: PipeAbstract, *, explicit: bool = False) -> dict[str, Any]:
     """Build the inputs template dict for a pipe.
 
@@ -38,8 +43,7 @@ def build_inputs_template(the_pipe: PipeAbstract, *, explicit: bool = False) -> 
         NoInputsRequiredError: If the pipe has no inputs
     """
     if not the_pipe.inputs.root:
-        msg = f"No inputs required for pipe '{the_pipe.code}'."
-        raise NoInputsRequiredError(msg)
+        raise NoInputsRequiredError(no_inputs_message(pipe_ref=the_pipe.pipe_ref))
 
     envelope_template = the_pipe.inputs.build_inputs_template(concept_provider=get_concept_library())
     if explicit:
