@@ -270,3 +270,24 @@ class TestCliPipeCmd:
         toml = _pipe_spec_to_toml(result)
         assert 'model = "$writing-creative"' in toml
         assert 'output = "Text"' in toml
+
+    def test_judge_fields_appear_in_toml(self) -> None:
+        """PipeJudge type-specific fields round-trip to TOML, its template written as `question` whatever spelling came in."""
+        spec = parse_pipe_spec(
+            {
+                "pipe_code": "route_ticket",
+                "description": "Route a ticket",
+                "inputs": {"ticket": "Text"},
+                "output": "Choice",
+                "model": "@default-judgment",
+                "prompt": "Which team should handle the ticket?",
+                "options": {"billing": "Charges and invoices", "technical": ""},
+            },
+            pipe_type="PipeJudge",
+        )
+        toml = _pipe_spec_to_toml(spec)
+        assert 'type = "PipeJudge"' in toml
+        assert 'model = "@default-judgment"' in toml
+        assert 'question = "Which team should handle the ticket?"' in toml
+        assert "prompt" not in toml
+        assert 'billing = "Charges and invoices"' in toml

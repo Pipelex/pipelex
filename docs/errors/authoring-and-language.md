@@ -82,6 +82,9 @@ own page. Classes are grouped by subsystem.
 - [`PipeFuncTransportError`](pipe-func-transport-error.md) — Pipe func transport
 - [`PipeImgGenFactoryError`](pipe-img-gen-factory-error.md) — Pipe img gen factory
 - [`PipeImgGenRunError`](pipe-img-gen-run-error.md) — Pipe img gen run
+- [`PipeJudgeError`](pipe-judge-error.md) — Pipe judge
+- [`PipeJudgeFactoryError`](pipe-judge-factory-error.md) — Pipe judge factory
+- [`PipeJudgeInputCapabilityError`](pipe-judge-input-capability-error.md) — Pipe judge input capability
 - [`PipeLLMFactoryError`](pipe-llm-factory-error.md) — Pipe LLM factory
 - [`PipeOperatorModelAvailabilityError`](pipe-operator-model-availability-error.md) — Pipe operator model availability
 - [`PipeSearchError`](pipe-search-error.md) — Pipe search

@@ -35,6 +35,8 @@ def _make_judgment_worker(judgment_assignment: JudgmentAssignment) -> JudgmentWo
 def _make_judgment_job(judgment_assignment: JudgmentAssignment) -> JudgmentJob:
     return JudgmentJobFactory.make_judgment_job(
         state=judgment_assignment.state,
+        images=judgment_assignment.images,
+        documents=judgment_assignment.documents,
         questions=judgment_assignment.questions,
         judgment_setting=judgment_assignment.judgment_setting,
         job_metadata=judgment_assignment.job_metadata,

@@ -481,8 +481,41 @@ class JudgmentAnswerMismatchError(CogtError):
     """A judgment worker answered questions nobody asked, or answered one in the wrong shape."""
 
 
+class JudgmentCapabilityError(CogtError):
+    """A judgment job carries files its model does not read: images to a model without vision, documents to one that reads none.
+
+    The author's choice of model, and so a configuration error, as `LLMCapabilityError` is for an LLM.
+    A document of a format the model does not read is the caller's file, which stays a
+    `PromptDocumentFormatError`.
+    """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+
 class JudgmentModelNotFoundError(ModelNotFoundError):
     pass
+
+
+class JudgmentModelMissingError(PipelexError):
+    """A judgment has no model to run on: the step names none, and the model deck names no default.
+
+    The deck serves no judgment model out of the box, since a judgment backend is one the user brings,
+    so a step that names no model is refused when its method loads, before a run spends anything, and
+    by the kernel's resolver for a programmatic caller. The message names only the step and the two
+    remedies, so it is kept verbatim for the caller.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, pipe_code: str | None = None):
+        self.pipe_code = pipe_code
+        step = f"PipeJudge '{pipe_code}'" if pipe_code else "This judgment"
+        message = (
+            f"{step} has no judgment model: it names none, and the model deck names no default for judgments. "
+            "Name the model in the step's `model` field, or set a `choice_default` under `[judgment]` in the model deck."
+        )
+        super().__init__(message)
 
 
 class RoutingProfileLibraryNotFoundError(CogtError):

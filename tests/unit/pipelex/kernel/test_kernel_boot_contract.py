@@ -65,7 +65,7 @@ SUBPROCESS_TIMEOUT_SECONDS = 300
 #: Both LLM arms run because they share almost nothing below the façade — `resolve_llm_setting_for_text`
 #: vs `_for_object`, and `dry_llm_gen_text` vs `dry_llm_gen_object` — so covering one leaves the
 #: other's closure unproven, and the contract is stated over *a kernel call*, not over one of them.
-#: The five operator ops below are called as module-level functions rather than through `PipelexKernel`
+#: The operator ops below are called as module-level functions rather than through `PipelexKernel`
 #: for the plain reason that the façade does not expose them.
 _KERNEL_CALL_SCRIPT = textwrap.dedent(
     """
@@ -77,6 +77,8 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_setting import ExtractSetting
     from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+    from pipelex.cogt.judgment.judgment_models import ChoiceQuestion
+    from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
     from pipelex.cogt.llm.llm_setting import LLMSetting
     from pipelex.cogt.search.search_setting import SearchSetting
     from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -88,6 +90,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
     from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
     from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+    from pipelex.core.stuffs.choice_content import ChoiceContent
     from pipelex.core.stuffs.image_content import ImageContent
     from pipelex.core.stuffs.list_content import ListContent
     from pipelex.core.stuffs.number_content import NumberContent
@@ -100,6 +103,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.kernel.func_ops import run_func
     from pipelex.kernel.img_gen_ops import build_img_gen_job_params, run_img_gen
     from pipelex.kernel.img_gen_prompt import assemble_img_gen_prompt
+    from pipelex.kernel.judgment_ops import run_judgment
     from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
     from pipelex.kernel.memory_ops import (
         extract_main_content,
@@ -364,6 +368,28 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     if search_result.rendered_query != search_query:
         fail(f"run_search rendered {search_result.rendered_query!r}, not the query it was given")
     check_stored(search_result, "run_search", SearchResultContent)
+
+    judgment_memory = WorkingMemoryFactory.make_from_single_stuff(
+        stuff=StuffFactory.make_stuff(concept=text_concept, content=TextContent(text="My invoice is wrong."), name="message")
+    )
+    judgment_result = asyncio.run(
+        run_judgment(
+            memory=judgment_memory,
+            question=ChoiceQuestion(instructions="Which team handles {{ message }}?", options={"billing": None, "technical": None}),
+            input_names=["message"],
+            judgment_setting=JudgmentSetting(model="kernel-boot-contract-judgment-model"),
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.CHOICE),
+            job_metadata=kernel.make_step_metadata(),
+            cogt_run_params=kernel.cogt_run_params,
+            templating_style=templating_style,
+            result_name="team",
+        )
+    )
+
+    # The rendered question proves the templating ran against memory rather than being skipped.
+    if judgment_result.rendered_question != "Which team handles My invoice is wrong.?":
+        fail(f"run_judgment rendered {judgment_result.rendered_question!r}, not the question over its memory")
+    check_stored(judgment_result, "run_judgment", ChoiceContent)
 
     composed_text = "Composed on a kernel-only boot."
     compose_result = asyncio.run(

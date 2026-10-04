@@ -10,6 +10,7 @@ ships is genuinely per-repo, so that is all these subclasses add.
 from typing import ClassVar
 
 from pipelex.test_extras.error_report_parity import ErrorReportParityTestData as SharedErrorReportParityTestData
+from pipelex.test_extras.error_report_parity import JudgeErrorReportParityTestData as SharedJudgeErrorReportParityTestData
 from pipelex.test_extras.error_report_parity import SearchErrorReportParityTestData as SharedSearchErrorReportParityTestData
 
 
@@ -23,3 +24,9 @@ class SearchErrorReportParityTestData(SharedSearchErrorReportParityTestData):
     """Local-arm view of the search parity fixtures, pointing at this repo's ``native_search`` bundle."""
 
     BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/error_handling/bundles/native_search.mthds"
+
+
+class JudgeErrorReportParityTestData(SharedJudgeErrorReportParityTestData):
+    """Local-arm view of the judgment parity fixtures, pointing at this repo's ``native_judge`` bundle."""
+
+    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/error_handling/bundles/native_judge.mthds"

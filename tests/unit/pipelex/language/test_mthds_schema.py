@@ -26,6 +26,7 @@ _PIPE_KIND_EXTRA_FIELDS: dict[str, dict[str, Any]] = {
     "PipeSearch": {"prompt": "find it"},
     "PipeStructure": {},
     "PipeDocGen": {"format": "pdf"},
+    "PipeJudge": {"question": "is it?"},
     "PipeBatch": {"branch_pipe_code": "sub_pipe", "input_list_name": "items", "input_item_name": "item"},
     "PipeCondition": {"default_outcome": "fallback_pipe", "outcomes": {"yes": "yes_pipe"}},
     "PipeParallel": {"branches": [{"pipe": "sub_pipe"}]},

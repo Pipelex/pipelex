@@ -151,8 +151,10 @@ Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/l
 JobMetadataError | Job metadata | https://docs.pipelex.com/latest/errors/job-metadata-error/
 JsonTypeError | Json type | https://docs.pipelex.com/latest/errors/json-type-error/
 JudgmentAnswerMismatchError | Judgment answer mismatch | https://docs.pipelex.com/latest/errors/judgment-answer-mismatch-error/
+JudgmentCapabilityError | Judgment capability | https://docs.pipelex.com/latest/errors/judgment-capability-error/
 JudgmentHandleNotFoundError | Judgment handle not found | https://docs.pipelex.com/latest/errors/judgment-handle-not-found-error/
 JudgmentJobFailureError | Judgment job failure | https://docs.pipelex.com/latest/errors/judgment-job-failure-error/
+JudgmentModelMissingError | Judgment model missing | https://docs.pipelex.com/latest/errors/judgment-model-missing-error/
 JudgmentModelNotFoundError | Judgment model not found | https://docs.pipelex.com/latest/errors/judgment-model-not-found-error/
 KitError | Kit | https://docs.pipelex.com/latest/errors/kit-error/
 KitIndexLoadingError | Kit index loading | https://docs.pipelex.com/latest/errors/kit-index-loading-error/
@@ -245,6 +247,9 @@ PipeImgGenRunError | Pipe img gen run | https://docs.pipelex.com/latest/errors/p
 PipeInputError | Pipe input | https://docs.pipelex.com/latest/errors/pipe-input-error/
 PipeInputsFactoryError | Pipe inputs factory | https://docs.pipelex.com/latest/errors/pipe-inputs-factory-error/
 PipeJobError | Pipe job | https://docs.pipelex.com/latest/errors/pipe-job-error/
+PipeJudgeError | Pipe judge | https://docs.pipelex.com/latest/errors/pipe-judge-error/
+PipeJudgeFactoryError | Pipe judge factory | https://docs.pipelex.com/latest/errors/pipe-judge-factory-error/
+PipeJudgeInputCapabilityError | Pipe judge input capability | https://docs.pipelex.com/latest/errors/pipe-judge-input-capability-error/
 PipeLLMFactoryError | Pipe LLM factory | https://docs.pipelex.com/latest/errors/pipe-llm-factory-error/
 PipeLibraryError | Pipe library | https://docs.pipelex.com/latest/errors/pipe-library-error/
 PipeLoadRefusalError | Pipe load refusal | https://docs.pipelex.com/latest/errors/pipe-load-refusal-error/
