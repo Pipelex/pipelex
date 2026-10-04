@@ -2,6 +2,12 @@
 
 ## [v0.72.0] - 2026-10-04
 
+### Highlights
+
+**`PipeJudge` brings judgment into MTHDS methods: a step asks a model one closed question about its inputs and gets back a typed verdict with the probabilities behind it.** A yes/no question returns a `YesNo`, a choice among declared options returns a `Choice`, and a position on a declared scale returns a `Rating`, so a `PipeCondition` can route on the verdict or gate a step on how sure the model was.
+
+**TypeSafe's Jev is the first judgment model Pipelex runs.** Jev answers closed questions with calibrated probabilities rather than free text: install `pipelex[typesafe]`, set `TYPESAFE_API_KEY` and name `@default-judgment` in the step.
+
 ### Added
 
 - **`PipeJudge`, an operator asking a judgment model one closed question about its inputs**: a step declaring neither `options` nor `levels` asks a yes/no question, which may carry `criteria` and a `threshold`, and outputs a `YesNo`; one declaring `options` outputs a `Choice`; one declaring `levels` outputs a `Rating`, each verdict carrying the probabilities the model measured. Every declared input is sent to the model as material whether or not the `question` reads it, and `prompt` is read as a synonym of `question`. A step is refused when the method loads if it names no model while the deck names no default for judgments, if its output disagrees with its kind of question (`Dynamic` included), if an input name reaches into a field with a dot, or if it has an image or a document input its model does not read, and a document a run is given in a format its model does not read is refused before the run starts. The builder and `pipelex-agent pipe` write it with `question`, and the MTHDS Test Corpus gains `operator_judge_urgent_message` and the `operator.judge` tag.
