@@ -8,11 +8,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
-# The section the manifold dialect's catalog is published under in the Pipelex service's artifact.
-# Named here so the kit config, the fetcher's dummy and the tests cannot drift apart on a string
-# literal.
-MANIFOLD_MODEL_SPECS_SECTION = "manifold_model_specs"
-
 
 class PipelexBackend(StrEnum):
     """Special Pipelex-managed inference backends."""
@@ -27,18 +22,6 @@ class PipelexBackend(StrEnum):
                 return "Pipelex Manifold"
             case PipelexBackend.INTERNAL:
                 return "Internal (software-only)"
-
-
-def resolve_model_specs_section(*, backend_name: str, declared_section: str | None) -> str | None:
-    """The remote-config section this backend's model specs come from, or `None` when it has none.
-
-    **Declaring a section is what makes a backend a managed gateway backend**: its model specs
-    arrive from the Pipelex service's published artifact rather than from a local per-backend TOML.
-    A backend with no section resolves to `None` and loads its specs from its own file, which is
-    every BYOK backend and the internal one. No name resolves to a section it did not declare.
-    """
-    del backend_name  # every managed backend declares its section; the name carries no default
-    return declared_section
 
 
 class InferenceBackend(ConfigModel):

@@ -158,7 +158,7 @@ def run_pipe_cmd(
                 agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
-            make_pipelex_for_agent_cli(needs_inference=not dry_run, needs_model_specs=True)
+            make_pipelex_for_agent_cli(needs_inference=not dry_run)
 
             try:
                 result = asyncio.run(

@@ -35,7 +35,6 @@ orchestration-venue sense and keeps the word for good.
 """
 
 import types
-import warnings
 from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
@@ -97,10 +96,6 @@ from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_ma
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.config_surface import INFERENCE_BACKEND_CONFIG_SURFACE_ID, PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
-from pipelex.system.pipelex_service.exceptions import RemoteConfigStaleWarning
-from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
-from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.registries.class_registry_access import class_registry_scoping
 from pipelex.system.registries.func_registry import FuncRegistry, func_registry
 from pipelex.system.registries.singleton import MetaSingleton
@@ -125,11 +120,8 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from pipelex.cogt.model_backends.gateway_config import GatewayConfig
     from pipelex.plugins.contract import PipelexPlugin
     from pipelex.plugins.plugin_group import PluginGroup
-    from pipelex.system.pipelex_service.remote_config import RemoteConfig
-    from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
@@ -341,7 +333,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
         boot_orchestrator: str | None = None,
-        needs_model_specs: bool | None = None,
         builtin_plugins: "Sequence[PipelexPlugin] | None" = None,
         core_unconditional_plugin_names: frozenset[str] | None = None,
         entry_point_groups: "Sequence[PluginGroup] | None" = None,
@@ -373,66 +364,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # --- Pipelex Service and Telemetry --------------------------------------------------
-
-        # Which Pipelex-managed gateway backends are enabled, and which section of the published
-        # artifact each takes its model specs from.
-        try:
-            managed_gateway_sections = enabled_managed_gateway_sections()
-        except BACKEND_LIBRARY_REFUSED as backends_document_exc:
-            # The document is read here before the library loads it: a file that does not parse
-            # is the library's refusal, and it gets the library's message.
-            msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backends_document_exc)
-            raise PipelexSetupError(msg) from backends_document_exc
-        is_pipelex_service_enabled = bool(managed_gateway_sections)
-
-        effective_needs_model_specs = needs_model_specs if needs_model_specs is not None else needs_inference
-
-        remote_config: RemoteConfig | None = None
-        managed_gateway_configs: dict[str, GatewayConfig] | None = None
-        gateway_config_source: RemoteConfigSource | None = None
-        if is_pipelex_service_enabled:
-            if not effective_needs_model_specs:
-                # Use dummy config when inference is not needed (for testing without network access)
-                remote_config = RemoteConfigFetcher.make_dummy_remote_config()
-                managed_gateway_configs = build_managed_gateway_configs(
-                    remote_config=remote_config,
-                    managed_gateway_sections=managed_gateway_sections,
-                )
-                # Keep ``gateway_config_source`` as ``None``: the dummy specs are an empty
-                # placeholder, not real Gateway data. ``ModelManager._enforce_gateway_model_membership``
-                # treats ``source is None`` as "nothing to validate against," so the membership
-                # check is skipped on this path — which is what we want for read-only flows like
-                # ``pipelex-agent models`` without ``--backend``.
-                log.verbose("Using dummy remote config (inference not needed)")
-            else:
-                # Fetch remote configuration (may fall back to on-disk cache when offline).
-                remote_config_result = RemoteConfigFetcher.fetch_remote_config()
-                remote_config = remote_config_result.config
-                gateway_config_source = remote_config_result.source
-                log.verbose(f"Successfully fetched the Pipelex remote configuration (source={gateway_config_source})")
-                managed_gateway_configs = build_managed_gateway_configs(
-                    remote_config=remote_config,
-                    managed_gateway_sections=managed_gateway_sections,
-                )
-                # Stale operation: warn loudly so machine consumers can re-surface the provenance.
-                # Emission lives at this orchestration layer (not in the fetcher) so the fetcher
-                # stays a pure data-returning function — and so test fixtures that swap in a
-                # cached fetcher (tests/conftest.py) don't need to special-case warning replay.
-                if gateway_config_source.is_cached:
-                    cached_at_iso = remote_config_result.cached_at.isoformat() if remote_config_result.cached_at else "unknown"
-                    warnings.warn(
-                        f"The Pipelex-managed gateway backends are running off a cached remote config (snapshot: {cached_at_iso}). "
-                        "Run `pipelex init` while online to refresh.",
-                        RemoteConfigStaleWarning,
-                        stacklevel=2,
-                    )
-
         # --- Plugin discovery -----------------------------------------------------------------
         # Build the plugin registrar from the fully-resolved config (pure and import-light:
         # registering the built-ins imports no backend SDK, constructs no client, touches no hub).
-        # Built here — after the managed-gateway precondition gate above (so a first-run boot fails fast
-        # before any discovery work) and before the secrets provider and the log sink below, the first two
+        # Built here, before the secrets provider and the log sink below, the first two
         # capabilities resolved out of it: the built-in SecretsPlugin's factory (and any external
         # pipelex-secrets-<backend>) is looked up from the registrar-derived SecretsProviderRegistry, then
         # the sink from the LogSinkRegistry. The other registries
@@ -476,7 +411,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # SecretsPlugin supplies the "env" method, so there is no separate core default. Building it ahead
         # of the sink costs nothing in kind: what the provider logs is held like every line before the sink,
         # and when it fails to build, the lines held until then reach stderr redacted through the holding
-        # handler, as they do when a remote-config fetch above fails, while its exception goes up to the
+        # handler, as they do when plugin discovery above fails, while its exception goes up to the
         # caller as raised. It goes on the hub only further down: until then the keyword the sink factory
         # receives is the one way to reach it.
         secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
@@ -577,8 +512,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # The registrar was built above, before any of this, so its declarations are final here.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
-                managed_gateway_configs=managed_gateway_configs,
-                gateway_config_source=gateway_config_source,
                 plugin_model_declarations=plugin_registrar.make_model_declarations(),
                 needs_inference=needs_inference,
             )
@@ -943,7 +876,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
         boot_orchestrator: str | None = None,
-        needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -979,7 +911,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
                 boot_orchestrator=boot_orchestrator,
-                needs_model_specs=needs_model_specs,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
                 storage_provider=storage_provider,

@@ -9,29 +9,51 @@ of a configuration directory. `test_surface_directories.py` is the directory hal
 """
 
 import re
+from fnmatch import fnmatch
 from pathlib import Path
 
 import pytest
 
 from pipelex.migration.exceptions import MigrationRegistryError
-from pipelex.migration.surfaces import SurfaceRegistry
+from pipelex.migration.surfaces import RETIRED_CONFIG_FILE_NAMES, SurfaceRegistry
 from tests.unit.pipelex.migration.conftest import CONFIGURATION_ROOT, SurfaceBuilder
 
 
 class TestSurfaceResolution:
     def test_an_exact_base_file_claims_before_another_surfaces_glob(self, build_surface: SurfaceBuilder) -> None:
-        """The real configuration: `pipelex_service.toml` also matches `pipelex_*.toml`."""
         registry = SurfaceRegistry(
             surfaces=[
                 build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml"),
-                build_surface(surface_id="pipelex-service-config", base_file="pipelex_service.toml", tier_glob=None),
+                build_surface(surface_id="extra-config", base_file="pipelex_extra.toml", tier_glob=None),
             ]
         )
 
-        resolved = registry.surface_for_file(subdirectory=CONFIGURATION_ROOT, file_name="pipelex_service.toml")
+        resolved = registry.surface_for_file(subdirectory=CONFIGURATION_ROOT, file_name="pipelex_extra.toml")
 
         assert resolved is not None
-        assert resolved.surface_id == "pipelex-service-config"
+        assert resolved.surface_id == "extra-config"
+
+    @pytest.mark.parametrize("retired_file_name", sorted(RETIRED_CONFIG_FILE_NAMES))
+    def test_a_retired_file_is_claimed_by_no_surface_even_when_a_glob_matches_it(self, build_surface: SurfaceBuilder, retired_file_name: str) -> None:
+        """The real configuration: `pipelex_service.toml` is retired, and it matches `pipelex_*.toml`.
+
+        Nothing reads a retired file any more, so no ledger may be replayed over it, least of all the
+        one of a surface that never owned it.
+        """
+        registry = SurfaceRegistry(surfaces=[build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml")])
+        assert fnmatch(retired_file_name, "pipelex_*.toml"), "the fixture no longer exercises a glob collision"
+
+        assert registry.surface_for_file(subdirectory=CONFIGURATION_ROOT, file_name=retired_file_name) is None
+
+    def test_a_directory_walk_leaves_a_retired_file_out(self, tmp_path: Path, build_surface: SurfaceBuilder) -> None:
+        registry = SurfaceRegistry(surfaces=[build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml")])
+        (tmp_path / "pipelex.toml").write_text("", encoding="utf-8")
+        for retired_file_name in RETIRED_CONFIG_FILE_NAMES:
+            (tmp_path / retired_file_name).write_text("", encoding="utf-8")
+
+        claimed = registry.files_by_surface_in_directory(directory=tmp_path)
+
+        assert [path.name for _, path in claimed] == ["pipelex.toml"]
 
     def test_a_tier_file_resolves_to_the_surface_whose_glob_matches(self, build_surface: SurfaceBuilder) -> None:
         registry = SurfaceRegistry(surfaces=[build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml")])

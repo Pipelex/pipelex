@@ -1,7 +1,7 @@
 """Read-side helpers shared by every configuration surface.
 
 A **configuration surface** is one family of user-owned TOML files with one schema and one
-migration ledger — `pipelex.toml` and its tiers, `telemetry.toml`, `pipelex_service.toml`, and the
+migration ledger — `pipelex.toml` and its tiers, `telemetry.toml`, and the
 inference backend definitions under `inference/backends/`. Two things are the same for all of them on
 the read path, and this module is the one place that knows about either.
 
@@ -109,7 +109,6 @@ def version_declared_below_the_floor(*, ledger: MigrationLedger, config_dict: di
 # loader and the registry from drifting apart on a string literal.
 PIPELEX_CONFIG_SURFACE_ID = "pipelex-config"
 TELEMETRY_CONFIG_SURFACE_ID = "telemetry-config"
-PIPELEX_SERVICE_CONFIG_SURFACE_ID = "pipelex-service-config"
 INFERENCE_BACKEND_CONFIG_SURFACE_ID = "inference-backend"
 
 

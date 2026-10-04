@@ -3,7 +3,7 @@ from importlib.resources.abc import Traversable
 
 # Git-ignored config files that should not be synced between .pipelex and kit/configs.
 # These are personal override files that differ per developer/environment:
-# - pipelex_service.toml: Contains the onboarding state of this machine (False for new users, True for devs)
+# - pipelex_service.toml: retired, written by earlier releases; a developer's checkout may still hold one
 # - pipelex_override.toml: Personal config overrides
 # - telemetry_override.toml: Personal telemetry settings
 # - inference/backends_override.toml, inference/routing_profiles_override.toml: personal

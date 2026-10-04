@@ -1,5 +1,5 @@
 ---
-description: "Set up AI model providers, routing profiles, and inference backends — use Pipelex Gateway, direct API keys, or custom configurations."
+description: "Set up AI model providers, routing profiles, and inference backends with your own API keys and custom routing."
 ---
 
 # Inference Backend Configuration
@@ -8,23 +8,11 @@ The Inference Backend Configuration System manages how Pipelex handles AI model 
 
 ## Configuration Approaches
 
-Pipelex supports three flexible approaches for accessing AI models:
+Pipelex calls AI models through backends you configure with your own provider API keys.
 
-### Option A: Pipelex Gateway (Optional & Free)
+### Bring Your Own Keys
 
-Get a single API key that works with all major providers (OpenAI, Anthropic, Google, Mistral, FAL, and more). This is the **recommended approach for getting started quickly**.
-
-- ✅ Single API key for all providers
-- ✅ Simplified configuration
-- ✅ Automatic model routing
-- ✅ Free on Discord (limited time offer)
-
-!!! note "Terms of Service"
-    Using Pipelex Gateway requires accepting our terms of service. When you run `pipelex init`, you'll be prompted to review and accept the terms. Gateway usage enables identified telemetry (tied to your hashed API key) for service monitoring. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
-
-### Option B: Bring Your Own Keys
-
-Use your own API keys from individual providers for full control and direct billing. Ideal for production deployments with existing provider relationships.
+Use your own API keys from individual providers for full control and direct billing.
 
 - ✅ Direct provider relationships
 - ✅ Full control over billing
@@ -33,14 +21,13 @@ Use your own API keys from individual providers for full control and direct bill
 
 See [Inference Backends](#inference-backends) section below for configuration.
 
-### Option C: Mix & Match (Custom Routing)
+### Mix & Match (Custom Routing)
 
-Configure custom routing profiles to use your own keys for some models and Pipelex Gateway for others. This gives you full flexibility to optimize for cost, performance, or rate limits.
+Configure custom routing profiles to send some models to one provider and others to another. This gives you full flexibility to optimize for cost, performance, or rate limits.
 
-- ✅ Hybrid approach
 - ✅ Cost optimization
 - ✅ Performance tuning
-- ✅ Gradual migration between approaches
+- ✅ Gradual migration between providers
 
 See [Routing Profiles](#routing-profiles) section below for setup.
 
@@ -93,125 +80,6 @@ Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with 
 
     To customize aliases, presets, or default choices without conflict, edit (or create) any file in this directory whose name starts with `x_custom_` — Pipelex never tracks or overwrites those. See [`pipelex update`](../../tools/cli/update.md) for the full workflow.
 
-## Pipelex Gateway (Optional & Free)
-
-Pipelex Gateway is a unified inference backend that provides access to all major AI providers through a single API key. This is the **recommended approach for getting started quickly** with Pipelex and **unlocking its full power**—with many models already available and new ones being added constantly. Using Pipelex Gateway is **completely optional**.
-
-### Benefits
-
-- **Single API Key**: Access OpenAI, Anthropic, Google, Mistral, FAL, and more with one key
-- **Free to Get Started**: Available free on [app.pipelex.com](https://app.pipelex.com/) (no credit card required, limited time offer)
-- **Simplified Configuration**: No need to manage multiple provider credentials
-- **Automatic Routing**: All AI models (LLMs, OCR, image generation) are automatically routed to their respective providers
-- **Unified Interface**: Same configuration system for text generation, OCR, and image generation
-
-### Terms of Service & Telemetry
-
-Using Pipelex Gateway requires accepting our terms of service. When you enable Gateway and run `pipelex init`, you'll be prompted with a terms panel explaining:
-
-- **What we collect**: Model names, token counts, latency, error rates (technical data only)
-- **What we do NOT collect**: Your prompts, completions, pipe codes, or business data
-- **Why**: To monitor service quality, enforce fair usage, and provide better support
-- **Your choice**: If you decline, Gateway is disabled and you can use direct provider backends instead
-
-Your API key is hashed for security. Gateway telemetry operates independently from your `telemetry.toml` settings. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
-
-### Setup
-
-1. **Get your API key:**
-
-    - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
-    - Request your free API key in the appropriate channel
-    - No credit card required (limited time offer)
-
-2. **Configure environment variables:**
-
-    ```bash
-    # Copy the example environment file
-    cp .env.example .env
-    
-    # Edit .env and add your Pipelex Gateway API key
-    PIPELEX_GATEWAY_API_KEY="your-api-key"
-    ```
-
-3. **Accept terms and verify configuration:**
-
-    ```bash
-    pipelex init
-    ```
-    
-    When prompted, review and accept the Gateway terms of service.
-
-4. **Verify backend configuration:**
-   
-   The `pipelex_gateway` backend should be enabled in `.pipelex/inference/backends.toml`:
-   
-   ```toml
-   [pipelex_gateway]
-   display_name = "⭐ Pipelex Gateway"
-   enabled = true
-   api_key = "${PIPELEX_GATEWAY_API_KEY}"
-   ```
-   
-   The environment variable `${PIPELEX_GATEWAY_API_KEY}` will be automatically loaded from your environment.
-
-4. **Verify routing configuration:**
-
-   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `all_pipelex_gateway`:
-
-   ```toml
-   active = "all_pipelex_gateway"
-
-   [profiles.all_pipelex_gateway]
-   description = "Use Pipelex Gateway for all its supported models"
-   default = "pipelex_gateway"
-   ```
-
-### Usage
-
-Once configured, all models are available through the unified backend. Use standard model names in your pipelines:
-
-```toml
-[pipe.example]
-type = "PipeLLM"
-model = { model = "claude-4.5-sonnet", temperature = 0.7 }
-# Model automatically routed through Pipelex Gateway
-```
-
-### Gateway Model Overrides
-
-!!! warning "Advanced Feature - Use at Your Own Risk"
-    The Pipelex Gateway model configuration is fetched remotely from Pipelex servers. Any local override may cause unexpected behavior or failures, as the remote configuration may change at any time.
-
-If you need to customize how a specific model behaves through the Gateway, you can add per-model overrides in `.pipelex/inference/backends/pipelex_gateway.toml`. However, only two keys are supported:
-
-- `sdk`: The SDK to use for the model (e.g., `gateway_completions`)
-- `structure_method`: The method for structured output (e.g., `instructor/openai_tools`)
-
-All other keys will be ignored. What each structure method sends is described under [Structure methods](#structure-methods).
-
-```toml
-# .pipelex/inference/backends/pipelex_gateway.toml
-
-# Per-model overrides example:
-[gpt-4o]
-sdk = "gateway_completions"
-structure_method = "instructor/openai_tools"
-```
-
-!!! tip "Prefer Direct Backends for Custom Configurations"
-    If you need custom configurations beyond `sdk` and `structure_method`, consider using your own API keys with direct provider backends (openai, anthropic, etc.) instead of Gateway overrides.
-
-### Model Availability Note
-
-While Pipelex Gateway provides access to most AI models through a unified API, certain specialized models require their native backend to be enabled directly:
-
-- **FAL image generation models** (e.g., Flux models) - Enable the FAL backend
-- **OpenAI image generation** (`gpt-image-1`) - Enable the OpenAI backend (should also work via Azure OpenAI, but we haven't been able to test this - if you've successfully used it on Azure, please let us know on [Discord](https://go.pipelex.com/discord) so we can validate this configuration)
-- **Mistral OCR models** - Enable the Mistral backend
-
-These models are not proxied through Pipelex Gateway and require direct configuration of their respective backends with appropriate API keys.
-
 ## Inference Backends
 
 Backends represent AI service providers that can offer LLMs, OCR models, or image generation models. Each backend is configured with its endpoint and authentication details.
@@ -234,9 +102,6 @@ cp .env.example .env
 The `.env.example` file contains all available providers with helpful comments:
 
 ```bash
-# [OPTIONAL] Free Pipelex Gateway API key - Get yours on Discord: https://go.pipelex.com/discord
-PIPELEX_GATEWAY_API_KEY=
-
 OPENAI_API_KEY=
 
 # Amazon Bedrock - For accessing models via Amazon Bedrock
@@ -300,7 +165,9 @@ enabled = true
 
 The `${VARIABLE_NAME}` syntax automatically loads values from your `.env` file. Set `enabled = true` to activate a backend, or `false` to disable it.
 
-Judgment models are never served by the Pipelex Gateway, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
+An enabled backend must declare at least one model in its file under `backends/` (see [Model Specifications](#model-specifications)). Pipelex refuses to boot when one declares none, because routing would send models to a backend that cannot serve them: disable the backend, or list the models it serves. The `internal` backend is exempt, since plugins add its models at boot. A backend table also no longer accepts a `model_specs_section` key; an enabled backend that still carries one is refused, and the fix is to list its models in `backends/<name>.toml` and remove the key, or to disable the backend.
+
+Judgment models are served by their own backend alone, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
 
 ### Model Specifications
 
@@ -358,7 +225,7 @@ A file whose format the consuming model does not declare is refused with an inpu
 
 #### Structure methods
 
-`structure_method` says how a model is asked for structured output. A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and so is `instructor/openai_structured_outputs`, which sends OpenAI a non-strict tool schema; `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through the Gateway's OpenAI-compatible SDKs.
+`structure_method` says how a model is asked for structured output. A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and so is `instructor/openai_structured_outputs`, which sends OpenAI a non-strict tool schema; `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through an OpenAI-compatible SDK.
 
 One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice.
 
@@ -394,35 +261,15 @@ Unknown key on model 'gpt-4o' for backend 'openai' from file '.pipelex/inference
 letters, digits and the characters !#$%&'*+-.^_`|~.
 ```
 
-The Pipelex Gateway's model specs are fetched from Pipelex servers rather than read from a local file, and there the same rule is applied leniently: a header-shaped key whose name and value the wire can carry becomes a header, and any other unknown key — including a header-shaped one whose value is not a string, or whose name or value HTTP would refuse — is dropped instead of failing the boot, since a served config can legitimately be newer or older than the client reading it.
-
-`endpoint_path` is a declared model-spec field, not a header: it names the provider-side route for models that are called by raw path (the Gateway's image models), and is never sent on the wire.
+`endpoint_path` is a declared model-spec field, not a header: it names the provider-side route for models that are called by raw path (some gateways' image models), and is never sent on the wire.
 
 ## Routing Profiles
 
-Routing profiles determine which backend handles specific models. This is where you configure the **Mix & Match approach** (Option C) to optimize your setup. Configure them in `.pipelex/inference/routing_profiles.toml`:
+Routing profiles determine which backend handles specific models. This is where you configure the **Mix & Match approach** to optimize your setup. Configure them in `.pipelex/inference/routing_profiles.toml`:
 
 ### Profile Examples
 
-**All Pipelex Gateway (Option A):**
-
-Setup:
-```bash
-# In .env
-PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
-```
-
-In `.pipelex/inference/routing_profiles.toml`:
-```toml
-# Which profile to use
-active = "all_pipelex_gateway"
-
-[profiles.all_pipelex_gateway]
-description = "Use Pipelex Gateway for all its supported models"
-default = "pipelex_gateway"
-```
-
-**Native Providers Only (Option B):**
+**Native Providers Only:**
 
 Setup:
 ```bash
@@ -450,12 +297,12 @@ default = "openai"
 "flux-*" = "fal"
 ```
 
-**Mix & Match (Option C):**
+**Mix & Match:**
 
 Setup:
 ```bash
-# In .env - combine Pipelex with specific provider keys
-PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
+# In .env - combine the provider keys you need
+ANTHROPIC_API_KEY="your-anthropic-key"
 OPENAI_API_KEY="your-openai-key"  # For GPT models
 FAL_API_KEY="your-fal-key"        # For image generation
 ```
@@ -465,16 +312,17 @@ In `.pipelex/inference/routing_profiles.toml`:
 active = "hybrid"
 
 [profiles.hybrid]
-description = "Use Pipelex Gateway for most models, native providers for specific ones"
-default = "pipelex_gateway"
+description = "Claude on Anthropic, GPT on OpenAI, FLUX on fal"
+default = "anthropic"
 
 [profiles.hybrid.routes]
-# Use your own OpenAI key for GPT models (better rate limits)
+# Use your own OpenAI key for GPT models and OpenAI image generation
 "gpt-*" = "openai"
 # Use your own FAL key for image generation (direct billing)
 "flux-*" = "fal"
-# All other models use Pipelex Gateway (claude, gemini, mistral, etc.)
 ```
+
+The `default` backend only serves the models it declares: Anthropic serves Claude models and nothing else, so a model with no route here that Anthropic does not serve, such as a Gemini or Mistral model, is left out of the deck. Give every model family you use a route, or list your backends in a `fallback_order` as the shipped `all_enabled_backends` profile does, so each model goes to the first enabled backend that serves it.
 
 ### Routing System Features
 
@@ -485,22 +333,22 @@ The routing system supports:
   - Prefix: `"gpt-*" = "openai"`
   - Suffix: `"*-turbo" = "openai"`
   - Contains: `"*-vision-*" = "openai"`
-- **Default fallback**: `default = "pipelex_gateway"`
+- **Default fallback**: `default = "anthropic"`
 
 ### Use Cases for Mix & Match
 
 Common scenarios for hybrid routing:
 
-1. **Cost Optimization**: Use Pipelex Gateway for expensive models, your own keys for cheaper ones
-2. **Rate Limits**: Use your own keys for high-volume models to avoid shared rate limits
-3. **Gradual Migration**: Start with Pipelex Gateway, gradually move to your own keys as usage grows
-4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Gateway
+1. **Cost Optimization**: Send expensive models to the provider that prices them best
+2. **Rate Limits**: Spread high-volume models across providers to avoid rate limits
+3. **Gradual Migration**: Move models from one provider to another one route at a time
+4. **Provider Features**: Use a model's native provider when you need features an aggregator does not proxy
 
 ### Internal Backend (Always Available)
 
 The **internal backend** is a special backend containing software-only models that run locally without requiring AI services. These include models for PDF text extraction, local document parsing, and other processing tasks that don't need external API calls.
 
-Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_pipelex_gateway` or `all_openai`).
+Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_anthropic` or `all_openai`).
 
 This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
 
@@ -681,12 +529,12 @@ Where a file lives decides its reach. The base file resolves as before — the p
 
 The global override reaches a project that carries its own tracked base, which is the point: one edit under `~/.pipelex/inference/` and every project follows. Deleting the override files restores the shipped default.
 
-A developer who wants a whole machine off the gateway and on Anthropic writes two files once:
+A developer who wants a whole machine on Anthropic alone writes two files once:
 
 ```toml
 # ~/.pipelex/inference/backends_override.toml
-[pipelex_gateway]
-enabled = false
+[anthropic]
+enabled = true
 ```
 
 ```toml
@@ -696,7 +544,7 @@ active = "all_anthropic"
 
 Enabling a backend and activating a profile that needs it go together: a profile whose default or routes name a backend that is not enabled is refused at boot, and the error names the backend to enable. `pipelex show backends` and `pipelex doctor` report the merged view, so what they print is what runs.
 
-An override leaves a trace. When one was merged, the boot logs which files each document was read from, so a run on an unexpected backend says why in its own log. A file that does not parse is refused the way an invalid document is — as a setup error naming the file, in the boot, in `pipelex init` and in the doctor's Models row — and so is a value where a table was meant, such as `anthropic = false` where `[anthropic]` with `enabled = false` was intended. `pipelex init` keeps writing the base file, but it decides whether a Pipelex-managed gateway backend is enabled on the merged document, so one switched on only by an override still gets the terms prompt; and when declining the terms disables those backends in the base while an override still pins one on, the command says so and names both the backend and the file to edit.
+An override leaves a trace. When one was merged, the boot logs which files each document was read from, so a run on an unexpected backend says why in its own log. A file that does not parse is refused the way an invalid document is — as a setup error naming the file, in the boot, in `pipelex init` and in the doctor's Models row — and so is a value where a table was meant, such as `anthropic = false` where `[anthropic]` with `enabled = false` was intended. `pipelex init` keeps writing the base file.
 
 ### Custom deck files
 
@@ -720,7 +568,7 @@ small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 
 ```toml
 [extract.waterfalls]
-document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
+document_extractor = ["mistral-document-ai-2505", "pypdfium2-extract-pdf"]
 ```
 
 When using waterfalls in `.mthds` files, prefix them with `~`:
@@ -783,7 +631,7 @@ pipelex migrate             # ask, then rewrite in place
 What it touches and what it leaves alone:
 
 - **Every `*.toml` directly in `inference/backends/`** — the files this page describes, in both the global `~/.pipelex/` and a project's `.pipelex/`.
-- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`, which also refreshes `internal.toml` from the kit.
+- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`, which also refreshes `internal.toml` from the kit. A `backends.toml` left by an older release that still enables a backend with no model file, such as `[pipelex_gateway]`, is refused at boot and has to be edited by hand: set that backend's `enabled = false`, and point the active routing profile in `routing_profiles.toml` at a backend you have enabled.
 - **Not a key you added yourself.** The history only describes keys *we* removed or renamed. An unknown key of your own — a misspelled `maxx_tokens`, an extra header that is not header-shaped — is still an error, and it names the file, the key and what to do. That is deliberate: silently dropping a key you meant to set would change which model you get.
 - **Every file it rewrites is copied first**, beside itself, as `<file>.bak.<UTC timestamp>`. Running the command twice is the same as running it once — a file already up to date comes back byte for byte identical.
 
@@ -794,9 +642,8 @@ See [The Migration Ledger](../../migration-ledger.md) for what the history may c
 ## Best Practices
 
 1. **Choosing Your Configuration Approach**:
-   - **Starting out?** Use Pipelex Gateway (Option A) to get running quickly
-   - **Production deployment?** Consider bringing your own keys (Option B) for direct billing control
-   - **Optimizing costs/performance?** Use Mix & Match (Option C) for maximum flexibility
+   - **Starting out?** Enable the one provider you already have a key for, and route everything to it
+   - **Optimizing costs/performance?** Use Mix & Match for maximum flexibility
    - You can switch between approaches at any time by changing your routing profile
 
 2. **Backend Management**:

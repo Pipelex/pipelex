@@ -20,12 +20,11 @@ Unlike LLM APIs (partly standardized around OpenAI's completions API), the OCR l
 | **pypdfium2** | Built-in | Basic PDF text and image extraction without AI inference — works out of the box with no API keys |
 | **Mistral OCR** | Cloud API | Industry-leading document understanding for media, text, tables, and equations |
 | **docling** | Local SDK | IBM's open-source extraction library with local CPU processing and optional GPU acceleration |
-| **Azure Document Intelligence** | Pipelex Manifold | Enterprise-grade OCR with high accuracy for complex layouts, tables, and handwriting |
 | **Linkup Fetch** | Cloud API | Web page content extraction — fetches and extracts text from web URLs |
 
 ## The Default Extractor
 
-A `PipeExtract` step that names no model uses `@default-extract-document`, which tries Azure Document Intelligence, then Mistral OCR, then `pypdfium2-extract-pdf`, and takes the first one an enabled backend serves. Azure Document Intelligence is served through Pipelex Manifold and Mistral OCR by the `mistral` backend with your own `MISTRAL_API_KEY`; with neither, a PDF is read locally from its text layer, which needs no key but recovers no text from a scanned page, and the run logs that it fell back. `@default-extract-image` and `@default-premium` try the two OCR models only, so they need one of those backends. Name a model in the step, or point the aliases elsewhere in `x_custom_extract_deck.toml`, to choose differently.
+A `PipeExtract` step that names no model uses `@default-extract-document`, which tries Mistral OCR, then `pypdfium2-extract-pdf`, and takes the first one an enabled backend serves. Mistral OCR is served by the `mistral` backend with your own `MISTRAL_API_KEY`; without it, a PDF is read locally from its text layer, which needs no key but recovers no text from a scanned page, and the run logs that it fell back. `@default-extract-image` and `@default-premium` try Mistral OCR only, so they need the `mistral` backend. Name a model in the step, or point the aliases elsewhere in `x_custom_extract_deck.toml`, to choose differently.
 
 ## Formats Each Extractor Reads
 
@@ -36,7 +35,6 @@ Each extract model declares the file formats it reads, and a `PipeExtract` step 
 | `pypdfium2-extract-pdf` | PDF |
 | `docling-extract-text` | PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), HTML, Markdown (`.md`), CSV, plain text (`.txt`), WebVTT captions (`.vtt`), email messages (`.eml`) and images |
 | Mistral OCR (`mistral-ocr` and its versions) | PDF and images |
-| `azure-document-intelligence` (Pipelex Manifold) | PDF and images |
 | `linkup-fetch` (Linkup) | Web pages, fetched from their URL |
 
 A file in a format the step's model does not read is refused before the run starts, with an input error that names the input, its format, the step, the model and the formats that model reads. Give the file in a format the model reads, or choose a model that reads it. When the step can only be reached through a condition, the run starts, and the step refuses the file the same way when it gets to it. See [File formats are checked before the run](../building-methods/concepts/native-concepts.md#file-formats-are-checked-before-the-run).

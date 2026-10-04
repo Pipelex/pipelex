@@ -39,10 +39,9 @@
 # The runtime layers more than the `_override` tier over a base file: `_local`, `_{environment}`
 # selected by PIPELEX_ENV, and `_temporary_override`, for every configuration family in the
 # directory rather than for `pipelex` alone. Environment names are open-ended, so the exclusion is
-# by shape — any suffixed variant of a base file — and the one tracked variant is named back in.
+# by shape — any suffixed variant of a base file.
 # The nested inference overrides need their own line because a pattern's `*` does not cross a `/`.
 api/.pipelex/*_*.toml
-!api/.pipelex/pipelex_service.toml
 api/.pipelex/inference/*_override.toml
 api/.pipelex/storage
 api/.pipelex/traces

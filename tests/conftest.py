@@ -10,9 +10,6 @@ from pipelex import log
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
-from pipelex.system.pipelex_service.remote_config import RemoteConfig
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher, RemoteConfigResult
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
@@ -24,22 +21,6 @@ pytest_plugins = [
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
-
-# Session-level cache for remote config (using dict to avoid global statement)
-_remote_config_cache: dict[str, RemoteConfig] = {}
-_original_fetch_remote_config = RemoteConfigFetcher.fetch_remote_config
-
-
-def _cached_fetch_remote_config(require_fresh: bool = False) -> "RemoteConfigResult":  # ruff: ignore[unused-function-argument]
-    """Wrapper that caches the remote config for the entire test session.
-
-    The ``require_fresh`` arg matches the new fetcher signature; ignored here because the
-    test-session cache exists precisely so we don't re-hit the network mid-suite.
-    """
-    if "config" not in _remote_config_cache:
-        result = _original_fetch_remote_config()
-        _remote_config_cache["config"] = result.config
-    return RemoteConfigResult(config=_remote_config_cache["config"], source=RemoteConfigSource.FRESH, cached_at=None)
 
 
 def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
@@ -68,9 +49,7 @@ def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def cache_configs_for_session(session_mocker: MockerFixture):
-    """Cache configurations and optimize teardown for the entire test session."""
-    # Cache remote config to avoid repeated network fetches
-    session_mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _cached_fetch_remote_config)
+    """Optimize teardown for the entire test session."""
     # Skip expensive telemetry shutdown (OTel + PostHog flush) during tests
     from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # ruff: ignore[import-outside-top-level]
 

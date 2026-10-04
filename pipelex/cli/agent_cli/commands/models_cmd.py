@@ -35,7 +35,7 @@ def agent_models_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
     try:
-        make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=backend is not None)
+        make_pipelex_for_agent_cli(needs_inference=False)
 
         result = list_models(categories=model_type, backend=backend)
 

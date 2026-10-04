@@ -102,8 +102,6 @@ FileTypeError | File type | https://docs.pipelex.com/latest/errors/file-type-err
 FixTransactionError | Fix transaction | https://docs.pipelex.com/latest/errors/fix-transaction-error/
 FixWriteConflictError | Fix write conflict | https://docs.pipelex.com/latest/errors/fix-write-conflict-error/
 FuncRegistryError | Func registry | https://docs.pipelex.com/latest/errors/func-registry-error/
-GatewayConfigMergeError | Gateway config merge | https://docs.pipelex.com/latest/errors/gateway-config-merge-error/
-GatewayUnknownModelError | Gateway unknown model | https://docs.pipelex.com/latest/errors/gateway-unknown-model-error/
 GcpLogSinkCredentialsError | Log sink credentials missing or refused | https://docs.pipelex.com/latest/errors/gcp-log-sink-credentials-error/
 GeneratedImageError | Generated image | https://docs.pipelex.com/latest/errors/generated-image-error/
 GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/
@@ -259,8 +257,6 @@ PipelexCLIError | Pipelex CLI | https://docs.pipelex.com/latest/errors/pipelex-c
 PipelexConfigError | Pipelex config | https://docs.pipelex.com/latest/errors/pipelex-config-error/
 PipelexError | Pipelex error | https://docs.pipelex.com/latest/errors/pipelex-error/
 PipelexRuntimeBridgeError | Pipelex runtime bridge | https://docs.pipelex.com/latest/errors/pipelex-runtime-bridge-error/
-PipelexServiceConfigValidationError | Pipelex service config validation | https://docs.pipelex.com/latest/errors/pipelex-service-config-validation-error/
-PipelexServiceError | Pipelex service | https://docs.pipelex.com/latest/errors/pipelex-service-error/
 PipelexSetupError | Pipelex setup | https://docs.pipelex.com/latest/errors/pipelex-setup-error/
 PipelexUnexpectedError | Unexpected internal error | https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/
 PipelineExecutionError | Pipeline execution | https://docs.pipelex.com/latest/errors/pipeline-execution-error/
@@ -286,9 +282,6 @@ PromptImageFactoryError | Prompt image factory | https://docs.pipelex.com/latest
 PromptImageFormatError | Prompt image format | https://docs.pipelex.com/latest/errors/prompt-image-format-error/
 PyPdfium2RendererError | Py pdfium 2 renderer | https://docs.pipelex.com/latest/errors/py-pdfium2-renderer-error/
 ReadinessCheckError | Readiness check | https://docs.pipelex.com/latest/errors/readiness-check-error/
-RemoteConfigFetchError | Remote config fetch | https://docs.pipelex.com/latest/errors/remote-config-fetch-error/
-RemoteConfigUnavailableError | Remote config unavailable | https://docs.pipelex.com/latest/errors/remote-config-unavailable-error/
-RemoteConfigValidationError | Remote config validation | https://docs.pipelex.com/latest/errors/remote-config-validation-error/
 RemoteFileFetchError | Remote file could not be fetched | https://docs.pipelex.com/latest/errors/remote-file-fetch-error/
 ReportingManagerError | Reporting manager | https://docs.pipelex.com/latest/errors/reporting-manager-error/
 ReservedServiceErrorCodeError | Reserved service error code | https://docs.pipelex.com/latest/errors/reserved-service-error-code-error/

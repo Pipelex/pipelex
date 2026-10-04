@@ -23,9 +23,6 @@ from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_secrets_provider
-from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
-from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 # The engines the stubs stand in for: the built-in pdf from the layout, and two of the document generation plugin's,
@@ -135,21 +132,12 @@ def make_doc_gen_backends(*, registrar: PluginRegistrar) -> dict[str, MakeWorker
 def make_models_manager(*, plugin_model_declarations: PluginModelDeclarations, backends_dir_path: Path | None = None) -> ModelManager:
     """A model manager set up from this runtime's configuration with the given plugins' declarations.
 
-    Set up the way a boot that needs no model specs is, with the managed gateways' placeholder specs: nothing is
-    fetched, and the internal models, the plugins' included, resolve through the internal backend. A test that needs
-    other backend files hands their directory in.
+    Set up the way a boot that needs no inference is: the internal models, the plugins' included, resolve through the
+    internal backend. A test that needs other backend files hands their directory in.
     """
-    managed_gateway_sections = enabled_managed_gateway_sections()
-    managed_gateway_configs = (
-        build_managed_gateway_configs(remote_config=RemoteConfigFetcher.make_dummy_remote_config(), managed_gateway_sections=managed_gateway_sections)
-        if managed_gateway_sections
-        else None
-    )
     models_manager = ModelManager()
     models_manager.setup(
         secrets_provider=get_secrets_provider(),
-        managed_gateway_configs=managed_gateway_configs,
-        gateway_config_source=None,
         plugin_model_declarations=plugin_model_declarations,
         needs_inference=False,
         backends_dir_path=str(backends_dir_path) if backends_dir_path is not None else None,

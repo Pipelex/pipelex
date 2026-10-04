@@ -24,18 +24,24 @@ turns these tests red instead of quietly testing an unplanted document.
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cogt.exceptions import InferenceBackendLibraryError
-from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
+from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceBackendLibraryValidationError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
+from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, CONFIG_DIR_NAME, INFERENCE_DIR_NAME
+from pipelex.system.configuration.config_loader import (
+    BACKENDS_DIR_NAME,
+    BACKENDS_FILE_NAME,
+    CONFIG_DIR_NAME,
+    INFERENCE_DIR_NAME,
+    ROUTING_PROFILES_FILE_NAME,
+)
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
@@ -53,18 +59,19 @@ enabled = true
 api_key = "sk-not-a-real-key-either"
 """
 
-MANIFOLD_BACKENDS_TOML = f"""
-[pipelex_manifold]
-enabled = true
-model_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"
-endpoint = "https://manifold.example.com"
-api_key = "sk-not-a-real-key"
-"""
+# The previous release's kit copies of `backends.toml` and `routing_profiles.toml`, as `pipelex init` left
+# them on every machine set up with it, plus the per-backend file that kit shipped for an enabled backend
+# the current kit no longer carries: a missing per-backend file is fatal for an enabled backend.
+PREVIOUS_RELEASE_KIT_DIR = Path("tests/data/inference/previous_release_kit")
 
-MANIFOLD_SERVED_SPECS: dict[str, Any] = {
-    "defaults": {"model_type": "llm", "sdk": "openai_responses", "thinking_mode": "none"},
-    "gpt-4o": {"model_id": "gpt-4o"},
-}
+# The disabled table in the previous kit: its variables are never set here, so a load that substituted
+# them before checking `enabled` would fail the strict case.
+PREVIOUS_RELEASE_DISABLED_BACKEND = "pipelex_manifold"
+PREVIOUS_RELEASE_DISABLED_BACKEND_VARS = ("PIPELEX_MANIFOLD_ENDPOINT", "PIPELEX_MANIFOLD_API_KEY")
+
+# The enabled table in the previous kit whose per-backend file declares no model, and the line enabling it.
+PREVIOUS_RELEASE_EMPTY_ENABLED_BACKEND = "pipelex_gateway"
+PREVIOUS_RELEASE_GATEWAY_ENABLED_LINE = "enabled = true                         # Enable after accepting terms via `pipelex init config`"
 
 # The key `#1104` deleted, and the two shapes it survives in. The value is immaterial to every
 # assertion below — what matters is that the blueprint no longer has anywhere to put it.
@@ -137,21 +144,13 @@ class TestAStaleBackendDirectory:
         plant_on_model(path=portkey_file, table_header='["gemini-2.5-pro"]')
         return openai_file, portkey_file
 
-    def _load(
-        self,
-        machine: Path,
-        *,
-        lenient: bool,
-        library_body: str = BACKENDS_TOML,
-        managed_gateway_configs: dict[str, GatewayConfig] | None = None,
-    ) -> InferenceBackendLibrary:
-        library_path = self._write_library(machine, body=library_body)
+    def _load(self, machine: Path, *, lenient: bool) -> InferenceBackendLibrary:
+        library_path = self._write_library(machine)
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
             backends_library_paths=[library_path],
             backends_dir_path=str(self._backends_dir(machine)),
-            managed_gateway_configs=managed_gateway_configs,
             lenient=lenient,
         )
         return library
@@ -254,27 +253,85 @@ class TestAStaleBackendDirectory:
 
         assert retry.call_count == 0
 
-    def test_a_stale_managed_gateway_override_never_reaches_the_loader_at_all(self, machine: Path) -> None:
-        """A managed gateway's local file is the one backend file a stale key cannot break, and here is why.
 
-        `GatewayConfigMerger` ignores a local `[defaults]` outright and keeps only `sdk` and
-        `structure_method` from a per-model override, so the retired key is filtered out before any
-        spec is built. That is why the retry below is wired to local backend files only — and this
-        test is what would go red if the merger ever stopped filtering, which is the day the gateway
-        path would need one too. `pipelex migrate` still repairs the file on disk: it is a `*.toml`
-        in the directory the surface owns, and the walk claims it like any other.
-        """
-        gateway_file = self._backends_dir(machine) / f"{PipelexBackend.MANIFOLD}.toml"
-        gateway_file.write_text(f'[defaults]\n{RETIRED_KEY} = "openai"\n\n[gpt-4o]\n{RETIRED_KEY} = "openai"\n', encoding="utf-8")
+def replace_once(*, path: Path, old: str, new: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    assert text.count(old) == 1, f"expected exactly one {old!r} in {path}"
+    path.write_text(text.replace(old, new), encoding="utf-8")
 
-        library = self._load(
-            machine,
-            lenient=False,
-            library_body=MANIFOLD_BACKENDS_TOML,
-            managed_gateway_configs={PipelexBackend.MANIFOLD: GatewayConfig(model_specs=MANIFOLD_SERVED_SPECS)},
+
+class TestThePreviousReleaseKit:
+    """A machine set up by the previous release is told what to change, then boots once it has.
+
+    As that release left it, its `backends.toml` enables the Pipelex Gateway over a comment-only file and
+    its active routing profile sends every model there: that is refused, naming the backend, rather than
+    booted with every model silently missing from the deck. Once the user disables that table and picks
+    another profile, as the changelog says, the rest loads: the disabled Manifold table, which carries a key
+    the backend blueprint does not define, is skipped before its variables are substituted or its file is
+    read, and only the active routing profile is validated against the enabled backends.
+    """
+
+    @pytest.fixture
+    def inference_dir(self, tmp_path: Path) -> Path:
+        inference_dir = tmp_path / INFERENCE_DIR_NAME
+        inference_dir.mkdir()
+        shutil.copy(PREVIOUS_RELEASE_KIT_DIR / BACKENDS_FILE_NAME, inference_dir / BACKENDS_FILE_NAME)
+        shutil.copy(PREVIOUS_RELEASE_KIT_DIR / ROUTING_PROFILES_FILE_NAME, inference_dir / ROUTING_PROFILES_FILE_NAME)
+        backends_dir = inference_dir / BACKENDS_DIR_NAME
+        shutil.copytree(kit_backends_dir(), backends_dir)
+        shutil.copytree(PREVIOUS_RELEASE_KIT_DIR / BACKENDS_DIR_NAME, backends_dir, dirs_exist_ok=True)
+        assert not (backends_dir / f"{PREVIOUS_RELEASE_DISABLED_BACKEND}.toml").exists(), "the disabled backend must have no file to read"
+        return inference_dir
+
+    @pytest.fixture
+    def environment(self, inference_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A dummy value for every variable the enabled tables reference, and none for the disabled table's."""
+        library_text = (inference_dir / BACKENDS_FILE_NAME).read_text(encoding="utf-8")
+        referenced_vars = set(re.findall(r"\$\{([A-Z0-9_]+)\}", library_text))
+        assert set(PREVIOUS_RELEASE_DISABLED_BACKEND_VARS) <= referenced_vars, "the fixture no longer exercises the disabled table"
+        for var_name in referenced_vars - set(PREVIOUS_RELEASE_DISABLED_BACKEND_VARS):
+            monkeypatch.setenv(var_name, f"dummy-{var_name.lower()}")
+        for var_name in PREVIOUS_RELEASE_DISABLED_BACKEND_VARS:
+            monkeypatch.delenv(var_name, raising=False)
+
+    @pytest.mark.usefixtures("environment")
+    @pytest.mark.parametrize("lenient", [True, False])
+    def test_as_left_its_enabled_gateway_serving_no_model_is_refused(self, inference_dir: Path, lenient: bool) -> None:
+        library = InferenceBackendLibrary.make_empty()
+        with pytest.raises(InferenceBackendLibraryValidationError) as refused:
+            library.load(
+                secrets_provider=EnvSecretsProvider(),
+                backends_library_paths=[inference_dir / BACKENDS_FILE_NAME],
+                backends_dir_path=str(inference_dir / BACKENDS_DIR_NAME),
+                lenient=lenient,
+            )
+
+        assert refused.value.backend_name == PREVIOUS_RELEASE_EMPTY_ENABLED_BACKEND
+        assert "declares no model" in str(refused.value)
+
+    @pytest.mark.usefixtures("environment")
+    @pytest.mark.parametrize("lenient", [True, False])
+    def test_its_backends_and_active_routing_profile_load_once_remedied(self, inference_dir: Path, lenient: bool) -> None:
+        replace_once(path=inference_dir / BACKENDS_FILE_NAME, old=PREVIOUS_RELEASE_GATEWAY_ENABLED_LINE, new="enabled = false")
+        replace_once(path=inference_dir / ROUTING_PROFILES_FILE_NAME, old='active = "all_pipelex_gateway"', new='active = "all_openai"')
+        library = InferenceBackendLibrary.make_empty()
+        library.load(
+            secrets_provider=EnvSecretsProvider(),
+            backends_library_paths=[inference_dir / BACKENDS_FILE_NAME],
+            backends_dir_path=str(inference_dir / BACKENDS_DIR_NAME),
+            lenient=lenient,
         )
 
-        backend = library.get_inference_backend(backend_name=PipelexBackend.MANIFOLD)
-        assert backend is not None
-        assert backend.model_specs["gpt-4o"].model_id == "gpt-4o", "the served spec is what loads, untouched"
+        enabled_backends = library.all_enabled_backends()
+        assert PREVIOUS_RELEASE_DISABLED_BACKEND not in library.root
+        assert {"openai", "anthropic", "internal"} <= set(enabled_backends)
         assert library.take_stale_configuration_warning() is None
+
+        routing_profile = load_active_routing_profile(
+            routing_profile_library_paths=[inference_dir / ROUTING_PROFILES_FILE_NAME],
+            enabled_backends=enabled_backends,
+            lenient=lenient,
+        )
+
+        assert routing_profile.default in enabled_backends
+        assert routing_profile.default != PREVIOUS_RELEASE_DISABLED_BACKEND

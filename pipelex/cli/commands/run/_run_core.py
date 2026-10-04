@@ -496,9 +496,8 @@ def execute_run(
     """
     # A dry run makes no inference call, so it must not demand credentials: `needs_inference=False`
     # forces every run to DRY and skips a backend whose key is missing instead of failing the boot.
-    # `needs_model_specs=True` keeps the real gateway model specs (not the dummy ones), so wherever
-    # credentials ARE present a dry run resolves model handles exactly as a live run would. It does not
-    # help on a machine with no key at all: a skipped backend contributes no models, so a pipe pinning a
+    # Wherever credentials ARE present a dry run resolves model handles exactly as a live run would. On
+    # a machine with no key at all, a skipped backend contributes no models, so a pipe pinning a
     # bare handle served only by that backend reports it as not found (see docs/features/validation-dry-run.md).
     # This is the same boot `pipelex-agent run --dry-run` uses, so the two CLIs agree either way.
     make_pipelex_for_cli(
@@ -506,7 +505,6 @@ def execute_run(
         library_dirs=library_dir,
         needs_inference=not dry_run,
         boot_orchestrator=orchestrator,
-        needs_model_specs=True,
     )
 
     try:

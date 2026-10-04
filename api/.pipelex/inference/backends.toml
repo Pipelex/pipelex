@@ -14,15 +14,6 @@
 #
 ####################################################################################################
 
-# Pipelex Manifold is a closed private beta: leave it off unless you have been invited.
-[pipelex_manifold]
-display_name = "Pipelex Manifold (private beta)"
-enabled = false
-endpoint = "${PIPELEX_MANIFOLD_ENDPOINT}"
-api_key = "${PIPELEX_MANIFOLD_API_KEY}"
-model_specs_section = "manifold_model_specs"
-auth_header = "x-pipelex-api-key"
-
 [anthropic]
 enabled = false
 api_key = "${ANTHROPIC_API_KEY}"

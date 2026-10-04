@@ -72,10 +72,6 @@ rationale = "Emits the formatted success result; single operand."
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::record_setup_warning"]
-param = "warning_payload"
-rationale = "Records the setup-warning payload; single operand."
-
 ["pipelex/cli/agent_cli/commands/agent_output.py::set_agent_cli_error_format"]
 param = "error_format"
 rationale = "Setter: installs the agent-CLI error format; single operand."
@@ -652,10 +648,6 @@ rationale = "Renders the value; single operand."
 param = "category"
 rationale = "Noun-named derivation: the header text for the category; single operand."
 
-["pipelex/cli/error_handlers.py::handle_gateway_unknown_model_error"]
-param = "exc"
-rationale = "Error handler: the exc is the single operand handled."
-
 ["pipelex/cli/error_handlers.py::handle_model_availability_error"]
 param = "exc"
 rationale = "Error handler: the exc is the single operand handled."
@@ -665,14 +657,6 @@ param = "exc"
 rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_model_deck_preset_error"]
-param = "exc"
-rationale = "Error handler: the exc is the single operand handled."
-
-["pipelex/cli/error_handlers.py::handle_remote_config_unavailable_error"]
-param = "exc"
-rationale = "Error handler: the exc is the single operand handled."
-
-["pipelex/cli/error_handlers.py::handle_remote_config_validation_error"]
 param = "exc"
 rationale = "Error handler: the exc is the single operand handled."
 
@@ -1984,10 +1968,6 @@ rationale = "Factory from source: builds the result from the backend_credential_
 param = "name"
 rationale = "Factory from source: builds the result from the name; single operand."
 
-["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary._load_gateway_model_specs"]
-param = "gateway_config"
-rationale = "Loads model specs from the gateway config; single operand."
-
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary._load_local_model_specs"]
 param = "backend_name"
 rationale = "Loads model specs for the named backend; single operand."
@@ -2191,22 +2171,6 @@ rationale = "Predicate on the candidate category; the filter list stays keyword.
 ["pipelex/cogt/models/model_listing.py::format_models_markdown"]
 param = "result"
 rationale = "Verb-object: formats the list_models result dict; single operand."
-
-["pipelex/cogt/models/model_manager.py::ModelManager._collect_candidates"]
-param = "ref"
-rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
-
-["pipelex/cogt/models/model_manager.py::ModelManager._collect_deck_referenced_handles"]
-param = "deck"
-rationale = "Keyed accessor by the deck; single operand."
-
-["pipelex/cogt/models/model_manager.py::ModelManager._enforce_gateway_model_membership"]
-param = "managed_gateway_configs"
-rationale = "Operates on the managed gateway configs; single operand (qualifiers keyword-only)."
-
-["pipelex/cogt/models/model_manager.py::ModelManager._extract_choice_handle"]
-param = "choice"
-rationale = "Extracts from the choice; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager.build_deck"]
 param = "model_deck_blueprint"
@@ -5519,42 +5483,6 @@ rationale = "Predicate on the var named by the key; single operand."
 ["pipelex/system/environment.py::is_env_var_truthy"]
 param = "key"
 rationale = "Predicate on the var named by the key; single operand."
-
-["pipelex/system/pipelex_service/gateway_config_merger.py::GatewayConfigMerger.merge"]
-param = "gateway_model_specs"
-rationale = "Verb-object: merges the gateway model specs; merge context stays keyword."
-
-["pipelex/system/pipelex_service/pipelex_service_config.py::load_pipelex_service_config_if_exists"]
-param = "config_dir"
-rationale = "Verb-object: loads from the config dir; single operand."
-
-["pipelex/system/pipelex_service/remote_config.py::RemoteConfig.get_model_specs_section"]
-param = "section_name"
-rationale = "Keyed accessor by the section_name; single operand."
-
-["pipelex/system/pipelex_service/remote_config_cache.py::RemoteConfigCache.store"]
-param = "remote_config_payload"
-rationale = "Verb-object: stores the payload; options stay keyword."
-
-["pipelex/system/pipelex_service/remote_config_fetcher.py::RemoteConfigFetcher._build_unavailable_error"]
-param = "fetch_error"
-rationale = "Builds the error from the fetch exception; single operand."
-
-["pipelex/system/pipelex_service/remote_config_fetcher.py::RemoteConfigFetcher._fetch_fresh"]
-param = "url"
-rationale = "Verb-object: fetches the URL; options stay keyword."
-
-["pipelex/system/pipelex_service/remote_config_fetcher.py::RemoteConfigFetcher._fetch_remote_config_with_retry"]
-param = "url"
-rationale = "Verb-object: fetches the URL; options stay keyword."
-
-["pipelex/system/pipelex_service/remote_config_fetcher.py::RemoteConfigFetcher._fetch_remote_config_with_retry._fetch_with_retry"]
-param = "url"
-rationale = "Nested retry closure fetching the URL; single operand."
-
-["pipelex/system/pipelex_service/remote_config_fetcher.py::RemoteConfigFetcher._log_retry_attempt"]
-param = "retry_state"
-rationale = "Positional Callable protocol: tenacity before_sleep callback, invoked callback(retry_state)."
 
 ["pipelex/system/registries/class_registry_utils.py::ClassRegistryUtils.auto_register_all_subclasses"]
 param = "base_class"
