@@ -5741,6 +5741,11 @@ components:
 
         Closed shape (`extra="forbid"`).'
     PipeJudgeBlueprint:
+      oneOf:
+      - required:
+        - question
+      - required:
+        - prompt
       properties:
         source:
           anyOf:
@@ -5805,12 +5810,15 @@ components:
           - type: number
           - type: 'null'
           title: Threshold
+        prompt:
+          type: string
+          title: Prompt
+          description: A synonym of `question`, read exactly as it.
       additionalProperties: false
       type: object
       required:
       - description
       - output
-      - question
       title: PipeJudgeBlueprint
       description: 'Asks a judging model one closed question about its inputs: yes/no, a choice, or a rating.
 

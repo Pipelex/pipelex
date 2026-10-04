@@ -16,6 +16,7 @@ a keyless boot is exactly the boot ``pipelex/kernel/`` documents as its target.
 """
 
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 
@@ -29,6 +30,7 @@ from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execution_seams import load_libraries_and_activate, prepare_pipe_job
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_content_generator, is_dry_run_forced
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -138,6 +140,23 @@ class TestKeylessBootForcedDry:
         try:
             with pytest.raises(PipelexSetupError, match="'typesafe'"):
                 Pipelex.make(integration_mode=_test_integration_mode())
+        finally:
+            Pipelex.teardown_if_needed()
+
+    @pytest.mark.asyncio
+    async def test_keyless_boot_validates_a_judge_whose_model_backend_it_skipped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A PipeJudge naming the TypeSafe model still loads and dry-runs when the keyless boot skipped TypeSafe.
+
+        The deck still names the alias, so the pipe names a model the deck knows; what the keyless boot
+        cannot read is the spec of a model whose backend it skipped, so it leaves what that model reads
+        to the keyed boot that runs the step.
+        """
+        monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+        bundle_path = Path("pipelex/test_extras/mthds_corpus/entries/operator_judge_urgent_message/bundle.mthds")
+        try:
+            self._boot_keyless()
+            result = await validate_bundle(mthds_file_path=bundle_path)
+            assert [pipe.code for pipe in result.pipes]
         finally:
             Pipelex.teardown_if_needed()
 

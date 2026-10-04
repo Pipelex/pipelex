@@ -19,8 +19,9 @@ resolving sub-pipes through the hub:
   unresolved cross-package reference consume nothing as far as the walk knows: it never guesses.
 - **Consumers.** A `PipeExtract` consumes its document input, and reads the formats of the model its
   extract choice resolves to. A `PipeLLM` consumes the documents its prompt references by variable
-  path, and reads its resolved model's document types. A waterfall reads a format when any of its
-  members reads it.
+  path, and reads its resolved model's document types. A `PipeJudge` consumes every document input
+  it declares, since every input is material to judge, and reads its resolved judgment model's
+  document types. A waterfall reads a format when any of its members reads it.
 
 The walk depends only on the library and the model deck, never on the input values.
 """
@@ -30,7 +31,7 @@ from typing import Final, NamedTuple
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError
+from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
@@ -38,6 +39,7 @@ from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKi
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_optional_pipe
 from pipelex.kernel.extract_ops import resolve_extract_setting
+from pipelex.kernel.judgment_ops import judgment_setting_of_choice
 from pipelex.kernel.llm_ops import resolve_llm_setting_for_object, resolve_llm_setting_for_text
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -46,6 +48,7 @@ from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
+from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_run.pipe_run_params import BatchParams
 from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
@@ -75,6 +78,7 @@ class FileConsumerKind(StrEnum):
 
     EXTRACT = "extract"
     LLM_DOCUMENT = "llm_document"
+    JUDGMENT_DOCUMENT = "judgment_document"
 
     @property
     def model_type(self) -> ModelType:
@@ -83,6 +87,8 @@ class FileConsumerKind(StrEnum):
                 return ModelType.TEXT_EXTRACTOR
             case FileConsumerKind.LLM_DOCUMENT:
                 return ModelType.LLM
+            case FileConsumerKind.JUDGMENT_DOCUMENT:
+                return ModelType.JUDGMENT
 
 
 class FileInputConsumer(BaseModel):
@@ -143,7 +149,7 @@ class FileInputConsumer(BaseModel):
         match self.kind:
             case FileConsumerKind.EXTRACT:
                 return "extracts it with"
-            case FileConsumerKind.LLM_DOCUMENT:
+            case FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT:
                 return "gives it to"
 
     def covers(self, *, file_input_path: tuple[str | int, ...]) -> bool:
@@ -309,6 +315,8 @@ def _visit(*, pipe: PipeAbstract, frame: _Frame, is_conditional: bool, visiting:
         _record_extract_consumer(pipe_extract=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
     elif isinstance(pipe, PipeLLM):
         _record_llm_document_consumers(pipe_llm=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
+    elif isinstance(pipe, PipeJudge):
+        _record_judgment_document_consumers(pipe_judge=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
 
 
 def _visit_sequence(
@@ -494,6 +502,55 @@ def _record_llm_document_consumers(*, pipe_llm: PipeLLM, frame: _Frame, is_condi
                 is_conditional=is_conditional,
             )
         )
+
+
+def _record_judgment_document_consumers(*, pipe_judge: PipeJudge, frame: _Frame, is_conditional: bool, consumers: list[FileInputConsumer]) -> None:
+    # A `Dynamic` input declares no kind of value, and an image input is an image by the setup check,
+    # so only the inputs declared as documents are followed, as the operator's load-time check does.
+    concept_library = get_concept_library()
+    document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
+    document_input_names = [
+        input_name
+        for input_name, stuff_spec in pipe_judge.inputs.items
+        if not NativeConceptCode.is_dynamic_concept(concept_code=stuff_spec.concept.code)
+        and concept_library.is_compatible(tested_concept=stuff_spec.concept, wanted_concept=document_concept, strict=True)
+    ]
+    if not document_input_names:
+        return
+    resolved_model = _resolve_judgment_model(pipe_judge=pipe_judge)
+    readable_formats: frozenset[str] | None = None
+    if resolved_model is not None:
+        readable_formats = frozenset[str]().union(*(model_spec.supported_document_types for model_spec in resolved_model.specs))
+    # A model that reads no documents at all is the method author's choice of model, which the
+    # method's load refuses: there is no caller's format to refuse.
+    if not readable_formats:
+        return
+    for input_name in document_input_names:
+        consumed_path = _tracked_path(frame=frame, variable_path=input_name)
+        if consumed_path is None:
+            continue
+        consumers.append(
+            FileInputConsumer(
+                slot_name=consumed_path[0],
+                consumed_path=consumed_path,
+                pipe_ref=pipe_judge.pipe_ref,
+                pipe_code=pipe_judge.code,
+                kind=FileConsumerKind.JUDGMENT_DOCUMENT,
+                model=resolved_model.model if resolved_model else None,
+                readable_formats=readable_formats,
+                reads_web_pages=False,
+                is_conditional=is_conditional,
+            )
+        )
+
+
+def _resolve_judgment_model(*, pipe_judge: PipeJudge) -> _ResolvedModel | None:
+    """The model a PipeJudge's choice resolves to, through the deck chain and any preset, `None` when unresolvable."""
+    try:
+        model_reference = judgment_setting_of_choice(judgment_choice=pipe_judge.judgment_choice, pipe_code=pipe_judge.code).model
+    except (JudgmentModelMissingError, ModelChoiceNotFoundError, ModelReferenceParseError):
+        return None
+    return _resolved_model(model_reference=model_reference, model_type=ModelType.JUDGMENT)
 
 
 def _resolve_extract_model(*, pipe_extract: PipeExtract) -> _ResolvedModel | None:

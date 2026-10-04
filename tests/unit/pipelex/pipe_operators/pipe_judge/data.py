@@ -15,6 +15,8 @@ class PipeJudgeBlueprintTestCases:
 
     REFUSED: ClassVar[list[tuple[str, dict[str, Any], str]]] = [
         ("both_spellings", _judge(prompt="Is it urgent?"), "sets `question`, or `prompt` as its synonym, but not both"),
+        ("empty_question", _judge(question=""), "`question` cannot be empty"),
+        ("blank_question", _judge(question="  \n "), "`question` cannot be empty"),
         ("options_and_levels", _judge(output="Choice", options={"a": "", "b": ""}, levels=["low", "high"]), "not both"),
         (
             "criteria_beside_options",

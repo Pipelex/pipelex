@@ -248,7 +248,6 @@ PipeInputError | Pipe input | https://docs.pipelex.com/latest/errors/pipe-input-
 PipeInputsFactoryError | Pipe inputs factory | https://docs.pipelex.com/latest/errors/pipe-inputs-factory-error/
 PipeJobError | Pipe job | https://docs.pipelex.com/latest/errors/pipe-job-error/
 PipeJudgeError | Pipe judge | https://docs.pipelex.com/latest/errors/pipe-judge-error/
-PipeJudgeFactoryError | Pipe judge factory | https://docs.pipelex.com/latest/errors/pipe-judge-factory-error/
 PipeJudgeInputCapabilityError | Pipe judge input capability | https://docs.pipelex.com/latest/errors/pipe-judge-input-capability-error/
 PipeLLMFactoryError | Pipe LLM factory | https://docs.pipelex.com/latest/errors/pipe-llm-factory-error/
 PipeLibraryError | Pipe library | https://docs.pipelex.com/latest/errors/pipe-library-error/

@@ -38,10 +38,12 @@ class TestJudgmentWorkerFileCapability:
     async def test_a_text_only_model_refuses_an_image(self) -> None:
         worker = self._worker(inputs=["text"])
 
-        with pytest.raises(JudgmentCapabilityError, match="does not read images"):
+        with pytest.raises(JudgmentCapabilityError, match="does not read images") as exc_info:
             await worker.judge(self._job(images={"photo": [self._IMAGE]}))
 
         assert not worker.was_called
+        # The message names the model as the deck does, with none of the console's markup escapes.
+        assert "Judgment model 'fake-judgment-handle' does not read images" in str(exc_info.value)
 
     async def test_a_text_only_model_refuses_a_document(self) -> None:
         worker = self._worker(inputs=["text"])

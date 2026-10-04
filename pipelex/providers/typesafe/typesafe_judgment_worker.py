@@ -2,6 +2,7 @@ from typesafe_sdk import AsyncTypeSafeClient, SystemOneResponse, TypeSafeError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import JudgmentCapabilityError
 from pipelex.cogt.inference.error_classification import extract_typesafe_metadata
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
@@ -38,6 +39,16 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
         self,
         judgment_job: JudgmentJob,
     ) -> dict[str, JudgmentAnswer]:
+        if judgment_job.images or judgment_job.documents:
+            # System One judges a JSON state and takes no file, so a request built from this job would
+            # drop the files and the verdict would be given over less than was asked. The kit's spec
+            # says the model reads text alone, which refuses files before this; a spec that claims more
+            # is refused here rather than believed.
+            msg = (
+                f"TypeSafe judges a JSON state alone, and this judgment carries files for model '{self.inference_model.name}': "
+                "its spec must not declare that it reads images or documents."
+            )
+            raise JudgmentCapabilityError(msg)
         typesafe_questions = to_typesafe_questions(questions=judgment_job.questions)
         try:
             # The SDK types its state as a recursive JSON alias that pyright cannot resolve to the end.

@@ -33,7 +33,6 @@ from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, Judgment
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.date_content import DateContent
@@ -62,19 +61,34 @@ JUDGMENT_QUESTION_KEY = "question"
 DEFAULT_YES_NO_THRESHOLD = 0.5
 
 
-def resolve_judgment_setting(*, judgment_choice: JudgmentModelChoice | None = None, pipe_code: str | None = None) -> JudgmentSetting:
-    """The deck chain for a judgment, then handle resolution.
+def judgment_setting_of_choice(*, judgment_choice: JudgmentModelChoice | None = None, pipe_code: str | None = None) -> JudgmentSetting:
+    """The deck chain for a judgment: the step's own model, else the deck's default, as a setting.
 
     The deck serves no judgment model by default, so when the step names none and the deck names no
     default either, there is nothing to resolve: that is `JudgmentModelMissingError`, the same refusal
-    the operator raises when its method loads. Otherwise the returned setting is pinned to the
-    *resolved* handle, so it doubles as a distributed run's routing key.
+    the operator raises when its method loads. The setting's model is still the handle the deck names,
+    which no backend may serve on this boot.
     """
     model_deck = get_model_deck()
     resolved_choice = judgment_choice or model_deck.judgment_choice_default
     if resolved_choice is None:
         raise JudgmentModelMissingError(pipe_code=pipe_code)
-    judgment_setting = model_deck.get_judgment_setting(judgment_choice=resolved_choice)
+    return model_deck.get_judgment_setting(judgment_choice=resolved_choice)
+
+
+def resolve_judgment_setting(
+    *, judgment_choice: JudgmentModelChoice | None = None, pipe_code: str | None = None, is_dry: bool = False
+) -> JudgmentSetting:
+    """The deck chain for a judgment, then handle resolution.
+
+    The returned setting is pinned to the *resolved* handle, so it doubles as a distributed run's
+    routing key. A dry run calls no judging worker, so a model the deck names that no backend serves on
+    this boot, as on a keyless boot that skipped the backend whose key is unset, keeps the deck's handle.
+    """
+    model_deck = get_model_deck()
+    judgment_setting = judgment_setting_of_choice(judgment_choice=judgment_choice, pipe_code=pipe_code)
+    if is_dry and model_deck.get_optional_inference_model(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT) is None:
+        return judgment_setting
 
     inference_model = model_deck.get_required_inference_model(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT)
     if inference_model.name != judgment_setting.model:
@@ -150,19 +164,20 @@ def build_judgment_material(
 ) -> tuple[JudgmentState, dict[str, list[PromptImage]], dict[str, list[PromptDocument]]]:
     """The state and the files a judgment is asked over, one entry per input, keyed by its declared name.
 
-    An optional input that resolved as a recorded absence is left out rather than sent as a null. An
-    image or a document, or a list of either, goes to the file channel; every other input is a member
-    of the state. An image nested inside a structured input is part of that input's JSON, its URL as
-    text, which is the author's concern.
+    An optional input that holds no value, whether its absence was recorded or it was never written, is
+    left out rather than sent as a null: a required input with no value never reaches the step, whose
+    presence scan refuses it. An image or a document, or a list of either, goes to the file channel;
+    every other input is a member of the state. An image nested inside a structured input is part of
+    that input's JSON, its URL as text, which is the author's concern.
     """
     state: JudgmentState = {}
     images: dict[str, list[PromptImage]] = {}
     documents: dict[str, list[PromptDocument]] = {}
     for input_name in input_names:
-        resolved = memory.resolve_stuff(name=input_name)
-        if isinstance(resolved, AbsenceRecord):
+        stuff = memory.get_optional_stuff(name=input_name)
+        if stuff is None:
             continue
-        content = resolved.content
+        content = stuff.content
         if prompt_images := _prompt_images(content=content):
             images[input_name] = prompt_images
         elif prompt_documents := _prompt_documents(content=content):
@@ -193,7 +208,9 @@ def material_value(*, content: StuffContent) -> Any:
         case ListContent():
             return [material_value(content=item) for item in content.items]
         case _:
-            return content.model_dump(mode="json", exclude_none=True)
+            # Serialized as what each field holds rather than as its declared type, so a field typed as the
+            # content base keeps the fields of the subclass a run put there.
+            return content.model_dump(mode="json", exclude_none=True, serialize_as_any=True)
 
 
 def _prompt_images(*, content: StuffContent) -> list[PromptImage] | None:

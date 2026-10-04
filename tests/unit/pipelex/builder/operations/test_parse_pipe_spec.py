@@ -489,3 +489,34 @@ class TestParsePipeSpec:
         )
         assert isinstance(spec, PipeJudgeSpec)
         assert spec.question == "Is it urgent?"
+
+    def test_judge_refuses_both_spellings_and_leaves_the_callers_dict_alone(self) -> None:
+        spec_data: dict[str, Any] = {
+            "pipe_code": "is_urgent",
+            "description": "Judge",
+            "inputs": {"message": "Text"},
+            "output": "YesNo",
+            "question": "Is it urgent?",
+            "prompt": "Is it urgent now?",
+        }
+        with pytest.raises(ValidationError, match="but not both"):
+            PipeJudgeSpec.model_validate(spec_data)
+        assert spec_data["prompt"] == "Is it urgent now?"
+
+    def test_judge_reading_the_synonym_leaves_the_callers_dict_alone(self) -> None:
+        spec_data: dict[str, Any] = {
+            "pipe_code": "is_urgent",
+            "description": "Judge",
+            "inputs": {"message": "Text"},
+            "output": "YesNo",
+            "prompt": "Is it urgent?",
+        }
+        spec = PipeJudgeSpec.model_validate(spec_data)
+        assert spec.question == "Is it urgent?"
+        assert spec_data == {
+            "pipe_code": "is_urgent",
+            "description": "Judge",
+            "inputs": {"message": "Text"},
+            "output": "YesNo",
+            "prompt": "Is it urgent?",
+        }

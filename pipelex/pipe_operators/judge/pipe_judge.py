@@ -14,7 +14,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
-from pipelex.kernel.judgment_ops import resolve_judgment_setting, run_judgment
+from pipelex.kernel.judgment_ops import judgment_setting_of_choice, resolve_judgment_setting, run_judgment
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.judge.exceptions import PipeJudgeInputCapabilityError
@@ -100,22 +100,31 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
 
     @override
     def validate_inputs_with_library(self):
-        """Resolve the judging model, and refuse an image or a document input it does not read.
+        """Find the judging model, and refuse an image or a document input it does not read.
 
-        The model is resolved when the method loads, so a step with no model to judge with, naming none
+        The model is found when the method loads, so a step with no model to judge with, naming none
         where the deck names no default, is refused with `JudgmentModelMissingError` before a run spends
         anything: the deck serves no judgment model out of the box. Every input is material to judge, so
         an `Image` or a `Document` input, or a list of either, is sent to the model as a file. Whether the
         model reads one is its own capability, stated in its spec's `inputs`: a model that does not is
-        refused here, naming the input and what it reads.
+        refused here, naming the input and what it reads. That needs the model's spec, which a boot that
+        skipped its backend, a keyless one with the backend's key unset, does not hold: the check is then
+        left to the worker when the step runs, as it is for a `Dynamic` input, whose declaration names no
+        kind of value.
         """
         with self.locating_model_choice(field_name="model"):
-            judgment_setting = resolve_judgment_setting(judgment_choice=self.judgment_choice, pipe_code=self.code)
-        inference_model = get_model_deck().get_required_inference_model(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT)
+            judgment_setting = judgment_setting_of_choice(judgment_choice=self.judgment_choice, pipe_code=self.code)
+        inference_model = get_model_deck().get_optional_inference_model(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT)
+        if inference_model is None:
+            return
         concept_library = get_concept_library()
         image_concept = get_native_concept(native_concept=NativeConceptCode.IMAGE)
         document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
         for input_name, stuff_spec in self.inputs.items:
+            if NativeConceptCode.is_dynamic_concept(concept_code=stuff_spec.concept.code):
+                # `Dynamic` is compatible with every concept, so its declaration says nothing about files:
+                # the worker checks what such an input actually holds when the step runs.
+                continue
             if concept_library.is_compatible(tested_concept=stuff_spec.concept, wanted_concept=image_concept, strict=True):
                 if not inference_model.is_vision_supported:
                     raise PipeJudgeInputCapabilityError(
@@ -175,7 +184,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
 
         # Resolved per run into a local and never cached onto `self`, for the reason `pipe_llm.py`
         # states about its own settings.
-        judgment_setting = resolve_judgment_setting(judgment_choice=self.judgment_choice, pipe_code=self.code)
+        judgment_setting = resolve_judgment_setting(judgment_choice=self.judgment_choice, pipe_code=self.code, is_dry=pipe_run_params.run_mode.is_dry)
         judgment_result = await run_judgment(
             memory=working_memory,
             question=self.judgment_question,

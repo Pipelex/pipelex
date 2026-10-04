@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:123aeecab089d6ca3df20a2a5f8bab3fae82d1d1cc3ae48b37fd0a98abfd11bb"
+digest = "sha256:9507f8db252c8209b7a962044584b5fb47249b68b89caf887c03180db674badc"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T00:24:04Z"
-rationale = "real-catch: judgment_ops and judgment_results are new kernel surface; the page gains the judgment_ops row, run_judgment in the templating and log-binding lists, the material and verdict paragraph, and now the no-probability case with threshold_applied."
+reviewed_at = "2026-10-04T01:43:41Z"
+rationale = "real-catch: judgment_ops gains judgment_setting_of_choice and a dry-run arm in resolve_judgment_setting, and build_judgment_material now skips an optional input never written; the page names the new function and both behaviours."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,7 +16,7 @@ rationale = "real-catch: judgment_ops and judgment_results are new kernel surfac
 "pipelex/kernel/img_gen_ops.py" = "blob:b85360f6c118e93be53bf8d1a04504ccb7552469"
 "pipelex/kernel/img_gen_prompt.py" = "blob:e4f72040561929aa0d96ad5f00b1c4af652d3f77"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
-"pipelex/kernel/judgment_ops.py" = "blob:05cec7dc0d06c4e61c4abcad24f0aab0bbc2b809"
+"pipelex/kernel/judgment_ops.py" = "blob:96953931c05edf64fd1d47f8f6430ac6129d5a9b"
 "pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
 "pipelex/kernel/llm_ops.py" = "blob:64a6d3d77a165f4f70614ced69876f56d873a8c7"
 "pipelex/kernel/llm_prompt_content.py" = "blob:3fade4a660226e63ad4f916952ee37d34e7d2bbd"

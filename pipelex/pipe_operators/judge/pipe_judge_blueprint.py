@@ -20,6 +20,30 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 QUESTION_SYNONYM = "prompt"
 
 
+def read_prompt_as_question(*, values: dict[str, Any]) -> dict[str, Any]:
+    """The fields with `prompt` renamed `question`, refusing both spellings; the caller's dict is never changed."""
+    if QUESTION_SYNONYM not in values:
+        return values
+    if "question" in values:
+        msg = f"A PipeJudge sets `question`, or `{QUESTION_SYNONYM}` as its synonym, but not both: remove one of the two."
+        raise ValueError(msg)
+    fields = dict(values)
+    fields["question"] = fields.pop(QUESTION_SYNONYM)
+    return fields
+
+
+def _admit_the_question_synonym(schema: dict[str, Any]) -> None:  # kw-only: ignore — pydantic calls `json_schema_extra` positionally
+    """Give the JSON schema the synonym the before-validator reads, requiring exactly one of the two spellings.
+
+    The synonym is not a field, so without this the schema would require `question` and, forbidding
+    extra keys, refuse a table that writes `prompt`, which the blueprint loads.
+    """
+    properties = schema["properties"]
+    properties[QUESTION_SYNONYM] = {**properties["question"], "title": "Prompt", "description": "A synonym of `question`, read exactly as it."}
+    schema["required"] = [name for name in schema.get("required", []) if name != "question"]
+    schema["oneOf"] = [{"required": ["question"]}, {"required": [QUESTION_SYNONYM]}]
+
+
 class JudgeYesNoCriteria(BaseModel):
     """What a yes and a no mean, for a yes/no question. Closed: a key other than `yes` or `no` is refused.
 
@@ -42,6 +66,8 @@ class PipeJudgeBlueprint(PipeBlueprint):
     is still read; only a variable the question names must be declared.
     """
 
+    model_config = ConfigDict(json_schema_extra=_admit_the_question_synonym)
+
     type: Literal["PipeJudge"] = "PipeJudge"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     question: str
@@ -53,18 +79,14 @@ class PipeJudgeBlueprint(PipeBlueprint):
 
     @model_validator(mode="before")
     @classmethod
-    def read_prompt_as_question(cls, values: dict[str, Any]) -> dict[str, Any]:
-        if QUESTION_SYNONYM not in values:
-            return values
-        if "question" in values:
-            msg = f"A PipeJudge sets `question`, or `{QUESTION_SYNONYM}` as its synonym, but not both: remove one of the two."
-            raise ValueError(msg)
-        fields = dict(values)
-        fields["question"] = fields.pop(QUESTION_SYNONYM)
-        return fields
+    def read_prompt_synonym(cls, values: dict[str, Any]) -> dict[str, Any]:
+        return read_prompt_as_question(values=values)
 
     @model_validator(mode="after")
     def validate_question_kind(self) -> Self:
+        if not self.question.strip():
+            msg = "A PipeJudge asks one question, so its `question` cannot be empty."
+            raise ValueError(msg)
         if self.options is not None and self.levels is not None:
             msg = "A PipeJudge declares `options` for a choice question or `levels` for a rating question, not both."
             raise ValueError(msg)

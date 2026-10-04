@@ -23,3 +23,7 @@ class TestPipeJudgeLoadAcceptances:
     @pytest.mark.parametrize("inputs", ['{ photo = "Image" }', '{ photos = "Image[]", claim = "Document" }'])
     async def test_a_file_input_is_admitted_for_a_model_that_reads_files(self, inputs: str) -> None:
         await validate_bundle(mthds_contents=[PipeJudgeLoadTestData.bundle(inputs=inputs, step_fields=_MODEL)])
+
+    async def test_a_dynamic_input_is_admitted_for_a_text_only_model(self) -> None:
+        # `Dynamic` is compatible with every concept, `Image` included, so its value is checked when it runs, never at load.
+        await validate_bundle(mthds_contents=[PipeJudgeLoadTestData.bundle(inputs='{ payload = "Dynamic" }', step_fields=_MODEL)])

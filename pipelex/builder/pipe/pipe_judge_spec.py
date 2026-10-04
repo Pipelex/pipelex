@@ -4,7 +4,7 @@ from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.pipe_operators.judge.pipe_judge_blueprint import QUESTION_SYNONYM, JudgeYesNoCriteria, PipeJudgeBlueprint
+from pipelex.pipe_operators.judge.pipe_judge_blueprint import JudgeYesNoCriteria, PipeJudgeBlueprint, read_prompt_as_question
 from pipelex.tools.misc.pretty import require_rich_for_rendering
 
 if TYPE_CHECKING:
@@ -52,11 +52,9 @@ class PipeJudgeSpec(PipeSpec):
 
     @model_validator(mode="before")
     @classmethod
-    def read_prompt_as_question(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """Accept `prompt` for `question`, the spelling every other inference operator uses."""
-        if QUESTION_SYNONYM in values and "question" not in values:
-            values["question"] = values.pop(QUESTION_SYNONYM)
-        return values
+    def read_prompt_synonym(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Accept `prompt` for `question`, the spelling every other inference operator uses, as the blueprint does."""
+        return read_prompt_as_question(values=values)
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
@@ -71,7 +69,7 @@ class PipeJudgeSpec(PipeSpec):
         judge_group.renderables.append(Text())
         judge_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{escape(self.model or '(default)')}[/bold yellow]"))
         judge_group.renderables.append(Text())
-        judge_group.renderables.append(Panel(self.question, title="Question", title_align="left", border_style="cyan", padding=(0, 1)))
+        judge_group.renderables.append(Panel(Text(self.question), title="Question", title_align="left", border_style="cyan", padding=(0, 1)))
         detail_lines: list[str] = []
         if self.options is not None:
             detail_lines.extend(f"Option {key}: {description}" if description else f"Option {key}" for key, description in self.options.items())

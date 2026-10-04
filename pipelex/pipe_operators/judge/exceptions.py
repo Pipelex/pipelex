@@ -1,10 +1,6 @@
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 
 
-class PipeJudgeFactoryError(PipelexError):
-    pass
-
-
 class PipeJudgeError(PipelexError):
     pass
 

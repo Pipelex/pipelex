@@ -138,6 +138,40 @@ class TestJudgmentWorkerContract:
         assert "severity" in str(exc_info.value)
         assert f"[{named}]" in str(exc_info.value)
 
+    @pytest.mark.parametrize(
+        ("question", "answer", "named"),
+        [
+            pytest.param(
+                ChoiceQuestion(instructions="Which topic?", options={"fire": None, "flood": None}),
+                ChoiceAnswer(choice="fire", probabilities={"fire": 1.0000001, "flood": 0.0}),
+                "fire",
+                id="choice_probability_above_one",
+            ),
+            pytest.param(
+                RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                RatingAnswer(level=1, probabilities={0: -0.1, 1: 1.1}),
+                "0",
+                id="rating_probability_below_zero",
+            ),
+            pytest.param(
+                RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                RatingAnswer(level=2, position=float("inf")),
+                "position",
+                id="rating_infinite_position",
+            ),
+        ],
+    )
+    async def test_it_refuses_a_measure_its_verdict_cannot_hold(self, question: JudgmentQuestion, answer: JudgmentAnswer, named: str) -> None:
+        """A probability outside the unit interval or a position that is not finite is refused as a mismatch, not left to the verdict's own model."""
+        job = make_fake_judgment_job({"verdict": question})
+        worker = FakeJudgmentWorker(make_fake_judgment_model(), answers={"verdict": answer})
+
+        with pytest.raises(JudgmentAnswerMismatchError) as exc_info:
+            await worker.judge(job)
+
+        assert "verdict" in str(exc_info.value)
+        assert named in str(exc_info.value)
+
     async def test_it_accepts_the_top_level_and_a_full_distribution(self) -> None:
         job = make_fake_judgment_job(
             {

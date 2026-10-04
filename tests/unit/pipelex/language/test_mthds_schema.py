@@ -286,6 +286,23 @@ class TestMthdsSchemaGeneration:
         assert not errors, f"{pipe_type} table should match exactly one oneOf arm, got errors: {[e.message for e in errors]}"
 
     @pytest.mark.parametrize(
+        ("question_fields", "should_validate"),
+        [
+            pytest.param({"question": "is it?"}, True, id="question"),
+            pytest.param({"prompt": "is it?"}, True, id="prompt-synonym"),
+            pytest.param({"question": "is it?", "prompt": "is it?"}, False, id="both"),
+            pytest.param({}, False, id="neither"),
+        ],
+    )
+    def test_pipe_judge_takes_its_question_or_the_prompt_synonym(
+        self, schema: dict[str, Any], question_fields: dict[str, Any], should_validate: bool
+    ) -> None:
+        """A PipeJudge writes its question as `question` or as `prompt`, exactly one, as its blueprint reads it."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {"type": "PipeJudge", "description": "A judge", "output": "YesNo", **question_fields}
+        assert validator.is_valid(table) is should_validate, f"{sorted(question_fields)} should {'' if should_validate else 'not '}validate"
+
+    @pytest.mark.parametrize(
         ("size_value", "should_validate"),
         [
             pytest.param("1k", True, id="tier-token"),

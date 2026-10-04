@@ -22,12 +22,20 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.rating_content import RatingContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.kernel.judgment_ops import build_judgment_material
+
+
+class _ReportWithNestedContents(StructuredContent):
+    """A structure whose fields are typed as the content base, so they hold whichever content subclass a run put there."""
+
+    payload: StuffContent
+    extras: list[StuffContent]
 
 
 def _memory(contents: dict[str, StuffContent]) -> WorkingMemory:
@@ -84,6 +92,16 @@ class TestJudgmentMaterial:
         assert images == {}
         assert documents == {}
 
+    def test_an_optional_input_never_written_is_left_out(self) -> None:
+        """An optional input with neither a value nor a recorded absence reaches the step: the presence scan lets it through."""
+        memory = _memory({"message": TextContent(text="help")})
+
+        state, images, documents = build_judgment_material(memory=memory, input_names=["message", "context"])
+
+        assert state == {"message": "help"}
+        assert images == {}
+        assert documents == {}
+
     def test_an_image_and_a_document_go_to_the_file_channel(self) -> None:
         memory = _memory(
             {
@@ -121,3 +139,8 @@ class TestJudgmentMaterial:
 
         assert state == {"photos": []}
         assert images == {}
+
+    def test_a_structure_keeps_the_fields_of_the_contents_nested_in_it(self) -> None:
+        report = _ReportWithNestedContents(payload=TextContent(text="The roof is on fire"), extras=[NumberContent(number=3)])
+        state, _, _ = build_judgment_material(memory=_memory({"report": report}), input_names=["report"])
+        assert state == {"report": {"payload": {"text": "The roof is on fire"}, "extras": [{"number": 3}]}}

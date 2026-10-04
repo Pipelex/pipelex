@@ -1,4 +1,6 @@
+import math
 from abc import abstractmethod
+from collections.abc import Mapping
 
 from typing_extensions import override
 
@@ -76,12 +78,12 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
         prompt_images = [image for images in judgment_job.images.values() for image in images]
         if prompt_images:
             if not self.inference_model.is_vision_supported:
-                msg = f"Judgment model '{self.inference_model.tag}' does not read images, and the judgment was given {len(prompt_images)}."
+                msg = f"Judgment model '{self.inference_model.name}' does not read images, and the judgment was given {len(prompt_images)}."
                 raise JudgmentCapabilityError(msg)
             max_prompt_images = self.inference_model.max_prompt_images
             if max_prompt_images is not None and len(prompt_images) > max_prompt_images:
                 msg = (
-                    f"Judgment model '{self.inference_model.tag}' reads at most {max_prompt_images} images, "
+                    f"Judgment model '{self.inference_model.name}' reads at most {max_prompt_images} images, "
                     f"and the judgment was given {len(prompt_images)}."
                 )
                 raise JudgmentCapabilityError(msg)
@@ -90,7 +92,7 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
         prompt_documents = [document for documents in judgment_job.documents.values() for document in documents]
         if prompt_documents:
             if not self.inference_model.is_document_supported:
-                msg = f"Judgment model '{self.inference_model.tag}' does not read documents, and the judgment was given {len(prompt_documents)}."
+                msg = f"Judgment model '{self.inference_model.name}' does not read documents, and the judgment was given {len(prompt_documents)}."
                 raise JudgmentCapabilityError(msg)
             check_prompt_documents_are_read(
                 model_name=self.inference_model.name,
@@ -147,6 +149,7 @@ def _check_answer_fits_question(*, question_key: str, question: JudgmentQuestion
             if unoffered:
                 msg = f"Judgment worker answered question '{question_key}' with options it does not offer: {unoffered}"
                 raise JudgmentAnswerMismatchError(msg)
+            _check_probabilities_are_probabilities(question_key=question_key, probabilities=answer.probabilities)
         case RatingQuestion():
             if not isinstance(answer, RatingAnswer):
                 raise JudgmentAnswerMismatchError(_wrong_kind_message(question_key=question_key, question=question, answer=answer))
@@ -159,6 +162,25 @@ def _check_answer_fits_question(*, question_key: str, question: JudgmentQuestion
                     f"outside its scale of {nb_levels} levels (0 to {nb_levels - 1})"
                 )
                 raise JudgmentAnswerMismatchError(msg)
+            _check_probabilities_are_probabilities(question_key=question_key, probabilities=answer.probabilities)
+            if answer.position is not None and not math.isfinite(answer.position):
+                msg = f"Judgment worker answered question '{question_key}' with a position of {answer.position}, which is not a position on its scale"
+                raise JudgmentAnswerMismatchError(msg)
+
+
+def _check_probabilities_are_probabilities(*, question_key: str, probabilities: Mapping[str, float] | Mapping[int, float] | None) -> None:
+    """Refuse a distribution with a probability outside the unit interval, which no verdict native can hold.
+
+    The answer models leave a distribution's values unbounded, so without this a backend's rounding past
+    one would pass the worker and fail in the verdict's own model, after the call was paid for, as an
+    error that says nothing about the answer.
+    """
+    if probabilities is None:
+        return
+    out_of_bounds = sorted(str(key) for key, probability in probabilities.items() if not 0 <= probability <= 1)
+    if out_of_bounds:
+        msg = f"Judgment worker answered question '{question_key}' with probabilities outside 0 to 1 for {out_of_bounds}"
+        raise JudgmentAnswerMismatchError(msg)
 
 
 def _wrong_kind_message(*, question_key: str, question: JudgmentQuestion, answer: JudgmentAnswer) -> str:
