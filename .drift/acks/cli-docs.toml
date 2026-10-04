@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:8b682745bf6c4cd2c979c973bf64f3adcef3fc0e65707c5fea6f9a9d66c234f9"
+digest = "sha256:2de1c86f2f5885be4f34f5552593d5eb842879d96efd6673aaf979ed0ca5f028"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T18:43:30Z"
-rationale = "real-catch: the CLI change removes remote-config handling, the agent-CLI setup warnings, init cache priming and the init fields inference_setup_completed, cache_primed and cache_priming_error, and needs_model_specs; agent-cli.md still documented the RemoteConfigStale warnings array and init.md the offline cache priming and pipelex_manifold as a backend example, all removed; init-cli-flows.md lost the onboarding and priming steps; migrate.md no longer lists pipelex_service.toml; the preprocess-test-models docstrings no longer mention a remote config"
+reviewed_at = "2026-10-04T21:23:47Z"
+rationale = "clean-pass: only a code comment in doctor_cmd.py changed, no CLI surface or behaviour change; docs need no update"
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -74,7 +74,7 @@ rationale = "real-catch: the CLI change removes remote-config handling, the agen
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:28b22cfbca717d3f5ee75162b68e132439655deb"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:27d7a06d571ad832b449d21b6f9eb66c017fb197"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:b393cb2ab7941eeb0c8e6e6207b1bca6a664e99a"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:aba718233ff3a55bf152b24984a8f79be381f17e"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:d39c0df92b95567f74881deb01f8c1b3119fc8ef"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:aa698305e6b60dfb7caf133698dc1d5c1f5f68f1"

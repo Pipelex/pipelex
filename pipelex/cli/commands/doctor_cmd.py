@@ -619,11 +619,11 @@ def check_backend_files(
             # Create a temporary backend library and try to load this backend
             temp_library = InferenceBackendLibrary.make_empty()
 
-            # This row reports on file shape, so the load is lenient: a backend whose gateway
-            # model specs were not handed to the loader (no fetch happens here) or whose
-            # credentials do not resolve is skipped rather than reported — those are the
-            # Models row's and the Credentials row's findings. A malformed file stays fatal
-            # in lenient mode, which is what this probe exists to catch.
+            # This row reports on file shape, so the load is lenient: a backend whose
+            # credentials do not resolve is skipped rather than reported — that is the
+            # Credentials row's finding. A malformed file stays fatal in lenient mode, which
+            # is what this probe exists to catch, and so do the library's refusals of an
+            # enabled backend that declares no model or still carries `model_specs_section`.
             temp_library.load(
                 secrets_provider=secrets_provider,
                 backends_library_paths=backends_file_paths,

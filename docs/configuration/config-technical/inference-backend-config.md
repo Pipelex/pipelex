@@ -165,6 +165,8 @@ enabled = true
 
 The `${VARIABLE_NAME}` syntax automatically loads values from your `.env` file. Set `enabled = true` to activate a backend, or `false` to disable it.
 
+An enabled backend must declare at least one model in its file under `backends/` (see [Model Specifications](#model-specifications)). Pipelex refuses to boot when one declares none, because routing would send models to a backend that cannot serve them: disable the backend, or list the models it serves. The `internal` backend is exempt, since plugins add its models at boot. A backend table also no longer accepts a `model_specs_section` key; an enabled backend that still carries one is refused, and the fix is to list its models in `backends/<name>.toml` and remove the key, or to disable the backend.
+
 Judgment models are served by their own backend alone, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
 
 ### Model Specifications
@@ -629,7 +631,7 @@ pipelex migrate             # ask, then rewrite in place
 What it touches and what it leaves alone:
 
 - **Every `*.toml` directly in `inference/backends/`** — the files this page describes, in both the global `~/.pipelex/` and a project's `.pipelex/`.
-- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`, which also refreshes `internal.toml` from the kit.
+- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`, which also refreshes `internal.toml` from the kit. A `backends.toml` left by an older release that still enables a backend with no model file, such as `[pipelex_gateway]`, is refused at boot and has to be edited by hand: set that backend's `enabled = false`, and point the active routing profile in `routing_profiles.toml` at a backend you have enabled.
 - **Not a key you added yourself.** The history only describes keys *we* removed or renamed. An unknown key of your own — a misspelled `maxx_tokens`, an extra header that is not header-shaped — is still an error, and it names the file, the key and what to do. That is deliberate: silently dropping a key you meant to set would change which model you get.
 - **Every file it rewrites is copied first**, beside itself, as `<file>.bak.<UTC timestamp>`. Running the command twice is the same as running it once — a file already up to date comes back byte for byte identical.
 

@@ -341,8 +341,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
             try:
                 # A per-model key the blueprint does not know is a request header only if it is shaped
-                # like one; anything else is a typo or a dead field, and what happens to it depends on
-                # where the table came from.
+                # like one; anything else is a typo or a dead field, and is refused.
                 key_split = split_model_spec_keys(model_spec_dict=model_spec_dict)
                 if key_split.rejected:
                     # Fatal in lenient mode too: leniency covers credentials only (see the docstring),
