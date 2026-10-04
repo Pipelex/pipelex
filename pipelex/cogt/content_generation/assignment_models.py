@@ -6,8 +6,10 @@ from typing_extensions import override
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.judgment.judgment_models import JudgmentQuestion, JudgmentState
@@ -249,11 +251,15 @@ class JudgmentAssignment(BaseModel):
 
     Unlike the structured-search leaf, there is no schema to ship and no dynamic class to rebuild:
     a judgment's answers are plain models of this package's own, so they cross a boundary as they are.
+    The files travel beside the state, keyed by the input they came from, as the prompt images and
+    documents an LLM assignment carries.
     """
 
     job_metadata: JobMetadata
     cogt_run_params: CogtRunParams
     state: JudgmentState
+    images: dict[str, list[PromptImage]] = Field(default_factory=dict)
+    documents: dict[str, list[PromptDocument]] = Field(default_factory=dict)
     questions: dict[str, JudgmentQuestion] = Field(min_length=1)
     judgment_setting: JudgmentSetting
 
@@ -262,5 +268,17 @@ class JudgmentAssignment(BaseModel):
         return self.judgment_setting.model
 
     def referenced_uris(self) -> list[UriReference]:
-        """None: a judgment hands its state to the provider as data and reads no URL the state carries."""
-        return []
+        """The URLs the leaf reads for this assignment: its files given by URI, never a URL the state carries as text."""
+        uri_references = [
+            UriReference(uri=image.uri, position=f"image {index} of input '{input_name}'")
+            for input_name, images in self.images.items()
+            for index, image in enumerate(images, start=1)
+            if isinstance(image, PromptImageUri)
+        ]
+        uri_references.extend(
+            UriReference(uri=document.uri, position=f"document {index} of input '{input_name}'")
+            for input_name, documents in self.documents.items()
+            for index, document in enumerate(documents, start=1)
+            if isinstance(document, PromptDocumentUri)
+        )
+        return uri_references

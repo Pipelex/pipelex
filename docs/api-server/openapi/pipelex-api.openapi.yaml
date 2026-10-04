@@ -3828,6 +3828,42 @@ components:
         has no effect on this arm (unlike `rendered_markdown`, which rides both arms because failure
 
         text is exactly what a human surface wants).'
+    JudgeYesNoCriteria:
+      properties:
+        'yes':
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: 'Yes'
+        'no':
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: 'No'
+      additionalProperties: false
+      type: object
+      title: JudgeYesNoCriteria
+      description: 'What a yes and a no mean, for a yes/no question. Closed: a key other than `yes` or `no` is refused.
+
+
+        The judging vendor silently ignores a criterion key it does not know, so this model is the only
+
+        place a typo in one is caught.'
+    JudgmentSetting:
+      properties:
+        model:
+          type: string
+          title: Model
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      additionalProperties: false
+      type: object
+      required:
+      - model
+      title: JudgmentSetting
     LLMSetting:
       properties:
         model:
@@ -5704,6 +5740,96 @@ components:
         with no inputs maps to `{"fields": []}` — an empty form is a valid form, not an omitted entry.
 
         Closed shape (`extra="forbid"`).'
+    PipeJudgeBlueprint:
+      oneOf:
+      - required:
+        - question
+      - required:
+        - prompt
+      properties:
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        pipe_category:
+          type: string
+          const: PipeOperator
+          title: Pipe Category
+          default: PipeOperator
+        type:
+          type: string
+          const: PipeJudge
+          title: Type
+          default: PipeJudge
+        description:
+          type: string
+          title: Description
+        inputs:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/InputSlotBlueprint'
+            type: object
+          - type: 'null'
+          title: Inputs
+        output:
+          type: string
+          title: Output
+        question:
+          type: string
+          title: Question
+        model:
+          anyOf:
+          - $ref: '#/components/schemas/JudgmentSetting'
+          - type: string
+          - $ref: '#/components/schemas/ModelReference'
+          - type: 'null'
+          title: Model
+        options:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Options
+        levels:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Levels
+        criteria:
+          anyOf:
+          - $ref: '#/components/schemas/JudgeYesNoCriteria'
+          - type: 'null'
+        threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Threshold
+        prompt:
+          type: string
+          title: Prompt
+          description: A synonym of `question`, read exactly as it.
+      additionalProperties: false
+      type: object
+      required:
+      - description
+      - output
+      title: PipeJudgeBlueprint
+      description: 'Asks a judging model one closed question about its inputs: yes/no, a choice, or a rating.
+
+
+        The kind is decided by which of `options` and `levels` the pipe declares, never by a field of its
+
+        own. `prompt` is accepted in place of `question` and read exactly as it, so nothing after parsing
+
+        sees the synonym. Every declared input is material to judge, so an input the question never names
+
+        is still read; only a variable the question names must be declared.'
     PipeLLMBlueprint:
       properties:
         source:
@@ -6201,6 +6327,7 @@ components:
       - PipeSearch
       - PipeStructure
       - PipeDocGen
+      - PipeJudge
       - PipeBatch
       - PipeCondition
       - PipeParallel
@@ -6374,6 +6501,7 @@ components:
               - $ref: '#/components/schemas/PipeLLMBlueprint'
               - $ref: '#/components/schemas/PipeExtractBlueprint'
               - $ref: '#/components/schemas/PipeSearchBlueprint'
+              - $ref: '#/components/schemas/PipeJudgeBlueprint'
               - $ref: '#/components/schemas/PipeStructureBlueprint'
               - $ref: '#/components/schemas/PipeDocGenBlueprint'
               - $ref: '#/components/schemas/PipeBatchBlueprint'
@@ -6391,6 +6519,7 @@ components:
                   PipeExtract: '#/components/schemas/PipeExtractBlueprint'
                   PipeFunc: '#/components/schemas/PipeFuncBlueprint'
                   PipeImgGen: '#/components/schemas/PipeImgGenBlueprint'
+                  PipeJudge: '#/components/schemas/PipeJudgeBlueprint'
                   PipeLLM: '#/components/schemas/PipeLLMBlueprint'
                   PipeParallel: '#/components/schemas/PipeParallelBlueprint'
                   PipeSearch: '#/components/schemas/PipeSearchBlueprint'

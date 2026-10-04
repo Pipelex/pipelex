@@ -374,6 +374,30 @@ prompt = "Compare these transcripts: $transcripts, given their summaries: $summa
             assert consumer.covers(file_input_path=("transcripts", 1))
             assert not consumer.covers(file_input_path=("notes", 1))
 
+    def test_a_pipe_judge_consumes_its_document_inputs(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
+        """Every input is material to judge, so a document input is sent as a file whether or not the question names it."""
+        model_deck = get_model_deck()
+        judgment_model = model_deck.judgment_aliases["default-judgment"]
+        booted_spec = model_deck.inference_models[judgment_model]
+        mocker.patch.dict(model_deck.inference_models, {judgment_model: booted_spec.model_copy(update={"inputs": ["text", "images", "pdf"]})})
+        pipes = """
+[pipe.main]
+type = "PipeJudge"
+description = "Judge whether the claims are complete"
+inputs = { claims = "Document[]", note = "Text", photo = "Image" }
+output = "YesNo"
+model = "@default-judgment"
+question = "Are these claims complete, given $note?"
+"""
+        consumers = _consumers(load_empty_library=load_empty_library, domain="fic_judge", pipes=pipes)
+
+        assert set(consumers) == {"claims"}
+        (consumer,) = consumers["claims"]
+        assert consumer.kind == FileConsumerKind.JUDGMENT_DOCUMENT
+        assert consumer.model == judgment_model
+        assert consumer.readable_formats == frozenset({"pdf"})
+        assert consumer.covers(file_input_path=("claims", 0))
+
     def test_a_waterfall_reads_a_format_when_any_member_reads_it(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
         mocker.patch.dict(get_model_deck().extract_waterfalls, {"fic-mixed-extractors": [PDF_ONLY_MODEL, DOCLING_MODEL]})
         pipes = """

@@ -20,6 +20,8 @@ from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
+from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
+from pipelex.pipe_operators.judge.pipe_judge_factory import PipeJudgeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
@@ -48,6 +50,7 @@ class PipeRegistryModels(RegistryModels):
         PipeLLM,
         PipeExtract,
         PipeSearch,
+        PipeJudge,
         PipeStructure,
         PipeDocGen,
     ]
@@ -59,6 +62,7 @@ class PipeRegistryModels(RegistryModels):
         PipeLLMFactory,
         PipeExtractFactory,
         PipeSearchFactory,
+        PipeJudgeFactory,
         PipeStructureFactory,
         PipeDocGenFactory,
     ]

@@ -78,7 +78,7 @@ Write a brief about this topic: $topic
 - **A presence block** — `{% if enriched %} ... {% endif %}` (any reference inside the block is guarded, including `$enriched` and attribute access).
 - **An inline presence conditional** — `{{ enriched.text if enriched else "no enrichment" }}`.
 
-The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, and PipeImgGen.
+The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, PipeJudge (question), and PipeImgGen.
 
 ## Controllers Under Absence
 

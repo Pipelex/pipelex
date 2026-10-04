@@ -129,7 +129,7 @@ The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at a
 
 ### Judgments need neither mechanism
 
-A judgment's leaf, `judgment_gen_answers`, has one entry point where search has three, because nothing about it is dynamic. Its `JudgmentAssignment` carries the state as a JSON object, the questions as the family's own discriminated models and the resolved `JudgmentSetting`; its result is a map of answers that are plain models of the same package. No caller class travels down and no schema is shipped, so the in-process arm and the boundary arm would be the same function, and there is nothing to split.
+A judgment's leaf, `judgment_gen_answers`, has one entry point where search has three, because nothing about it is dynamic. Its `JudgmentAssignment` carries the state as a JSON object, the image and document inputs as prompt files keyed by input name, which cross the boundary as an LLM prompt's files do, the questions as the family's own discriminated models and the resolved `JudgmentSetting`; its result is a map of answers that are plain models of the same package. No caller class travels down and no schema is shipped, so the in-process arm and the boundary arm would be the same function, and there is nothing to split.
 
 ---
 

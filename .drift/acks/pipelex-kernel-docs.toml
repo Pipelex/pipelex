@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:3fde64b7f78e5a662bebb1f86757336c3dc437bee2e48dfa9d25b4d74865df8c"
+digest = "sha256:7dc6488e6ce37ae17d2cc40cefa51884730086a4a0d7cc766128d2b108af02ae"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-03T09:31:38Z"
-rationale = "clean-pass: assemble_llm_prompt now passes each registry image's mime_type into its prompt image, the way documents already carried theirs; the kernel doc describes the assemble functions' responsibilities and signatures, which are unchanged, so no doc change is needed."
+reviewed_at = "2026-10-04T02:27:50Z"
+rationale = "real-catch: build_judgment_material now reads a dotted input as the value at its path, keyed by its full name, as MTHDS allows; the page states it."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,6 +16,8 @@ rationale = "clean-pass: assemble_llm_prompt now passes each registry image's mi
 "pipelex/kernel/img_gen_ops.py" = "blob:b85360f6c118e93be53bf8d1a04504ccb7552469"
 "pipelex/kernel/img_gen_prompt.py" = "blob:e4f72040561929aa0d96ad5f00b1c4af652d3f77"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
+"pipelex/kernel/judgment_ops.py" = "blob:b205e52e30b55c50e215d5fa2fd4db94ededf347"
+"pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
 "pipelex/kernel/llm_ops.py" = "blob:64a6d3d77a165f4f70614ced69876f56d873a8c7"
 "pipelex/kernel/llm_prompt_content.py" = "blob:3fade4a660226e63ad4f916952ee37d34e7d2bbd"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
@@ -25,4 +27,4 @@ rationale = "clean-pass: assemble_llm_prompt now passes each registry image's mi
 "pipelex/kernel/search_ops.py" = "blob:f9c1dc09dd3beaf1a54ac8e3774db1d510cbdaa3"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
 "pipelex/kernel/templating_style_ops.py" = "blob:395473806d600dfc4f124c07f2afebb951fc086b"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:5ba8a8315cd5f8ac3b1f57171be46cc8f0598497"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:21dbb38c9b38a051c00604ff4abd3cf715a29b92"

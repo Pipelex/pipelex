@@ -21,6 +21,8 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, YesNoAnswer, YesNoQuestion
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.search.search_setting import SearchSetting
@@ -33,6 +35,7 @@ from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.kernel.extract_ops import build_extract_job_params, run_extract
 from pipelex.kernel.img_gen_ops import build_img_gen_job_params, run_img_gen
+from pipelex.kernel.judgment_ops import run_judgment
 from pipelex.kernel.llm_ops import generate_object_content, run_llm_object, run_llm_text
 from pipelex.kernel.llm_prompt_content import LlmPromptContent
 from pipelex.kernel.pipelex_kernel import PipelexKernel
@@ -85,6 +88,10 @@ class ContentGeneratorProbe:
     async def make_single_image(self, **kwargs: Any) -> ImageContent:  # ruff: ignore[unused-method-argument]
         self._record()
         return ImageContent(url="https://example.com/kernel-log-context.png")
+
+    async def make_judgment_answers(self, **kwargs: Any) -> dict[str, JudgmentAnswer]:  # ruff: ignore[unused-method-argument]
+        self._record()
+        return {"question": YesNoAnswer(probability=0.8)}
 
 
 def _install_probe(mocker: MockerFixture, *, ops_module: str) -> ContentGeneratorProbe:
@@ -196,6 +203,24 @@ class TestKernelLogContext:
             cogt_run_params=kernel.cogt_run_params,
             templating_style=resolve_templating_style(authored=None),
             result_name="findings",
+        )
+
+        _assert_the_step_was_bound(probe=probe, step=step)
+
+    async def test_run_judgment_binds_its_step(self, mocker: MockerFixture) -> None:
+        probe = _install_probe(mocker, ops_module="judgment_ops")
+        kernel, step = _kernel_and_step()
+
+        await run_judgment(
+            memory=WorkingMemoryFactory.make_empty(),
+            question=YesNoQuestion(instructions="Does the log context bind?"),
+            input_names=[],
+            judgment_setting=JudgmentSetting(model="kernel-log-context-judgment-model"),
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.YES_NO),
+            job_metadata=step,
+            cogt_run_params=kernel.cogt_run_params,
+            templating_style=resolve_templating_style(authored=None),
+            result_name="verdict",
         )
 
         _assert_the_step_was_bound(probe=probe, step=step)

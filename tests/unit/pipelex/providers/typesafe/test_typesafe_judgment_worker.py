@@ -6,7 +6,9 @@ from typesafe_sdk import AsyncTypeSafeClient, SystemOneResponse
 from typesafe_sdk import Noul as TypesafeNoul
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import JudgmentModelNotFoundError
+from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
+from pipelex.cogt.exceptions import JudgmentCapabilityError, JudgmentModelNotFoundError
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.judgment.judgment_job_factory import JudgmentJobFactory
@@ -44,14 +46,14 @@ class _RecordingDelegate(ReportingNoOp):
         self.reported.append(inference_job)
 
 
-def _model() -> InferenceModelSpec:
+def _model(*, inputs: list[str] | None = None) -> InferenceModelSpec:
     return InferenceModelSpec(
         backend_name="typesafe",
         name="jev-1.13.0",
         sdk="typesafe",
         model_type=ModelType.JUDGMENT,
         model_id="jev-1.13.0",
-        inputs=["text"],
+        inputs=inputs or ["text"],
         outputs=["judgments"],
         costs={CostCategory.INPUT: 0.042, CostCategory.OUTPUT: 0},
         thinking_mode=ThinkingMode.NONE,
@@ -71,6 +73,44 @@ def _job(questions: dict[str, JudgmentQuestion]) -> JudgmentJob:
 
 @pytest.mark.asyncio
 class TestTypesafeJudgmentWorker:
+    @pytest.mark.parametrize(
+        ("inputs", "images", "documents"),
+        [
+            pytest.param(
+                ["text", "images"], {"photo": [PromptImageUri(uri="pipelex-storage://s/photo.png", mime_type="image/png")]}, None, id="image"
+            ),
+            pytest.param(
+                ["text", "pdf"], None, {"claim": [PromptDocumentUri(uri="pipelex-storage://s/claim.pdf", mime_type="application/pdf")]}, id="document"
+            ),
+        ],
+    )
+    async def test_a_job_carrying_files_is_refused_whatever_the_spec_claims(
+        self,
+        mocker: MockerFixture,
+        inputs: list[str],
+        images: dict[str, list[PromptImage]] | None,
+        documents: dict[str, list[PromptDocument]] | None,
+    ) -> None:
+        """TypeSafe judges a JSON state alone, so a spec claiming it reads files would have its files dropped from the request."""
+        client = mocker.Mock(spec=AsyncTypeSafeClient)
+        client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TestData.THREE_SHAPES))
+        worker = TypesafeJudgmentWorker(sdk_instance=cast("AsyncTypeSafeClient", client), inference_model=_model(inputs=inputs))
+        job = JudgmentJobFactory.make_judgment_job(
+            state={"message": "See the attached file."},
+            images=images,
+            documents=documents,
+            questions={"is_urgent": YesNoQuestion(instructions=TestData.THREE_SHAPES_INSTRUCTIONS["is_urgent"])},
+            judgment_setting=JudgmentSetting(model="jev-1.13.0"),
+            job_metadata=JobMetadata(
+                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_typesafe")
+            ),
+        )
+
+        with pytest.raises(JudgmentCapabilityError, match="TypeSafe"):
+            await worker.judge(job)
+
+        client.system_one.assert_not_called()
+
     async def test_one_request_carries_the_whole_job_and_its_usage_is_recorded(self, mocker: MockerFixture) -> None:
         """The job goes out as a single request under the pinned model id, and the billed tokens land on the report."""
         client = mocker.Mock(spec=AsyncTypeSafeClient)

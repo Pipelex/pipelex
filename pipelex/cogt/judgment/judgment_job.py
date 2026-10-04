@@ -3,6 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
+from pipelex.cogt.document.prompt_document import PromptDocument
+from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.judgment.judgment_models import JudgmentQuestion, JudgmentState
 from pipelex.cogt.judgment.judgment_report import JudgmentTokensUsage
@@ -28,9 +30,16 @@ class JudgmentJob(InferenceJobAbstract):
 
     The question keys are the caller's own — the model never sees them — and they are what the
     answers come back under.
+
+    The files travel beside the state, keyed by the name of the input they came from, because a file
+    is not a JSON value: an image or a document reaches a judgment exactly as it reaches an LLM, as a
+    prompt image or a prompt document. Whether the model reads them is its own capability, which the
+    worker checks before the backend is called.
     """
 
     state: JudgmentState
+    images: dict[str, list[PromptImage]] = Field(default_factory=dict)
+    documents: dict[str, list[PromptDocument]] = Field(default_factory=dict)
     questions: dict[str, JudgmentQuestion] = Field(min_length=1)
     job_params: JudgmentJobParams
     job_report: JudgmentJobReport = JudgmentJobReport()

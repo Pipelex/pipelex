@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:75768fa677bc8550119a8b20ce80c22e5edfa1040eee6b32fe574f7ae2019435"
+digest = "sha256:644cc1387406a8e2c330a76f4139ec25318bd56a7d78caa46f9bb54f2bf7b682"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-30T00:36:45Z"
-rationale = "The document renderer registry is removed from the runtime hub again, since document engines register as inference backends of the doc_gen family, so runtime_hub.py and docs/contribute/hub-layering.md are both back to dev's state. No layer placement changed."
+reviewed_at = "2026-10-04T00:24:05Z"
+rationale = "clean-pass: runtime_hub.py changed only in a docstring, which adds PipeJudge to the list of inference operators resolving the content generator; no layer placement or hub member moved, so docs/contribute/hub-layering.md is unaffected."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:48caf3ba024b97e112aca1a8c3db5e5d2f17b4cd"
+"pipelex/runtime_hub.py" = "blob:b6dcef79b73d5ce05669c478bff9dc4b367696e5"

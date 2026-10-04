@@ -1,0 +1,9 @@
+domain      = "native_judge_test"
+description = "Single PipeJudge step over a fixed question (no dynamic classes)"
+
+[pipe.native_judge]
+type        = "PipeJudge"
+description = "Judge whether a fixed claim holds"
+output      = "YesNo"
+model       = "jev-1.13.0"
+question    = "Is the sky blue on a clear day?"

@@ -1,3 +1,5 @@
+from pipelex.cogt.document.prompt_document import PromptDocument
+from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.judgment.judgment_job import JudgmentJob, JudgmentJobParams
 from pipelex.cogt.judgment.judgment_models import JudgmentQuestion, JudgmentState
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
@@ -13,12 +15,16 @@ class JudgmentJobFactory:
         questions: dict[str, JudgmentQuestion],
         judgment_setting: JudgmentSetting,
         job_metadata: JobMetadata,
+        images: dict[str, list[PromptImage]] | None = None,
+        documents: dict[str, list[PromptDocument]] | None = None,
     ) -> JudgmentJob:
         job_metadata.job_category = JobCategory.JUDGMENT_JOB
         job_params = JudgmentJobParams(judgment_setting=judgment_setting)
         return JudgmentJob(
             job_metadata=job_metadata,
             state=state,
+            images=images or {},
+            documents=documents or {},
             questions=questions,
             job_params=job_params,
         )

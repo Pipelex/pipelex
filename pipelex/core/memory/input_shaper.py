@@ -1070,8 +1070,9 @@ class InputShaper:
     def _is_scalar_at_a_verdict_input(cls, *, value: Any, declared_concept: Concept, concept_provider: ConceptProviderAbstract) -> bool:
         """Whether a bare value the fallback has no reading for is a scalar, or a list of scalars, at an input of a verdict native.
 
-        A caller sends a `Choice`'s key or a `Rating`'s level alone by mistake, which no container native
-        invites, so only an input whose concept is or refines a verdict native answers. An object is
+        A caller sends a `Rating`'s level alone by mistake, which no container native invites, so only an
+        input whose concept is or refines a verdict native answers. A string never reaches here, since the
+        factory reads it as a `Text`. An object is
         never a scalar: whether it is the verdict's content unwrapped is `_is_content_of_declared_concept`'s
         question. `Dynamic` is compatible with every concept, so it never answers.
         """

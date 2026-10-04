@@ -94,7 +94,7 @@ And the bookmark beside it:
 # keeps their `{concept, content}` envelope, which is the only form the input shaper takes back.
 [pipe.scaffold_verdict_natives]
 type        = "PipeCompose"
-description = "SCAFFOLD_pipe_scaffold_verdict_natives: the three verdict natives, each at a slot position"
+description = "SCAFFOLD_pipe_scaffold_verdict_natives: the verdict natives, each at a slot position"
 inputs      = { approved_in = "YesNo", team_in = "Choice", grade_in = "Rating" }
 output      = "Text"
 template    = "SCAFFOLD_template_verdict_natives: $approved_in $team_in $grade_in"

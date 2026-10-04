@@ -93,6 +93,9 @@ code = "PipeStructure"
 [operator.doc_gen]
 code = "PipeDocGen"
 
+[operator.judge]
+code = "PipeJudge"
+
 [controller.batch]
 code = "PipeBatch"
 

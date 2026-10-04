@@ -15,6 +15,7 @@ from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
+from pipelex.builder.pipe.pipe_judge_spec import PipeJudgeSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
@@ -451,6 +452,17 @@ class TestParsePipeSpec:
                 PipeSearchSpec,
             ),
             (
+                "PipeJudge",
+                {
+                    "pipe_code": "is_urgent",
+                    "description": "Judge urgency",
+                    "inputs": {"message": "Text"},
+                    "output": "YesNo",
+                    "prompt": "Is the message urgent?",
+                },
+                PipeJudgeSpec,
+            ),
+            (
                 "PipeBatch",
                 {
                     "pipe_code": "my_batch",
@@ -468,3 +480,43 @@ class TestParsePipeSpec:
     def test_correct_subclass(self, pipe_type: str, spec_data: dict[str, Any], expected_class: type) -> None:
         result = parse_pipe_spec(spec_data, pipe_type=pipe_type)
         assert isinstance(result, expected_class)
+
+    @pytest.mark.parametrize("question_key", ["question", "prompt"])
+    def test_judge_reads_prompt_as_question(self, question_key: str) -> None:
+        spec = parse_pipe_spec(
+            {"pipe_code": "is_urgent", "description": "Judge", "inputs": {"message": "Text"}, "output": "YesNo", question_key: "Is it urgent?"},
+            pipe_type="PipeJudge",
+        )
+        assert isinstance(spec, PipeJudgeSpec)
+        assert spec.question == "Is it urgent?"
+
+    def test_judge_refuses_both_spellings_and_leaves_the_callers_dict_alone(self) -> None:
+        spec_data: dict[str, Any] = {
+            "pipe_code": "is_urgent",
+            "description": "Judge",
+            "inputs": {"message": "Text"},
+            "output": "YesNo",
+            "question": "Is it urgent?",
+            "prompt": "Is it urgent now?",
+        }
+        with pytest.raises(ValidationError, match="but not both"):
+            PipeJudgeSpec.model_validate(spec_data)
+        assert spec_data["prompt"] == "Is it urgent now?"
+
+    def test_judge_reading_the_synonym_leaves_the_callers_dict_alone(self) -> None:
+        spec_data: dict[str, Any] = {
+            "pipe_code": "is_urgent",
+            "description": "Judge",
+            "inputs": {"message": "Text"},
+            "output": "YesNo",
+            "prompt": "Is it urgent?",
+        }
+        spec = PipeJudgeSpec.model_validate(spec_data)
+        assert spec.question == "Is it urgent?"
+        assert spec_data == {
+            "pipe_code": "is_urgent",
+            "description": "Judge",
+            "inputs": {"message": "Text"},
+            "output": "YesNo",
+            "prompt": "Is it urgent?",
+        }
