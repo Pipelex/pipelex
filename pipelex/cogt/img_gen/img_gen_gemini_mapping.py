@@ -166,6 +166,19 @@ class ImgGenGeminiMapping:
             return None
 
     @classmethod
+    def optional_gemini_taxonomy(cls, inference_model: InferenceModelSpec) -> AspectRatioTaxonomy | None:
+        """The model's geometry taxonomy when it is a Gemini Image one, else None.
+
+        This is the spec-level test for "is this a Gemini image model": the rules name a Gemini
+        taxonomy for exactly those models, whatever handle or model id the catalog gives them.
+        Missing rules, an unknown taxonomy string and a non-Gemini taxonomy all answer None.
+        """
+        taxonomy = cls.optional_img_gen_taxonomy(inference_model)
+        if taxonomy is None or not taxonomy.is_gemini:
+            return None
+        return taxonomy
+
+    @classmethod
     def resolve_image_config(
         cls,
         taxonomy: AspectRatioTaxonomy,

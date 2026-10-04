@@ -1772,6 +1772,10 @@ rationale = "Derives the image size for the size tier; single operand."
 param = "inference_model"
 rationale = "Reads the aspect-ratio taxonomy off the inference model; single operand."
 
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.optional_gemini_taxonomy"]
+param = "inference_model"
+rationale = "Reads the Gemini aspect-ratio taxonomy off the inference model, None when it declares no Gemini one; single operand."
+
 ["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.optional_img_gen_taxonomy"]
 param = "inference_model"
 rationale = "Reads the aspect-ratio taxonomy off the inference model, None when it declares none; single operand."
@@ -5273,8 +5277,8 @@ param = "sdk"
 rationale = "Predicate on the sdk; single operand."
 
 ["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory._make_gemini_image_config"]
-param = "inference_model"
-rationale = "Factory from source: builds the result from the inference_model; single operand."
+param = "taxonomy"
+rationale = "Builds the image_config block from the Gemini aspect-ratio taxonomy; the job params and model name stay keyword-only."
 
 ["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_api_key"]
 param = "backend"
