@@ -25,7 +25,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputUrlInvalidError, PipelineInputUrlMissingError
-from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
+from pipelex.pipeline.input_normalizer import prepare_file_inputs
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 
@@ -56,7 +56,7 @@ class TestInputNormalizerUrlGuards:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputUrlMissingError, match="blank url"):
-            await normalize_data_urls_to_storage(_memory_with_document(blank_url), storage_scope="test/scope", read_scope=None)
+            await prepare_file_inputs(_memory_with_document(blank_url), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
     @pytest.mark.parametrize("bad_url", ["https://", "https://exa mple.com/file.pdf"])
     async def test_malformed_http_url_raises_caller_facing_input_error(self, mocker: MockerFixture, bad_url: str) -> None:
@@ -64,7 +64,7 @@ class TestInputNormalizerUrlGuards:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputUrlInvalidError) as exc_info:
-            await normalize_data_urls_to_storage(_memory_with_document(bad_url), storage_scope="test/scope", read_scope=None)
+            await prepare_file_inputs(_memory_with_document(bad_url), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
         strict = exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert "not a valid http(s) URL" in strict["message"]
@@ -74,8 +74,8 @@ class TestInputNormalizerUrlGuards:
         _patch_storage_and_config(mocker)
         mock_get = mocker.patch("httpx.AsyncClient.get")
 
-        memory = await normalize_data_urls_to_storage(
-            _memory_with_document("https://example.com/file.pdf"), storage_scope="test/scope", read_scope=None
+        memory = await prepare_file_inputs(
+            _memory_with_document("https://example.com/file.pdf"), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True
         )
 
         content = memory.get_stuff("document").content
@@ -93,7 +93,7 @@ class TestInputNormalizerUrlGuards:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputUrlMissingError) as exc_info:
-            await normalize_data_urls_to_storage(_memory_with_document(""), storage_scope="test/scope", read_scope=None)
+            await prepare_file_inputs(_memory_with_document(""), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
         strict = exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert "blank url" in strict["message"]
@@ -111,7 +111,9 @@ class TestInputNormalizerUrlGuards:
         missing_path = tmp_path / "nope.pdf"
 
         with pytest.raises(PipelineInputContentError) as exc_info:
-            await normalize_data_urls_to_storage(_memory_with_document(str(missing_path)), storage_scope="test/scope", read_scope=None)
+            await prepare_file_inputs(
+                _memory_with_document(str(missing_path)), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True
+            )
 
         report = exc_info.value.to_error_report()
         assert str(missing_path) in report.message, "precondition: the raw message carries the path"
@@ -127,17 +129,21 @@ class TestInputNormalizerUrlGuards:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputContentError, match="cannot be read"):
-            await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path)), storage_scope="test/scope", read_scope=None)
+            await prepare_file_inputs(_memory_with_document(str(tmp_path)), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
 
     async def test_path_with_null_byte_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A NUL byte makes the path unusable: the read raises ValueError, not OSError, and it must still be an input error."""
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputContentError, match="cannot be read"):
-            await normalize_data_urls_to_storage(_memory_with_document(f"{tmp_path}/a\x00b.pdf"), storage_scope="test/scope", read_scope=None)
+            await prepare_file_inputs(
+                _memory_with_document(f"{tmp_path}/a\x00b.pdf"), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True
+            )
 
     async def test_missing_file_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputContentError, match="cannot be read"):
-            await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path / "nope.pdf")), storage_scope="test/scope", read_scope=None)
+            await prepare_file_inputs(
+                _memory_with_document(str(tmp_path / "nope.pdf")), storage_scope="test/scope", read_scope=None, is_relocation_enabled=True
+            )

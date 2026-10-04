@@ -13,7 +13,7 @@ from pydantic import Field, RootModel
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.pipeline.input_form import FieldKind, InputFormDeriver
+from pipelex.pipeline.input_form import FieldKind, FormPosition, InputFormDeriver
 from pipelex.system.registries.class_registry_access import get_class_registry
 from tests.helpers.input_form import as_list, as_object, fields_by_name
 
@@ -59,7 +59,7 @@ class TestInputFormDeriverEscapeHatches:
                 structure={"label": "The label", "child": _concept_field(concept_ref="demo.Node")},
             ),
         }
-        node = InputFormDeriver(concepts=concepts).derive_concept(name="root", concept_ref="demo.Node")
+        node = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="root", concept_ref="demo.Node")
 
         child = as_object(node).fields[1]
         assert child.name == "child"
@@ -71,7 +71,7 @@ class TestInputFormDeriverEscapeHatches:
             "demo.Left": ConceptBlueprint(description="Left", structure={"right": _concept_field(concept_ref="demo.Right")}),
             "demo.Right": ConceptBlueprint(description="Right", structure={"left": _concept_field(concept_ref="demo.Left")}),
         }
-        left = InputFormDeriver(concepts=concepts).derive_concept(name="left", concept_ref="demo.Left")
+        left = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="left", concept_ref="demo.Left")
 
         right = as_object(as_object(left).fields[0])
         assert right.fields[0].kind == FieldKind.UNKNOWN
@@ -82,7 +82,7 @@ class TestInputFormDeriverEscapeHatches:
         concepts: dict[str, ConceptBlueprint | str] = {
             "demo.Ghost": ConceptBlueprint(description="Backed by a class nobody registered", structure="NoSuchRegisteredClass"),
         }
-        ghost = InputFormDeriver(concepts=concepts).derive_concept(name="ghost", concept_ref="demo.Ghost")
+        ghost = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="ghost", concept_ref="demo.Ghost")
 
         assert ghost.kind == FieldKind.UNKNOWN
         assert ghost.concept_ref == "demo.Ghost"
@@ -90,7 +90,7 @@ class TestInputFormDeriverEscapeHatches:
 
     def test_concept_absent_from_the_crate_is_unknown_without_a_class(self) -> None:
         """A slot typed with a concept the crate never saw (a `library_dirs` load) still gets a descriptor."""
-        missing = InputFormDeriver(concepts={}).derive_concept(name="missing", concept_ref="elsewhere.Missing")
+        missing = InputFormDeriver(concepts={}, position=FormPosition.INPUT).derive_concept(name="missing", concept_ref="elsewhere.Missing")
 
         assert missing.kind == FieldKind.UNKNOWN
         assert missing.concept_ref == "elsewhere.Missing"
@@ -100,7 +100,7 @@ class TestInputFormDeriverEscapeHatches:
         concepts: dict[str, ConceptBlueprint | str] = {
             "demo.RefinedScore": ConceptBlueprint(description="Refines a dependency's score", refines="dep->other.Score"),
         }
-        node = InputFormDeriver(concepts=concepts).derive_concept(name="score", concept_ref="demo.RefinedScore")
+        node = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="score", concept_ref="demo.RefinedScore")
 
         assert node.kind == FieldKind.UNKNOWN
         assert node.refines == ["dep->other.Score"]
@@ -114,7 +114,7 @@ class TestInputFormDeriverEscapeHatches:
         registry = get_class_registry()
         registry.register_class(SelfReferentialPayload)
         try:
-            node = InputFormDeriver(concepts=concepts).derive_concept(name="recursive", concept_ref="demo.Recursive")
+            node = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="recursive", concept_ref="demo.Recursive")
         finally:
             registry.unregister_class(SelfReferentialPayload)
 
@@ -132,7 +132,7 @@ class TestInputFormDeriverEscapeHatches:
         registry = get_class_registry()
         registry.register_class(RootBackedPayload)
         try:
-            node = InputFormDeriver(concepts=concepts).derive_concept(name="root_backed", concept_ref="demo.RootBacked")
+            node = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="root_backed", concept_ref="demo.RootBacked")
         finally:
             registry.unregister_class(RootBackedPayload)
 
@@ -150,7 +150,7 @@ class TestInputFormDeriverEscapeHatches:
         registry = get_class_registry()
         registry.register_class(RootBackedSlug)
         try:
-            node = InputFormDeriver(concepts=concepts).derive_concept(name="slug", concept_ref="demo.Slug")
+            node = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="slug", concept_ref="demo.Slug")
         finally:
             registry.unregister_class(RootBackedSlug)
 
@@ -166,7 +166,7 @@ class TestInputFormDeriverEscapeHatches:
         registry = get_class_registry()
         registry.register_class(RootBackedTagList)
         try:
-            node = InputFormDeriver(concepts=concepts).derive_concept(name="tag_list", concept_ref="demo.TagList")
+            node = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="tag_list", concept_ref="demo.TagList")
         finally:
             registry.unregister_class(RootBackedTagList)
 

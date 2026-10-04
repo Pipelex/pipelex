@@ -7,7 +7,7 @@ The server writes structured logs: one JSON object per line, on **stderr**, with
 An error response produces exactly one line. A caller mistake:
 
 ```json
-{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "API error 422: InvalidModelCategory", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "event": "api_error", "route": "/v1/models", "error_type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "status": 422, "detail": "Invalid model category. Valid values: extract, img_gen, llm, search"}
+{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "API error 422: InvalidModelCategory", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "event": "api_error", "route": "/v1/models", "error_type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "status": 422, "detail": "Invalid model category. Valid values: extract, img_gen, judgment, llm, search"}
 ```
 
 A server fault looks the same at `ERROR`, and carries the traceback under an `exception` key.

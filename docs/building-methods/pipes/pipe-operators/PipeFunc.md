@@ -1,10 +1,13 @@
 ---
-description: "Run custom Python functions inside Pipelex pipelines with PipeFunc. Integrate business logic, external APIs, and data transformations."
+description: "Run custom Python functions inside Pipelex pipelines with PipeFunc. Add exact computation, business rules, and data transformations to your methods."
 ---
 
 # PipeFunc
 
-The `PipeFunc` operator provides an essential escape hatch, allowing you to execute arbitrary Python code from within a pipeline. This is useful for custom data manipulation, complex logic, or integrating with external services not supported by other operators.
+The `PipeFunc` operator provides an essential escape hatch, allowing you to execute arbitrary Python code from within a pipeline. It is for the work a model should not do: exact arithmetic, deterministic business rules, and reshaping data, for example with pandas or openpyxl.
+
+!!! note "Keep other services out of a PipeFunc"
+    A method receives its data through its inputs and hands its results to whatever runs it. Reading from a mailbox, a drive or a CRM, and writing back to one, belongs to that caller: an application using the SDK, an automation platform such as n8n, or an agent with its own connectors. A PipeFunc that calls another service works on your machine but fails on a sandbox-hosted deployment, where PipeFunc code runs in an isolated sandbox with no network access, no credentials and a short time limit. To read a web page or search the web, use [PipeExtract](PipeExtract.md) or [PipeSearch](PipeSearch.md).
 
 ## How it works
 

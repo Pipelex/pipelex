@@ -14,6 +14,8 @@ import pytest
 
 from pipelex.cli.commands.doctor_cmd import BackendFileReport, check_models
 from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
     InferenceBackendLibraryError,
     InferenceBackendLibraryValidationError,
     ModelDeckValidationError,
@@ -23,11 +25,17 @@ from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTI
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
 from pipelex.system.pipelex_service.types import RemoteConfigSource
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pytest_mock import MockerFixture
+
+
+# The provider the doctor's runtime setup built from ``[runtime.secrets]``: what the backends resolve their credentials through.
+SECRETS_PROVIDER = EnvSecretsProvider()
+VAULT_TOKEN = "hvs.models-row-token-0123456789"
 
 
 class TestCheckModels:
@@ -62,7 +70,7 @@ class TestCheckModels:
         )
         manager_class_mock = mocker.patch("pipelex.cli.commands.doctor_cmd.ModelManager")
 
-        healthy, message, reports = check_models()
+        healthy, message, reports = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert message == "Backend configuration error: openai: bad spec"
@@ -72,7 +80,7 @@ class TestCheckModels:
     @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
     def test_gateway_disabled_happy_path(self, models_manager: Any) -> None:
         """With the gateway disabled and a valid deck, models are healthy."""
-        healthy, message, reports = check_models()
+        healthy, message, reports = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is True
         assert message == "Models are valid"
@@ -90,7 +98,7 @@ class TestCheckModels:
         )
         mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=None)
 
-        healthy, message, _ = check_models()
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert message == "Pipelex Gateway is enabled but service configuration is missing"
@@ -105,7 +113,7 @@ class TestCheckModels:
         service_config = SimpleNamespace(agreement=SimpleNamespace(terms_accepted=False))
         mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=service_config)
 
-        healthy, message, _ = check_models()
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert message == "Pipelex Gateway is enabled but terms have not been accepted"
@@ -124,7 +132,7 @@ class TestCheckModels:
             side_effect=RemoteConfigUnavailableError("offline, cold cache"),
         )
 
-        healthy, message, _ = check_models()
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert message == "Failed to fetch Pipelex Gateway remote configuration: offline, cold cache"
@@ -148,7 +156,7 @@ class TestCheckModels:
         )
         mocker.patch("pipelex.cli.commands.doctor_cmd.RemoteConfigFetcher.fetch_remote_config", return_value=fetch_result)
 
-        healthy, message, _ = check_models()
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is True
         assert message == "Models are valid"
@@ -163,7 +171,7 @@ class TestCheckModels:
         """A deck validation failure is reported as a models error."""
         models_manager.validate_model_deck.side_effect = ModelDeckValidationError("preset broken")
 
-        healthy, message, _ = check_models()
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert message == "Error checking models: preset broken"
@@ -182,7 +190,7 @@ class TestCheckModels:
         )
         models_manager.setup.side_effect = InferenceBackendLibraryError("cannot resolve model", backend_name="openai")
 
-        healthy, message, reports = check_models()
+        healthy, message, reports = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert message == "Error checking models: cannot resolve model"
@@ -208,7 +216,7 @@ class TestCheckModels:
             backend_name="openai",
         )
 
-        healthy, _, reports = check_models()
+        healthy, _, reports = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert reports["openai"].is_valid is False
@@ -220,7 +228,7 @@ class TestCheckModels:
         """The likeliest override typo — `active = "nope"` — is the routing library's own refusal, and the doctor must report it, not crash."""
         models_manager.setup.side_effect = RoutingProfileLibraryError("Active profile 'nope' not found in the routing profile library")
 
-        healthy, message, reports = check_models()
+        healthy, message, reports = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert "Active profile 'nope' not found" in message
@@ -229,7 +237,7 @@ class TestCheckModels:
     @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
     def test_global_pins_both_documents_as_base_plus_override(self, models_manager: Any, tmp_path: Path) -> None:
         """`--global` hands the model manager that directory's base and its own override, for both documents."""
-        check_models(config_dir=tmp_path)
+        check_models(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         kwargs = models_manager.setup.call_args.kwargs
         assert kwargs["backends_library_paths"] == [tmp_path / "inference" / "backends.toml", tmp_path / "inference" / "backends_override.toml"]
@@ -246,9 +254,62 @@ class TestCheckModels:
             side_effect=InferenceBackendLibraryValidationError("Invalid inference backend library 'x' with overrides 'y': TOML parsing error"),
         )
 
-        healthy, message, reports = check_models()
+        healthy, message, reports = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is False
         assert "TOML parsing error" in message
         assert reports == {}
         models_manager.setup.assert_not_called()
+
+    @pytest.mark.usefixtures("gateway_disabled")
+    def test_the_configured_secrets_provider_is_the_one_the_backends_are_checked_against(self, mocker: MockerFixture, models_manager: Any) -> None:
+        """Not a provider of the doctor's own choosing: a deployment on another secrets method is diagnosed against its own secrets."""
+        check_backend_files = mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_backend_files",
+            return_value=(True, {}, "All backend files are valid"),
+        )
+
+        healthy, _, _ = check_models(secrets_provider=SECRETS_PROVIDER)
+
+        assert healthy is True
+        assert check_backend_files.call_args.kwargs["secrets_provider"] is SECRETS_PROVIDER
+        assert models_manager.setup.call_args.kwargs["secrets_provider"] is SECRETS_PROVIDER
+
+    def test_without_a_secrets_provider_nothing_is_checked_and_the_row_says_why(self, mocker: MockerFixture, models_manager: Any) -> None:
+        check_backend_files = mocker.patch("pipelex.cli.commands.doctor_cmd.check_backend_files")
+
+        healthy, message, reports = check_models(secrets_provider=None)
+
+        assert healthy is False
+        assert "the secrets provider did not build" in message
+        assert reports == {}
+        check_backend_files.assert_not_called()
+        models_manager.setup.assert_not_called()
+
+    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    def test_a_provider_failing_on_a_lookup_is_a_row_finding_quoted_redacted(self, models_manager: Any) -> None:
+        """An external provider may raise anything on a lookup: the row reports it, scrubbed, instead of the doctor stopping."""
+        models_manager.setup.side_effect = ConnectionError(f"vault unreachable; request headers had Authorization: Bearer {VAULT_TOKEN}")
+
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
+
+        assert healthy is False
+        assert message.startswith("Error checking models: the setup failed on a ConnectionError: vault unreachable")
+        assert "Authorization: Bearer [REDACTED]" in message
+        assert VAULT_TOKEN not in message
+
+    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    def test_a_credentials_error_quoting_the_providers_text_is_redacted_in_the_row(self, models_manager: Any) -> None:
+        """The loader copies a provider's not-found text into its own error, so the row scrubs a Pipelex error too."""
+        models_manager.setup.side_effect = InferenceBackendCredentialsError(
+            credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+            backend_name="openai",
+            key_name="api_key",
+            message=f"Could not get variable 'OPENAI_API_KEY': vault said no to Authorization: Bearer {VAULT_TOKEN}",
+        )
+
+        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
+
+        assert healthy is False
+        assert "Authorization: Bearer [REDACTED]" in message
+        assert VAULT_TOKEN not in message

@@ -13,6 +13,7 @@ from pipelex.core.memory.exceptions import (
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -22,6 +23,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
@@ -498,6 +500,14 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         """Get stuff content as YesNoContent if applicable."""
         return self.get_stuff(name=name).as_yes_no
 
+    def get_stuff_as_choice(self, name: str) -> ChoiceContent:
+        """Get stuff content as ChoiceContent if applicable."""
+        return self.get_stuff(name=name).as_choice
+
+    def get_stuff_as_rating(self, name: str) -> RatingContent:
+        """Get stuff content as RatingContent if applicable."""
+        return self.get_stuff(name=name).as_rating
+
     def get_stuff_as_date(self, name: str) -> DateContent:
         """Get stuff content as DateContent if applicable."""
         return self.get_stuff(name=name).as_date
@@ -552,6 +562,16 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def main_stuff_as_yes_no(self) -> YesNoContent:
         """Get main stuff content as YesNoContent if applicable."""
         return self.get_stuff_as_yes_no(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_choice(self) -> ChoiceContent:
+        """Get main stuff content as ChoiceContent if applicable."""
+        return self.get_stuff_as_choice(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_rating(self) -> RatingContent:
+        """Get main stuff content as RatingContent if applicable."""
+        return self.get_stuff_as_rating(name=MAIN_STUFF_NAME)
 
     @property
     def main_stuff_as_date(self) -> DateContent:

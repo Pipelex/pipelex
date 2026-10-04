@@ -16,14 +16,22 @@ forge content, such as an image pointing at another organisation's storage key.
   are data, and a key it does not hold falls back to an attribute read, which the rule above refuses.
   Jinja's own refusals (a function's globals, a frame, a class's `mro`) stay in force.
 - **Calling.** A template calls Jinja's own runtime (macros, `caller`, `loop`, `cycler`, `joiner`,
-  block references and the environment's globals), methods bound to an instance of a plain value type
-  (`str`, numbers, dates and times, and the built-in containers), `str.format` through the sandbox's
-  safe formatter, and the methods a type declares in its template surface. Everything else is
-  refused: pydantic methods, `Stuff` and content methods, classes, free functions and class methods,
-  and every method that changes a list, a dict or a set in place.
+  block references and the environment's globals), the methods of a plain value type (`str`, numbers,
+  dates and times, and the built-in containers) that the budget's table lists for that type
+  (`PLAIN_VALUE_METHOD_COSTS` in `jinja2_render_costs.py`), `str.format` through the sandbox's safe
+  formatter, and the methods a type declares in its template surface. Everything else is refused:
+  pydantic methods, `Stuff` and content methods, classes, free functions and class methods, every
+  method that changes a list, a dict or a set in place, and the few that produce bytes.
 - **Refusing.** A refusal raises `jinja2.exceptions.SecurityError` at the point of access, which the
   render functions turn into `Jinja2TemplateSecurityError`. Jinja's stock sandbox returns an undefined
   value that prints as nothing, which would send a prompt with a hole in it.
+- **Spending.** What a template may reach says nothing about what it may spend, so every render also
+  spends from one budget (`jinja2_render_budget.py`), charged by the hooks of this class, by wrappers
+  around every filter and test, and by a rewrite of the parsed template for what no hook reaches
+  (`jinja2_render_charging.py`, `jinja2_render_rewrite.py`). Converting Markdown, which markupsafe
+  does through `__html__` where no hook sees it, charges the budget the template makes active while it
+  renders (`markdown_parser.py`). An overdraft raises `RenderBudgetExceededError`, which the render
+  functions turn into `Jinja2TemplateBudgetError`.
 
 Filters and tests are not calls in this sense: they are Pipelex's or Jinja's own code, registered by
 the environment, and Jinja invokes them directly. That makes every filter trusted code with one
@@ -45,7 +53,7 @@ import inspect
 import types
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from jinja2.exceptions import SecurityError
 from jinja2.runtime import BlockReference, Context, LoopContext, Macro, Undefined
@@ -54,10 +62,25 @@ from jinja2.utils import Cycler, Joiner, Namespace, generate_lorem_ipsum
 from markupsafe import Markup
 from typing_extensions import override
 
+from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, active_render_budget, compare_weight
+from pipelex.tools.jinja2.jinja2_render_charging import (
+    INTERNAL_FILTERS,
+    BudgetedContext,
+    BudgetedTemplate,
+    SandboxedStrFormat,
+    charge_registered_functions,
+    charged_binop,
+    charged_call,
+    make_charged_finalize,
+)
+from pipelex.tools.jinja2.jinja2_render_costs import PLAIN_VALUE_METHOD_COSTS
+from pipelex.tools.jinja2.jinja2_render_rewrite import rewrite_for_render_budget
 from pipelex.tools.jinja2.template_surface import get_template_surface
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from jinja2 import nodes
 
 # The types whose own methods a template may call on an instance: formatting, not program logic.
 _PLAIN_VALUE_TYPES: tuple[type, ...] = (
@@ -120,34 +143,7 @@ _JINJA_CALLABLE_INSTANCE_TYPES: tuple[type, ...] = (Macro, LoopContext, BlockRef
 # `cycler.next()`, `cycler.reset()`.
 _JINJA_METHOD_OWNER_TYPES: tuple[type, ...] = (LoopContext, Cycler, BlockReference)
 
-# The methods that change a mutable plain value in place, listed here rather than taken from Jinja's
-# `modifies_known_mutable`, whose list misses `set.intersection_update`. The test suite checks this list
-# against every public method of each type, so a method a later Python adds cannot slip through.
-_MUTATING_METHOD_NAMES: dict[type, frozenset[str]] = {
-    list: frozenset({"append", "clear", "extend", "insert", "pop", "remove", "reverse", "sort"}),
-    dict: frozenset({"clear", "pop", "popitem", "setdefault", "update"}),
-    set: frozenset({"add", "clear", "difference_update", "discard", "intersection_update", "pop", "remove", "symmetric_difference_update", "update"}),
-}
-
 _MISSING = object()
-
-
-class _SandboxedStrFormat:
-    """The `str.format` or `str.format_map` of a string, routed through the sandbox's safe formatter.
-
-    Jinja builds this wrapper when a template reads `format` on a string, so that the replacement
-    fields of the format string (`{0.name}`, `{0[key]}`) go through the environment's own attribute
-    and item checks. Wrapping it in a type of its own lets the call policy recognise it by type,
-    while the raw `str.format` stays refused.
-    """
-
-    __slots__ = ("_format",)
-
-    def __init__(self, format_function: Callable[..., str]) -> None:
-        self._format = format_function
-
-    def __call__(self, *args: Any, **kwargs: Any) -> str:
-        return self._format(*args, **kwargs)
 
 
 def _is_private_name(*, name: str) -> bool:
@@ -175,7 +171,9 @@ def _is_plain_value_method(*, obj: object) -> bool:
 
     The binding has to be to an instance, so a class method reached through an instance
     (`created_at.now()`, which reads the clock) is refused. The method has to be the plain type's own,
-    so a subclass (a `StrEnum` member is a `str`) cannot add a callable method or override one.
+    so a subclass (a `StrEnum` member is a `str`) cannot add a callable method or override one, and it
+    has to be listed for that type in `PLAIN_VALUE_METHOD_COSTS`, which leaves out the methods that
+    change a value in place and those whose cost the render budget cannot bound.
     """
     if not isinstance(obj, (types.BuiltinMethodType, types.MethodType)):
         return False
@@ -186,10 +184,9 @@ def _is_plain_value_method(*, obj: object) -> bool:
     if plain_type is None:
         return False
     name = obj.__name__
-    if isinstance(bound_to, str) and name in {"format", "format_map"}:
-        # Only the sandbox's own wrapper formats a string: the raw method would resolve `{0.__class__}`.
-        return False
-    if name in _MUTATING_METHOD_NAMES.get(plain_type, frozenset()):
+    # `format` and `format_map` are not listed: only the sandbox's own wrapper formats a string, since
+    # the raw method would resolve `{0.__class__}`.
+    if name not in PLAIN_VALUE_METHOD_COSTS[plain_type]:
         return False
     plain_member = inspect.getattr_static(plain_type, name, _MISSING)
     return plain_member is not _MISSING and inspect.getattr_static(type(bound_to), name, _MISSING) is plain_member
@@ -218,6 +215,8 @@ def _describe_callable(*, obj: object) -> str:
         if bound_to is None or isinstance(bound_to, types.ModuleType):
             return f"the function '{name}'"
         return f"the method '{name}' of a '{type(bound_to).__name__}' value"
+    if isinstance(obj, Macro):
+        return f"the macro '{obj.name}'"
     if isinstance(obj, type):
         return f"the class '{obj.__name__}'"
     if isinstance(obj, types.FunctionType):
@@ -226,11 +225,38 @@ def _describe_callable(*, obj: object) -> str:
 
 
 class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
-    """The Jinja2 environment every Pipelex template renders under. The module docstring states its policy."""
+    """The Jinja2 environment every Pipelex template renders under. The module docstring states its policy.
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+    `render_budget_units` is the budget each render gets. A caller's `finalize` is passed here, never
+    assigned afterwards, since the environment's own `finalize` wraps it to charge what is printed.
+    """
+
+    context_class = BudgetedContext
+    template_class = BudgetedTemplate
+    intercepted_binops = frozenset({"+", "-", "*", "/", "//", "%", "**"})
+
+    def __init__(
+        self,
+        *args: Any,
+        finalize: Callable[..., Any] | None = None,
+        render_budget_units: int = DEFAULT_RENDER_BUDGET_UNITS,
+        **kwargs: Any,
+    ) -> None:
+        self.render_budget_units = render_budget_units
+        self._charged_finalize = make_charged_finalize(inner=finalize)
+        super().__init__(*args, finalize=self._charged_finalize, **kwargs)
         self.globals["namespace"] = DataNamespace
+        self.filters.update(INTERNAL_FILTERS)
+
+    @override
+    def _generate(self, source: nodes.Template, name: str | None, filename: str | None, defer_init: bool = False) -> str:
+        if self.finalize is not self._charged_finalize:
+            msg = "A PipelexTemplateEnvironment takes its finalize at construction: one assigned afterwards would print uncharged."
+            raise RuntimeError(msg)
+        charge_registered_functions(filters=self.filters, tests=cast("dict[str, Callable[..., Any]]", self.tests))
+        rewritten = rewrite_for_render_budget(source)
+        rewritten.set_environment(self)
+        return super()._generate(rewritten, name, filename, defer_init=defer_init)
 
     @override
     def is_safe_attribute(self, obj: Any, attr: str, value: Any) -> bool:
@@ -243,7 +269,7 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
         if not super().is_safe_callable(obj):
             return False
         return (
-            isinstance(obj, _SandboxedStrFormat)
+            isinstance(obj, SandboxedStrFormat)
             or _is_jinja_runtime_callable(obj=obj)
             or _is_plain_value_method(obj=obj)
             or _is_declared_template_method(obj=obj)
@@ -271,6 +297,12 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
             and not _declares_private_name(obj=obj, name=argument)
         ):
             self.unsafe_undefined(obj, argument)
+        key: object = argument
+        if isinstance(key, tuple):
+            # Reading with a tuple key hashes every element of it again, nested ones included.
+            budget = active_render_budget()
+            if budget is not None:
+                budget.charge(units=compare_weight(key, limit=budget.remaining), operation="reading an item by a tuple key")
         return super().getitem(obj, argument)
 
     @override
@@ -283,11 +315,17 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
         format_function = super().wrap_str_format(value)
         if format_function is None:
             return None
-        return _SandboxedStrFormat(format_function)
+        return SandboxedStrFormat(
+            format_function=format_function, environment=self, template=value.__self__, is_format_map=value.__name__ == "format_map"
+        )
 
     @override
     def call(self, context: Context, obj: Any, /, *args: Any, **kwargs: Any) -> Any:
         if not self.is_safe_callable(obj):
             msg = f"A template may not call {_describe_callable(obj=obj)}: templates read data and call methods of plain values only."
             raise SecurityError(msg)
-        return context.call(obj, *args, **kwargs)
+        return charged_call(context=context, obj=obj, args=args, kwargs=kwargs, operation=lambda: f"calling {_describe_callable(obj=obj)}")
+
+    @override
+    def call_binop(self, context: Context, operator: str, left: Any, right: Any) -> Any:
+        return charged_binop(context=context, operator=operator, left=left, right=right, compute=self.binop_table[operator])

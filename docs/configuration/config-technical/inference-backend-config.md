@@ -72,6 +72,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── vertexai.toml       # Google Vertex AI models (LLMs)
     │   ├── fal.toml            # FAL models (image generation)
     │   ├── linkup.toml          # Linkup models (web search)
+    │   ├── typesafe.toml       # TypeSafe models (judgment)
     │   ├── internal.toml       # Internal/local models (text extraction, the built-in document engine), managed by `pipelex update`
     │   └── ...
     └── deck/                   # Model deck configurations
@@ -80,6 +81,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
         ├── 3_extract_deck.toml       # Document extraction config
         ├── 4_search_deck.toml        # Web search config
         ├── 5_doc_gen_deck.toml       # Document engines, by format and source
+        ├── 6_judgment_deck.toml      # Judgment config
         ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
         └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```
@@ -87,7 +89,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
 Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with custom/override files (`x_` prefix) loaded last.
 
 !!! tip "Numbered files are pipelex-managed; overrides go in `x_custom_*.toml`"
-    The numbered deck files (`1_llm_deck.toml`...`5_doc_gen_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
+    The numbered deck files (`1_llm_deck.toml`...`6_judgment_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
 
     To customize aliases, presets, or default choices without conflict, edit (or create) any file in this directory whose name starts with `x_custom_` — Pipelex never tracks or overwrites those. See [`pipelex update`](../../tools/cli/update.md) for the full workflow.
 
@@ -257,6 +259,8 @@ GCP_CREDENTIALS_FILE_PATH=gcp_credentials.json
 FAL_API_KEY=
 
 LINKUP_API_KEY=
+
+TYPESAFE_API_KEY=
 # ... (see .env.example for full list)
 ```
 
@@ -285,12 +289,18 @@ api_key = "${FAL_API_KEY}"
 enabled = true
 api_key = "${LINKUP_API_KEY}"
 
+[typesafe]
+enabled = true
+api_key = "${TYPESAFE_API_KEY}"
+
 [internal]
 enabled = true
 # No API key needed for internal/local processing
 ```
 
 The `${VARIABLE_NAME}` syntax automatically loads values from your `.env` file. Set `enabled = true` to activate a backend, or `false` to disable it.
+
+Judgment models are never served by the Pipelex Gateway, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
 
 ### Model Specifications
 
@@ -325,6 +335,26 @@ costs = { input = 0.04, output = 0.0 }
 ```
 
 The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
+
+#### Input formats
+
+`inputs` lists what a model reads. For files, its entries are format keys, the same keys the runtime derives from a file's MIME type to check, before a run starts, that every file reaches a model able to read it: every image type is the `image` family, and any other type is its extension.
+
+- **LLMs** declare `images` to read images (vision), and the document formats they read among `pdf`, `docx`, `pptx`, `xlsx` and `html`.
+- **Extract models** declare the file formats they read among `pdf`, `docx`, `pptx`, `xlsx`, `html`, `md`, `csv`, `txt`, `vtt`, `eml` and `image`, and `web_page` when they fetch a web page from its URL themselves.
+
+```toml
+# internal.toml
+[docling-extract-text]
+model_type = "text_extractor"
+sdk = "docling_sdk"
+model_id = "extract-text"
+inputs = ["pdf", "docx", "pptx", "xlsx", "html", "md", "csv", "txt", "vtt", "eml", "image"]
+outputs = ["pages"]
+costs = {}
+```
+
+A file whose format the consuming model does not declare is refused with an input error that names the input, the model and the formats it reads. A file whose format is unknown, with no type or the generic `application/octet-stream`, is left to the provider. Declare a format only once the model is known to read it.
 
 #### Structure methods
 

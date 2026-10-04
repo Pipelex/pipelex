@@ -1,6 +1,6 @@
 """Shared template lints, applied by every pipe that renders authored templates over its inputs
 (PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts,
-PipeCondition expressions):
+PipeJudge questions, PipeCondition expressions):
 
 - the guard-lint (optionals design D7): each reference to a declared-optional (`?`) input must be
   guarded, otherwise validation fails with `OPTIONAL_INPUT_UNGUARDED` and the precise fix;

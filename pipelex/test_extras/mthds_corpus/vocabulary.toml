@@ -41,6 +41,12 @@ code = "Number"
 [native.yes_no]
 code = "YesNo"
 
+[native.choice]
+code = "Choice"
+
+[native.rating]
+code = "Rating"
+
 [native.date]
 code = "Date"
 
@@ -86,6 +92,9 @@ code = "PipeStructure"
 
 [operator.doc_gen]
 code = "PipeDocGen"
+
+[operator.judge]
+code = "PipeJudge"
 
 [controller.batch]
 code = "PipeBatch"

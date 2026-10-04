@@ -25,9 +25,11 @@ _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "p
 # The normalized pin was recomputed again when MTHDS v0.9.0 made `native.Html`'s `css_class`
 # optional: normalization materializes the pinned natives into the crate, so a standard change to
 # a pinned definition legitimately moves every conforming implementation's normalized digest — the
-# content pin, which hashes only authored content, did not move.
+# content pin, which hashes only authored content, did not move. It moved once more, for the same
+# reason, when MTHDS 3.0.0 gave `native.YesNo` its optional `probability`: removing that one member
+# from the pinned definition reproduces the previous digest exactly.
 _PINNED_CONTENT_FINGERPRINT = "053d3ce1a1963feffcea1aaea21e6329a7d2d2371cecdb92eb4a1e51269b0043"
-_PINNED_NORMALIZED_FINGERPRINT = "8d6fd88088228beb4f5fdad5b204a30146e8fcfc9392df93caa7df37d4ed471a"
+_PINNED_NORMALIZED_FINGERPRINT = "6c53e12e4dd7af352130382c4dd39dc3ac4767783b30f3e42cc8f2c42f84dffa"
 
 _MTHDS_TEST_VERSION = "0.0.0-test"
 

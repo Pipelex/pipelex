@@ -6,10 +6,14 @@ from typing_extensions import override
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.cogt.judgment.judgment_models import JudgmentQuestion, JudgmentState
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -235,3 +239,46 @@ class SearchObjectAssignment(BaseModel):
             output_class_schema=output_class.model_json_schema(),
             search_assignment=search_assignment,
         )
+
+
+class JudgmentAssignment(BaseModel):
+    """Serializable unit for a single judgment leaf call.
+
+    Carries everything the framework-agnostic ``judgment_generate`` core needs to rebuild the
+    ``JudgmentJob`` on the other side of a distributed boundary: the state the questions are asked
+    over, the questions themselves, and the fully resolved ``judgment_setting`` (its ``model`` is the
+    resolved provider handle, also the routing key). Mirrors ``SearchAssignment`` for the search leaf.
+
+    Unlike the structured-search leaf, there is no schema to ship and no dynamic class to rebuild:
+    a judgment's answers are plain models of this package's own, so they cross a boundary as they are.
+    The files travel beside the state, keyed by the input they came from, as the prompt images and
+    documents an LLM assignment carries.
+    """
+
+    job_metadata: JobMetadata
+    cogt_run_params: CogtRunParams
+    state: JudgmentState
+    images: dict[str, list[PromptImage]] = Field(default_factory=dict)
+    documents: dict[str, list[PromptDocument]] = Field(default_factory=dict)
+    questions: dict[str, JudgmentQuestion] = Field(min_length=1)
+    judgment_setting: JudgmentSetting
+
+    @property
+    def judgment_handle(self) -> str:
+        return self.judgment_setting.model
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs the leaf reads for this assignment: its files given by URI, never a URL the state carries as text."""
+        uri_references = [
+            UriReference(uri=image.uri, position=f"image {index} of input '{input_name}'")
+            for input_name, images in self.images.items()
+            for index, image in enumerate(images, start=1)
+            if isinstance(image, PromptImageUri)
+        ]
+        uri_references.extend(
+            UriReference(uri=document.uri, position=f"document {index} of input '{input_name}'")
+            for input_name, documents in self.documents.items()
+            for index, document in enumerate(documents, start=1)
+            if isinstance(document, PromptDocumentUri)
+        )
+        return uri_references

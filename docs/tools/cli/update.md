@@ -54,7 +54,7 @@ Locally-modified files are preserved as `<file>.bak.<UTC-timestamp>` before the 
 
 Pipelex draws a sharp line between the files it owns and the files you own.
 
-- **Managed (pipelex-owned)** — the numbered deck files, `1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml` and `5_doc_gen_deck.toml`, and `backends/internal.toml`. These are refreshed by `pipelex update`. Local edits are preserved with a `.bak.<timestamp>` backup but will not survive future updates.
+- **Managed (pipelex-owned)** — the numbered deck files, `1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`, `5_doc_gen_deck.toml` and `6_judgment_deck.toml`, and `backends/internal.toml`. These are refreshed by `pipelex update`. Local edits are preserved with a `.bak.<timestamp>` backup but will not survive future updates.
 - **User overrides** — any file in the deck directory whose name starts with `x_custom_` (e.g. `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`). `pipelex update` never tracks, hashes, copies, or removes these, while `pipelex init`, a full reset, rewrites the two the kit ships. Add new ones whenever you need to override aliases, presets, or default choices for a backend.
 - **Every other backend file** — `openai.toml`, `anthropic.toml`, a backend of your own, and the rest of `backends/`. `pipelex update` never touches them; `pipelex init`, a full reset, rewrites the ones the kit ships, such as `openai.toml`, and leaves a backend of your own in place. Declare models of your own in a backend of your own rather than in `internal.toml`.
 

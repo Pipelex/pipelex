@@ -241,6 +241,7 @@ plugins:
         - features/document-extraction.md: "Document Extraction"
         - features/image-generation.md: "Image Generation"
         - features/web-search.md: "Web Search"
+        - features/judgment.md: "Judgment"
         - features/pipelex-plugin.md: "Pipelex Plugin"
         - features/cli.md: "CLI"
         - features/plxt.md: "plxt Formatter & Linter"
@@ -277,6 +278,7 @@ plugins:
         - building-methods/pipes/pipe-operators/PipeExtract.md: "PipeExtract"
         - building-methods/pipes/pipe-operators/PipeImgGen.md: "PipeImgGen"
         - building-methods/pipes/pipe-operators/PipeSearch.md: "PipeSearch"
+        - building-methods/pipes/pipe-operators/PipeJudge.md: "PipeJudge"
         - building-methods/pipes/pipe-operators/PipeCompose.md: "PipeCompose"
         - building-methods/pipes/pipe-operators/PipeDocGen.md: "PipeDocGen"
         - building-methods/pipes/pipe-operators/PipeFunc.md: "PipeFunc"
@@ -368,6 +370,7 @@ plugins:
         - contribute/actions-allowlist.md: "Actions Allowlist"
         - contribute/test-duration-map.md: "Test Duration Map"
         - contribute/registration-surface.md: "Registration Surface"
+        - contribute/inference-family-surface.md: "Inference Family Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
         - contribute/mthds-test-corpus.md: "MTHDS Test Corpus"
         - contribute/trace-input-semantics.md: "Tracing Input Semantics"
@@ -383,7 +386,6 @@ plugins:
         - api-server/pipe-validate.md: "API Server Pipe Validate"
         - api-server/pipe-io.md: "API Server Pipe I/O"
         - api-server/codegen.md: "API Server Resolve & Codegen"
-        - api-server/pipe-builder.md: "API Server Pipe Builder"
         - api-server/mthds-tools.md: "API Server MTHDS Tools"
         - api-server/error-responses.md: "API Server Error Responses"
         - api-server/logging.md: "API Server Logging"
@@ -463,6 +465,7 @@ nav:
         - Document Extraction: features/document-extraction.md
         - Image Generation: features/image-generation.md
         - Web Search: features/web-search.md
+        - Judgment: features/judgment.md
       - Developer Tools:
         - Pipelex Plugin: features/pipelex-plugin.md
         - CLI: features/cli.md
@@ -507,6 +510,7 @@ nav:
           - PipeExtract: building-methods/pipes/pipe-operators/PipeExtract.md
           - PipeImgGen: building-methods/pipes/pipe-operators/PipeImgGen.md
           - PipeSearch: building-methods/pipes/pipe-operators/PipeSearch.md
+          - PipeJudge: building-methods/pipes/pipe-operators/PipeJudge.md
           - PipeCompose: building-methods/pipes/pipe-operators/PipeCompose.md
           - PipeDocGen: building-methods/pipes/pipe-operators/PipeDocGen.md
           - PipeFunc: building-methods/pipes/pipe-operators/PipeFunc.md
@@ -620,6 +624,7 @@ nav:
     - Actions Allowlist: contribute/actions-allowlist.md
     - Test Duration Map: contribute/test-duration-map.md
     - Registration Surface: contribute/registration-surface.md
+    - Inference Family Surface: contribute/inference-family-surface.md
     - Drift Contracts: contribute/drift-contracts.md
     - MTHDS Test Corpus: contribute/mthds-test-corpus.md
     - Tracing Input Semantics: contribute/trace-input-semantics.md
@@ -637,9 +642,9 @@ nav:
     - Pipe Validate: api-server/pipe-validate.md
     - Pipe I/O: api-server/pipe-io.md
     - Resolve & Codegen: api-server/codegen.md
-    - Pipe Builder: api-server/pipe-builder.md
     - MTHDS Tools: api-server/mthds-tools.md
     - Error Responses: api-server/error-responses.md
     - Logging: api-server/logging.md
     - Storage Transport (Removed): api-server/storage-transport.md
+    - Pipe Builder (Removed): api-server/pipe-builder.md
     - Changelog to v0.33.2: api-server/changelog.md

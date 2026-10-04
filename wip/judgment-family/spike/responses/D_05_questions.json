@@ -1,0 +1,29 @@
+{
+  "answers": {
+    "q00": {
+      "noul": 0.38,
+      "type": "noul"
+    },
+    "q01": {
+      "noul": 0.48,
+      "type": "noul"
+    },
+    "q02": {
+      "noul": 0.3,
+      "type": "noul"
+    },
+    "q03": {
+      "noul": 0.28,
+      "type": "noul"
+    },
+    "q04": {
+      "noul": 0.28,
+      "type": "noul"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 387,
+    "output_tokens": 94
+  }
+}

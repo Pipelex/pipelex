@@ -1,0 +1,13 @@
+domain      = "inbox_triage"
+description = "Judging whether an inbox message needs an answer today"
+main_pipe   = "judge_is_urgent"
+
+[pipe.judge_is_urgent]
+type        = "PipeJudge"
+description = "Judges whether a message needs an answer today"
+inputs      = { message = "Text" }
+output      = "YesNo"
+model       = "@default-judgment"
+question    = "Does this message need an answer today?"
+criteria    = { yes = "Something is broken or blocked for the sender right now", no = "The sender can wait for a reply" }
+threshold   = 0.7

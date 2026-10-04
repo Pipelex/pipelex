@@ -82,12 +82,12 @@ Your agent builds these too, and each can also be done by hand.
 
 ### As a webapp
 
-Ask your agent for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. By hand, the same app takes these commands:
+Ask your agent for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-sdk/tree/main/method-apps) and leaves it running on your machine. By hand, the same app takes these commands:
 
 ```bash
 src=$(mktemp -d)
-git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$src"
-mkdir -p my-app && cp -R "$src/webapp-js/." my-app/
+git clone --depth 1 https://github.com/Pipelex/pipelex-sdk.git "$src"
+mkdir -p my-app && cp -R "$src/method-apps/webapp-js/." my-app/
 cd my-app && git init
 
 export PIPELEX_API_KEY=plx_sk_...
@@ -147,7 +147,7 @@ export PIPELEX_API_KEY=plx_sk_...
     console.log(result.main_stuff);
     ```
 
-    More in the [`@pipelex/sdk` reference](https://github.com/Pipelex/pipelex-sdk-js/tree/main/docs).
+    More in the [`@pipelex/sdk` reference](https://github.com/Pipelex/pipelex-sdk/tree/main/js/docs).
 
 === "Python"
 
@@ -178,7 +178,7 @@ export PIPELEX_API_KEY=plx_sk_...
     asyncio.run(main())
     ```
 
-    More in the [`pipelex-sdk` reference](https://github.com/Pipelex/pipelex-sdk-python/tree/main/docs).
+    More in the [`pipelex-sdk` reference](https://github.com/Pipelex/pipelex-sdk/tree/main/python/docs).
 
 **Next:** [what Pipelex is](https://go.pipelex.com/product) · [documentation](https://go.pipelex.com/docs) · [your console](https://app.pipelex.com) · [Discord](https://go.pipelex.com/discord)
 

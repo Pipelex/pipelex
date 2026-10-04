@@ -597,7 +597,7 @@ _content_generator_override: ContextVar[ContentGeneratorProtocol | None] = Conte
 def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Generator[None, None, None]:
     """Set ``content_generator`` as the active generator for the scope, then restore the prior value on exit.
 
-    Inference operators (PipeLLM / PipeImgGen / PipeExtract / PipeSearch / PipeStructure) resolve
+    Inference operators (PipeLLM / PipeImgGen / PipeExtract / PipeSearch / PipeJudge / PipeStructure) resolve
     :func:`get_content_generator`; under a Temporal-enabled hub that default is
     ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process run (e.g. the
     dry-run/validation activity body) wraps itself in this scope with an inline generator so its

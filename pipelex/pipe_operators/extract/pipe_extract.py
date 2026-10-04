@@ -8,7 +8,7 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
@@ -110,14 +110,18 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeExtractOutput:
-        image_uri: str | None = None
-        pdf_uri: str | None = None
+        # The format run setup established for the file rides along, with the input's name, so the
+        # worker checks it against its model and names the input when it refuses.
+        extract_input: ExtractInput
         if self.image_stuff_name:
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
-            image_uri = image_stuff.url
+            extract_input = ExtractInput(image_uri=image_stuff.url, mime_type=image_stuff.mime_type, input_name=self.image_stuff_name)
         elif self.document_stuff_name:
             document_stuff = working_memory.get_stuff_as_document(name=self.document_stuff_name)
-            pdf_uri = document_stuff.url
+            extract_input = ExtractInput(document_uri=document_stuff.url, mime_type=document_stuff.mime_type, input_name=self.document_stuff_name)
+        else:
+            msg = f"PipeExtract '{self.code}' has neither an image nor a document input"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # The deck chain and the job-params composition are kernel semantics; the setting is resolved
         # per run into a local and never cached onto `self`, for the reason `pipe_llm.py` states about
@@ -134,7 +138,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         )
         extract_result = await run_extract(
             memory=working_memory,
-            extract_input=ExtractInput(image_uri=image_uri, document_uri=pdf_uri),
+            extract_input=extract_input,
             extract_setting=extract_setting,
             extract_job_params=extract_job_params,
             concept=self.output.concept,

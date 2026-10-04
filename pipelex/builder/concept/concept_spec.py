@@ -10,6 +10,7 @@ from pipelex.builder.concept.exceptions import ConceptSpecError
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import require_rich_for_rendering
@@ -263,7 +264,7 @@ class ConceptSpec(StructuredContent):
         default=None,
         description=(
             "If applicable: the native concept this concept extends "
-            "(Text, Markdown, Html, Image, Document, Number, Page, TextAndImages, JSON, Anything, Dynamic) "
+            f"({', '.join(NativeConceptCode)}) "
             "in PascalCase format. Cannot be used together with 'structure'."
         ),
         examples=["Text", "Markdown", "Html", "Image", "Document", "Number", "Page", "TextAndImages", "JSON"],

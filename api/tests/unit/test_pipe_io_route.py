@@ -20,6 +20,7 @@ from pipelex.pipeline.exceptions import PipeIOContractError
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.limits import MAX_PIPE_CODE_LEN
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
     COLLIDING_ECHO_LIST_MTHDS,
@@ -33,6 +34,7 @@ from tests.unit._constants import (
     SIGNATURE_ONLY_BATCH,
     STUB_METHOD_ADDRESS,
     STUB_METHOD_MANIFEST_MAIN_PIPE_SHOUT,
+    STUB_METHOD_MANIFEST_NO_MAIN_PIPE,
     STUB_METHOD_MANIFEST_NOMAIN_ENTRY,
     VALID_MTHDS,
 )
@@ -367,6 +369,44 @@ class TestPipeIoRoute:
     def test_closure_selector_xor_is_a_request_shape_422(self, payload: dict[str, Any]):
         client = _build_client()
         _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            pytest.param({"files": []}, id="empty-files"),
+            pytest.param({"files": [{"content": VALID_MTHDS}], "pipe_ref": "x" * (MAX_PIPE_CODE_LEN + 1)}, id="oversized-pipe-ref"),
+        ],
+    )
+    def test_out_of_bounds_selectors_are_a_request_shape_422(self, payload: dict[str, Any]):
+        client = _build_client()
+        _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
+
+    def test_a_bare_pipe_code_resolves_but_is_answered_qualified(self):
+        # The engine's entry lookup still accepts a bare request code, falling back across domains, until
+        # `resolve_requested_pipe` refuses one as the pipe-selector ruling asks; that change flips this
+        # test. Meanwhile the valid arm promises a qualified ref, so the answer is read off the resolved
+        # pipe, never echoed from the request's own bare spelling.
+        client = _build_client()
+        body = _valid_arm(client, {"files": _files(VALID_MTHDS, SIBLING_MTHDS), "pipe_ref": "wrap_echo"})
+        assert body["pipe_ref"] == "smoke.wrap_echo"
+        _assert_keys(body, {"smoke.wrap_echo"})
+
+    def test_a_manifest_without_main_pipe_falls_through_to_the_closures_declaration(self, install_method_package: Callable[..., Path]):
+        # A manifest may declare no `main_pipe`; the chain then falls through to the closure's own
+        # declaration, the default inline `files[]` get, rather than refusing.
+        install_method_package(files={"documents.mthds": VALID_MTHDS}, manifest_toml=STUB_METHOD_MANIFEST_NO_MAIN_PIPE)
+        client = _build_client()
+        body = _valid_arm(client, {"method_ref": STUB_METHOD_REF})
+        assert body["pipe_ref"] == "smoke.echo"
+        assert body["default_pipe_ref"] == "smoke.echo"
+
+    def test_a_method_with_no_entry_pipe_anywhere_is_still_a_422(self, install_method_package: Callable[..., Path]):
+        # The whole chain empty: no `pipe_ref`, a manifest with no `main_pipe`, a closure declaring
+        # none. The manifest only ever adds a default, so the closure arm's refusal stands.
+        install_method_package(files={"documents.mthds": NO_MAIN_PIPE_MTHDS}, manifest_toml=STUB_METHOD_MANIFEST_NO_MAIN_PIPE)
+        client = _build_client()
+        detail = _assert_input_422(client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF}), error_type=PIPE_NOT_FOUND_ERROR)
+        assert "main_pipe" in detail
 
     @pytest.mark.parametrize(
         ("contents", "request_fields"),

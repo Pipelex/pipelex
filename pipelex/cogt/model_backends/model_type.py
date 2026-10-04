@@ -7,6 +7,7 @@ class ModelType(StrEnum):
     IMG_GEN = "img_gen"
     SEARCH = "search"
     DOC_GEN = "doc_gen"
+    JUDGMENT = "judgment"
 
     @property
     def indefinite_description(self) -> str:
@@ -22,3 +23,5 @@ class ModelType(StrEnum):
                 return "a search model"
             case ModelType.DOC_GEN:
                 return "a document-generation engine"
+            case ModelType.JUDGMENT:
+                return "a judgment model"

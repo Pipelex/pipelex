@@ -1,0 +1,38 @@
+{
+  "answers": {
+    "q": {
+      "confidence": 0.54,
+      "legend": {
+        "0": "Severity level 0",
+        "1": "Severity level 1",
+        "2": "Severity level 2",
+        "3": "Severity level 3",
+        "4": "Severity level 4",
+        "5": "Severity level 5",
+        "6": "Severity level 6",
+        "7": "Severity level 7",
+        "8": "Severity level 8",
+        "9": "Severity level 9"
+      },
+      "probabilities": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.01,
+        "4": 0.03,
+        "5": 0.05,
+        "6": 0.05,
+        "7": 0.12,
+        "8": 0.31,
+        "9": 0.43
+      },
+      "score": 7.86,
+      "type": "score"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 413,
+    "output_tokens": 17
+  }
+}

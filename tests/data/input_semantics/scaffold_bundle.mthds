@@ -87,3 +87,14 @@ SCAFFOLD_prompt_dynamic_marker_dollar: $dynamic_prompted
 And the bookmark beside it:
 @bookmark
 """
+
+# The verdict natives at slot positions. `native.YesNo` is a `boolean` where a caller supplies it,
+# so its compact template is the bare verdict; `native.Choice` and `native.Rating` carry optional
+# measures beside their verdict, so the descriptor states them as objects and every projection
+# keeps their `{concept, content}` envelope, which is the only form the input shaper takes back.
+[pipe.scaffold_verdict_natives]
+type        = "PipeCompose"
+description = "SCAFFOLD_pipe_scaffold_verdict_natives: the verdict natives, each at a slot position"
+inputs      = { approved_in = "YesNo", team_in = "Choice", grade_in = "Rating" }
+output      = "Text"
+template    = "SCAFFOLD_template_verdict_natives: $approved_in $team_in $grade_in"

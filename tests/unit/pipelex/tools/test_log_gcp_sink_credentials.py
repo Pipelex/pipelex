@@ -459,6 +459,20 @@ class TestGcpLogSinkCredentials:
         assert "'json' sink" in message
         assert isinstance(exc_info.value.__cause__, failure_type)
 
+    def test_a_key_path_resolved_from_a_placeholder_is_named_with_the_placeholder_to_fix(self, tmp_path: Path) -> None:
+        """The path came from a secret, so the reader is told which variable to fix rather than to edit the TOML."""
+        key_path = tmp_path / "missing-key.json"
+
+        with pytest.raises(GcpLogSinkCredentialsError) as exc_info:
+            make_gcp_log_sink(
+                config=GcpLogSinkConfig(log_name="pipelex", project_id="a-test-project", credentials_file_path=str(key_path)),
+                credentials_file_path_placeholder="${GCP_CREDENTIALS_FILE_PATH}",
+            )
+
+        message = str(exc_info.value)
+        assert f"could not load the service-account key at '{key_path}' (resolved from '${{GCP_CREDENTIALS_FILE_PATH}}')" in message
+        assert "Point the variable that `credentials_file_path` in [runtime.log.gcp] names, '${GCP_CREDENTIALS_FILE_PATH}'" in message
+
     def test_a_key_file_without_a_project_is_not_a_credentials_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
     ) -> None:

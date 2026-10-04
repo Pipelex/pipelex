@@ -92,6 +92,7 @@ ExplicitConceptIncompatibleError | Explicit concept incompatible | https://docs.
 ExtractCapabilityError | Extract capability | https://docs.pipelex.com/latest/errors/extract-capability-error/
 ExtractHandleNotFoundError | Extract handle not found | https://docs.pipelex.com/latest/errors/extract-handle-not-found-error/
 ExtractInputError | Extract input | https://docs.pipelex.com/latest/errors/extract-input-error/
+ExtractInputFormatError | Extract input format | https://docs.pipelex.com/latest/errors/extract-input-format-error/
 ExtractJobFailureError | Extract job failure | https://docs.pipelex.com/latest/errors/extract-job-failure-error/
 ExtractModelNotFoundError | Extract model not found | https://docs.pipelex.com/latest/errors/extract-model-not-found-error/
 ExtractOutputError | Extract output | https://docs.pipelex.com/latest/errors/extract-output-error/
@@ -143,11 +144,18 @@ InputStuffSpecsFactoryError | Input stuff specs factory | https://docs.pipelex.c
 Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/jinja2-context-error/
 Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
 Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/
+Jinja2TemplateBudgetError | Template render budget exceeded | https://docs.pipelex.com/latest/errors/jinja2-template-budget-error/
 Jinja2TemplateRenderError | Jinja 2 template render | https://docs.pipelex.com/latest/errors/jinja2-template-render-error/
 Jinja2TemplateSecurityError | Jinja 2 template security | https://docs.pipelex.com/latest/errors/jinja2-template-security-error/
 Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/
 JobMetadataError | Job metadata | https://docs.pipelex.com/latest/errors/job-metadata-error/
 JsonTypeError | Json type | https://docs.pipelex.com/latest/errors/json-type-error/
+JudgmentAnswerMismatchError | Judgment answer mismatch | https://docs.pipelex.com/latest/errors/judgment-answer-mismatch-error/
+JudgmentCapabilityError | Judgment capability | https://docs.pipelex.com/latest/errors/judgment-capability-error/
+JudgmentHandleNotFoundError | Judgment handle not found | https://docs.pipelex.com/latest/errors/judgment-handle-not-found-error/
+JudgmentJobFailureError | Judgment job failure | https://docs.pipelex.com/latest/errors/judgment-job-failure-error/
+JudgmentModelMissingError | Judgment model missing | https://docs.pipelex.com/latest/errors/judgment-model-missing-error/
+JudgmentModelNotFoundError | Judgment model not found | https://docs.pipelex.com/latest/errors/judgment-model-not-found-error/
 KitError | Kit | https://docs.pipelex.com/latest/errors/kit-error/
 KitIndexLoadingError | Kit index loading | https://docs.pipelex.com/latest/errors/kit-index-loading-error/
 LLMAssignmentError | LLM assignment | https://docs.pipelex.com/latest/errors/llm-assignment-error/
@@ -166,6 +174,8 @@ LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
 LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
+LogSinkHeaderValueError | Log sink header value holds a line break | https://docs.pipelex.com/latest/errors/log-sink-header-value-error/
+LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
 ManifoldCredentialsError | Manifold credentials | https://docs.pipelex.com/latest/errors/manifold-credentials-error/
 ManifoldEndpointError | Manifold endpoint | https://docs.pipelex.com/latest/errors/manifold-endpoint-error/
 ManifoldError | Manifold | https://docs.pipelex.com/latest/errors/manifold-error/
@@ -237,6 +247,8 @@ PipeImgGenRunError | Pipe img gen run | https://docs.pipelex.com/latest/errors/p
 PipeInputError | Pipe input | https://docs.pipelex.com/latest/errors/pipe-input-error/
 PipeInputsFactoryError | Pipe inputs factory | https://docs.pipelex.com/latest/errors/pipe-inputs-factory-error/
 PipeJobError | Pipe job | https://docs.pipelex.com/latest/errors/pipe-job-error/
+PipeJudgeError | Pipe judge | https://docs.pipelex.com/latest/errors/pipe-judge-error/
+PipeJudgeInputCapabilityError | Pipe judge input capability | https://docs.pipelex.com/latest/errors/pipe-judge-input-capability-error/
 PipeLLMFactoryError | Pipe LLM factory | https://docs.pipelex.com/latest/errors/pipe-llm-factory-error/
 PipeLibraryError | Pipe library | https://docs.pipelex.com/latest/errors/pipe-library-error/
 PipeLoadRefusalError | Pipe load refusal | https://docs.pipelex.com/latest/errors/pipe-load-refusal-error/
@@ -267,6 +279,9 @@ PipelexSetupError | Pipelex setup | https://docs.pipelex.com/latest/errors/pipel
 PipelexUnexpectedError | Unexpected internal error | https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/
 PipelineExecutionError | Pipeline execution | https://docs.pipelex.com/latest/errors/pipeline-execution-error/
 PipelineInputContentError | Pipeline input content | https://docs.pipelex.com/latest/errors/pipeline-input-content-error/
+PipelineInputFormatError | Pipeline input format | https://docs.pipelex.com/latest/errors/pipeline-input-format-error/
+PipelineInputFormatUnsupportedError | Pipeline input format unsupported | https://docs.pipelex.com/latest/errors/pipeline-input-format-unsupported-error/
+PipelineInputNotAnImageError | Pipeline input not an image | https://docs.pipelex.com/latest/errors/pipeline-input-not-an-image-error/
 PipelineInputUrlInvalidError | Pipeline input url invalid | https://docs.pipelex.com/latest/errors/pipeline-input-url-invalid-error/
 PipelineInputUrlMissingError | Pipeline input url missing | https://docs.pipelex.com/latest/errors/pipeline-input-url-missing-error/
 PipelineManagerAlreadyExistsError | Pipeline manager already exists | https://docs.pipelex.com/latest/errors/pipeline-manager-already-exists-error/
@@ -280,6 +295,7 @@ PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/
 PortkeyError | Portkey | https://docs.pipelex.com/latest/errors/portkey-error/
 PortkeyFactoryError | Portkey factory | https://docs.pipelex.com/latest/errors/portkey-factory-error/
 PromptDocumentFactoryError | Prompt document factory | https://docs.pipelex.com/latest/errors/prompt-document-factory-error/
+PromptDocumentFormatError | Prompt document format | https://docs.pipelex.com/latest/errors/prompt-document-format-error/
 PromptImageFactoryError | Prompt image factory | https://docs.pipelex.com/latest/errors/prompt-image-factory-error/
 PromptImageFormatError | Prompt image format | https://docs.pipelex.com/latest/errors/prompt-image-format-error/
 PyPdfium2RendererError | Py pdfium 2 renderer | https://docs.pipelex.com/latest/errors/py-pdfium2-renderer-error/
@@ -331,6 +347,9 @@ TemplateSigilSyntaxError | Template sigil syntax | https://docs.pipelex.com/late
 TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error/
 ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
+TypesafeError | Typesafe | https://docs.pipelex.com/latest/errors/typesafe-error/
+TypesafeJudgmentResponseError | Typesafe judgment response | https://docs.pipelex.com/latest/errors/typesafe-judgment-response-error/
+TypesafeQuestionUnsupportedError | Typesafe question unsupported | https://docs.pipelex.com/latest/errors/typesafe-question-unsupported-error/
 UnknownBootOrchestratorError | Unknown boot orchestrator | https://docs.pipelex.com/latest/errors/unknown-boot-orchestrator-error/
 UnknownInputNameError | Unknown input name | https://docs.pipelex.com/latest/errors/unknown-input-name-error/
 UnknownLogSinkError | Unknown log sink | https://docs.pipelex.com/latest/errors/unknown-log-sink-error/

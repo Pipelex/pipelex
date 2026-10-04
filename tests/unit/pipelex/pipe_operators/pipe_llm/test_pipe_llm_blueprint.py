@@ -175,6 +175,44 @@ class TestPipeLLMBlueprint:
         )
         assert set(blueprint.input_names) == {"items"}
 
+    def test_validate_inputs_correct_with_a_set_read_in_its_loop_body(self):
+        """A name a loop body sets is the template's own where the body reads it, not an input."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"expenses": "native.Text[]"},
+            output="native.Text",
+            prompt="Plan these:\n{% for expense in expenses %}{% set day = expense.text %}- {{ day }}\n{% endfor %}",
+        )
+        assert set(blueprint.input_names) == {"expenses"}
+
+    def test_validate_inputs_incorrect_input_read_only_through_a_loop_set(self):
+        """An input declared only for a name the loop body sets is never read: the body reads its own `day`."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"expenses": "native.Text[]", "day": "native.Text"},
+                "output": "native.Text",
+                "prompt": "{% for expense in expenses %}{% set day = expense.text %}- {{ day }}\n{% endfor %}",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+        assert error.variable_names == ["day"]
+
+    def test_validate_inputs_incorrect_set_in_only_some_branches(self):
+        """A name only some branches of an `if` set is read from the inputs on the paths where none ran."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"topic": "native.Text"},
+                "output": "native.Text",
+                "prompt": "{% if topic %}{% set tone = 'formal' %}{% endif %}Write about $topic in a {{ tone }} tone",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
+        assert error.variable_names == ["tone"]
+
     def test_validate_inputs_correct_with_input_named_like_a_jinja_global(self):
         """An input named like a Jinja global shadows it, so reading the name reads the input."""
         blueprint = PipeLLMBlueprint(

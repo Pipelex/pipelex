@@ -1,0 +1,10 @@
+name = "native_choice_ticket_routing"
+description = "A support ticket routed on the option a choice verdict picked"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.choice",
+]

@@ -1,4 +1,5 @@
 import base64
+import binascii
 from enum import StrEnum
 from functools import cached_property
 from typing import Annotated, Literal, Union
@@ -12,6 +13,7 @@ from pipelex.tools.misc.filetype_utils import (
     FileType,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
+    guess_file_type_from_bytes,
     mime_type_to_extension,
 )
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
@@ -78,6 +80,10 @@ class PromptImageUri(BaseModel):
             return mime_type_to_extension(self.mime_type)
         return UNKNOWN_FILE_TYPE
 
+    def known_mime_type(self) -> str | None:
+        """The MIME type this image is known to have, without loading it: the one run setup stamped, if any."""
+        return self.mime_type
+
 
 class PromptImageBase64(BaseModel):
     """A prompt image as base64-encoded string."""
@@ -93,6 +99,15 @@ class PromptImageBase64(BaseModel):
 
     def get_decoded_bytes(self) -> bytes:
         return base64.b64decode(self.base64_data)
+
+    def known_mime_type(self) -> str | None:
+        """The MIME type the bytes identify, or `None` when they identify none or do not decode."""
+        try:
+            raw_bytes = self.get_decoded_bytes()
+        except binascii.Error:
+            return None
+        file_type = guess_file_type_from_bytes(raw_bytes=raw_bytes)
+        return file_type.mime if file_type else None
 
     @override
     def __str__(self) -> str:
@@ -123,6 +138,11 @@ class PromptImageBinary(BaseModel):
 
     def get_mime_type(self) -> str:
         return self.get_file_type().mime
+
+    def known_mime_type(self) -> str | None:
+        """The MIME type the bytes identify, or `None` when they identify none."""
+        file_type = guess_file_type_from_bytes(raw_bytes=self.raw_bytes)
+        return file_type.mime if file_type else None
 
     @override
     def __str__(self) -> str:

@@ -35,6 +35,42 @@ class TestDetectUnguardedOptionalReferences:
             ("with_shadow_local", "{% with assessment = 'x' %}{{ assessment }}{% endwith %}"),
             ("for_filter_bare_presence_probe", "{% for item in topic_items if assessment %}{{ item }}{% endfor %}"),
             ("for_filter_target_shadows", "{% for assessment in topic_items if assessment.flag %}{{ assessment }}{% endfor %}"),
+            ("set_in_every_branch", "{% if topic %}{% set assessment = 'a' %}{% else %}{% set assessment = 'b' %}{% endif %}{{ assessment.amount }}"),
+            (
+                "set_in_every_branch_with_elifs",
+                (
+                    "{% if topic %}{% set assessment = 'a' %}{% elif other %}{% set assessment = 'b' %}"
+                    "{% else %}{% set assessment = 'c' %}{% endif %}{{ assessment }}"
+                ),
+            ),
+            ("set_in_a_call_block_body", "{% call m() %}{% set assessment = 'x' %}{{ assessment.amount }}{% endcall %}"),
+            ("set_in_a_filter_block_body", "{% filter upper %}{% set assessment = 'x' %}{{ assessment.amount }}{% endfilter %}"),
+            ("call_block_argument_shadows", "{% call(assessment) m() %}{{ assessment.amount }}{% endcall %}"),
+            ("set_in_an_autoescape_block", "{% autoescape true %}{% set assessment = 'x' %}{{ assessment.amount }}{% endautoescape %}"),
+            ("set_in_a_block_body", "{% block b %}{% set assessment = 'x' %}{{ assessment.amount }}{% endblock %}"),
+            ("set_target_in_a_block_is_a_store_not_a_read", "{% block b %}{% set assessment = 'x' %}{% endblock %}"),
+            ("macro_reads_a_later_set", "{% macro show() %}{{ assessment.amount }}{% endmacro %}{% set assessment = 'x' %}{{ show() }}"),
+            ("top_level_set_reaches_a_block", "{% set assessment = 'x' %}{% block b %}{{ assessment.amount }}{% endblock %}"),
+            ("guard_reaches_a_block", "{% if assessment %}{% block b %}{{ assessment.amount }}{% endblock %}{% endif %}"),
+            (
+                "guard_around_a_loop_reaches_a_block_in_it",
+                "{% if assessment %}{% for i in items %}{% block b %}{{ assessment.amount }}{% endblock %}{% endfor %}{% endif %}",
+            ),
+            (
+                "guard_in_a_loop_reaches_a_block",
+                "{% for i in items %}{% if assessment %}{% block b %}{{ assessment.amount }}{% endblock %}{% endif %}{% endfor %}",
+            ),
+            (
+                "macro_in_an_if_branch_reads_a_later_set",
+                (
+                    "{% if topic %}{% macro show() %}{{ assessment.amount }}{% endmacro %}{% else %}{% macro show() %}x{% endmacro %}"
+                    "{% endif %}{% set assessment = 'x' %}{{ show() }}"
+                ),
+            ),
+            (
+                "scoped_block_sees_the_loop_target",
+                "{% for assessment in items %}{% block b scoped %}{{ assessment.amount }}{% endblock %}{% endfor %}",
+            ),
         ],
     )
     def test_guarded_references_produce_no_findings(self, topic: str, template_source: str):
@@ -64,6 +100,54 @@ class TestDetectUnguardedOptionalReferences:
             ("with_value_reads_optional", "{% with local = assessment %}{{ local }}{% endwith %}", "assessment"),
             ("with_body_reads_other_optional", "{% with other = 'x' %}{{ assessment.amount }}{% endwith %}", "assessment.amount"),
             ("for_filter_deep_access", "{% for item in topic_items if assessment.flag %}{{ item }}{% endfor %}", "assessment.flag"),
+            ("set_in_some_branches", "{% if topic %}{% set assessment = 'x' %}{% endif %}{{ assessment.amount }}", "assessment.amount"),
+            ("else_does_not_see_the_body_set", "{% if topic %}{% set assessment = 'x' %}{% else %}{{ assessment }}{% endif %}", "assessment"),
+            ("set_does_not_escape_a_call_block", "{% call m() %}{% set assessment = 'x' %}{% endcall %}{{ assessment }}", "assessment"),
+            ("set_does_not_escape_a_filter_block", "{% filter upper %}{% set assessment = 'x' %}{% endfilter %}{{ assessment }}", "assessment"),
+            ("set_does_not_escape_a_set_block", "{% set s %}{% set assessment = 'x' %}{% endset %}{{ assessment }}", "assessment"),
+            ("macro_default_reads_optional", "{% macro m(x=assessment.amount) %}{{ x }}{% endmacro %}{{ m() }}", "assessment.amount"),
+            (
+                "set_does_not_escape_an_autoescape_block",
+                "{% autoescape true %}{% set assessment = 'x' %}{% endautoescape %}{{ assessment }}",
+                "assessment",
+            ),
+            ("set_does_not_escape_a_block", "{% block b %}{% set assessment = 'x' %}{% endblock %}{{ assessment }}", "assessment"),
+            (
+                "macro_reads_a_name_set_in_some_branches",
+                "{% macro show() %}{{ assessment.amount }}{% endmacro %}{% if topic %}{% set assessment = 'x' %}{% endif %}{{ show() }}",
+                "assessment.amount",
+            ),
+            (
+                "macro_reads_an_optional_its_frame_reads_before_setting",
+                (
+                    "{% if assessment %}{{ assessment }}{% endif %}"
+                    "{% macro show() %}{{ assessment.amount }}{% endmacro %}{{ show() }}{% set assessment = 'x' %}"
+                ),
+                "assessment.amount",
+            ),
+            (
+                "loop_target_does_not_reach_a_block",
+                "{% for assessment in items %}{% block b %}{{ assessment.amount }}{% endblock %}{% endfor %}",
+                "assessment.amount",
+            ),
+            (
+                "guard_on_a_loop_target_does_not_reach_a_block",
+                "{% for assessment in items %}{% if assessment %}{% block b %}{{ assessment.amount }}{% endblock %}{% endif %}{% endfor %}",
+                "assessment.amount",
+            ),
+            (
+                "autoescape_set_does_not_reach_a_block",
+                "{% autoescape true %}{% set assessment = 'x' %}{% block b %}{{ assessment.amount }}{% endblock %}{% endautoescape %}",
+                "assessment.amount",
+            ),
+            (
+                "guard_on_a_block_local_does_not_reach_a_nested_block",
+                (
+                    "{% block outer %}{% set assessment = 'x' %}{% if assessment %}"
+                    "{% block inner %}{{ assessment.amount }}{% endblock %}{% endif %}{% endblock %}"
+                ),
+                "assessment.amount",
+            ),
         ],
     )
     def test_unguarded_references_are_reported(self, topic: str, template_source: str, expected_path: str):

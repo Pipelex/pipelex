@@ -14,6 +14,7 @@ class InferenceFamily(StrEnum):
     EXTRACT = "extract"
     SEARCH = "search"
     DOC_GEN = "doc_gen"
+    JUDGMENT = "judgment"
 
 
 # The uniform inference-backend factory. A backend plugin registers one of these

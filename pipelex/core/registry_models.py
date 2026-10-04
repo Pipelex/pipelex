@@ -1,5 +1,6 @@
 from typing import ClassVar
 
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -11,6 +12,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -38,6 +40,8 @@ class CoreRegistryModels(RegistryModels):
         MarkdownContent,
         NumberContent,
         YesNoContent,
+        ChoiceContent,
+        RatingContent,
         DateContent,
         TimeContent,
         ImageContent,

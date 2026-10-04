@@ -40,7 +40,7 @@ A template reads data and calls methods of plain values, and nothing else: it ca
 | `output`        | string            | The concept for the output                                                  | Yes      |
 | `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
 
-Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 *Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
 
@@ -109,7 +109,7 @@ template = """
 """
 ```
 
-**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through. A bare URL becomes a link only when it has a scheme, such as `https://example.com`, so a file name like `README.md` stays text; a link written in Markdown, such as `[the guide](docs/guide.md)`, is a link whatever its target. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template.
+**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through. A bare URL becomes a link only when it has a scheme, such as `https://example.com`, so a file name like `README.md` stays text; a link written in Markdown, such as `[the guide](docs/guide.md)`, is a link whatever its target. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template. Converting Markdown is charged to the template's [render budget](../../../under-the-hood/template-sandbox.md#the-render-budget), so one render converts at most about 65,000 characters of it, each conversion counting.
 
 ## Construct Mode
 
@@ -186,6 +186,8 @@ Conversion matrix:
 | `Time[]` | `type = "list"`, `item_type = "time"` | the list of times of day |
 
 When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
+
+`Choice` and `Rating` are not in the matrix: reach their verdict by path, `{ from = "team.choice" }` or `{ from = "severity.level" }`. A `YesNo` converts to its boolean and leaves its probability behind, so copy `{ from = "approved.probability" }` into a `number` field when you need it.
 
 One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp. The same guard applies per item when copying a `Date[]` into a list of `date` items.
 

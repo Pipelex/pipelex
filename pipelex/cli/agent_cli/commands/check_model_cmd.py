@@ -58,7 +58,7 @@ def agent_check_model_cmd(
     ],
     model_type: Annotated[
         ModelCategory,
-        typer.Option("--type", "-t", help="Model category: llm, extract, img_gen, search"),
+        typer.Option("--type", "-t", help="Model category: llm, extract, img_gen, search, judgment"),
     ],
     output_format: Annotated[
         CliOutputFormat,

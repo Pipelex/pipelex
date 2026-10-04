@@ -12,6 +12,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMCapabilityError
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.system.exceptions import JobMetadataError
@@ -28,7 +29,6 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
-from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -434,6 +434,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                 msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
                 raise LLMCapabilityError(msg)
 
+            check_prompt_images_are_images(model_name=self.inference_model.name, prompt_images=llm_job.llm_prompt.user_images)
+
     def _check_document_support(self, llm_job: LLMJob):
         if not llm_job.llm_prompt.user_documents:
             return
@@ -442,16 +444,11 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             msg = f"LLM Engine '{self.inference_model.tag}' does not support documents."
             raise LLMCapabilityError(msg)
 
-        # Check each document's type is supported
-        supported = self.inference_model.supported_document_types
-        for doc in llm_job.llm_prompt.user_documents:
-            doc_type = doc.get_document_type()
-            # Skip validation for unknown types - let the provider handle it
-            if doc_type == UNKNOWN_FILE_TYPE:
-                continue
-            if doc_type not in supported:
-                msg = f"LLM Engine '{self.inference_model.tag}' does not support {doc_type} documents."
-                raise LLMCapabilityError(msg)
+        check_prompt_documents_are_read(
+            model_name=self.inference_model.name,
+            supported_document_types=self.inference_model.supported_document_types,
+            prompt_documents=llm_job.llm_prompt.user_documents,
+        )
 
     async def gen_text(
         self,

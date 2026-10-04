@@ -137,6 +137,56 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageS3Error(msg) from exc
 
     @override
+    async def _load_head(self, key: str, *, nb_bytes: int) -> bytes:
+        """Load the first bytes of an S3 object with a ranged GET, instead of the whole object.
+
+        Args:
+            key: Storage key (without scheme prefix).
+            nb_bytes: How many leading bytes to read. An object shorter than this is read whole.
+
+        Returns:
+            At most `nb_bytes` leading bytes of the object.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageS3Error: If the S3 operation fails (any other ClientError or BotoCoreError).
+        """
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
+
+        session = self._get_session()
+        client_config = self._get_client_config()
+
+        async with session.create_client(**client_config) as client:
+            try:
+                # The Range header's end offset is inclusive.
+                response = await client.get_object(Bucket=self._bucket_name, Key=key, Range=f"bytes=0-{nb_bytes - 1}")
+                async with response["Body"] as stream:
+                    data: bytes = await stream.read()
+                return data[:nb_bytes]
+            except client.exceptions.NoSuchKey as exc:
+                msg = f"Object not found in S3: '{key}'"
+                raise StorageFileNotFoundError(msg) from exc
+            except client.exceptions.NoSuchBucket as exc:
+                msg = f"Bucket not found in S3: '{self._bucket_name}'"
+                raise StorageS3Error(msg) from exc
+            except ClientError as exc:
+                error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                if error_code == "InvalidRange":
+                    # S3 refuses any range over an empty object: its head is empty.
+                    return b""
+                if error_code == "NoSuchKey":
+                    msg = f"Object not found in S3: '{key}'"
+                    raise StorageFileNotFoundError(msg) from exc
+                msg = f"S3 ClientError ({error_code}) for key '{key}'"
+                raise StorageS3Error(msg) from exc
+            except BotoCoreError as exc:
+                msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg) from exc
+
+    @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store bytes to an S3 object.
 

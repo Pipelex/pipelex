@@ -70,6 +70,8 @@ class TestInputShaperFallbackRefusal:
             ("native.Dynamic", None, True, "'Anything'"),
             ("native.Dynamic", True, [1, "a"], "'Anything[]'"),
             ("native.Dynamic", True, [{"a": 1}, {"b": 2}], "'JSON[]'"),
+            # A container native keeps the declaration advice for a scalar: only a verdict is sent as one by mistake.
+            ("native.Html", None, 3, "'Anything'"),
         ],
     )
     def test_the_advice_names_the_declaration_that_reads_the_value(
@@ -113,3 +115,84 @@ class TestInputShaperFallbackRefusal:
         assert factory_reason in message
         assert "no reading" not in message
         assert isinstance(exc_info.value.__cause__, StuffFactoryError)
+
+    @pytest.mark.parametrize(
+        ("concept_ref", "multiplicity", "provided_value"),
+        [
+            ("native.Choice", None, {"choice": "billing"}),
+            ("native.Choice", None, {"choice": "billing", "confidence": 0.9}),
+            ("native.Rating", None, {"level": 2}),
+            ("native.Html", None, {"inner_html": "<p>hi</p>"}),
+            ("native.Html", True, [{"inner_html": "<p>a</p>"}, {"inner_html": "<p>b</p>"}]),
+        ],
+    )
+    def test_the_declared_concept_s_own_content_unwrapped_is_told_to_send_the_envelope(
+        self, concept_ref: str, multiplicity: VariableMultiplicity | None, provided_value: Any
+    ) -> None:
+        input_specs = build_input_specs([("payload", concept_ref, multiplicity)])
+        payload_input: dict[str, Any] = {"payload": provided_value}
+
+        with pytest.raises(StructureValidationError, match="without the envelope that names its concept") as exc_info:
+            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        error = exc_info.value
+        assert f"could not be built as '{concept_ref}'" in str(error)
+        assert "Expected shape:" in str(error)
+        assert isinstance(error.__cause__, StuffFactoryError)
+        # The value is right in substance: declaring the input as `JSON` would discard the concept the method asked for.
+        assert error.user_action is not None
+        assert error.user_action.kind == UserActionKind.CHANGE_INPUT
+        assert "expected shape" in error.user_action.detail
+        assert "Declare" not in error.user_action.detail
+
+    @pytest.mark.parametrize(
+        ("concept_ref", "multiplicity", "provided_value", "suggested_declaration"),
+        [
+            # A key the structure does not have, or a field of the wrong kind, is not the concept's content.
+            ("native.Choice", None, {"choice": "billing", "team": "support"}, "'JSON'"),
+            ("native.Choice", None, {"choice": 3}, "'JSON'"),
+            ("native.Html", True, [{"inner_html": "<p>a</p>"}, {"b": 2}], "'JSON[]'"),
+            # `Composite` holds any object, so fitting it says nothing about what the caller meant.
+            ("native.Composite", True, [{"a": 1}], "'JSON[]'"),
+        ],
+    )
+    def test_an_object_that_is_not_the_declared_concept_s_content_keeps_the_declaration_advice(
+        self, concept_ref: str, multiplicity: VariableMultiplicity | None, provided_value: Any, suggested_declaration: str
+    ) -> None:
+        input_specs = build_input_specs([("payload", concept_ref, multiplicity)])
+        payload_input: dict[str, Any] = {"payload": provided_value}
+
+        with pytest.raises(StructureValidationError, match="with no reading for this one") as exc_info:
+            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        user_action = exc_info.value.user_action
+        assert user_action is not None
+        assert f"as {suggested_declaration}," in user_action.detail
+
+    @pytest.mark.parametrize(
+        ("concept_ref", "multiplicity", "provided_value", "provided_description"),
+        [
+            ("native.Rating", None, 2, "a number (2)"),
+            ("native.Rating", True, [1, 2], "a list of 2 item(s)"),
+            ("native.Rating", None, True, "a boolean (true)"),
+            ("native.Choice", None, 3, "a number (3)"),
+        ],
+    )
+    def test_a_scalar_at_a_verdict_input_is_told_to_send_the_envelope(
+        self, concept_ref: str, multiplicity: VariableMultiplicity | None, provided_value: Any, provided_description: str
+    ) -> None:
+        input_specs = build_input_specs([("payload", concept_ref, multiplicity)])
+        payload_input: dict[str, Any] = {"payload": provided_value}
+
+        with pytest.raises(StructureValidationError, match="takes its value in the envelope that names its concept") as exc_info:
+            InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        error = exc_info.value
+        assert f"could not be built as '{concept_ref}': you provided {provided_description}," in str(error)
+        assert "Expected shape:" in str(error)
+        assert isinstance(error.__cause__, StuffFactoryError)
+        # A bare level is a verdict's level without the verdict: declaring the input `Anything` would discard the verdict the method branches on.
+        assert error.user_action is not None
+        assert error.user_action.kind == UserActionKind.CHANGE_INPUT
+        assert "expected shape" in error.user_action.detail
+        assert "Declare" not in error.user_action.detail

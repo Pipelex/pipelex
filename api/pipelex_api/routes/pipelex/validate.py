@@ -166,13 +166,13 @@ def _effective_default_pipe_ref(report: PipelexValidationReport, *, manifest_mai
     The run routes' precedence, minus the request selector `/validate` does not have
     (`pipeline.py`: `pipe_code or fetched.main_pipe`, then the batch's primary blueprint via
     `select_primary_blueprint`): a fetched package's manifest `main_pipe` wins, and only when there
-    is none does the closure's own declaration decide. The per-pipe tooling routes apply that same
+    is none does the closure's own declaration decide. The per-pipe tooling route applies that same
     chain in `crate_ops.resolve_requested_pipe`, so a caller reading this field and a caller omitting
-    `pipe_ref` on `/build/*` are told about the same pipe wherever `/build/*` defaults at all — see
+    `pipe_ref` on `/pipe-io` are told about the same pipe wherever `/pipe-io` defaults at all — see
     the one case below where it refuses to.
 
-    It deliberately states the RUN default, not the build routes' stricter one: a closure whose
-    domains each declare a `main_pipe` is refused by `/build/*` but runs happily — `execute` and
+    It deliberately states the RUN default, not the per-pipe route's stricter one: a closure whose
+    domains each declare a `main_pipe` is refused by `/pipe-io` but runs happily — `execute` and
     `start` take the first declaring blueprint — so reporting `null` for it would make a consumer
     refuse to prepare a method the server would run. The report's `bundle_blueprint` IS that first
     declaring blueprint (`build_validation_report` selects it through the same
@@ -374,10 +374,11 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         # so it is never rendered as `is_valid: false` (that verdict is about MTHDS content).
         with fetched_method_source(request_data.method_ref) as fetched:
             validated_contents = fetched.mthds_contents
-            # The manifest's declared entry pipe outranks the closure's own in the run/build default
-            # chain, so it must reach `default_pipe_ref` — the report itself is manifest-blind — and
-            # the graph arm, which would otherwise draw the primary blueprint's `main_pipe`: a
-            # different pipe when the two disagree, and no graph at all when the bundles declare none.
+            # The manifest's declared entry pipe outranks the closure's own in the default chain the
+            # run routes and `/pipe-io` share, so it must reach `default_pipe_ref` — the report itself
+            # is manifest-blind — and the graph arm, which would otherwise draw the primary blueprint's
+            # `main_pipe`: a different pipe when the two disagree, and no graph at all when the bundles
+            # declare none.
             # The bare code is passed as is, so the graph arm resolves it exactly as the run does.
             manifest_main_pipe = fetched.main_pipe
             verdict = await ApiRunner(

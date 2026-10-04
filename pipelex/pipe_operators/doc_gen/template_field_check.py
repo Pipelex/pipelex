@@ -22,7 +22,8 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenFactoryError
 from pipelex.runtime_hub import get_class_registry
-from pipelex.tools.jinja2.jinja2_field_paths import LIST_ITEM_SEGMENT, TemplateFieldPath, detect_template_field_paths
+from pipelex.tools.jinja2.jinja2_field_paths import TemplateFieldPath, detect_template_field_paths
+from pipelex.tools.jinja2.jinja2_scopes import LIST_ITEM_SEGMENT
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
 _NONE_TYPE = type(None)

@@ -40,12 +40,16 @@ The table and rules above ARE the no-hint kind assignment — stated rules, not 
 |---|---|
 | `Text`, `Markdown` | `prose` |
 | `Number` | `number` with `integer: false` |
-| `YesNo` | `boolean` |
+| `YesNo` | `boolean` on the input side; `object` over `yes_no` and `probability` in an output descriptor |
 | `Time` | `text` with `format: "time"` |
 | `Document` | `document` |
 | `Image` | `image` |
-| `Date`, `Html`, `Page`, `TextAndImages`, `SearchResult` | `object` over the pinned blueprint's fields |
-| `Dynamic`, `Anything`, `JSON` | `unknown` |
+| `Date`, `Html`, `Page`, `TextAndImages`, `SearchResult`, `JSON`, `Choice`, `Rating` | `object` over the pinned blueprint's fields |
+| `Dynamic`, `Anything`, `Composite` | `unknown` |
+
+`JSON` is the one row where Pipelex departs from the published standard, which lists it as `unknown`: Pipelex derives it as an `object` over its pinned `json_obj` member, itself an `unknown` dict, because a template describing a `JSON` input as unknown renders `{}`, which `JSONContent` then refuses.
+
+`YesNo` is the one native read differently by position, as the standard states: a caller supplies the bare verdict, while a producer may report a probability beside it. The output descriptor is the same derivation (`InputFormDeriver`) told its position by `build_output_form`, and the position is read in `YesNo`'s row and nowhere else, so a `YesNo` is an `object` at every depth of an output node — at the top, as a nested field, as a list's item, through a reflected class field and through a class-backed concept.
 
 Nested structure fields map by their declared type: `text` → `text`; `integer` → `number` with `integer: true`; `number` → `number`; `boolean` → `boolean`; `date` → `date`; `datetime` → `date` with `datetime: true`; `time` → `text` with `format: "time"`; a field with `choices` → `enum` (choices win over `type`, matching the structure generator); `concept` → the concept's node, carrying its namespaced `concept_ref`; `list` → `list` whose `item` comes from `item_type` / `item_concept_ref` (a nested list's inner item is inexpressible and reports `unknown`; the `item` node carries no `name` member — a list's item has no authored name, and the index labels entries); `dict` → `unknown`. The shorthand `field = "description"` form is a required `text`. Nested fields take the blueprint field's description and `required` over the concept's; a scalar flattened at the top level keeps the concept's description.
 
@@ -73,4 +77,4 @@ Inapplicable slots are absent, never JSON `null`: the report's valid arm is dump
 
 ## What clients project from it
 
-The descriptor is what a client SDK renders a pipe's fill-in inputs template from — the hosted build routes no longer render one server-side. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.
+The descriptor is what a client SDK renders a pipe's fill-in inputs template from — no server route renders one. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.

@@ -43,6 +43,13 @@ class TestPipeDocGenBlueprint:
         with pytest.raises(ValidationError, match=expected_message):
             _blueprint(**overrides)
 
+    def test_a_name_every_branch_sets_is_the_template_s_own(self) -> None:
+        template = (
+            "{% if invoice.paid %}{% set status = 'Paid' %}{% else %}{% set status = 'Due' %}{% endif %}<h1>{{ invoice.number }}: {{ status }}</h1>"
+        )
+        blueprint = _blueprint(template=template)
+        assert blueprint.template == template
+
     def test_a_sigil_in_the_template_reads_its_input(self) -> None:
         blueprint = _blueprint(template="<h1>$invoice.number</h1>")
         assert blueprint.template == "<h1>$invoice.number</h1>"

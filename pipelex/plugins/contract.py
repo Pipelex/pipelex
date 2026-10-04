@@ -33,7 +33,12 @@ if TYPE_CHECKING:
 # ``add_internal_model`` and ``add_doc_gen_default`` — plain data a plugin declares for the model manager to merge at
 # boot: a model of the internal backend, as the table a backend file would hold, and the model deck's default engine for
 # one document format and source — joined under v4 without a bump, on the same reasoning as ``add_log_sink``.
-PLUGIN_API_VERSION: int = 4
+#
+# v5 changed the log-sink factory contract: boot now resolves the secrets provider before the log sink, and
+# a ``LogSinkFactoryFn`` receives it as the ``secrets_provider`` keyword argument, so a sink's settings can
+# name a secret. A factory written against v4 would be called with a keyword it does not accept and fail at
+# boot with a bare ``TypeError``; the bump turns that into a discovery-time mismatch naming the plugin.
+PLUGIN_API_VERSION: int = 5
 
 
 @runtime_checkable

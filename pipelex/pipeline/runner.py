@@ -67,6 +67,62 @@ class PipelexModelDeck(MthdsModelDeck):
     waterfalls: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
 
 
+def _protocol_category_of(*, builder_category: ModelCategory) -> MthdsModelCategory:
+    """The protocol's model category a category this runtime serves is listed under in `models`.
+
+    The match is exhaustive on purpose, with no default arm. A runner must never put a value the
+    protocol does not define in a deck entry's `type`, so a family this runtime adds that the
+    protocol has no category for has no arm to write here, and the type checker stops at this
+    function until someone decides where the family goes: its presets would then be reported under
+    an extension property `PipelexModelDeck` adds for them, the way its aliases and waterfalls
+    already travel under the category-keyed routing extensions, and never under an invented
+    category.
+
+    Args:
+        builder_category: A category of the builder's model listing.
+
+    Returns:
+        The protocol category of the same settings family.
+    """
+    match builder_category:
+        case ModelCategory.LLM:
+            return MthdsModelCategory.LLM
+        case ModelCategory.EXTRACT:
+            return MthdsModelCategory.EXTRACT
+        case ModelCategory.IMG_GEN:
+            return MthdsModelCategory.IMG_GEN
+        case ModelCategory.SEARCH:
+            return MthdsModelCategory.SEARCH
+        case ModelCategory.JUDGMENT:
+            return MthdsModelCategory.JUDGMENT
+
+
+def _builder_category_of(*, protocol_category: MthdsModelCategory) -> ModelCategory:
+    """The builder category a protocol `?type=` filter selects.
+
+    Exhaustive like its inverse: a category a later protocol release adds stops the type checker
+    here when the `mthds` pin moves, rather than surfacing as a `ValueError` on the first request
+    that filters on it.
+
+    Args:
+        protocol_category: A category of the protocol's model list.
+
+    Returns:
+        The builder category of the same settings family.
+    """
+    match protocol_category:
+        case MthdsModelCategory.LLM:
+            return ModelCategory.LLM
+        case MthdsModelCategory.EXTRACT:
+            return ModelCategory.EXTRACT
+        case MthdsModelCategory.IMG_GEN:
+            return ModelCategory.IMG_GEN
+        case MthdsModelCategory.SEARCH:
+            return ModelCategory.SEARCH
+        case MthdsModelCategory.JUDGMENT:
+            return ModelCategory.JUDGMENT
+
+
 class PipelexVersionInfo(VersionInfo):
     """Pipelex's version handshake — the protocol base plus this
     implementation's identification.
@@ -477,21 +533,22 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         them would silently drop entries on collision.
 
         Args:
-            category: Optional deck filter (`llm`, `extract`, `img_gen`, `search`).
+            category: Optional deck filter, one of the protocol's own categories.
 
         Returns:
             PipelexModelDeck with the flat model list and the category-keyed
             aliases and routing waterfalls.
         """
-        categories = [ModelCategory(category)] if category is not None else None
+        categories = [_builder_category_of(protocol_category=category)] if category is not None else None
         deck_raw = list_models(categories=categories)
         models: list[MthdsModelInfo] = []
         presets_by_category: dict[str, list[dict[str, Any]]] = deck_raw["presets"]
         aliases_by_category: dict[str, dict[str, str]] = deck_raw["aliases"]
         waterfalls_by_category: dict[str, dict[str, list[str]]] = deck_raw["waterfalls"]
         for category_key, category_presets in presets_by_category.items():
+            protocol_category = _protocol_category_of(builder_category=ModelCategory(category_key))
             for preset in category_presets:
-                models.append(MthdsModelInfo(name=preset["name"], type=MthdsModelCategory(category_key)))
+                models.append(MthdsModelInfo(name=preset["name"], type=protocol_category))
         return PipelexModelDeck(models=models, aliases=aliases_by_category, waterfalls=waterfalls_by_category)
 
     @override

@@ -216,6 +216,20 @@ class ConceptFactory:
                     description="A search result with answer and sources",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.CHOICE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="One option picked out of a declared set",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.RATING:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A position on an ordered scale of described levels",
+                    structure_class_name=structure_class_name,
+                )
             case NativeConceptCode.COMPOSITE:
                 return Concept(
                     code=native_concept_code,

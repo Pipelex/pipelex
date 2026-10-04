@@ -36,8 +36,8 @@ define HELP_LOCAL
 	make bundle-curl$(RESET) BUNDLE=<dir|.mthds>:     Emit a ready-to-run curl command for the bundle.
 	make bundle-postman$(RESET) BUNDLE=<dir|.mthds>:  Push request(s) into the live Pipelex FastAPI Postman collection.
 	make bundle-dry$(RESET) BUNDLE=<dir|.mthds>:      Print the request body only — touch nothing.
-	  Optional: ENDPOINT=execute|start|validate|resolve|codegen|build-inputs|build-output|build-runner|both
-	  PIPE=<code>  INPUTS=<path>  NAME=<folder>  ALLOW_SIGNATURES=1  TARGET=<codegen target>  OUTPUT_FORMAT=schema|json|python
+	  Optional: ENDPOINT=execute|start|validate|resolve|codegen|both
+	  PIPE=<code>  INPUTS=<path>  NAME=<folder>  ALLOW_SIGNATURES=1  TARGET=<codegen target>
 	  CALLBACK_URL=<url>  BASE_URL=<url>  TOKEN=<bearer>  ARGS=<extra>
 	  (the async start endpoint needs CALLBACK_URL — set it here, or via CALLBACK_URL in .env)
 
@@ -208,14 +208,10 @@ tstop: temporal-stop
 #
 # Only execute/start trigger inference. bundle-validate (/v1/validate),
 # bundle-resolve (/v1/resolve), and bundle-codegen (/v1/codegen) are free —
-# parse/load/dry-run only — so they hardcode --run. The build routes
-# (/v1/build/{inputs,output,runner}) ride the generic targets via ENDPOINT=,
-# e.g. `make bundle-run ENDPOINT=build-inputs` or
-# `make bundle-postman ENDPOINT=build-output OUTPUT_FORMAT=json`.
+# parse/load/dry-run only — so they hardcode --run.
 #
 # Optional pass-throughs: ENDPOINT, PIPE, INPUTS, NAME, ALLOW_SIGNATURES,
-# TARGET (codegen only — required), OUTPUT_FORMAT (build-output only),
-# RENDER (validate only — e.g. RENDER=markdown reproduces a skill-driven
+# TARGET (codegen only — required), RENDER (validate only — e.g. RENDER=markdown reproduces a skill-driven
 # validate, response carries rendered_markdown), CALLBACK_URL (all modes);
 # BASE_URL, TOKEN (run/curl); ARGS for anything else.
 # The async start endpoint requires CALLBACK_URL — pass it here, or set
@@ -223,7 +219,7 @@ tstop: temporal-stop
 # POSTMAN_API_KEY in the environment (it lives in ~/.zshenv, so any zsh-launched
 # make has it).
 BUNDLE_SCRIPT := .claude/skills/postman-bundle/scripts/build_postman_query.py
-BUNDLE_OPTS    = $(if $(ENDPOINT),--endpoint $(ENDPOINT)) $(if $(PIPE),--pipe $(PIPE)) $(if $(INPUTS),--inputs $(INPUTS)) $(if $(NAME),--name $(NAME)) $(if $(ALLOW_SIGNATURES),--allow-signatures) $(if $(TARGET),--target $(TARGET)) $(if $(OUTPUT_FORMAT),--output-format $(OUTPUT_FORMAT)) $(if $(RENDER),--render $(RENDER)) $(if $(CALLBACK_URL),--callback-url '$(CALLBACK_URL)') $(ARGS)
+BUNDLE_OPTS    = $(if $(ENDPOINT),--endpoint $(ENDPOINT)) $(if $(PIPE),--pipe $(PIPE)) $(if $(INPUTS),--inputs $(INPUTS)) $(if $(NAME),--name $(NAME)) $(if $(ALLOW_SIGNATURES),--allow-signatures) $(if $(TARGET),--target $(TARGET)) $(if $(RENDER),--render $(RENDER)) $(if $(CALLBACK_URL),--callback-url '$(CALLBACK_URL)') $(ARGS)
 BUNDLE_RUN_OPTS = $(if $(BASE_URL),--base-url $(BASE_URL)) $(if $(TOKEN),--token $(TOKEN))
 
 check-bundle-arg:

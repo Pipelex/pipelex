@@ -1,6 +1,6 @@
 ---
 title: "Pipe Operators Overview"
-description: "Pipe operators are the building blocks of Pipelex methods: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc — each handling a specific type of AI processing."
+description: "Pipe operators are the building blocks of Pipelex methods: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeJudge, PipeCompose, PipeDocGen, and PipeFunc — each handling a specific type of AI processing."
 ---
 
 # Pipe Operators
@@ -9,7 +9,7 @@ The workers that perform the actual processing in your pipelines.
 
 ## Overview
 
-Pipe operators are the building blocks of Pipelex methods. Each operator performs a specific type of work: calling an LLM, structuring text into typed data, extracting text from documents, generating images, searching the web, composing data, or running custom code. Operators declare their input and output concepts, and the runtime validates type compatibility at definition time.
+Pipe operators are the building blocks of Pipelex methods. Each operator performs a specific type of work: calling an LLM, structuring text into typed data, extracting text from documents, generating images, searching the web, judging, composing data, or running custom code. Operators declare their input and output concepts, and the runtime validates type compatibility at definition time.
 
 ## PipeLLM
 
@@ -40,6 +40,12 @@ See [PipeImgGen reference](../building-methods/pipes/pipe-operators/PipeImgGen.m
 Web search with structured results and source citations. Powered by Linkup or Pipelex Gateway, results come back as typed SearchResult concepts ready for downstream processing.
 
 See [PipeSearch reference](../building-methods/pipes/pipe-operators/PipeSearch.md).
+
+## PipeJudge
+
+One closed question asked of a judgment model about the step's inputs: yes or no, one option out of a set, or a level on a scale. The verdict comes back as a typed `YesNo`, `Choice` or `Rating` carrying the probabilities the model measured, ready to route a `PipeCondition` or gate a step on a threshold.
+
+See [PipeJudge reference](../building-methods/pipes/pipe-operators/PipeJudge.md).
 
 ## PipeCompose
 

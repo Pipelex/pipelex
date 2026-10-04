@@ -258,6 +258,15 @@ class PipeComposeInputCheckTestCases:
             {"description": "d", "inputs": {"topic": "Text"}, "output": "Text", "template": "{% set topic = topic|trim %}About {{ topic }}"},
         ),
         (
+            "set_in_every_branch_of_an_if",
+            {
+                "description": "d",
+                "inputs": {"flag": "Text"},
+                "output": "Text",
+                "template": "{% if flag %}{% set label = 'on' %}{% else %}{% set label = 'off' %}{% endif %}Status: {{ label }}",
+            },
+        ),
+        (
             "input_named_like_a_jinja_global",
             {"description": "d", "inputs": {"namespace": "Text"}, "output": "Text", "template": "List the pods in $namespace"},
         ),

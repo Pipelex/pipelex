@@ -2,16 +2,16 @@
 openapi: 3.1.0
 info:
   title: Pipelex API
-  summary: The source-available Pipelex runner — implements MTHDS Protocol v0.6.0.
-  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v0.6.0 (`POST /execute`, `POST /start`, `POST
+  summary: The source-available Pipelex runner — implements MTHDS Protocol v0.7.0.
+  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v0.7.0 (`POST /execute`, `POST /start`, `POST
     /validate`, `GET /models`, `GET /version` — marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve
-    and codegen (`/resolve`, `/codegen`), build tooling (`/build/*`), and editor tooling (`/lint`, `/format`). Contract layering:
-    MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API. All endpoints are served under the `/v1` base path; every
-    error is an RFC 7807 `application/problem+json` problem document, documented per operation as a `ProblemDocument`.'
+    and codegen (`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), and editor tooling (`/lint`, `/format`). Contract
+    layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API. All endpoints are served under the `/v1` base
+    path; every error is an RFC 7807 `application/problem+json` problem document, documented per operation as a `ProblemDocument`.'
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.71.1
+  version: 0.72.0
 paths:
   /health:
     get:
@@ -67,307 +67,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
       x-mthds-protocol: true
-  /v1/build/inputs:
-    post:
-      tags:
-      - build
-      summary: Build Inputs
-      description: "Generate an example inputs template for a pipe (the inputs projection, per pipe).\n\nRides the **same\
-        \ static core** as `POST /resolve` and `POST /codegen`: the closure is resolved to\nits normalized crate, the requested\
-        \ pipe is read live from the library that leaves loaded, and its\n*declared* inputs are rendered — the exact projection\
-        \ `pipelex codegen inputs` writes, on both of\nits axes (`format`, `explicit`).\n\nStatic is the point: a template\
-        \ is a read of the pipe's declared IO, so there is **no dry-run\nsweep** here (that is `/validate`'s vocabulary, and\
-        \ `/build/runner`'s need). A valid verdict says\nthe closure is structurally sound and the template matches what the\
-        \ pipe declares — it is *not* a\npromise the pipe runs. Ask `/validate` for that.\n\nThis projection is deliberately\
-        \ **not** a `/codegen` kind: the templates are user-editable\nscaffolds, never stamped or locked, so they cannot ride\
-        \ the trust chain `/codegen`'s valid arm\npromises (see `CodegenRouteKind`).\n\nResponse contract (the `/validate`\
-        \ discipline):\n\n- **Valid verdict (200, `is_valid: true`):** the template, in `inputs` or `inputs_toml` per `format`.\n\
-        - **Invalid verdict (200, `is_valid: false`):** the closure could not be parsed, loaded, or\n  validated — `validation_errors[]`\
-        \ from pipelex's one shared builder; no template exists.\n- **No verdict (non-2xx):** a selection refusal — an unknown\
-        \ pipe ref, or an omitted `pipe_ref` that\n  nothing defaults (no fetched-manifest `main_pipe`, and a closure declaring\
-        \ no — or several —\n  `main_pipe`) — is an input 422 whose `error_type` is `EntryPipeNotFoundError` or\n  `EntryPipeAmbiguousError`;\
-        \ a malformed closure selector is a request-shape 422 problem+json; a\n  registry-form `method_ref` is a 501 until\
-        \ server-side method-registry resolution exists.\n\nAn omitted `pipe_ref` defaults the way a run by address does:\
-        \ to the fetched package manifest's\n`main_pipe` on a `method_ref` request, else to the closure's own declared `main_pipe`."
-      operationId: build_inputs_v1_build_inputs_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BuildInputsRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                oneOf:
-                - $ref: '#/components/schemas/BuildInputsValidReport'
-                - $ref: '#/components/schemas/CrateInvalidReport'
-                title: Response Build Inputs V1 Build Inputs Post
-                discriminator:
-                  propertyName: is_valid
-                  mapping:
-                    'True': '#/components/schemas/BuildInputsValidReport'
-                    'False': '#/components/schemas/CrateInvalidReport'
-        '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
-          headers:
-            WWW-Authenticate:
-              description: Authentication challenge — always `Bearer`.
-              schema:
-                type: string
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
-            a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-  /v1/build/output:
-    post:
-      tags:
-      - build
-      summary: Build Output
-      description: "Generate an example output representation for a pipe (the output projection, per pipe).\n\nRides the **same\
-        \ static core** as `POST /resolve`, `POST /codegen` and `POST /build/inputs`: the\nclosure is resolved to its normalized\
-        \ crate, the requested pipe is read live from the library that\nleaves loaded, and its *declared* output is rendered.\n\
-        \nStatic is the point: the representation is a read of the pipe's declared IO, so there is **no\ndry-run sweep** here.\
-        \ A valid verdict says the closure is structurally sound and the shape matches\nwhat the pipe declares — it is *not*\
-        \ a promise the pipe runs. Ask `/validate` for that.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid\
-        \ verdict (200, `is_valid: true`):** the representation, in `output` or `output_python` per `format`.\n- **Invalid\
-        \ verdict (200, `is_valid: false`):** the closure could not be parsed, loaded, or\n  validated — `validation_errors[]`;\
-        \ no representation exists.\n- **No verdict (non-2xx):** a selection refusal — an unknown pipe ref, or an omitted\
-        \ `pipe_ref` that\n  nothing defaults (no fetched-manifest `main_pipe`, and a closure declaring no — or several —\n\
-        \  `main_pipe`) — is an input 422 whose `error_type` is `EntryPipeNotFoundError` or\n  `EntryPipeAmbiguousError`;\
-        \ a pipe whose `native.Anything` output has no determinable shape, or a\n  malformed closure selector, is a request-shape\
-        \ 422 problem+json; a registry-form `method_ref` is a 501 until server-side\n  method-registry resolution exists.\n\
-        \nAn omitted `pipe_ref` defaults the way a run by address does: to the fetched package manifest's\n`main_pipe` on\
-        \ a `method_ref` request, else to the closure's own declared `main_pipe`."
-      operationId: build_output_v1_build_output_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BuildOutputRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                oneOf:
-                - $ref: '#/components/schemas/BuildOutputValidReport'
-                - $ref: '#/components/schemas/CrateInvalidReport'
-                title: Response Build Output V1 Build Output Post
-                discriminator:
-                  propertyName: is_valid
-                  mapping:
-                    'True': '#/components/schemas/BuildOutputValidReport'
-                    'False': '#/components/schemas/CrateInvalidReport'
-        '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
-          headers:
-            WWW-Authenticate:
-              description: Authentication challenge — always `Bearer`.
-              schema:
-                type: string
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
-            a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-  /v1/build/runner:
-    post:
-      tags:
-      - build
-      summary: Build Runner
-      description: 'Generate a Python runner script for a pipe, riding the codegen types projection.
-
-
-        The one `/build/*` projection that is **not** static: a runner script is a promise the pipe can
-
-        actually run, so this route keeps the dry-run sweep its siblings dropped (and with it
-
-        `allow_signatures`, which only ever parameterized that sweep). `validate_bundle` opens a single
-
-        library, loads the closure, sweeps, and on success leaves the library loaded + current; on failure
-
-        it tears it down itself. On the success path the crate is read from that library, the
-
-        `python-structures` projection is emitted and stamped, and the runner script is generated with the
-
-        **emitted** class names — the same flow as a local `pipelex build runner`.
-
-
-        The sweep is scoped to the requested pipe, so unrelated broken siblings do not block a good pipe.
-
-        When `pipe_ref` is omitted the scope is not settled before the closure loads, so the whole closure
-
-        is swept and the pipe then defaults the way a run by address does — to the fetched package
-
-        manifest''s `main_pipe` on a `method_ref` request, else to the closure''s own declared `main_pipe` —
-
-        a stricter verdict, and the honest one for a caller who did not say which pipe they meant.
-
-
-        Response contract (the `/validate` discipline): an invalid closure — including a failed dry-run of
-
-        the requested pipe — is a produced verdict: a **200** `is_valid: false` with the structured
-
-        `validation_errors[]`. Non-2xx is reserved for no-verdict conditions: a selection refusal (an
-
-        unknown pipe ref, an omitted `pipe_ref` that nothing defaults — no fetched-manifest `main_pipe`,
-
-        and a closure declaring no, or several, `main_pipe`), an input 422 whose `error_type` is
-
-        `EntryPipeNotFoundError` or `EntryPipeAmbiguousError`; a request-shape 422 for a requested pipe
-
-        whose cross-package dependencies are absent from the request; a 501 for a registry-form `method_ref`, auth, server
-
-        fault — RFC 7807 via the global handlers.'
-      operationId: build_runner_v1_build_runner_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BuildRunnerRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                oneOf:
-                - $ref: '#/components/schemas/BuildRunnerValidReport'
-                - $ref: '#/components/schemas/CrateInvalidReport'
-                title: Response Build Runner V1 Build Runner Post
-                discriminator:
-                  propertyName: is_valid
-                  mapping:
-                    'True': '#/components/schemas/BuildRunnerValidReport'
-                    'False': '#/components/schemas/CrateInvalidReport'
-        '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
-          headers:
-            WWW-Authenticate:
-              description: Authentication challenge — always `Bearer`.
-              schema:
-                type: string
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
-            a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
   /v1/execute:
     post:
       tags:
@@ -1405,9 +1104,9 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
-          description: 'Filter by model category: llm, extract, img_gen, search. Single value (protocol arity).'
+          description: 'Filter by model category: llm, extract, img_gen, search, judgment. Single value (protocol arity).'
           title: Type
-        description: 'Filter by model category: llm, extract, img_gen, search. Single value (protocol arity).'
+        description: 'Filter by model category: llm, extract, img_gen, search, judgment. Single value (protocol arity).'
       responses:
         '200':
           description: Successful Response
@@ -1449,145 +1148,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
       x-mthds-protocol: true
-  /v1/build/concept:
-    post:
-      tags:
-      - agent
-      summary: Build Concept
-      description: 'Convert a JSON concept spec to TOML format.
-
-
-        A malformed spec surfaces as a Pydantic `ValidationError` — an API-owned
-
-        422. Pipelex domain failures propagate untouched to the global
-
-        `PipelexError` handler in `pipelex_api.exception_handlers`.
-
-
-        A malformed shape — a non-mapping `structure` (`{"structure": "string"}`)
-
-        or a `structure` field that is neither a string nor a mapping
-
-        (`{"structure": {"f": 42}}`) — is refused by `parse_concept_spec` itself
-
-        with a typed `ConceptSpecError`, which that same handler answers. Nothing
-
-        broader is caught here: a bare exception from pipelex is the signal of a
-
-        real programming bug, and a route-level catch would mask it.'
-      operationId: build_concept_v1_build_concept_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BuildConceptRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BuildConceptResponse'
-        '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
-          headers:
-            WWW-Authenticate:
-              description: Authentication challenge — always `Bearer`.
-              schema:
-                type: string
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-  /v1/build/pipe-spec:
-    post:
-      tags:
-      - agent
-      summary: Build Pipe Spec
-      description: 'Convert a JSON pipe spec to TOML format.
-
-
-        Two caller-mistake paths surface as a 422 here: a `ValidationError` from
-
-        Pydantic when the spec shape doesn''t match the chosen pipe type, and a
-
-        `ValueError` from `parse_pipe_spec` when `pipe_type` is not one of the
-
-        known pipe types (documented in `parse_pipe_spec`''s docstring; raised at
-
-        exactly one site). Pipelex domain failures propagate untouched to the
-
-        global `PipelexError` handler in `pipelex_api.exception_handlers`.'
-      operationId: build_pipe_spec_v1_build_pipe_spec_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BuildPipeSpecRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BuildPipeSpecResponse'
-        '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
-          headers:
-            WWW-Authenticate:
-              description: Authentication challenge — always `Bearer`.
-              schema:
-                type: string
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
   /:
     get:
       tags:
@@ -1808,383 +1368,6 @@ components:
       - required
       title: BooleanItem
       description: '`boolean` — true or false.'
-    BuildConceptRequest:
-      properties:
-        spec:
-          additionalProperties: true
-          type: object
-          title: Spec
-          description: JSON concept specification.
-      type: object
-      required:
-      - spec
-      title: BuildConceptRequest
-    BuildConceptResponse:
-      properties:
-        success:
-          type: boolean
-          title: Success
-          description: Whether the operation was successful
-          default: true
-        concept_code:
-          type: string
-          title: Concept Code
-          description: The concept code that was generated
-        toml:
-          type: string
-          title: Toml
-          description: Generated TOML content for the concept
-      type: object
-      required:
-      - concept_code
-      - toml
-      title: BuildConceptResponse
-    BuildInputsRequest:
-      properties:
-        files:
-          anyOf:
-          - items:
-              $ref: '#/components/schemas/MthdsFileItem'
-            type: array
-            maxItems: 16
-            minItems: 1
-          - type: 'null'
-          title: Files
-          description: Inline MTHDS bundles forming the closure to resolve (content-passing — no server-side path reads).
-        method_ref:
-          anyOf:
-          - type: string
-            maxLength: 512
-            minLength: 1
-          - type: 'null'
-          title: Method Ref
-          description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
-            is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
-        pipe_ref:
-          anyOf:
-          - type: string
-            maxLength: 256
-            minLength: 1
-          - type: 'null'
-          title: Pipe Ref
-          description: Qualified pipe ref (`domain.pipe_code`) to project. Optional — defaults to the fetched package manifest's
-            `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, or
-            several, with no manifest `main_pipe` to settle it, requires it explicitly.
-        format:
-          $ref: '#/components/schemas/InputsTemplateFormat'
-          description: Template encoding. `json` returns the parsed template in `inputs`; `toml` returns the raw text in `inputs_toml`.
-          default: json
-        explicit:
-          type: boolean
-          title: Explicit
-          description: When true, emit the ceremonial `{concept, content}` envelope for every input. Defaults to false — the
-            light, signature-driven shape that smart inputs accepts (a bare string for a Text input, and so on).
-          default: false
-      type: object
-      title: BuildInputsRequest
-      description: 'The inputs-template request: the shared closure + pipe selectors, plus the two rendering axes.
-
-
-        Both axes mirror `pipelex codegen inputs` exactly — `--format` and `--explicit` — and every
-
-        combination of them is served, as on the CLI.'
-    BuildInputsValidReport:
-      properties:
-        is_valid:
-          type: boolean
-          const: true
-          title: Is Valid
-          default: true
-        pipe_ref:
-          type: string
-          title: Pipe Ref
-          description: The qualified pipe the template was generated for — the resolved selector.
-        requested_pipe_ref:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Requested Pipe Ref
-          description: The `pipe_ref` as submitted. Absent when it was omitted and defaulted — to the fetched package manifest's
-            `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`.
-        format:
-          $ref: '#/components/schemas/InputsTemplateFormat'
-          description: The template encoding (echo of the request).
-        explicit:
-          type: boolean
-          title: Explicit
-          description: Whether the ceremonial envelope shape was emitted (echo of the request).
-        inputs:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-          title: Inputs
-          description: The parsed inputs template — present exactly when `format` is `json`.
-        inputs_toml:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Inputs Toml
-          description: The inputs template as TOML text — present exactly when `format` is `toml`.
-        message:
-          type: string
-          title: Message
-          description: Status message
-          default: Inputs template generated successfully
-      type: object
-      required:
-      - pipe_ref
-      - format
-      - explicit
-      title: BuildInputsValidReport
-      description: 'The 200 **valid** arm: the example inputs template for the requested pipe.
-
-
-        The template rides **one of two fields, chosen by `format`** — `inputs` (parsed object) for
-
-        `json`, `inputs_toml` (raw text) for `toml`. TOML cannot be carried as a parsed object without
-
-        losing what makes it worth asking for (its concept comments and key order), and the JSON case
-
-        must stay a real object, since that is what the deploy dialog and the SDKs consume. So the two
-
-        are separate, honestly-typed fields, and the unused one is omitted from the body entirely.
-
-
-        A pipe that declares no inputs is a *valid* verdict, not an error (the CLI likewise exits 0):
-
-        the template is simply empty, and `message` says so.'
-    BuildOutputRequest:
-      properties:
-        files:
-          anyOf:
-          - items:
-              $ref: '#/components/schemas/MthdsFileItem'
-            type: array
-            maxItems: 16
-            minItems: 1
-          - type: 'null'
-          title: Files
-          description: Inline MTHDS bundles forming the closure to resolve (content-passing — no server-side path reads).
-        method_ref:
-          anyOf:
-          - type: string
-            maxLength: 512
-            minLength: 1
-          - type: 'null'
-          title: Method Ref
-          description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
-            is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
-        pipe_ref:
-          anyOf:
-          - type: string
-            maxLength: 256
-            minLength: 1
-          - type: 'null'
-          title: Pipe Ref
-          description: Qualified pipe ref (`domain.pipe_code`) to project. Optional — defaults to the fetched package manifest's
-            `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, or
-            several, with no manifest `main_pipe` to settle it, requires it explicitly.
-        format:
-          $ref: '#/components/schemas/ConceptRepresentationFormat'
-          description: Representation to render. `schema` (JSON Schema) and `json` (example value) return a parsed object
-            in `output`; `python` returns Python source in `output_python`.
-          default: schema
-      type: object
-      title: BuildOutputRequest
-      description: 'The output-representation request: the shared closure + pipe selectors, plus the format axis.'
-    BuildOutputValidReport:
-      properties:
-        is_valid:
-          type: boolean
-          const: true
-          title: Is Valid
-          default: true
-        pipe_ref:
-          type: string
-          title: Pipe Ref
-          description: The qualified pipe the representation was generated for — the resolved selector.
-        requested_pipe_ref:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Requested Pipe Ref
-          description: The `pipe_ref` as submitted. Absent when it was omitted and defaulted — to the fetched package manifest's
-            `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`.
-        format:
-          $ref: '#/components/schemas/ConceptRepresentationFormat'
-          description: The representation format (echo of the request).
-        output:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-          title: Output
-          description: The parsed output representation — present exactly when `format` is `schema` or `json`.
-        output_python:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Output Python
-          description: The output representation as Python source — present exactly when `format` is `python`.
-        message:
-          type: string
-          title: Message
-          description: Status message
-          default: Output representation generated successfully
-      type: object
-      required:
-      - pipe_ref
-      - format
-      title: BuildOutputValidReport
-      description: 'The 200 **valid** arm: the example output representation for the requested pipe.
-
-
-        The representation rides **one of two fields, chosen by `format`**, for the same reason
-
-        `/build/inputs` splits `inputs` / `inputs_toml`: `schema` and `json` are objects, `python` is
-
-        source text. (Before this split the route parsed *every* format as JSON, so `format=python` was a
-
-        hard 500 — it fed Python source to `json.loads`.)'
-    BuildPipeSpecRequest:
-      properties:
-        pipe_type:
-          type: string
-          maxLength: 128
-          minLength: 1
-          title: Pipe Type
-          description: The pipe type (e.g. PipeLLM, PipeSequence, etc.).
-        spec:
-          additionalProperties: true
-          type: object
-          title: Spec
-          description: JSON pipe specification.
-      type: object
-      required:
-      - pipe_type
-      - spec
-      title: BuildPipeSpecRequest
-    BuildPipeSpecResponse:
-      properties:
-        success:
-          type: boolean
-          title: Success
-          description: Whether the operation was successful
-          default: true
-        pipe_code:
-          type: string
-          title: Pipe Code
-          description: The pipe code that was generated
-        pipe_type:
-          type: string
-          title: Pipe Type
-          description: The pipe type
-        toml:
-          type: string
-          title: Toml
-          description: Generated TOML content for the pipe
-      type: object
-      required:
-      - pipe_code
-      - pipe_type
-      - toml
-      title: BuildPipeSpecResponse
-    BuildRunnerRequest:
-      properties:
-        analytics_groups:
-          anyOf:
-          - additionalProperties:
-              type: string
-            type: object
-          - type: 'null'
-          title: Analytics Groups
-          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the host-supplied groups the caller of this
-            request belongs to, as a mapping of group type to group key (e.g. `{"organization": "org_acme"}`), exactly as
-            a run request states them. The work this request does is not a run, but it still emits telemetry — the validation
-            sweep''s `pipe_dry_run` event and its dry runs — and that telemetry is attributed to the caller: the authenticated
-            user and these groups. Same rules and same 422 `InvalidAnalyticsGroups` refusal as on `/execute` and `/start`.
-            Omit it and the caller belongs to no group.'
-        files:
-          anyOf:
-          - items:
-              $ref: '#/components/schemas/MthdsFileItem'
-            type: array
-            maxItems: 16
-            minItems: 1
-          - type: 'null'
-          title: Files
-          description: Inline MTHDS bundles forming the closure to resolve (content-passing — no server-side path reads).
-        method_ref:
-          anyOf:
-          - type: string
-            maxLength: 512
-            minLength: 1
-          - type: 'null'
-          title: Method Ref
-          description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
-            is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
-        pipe_ref:
-          anyOf:
-          - type: string
-            maxLength: 256
-            minLength: 1
-          - type: 'null'
-          title: Pipe Ref
-          description: Qualified pipe ref (`domain.pipe_code`) to project. Optional — defaults to the fetched package manifest's
-            `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, or
-            several, with no manifest `main_pipe` to settle it, requires it explicitly.
-        allow_signatures:
-          type: boolean
-          title: Allow Signatures
-          description: When true, the validation sweep tolerates unimplemented pipe signatures instead of rejecting the bundle
-            (signatures dry-run trivially by minting a mock). Defaults to false (strict).
-          default: false
-      type: object
-      title: BuildRunnerRequest
-      description: 'The runner-script request: the shared closure + pipe selectors, plus the sweep''s `allow_signatures`.
-
-
-        Alone among the `/build/*` projections this route keeps `allow_signatures`, because alone among
-
-        them it still runs the dry-run sweep — the flag only ever parameterized that sweep.'
-    BuildRunnerValidReport:
-      properties:
-        is_valid:
-          type: boolean
-          const: true
-          title: Is Valid
-          default: true
-        pipe_ref:
-          type: string
-          title: Pipe Ref
-          description: The qualified pipe the runner was generated for — the resolved selector.
-        requested_pipe_ref:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Requested Pipe Ref
-          description: The `pipe_ref` as submitted. Absent when it was omitted and defaulted — to the fetched package manifest's
-            `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`.
-        python_code:
-          type: string
-          title: Python Code
-          description: Generated Python script for running the pipeline, imports spelled with the emitted class names.
-        structures:
-          $ref: '#/components/schemas/RunnerStructures'
-          description: The typed-structures projection the script imports from.
-        message:
-          type: string
-          title: Message
-          description: Status message
-          default: Runner code generated successfully
-      type: object
-      required:
-      - pipe_ref
-      - python_code
-      - structures
-      title: BuildRunnerValidReport
-      description: 'The 200 **valid** arm: the runner script plus the structures projection it imports from.'
     CodegenRequest:
       properties:
         files:
@@ -2240,9 +1423,9 @@ components:
 
         the promise this route''s valid arm makes by carrying a `lock`. Input templates are user-editable
 
-        scaffolds, never stamped or locked, so they cannot make that promise; they ride
+        scaffolds, never stamped or locked, so they cannot make that promise: a client projects one from
 
-        `POST /build/inputs` instead and `inputs` is therefore not a kind here. Future per-pipe kinds
+        the input form `POST /pipe-io` serves, and `inputs` is therefore not a kind here. Future per-pipe kinds
 
         (`docs`, `tools`, `tests`) do emit tracked artifacts, so they join this enum and select their
 
@@ -2403,14 +1586,6 @@ components:
       required:
       - description
       title: ConceptBlueprint
-    ConceptRepresentationFormat:
-      type: string
-      enum:
-      - json
-      - python
-      - schema
-      title: ConceptRepresentationFormat
-      description: Output format for concept representations.
     ConceptStructureBlueprint:
       properties:
         description:
@@ -3761,13 +2936,6 @@ components:
         `PipeBlueprint.collapse_hint_free_slot_tables`), so a slot value that IS a table carries
 
         non-empty hints — hint-free bundles produce byte-identical blueprints to the string form.'
-    InputsTemplateFormat:
-      type: string
-      enum:
-      - json
-      - toml
-      title: InputsTemplateFormat
-      description: Serialization format for a generated inputs template.
     InvalidReport:
       properties:
         is_valid:
@@ -3828,6 +2996,42 @@ components:
         has no effect on this arm (unlike `rendered_markdown`, which rides both arms because failure
 
         text is exactly what a human surface wants).'
+    JudgeYesNoCriteria:
+      properties:
+        'yes':
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: 'Yes'
+        'no':
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: 'No'
+      additionalProperties: false
+      type: object
+      title: JudgeYesNoCriteria
+      description: 'What a yes and a no mean, for a yes/no question. Closed: a key other than `yes` or `no` is refused.
+
+
+        The judging vendor silently ignores a criterion key it does not know, so this model is the only
+
+        place a typo in one is caught.'
+    JudgmentSetting:
+      properties:
+        model:
+          type: string
+          title: Model
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      additionalProperties: false
+      type: object
+      required:
+      - model
+      title: JudgmentSetting
     LLMSetting:
       properties:
         model:
@@ -4154,8 +3358,23 @@ components:
       - extract
       - img_gen
       - search
+      - judgment
       title: ModelCategory
-      description: Model categories accepted by the protocol's `GET /models?type=` filter.
+      description: 'The protocol''s model categories: what a deck entry''s `type` reports and the `GET /models?type=` filter
+        accepts.
+
+
+        A category is a settings family of the language — the inline settings a model
+
+        serves, and so the pipes that can name it: `llm` (`LLMSetting`, named by
+
+        `PipeLLM` and `PipeStructure`), `extract` (`ExtractSetting`, `PipeExtract`),
+
+        `img_gen` (`ImgGenSetting`, `PipeImgGen`), `search` (`SearchSetting`,
+
+        `PipeSearch`) and `judgment` (`JudgmentSetting`, `PipeJudge`). A settings
+
+        family the standard adds brings a category in the next protocol minor.'
     ModelInfo:
       properties:
         name:
@@ -4164,13 +3383,34 @@ components:
         type:
           anyOf:
           - $ref: '#/components/schemas/ModelCategory'
+          - type: string
           - type: 'null'
+          title: Type
       additionalProperties: true
       type: object
       required:
       - name
       title: ModelInfo
-      description: One entry of the model deck (`ModelDeck.models[]`) — base fields + extensions.
+      description: 'One entry of the model deck (`ModelDeck.models[]`) — base fields + extensions.
+
+
+        `type` is an open read of the entry''s category, under the protocol''s reader
+
+        rule: "A client reading a model list MUST NOT fail it because an entry carries
+
+        a category it does not recognize; it keeps that entry with its raw value or
+
+        leaves it out." This package keeps it: a category it knows reads as its
+
+        `ModelCategory` member, and one it does not — a category a runner of a later
+
+        protocol minor reports — keeps its raw string, so a consumer handles the
+
+        `str` case rather than the whole deck failing. The union is validated left to
+
+        right on purpose: pydantic''s default smart mode would keep every string,
+
+        known or not, as a plain `str`.'
     ModelReference:
       type: string
     ModelReferenceKind:
@@ -5390,9 +4630,9 @@ components:
             minLength: 1
           - type: 'null'
           title: Pipe Ref
-          description: Qualified pipe ref (`domain.pipe_code`) to project. Optional — defaults to the fetched package manifest's
+          description: Qualified pipe ref (`domain.pipe_code`) to select. Optional — defaults to the fetched package manifest's
             `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, or
-            several, with no manifest `main_pipe` to settle it, requires it explicitly.
+            several, with no manifest `main_pipe` to settle it, requires it unless `all_pipes` is set.
         all_pipes:
           type: boolean
           title: All Pipes
@@ -5668,6 +4908,96 @@ components:
         with no inputs maps to `{"fields": []}` — an empty form is a valid form, not an omitted entry.
 
         Closed shape (`extra="forbid"`).'
+    PipeJudgeBlueprint:
+      oneOf:
+      - required:
+        - question
+      - required:
+        - prompt
+      properties:
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        pipe_category:
+          type: string
+          const: PipeOperator
+          title: Pipe Category
+          default: PipeOperator
+        type:
+          type: string
+          const: PipeJudge
+          title: Type
+          default: PipeJudge
+        description:
+          type: string
+          title: Description
+        inputs:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/InputSlotBlueprint'
+            type: object
+          - type: 'null'
+          title: Inputs
+        output:
+          type: string
+          title: Output
+        question:
+          type: string
+          title: Question
+        model:
+          anyOf:
+          - $ref: '#/components/schemas/JudgmentSetting'
+          - type: string
+          - $ref: '#/components/schemas/ModelReference'
+          - type: 'null'
+          title: Model
+        options:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Options
+        levels:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Levels
+        criteria:
+          anyOf:
+          - $ref: '#/components/schemas/JudgeYesNoCriteria'
+          - type: 'null'
+        threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Threshold
+        prompt:
+          type: string
+          title: Prompt
+          description: A synonym of `question`, read exactly as it.
+      additionalProperties: false
+      type: object
+      required:
+      - description
+      - output
+      title: PipeJudgeBlueprint
+      description: 'Asks a judging model one closed question about its inputs: yes/no, a choice, or a rating.
+
+
+        The kind is decided by which of `options` and `levels` the pipe declares, never by a field of its
+
+        own. `prompt` is accepted in place of `question` and read exactly as it, so nothing after parsing
+
+        sees the synonym. Every declared input is material to judge, so an input the question never names
+
+        is still read; only a variable the question names must be declared.'
     PipeLLMBlueprint:
       properties:
         source:
@@ -6165,6 +5495,7 @@ components:
       - PipeSearch
       - PipeStructure
       - PipeDocGen
+      - PipeJudge
       - PipeBatch
       - PipeCondition
       - PipeParallel
@@ -6338,6 +5669,7 @@ components:
               - $ref: '#/components/schemas/PipeLLMBlueprint'
               - $ref: '#/components/schemas/PipeExtractBlueprint'
               - $ref: '#/components/schemas/PipeSearchBlueprint'
+              - $ref: '#/components/schemas/PipeJudgeBlueprint'
               - $ref: '#/components/schemas/PipeStructureBlueprint'
               - $ref: '#/components/schemas/PipeDocGenBlueprint'
               - $ref: '#/components/schemas/PipeBatchBlueprint'
@@ -6355,6 +5687,7 @@ components:
                   PipeExtract: '#/components/schemas/PipeExtractBlueprint'
                   PipeFunc: '#/components/schemas/PipeFuncBlueprint'
                   PipeImgGen: '#/components/schemas/PipeImgGenBlueprint'
+                  PipeJudge: '#/components/schemas/PipeJudgeBlueprint'
                   PipeLLM: '#/components/schemas/PipeLLMBlueprint'
                   PipeParallel: '#/components/schemas/PipeParallelBlueprint'
                   PipeSearch: '#/components/schemas/PipeSearchBlueprint'
@@ -6563,7 +5896,7 @@ components:
           title: Validation Errors
           description: Structured per-error diagnostics, carried by a `ValidateBundleError`. Each item may carry a `suggested_fix`.
             Retained under `ERROR_DISCLOSURE=strict` — it describes the caller's own bundle, not server internals. On `/validate`,
-            `/resolve`, `/codegen` and `/build/*` an invalid bundle is a **200** verdict instead, so the items ride the response
+            `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead, so the items ride the response
             body there rather than a problem document.
       additionalProperties: true
       type: object
@@ -6818,6 +6151,7 @@ components:
       - huggingface
       - gateway
       - linkup
+      - typesafe
       - docling
       - pypdfium2
       title: ProviderName
@@ -6983,40 +6317,6 @@ components:
       - ERROR
       title: RunState
       description: Run lifecycle state — a pipelex extension field on run responses (the protocol defines none).
-    RunnerStructures:
-      properties:
-        directory:
-          type: string
-          title: Directory
-          description: Directory (relative to the runner script) to write the artifacts and lock into.
-          default: structures
-        artifacts:
-          items:
-            $ref: '#/components/schemas/GeneratedArtifact'
-          type: array
-          title: Artifacts
-          description: The stamped generated files (paths relative to `directory`).
-        lock:
-          type: string
-          title: Lock
-          description: The lock content (TOML) tracking the artifact set — write verbatim inside `directory`.
-        lock_filename:
-          type: string
-          title: Lock Filename
-          description: Filename the lock content must be written as.
-          default: codegen.lock
-      type: object
-      required:
-      - lock
-      title: RunnerStructures
-      description: 'The typed-structures projection the runner script imports from (`from structures.structures import ...`).
-
-
-        The same stamped `python-structures` artifacts + `codegen.lock` a local `pipelex build runner`
-
-        scaffolds into `<output>/structures/` — write `artifacts` and the lock under `directory` and
-
-        the returned `python_code` runs against them, with the offline `codegen check` passing there.'
     SearchSetting:
       properties:
         model:

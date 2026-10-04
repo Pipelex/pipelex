@@ -4,6 +4,7 @@ from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -14,6 +15,7 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -31,6 +33,8 @@ class NativeConceptCode(StrEnum):
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     YES_NO = "YesNo"
+    CHOICE = "Choice"
+    RATING = "Rating"
     DATE = "Date"
     TIME = "Time"
     PAGE = "Page"
@@ -59,6 +63,8 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -89,6 +95,8 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -120,6 +128,8 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -164,6 +174,10 @@ class NativeConceptCode(StrEnum):
                 return NumberContent
             case NativeConceptCode.YES_NO:
                 return YesNoContent
+            case NativeConceptCode.CHOICE:
+                return ChoiceContent
+            case NativeConceptCode.RATING:
+                return RatingContent
             case NativeConceptCode.DATE:
                 return DateContent
             case NativeConceptCode.TIME:
@@ -228,6 +242,8 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -265,6 +281,8 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -291,6 +309,8 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE

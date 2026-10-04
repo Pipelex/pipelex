@@ -74,7 +74,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
     ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
@@ -86,7 +86,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         endpoint_path = self.inference_model.endpoint_path
         if not endpoint_path:
             msg = f"Model '{self.inference_model.name}' does not have an endpoint_path configured but it's required for this model/sdk."
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         image_files: list[ImageFileTuple] | None = args_dict.pop("image", None)
         # Given that different backends and different models can be used with this worker, we must interpret the response,
@@ -102,7 +102,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 edits_endpoint_path = endpoint_path.replace("/images/generations", "/images/edits", 1)
                 if edits_endpoint_path == endpoint_path:
                     msg = f"Could not derive an /images/edits route from endpoint path '{endpoint_path}'"
-                    raise ImgGenParameterError(msg)
+                    raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
                 # OpenAI's multipart convention for /images/edits (matching the openai SDK's
                 # extract_files serialization): a single input image is the bare 'image' field,
                 # but multiple images must each go under 'image[]' — repeated bare 'image' parts
