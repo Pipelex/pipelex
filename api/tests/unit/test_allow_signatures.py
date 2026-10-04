@@ -3,18 +3,15 @@
 After the signatures-as-data reframe, an unimplemented `PipeSignature` is **never** a validation
 error — it is a *runnability fact*. `allow_signatures` no longer gates acceptance; it only controls
 whether signature pipes are mock-run during the dry-run sweep (and therefore listed in
-`validated_pipes`). So a bundle containing a signature is accepted in BOTH modes on the two routes
-that still run that sweep — `/validate` and `/build/runner`. On `/validate` the outstanding signature
-surfaces as `pending_signatures` + `is_runnable: false` (a 200 `ValidReport`, since the verdict is
-"sound but not runnable"), and the only mode difference is whether the signature pipe appears in
-`validated_pipes`.
+`validated_pipes`). So a bundle containing a signature is accepted in BOTH modes on `/validate`, the
+one route that runs that sweep. The outstanding signature surfaces as `pending_signatures` +
+`is_runnable: false` (a 200 `ValidReport`, since the verdict is "sound but not runnable"), and the
+only mode difference is whether the signature pipe appears in `validated_pipes`.
 
-The static projections (`/build/{inputs,output}`) dropped the sweep entirely, so they no longer take
-the flag at all — a signature bundle is simply accepted there, and that is asserted in
-`test_build_routes_envelope.py`, not here.
+The static crate routes run no sweep, so they do not take the flag at all.
 
 (`SignaturesNotAllowedError` — the strict-mode rejection this module used to assert — was removed
-with the de-raise; the build routes no longer reject a signature bundle.)
+with the de-raise.)
 """
 
 import pytest
@@ -34,19 +31,12 @@ def _build_client() -> TestClient:
 
 
 class TestAllowSignatures:
-    @pytest.mark.parametrize(
-        ("path", "payload_base"),
-        [
-            ("/v1/validate", {"mthds_contents": [SIGNATURE_MTHDS]}),
-            ("/v1/build/runner", {"files": [{"content": SIGNATURE_MTHDS}], "pipe_ref": "sig_api.caller_seq"}),
-        ],
-    )
     @pytest.mark.parametrize("allow_signatures", [False, True], ids=["strict", "lenient"])
-    def test_signature_bundle_accepted_in_both_modes(self, path: str, payload_base: dict[str, object], allow_signatures: bool):
-        # An unimplemented signature is never a rejection (D-B): both modes answer 200 on the two routes
-        # that still sweep. Strict no longer differs from lenient on acceptance.
+    def test_signature_bundle_accepted_in_both_modes(self, allow_signatures: bool):
+        # An unimplemented signature is never a rejection (D-B): both modes answer 200. Strict no
+        # longer differs from lenient on acceptance.
         client = _build_client()
-        response = client.post(path, json={**payload_base, "allow_signatures": allow_signatures})
+        response = client.post("/v1/validate", json={"mthds_contents": [SIGNATURE_MTHDS], "allow_signatures": allow_signatures})
         assert response.status_code == 200, response.text
 
     @pytest.mark.parametrize("allow_signatures", [False, True], ids=["strict", "lenient"])
@@ -77,18 +67,3 @@ class TestAllowSignatures:
         assert strict["pending_signatures"] == lenient["pending_signatures"] == ["sig_api.summary_sig"]
         assert strict["is_runnable"] is False
         assert lenient["is_runnable"] is False
-
-    def test_build_runner_generates_code_for_bundle_with_signatures_when_opted_in(self):
-        # The most concrete proof the flag threads through to the runner build: with allow_signatures
-        # the dry-run sweep mock-runs the signature, the library stays open, and runner code is
-        # generated for the caller pipe.
-        client = _build_client()
-        response = client.post(
-            "/v1/build/runner",
-            json={"files": [{"content": SIGNATURE_MTHDS}], "pipe_ref": "sig_api.caller_seq", "allow_signatures": True},
-        )
-        assert response.status_code == 200, response.text
-        body = response.json()
-        assert body["is_valid"] is True
-        assert body["pipe_ref"] == "sig_api.caller_seq"
-        assert body["python_code"]

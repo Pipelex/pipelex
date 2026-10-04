@@ -59,7 +59,7 @@ Resolution is a first-class language operation alongside validation: the closure
 
 Resolves the closure exactly like `/resolve`, then projects the crate through the two explicit axes:
 
-- `kind` (string, required): what to project. Served: `types` (the crate's concept set as typed models). Membership follows the **trust chain** — a kind is served here exactly when its artifacts are stamped and locked, which is the promise the valid arm makes by carrying a `lock`. Input templates are user-editable scaffolds, never stamped or locked, so they cannot make that promise: they ride [`POST /v1/build/inputs`](pipe-builder.md) instead and `inputs` is deliberately **not** a kind here.
+- `kind` (string, required): what to project. Served: `types` (the crate's concept set as typed models). Membership follows the **trust chain** — a kind is served here exactly when its artifacts are stamped and locked, which is the promise the valid arm makes by carrying a `lock`. Input templates are user-editable scaffolds, never stamped or locked, so they cannot make that promise: a client projects one from the input form [`POST /v1/pipe-io`](pipe-io.md) serves, and `inputs` is deliberately **not** a kind here.
 - `target` (string, required): for whom. `ts-zod` (zod schemas + inferred types), `python-pydantic` (self-contained pydantic models), or `python-structures` (runtime `StructuredContent` classes, for a Pipelex host).
 - `pipe_ref` (string, optional): pipe selector for future per-pipe kinds — not accepted for `types` (request-shape `422`).
 

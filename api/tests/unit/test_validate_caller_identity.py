@@ -1,4 +1,4 @@
-"""`/validate` and `/build/runner` hand the runtime the caller their validation sweep is done for.
+"""`/validate` hands the runtime the caller its validation sweep is done for.
 
 A validation is not a run, but its dry runs and its `pipe_dry_run` event are still telemetry, and
 the runtime attributes them to the `CallerIdentity` it is handed. Every failure on this path is
@@ -6,7 +6,7 @@ SILENT by construction: a keyword left out of `ApiRunner(...)` or `validate_bund
 answers 200, and the only symptom is that the sweep lands in PostHog under the deployment's
 constant id instead of the caller. So these tests read the caller off the call the runtime
 actually received — a recording validator for the dispatched `/validate`, the real in-process
-entry points (wrapped, not replaced) for the direct path and for `/build/runner`.
+entry point (wrapped, not replaced) for the direct path.
 
 The user comes from `request.state.user`, which the auth layer sets; a tiny middleware stands in
 for it here. The groups come from the body and are refused at the wire exactly as on a run.
@@ -20,7 +20,6 @@ import pytest
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import ErrorReport, ValidationErrorCategory, ValidationErrorItem
-from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
@@ -34,7 +33,6 @@ from pipelex_api.security import RequestUser
 from tests.unit._constants import STUB_METHOD_ADDRESS, VALID_MTHDS
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
-_RUNNER_NS = "pipelex_api.routes.pipelex.build.runner"
 _DIRECT_VALIDATOR_NS = "pipelex.pipeline.direct_bundle_validator"
 _MODE = "temporal"
 _USER_ID = "user_42"
@@ -191,42 +189,3 @@ class TestValidationCallerIdentity:
         assert "analytics_groups" in body["detail"]
         assert "allow_signatures" in body["detail"]
         assert validator.caller_identities == []
-
-    def test_build_runner_sweeps_for_the_caller(self, mocker: MockerFixture) -> None:
-        sweep = mocker.patch(f"{_RUNNER_NS}.validate_bundle", wraps=validate_bundle)
-        client = _build_client(user_id=_USER_ID)
-
-        response = client.post(
-            "/v1/build/runner",
-            json={"files": [{"content": VALID_MTHDS}], "pipe_ref": "smoke.echo", "analytics_groups": _GROUPS},
-        )
-
-        assert response.status_code == 200, response.text
-        assert response.json()["is_valid"] is True
-        assert sweep.call_count == 1
-        assert _caller_of(sweep.call_args) == CallerIdentity(user_id=_USER_ID, extras=_GROUPS)
-
-    def test_build_runner_without_groups_or_user_states_the_single_tenant_caller(self, mocker: MockerFixture) -> None:
-        sweep = mocker.patch(f"{_RUNNER_NS}.validate_bundle", wraps=validate_bundle)
-        client = _build_client(user_id=None)
-
-        response = client.post("/v1/build/runner", json={"files": [{"content": VALID_MTHDS}], "pipe_ref": "smoke.echo"})
-
-        assert response.status_code == 200, response.text
-        assert _caller_of(sweep.call_args) == CallerIdentity(user_id=SINGLE_TENANT_USER_ID, extras={})
-
-    @pytest.mark.parametrize("bad_groups", _BAD_GROUPS)
-    def test_build_runner_refuses_malformed_groups_with_a_422_naming_the_field(self, mocker: MockerFixture, bad_groups: Any) -> None:
-        sweep = mocker.patch(f"{_RUNNER_NS}.validate_bundle", wraps=validate_bundle)
-        client = _build_client(user_id=_USER_ID)
-
-        response = client.post(
-            "/v1/build/runner",
-            json={"files": [{"content": VALID_MTHDS}], "pipe_ref": "smoke.echo", "analytics_groups": bad_groups},
-        )
-
-        assert response.status_code == 422, response.text
-        body = response.json()
-        assert body["error_type"] == "InvalidAnalyticsGroups"
-        assert "analytics_groups" in body["detail"]
-        assert sweep.call_count == 0

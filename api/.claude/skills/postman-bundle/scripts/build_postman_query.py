@@ -9,10 +9,9 @@ live "Pipelex FastAPI" Postman collection under ``Bundles/<bundle>/``.
 Requests are generated per bundle (configurable via ``--endpoint``):
 ``Execute (sync)`` -> ``POST /v1/execute``, ``Start (async)`` ->
 ``POST /v1/start``, ``Validate (dry-run)`` -> ``POST /v1/validate``,
-``Resolve (crate)`` -> ``POST /v1/resolve``, ``Codegen (types)`` ->
-``POST /v1/codegen``, and the three bundle build routes ->
-``POST /v1/build/{inputs,output,runner}``. Only execute/start trigger
-inference — every other endpoint parses/loads/dry-runs with zero cost. All use
+``Resolve (crate)`` -> ``POST /v1/resolve``, and ``Codegen (types)`` ->
+``POST /v1/codegen``. Only execute/start trigger inference — every other
+endpoint parses/loads/dry-runs with zero cost. All use
 the collection's ``{{base_url}}`` and inherit its ``{{auth_token}}`` bearer auth.
 
 The async ``Start (async)`` body additionally carries ``callback_urls`` — the
@@ -59,9 +58,6 @@ TOP_FOLDER_NAME = "Bundles"
 #   "validate"     -> {mthds_contents, allow_signatures [, mthds_sources, render]}
 #   "resolve"      -> {files: [{content, source}]} — the crate envelope
 #   "codegen"      -> the crate envelope plus {kind, target}
-#   "build_inputs" -> the crate envelope plus {pipe_ref, format, explicit}
-#   "build_output" -> the crate envelope plus {pipe_ref, format}
-#   "build_runner" -> the crate envelope plus {pipe_ref, allow_signatures}
 # Only "run"/"start" trigger inference; every other kind is a free
 # parse/load/dry-run on the server.
 ENDPOINTS: dict[str, tuple[str, list[str], str]] = {
@@ -70,22 +66,17 @@ ENDPOINTS: dict[str, tuple[str, list[str], str]] = {
     "validate": ("Validate (dry-run)", ["v1", "validate"], "validate"),
     "resolve": ("Resolve (crate)", ["v1", "resolve"], "resolve"),
     "codegen": ("Codegen (types)", ["v1", "codegen"], "codegen"),
-    "build-inputs": ("Build Inputs", ["v1", "build", "inputs"], "build_inputs"),
-    "build-output": ("Build Output", ["v1", "build", "output"], "build_output"),
-    "build-runner": ("Build Runner", ["v1", "build", "runner"], "build_runner"),
 }
 
 # Which endpoints need what. execute/start run a specific pipe with real inputs;
-# the build routes target a specific pipe but take no inputs; validate and the
-# crate routes (resolve/codegen) derive everything from the bundle text.
-PIPE_CODE_ENDPOINTS = {"execute", "start", "build-inputs", "build-output", "build-runner"}
+# validate and the crate routes (resolve/codegen) derive everything from the
+# bundle text.
+PIPE_CODE_ENDPOINTS = {"execute", "start"}
 INPUTS_ENDPOINTS = {"execute", "start"}
-SIGNATURE_ENDPOINTS = {"validate", "build-runner"}
+SIGNATURE_ENDPOINTS = {"validate"}
 CRATE_ENDPOINTS = {"resolve", "codegen"}
 
 CODEGEN_TARGETS = ["ts-zod", "python-pydantic", "python-structures"]
-OUTPUT_FORMATS = ["schema", "json", "python"]
-INPUTS_FORMATS = ["json", "toml"]
 
 
 def fail(msg: str) -> NoReturn:
@@ -333,7 +324,7 @@ def build_crate_body(
     crate routes pair each content with its source in one ``{content, source}``
     entry (the shape the codegen spec pins). No ``pipe_code``, no ``inputs`` —
     the closure is the whole request. /codegen adds the two projection axes:
-    ``kind`` (only ``types`` is served — input templates ride /build/inputs) and
+    ``kind`` (only ``types`` is served — an inputs template is projected client-side) and
     ``target`` (``ts-zod`` | ``python-pydantic`` | ``python-structures``).
     """
     body: dict[str, Any] = {}
@@ -341,50 +332,6 @@ def build_crate_body(
         body["kind"] = codegen_kind
     if codegen_target:
         body["target"] = codegen_target
-    body["files"] = [{"content": content, "source": source} for content, source in zip(mthds_contents, mthds_sources)]
-    return json.dumps(body, indent=2, ensure_ascii=False)
-
-
-def build_build_body(
-    mthds_contents: list[str],
-    mthds_sources: list[str],
-    *,
-    pipe_ref: str | None,
-    allow_signatures: bool | None = None,
-    output_format: str | None = None,
-    inputs_format: str | None = None,
-    explicit: bool | None = None,
-) -> str:
-    """Body for /build/{inputs,output,runner} — the SAME ``files[]`` closure envelope as
-    /resolve and /codegen, plus a pipe selector.
-
-    ``pipe_ref`` is the qualified ``domain.pipe_code`` and is optional on the wire
-    (it defaults to the closure's ``main_pipe``); it is sent explicitly here so the
-    generated query is unambiguous and stays correct if the bundle later declares
-    several main_pipes.
-
-    Each route projects one artifact for that pipe — an inputs template (``format``:
-    json | toml, plus ``explicit``; /build/inputs only), an output representation
-    (``format``: schema | json | python; /build/output only), or a runner script. No
-    ``inputs`` on the wire — nothing runs.
-
-    ``format`` is a per-route axis with a different vocabulary on each, so the two are
-    threaded separately (``inputs_format`` vs ``output_format``) and only ever one is set.
-
-    ``allow_signatures`` is sent only for /build/runner: it parameterizes the dry-run
-    sweep, and the static /build/{inputs,output} projections dropped that sweep.
-    """
-    body: dict[str, Any] = {}
-    if pipe_ref:
-        body["pipe_ref"] = pipe_ref
-    if allow_signatures is not None:
-        body["allow_signatures"] = allow_signatures
-    if output_format:
-        body["format"] = output_format
-    if inputs_format:
-        body["format"] = inputs_format
-    if explicit is not None:
-        body["explicit"] = explicit
     body["files"] = [{"content": content, "source": source} for content, source in zip(mthds_contents, mthds_sources)]
     return json.dumps(body, indent=2, ensure_ascii=False)
 
@@ -532,9 +479,8 @@ def main() -> None:
         "--allow-signatures",
         action="store_true",
         help=(
-            "(validate + build-runner) Tolerate unimplemented pipe signatures instead of rejecting the bundle. "
-            "Parameterizes the dry-run sweep, so the static build-inputs/build-output projections do not take it. "
-            "Default: strict."
+            "(validate only) Tolerate unimplemented pipe signatures instead of rejecting the bundle. "
+            "Parameterizes the dry-run sweep. Default: strict."
         ),
     )
     parser.add_argument(
@@ -544,29 +490,6 @@ def main() -> None:
             "(codegen only) Projection target: ts-zod (zod schemas + inferred types), python-pydantic "
             "(self-contained BaseModels), or python-structures (Pipelex runtime StructuredContent classes). "
             "Required when --endpoint codegen."
-        ),
-    )
-    parser.add_argument(
-        "--output-format",
-        choices=OUTPUT_FORMATS,
-        default="schema",
-        help="(build-output only) Output representation format (default: schema). `python` returns source text in `output_python`.",
-    )
-    parser.add_argument(
-        "--inputs-format",
-        choices=INPUTS_FORMATS,
-        default="json",
-        help=(
-            "(build-inputs only) Inputs template encoding (default: json). `json` returns a parsed object in `inputs`; "
-            "`toml` returns raw text in `inputs_toml`, carrying the per-key `# concept:` comments JSON cannot."
-        ),
-    )
-    parser.add_argument(
-        "--explicit",
-        action="store_true",
-        help=(
-            "(build-inputs only) Emit the ceremonial {concept, content} envelope for every input instead of the "
-            "default light shape (a bare string for a Text input, and so on)."
         ),
     )
     parser.add_argument(
@@ -587,9 +510,8 @@ def main() -> None:
         help=(
             "Which endpoint(s) to target (default: both = execute + start). Besides the run pair, "
             "every choice is inference-free: 'validate' dry-runs the bundle, 'resolve' returns the "
-            "normalized library crate, 'codegen' projects the crate into typed artifacts "
-            "(needs --target), and 'build-inputs'/'build-output'/'build-runner' project one "
-            "artifact for the requested pipe. For --run, 'both' runs execute (sync)."
+            "normalized library crate, and 'codegen' projects the crate into typed artifacts "
+            "(needs --target). For --run, 'both' runs execute (sync)."
         ),
     )
     parser.add_argument("--name", help="Override the per-bundle subfolder name (default: bundle domain or filename)")
@@ -624,7 +546,7 @@ def main() -> None:
     needs_validate = any(ENDPOINTS[key][2] == "validate" for key in active_keys)
     needs_crate = any(key in CRATE_ENDPOINTS for key in active_keys)
     needs_signatures = any(key in SIGNATURE_ENDPOINTS for key in active_keys)
-    # execute/start need pipe_code + inputs; the build routes need pipe_code only.
+    # execute/start need pipe_code + inputs.
     needs_pipe = any(key in PIPE_CODE_ENDPOINTS for key in active_keys)
     needs_inputs = any(key in INPUTS_ENDPOINTS for key in active_keys)
 
@@ -706,34 +628,6 @@ def main() -> None:
         bodies["resolve"] = build_crate_body(mthds_contents, mthds_sources)
     if "codegen" in active_keys:
         bodies["codegen"] = build_crate_body(mthds_contents, mthds_sources, codegen_kind="types", codegen_target=args.target)
-    # The build routes take the QUALIFIED pipe ref (`domain.pipe_code`).
-    #
-    # Only `main_pipe` is guaranteed to live in the MAIN file's domain, so only it may be qualified
-    # with that domain. A `--pipe` override is passed through verbatim: in a multi-file closure the
-    # user may well be naming a pipe in a sibling domain, and stapling the main file's domain onto it
-    # would silently select the wrong pipe (or 422 on a ref that doesn't exist). A bare `--pipe` still
-    # resolves — the engine's lookup matches a bare code too — and the user can always qualify it.
-    if args.pipe:
-        pipe_ref = args.pipe
-    elif domain and main_pipe:
-        pipe_ref = f"{domain}.{main_pipe}"
-    else:
-        pipe_ref = main_pipe
-    if "build-inputs" in active_keys:
-        bodies["build_inputs"] = build_build_body(
-            mthds_contents,
-            mthds_sources,
-            pipe_ref=pipe_ref,
-            inputs_format=args.inputs_format,
-            explicit=args.explicit or None,
-        )
-    if "build-output" in active_keys:
-        bodies["build_output"] = build_build_body(mthds_contents, mthds_sources, pipe_ref=pipe_ref, output_format=args.output_format)
-    if "build-runner" in active_keys:
-        # Only /build/runner still runs the dry-run sweep that `allow_signatures` parameterizes.
-        bodies["build_runner"] = build_build_body(
-            mthds_contents, mthds_sources, pipe_ref=pipe_ref, allow_signatures=args.allow_signatures
-        )
 
     print(f"Bundle:      {main_file}")
     print(f"mthds files: {', '.join(path.name for path in all_mthds)}")
@@ -753,8 +647,6 @@ def main() -> None:
         print(f"crate:       files[] envelope — sources: {', '.join(mthds_sources)} (no inference)")
     if "codegen" in active_keys:
         print(f"codegen:     kind=types target={args.target}")
-    if "build-output" in active_keys:
-        print(f"format:      {args.output_format}")
     if local_url_warnings:
         warn_target = "the API" if mode in ("run", "curl") else "Postman"
         print("\nWARNING: inputs reference local (non-http) url(s) — file uploads are out of scope.")
@@ -836,40 +728,18 @@ def main() -> None:
                 "200 discriminated on `is_valid`: the canonical JSON crate on the valid arm, structured "
                 f"validation_errors[] on the invalid arm. {trailer}"
             )
-        if key == "codegen":
-            return (
-                f"Project the `{subfolder_name}` crate into typed artifacts (kind=types, target={args.target}) "
-                "plus its codegen.lock. NO inference.\n\n"
-                f"{source_lines}\n"
-                "A client that writes the artifacts and lock verbatim reproduces a local `pipelex codegen types` "
-                f"run byte-for-byte, so the offline `pipelex codegen check` passes. {trailer}"
-            )
-        # build-inputs / build-output / build-runner
-        artifact = {
-            "build-inputs": "the inputs JSON template",
-            "build-output": f"the output representation (format={args.output_format})",
-            "build-runner": "a runner script (plus the structures projection it imports)",
-        }[key]
-        if key == "build-runner":
-            return (
-                f"Generate {artifact} for pipe `{pipe_code}` of the `{subfolder_name}` bundle. Validates the "
-                "bundle first (dry-run sweep scoped to the pipe, NO inference).\n\n"
-                f"{source_lines}"
-                f"- allow_signatures: {args.allow_signatures}\n\n"
-                f"200 discriminated on `is_valid`. {trailer}"
-            )
+        # codegen
         return (
-            f"Generate {artifact} for pipe `{pipe_code}` of the `{subfolder_name}` bundle. Static projection: "
-            "resolves the closure and renders the pipe's declared IO — no dry-run sweep, NO inference.\n\n"
+            f"Project the `{subfolder_name}` crate into typed artifacts (kind=types, target={args.target}) "
+            "plus its codegen.lock. NO inference.\n\n"
             f"{source_lines}\n"
-            f"200 discriminated on `is_valid`. {trailer}"
+            "A client that writes the artifacts and lock verbatim reproduces a local `pipelex codegen types` "
+            f"run byte-for-byte, so the offline `pipelex codegen check` passes. {trailer}"
         )
 
     def display_name(key: str) -> str:
         if key == "codegen":
             return f"Codegen (types → {args.target})"
-        if key == "build-output":
-            return f"Build Output ({args.output_format})"
         return ENDPOINTS[key][0]
 
     requests = [build_request_item(display_name(key), ENDPOINTS[key][1], bodies[ENDPOINTS[key][2]], describe(key)) for key in selected]

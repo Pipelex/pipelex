@@ -1,4 +1,4 @@
-"""Shared crate-resolution plumbing for the `/resolve`, `/codegen`, `/pipe-io` and `/build/*` routes.
+"""Shared crate-resolution plumbing for the `/resolve`, `/codegen` and `/pipe-io` routes.
 
 They all select a closure the same way (inline `files[]` XOR `method_ref`), resolve it through the
 same engine core (`pipelex.pipeline.resolve_bundle.resolve_crate_from_contents`), and speak the same
@@ -8,10 +8,8 @@ This module holds the pieces they share so the envelopes cannot drift.
 
 The invalid arm here is the *crate* verdict: it deliberately omits `/validate`'s runnability facts
 (`pending_signatures`, `is_runnable`) — resolution is static (no dry-run sweep, matching
-`pipelex resolve`), so runnability is not part of its vocabulary. The per-pipe projections
-(`/build/{inputs,output}`) ride that same static core: a template is a read of the pipe's *declared*
-IO, so a valid verdict there says the closure is structurally sound, never that the pipe runs.
-`/build/runner` is the exception — it needs the dry-run sweep, so it keeps `validate_bundle`.
+`pipelex resolve`), so runnability is not part of its vocabulary. The per-pipe route (`/pipe-io`)
+rides that same static core: it reads the selected pipe's *declared* IO with no dry-run sweep.
 """
 
 from enum import StrEnum
@@ -87,15 +85,14 @@ class SelectedFiles(NamedTuple):
 def selected_files(request_data: MthdsFilesRequest) -> SelectedFiles:
     """The files the closure selector names: inline `files[]`, or an address `method_ref`'s package.
 
-    Shared by every route on the `files[]` envelope — including `/build/runner`, which cannot use
-    `resolve_requested_crate` (it needs `validate_bundle`'s dry-run sweep) but owes the caller the
-    same answer on every selector.
+    Every route on the `files[]` envelope reaches it through `resolve_requested_crate`, so they all
+    give the same answer on every selector.
 
     An **address-form** `method_ref` (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) resolves
     through the same fetch path the run routes use: the package's `.mthds` files come back as
     `files[]` items with their real relative paths as per-file sources, and the manifest's
-    `main_pipe` rides beside them so the per-pipe projections can default their selector the way
-    a run by address does. Only `.mthds` data travels — the package's Python (if any) never loads
+    `main_pipe` rides beside them so the per-pipe route can default its selector the way a run
+    by address does. Only `.mthds` data travels — the package's Python (if any) never loads
     on these routes. The **registry form** (any non-address reference) stays reserved and keeps
     its 501 until the packaging program's registry phase.
 
@@ -159,10 +156,10 @@ def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedClosure:
 
 
 class RequestedPipe(NamedTuple):
-    """The pipe a per-pipe projection was asked for: its resolved qualified ref and the live pipe."""
+    """The pipe a per-pipe route was asked for: its resolved qualified ref and the live pipe."""
 
     ref: str
-    """The qualified `domain.pipe_code` actually projected — always qualified, whatever the request spelled."""
+    """The qualified `domain.pipe_code` actually selected — always qualified, whatever the request spelled."""
 
     pipe: PipeAbstract
     """The live pipe, read from the library `resolve_requested_crate` left loaded + current."""
@@ -197,7 +194,7 @@ class _SelectorOrigin(StrEnum):
 
 
 def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifest_main_pipe: str | None) -> RequestedPipe:
-    """Select the pipe a per-pipe projection targets, defaulting to the manifest's, then the closure's, `main_pipe`.
+    """Select the pipe a per-pipe route targets, defaulting to the manifest's, then the closure's, `main_pipe`.
 
     The request's `pipe_ref` wins; omitted, the default chain (`select_default_pipe`) decides. Every
     failed selection — an unknown ref, an ambiguous one, a chain that finds no entry pipe or several —

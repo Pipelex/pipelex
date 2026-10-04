@@ -126,7 +126,7 @@ The field exists because the canonical report is **manifest-blind**: `bundle_blu
 
 The graph follows the same precedence: on a `method_ref` request whose manifest names a `main_pipe`, the route hands that pipe to the runtime as the graph target, so `graph_spec` draws the pipe `default_pipe_ref` names — including for a package whose bundles declare no `main_pipe` at all, whose entry pipe only the manifest states. A manifest `main_pipe` the closure does not resolve leaves both fields `null` rather than graphing the closure's own `main_pipe`, which no run by that address executes. The target travels with the dispatch, so a validation sent to a worker is graphed the same way.
 
-It states the **run** default, which is looser than the `/build/*` routes' rule on one point: a closure whose domains each declare a `main_pipe` cannot be defaulted on `/build/*` (a `422`), but `/execute` and `/start` run its first declaring blueprint happily — so this field names that pipe rather than reporting `null`.
+It states the **run** default, which is looser than the [`/pipe-io`](pipe-io.md#pipe-selection) selection chain on one point: a closure whose domains each declare a `main_pipe` cannot be defaulted on `/pipe-io` (a `422`), but `/execute` and `/start` run its first declaring blueprint happily — so this field names that pipe rather than reporting `null`.
 
 The field rides the valid arm only. The invalid arm assembles no library, so there is no entry pipe to name and the field is absent, like the other structural artifacts.
 

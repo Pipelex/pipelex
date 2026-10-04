@@ -3,7 +3,7 @@
 
   <h2 align="center">Pipelex API</h2>
 
-The official REST API server for building and executing Pipelex pipelines. Deploy your pipelines as HTTP endpoints and integrate them into any application or workflow.
+The official REST API server for validating and executing Pipelex pipelines. Deploy your pipelines as HTTP endpoints and integrate them into any application or workflow.
 
   <div>
     <a href="https://docs.pipelex.com/latest/api-server/"><strong>API Documentation</strong></a> -
@@ -37,7 +37,7 @@ The official REST API server for building and executing Pipelex pipelines. Deplo
 
 The **Pipelex API Server** is a FastAPI-based REST API that allows you to execute [Pipelex](https://github.com/Pipelex/pipelex) pipelines via HTTP requests. Deploy your pipelines as HTTP endpoints and integrate them into any application or workflow.
 
-It is the source-available reference implementation of the **[MTHDS Protocol](https://mthds.ai)** — the minimal HTTP contract every MTHDS runner implements (`POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`). The contracts nest: **MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API**. This server adds the build tooling extensions (`/build/*`) on top of the protocol; the hosted API at `api.pipelex.com/v1` adds durable runs, the method catalog, and account management on top of this server — same shapes throughout. All routes live under the `/v1` base path; the committed contract is [`pipelex-api.openapi.yaml`](https://github.com/Pipelex/pipelex/blob/main/docs/api-server/openapi/pipelex-api.openapi.yaml).
+It is the source-available reference implementation of the **[MTHDS Protocol](https://mthds.ai)** — the minimal HTTP contract every MTHDS runner implements (`POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`). The contracts nest: **MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API**. This server adds the tooling extensions (`/resolve`, `/codegen`, `/pipe-io`, `/lint`, `/format`) on top of the protocol; the hosted API at `api.pipelex.com/v1` adds durable runs, the method catalog, and account management on top of this server — same shapes throughout. All routes live under the `/v1` base path; the committed contract is [`pipelex-api.openapi.yaml`](https://github.com/Pipelex/pipelex/blob/main/docs/api-server/openapi/pipelex-api.openapi.yaml).
 
 # 🚀 Quick Start with Docker
 
@@ -119,7 +119,8 @@ The full reference for this API server is part of the Pipelex documentation, und
 - [Overview](https://docs.pipelex.com/latest/api-server/) — endpoints, authentication, deployment
 - [Pipe Run](https://docs.pipelex.com/latest/api-server/pipe-run/) — `/execute`, `/start`, every input shape
 - [Pipe Validate](https://docs.pipelex.com/latest/api-server/pipe-validate/) — `/validate`
-- [Pipe Builder](https://docs.pipelex.com/latest/api-server/pipe-builder/) — `/build/inputs`, `/build/output`, `/build/runner`
+- [Pipe I/O](https://docs.pipelex.com/latest/api-server/pipe-io/) — `/pipe-io`
+- [Resolve & Codegen](https://docs.pipelex.com/latest/api-server/codegen/) — `/resolve`, `/codegen`
 - [Configuration](https://docs.pipelex.com/latest/api-server/configuration/) — env vars, mounting your own `.pipelex/` config
 
 For broader Pipelex documentation (MTHDS language, concepts, pipe types, the Gateway): **[https://docs.pipelex.com/](https://docs.pipelex.com/)**
