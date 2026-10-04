@@ -150,5 +150,5 @@ class TestRemoteConfigCache:
         assert loaded.raw_config["unknown_future_key"] == {"hello": "world"}
 
         remote_config = loaded.to_remote_config()
-        # Pydantic ``extra="allow"`` keeps unknown fields accessible via model_extra
-        assert remote_config.model_extra == {"unknown_future_key": {"hello": "world"}}
+        # ``RemoteConfig`` declares no field, so ``extra="allow"`` keeps the whole payload in model_extra
+        assert remote_config.model_extra == payload

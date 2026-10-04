@@ -227,16 +227,10 @@ class RemoteConfigFetcher:
             cached = RemoteConfigCache.load()
             if cached is None:
                 raise cls._build_unavailable_error(fetch_error) from fetch_error
-            # A valid cache wrapper can still hold a stale or malformed ``raw_config`` —
-            # ``RemoteConfigCache.load()`` only validates the wrapper, not the inner payload.
-            # Treat such a cache as unusable and surface the normal offline-mode remediation
-            # instead of letting a raw Pydantic ``ValidationError`` escape.
-            try:
-                cached_config = cached.to_remote_config()
-            except ValidationError as validation_error:
-                raise cls._build_unavailable_error(fetch_error) from validation_error
+            # The wrapper `load()` validated already holds the payload as a JSON object, and
+            # `RemoteConfig` declares no field of its own, so re-validating it cannot fail.
             return RemoteConfigResult(
-                config=cached_config,
+                config=cached.to_remote_config(),
                 source=RemoteConfigSource.CACHED,
                 cached_at=cached.cached_at,
             )

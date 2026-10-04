@@ -234,21 +234,38 @@ class TestDoctorBackendChecks:
         assert reports["vertexai"].is_valid is True
 
     def test_backend_files_stock_kit_is_healthy(self, tmp_path: Path) -> None:
-        """The shipped defaults ship the manifold backend's override file; the probe hands the loader
-        no gateway config, and that must not be reported as a malformed file.
-        """
+        """Every backend file the shipped defaults enable loads cleanly."""
         self._copy_kit_inference(tmp_path)
 
         healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert message == "All backend files are valid"
-        assert reports["pipelex_manifold"].is_valid is True
+        assert reports
         assert all(report.is_valid for report in reports.values())
 
-    def test_backend_files_malformed_file_still_caught_under_leniency(self, tmp_path: Path) -> None:
-        """Leniency skips the managed gateway, not a malformed file — and the gateway no longer hides one behind it."""
+    def test_backend_files_enabled_manifold_is_healthy(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The probe hands the loader no manifold model specs, and that must not be reported as a malformed file.
+
+        The manifold's variables are set, or the loader would skip it before ever asking for its specs.
+        """
+        self._copy_kit_inference(tmp_path)
+        _write_backends_override(tmp_path, "[pipelex_manifold]\nenabled = true\n")
+        monkeypatch.setenv("PIPELEX_MANIFOLD_ENDPOINT", "https://manifold.example.test/v1")
+        monkeypatch.setenv("PIPELEX_MANIFOLD_API_KEY", "test-manifold-key")
+
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
+
+        assert healthy is True
+        assert message == "All backend files are valid"
+        assert reports["pipelex_manifold"].is_valid is True
+
+    def test_backend_files_malformed_file_still_caught_under_leniency(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Leniency skips the managed gateway, not a malformed file — and the gateway does not hide one behind it."""
         backends_dir = self._copy_kit_inference(tmp_path)
+        _write_backends_override(tmp_path, "[pipelex_manifold]\nenabled = true\n")
+        monkeypatch.setenv("PIPELEX_MANIFOLD_ENDPOINT", "https://manifold.example.test/v1")
+        monkeypatch.setenv("PIPELEX_MANIFOLD_API_KEY", "test-manifold-key")
         anthropic_file = backends_dir / "anthropic.toml"
         anthropic_file.write_text(anthropic_file.read_text(encoding="utf-8") + '\n[bogus_key_table]\nfoo = "bar"\n', encoding="utf-8")
 

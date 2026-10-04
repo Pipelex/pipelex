@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
-from pydantic import ValidationError
 
 from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.system.configuration.config_loader import ConfigLoader
@@ -148,30 +147,6 @@ class TestRemoteConfigFetcher:
         assert "pipelex init" in str(exc_info.value), "error message must point at the remediation command"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
-    def test_network_failure_with_invalid_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
-        """A cache with a valid wrapper but a stale/malformed ``raw_config`` must be treated
-        as unusable. ``RemoteConfigCache.load()`` only validates the wrapper, so the offline
-        path must catch the inner ``RemoteConfig`` validation failure and raise
-        ``RemoteConfigUnavailableError`` with the normal remediation message — never let a
-        raw Pydantic ``ValidationError`` escape.
-        """
-        # store() does not validate raw_config against RemoteConfig, so this writes a
-        # cache whose wrapper is valid but whose payload cannot parse as RemoteConfig.
-        RemoteConfigCache.store({"bogus": "payload"})
-
-        mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
-        mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
-
-        with pytest.raises(RemoteConfigUnavailableError) as exc_info:
-            RemoteConfigFetcher.fetch_remote_config()
-
-        assert "pipelex init" in str(exc_info.value), "invalid cache must surface the normal offline remediation, not a raw ValidationError"
-        assert isinstance(exc_info.value.__cause__, ValidationError), (
-            "the unavailable error must chain from the inner RemoteConfig ValidationError, "
-            "proving the malformed-cache branch (not the missing-cache branch) was exercised"
-        )
-
-    @pytest.mark.usefixtures("isolated_cache_dir")
     def test_http_error_with_cache_returns_cached(self, mocker: MockerFixture) -> None:
         """5xx response with a primed cache falls back to cache, same as a connect error.
         Asserts the cached payload (not a fabricated empty one) flows back, with its
@@ -212,7 +187,7 @@ class TestRemoteConfigFetcher:
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_validation_error_does_not_fall_back(self, mocker: MockerFixture) -> None:
         """Server-side schema break must surface — we control the server, so a stale cache
-        would be the wrong answer here.
+        would be the wrong answer here. The artifact must be a JSON object; any object parses.
         """
         # Cache is populated and otherwise usable; we want to assert it's NOT consulted.
         RemoteConfigCache.store(_valid_remote_config_payload())
@@ -220,7 +195,7 @@ class TestRemoteConfigFetcher:
         bad_response = httpx.Response(
             status_code=200,
             request=httpx.Request("GET", "https://example.com/remote_config.json"),
-            content=b'{"posthog": "not-an-object"}',
+            content=b'["not-an-object"]',
         )
         mocker.patch("httpx.get", return_value=bad_response)
 

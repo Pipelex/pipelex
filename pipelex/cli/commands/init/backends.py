@@ -94,9 +94,10 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
         # Get currently enabled backends to show user their current selection
         currently_enabled = get_currently_enabled_backends(backends_toml_path, backend_options=backend_options)
 
-        # If this is first-time setup, ignore what's in the template (all enabled)
-        # and use only the recommended backend as the default
-        if is_first_time_setup or (currently_enabled and len(currently_enabled) == len(backend_options)):
+        # A first-time setup, or a file still enabling exactly what the template enables, is not a
+        # selection anybody made: pre-select the recommended backend instead of the template's set.
+        template_enabled = get_currently_enabled_backends(template_backends_path, backend_options=backend_options)
+        if is_first_time_setup or currently_enabled == template_enabled:
             currently_enabled = []
 
         # Load the backends.toml file

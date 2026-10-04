@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import typer
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Confirm
@@ -87,17 +87,10 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
 
     # A successful fetch does NOT guarantee a usable cache. ``RemoteConfigFetcher`` treats the
     # cache write as opportunistic and swallows OSErrors (read-only / full cache dir) with only a
-    # stderr warning. And even when a file is written, ``RemoteConfigCache.load()`` validates only
-    # the cache *wrapper* — a malformed inner ``raw_config`` would still pass it but break later
-    # offline runs (see the matching check in ``RemoteConfigFetcher.fetch_remote_config``). Verify
-    # both: the wrapper loads AND its payload re-validates as a ``RemoteConfig``. Otherwise priming
-    # would misreport success and later offline runs would hit ``RemoteConfigUnavailableError``.
+    # stderr warning, so read the cache back: a wrapper that loads holds the payload as a JSON
+    # object, which is all a ``RemoteConfig`` needs. Otherwise priming would misreport success and
+    # later offline runs would hit ``RemoteConfigUnavailableError``.
     cached = RemoteConfigCache.load()
-    if cached is not None:
-        try:
-            cached.to_remote_config()
-        except ValidationError:
-            cached = None
     if cached is None:
         msg = (
             f"Remote config was fetched but the cache at {RemoteConfigCache.cache_path()} "

@@ -10,6 +10,7 @@ distinct, user-actionable failure mode that deserves its own error class.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -18,6 +19,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import GatewayUnknownModelError
 from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.pipelex import Pipelex
+from pipelex.system.configuration.config_loader import ConfigLoader, config_manager
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import (
     RemoteConfigFetcher,
@@ -25,13 +27,14 @@ from pipelex.system.pipelex_service.remote_config_fetcher import (
 )
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import IntegrationMode
+from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
     from pytest_mock import MockerFixture
 
-RUNTIME_BOOT_MODULE = "pipelex.runtime_boot"
+MANIFOLD_ROUTING_PROFILE = "all_pipelex_manifold"
 
 
 def _empty_manifold_remote_config_result(source: RemoteConfigSource) -> RemoteConfigResult:
@@ -51,6 +54,37 @@ def reset_pipelex_config_fixture() -> Generator[None, None, None]:
     Pipelex.teardown_if_needed()
 
 
+@pytest.fixture
+def manifold_routed_boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Boot on the repository's inference documents with the manifold enabled and every model routed to it.
+
+    The membership check only judges the handles the active profile routes to a managed backend, so
+    enabling the manifold is not enough: the default profile tries it last, after every BYOK backend
+    that serves the same model. Both sequences are pinned whole, so a personal override on this machine
+    cannot route the boot elsewhere. The manifold's variables are set, or the loader would disable it
+    before ever reading its specs.
+    """
+    routing_profiles_doc = load_toml_with_tomlkit(str(config_manager.routing_profiles_file_path))
+    routing_profiles_doc["active"] = MANIFOLD_ROUTING_PROFILE
+    routing_profiles_path = tmp_path / "routing_profiles.toml"
+    save_toml_to_path(routing_profiles_doc, path=str(routing_profiles_path))
+
+    backends_base_path = Path(config_manager.backends_file_path)
+    backends_override_path = tmp_path / "backends_override.toml"
+    backends_override_path.write_text(f"[{PipelexBackend.MANIFOLD}]\nenabled = true\n", encoding="utf-8")
+
+    def pinned_routing_profiles_file_paths(_self: object, **_kwargs: object) -> list[Path]:
+        return [routing_profiles_path]
+
+    def pinned_backends_file_paths(_self: object, **_kwargs: object) -> list[Path]:
+        return [backends_base_path, backends_override_path]
+
+    monkeypatch.setattr(ConfigLoader, "routing_profiles_file_paths", pinned_routing_profiles_file_paths)
+    monkeypatch.setattr(ConfigLoader, "backends_file_paths", pinned_backends_file_paths)
+    monkeypatch.setenv("PIPELEX_MANIFOLD_ENDPOINT", "https://manifold.example.test/v1")
+    monkeypatch.setenv("PIPELEX_MANIFOLD_API_KEY", "test-manifold-key")
+
+
 class TestGatewayUnknownModel:
     def test_known_model_loads(self) -> None:
         """Happy path: with no managed gateway enabled by default, the membership check has
@@ -67,15 +101,12 @@ class TestGatewayUnknownModel:
             Pipelex.teardown_if_needed()
             log.reset()
 
+    @pytest.mark.usefixtures("manifold_routed_boot")
     def test_unknown_model_fresh_raises(self, mocker: MockerFixture) -> None:
         """The manifold section carries no model specs → the first deck-referenced handle trips
         ``GatewayUnknownModelError(source=FRESH)`` with the missing model name surfaced.
         """
         Pipelex.teardown_if_needed()
-        mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
-        )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -102,6 +133,7 @@ class TestGatewayUnknownModel:
             Pipelex.teardown_if_needed()
             log.reset()
 
+    @pytest.mark.usefixtures("manifold_routed_boot")
     def test_dummy_specs_path_skips_membership_check(self, mocker: MockerFixture) -> None:
         """When a managed gateway is enabled but ``needs_model_specs=False``, ``Pipelex.setup`` builds
         a dummy ``RemoteConfig`` with empty sections. The membership check must NOT run on this
@@ -111,10 +143,6 @@ class TestGatewayUnknownModel:
         fetching specs.
         """
         Pipelex.teardown_if_needed()
-        mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
-        )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -135,15 +163,12 @@ class TestGatewayUnknownModel:
             Pipelex.teardown_if_needed()
             log.reset()
 
+    @pytest.mark.usefixtures("manifold_routed_boot")
     def test_unknown_model_cached_raises_with_stale_hint(self, mocker: MockerFixture) -> None:
         """Same scenario as fresh, but the remote config came from the cache → the error
         message must point at ``pipelex init`` (while online) to refresh the cache.
         """
         Pipelex.teardown_if_needed()
-        mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
-        )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,

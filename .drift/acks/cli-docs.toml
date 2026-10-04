@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:c09840498f27162aa7d8456cef4edd672a9d9852572211f7fec7f04173987307"
+digest = "sha256:255663bcb5a181f230c92aeaf85ea290a0eb4fe5b21ce81c2c079a63c722fa7c"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-04T14:04:15Z"
-rationale = "real-catch: merging dev into the gateway removal, the CLI tree drops login, accept-gateway-terms and the init gateway UI; docs/tools/cli names none of them, but agent-cli.md quoted a RemoteConfigStale message the boot no longer emits and said the warning fires when the gateway is enabled, so it now quotes the runtime_boot.py message and says a Pipelex-managed gateway backend, and pipelex/cli/agent_cli/CLAUDE.md no longer lists accept-gateway-terms among the JSON-only commands. init.md was read against init/routing.py and stays accurate."
+reviewed_at = "2026-10-04T14:57:24Z"
+rationale = "real-catch: init now pre-selects the recommended backend while backends.toml still enables exactly the template's set (it compared against every option, which the disabled manifold made unreachable), so init.md's backend-selection step now says what the prompt pre-selects; the priming change only drops a re-validation that could no longer fail, and the offline cache-priming note in init.md and pipelex/cli/agent_cli/CLAUDE.md stay accurate."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -89,8 +89,8 @@ rationale = "real-catch: merging dev into the gateway removal, the CLI tree drop
 "pipelex/cli/commands/fix/bundle_cmd.py" = "blob:427364cc453957dfe0cec879f019050329c13b3c"
 "pipelex/cli/commands/graph_cmd.py" = "blob:d54737af7efc9ab9bbf3f978050d017af0e27a41"
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/commands/init/backends.py" = "blob:18cb9165315488e472a8b1cc7341a00938350967"
-"pipelex/cli/commands/init/command.py" = "blob:412858a12a3ae93822db5b1b4ae50440f45e6518"
+"pipelex/cli/commands/init/backends.py" = "blob:04a1a06f1003ed0c7157ec4ca6c8659e4e09fe6b"
+"pipelex/cli/commands/init/command.py" = "blob:2aedf2b8f5b7fccf767d113650bcfba1c1a376e9"
 "pipelex/cli/commands/init/config_files.py" = "blob:c13be6b8d2a8b211ce9ef0f4889ee131ffc3d2d8"
 "pipelex/cli/commands/init/credentials.py" = "blob:36dcc33599a2749b7d63bf214363a4b6fd6698e8"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:9f0ec1494c07062246ecc906bc55b7f2cf95c715"

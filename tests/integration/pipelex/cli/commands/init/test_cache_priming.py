@@ -14,7 +14,6 @@ These tests pin the helper's behaviour:
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path  # ruff: ignore[typing-only-standard-library-import] — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
@@ -26,8 +25,6 @@ from pipelex.cli.commands.init.command import prime_remote_config_cache
 from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.remote_config_cache import (
-    CACHE_SCHEMA_VERSION,
-    CachedRemoteConfig,
     RemoteConfigCache,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -54,22 +51,15 @@ def _fake_remote_payload() -> dict[str, object]:
     }
 
 
-def _store_malformed_cache(remote_config_payload: dict[str, object]) -> None:
-    """Drop-in for ``RemoteConfigCache.store`` that writes a structurally valid cache *wrapper*
-    whose inner ``raw_config`` does NOT validate as a ``RemoteConfig``.
+def _store_unreadable_cache(remote_config_payload: dict[str, object]) -> None:
+    """Drop-in for ``RemoteConfigCache.store`` that writes a cache file ``RemoteConfigCache.load()`` cannot read back.
 
-    Reproduces the case where ``RemoteConfigCache.load()`` succeeds (the wrapper is fine) but the
-    cached payload is unusable for offline runs.
+    Reproduces a write that lands on disk without raising yet leaves nothing an offline run can use.
     """
-    del remote_config_payload  # intentionally discarded — we write a deliberately broken payload
-    cached = CachedRemoteConfig(
-        schema_version=CACHE_SCHEMA_VERSION,
-        cached_at=datetime.now(tz=UTC),
-        raw_config={},
-    )
+    del remote_config_payload  # intentionally discarded — we write a deliberately broken file
     cache_path = RemoteConfigCache.cache_path()
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(cached.model_dump_json(), encoding="utf-8")
+    cache_path.write_text("{not json", encoding="utf-8")
 
 
 def _make_httpx_response(payload: dict[str, object]) -> httpx.Response:
@@ -339,14 +329,12 @@ class TestCachePriming:
         assert "yellow" in printed.lower(), f"a failed cache write must surface a yellow warning; got: {printed!r}"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
-    def test_init_warns_when_cached_payload_is_malformed(self, mocker: MockerFixture) -> None:
-        """Online fetch succeeds and a cache file is written, but its inner ``raw_config`` is not
-        a valid ``RemoteConfig`` → priming reports failure, not success.
+    def test_init_warns_when_the_written_cache_does_not_read_back(self, mocker: MockerFixture) -> None:
+        """Online fetch succeeds and a cache file is written, but it does not read back → priming
+        reports failure, not success.
 
-        ``RemoteConfigCache.load()`` validates only the cache *wrapper*, so a malformed inner
-        payload would still pass an ``is None`` check. Priming must re-validate the payload as a
-        ``RemoteConfig``, otherwise ``pipelex-agent init`` would emit ``cache_primed: true`` while
-        a later offline run hits ``RemoteConfigUnavailableError``.
+        Priming reads the cache back rather than trusting the write, otherwise ``pipelex-agent init``
+        would emit ``cache_primed: true`` while a later offline run hits ``RemoteConfigUnavailableError``.
         """
         mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=MANIFOLD_ONLY_SECTIONS)
         mocker.patch(
@@ -356,13 +344,13 @@ class TestCachePriming:
         )
         mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _ORIGINAL_FETCH_REMOTE_CONFIG)
         mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
-        mocker.patch.object(RemoteConfigCache, "store", side_effect=_store_malformed_cache)
+        mocker.patch.object(RemoteConfigCache, "store", side_effect=_store_unreadable_cache)
 
         console = mocker.create_autospec(Console, instance=True)
         prime_remote_config_cache(console=console)  # must NOT raise
 
         printed = " ".join(str(call_args) for call_args in console.print.call_args_list)
-        assert "yellow" in printed.lower(), f"a malformed cached payload must surface a yellow warning; got: {printed!r}"
+        assert "yellow" in printed.lower(), f"a cache that does not read back must surface a yellow warning; got: {printed!r}"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_does_not_double_prime(self, mocker: MockerFixture) -> None:
