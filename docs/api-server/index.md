@@ -16,7 +16,7 @@ This server is the source-available reference implementation of the **[MTHDS Pro
 
 ```
 MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
-(the standard)     (protocol + build tooling)    (+ durable runs, catalog, account)
+(the standard)     (protocol + extensions)       (+ durable runs, catalog, account)
 ```
 
 - **MTHDS Protocol** — five routes: `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those five — the flag is how a conformance suite or a third-party runner extracts the portable subset.

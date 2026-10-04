@@ -3,8 +3,8 @@
 The committed file (`docs/api-server/openapi/pipelex-api.openapi.yaml` at the repository root,
 published on the pipelex docs site beside the server's pages) is the layer-2 contract of the MTHDS
 Protocol nesting (MTHDS Protocol ⊂ Pipelex API ⊂ Pipelex hosted API): the five protocol routes are
-tagged `x-mthds-protocol: true`, the build tooling extensions ride alongside, and the non-contract
-storage routes (`/upload`, `/resolve-storage-url`) are documented as such in their descriptions.
+tagged `x-mthds-protocol: true`, and the untagged Pipelex extensions (`/resolve`, `/codegen`,
+`/pipe-io`, `/lint`, `/format`) ride alongside.
 
 Usage:
     python scripts/export_openapi.py ../docs/api-server/openapi/pipelex-api.openapi.yaml

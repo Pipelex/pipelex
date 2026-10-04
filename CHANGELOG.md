@@ -30,7 +30,7 @@
 
 ### Removed
 
-- **The API server's `/v1/build/*` routes (Breaking)**: `pipelex-api` no longer serves `POST /v1/build/inputs`, `/v1/build/output`, `/v1/build/runner`, `/v1/build/concept` or `/v1/build/pipe-spec`, which now answer `404`, and the `MAX_AGENT_SPEC_KIB` setting that bounded the last two is gone. A client reads a pipe's I/O from `POST /v1/pipe-io` and projects an inputs template from its `input_form`, as `@pipelex/sdk`, `pipelex-sdk` and `mthds-agent inputs` do; the output representation, the runner script and the concept and pipe spec conversions have no HTTP replacement.
+- **The API server's `/v1/build/*` routes (Breaking)**: `pipelex-api` no longer serves `POST /v1/build/inputs`, `/v1/build/output`, `/v1/build/runner`, `/v1/build/concept` or `/v1/build/pipe-spec`, which now answer `404`, and the `MAX_AGENT_SPEC_KIB` setting that bounded the last two is gone. A client reads a pipe's I/O from `POST /v1/pipe-io` and projects an inputs template from its `input_form` with the `mthds` packages' projection (`renderInputsTemplate`, which `@pipelex/sdk` re-exports, or `mthds.protocol.inputs_template` in Python), as `mthds-agent inputs` does; the output representation, the runner script and the concept and pipe spec conversions have no HTTP replacement.
 
 ### Security
 
