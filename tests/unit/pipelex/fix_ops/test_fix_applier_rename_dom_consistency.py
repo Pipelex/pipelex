@@ -26,7 +26,7 @@ import pytest
 import tomlkit
 from tomlkit import TOMLDocument
 
-from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops
+from pipelex.fix_ops.applier import FixOpOutcome, apply_fix_ops
 from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp
 
 FLAT = """\

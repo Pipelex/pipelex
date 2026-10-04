@@ -32,19 +32,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.config import get_config
-from pipelex.interpreter_hub import resolve_library_dirs
-from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
-from pipelex.pipeline.exceptions import FixWriteConflictError, ValidateBundleError
-from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
-from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
-from pipelex.pipeline.fixes.file_transaction import (
+from pipelex.fix_ops.applier import apply_fix_ops, serialize_and_format
+from pipelex.fix_ops.exceptions import FixWriteConflictError
+from pipelex.fix_ops.file_transaction import (
     FileSnapshot,
     PendingFileUpdate,
     assert_snapshot_unchanged,
     commit_file_updates,
     read_file_snapshot,
 )
+from pipelex.interpreter_hub import resolve_library_dirs
+from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError

@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:35e4a1027244f3cc4546249c0a3b4d3937ceb5a10a20b74c536b2cc72439ea6a"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T18:44:31Z"
-rationale = "real-catch: runtime_hub.py gained get_optional_service_error_vocabulary and its setter, the plugins' service error codes frozen at boot; hub-layering.md's plugin-registries row and its sentence on what RuntimeBoot.setup installs on the RuntimeHub now name it."
+digest = "sha256:0d04191133ff7766daf3182784f868d2da5a724f655b9d23428a3634ec97e8d3"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-04T20:43:02Z"
+rationale = "real-catch: the guard now declares pipelex.fix_ops and pipelex.migration; hub-layering.md's declared-package list, the paragraph that called declaring migration an overreach, and a new known inversion now say so. Re-deriving the 'every top-level package accounted for' claim from ls pipelex/ found pipelex.methods unaccounted for; measured it (structures_check imports pipelex.codegen, loading interpreter modules without reaching the hub) and added it to both the doc and the guard's note."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fe10deb00e0d30f300352a0696258ab108668e3c"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
 "pipelex/runtime_hub.py" = "blob:05f84b9604b9f904e7df96d222b8856123ce9e91"

@@ -91,6 +91,9 @@ KERNEL_LAYER_ENTRY_POINTS = [
     "pipelex.core.pipes.stuff_spec.stuff_spec_factory",
     "pipelex.core.stuffs.stuff_factory",
     "pipelex.providers.anthropic.anthropic_list",
+    # The boot-tolerance replay imports the engine; `pipelex migrate` drives the runner.
+    "pipelex.migration.engine",
+    "pipelex.migration.runner",
 ]
 
 #: The negative control, and the reason it is needed: the detector below is a `textwrap.dedent`

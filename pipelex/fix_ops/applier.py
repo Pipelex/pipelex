@@ -133,7 +133,7 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
     The ``.mthds`` fix path is unaffected because it renames ``[pipe.*]`` tables, which take the
     branch tomlkit does keep in step; configuration migration re-reads the document between
     operations that applied, for its own reasons, and is unaffected too. Both facts are pinned by
-    ``tests/unit/pipelex/pipeline/fixes/test_fix_applier_rename_dom_consistency.py``, which is the
+    ``tests/unit/pipelex/fix_ops/test_fix_applier_rename_dom_consistency.py``, which is the
     tripwire if this is ever repaired across every facade.
 
     ``_resolve_table`` hands back one of three dict-like shapes, each with its own route to the

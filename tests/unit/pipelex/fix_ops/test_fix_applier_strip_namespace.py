@@ -13,7 +13,7 @@ from typing import Any, cast
 
 import tomlkit
 
-from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
+from pipelex.fix_ops.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
 from pipelex.suggested_fix import FixOp, RenameTableKeyOp, SetKeyOp
 
 _DATA = Path("tests/data/fixes")

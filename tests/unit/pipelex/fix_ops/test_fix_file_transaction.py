@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
-from pipelex.pipeline.fixes.file_transaction import (
+from pipelex.fix_ops.exceptions import FixTransactionError, FixWriteConflictError
+from pipelex.fix_ops.file_transaction import (
     FileSnapshot,
     PendingFileUpdate,
     assert_snapshot_unchanged,
@@ -121,7 +121,7 @@ class TestFixFileTransaction:
                 raise FixWriteConflictError(msg)
             assert_snapshot_unchanged(snapshot)
 
-        mocker.patch("pipelex.pipeline.fixes.file_transaction.assert_snapshot_unchanged", new=inject_edit_before_third_commit)
+        mocker.patch("pipelex.fix_ops.file_transaction.assert_snapshot_unchanged", new=inject_edit_before_third_commit)
 
         with pytest.raises(FixTransactionError, match="rollback was incomplete") as exc_info:
             commit_file_updates(updates)

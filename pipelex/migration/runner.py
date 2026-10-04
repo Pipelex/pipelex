@@ -20,14 +20,14 @@ from tomlkit import TOMLDocument
 from tomlkit.exceptions import TOMLKitError
 
 from pipelex import log
+from pipelex.fix_ops.exceptions import FixTransactionError, FixWriteConflictError
+from pipelex.fix_ops.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates, read_file_snapshot
 from pipelex.migration.backup import RescuedBackup, WrittenBackup, keep_backup_for_rescue, prune_backups_except, write_backup
 from pipelex.migration.diagnosis import diagnose_unexplained_paths
 from pipelex.migration.engine import DocumentReplay, replay_ledger_over_text
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached
 from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport, UnexplainedPath
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
-from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
-from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates, read_file_snapshot
 from pipelex.system.configuration.config_surface import version_declared_below_the_floor
 
 

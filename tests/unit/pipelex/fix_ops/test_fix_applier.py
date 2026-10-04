@@ -15,7 +15,7 @@ import tomlkit
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
+from pipelex.fix_ops.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, FixOp, SetKeyOp
 
 _FIXTURE_PATH = Path("tests/data/fixes/sequence_wrong_output.mthds")
@@ -114,7 +114,7 @@ class TestFixApplier:
         loudly (never write it out), keeping the diagnostic's message and position for debugging.
         """
         mocker.patch(
-            "pipelex.pipeline.fixes.applier.format_mthds",
+            "pipelex.fix_ops.applier.format_mthds",
             return_value={
                 "formatted": "broken",
                 "changed": False,
