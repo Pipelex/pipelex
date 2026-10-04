@@ -9561,7 +9561,7 @@
     "tests/unit/pipelex/pipeline/test_runner_execute_error_paths.py::TestRunnerExecuteErrorPaths::test_validation_error_wraps_into_pipe_execution_error": 0.101,
     "tests/unit/pipelex/pipeline/test_runner_models.py::TestRunnerModels::test_deck_keeps_category_keyed_aliases_on_cross_category_collision": 0.9182,
     "tests/unit/pipelex/pipeline/test_runner_protocol_surfaces.py::TestRunnerProtocolSurfaces::test_execute_rejects_extra_args_listing_keys_sorted": 0.7517,
-    "tests/unit/pipelex/pipeline/test_runner_protocol_surfaces.py::TestRunnerProtocolSurfaces::test_models_category_filter_translates_to_builder_enum": 0.0015,
+    "tests/unit/pipelex/pipeline/test_runner_protocol_surfaces.py::TestRunnerProtocolSurfaces::test_models_category_filter_translates_to_listing_enum": 0.0015,
     "tests/unit/pipelex/pipeline/test_runner_protocol_surfaces.py::TestRunnerProtocolSurfaces::test_models_shapes_deck_and_keeps_aliases_and_waterfalls_keyed_by_category": 0.0016,
     "tests/unit/pipelex/pipeline/test_runner_protocol_surfaces.py::TestRunnerProtocolSurfaces::test_start_raises_not_implemented_pointing_at_execute": 0.001,
     "tests/unit/pipelex/pipeline/test_runner_protocol_surfaces.py::TestRunnerProtocolSurfaces::test_validate_rejects_blank_graph_pipe_code_extra": 0.001,
