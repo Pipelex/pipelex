@@ -284,6 +284,18 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         raise
                     backend_model_specs = recovered.model_specs
                     stale_plans.extend(recovered.plans)
+                if enabled and not backend_model_specs and backend_name != PipelexBackend.INTERNAL:
+                    # An enabled backend serving nothing is never what a user meant: it is a table an
+                    # earlier release left enabled over a comment-only file, the Pipelex Gateway's above all.
+                    # Booting it would only drop every model routed to it from the deck, which says
+                    # "handle not found" and nothing about why. The internal backend is exempt: plugins
+                    # add its models after this load.
+                    msg = (
+                        f"Inference backend '{backend_name}' is enabled in {library_paths_description} but "
+                        f"{backend_config_source} declares no model. Disable it, or list the models it serves; "
+                        f"if a routing profile sends models to it, point that profile at a backend that serves them."
+                    )
+                    raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
                 backend = InferenceBackendFactory.make_inference_backend(
                     name=backend_name,
                     blueprint=backend_blueprint,

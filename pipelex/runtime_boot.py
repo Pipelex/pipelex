@@ -410,7 +410,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # SecretsPlugin supplies the "env" method, so there is no separate core default. Building it ahead
         # of the sink costs nothing in kind: what the provider logs is held like every line before the sink,
         # and when it fails to build, the lines held until then reach stderr redacted through the holding
-        # handler, as they do when a remote-config fetch above fails, while its exception goes up to the
+        # handler, as they do when plugin discovery above fails, while its exception goes up to the
         # caller as raised. It goes on the hub only further down: until then the keyword the sink factory
         # receives is the one way to reach it.
         secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)

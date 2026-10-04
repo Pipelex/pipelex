@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cogt.exceptions import InferenceBackendLibraryError
+from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceBackendLibraryValidationError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
 from pipelex.kit.paths import get_kit_configs_dir
@@ -68,6 +68,10 @@ PREVIOUS_RELEASE_KIT_DIR = Path("tests/data/inference/previous_release_kit")
 # them before checking `enabled` would fail the strict case.
 PREVIOUS_RELEASE_DISABLED_BACKEND = "pipelex_manifold"
 PREVIOUS_RELEASE_DISABLED_BACKEND_VARS = ("PIPELEX_MANIFOLD_ENDPOINT", "PIPELEX_MANIFOLD_API_KEY")
+
+# The enabled table in the previous kit whose per-backend file declares no model, and the line enabling it.
+PREVIOUS_RELEASE_EMPTY_ENABLED_BACKEND = "pipelex_gateway"
+PREVIOUS_RELEASE_GATEWAY_ENABLED_LINE = "enabled = true                         # Enable after accepting terms via `pipelex init config`"
 
 # The key `#1104` deleted, and the two shapes it survives in. The value is immaterial to every
 # assertion below — what matters is that the blueprint no longer has anywhere to put it.
@@ -250,14 +254,21 @@ class TestAStaleBackendDirectory:
         assert retry.call_count == 0
 
 
-class TestThePreviousReleaseKit:
-    """A machine set up by the previous release still boots its inference configuration.
+def replace_once(*, path: Path, old: str, new: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    assert text.count(old) == 1, f"expected exactly one {old!r} in {path}"
+    path.write_text(text.replace(old, new), encoding="utf-8")
 
-    Its `backends.toml` carries a disabled table for a backend the runtime no longer serves, with a key the
-    backend blueprint does not define, and its `routing_profiles.toml` carries a profile routing to that
-    backend. Neither may stop the boot: a disabled backend is skipped before its variables are substituted
-    or its per-backend file is read, and only the active routing profile is validated against the enabled
-    backends.
+
+class TestThePreviousReleaseKit:
+    """A machine set up by the previous release is told what to change, then boots once it has.
+
+    As that release left it, its `backends.toml` enables the Pipelex Gateway over a comment-only file and
+    its active routing profile sends every model there: that is refused, naming the backend, rather than
+    booted with every model silently missing from the deck. Once the user disables that table and picks
+    another profile, as the changelog says, the rest loads: the disabled Manifold table, which carries a key
+    the backend blueprint does not define, is skipped before its variables are substituted or its file is
+    read, and only the active routing profile is validated against the enabled backends.
     """
 
     @pytest.fixture
@@ -285,7 +296,24 @@ class TestThePreviousReleaseKit:
 
     @pytest.mark.usefixtures("environment")
     @pytest.mark.parametrize("lenient", [True, False])
-    def test_its_backends_and_active_routing_profile_load(self, inference_dir: Path, lenient: bool) -> None:
+    def test_as_left_its_enabled_gateway_serving_no_model_is_refused(self, inference_dir: Path, lenient: bool) -> None:
+        library = InferenceBackendLibrary.make_empty()
+        with pytest.raises(InferenceBackendLibraryValidationError) as refused:
+            library.load(
+                secrets_provider=EnvSecretsProvider(),
+                backends_library_paths=[inference_dir / BACKENDS_FILE_NAME],
+                backends_dir_path=str(inference_dir / BACKENDS_DIR_NAME),
+                lenient=lenient,
+            )
+
+        assert refused.value.backend_name == PREVIOUS_RELEASE_EMPTY_ENABLED_BACKEND
+        assert "declares no model" in str(refused.value)
+
+    @pytest.mark.usefixtures("environment")
+    @pytest.mark.parametrize("lenient", [True, False])
+    def test_its_backends_and_active_routing_profile_load_once_remedied(self, inference_dir: Path, lenient: bool) -> None:
+        replace_once(path=inference_dir / BACKENDS_FILE_NAME, old=PREVIOUS_RELEASE_GATEWAY_ENABLED_LINE, new="enabled = false")
+        replace_once(path=inference_dir / ROUTING_PROFILES_FILE_NAME, old='active = "all_pipelex_gateway"', new='active = "all_openai"')
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
