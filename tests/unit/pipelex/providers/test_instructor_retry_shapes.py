@@ -34,7 +34,7 @@ from tenacity import RetryError
 
 from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
-from pipelex.cogt.inference.error_classification import GatewayRoutingRefusal, UserActionKind, extract_underlying_sdk_exception
+from pipelex.cogt.inference.error_classification import UserActionKind, extract_underlying_sdk_exception
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
@@ -280,7 +280,7 @@ class TestInstructorRetryShapes:
         assert not isinstance(failure, LLMModelNotFoundError)
         assert failure.provider_metadata is not None
         assert failure.provider_metadata.status_code == 412
-        assert failure.provider_metadata.gateway_routing_refusal == GatewayRoutingRefusal.MODEL_NOT_ALLOWED
+        assert failure.provider_metadata.is_model_not_allowed
 
         located = PipeRouterError.make_located(
             failure=failure,
