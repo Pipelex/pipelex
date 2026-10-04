@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:33d5d63ac68e3b0622fc91c022402e7faeeb93bd75cd9b66cf84d112914cf9bb"
+digest = "sha256:0c6ad1ab6e3210129c0a0b7ea1fabcc73e4b883ff8e6f8680750b50713c8a3ab"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-04T16:18:55Z"
-rationale = "real-catch: the first-run check is removed with InferenceSetupRequiredError, so both CLI factories lose its handler (the agent factory's exit-0 markdown exception included) and interactive init stops writing the onboarding flag; init.md no longer says init keeps an onboarding state global. Swept docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md for the error, first-run wording and pipelex_service.toml: migrate.md's mention of the file stays true, nothing else names the check."
+reviewed_at = "2026-10-04T16:59:46Z"
+rationale = "real-catch: the comment on the init backend recommendation now scopes OpenAI's one key to the language-model and image-generation tiers, since extraction and search default to their own backends; init.md said every default tier at both its backend-selection step and its global-init example, both corrected. Swept docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md for tier and extraction-default claims: update.md's account of managed deck files and x_custom_ overrides still holds."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -90,7 +90,7 @@ rationale = "real-catch: the first-run check is removed with InferenceSetupRequi
 "pipelex/cli/commands/init/routing.py" = "blob:c73927deb99804556cb545cdaa6eabf8d1fc3450"
 "pipelex/cli/commands/init/telemetry.py" = "blob:17314182dbfa8e1a25f439f10eea9808b9fb6d33"
 "pipelex/cli/commands/init/ui/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/commands/init/ui/backends_ui.py" = "blob:6cb0553aa3f913d1a73610e19c5ef38af86afe32"
+"pipelex/cli/commands/init/ui/backends_ui.py" = "blob:a5250ebf7f2865da6ca12fc292b75fa7f5e8a690"
 "pipelex/cli/commands/init/ui/general_ui.py" = "blob:6fdc9cb429a5da261013679aae19afa10344770e"
 "pipelex/cli/commands/init/ui/routing_ui.py" = "blob:640bd0d11d1879ead83fd9f3d1736d2735c1abfa"
 "pipelex/cli/commands/init/ui/types.py" = "blob:e263802d8e9c9f9687435de1eb992afa5336544f"

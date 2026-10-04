@@ -13,7 +13,8 @@ from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
-# The backend `pipelex init` pre-selects: the one key that serves every default tier of the shipped model deck.
+# The backend `pipelex init` pre-selects: the one key that serves every default language-model and image-generation tier
+# of the shipped model deck.
 RECOMMENDED_INIT_BACKEND = "openai"
 
 

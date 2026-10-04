@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from pipelex.cogt.models.model_reference import ModelReference
 from tests.e2e.agent_cli.conftest import (
     OFFLINE_BUNDLES_DIR,
     PIPELEX_AGENT_BIN,
@@ -207,12 +208,13 @@ class TestOfflineDryRun:
         Pipelex Manifold never provides. If the derived manifold specs claimed it, an offline dry-run
         could resolve the alias to the fake ``manifold_extract`` worker instead of exercising the real
         internal backend. The companion assertion guards the other direction: a genuinely manifold-served
-        extract model (the ``default-extract-document`` target) must stay covered, so the exclusion does
+        extract model (the first choice of the ``default-extract-document`` waterfall) must stay covered, so the exclusion does
         not over-reach onto provider-backed models the manifold does proxy.
         """
         blueprint = load_kit_model_deck_blueprint()
         software_only_target = blueprint.extract.aliases["default-no-inference"]
-        manifold_extract_target = blueprint.extract.aliases["default-extract-document"]
+        document_waterfall = ModelReference.parse(blueprint.extract.aliases["default-extract-document"])
+        manifold_extract_target = blueprint.extract.waterfalls[document_waterfall.name][0]
         specs = manifold_model_specs_for_kit_deck()
         assert software_only_target not in specs, (
             f"Derived manifold specs must exclude software-only internal handle '{software_only_target}'; got handles: {sorted(specs)}"

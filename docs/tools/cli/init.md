@@ -74,7 +74,7 @@ This command creates or resets a Pipelex config directory with:
 When you run `pipelex init`, Pipelex can guide you through:
 
 1. **Config reset** - Recreate the selected config files
-2. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default tier of the shipped model deck
+2. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default language-model and image-generation tier of the shipped model deck
 3. **Credential prompts** - Fill in missing keys when relevant
 4. **Routing configuration** - Set up how models are routed to backends
 5. **Telemetry setup** - Configure observability and analytics
@@ -116,7 +116,7 @@ Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a
 # Initialize with OpenAI backend (project-level)
 pipelex-agent init --config '{"backends": ["openai"]}'
 
-# Initialize globally with OpenAI, whose one key serves every default tier of the model deck
+# Initialize globally with OpenAI, whose one key serves every default language-model and image-generation tier of the model deck
 pipelex-agent init -g --config '{"backends": ["openai"]}'
 ```
 

@@ -1,4 +1,4 @@
-"""The backend `pipelex init` recommends serves every default tier of the shipped model deck.
+"""The backend `pipelex init` recommends serves every default language-model and image-generation tier of the shipped deck.
 
 Accepting the recommendation enables that backend alone and routes every model to it, so a default
 alias it does not serve fails the first method that uses it, with a valid key in hand.
