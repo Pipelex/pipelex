@@ -1,7 +1,7 @@
 """An image worker refuses a model spec it cannot use as a configuration fault, not as the caller's input.
 
-A spec with no `rules`, or one missing the `model_choice` or `endpoint_path` its worker needs, is the
-backend configuration's fault: the job fails before any provider call with an `ImgGenParameterError`
+A spec with no `rules`, a rule value this release does not know, or one missing the `model_choice` or
+`endpoint_path` its worker needs, is the backend configuration's fault: the job fails before any provider call with an `ImgGenParameterError`
 in the `CONFIGURATION` category, which the error model renders as a 500 rather than the 422 that
 tells a caller to change what they sent.
 """
@@ -38,6 +38,10 @@ if TYPE_CHECKING:
 
 # Rules that every worker's args factory accepts, and that name neither a model choice nor a geometry.
 PROMPT_ONLY_RULES: ImgGenModelRules = {ImgGenArgTopic.PROMPT: "positive_only"}
+# Rules naming an aspect_ratio taxonomy no release knows, as a catalog newer than this release could.
+UNKNOWN_ASPECT_RATIO_RULES: ImgGenModelRules = {ImgGenArgTopic.ASPECT_RATIO: "gemini_9_turbo"}
+# Rules naming a prompt taxonomy no release knows, so the refusal is not particular to geometry.
+UNKNOWN_PROMPT_RULES: ImgGenModelRules = {ImgGenArgTopic.PROMPT: "weird"}
 
 
 def _model(*, backend_name: str, sdk: str, rules: ImgGenModelRules | None) -> InferenceModelSpec:
@@ -111,6 +115,12 @@ class TestImgGenWorkerConfigFaults:
             ("fal", PROMPT_ONLY_RULES, "must include a 'model_choice' entry"),
             ("huggingface", PROMPT_ONLY_RULES, "must include a 'model_choice' entry"),
             ("gateway", PROMPT_ONLY_RULES, "does not have an endpoint_path configured"),
+            ("openai", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
+            ("manifold", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
+            ("azure", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
+            ("openai", UNKNOWN_PROMPT_RULES, "unknown prompt taxonomy 'weird'"),
+            ("fal", UNKNOWN_PROMPT_RULES, "unknown prompt taxonomy 'weird'"),
+            ("huggingface", UNKNOWN_PROMPT_RULES, "unknown prompt taxonomy 'weird'"),
         ],
     )
     async def test_unusable_model_spec_is_a_configuration_fault(
