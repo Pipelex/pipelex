@@ -4,7 +4,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
-from pipelex.builder.operations.models_ops import ModelCategory
+from pipelex.cogt.models.model_listing import ModelCategory
 from pipelex.interpreter_hub import get_library_manager
 from pytest_mock import MockerFixture
 

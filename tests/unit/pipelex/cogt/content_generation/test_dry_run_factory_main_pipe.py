@@ -16,7 +16,7 @@ class PipeStub(BaseModel):
 
 
 class BundleStub(BaseModel):
-    """Mirrors the real bundle shape (`PipelexBundleBlueprint` / builder `BundleSpec`).
+    """Mirrors the real bundle shape (`PipelexBundleBlueprint`).
 
     The combination of a `pipe` dict and a `main_pipe` that must reference one of its
     keys is exactly what makes `DryRunFactory.make_dry_run_factory` register the

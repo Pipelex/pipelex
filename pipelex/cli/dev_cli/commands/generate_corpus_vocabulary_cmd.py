@@ -144,14 +144,6 @@ _PIPE_TYPE_EXCLUSIONS: dict[PipeType, str] = {
 # exclusion maps are: a code that leaves the registry breaks this module at import instead of leaving
 # a dead exclusion behind in the generated file.
 _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
-    PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR: (
-        "Raised only from the pipe sorter, and the pipe sorter runs only on `PipelexBundleSpec.to_blueprint()` "
-        "— the builder's spec-to-blueprint conversion, which is how an AI-authored spec becomes a bundle. A "
-        "`.mthds` file parses straight into a blueprint and never passes through it, so no corpus entry can "
-        "produce this. Measured rather than read off the call graph: a self-referencing PipeSequence fails the "
-        "dry run with `DryRunError`, and a mutually recursive PipeCondition pair exhausts the interpreter's "
-        "stack — neither reports a circular dependency."
-    ),
     PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT: (
         "Advisory-only: it rides the validation report's `warnings` array and never makes a verdict invalid. An "
         "entry contract that models one `expected_error` on an invalid entry has nowhere to put a warning on a "

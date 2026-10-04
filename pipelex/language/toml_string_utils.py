@@ -1,7 +1,7 @@
 """Shared TOML string formatting utilities.
 
 Provides a pure function for building tomlkit string nodes with multi-line
-support, used by both MthdsFactory (with config) and the agent CLI (with defaults).
+support, used by MthdsFactory.
 """
 
 from __future__ import annotations

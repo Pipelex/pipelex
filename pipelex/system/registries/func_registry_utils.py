@@ -19,7 +19,7 @@ class FuncRegistryUtils:
         """Register all @pipe_func decorated functions from a package.
 
         Args:
-            package_name: Full name of the package (e.g. "pipelex.builder")
+            package_name: Full name of the package (e.g. "my_project.pipe_funcs")
             package: The imported package object
 
         Returns:
@@ -76,7 +76,6 @@ class FuncRegistryUtils:
         cls,
         folder_path: Path,
         *,
-        force_include_dirs: list[Path] | None = None,
         is_recursive: bool = True,
     ) -> None:
         """Discovers and attempts to register all functions in Python files within a folder.
@@ -95,7 +94,6 @@ class FuncRegistryUtils:
         Args:
             folder_path: Path to folder containing Python files
             is_recursive: Whether to search recursively in subdirectories
-            force_include_dirs: List of directories to force include even if they are within excluded_dirs.
 
         """
         python_files = find_files_in_dir(
@@ -103,7 +101,6 @@ class FuncRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().interpreter.scan.excluded_dirs),
-            force_include_dirs=[str(force_include_dir) for force_include_dir in force_include_dirs] if force_include_dirs is not None else None,
         )
 
         for python_file in python_files:

@@ -78,7 +78,6 @@ class ClassRegistryUtils:
         cls,
         folder_path: Path,
         *,
-        force_include_dirs: list[Path] | None = None,
         is_recursive: bool = True,
         base_class_names: list[str] | None = None,
     ) -> None:
@@ -97,7 +96,6 @@ class ClassRegistryUtils:
             base_class_names: Optional list of base class names (e.g. ["StructuredContent"]).
                             If provided, only imports files that contain classes inheriting
                             from these base classes. If None, imports all Python files.
-            force_include_dirs: List of directories to force include even if they are within excluded_dirs.
 
         """
         python_files = find_files_in_dir(
@@ -105,7 +103,6 @@ class ClassRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().interpreter.scan.excluded_dirs),
-            force_include_dirs=[str(force_include_dir) for force_include_dir in force_include_dirs] if force_include_dirs is not None else None,
         )
 
         for python_file in python_files:

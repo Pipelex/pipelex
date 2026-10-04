@@ -57,7 +57,7 @@ class TextContent(StuffContent):
         return Markdown(self.text)
 ```
 
-- **`require_rich_for_rendering()`** (`pipelex.tools.misc.pretty`) is the check for a rendering: the `rendered_pretty` methods of the content types and the builder specs, and the `rich` pretty-print mode. Its message points at the Rich-free pretty-print modes as well as at the extra.
+- **`require_rich_for_rendering()`** (`pipelex.tools.misc.pretty`) is the check for a rendering: the `rendered_pretty` methods of the content types, and the `rich` pretty-print mode. Its message points at the Rich-free pretty-print modes as well as at the extra.
 - **`require_rich(message=...)`** (`pipelex.tools.misc.rich_extra`) is the check for anything else, with a message saying what needed Rich: the `console` log sink uses it, and so does `get_console()`.
 - **`is_rich_installed()`**, in the same module, answers without raising, for a caller that has a Rich-free fallback. The stuff viewer page uses it, and shows the JSON rendering in its Pretty tab when Rich is absent.
 - **A type-only import goes under `if TYPE_CHECKING:`.** In a module with `from __future__ import annotations`, the annotation can stay unquoted; in a pydantic model module without it, quote the annotation, as `"PrettyPrintable"` is quoted above, since pydantic resolves annotations at class creation.

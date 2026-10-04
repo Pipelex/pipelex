@@ -15,7 +15,7 @@ Every Pipelex error class has a stable RFC 7807 `type` URI on the form
 The classes are grouped into a few macro areas — pick the one that matches where
 the error came from:
 
-- [Authoring & language](authoring-and-language.md) — MTHDS parsing, Core language, Pipe operators, Pipe controllers, Pipe signatures, Builder, Libraries.
+- [Authoring & language](authoring-and-language.md) — MTHDS parsing, Core language, Pipe operators, Pipe controllers, Pipe signatures, Libraries.
 - [Execution & runtime](execution-and-runtime.md) — Pipe execution, Pipeline execution, Runtime bridge, Graph, Tracing.
 - [Inference & providers](inference-and-providers.md) — Inference (Cogt), Provider adapters, Plugin system.
 - [Platform & tooling](platform-and-tooling.md) — Base & root errors, Tools, Kit, System & configuration, CLI, Codegen, Methods, Migration.

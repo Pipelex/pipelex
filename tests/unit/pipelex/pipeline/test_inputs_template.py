@@ -1,4 +1,4 @@
-"""Unit tests for build_inputs_for_pipe in builder operations (inputs_ops)."""
+"""Unit tests for build_inputs_for_pipe, the inputs template engine behind `pipelex-agent inputs`."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.builder.operations.inputs_ops import build_inputs_for_pipe
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.pipeline.inputs_template import build_inputs_for_pipe
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-MODULE = "pipelex.builder.operations.inputs_ops"
+MODULE = "pipelex.pipeline.inputs_template"
 
 
 class TestBuildInputsForPipe:

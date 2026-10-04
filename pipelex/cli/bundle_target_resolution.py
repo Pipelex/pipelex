@@ -4,8 +4,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import NamedTuple
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 
 
 class BundleTargetResolutionErrorKind(StrEnum):

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class PipeSignature(PipeAbstract):
-    """Runtime stand-in for a contract-only `PipeSignatureSpec`.
+    """Runtime pipe for a contract-only `PipeSignatureBlueprint`.
 
     Dry-run mints a mock output via the declared `StuffSpec`. Live-run raises
     `PipeSignatureNotExecutableError` to enforce that signatures must be replaced with

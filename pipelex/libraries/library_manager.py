@@ -14,7 +14,6 @@ from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifes
 from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
-import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
@@ -506,9 +505,7 @@ class LibraryManager(LibraryManagerAbstract):
                 # built class escapes; such a file then travels as source and still never executes here.
                 sources_by_dir = {library_dir: FuncRegistryUtils.read_py_sources(folder_path=library_dir) for library_dir in all_dirs}
                 ensure_no_structured_content_in_library_sources(sources_by_dir=sources_by_dir)
-                # No force-include here (unlike the direct branch): the only force-included dir is pipelex's
-                # own builder package, which must NOT travel in a customer crate — the sandbox has pipelex
-                # installed. Accumulate across dirs, but fail loud on a relpath collision: the sandbox writes
+                # Accumulate across dirs, but fail loud on a relpath collision: the sandbox writes
                 # sources flat by relpath, so two dirs sharing a path would otherwise silently clobber one
                 # customer's code and run the wrong PipeFunc body.
                 captured_sources = self._library_sources.setdefault(library_id, {})
@@ -534,14 +531,10 @@ class LibraryManager(LibraryManagerAbstract):
                     ClassRegistryUtils.import_modules_in_folder(
                         folder_path=library_dir,
                         base_class_names=[StructuredContent.__name__],
-                        force_include_dirs=[Path(builder_pkg.__file__).parent],
                     )
                     # Import files that contain @pipe_func decorated functions (uses AST pre-check) and
                     # register them in the process-global func_registry.
-                    FuncRegistryUtils.register_funcs_in_folder(
-                        folder_path=library_dir,
-                        force_include_dirs=[Path(builder_pkg.__file__).parent],
-                    )
+                    FuncRegistryUtils.register_funcs_in_folder(folder_path=library_dir)
 
             # Auto-discover and register all StructuredContent classes from sys.modules
             num_registered = ClassRegistryUtils.auto_register_all_subclasses(

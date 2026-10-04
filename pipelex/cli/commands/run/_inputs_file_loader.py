@@ -14,10 +14,10 @@ import datetime
 from pathlib import Path
 from typing import Any
 
-from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.time_content import TimeContent
+from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 

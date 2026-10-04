@@ -6,8 +6,7 @@
 temporary library down and restore the caller's outer current-library. Otherwise a long-lived host
 that imports it (e.g. the build-assistant sandbox) accumulates libraries and leaves the
 current-library ContextVar pointing at a stale validation library (later operations resolve pipes
-against the wrong scope). This mirrors the builder twin's guarantee
-(``test_validate_pipe_library_lifecycle.py``), which the agent-CLI core previously lacked.
+against the wrong scope).
 
 Fully dry (no inference).
 """

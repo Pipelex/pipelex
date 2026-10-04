@@ -402,7 +402,6 @@ _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     ("pipe_operators", "authoring-and-language", "Pipe operators"),
     ("pipe_controllers", "authoring-and-language", "Pipe controllers"),
     ("pipe_signature", "authoring-and-language", "Pipe signatures"),
-    ("builder", "authoring-and-language", "Builder"),
     ("libraries", "authoring-and-language", "Libraries"),
     # Execution & runtime
     ("pipe_run", "execution-and-runtime", "Pipe execution"),

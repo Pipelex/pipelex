@@ -12,7 +12,6 @@ from mthds.protocol.exceptions import PipelineRequestError
 from mthds.runners.api.exceptions import ApiResponseError, ClientAuthenticationError
 from mthds.runners.types import RunnerType
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
@@ -30,6 +29,7 @@ from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
