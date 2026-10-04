@@ -100,12 +100,14 @@ class ManifoldExtrasBySpecTestData:
             "gemini-lookalike",
             {"model_type": "img_gen", "sdk": "manifold_completions", "model_id": "gemini-2.5-flash-image"},
         ),
-        (
-            "unknown_taxonomy",
-            "nano-banana-next",
-            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"aspect_ratio": "gemini_from_the_future"}},
-        ),
     ]
+
+    # An `aspect_ratio` value this release does not know may name a newer Gemini taxonomy, so it is refused rather than read as non-Gemini.
+    UNKNOWN_TAXONOMY_ENTRY: ClassVar[dict[str, Any]] = {
+        "model_type": "img_gen",
+        "sdk": "manifold_completions",
+        "rules": {"aspect_ratio": "gemini_from_the_future"},
+    }
 
     # (topic, handle, catalog entry, whether the job gets a seed): the Mistral seed still keys on the model id's prefix,
     # which the one manifold Mistral handle carries whether or not the entry names the provider's id.

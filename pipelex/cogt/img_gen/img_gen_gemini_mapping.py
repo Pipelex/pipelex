@@ -171,10 +171,23 @@ class ImgGenGeminiMapping:
 
         This is the spec-level test for "is this a Gemini image model": the rules name a Gemini
         taxonomy for exactly those models, whatever handle or model id the catalog gives them.
-        Missing rules, an unknown taxonomy string and a non-Gemini taxonomy all answer None.
+        Missing rules and a non-Gemini taxonomy answer None. An `aspect_ratio` value this release
+        does not know raises: it may name a newer Gemini taxonomy, and answering None would drop
+        the requested ratio and size without a word.
         """
-        taxonomy = cls.optional_img_gen_taxonomy(inference_model)
-        if taxonomy is None or not taxonomy.is_gemini:
+        rules = inference_model.rules or {}
+        taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)
+        if taxonomy_value is None:
+            return None
+        try:
+            taxonomy = AspectRatioTaxonomy(taxonomy_value)
+        except ValueError as exc:
+            msg = (
+                f"Image model '{inference_model.name}' has an unknown aspect_ratio taxonomy '{taxonomy_value}', "
+                "so whether it takes Google's image_config cannot be decided"
+            )
+            raise ImgGenParameterError(msg) from exc
+        if not taxonomy.is_gemini:
             return None
         return taxonomy
 

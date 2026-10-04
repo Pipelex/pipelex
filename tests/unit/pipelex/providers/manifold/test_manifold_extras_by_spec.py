@@ -92,6 +92,14 @@ class TestManifoldExtrasBySpec:
 
         assert extra_body == {}
 
+    @pytest.mark.parametrize("size", [None, SizeTier.ONE_K])
+    def test_unknown_taxonomy_is_refused(self, size: SizeTier | None) -> None:
+        """An aspect_ratio value this release does not know fails the job instead of dropping the ratio and size silently."""
+        spec = _spec(handle="nano-banana-next", entry=ManifoldExtrasBySpecTestData.UNKNOWN_TAXONOMY_ENTRY)
+
+        with pytest.raises(ImgGenParameterError, match="unknown aspect_ratio taxonomy 'gemini_from_the_future'"):
+            ManifoldFactory.make_extras(spec, inference_job=_img_gen_job(aspect_ratio=AspectRatio.SQUARE, size=size), output_desc="Image")
+
     def test_size_beyond_the_gemini_taxonomy_is_refused(self) -> None:
         """A handle-only Gemini spec still checks the request against its taxonomy's grids."""
         spec = _spec(handle="nano-banana", entry=ManifoldExtrasBySpecTestData.GEMINI_IMAGE_CASES[0][1])
