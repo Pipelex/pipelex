@@ -42,6 +42,8 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pytest_mock import MockerFixture
+
 
 class TestAgentOutput:
     """Tests for agent_error, agent_success, and extract_validation_errors."""
@@ -440,21 +442,22 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == "input"
 
-    def test_app_callback_resets_error_format_to_json(self) -> None:
+    def test_app_callback_resets_error_format_to_json(self, mocker: MockerFixture) -> None:
         """The error-format ContextVar must be reset per invocation: a markdown command leaving
         it set must not leak markdown into a later JSON-only command in the same process.
         """
         # Simulate a prior markdown command having left the ContextVar set.
         set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
+        mocker.patch("pipelex.cli.agent_cli.commands.plxt_passthrough.shutil.which", return_value=None)
 
-        # `concept` is a JSON-only command with no --format / --error-format option; invoked with no spec it
-        # errors via agent_error(). Its error must be JSON, proving the callback reset the format.
-        result = CliRunner().invoke(app, ["concept"])
+        # `fmt` is a JSON-only command with no --format / --error-format option; with no plxt binary on the
+        # path it errors via agent_error(). Its error must be JSON, proving the callback reset the format.
+        result = CliRunner().invoke(app, ["fmt", "bundle.mthds"])
 
         assert result.exit_code == 1
         parsed = json.loads(result.stderr)
         assert parsed["error"] is True
-        assert parsed["error_type"] == "ArgumentError"
+        assert parsed["error_type"] == "BinaryNotFoundError"
 
     # -------------------------------------------------------------------------
     # Setup-warnings buffer tests (record_setup_warning / consume_setup_warnings

@@ -160,7 +160,7 @@ async def validate_pipe_core(
     """
     library_manager = get_library_manager()
     # Capture the caller's outer current-library so it can be restored after this temporary validation
-    # library is torn down (mirrors the builder validate_ops.validate_pipe twin).
+    # library is torn down.
     prev_library_id = get_current_library_id_or_none()
     library_id, _ = library_manager.open_library()
     try:

@@ -34,7 +34,6 @@ ConceptLibraryError | Concept library | https://docs.pipelex.com/latest/errors/c
 ConceptLoadingError | Concept loading | https://docs.pipelex.com/latest/errors/concept-loading-error/
 ConceptRefAmbiguousError | Concept ref ambiguous | https://docs.pipelex.com/latest/errors/concept-ref-ambiguous-error/
 ConceptRefineError | Concept refine | https://docs.pipelex.com/latest/errors/concept-refine-error/
-ConceptSpecError | Concept spec | https://docs.pipelex.com/latest/errors/concept-spec-error/
 ConceptStringError | Concept string | https://docs.pipelex.com/latest/errors/concept-string-error/
 ConceptStructureGeneratorError | Concept structure generator | https://docs.pipelex.com/latest/errors/concept-structure-generator-error/
 ConceptStructureValidationError | Concept structure validation | https://docs.pipelex.com/latest/errors/concept-structure-validation-error/
@@ -254,10 +253,8 @@ PipeSearchError | Pipe search | https://docs.pipelex.com/latest/errors/pipe-sear
 PipeSearchFactoryError | Pipe search factory | https://docs.pipelex.com/latest/errors/pipe-search-factory-error/
 PipeSequenceFactoryError | Pipe sequence factory | https://docs.pipelex.com/latest/errors/pipe-sequence-factory-error/
 PipeSignatureNotExecutableError | Pipe signature not executable | https://docs.pipelex.com/latest/errors/pipe-signature-not-executable-error/
-PipeSpecError | Pipe spec | https://docs.pipelex.com/latest/errors/pipe-spec-error/
 PipeStackOverflowError | Pipe stack overflow | https://docs.pipelex.com/latest/errors/pipe-stack-overflow-error/
 PipelexBridgeDispatchError | Pipelex bridge dispatch | https://docs.pipelex.com/latest/errors/pipelex-bridge-dispatch-error/
-PipelexBundleSpecBlueprintError | Pipelex bundle spec blueprint | https://docs.pipelex.com/latest/errors/pipelex-bundle-spec-blueprint-error/
 PipelexCLIError | Pipelex CLI | https://docs.pipelex.com/latest/errors/pipelex-cli-error/
 PipelexConfigError | Pipelex config | https://docs.pipelex.com/latest/errors/pipelex-config-error/
 PipelexError | Pipelex error | https://docs.pipelex.com/latest/errors/pipelex-error/

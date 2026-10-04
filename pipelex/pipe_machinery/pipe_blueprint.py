@@ -34,14 +34,12 @@ PIPE_SIGNATURE_TYPE_TAG = "PipeSignature"
 # is a non-user blueprint field, admitted defensively so this set matches `PipeSignatureBlueprint`'s
 # writable contract; it is unreachable via the stray-key path today (a section carrying `source` was
 # dumped from a blueprint, so it also carries `type`, which short-circuits before this set is
-# consulted). Single source of truth for the blueprint and spec (authoring) layers — the spec layer
-# reuses it augmented with its structural `pipe_code` field (see `SIGNATURE_ONLY_SPEC_KEYS`).
+# consulted).
 SIGNATURE_ONLY_KEYS: frozenset[str] = frozenset({"description", "inputs", "output", "signature_for", "source"})
 
 # The contract keys advertised to authors in the typeless-signature teaching message, in display order.
-# Deliberately NOT derived from `SIGNATURE_ONLY_KEYS` / `SIGNATURE_ONLY_SPEC_KEYS`: those admit internal
-# keys never written by an author (`source`, and the spec layer's structural `pipe_code`) that must not
-# leak into a user-facing message. Kept here so the message can never drift from the advertisable set.
+# Deliberately NOT derived from `SIGNATURE_ONLY_KEYS`: it admits `source`, an internal key never written
+# by an author, which must not leak into a user-facing message. Kept here so the message can never drift from the advertisable set.
 _ADVERTISABLE_SIGNATURE_KEYS: tuple[str, ...] = ("description", "inputs", "output", "signature_for")
 
 
@@ -50,8 +48,7 @@ def explicit_signature_tag_migration_message(pipe_code: Any) -> str:
 
     Starts with ``Pipe `<code>``` so the validation-error categorizer recovers the pipe code from the
     message (the error is raised on the aggregate `pipe` field, which carries no pipe code in its
-    pydantic `loc`). Single source of truth for the blueprint and spec layers and the single-pipe
-    authoring path (`parse_pipe_spec`).
+    pydantic `loc`).
     """
     return (
         f'Pipe `{pipe_code}` sets `type = "PipeSignature"`, which is no longer a pipe type. '
@@ -59,18 +56,15 @@ def explicit_signature_tag_migration_message(pipe_code: Any) -> str:
     )
 
 
-def normalize_typeless_signature_section(*, pipe_code: Any, pipe_section: Any, allowed_keys: frozenset[str] = SIGNATURE_ONLY_KEYS) -> Any:
+def normalize_typeless_signature_section(*, pipe_code: Any, pipe_section: Any) -> Any:
     """Inject the internal `PipeSignature` tag on a typeless contract-only section, reject a typeless
     section that declares more than the contract, and reject a section that still writes the retired
     explicit `type = "PipeSignature"` tag. Non-dict values (already-built pipe instances) and sections
     that name a concrete `type` pass through unchanged.
 
-    Shared by the blueprint (`PipelexBundleBlueprint`) and spec (`PipelexBundleSpec`) `pipe`
-    before-validators so both teaching messages — whose exact wording the validation-error categorizer
-    keys off (`_MISSING_PIPE_TYPE_MARKER` / `_EXPLICIT_SIGNATURE_TAG_MARKER` in
-    `validation_error_categorizer.py`) — have a single source of truth. `allowed_keys` differs per
-    layer: the spec section additionally carries the structural `pipe_code` field, so it passes
-    `SIGNATURE_ONLY_SPEC_KEYS`.
+    Called by the `pipe` before-validator of `PipelexBundleBlueprint`. The exact wording of both
+    teaching messages is what the validation-error categorizer keys off (`_MISSING_PIPE_TYPE_MARKER` /
+    `_EXPLICIT_SIGNATURE_TAG_MARKER` in `validation_error_categorizer.py`).
 
     The injected tag never re-enters this function: it is returned in a fresh dict that downstream
     validation consumes directly, and `PipeSignatureBlueprint` excludes `type` from its serialization,
@@ -84,7 +78,7 @@ def normalize_typeless_signature_section(*, pipe_code: Any, pipe_section: Any, a
         if typed_section["type"] == PIPE_SIGNATURE_TYPE_TAG:
             raise ValueError(explicit_signature_tag_migration_message(pipe_code))
         return typed_section
-    stray_keys = [key for key in typed_section if key not in allowed_keys]
+    stray_keys = [key for key in typed_section if key not in SIGNATURE_ONLY_KEYS]
     if stray_keys:
         stray = ", ".join(f"`{key}`" for key in stray_keys)
         allowed = ", ".join(f"`{key}`" for key in _ADVERTISABLE_SIGNATURE_KEYS)
@@ -182,7 +176,7 @@ def valid_pipe_type_tags() -> list[str]:
     typeless section, so the injected value must pass the `type` field validator and therefore belongs
     in this allowlist. It is never written by users: an explicit `type = "PipeSignature"` is rejected
     upstream in the before-validator (`normalize_typeless_signature_section`). Single source of truth
-    for the three layers (`PipeBlueprint`, `PipeAbstract`, `PipeSpec`) that gate `type`.
+    for the two layers (`PipeBlueprint`, `PipeAbstract`) that gate `type`.
     """
     return [*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG]
 

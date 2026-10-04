@@ -15,7 +15,7 @@ from pydantic import Field, ValidationError
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.builder.operations.models_ops import ModelCategory, list_models
+from pipelex.cogt.models.model_listing import ModelCategory, list_models
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
@@ -67,7 +67,7 @@ class PipelexModelDeck(MthdsModelDeck):
     waterfalls: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
 
 
-def _protocol_category_of(*, builder_category: ModelCategory) -> MthdsModelCategory:
+def _protocol_category_of(*, listing_category: ModelCategory) -> MthdsModelCategory:
     """The protocol's model category a category this runtime serves is listed under in `models`.
 
     The match is exhaustive on purpose, with no default arm. A runner must never put a value the
@@ -79,12 +79,12 @@ def _protocol_category_of(*, builder_category: ModelCategory) -> MthdsModelCateg
     category.
 
     Args:
-        builder_category: A category of the builder's model listing.
+        listing_category: A category of the model listing.
 
     Returns:
         The protocol category of the same settings family.
     """
-    match builder_category:
+    match listing_category:
         case ModelCategory.LLM:
             return MthdsModelCategory.LLM
         case ModelCategory.EXTRACT:
@@ -97,8 +97,8 @@ def _protocol_category_of(*, builder_category: ModelCategory) -> MthdsModelCateg
             return MthdsModelCategory.JUDGMENT
 
 
-def _builder_category_of(*, protocol_category: MthdsModelCategory) -> ModelCategory:
-    """The builder category a protocol `?type=` filter selects.
+def _listing_category_of(*, protocol_category: MthdsModelCategory) -> ModelCategory:
+    """The model listing's category a protocol `?type=` filter selects.
 
     Exhaustive like its inverse: a category a later protocol release adds stops the type checker
     here when the `mthds` pin moves, rather than surfacing as a `ValueError` on the first request
@@ -108,7 +108,7 @@ def _builder_category_of(*, protocol_category: MthdsModelCategory) -> ModelCateg
         protocol_category: A category of the protocol's model list.
 
     Returns:
-        The builder category of the same settings family.
+        The model listing's category of the same settings family.
     """
     match protocol_category:
         case MthdsModelCategory.LLM:
@@ -469,7 +469,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         verdict — `pending_signatures` (qualified refs of pipes still declared
         as `PipeSignature` in the assembled library) plus
         `is_runnable = not pending_signatures`, the same convention as the
-        agent-CLI / builder validate envelopes. Signatures are never a validation
+        agent-CLI validate envelopes. Signatures are never a validation
         error (D-B): strict and lenient return the same report body — `allow_signatures`
         only controls whether signature pipes are mock-run and listed in
         `validated_pipes`, not the verdict. The "is an unsatisfied signature a
@@ -526,7 +526,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     async def models(self, category: MthdsModelCategory | None = None) -> PipelexModelDeck:
         """The model deck this runtime can route to — protocol `models`.
 
-        Wraps the builder's `list_models`: presets project into the protocol's flat
+        Wraps the model listing's `list_models`: presets project into the protocol's flat
         `models` list (each entry carries its category as `type`); the aliases and
         waterfalls routing extensions stay keyed by category — the same alias name
         exists in several categories pointing at different models, so flattening
@@ -539,14 +539,14 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             PipelexModelDeck with the flat model list and the category-keyed
             aliases and routing waterfalls.
         """
-        categories = [_builder_category_of(protocol_category=category)] if category is not None else None
+        categories = [_listing_category_of(protocol_category=category)] if category is not None else None
         deck_raw = list_models(categories=categories)
         models: list[MthdsModelInfo] = []
         presets_by_category: dict[str, list[dict[str, Any]]] = deck_raw["presets"]
         aliases_by_category: dict[str, dict[str, str]] = deck_raw["aliases"]
         waterfalls_by_category: dict[str, dict[str, list[str]]] = deck_raw["waterfalls"]
         for category_key, category_presets in presets_by_category.items():
-            protocol_category = _protocol_category_of(builder_category=ModelCategory(category_key))
+            protocol_category = _protocol_category_of(listing_category=ModelCategory(category_key))
             for preset in category_presets:
                 models.append(MthdsModelInfo(name=preset["name"], type=protocol_category))
         return PipelexModelDeck(models=models, aliases=aliases_by_category, waterfalls=waterfalls_by_category)

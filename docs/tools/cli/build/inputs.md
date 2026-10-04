@@ -206,5 +206,4 @@ When an input is declared multiple (`Tag[]`), the light form wraps the example v
 ## Related Documentation
 
 - [Build Output](output.md) - Generate example output JSON for a pipe
-- [Build Runner](runner.md) - Generate Python code to run a pipe
 - [Provide Inputs](../../../building-methods/pipes/provide-inputs.md) - Learn about input formats

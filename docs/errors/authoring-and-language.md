@@ -106,12 +106,6 @@ own page. Classes are grouped by subsystem.
 
 - [`PipeSignatureNotExecutableError`](pipe-signature-not-executable-error.md) — Pipe signature not executable
 
-## Builder
-
-- [`ConceptSpecError`](concept-spec-error.md) — Concept spec
-- [`PipeSpecError`](pipe-spec-error.md) — Pipe spec
-- [`PipelexBundleSpecBlueprintError`](pipelex-bundle-spec-blueprint-error.md) — Pipelex bundle spec blueprint
-
 ## Libraries
 
 - [`ConceptLibraryError`](concept-library-error.md) — Concept library

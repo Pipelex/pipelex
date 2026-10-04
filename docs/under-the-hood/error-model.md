@@ -222,6 +222,8 @@ own_domain = self.error_category.error_domain if self.error_category is not None
 
 The consequence worth knowing at the HTTP boundary: a **content-classified inference failure answers 422, not 500** — a content-policy refusal, a malformed prompt image, a bad prompt parameter are all properties of material the caller submitted. Everything else keeps the status it already had; only the report became truthful about why.
 
+The category a class declares is its default, and a raise site that knows better passes its own through the `error_category` argument. `ImgGenParameterError` is `CONTENT`, because an aspect ratio or a size the model's grid refuses is a property of the caller's request. A model spec its worker cannot use is not: no `rules`, a rule value this release does not know, a missing `model_choice` or `endpoint_path`, or, where a worker reads the Gemini geometry, a missing `aspect_ratio` taxonomy or one of another family. Those sites raise it with `error_category=InferenceErrorCategory.CONFIGURATION`, so the failure answers 500 and lands in server-error alerting like any other configuration fault, rather than a 422 telling the caller to change what they sent.
+
 #### Classified where it is raised
 
 Most classes state whose fault they are in their body: an `error_domain`, and `_authors_caller_facing_message = True` when their message is copy written for the caller, which STRICT disclosure then keeps instead of replacing it with `An internal error occurred.`. Every instance of such a class is the same kind of fault. A few classes are raised both for faults in the caller's own method or inputs and for faults that are not the caller's, so they cannot state it. For those, the site that raises the error and knows calls `as_caller_fault()` on it: the report then carries the `input` domain, so an HTTP surface answers 422, a caller-facing message, and the next step the raise site passes, if any.
@@ -480,7 +482,7 @@ The agent CLI (`pipelex-agent`) emits a structured error to **stderr**, markdown
 | Command | Error output |
 |---------|--------------|
 | `run`, `validate`, `init`, `models`, `check-model`, `doctor` | Markdown (default) or JSON via `--error-format` (or via `--format`, which `--error-format` inherits) |
-| `inputs`, `concept`, `pipe` | JSON only |
+| `inputs` | JSON only |
 | `fmt`, `lint` | Native `plxt` output (subprocess passthrough); falls back to JSON only when the `plxt` binary itself is missing |
 
 The human CLI (`pipelex`) renders a Rich error panel — red banner, structured fields, the `user_action` tip, doc/Discord links — through the shared `display_error_panel()` helper in `pipelex/cli/error_handlers.py`.

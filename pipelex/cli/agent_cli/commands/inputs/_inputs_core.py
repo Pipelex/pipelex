@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.builder.operations.inputs_ops import build_inputs_for_pipe
 from pipelex.cli.agent_cli.commands.agent_output import agent_success
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, serialize_inputs_template_to_toml
+from pipelex.pipeline.inputs_template import build_inputs_for_pipe
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,8 +42,7 @@ def emit_inputs_result(result: dict[str, Any], *, template_format: InputsTemplat
     """Emit an inputs-generation result in the requested template format.
 
     JSON keeps the structured success envelope; TOML prints the raw template to
-    stdout, in the same spirit as the ``concept``/``pipe`` raw-TOML passthrough
-    commands. The default light template needs the inline-table layout (``light=True``) so a
+    stdout. The default light template needs the inline-table layout (``light=True``) so a
     bare scalar declared after a structured value stays valid TOML, and carries the declared
     concept as a ``# concept: ...`` comment per key (same hints the human ``build inputs --format
     toml`` writes); ``--explicit`` restores the all-tables envelope layout. A pipe that declares

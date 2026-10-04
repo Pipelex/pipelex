@@ -4,14 +4,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
@@ -25,6 +23,7 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from pipelex.core.stuffs.stuff import Stuff
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
 
@@ -267,23 +266,13 @@ class PipeBatch(PipeController):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        pipe_output = await self._live_run_controller_pipe(
+        return await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
             library_crate=library_crate,
         )
-        # Dry-run coordination: see stamp_mock_main_coordination's docstring (single home, D3).
-        # Tri-state read for robustness: the batch's own aggregated output is always stamped by the
-        # live arm today, but this site must never crash on a resolved-as-absent main.
-        main_resolved = pipe_output.working_memory.resolve_main_stuff()
-        if isinstance(main_resolved, Stuff):
-            content = main_resolved.content
-            if isinstance(content, ListContent):
-                list_content = cast("ListContent[StuffContent]", content)
-                stamp_mock_main_coordination(list_content.items)
-        return pipe_output
 
     @override
     async def _validate_after_run(

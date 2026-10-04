@@ -40,7 +40,6 @@ class ErrorContext(StrEnum):
     VALIDATION_BEFORE_SHOW_MODELS = "Pre-validation (show models)"
     VALIDATION_BEFORE_SHOW_BACKENDS = "Pre-validation (show backends)"
     VALIDATION_BEFORE_PIPE_RUN = "Pre-validation (pipe run)"
-    VALIDATION_BEFORE_BUILD_RUNNER = "Pre-validation (build runner)"
     VALIDATION_BEFORE_BUILD_INPUTS = "Pre-validation (build inputs)"
     VALIDATION_BEFORE_BUILD_OUTPUT = "Pre-validation (build output)"
     KIT = "Kit operation"

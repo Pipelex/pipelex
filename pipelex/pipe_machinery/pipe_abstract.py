@@ -204,7 +204,7 @@ class PipeAbstract(ABC, BaseModel):
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:
         # Strip namespace prefix if present (e.g., "domain.my_pipe" → "my_pipe").
-        # The builder LLM sometimes generates dotted pipe codes; the namespace
+        # An LLM author sometimes writes dotted pipe codes; the namespace
         # comes from the bundle's domain field, not from the pipe code itself.
         if "." in code:
             bare_code = code.rsplit(".", maxsplit=1)[1]

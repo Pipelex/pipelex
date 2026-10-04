@@ -120,7 +120,6 @@ INTERPRETER_PACKAGES: tuple[str, ...] = (
     "pipe_operators",
     "pipe_controllers",
     "codegen",
-    "builder",
     # The built-ins that adapt interpreter-layer ports; they construct interpreter-layer objects.
     "interpreter_plugins",
     # Core's Pipe machinery and the pipe-kind registration manifest, hoisted out of `core/`.

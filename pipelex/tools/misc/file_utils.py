@@ -570,7 +570,6 @@ def find_files_in_dir(
     pattern: str,
     is_recursive: bool = True,
     excluded_dirs: list[str] | None = None,
-    force_include_dirs: list[str] | None = None,
 ) -> list[Path]:
     """Find files matching a pattern in a directory.
 
@@ -579,8 +578,6 @@ def find_files_in_dir(
         pattern: File pattern to match (e.g. "*.py")
         is_recursive: Whether to search recursively in subdirectories
         excluded_dirs: List of directory names to exclude from the search (e.g. [".venv", "node_modules"])
-        force_include_dirs: List of directories to force include even if they are within excluded_dirs.
-                           Can be either full absolute paths or directory names.
 
     Returns:
         List of matching Path objects
@@ -617,28 +614,7 @@ def find_files_in_dir(
                     is_excluded = True
                     break
 
-        # Check if file is in a force include directory (forced inclusion despite exclusions)
-        # Force include dirs can be full paths or directory names
-        should_force_include = False
-        if force_include_dirs is not None:
-            for force_include_dir in force_include_dirs:
-                force_include_path = Path(force_include_dir)
-                # If force_include_dir is an absolute path, check if file is under it
-                if force_include_path.is_absolute():
-                    try:
-                        file.relative_to(force_include_path)
-                        should_force_include = True
-                        break
-                    except ValueError:
-                        # file is not relative to force_include_path
-                        continue
-                # If force_include_dir is just a directory name, check if it's in the file path parts
-                elif force_include_dir in file.parts:
-                    should_force_include = True
-                    break
-
-        # Include if not excluded, or if force included
-        if not is_excluded or should_force_include:
+        if not is_excluded:
             filtered_files.append(file)
 
     return filtered_files

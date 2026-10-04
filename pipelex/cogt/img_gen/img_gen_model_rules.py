@@ -104,6 +104,30 @@ class AspectRatioTaxonomy(StrEnum):
     GEMINI_3_FLASH = "gemini_3_flash"
     GEMINI_3_FLASH_LITE = "gemini_3_flash_lite"
 
+    @property
+    def is_gemini(self) -> bool:
+        """Whether this is a Google Gemini Image taxonomy, whose geometry travels as Google's `image_config`.
+
+        It identifies a Gemini image model from its spec rather than from its name, since a catalog
+        may serve one under a handle that does not start with `gemini`.
+        """
+        match self:
+            case (
+                AspectRatioTaxonomy.GEMINI_2_5
+                | AspectRatioTaxonomy.GEMINI_3_PRO
+                | AspectRatioTaxonomy.GEMINI_3_FLASH
+                | AspectRatioTaxonomy.GEMINI_3_FLASH_LITE
+            ):
+                return True
+            case (
+                AspectRatioTaxonomy.FLUX
+                | AspectRatioTaxonomy.FLUX_11_ULTRA
+                | AspectRatioTaxonomy.GPT_IMAGE_LEGACY
+                | AspectRatioTaxonomy.GPT_IMAGE_2
+                | AspectRatioTaxonomy.QWEN_IMAGE
+            ):
+                return False
+
 
 class InferenceTaxonomy(StrEnum):
     """Taxonomy for mapping inference-related parameters (steps, quality, guidance).

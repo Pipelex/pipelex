@@ -82,21 +82,3 @@ def allocate_ts_type_names(library: ResolvedLibrary) -> dict[str, str]:
 def _ts_symbols_are_free(type_name: str, *, used_symbols: set[str]) -> bool:
     """Whether a type and its derived schema identifier are both unclaimed."""
     return type_name not in used_symbols and f"{type_name}Schema" not in used_symbols
-
-
-def runtime_to_emitted_class_names(library: ResolvedLibrary) -> dict[str, str]:
-    """Map each concept's runtime structure-class name to its emitted Python class name.
-
-    The runtime materializes every non-native concept under the domain-qualified spelling
-    (`make_qualified_structure_class_name`), while the Python emitters name bare-when-unique — this
-    mapping lets a consumer (the runner-script generator) spell classes the way the emitted
-    projection defines them. Opaque Python-backed concepts (`structure = "<ClassName>"`) keep the
-    user's real class at runtime, so they are deliberately not remapped.
-    """
-    mapping: dict[str, str] = {}
-    for concept in library.concepts:
-        if concept.is_native or concept.opaque_python_class:
-            continue
-        runtime_name = make_qualified_structure_class_name(domain_code=concept.domain, concept_code=concept.code)
-        mapping[runtime_name] = python_class_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification)
-    return mapping

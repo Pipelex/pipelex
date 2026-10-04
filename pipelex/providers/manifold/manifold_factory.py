@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from portkey_ai import AsyncPortkey
 
     from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobParams
+    from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
     from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -105,25 +106,18 @@ class ManifoldFactory:
         return bool(backend.extra_config.get("debug", False))
 
     @classmethod
-    def _make_gemini_image_config(cls, inference_model: InferenceModelSpec, *, job_params: ImgGenJobParams) -> dict[str, str]:
+    def _make_gemini_image_config(cls, taxonomy: AspectRatioTaxonomy, *, job_params: ImgGenJobParams, model_name: str) -> dict[str, str]:
         """The gemini `image_config` block, honouring the portable size.
 
-        Same resolution as the native Google worker: a requested size (tier or exact) goes through
-        the model's taxonomy rules, an unset size omits `image_size` so the provider applies its own
-        default, and a model with no usable taxonomy falls back to the ratio alone rather than
-        guessing.
+        Same resolution as the native Google worker: the requested ratio and size (tier or exact)
+        are checked against the model's Gemini taxonomy, and an unset size omits `image_size` so the
+        provider applies its own default.
         """
-        if job_params.size is None:
-            taxonomy = ImgGenGeminiMapping.optional_img_gen_taxonomy(inference_model)
-            if taxonomy is None:
-                return {"aspect_ratio": ImgGenGeminiMapping.aspect_ratio_literal(job_params.aspect_ratio)}
-        else:
-            taxonomy = ImgGenGeminiMapping.img_gen_taxonomy(inference_model)
         resolved = ImgGenGeminiMapping.resolve_image_config(
             taxonomy,
             aspect_ratio=job_params.aspect_ratio,
             size=job_params.size,
-            model_name=inference_model.name,
+            model_name=model_name,
         )
         image_config: dict[str, str] = {"aspect_ratio": resolved.aspect_ratio}
         if resolved.image_size is not None:
@@ -155,10 +149,22 @@ class ManifoldFactory:
         # After the catalog's headers, so a catalog entry cannot restate whose call this is.
         extra_headers.update(make_manifold_metadata_headers(job_metadata=inference_job.job_metadata))
 
-        if isinstance(inference_job, LLMJob) and inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
-            # Mistral models really want a non-null seed.
-            extra_body["seed"] = random.randint(0, 1000000)
-        elif isinstance(inference_job, ImgGenJob) and inference_model.model_id.startswith("gemini"):
-            extra_body["image_config"] = cls._make_gemini_image_config(inference_model, job_params=inference_job.job_params)
+        if isinstance(inference_job, LLMJob):
+            # Mistral models really want a non-null seed. The spec carries no Mistral-specific field
+            # to key this on, so the model id's prefix decides, and it holds whether the catalog
+            # gives the provider's id or leaves the id to default to a `mistral-` handle.
+            if inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
+                extra_body["seed"] = random.randint(0, 1000000)
+        elif isinstance(inference_job, ImgGenJob):
+            # Decided by the spec, not the name: the catalog may serve a Gemini image model under a
+            # handle such as `nano-banana`, and the model id defaults to the handle when the catalog
+            # gives none. A Gemini taxonomy in the image rules is what makes it one, and a spec whose
+            # rules cannot say is refused rather than read as non-Gemini.
+            if (gemini_taxonomy := ImgGenGeminiMapping.optional_gemini_taxonomy(inference_model)) is not None:
+                extra_body["image_config"] = cls._make_gemini_image_config(
+                    gemini_taxonomy,
+                    job_params=inference_job.job_params,
+                    model_name=inference_model.name,
+                )
 
         return extra_headers, extra_body

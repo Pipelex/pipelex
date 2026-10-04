@@ -1,7 +1,7 @@
 """The manifold dialect's names: its sdk set, its two wire headers, and its route paths.
 
 Everything the manifold plugin needs to name is named here rather than imported from
-``providers/portkey/`` or ``providers/gateway/``. The duplication is deliberate — it is the
+``providers/portkey/``. The duplication is deliberate — it is the
 no-intertwining rule from the two-gateways design, and it is what keeps the eventual retirement of
 the Portkey path a module deletion rather than an untangling.
 """

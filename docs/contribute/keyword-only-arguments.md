@@ -49,7 +49,7 @@ The command validates the def (it must exist, be inspected by the guard, and hav
 
 A subject grant is warranted when EITHER:
 
-- **Verb–object test:** the function name is a verb (phrase) and the param is its direct object — the call reads as a sentence (`render(node)`, `validate_bundle(bundle)`, `parse_concept_spec(spec_data)`) — AND it is the **single candidate** (if you hesitate between two params, neither is the subject) — AND typical call sites pass a **self-labelling expression**, never a bare literal (literal-typed subjects are banned outright anyway);
+- **Verb–object test:** the function name is a verb (phrase) and the param is its direct object — the call reads as a sentence (`render(node)`, `validate_bundle(bundle)`) — AND it is the **single candidate** (if you hesitate between two params, neither is the subject) — AND typical call sites pass a **self-labelling expression**, never a bare literal (literal-typed subjects are banned outright anyway);
 - OR the def must satisfy a **positional `Callable` protocol** (it is passed as a value to something that calls it positionally) and a grant keeps it compliant without reaching for the heavier `# kw-only: ignore`.
 
 When in doubt → keyword-only. The grant is the exception tier; all-keyword is always compliant and often more readable. Rationales must be def-specific but may be terse for obvious keeps ("verb–object; single operand") — the value is that someone actually looked; copy-paste boilerplate across dozens of entries defeats the point.
@@ -139,8 +139,8 @@ A `# kw-only: ignore` comment on the `def` line (or the `async def` line) suppre
 A subject plus options — the canonical shape, legal only with a grant:
 
 ```python
-# subject_grants.toml carries: ["pipelex/builder/build.py::build_pipe"] param = "spec" rationale = "…"
-def build_pipe(spec, *, dry_run, retries, validate): ...  # build_pipe(my_spec, dry_run=True, retries=3, validate=False)
+# subject_grants.toml carries: ["pipelex/pipeline/publish.py::publish_bundle"] param = "bundle" rationale = "…"
+def publish_bundle(bundle, *, dry_run, retries, validate): ...  # publish_bundle(my_bundle, dry_run=True, retries=3, validate=False)
 ```
 
 A single subject and nothing else — needs a grant too (strict-all scope; lone-subject defs are not implicitly exempt):

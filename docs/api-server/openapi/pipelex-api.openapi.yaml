@@ -11,7 +11,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.71.1
+  version: 0.72.0
 paths:
   /health:
     get:
@@ -5505,7 +5505,6 @@ components:
       - input_stuff_spec_mismatch
       - inadequate_output_concept
       - inadequate_output_multiplicity
-      - circular_dependency_error
       - llm_output_cannot_be_image
       - invalid_pipe_code_syntax
       - unknown_pipe_type

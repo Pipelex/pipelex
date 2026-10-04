@@ -11,8 +11,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.bundle_target_resolution import BundleTargetResolutionError, resolve_bundle_target_core
+from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME
 from pipelex.test_extras.mthds_corpus.exceptions import CorpusEntryError
 from pipelex.test_extras.mthds_corpus.manifest import (
     ENTRY_NAME_PATTERN,

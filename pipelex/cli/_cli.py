@@ -231,9 +231,7 @@ def migrate_command(
     migrate_cmd(dry_run=dry_run, yes=yes)
 
 
-app.add_typer(
-    build_app, name="build", help="Generate AI methods from natural language requirements: pipelines in .mthds format and python code to run them"
-)
+app.add_typer(build_app, name="build", help="Generate example inputs, example outputs and structure classes for a pipe")
 app.add_typer(
     validate_app,
     name="validate",

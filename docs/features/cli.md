@@ -19,7 +19,7 @@ The `pipelex` CLI is the primary tool for working with Pipelex methods. It cover
 | **`pipelex init`** | Initialize configuration, backends, credentials, routing, and telemetry |
 | **`pipelex update`** | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
 | **`pipelex doctor`** | Check configuration health and suggest fixes |
-| **`pipelex build`** | AI-powered method generation from natural language requirements |
+| **`pipelex build`** | Generate the structures of your concepts and example inputs and outputs for a pipe |
 | **`pipelex validate`** | Check pipeline syntax, structure, and run dry-run validation |
 | **`pipelex fix`** | Apply deterministic safe fixes to a bundle and re-validate (with `--diff` preview) |
 | **`pipelex run`** | Execute pipelines from bundle files or libraries |
@@ -54,8 +54,6 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 | `fmt` | Format `.mthds`, `.toml`, or `.plx` files in-place |
 | `lint` | Lint files for errors |
 | `inputs` | Generate example input JSON for a pipe |
-| `concept` | Convert a JSON concept spec into raw TOML (stdout) |
-| `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
 | `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `doctor` | Check configuration health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
