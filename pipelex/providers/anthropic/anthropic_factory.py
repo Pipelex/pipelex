@@ -53,12 +53,19 @@ class AnthropicFactory:
         model_handle: ModelHandle,
         *,
         backend: InferenceBackend,
+        sdk_variant: AnthropicSdkVariant | None = None,
     ) -> AsyncAnthropic | AsyncAnthropicBedrock:
-        try:
-            sdk_variant = AnthropicSdkVariant(model_handle.sdk)
-        except ValueError as exc:
-            msg = f"ModelHandle '{model_handle}' is not supported by AnthropicFactory"
-            raise AnthropicFactoryError(msg) from exc
+        """Build the client for the handle's sdk, or for `sdk_variant` when one is given.
+
+        `sdk_variant` is for a plugin that registers an sdk token of its own over the Anthropic protocol:
+        its token names its worker, and the variant names the client that worker speaks through.
+        """
+        if sdk_variant is None:
+            try:
+                sdk_variant = AnthropicSdkVariant(model_handle.sdk)
+            except ValueError as exc:
+                msg = f"ModelHandle '{model_handle}' is not supported by AnthropicFactory"
+                raise AnthropicFactoryError(msg) from exc
 
         # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
         # instead of inheriting the silent SDK default (anthropic's own DEFAULT_MAX_RETRIES).
@@ -69,11 +76,9 @@ class AnthropicFactory:
                 auth_header_config = backend.get_extra_config(AnthropicExtraField.AUTH_HEADER)
                 if auth_header_config is not None:
                     # The backend speaks the Anthropic protocol but authenticates on a header of
-                    # its own rather than on `x-api-key`. The Pipelex Manifold service is the case
-                    # this exists for: it reads `x-pipelex-api-key` (or an `Authorization` bearer)
-                    # and never looks at `x-api-key`, so a key left in the SDK's own slot reaches
-                    # it as an anonymous request. Carry it in the named header instead — the same
-                    # move the manifold OpenAI-substrate factories already make.
+                    # its own rather than on `x-api-key`: a gateway that never looks at `x-api-key`
+                    # would receive a key left in the SDK's own slot as an anonymous request. Carry it
+                    # in the named header instead.
                     if not backend.api_key:
                         msg = f"Backend '{backend.name}' sets '{AnthropicExtraField.AUTH_HEADER}' but carries no api_key"
                         raise AnthropicFactoryError(msg)

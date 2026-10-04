@@ -46,6 +46,8 @@ def _make_worker(mocker: MockerFixture, *, structure_method: StructureMethod) ->
     mocker.patch.object(sdk_client.messages, "create", new=create)
 
     worker = object.__new__(AnthropicLLMWorker)
+
+    worker.extras_factory = None
     model = mocker.MagicMock()
     model.desc = "test-model-desc"
     model.model_id = "claude-test"

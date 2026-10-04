@@ -16,7 +16,7 @@ from enum import StrEnum
 # its auth runs (`src/pig/serviceTokenHeader.ts` there), which is what let the rename happen — it
 # had no runtime-only half. This is the one header the dialect sends about itself, on every
 # protocol: the OpenAI-substrate factories and the native client put it there directly, and the
-# shared Anthropic driver reads it from the backend's `auth_header` field, so the value in
+# Anthropic client reads it from the backend's `auth_header` field, so the value in
 # `backends.toml` must spell it exactly as this constant does.
 MANIFOLD_AUTH_HEADER = "x-pipelex-api-key"
 
@@ -58,10 +58,11 @@ MANIFOLD_SEARCH_ROUTE = "/pipelex/search"
 class ManifoldSdk(StrEnum):
     """The sdk values the manifold catalog section may name.
 
-    `anthropic` is deliberately absent: Claude reaches the manifold service over the *shared*
-    Anthropic SDK driver, which is not part of this package and outlives the Portkey retirement.
+    `manifold_anthropic` is the open Anthropic worker with this package's extras factory, which adds
+    the metadata header to every Claude call.
     """
 
+    ANTHROPIC = "manifold_anthropic"
     COMPLETIONS = "manifold_completions"
     RESPONSES = "manifold_responses"
     IMG_GEN = "manifold_img_gen"

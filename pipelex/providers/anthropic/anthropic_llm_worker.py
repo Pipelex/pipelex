@@ -32,7 +32,6 @@ from pipelex.cogt.llm.llm_utils import (
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
@@ -43,8 +42,9 @@ from pipelex.providers.anthropic.anthropic_factory import (
     AnthropicFactory,
     AnthropicSdkVariant,
 )
-from pipelex.providers.manifold.manifold_metadata import make_manifold_metadata_headers
+from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.telemetry.otel_constants import InferenceOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -70,6 +70,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
+        extras_factory: BackendExtrasFactory | None = None,
     ):
         LLMWorkerAbstract.__init__(
             self,
@@ -77,6 +78,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             reporting_delegate=reporting_delegate,
         )
         self.extra_config: dict[str, Any] = extra_config
+        self.extras_factory = extras_factory
         self.default_max_tokens: int = 0
         if inference_model.max_tokens:
             self.default_max_tokens = inference_model.max_tokens
@@ -251,7 +253,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 max_tokens=max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,
-                **self._request_header_kwargs(llm_job=llm_job),
+                **self._request_extras_kwargs(llm_job=llm_job, output_desc=InferenceOutputType.TEXT),
             ) as stream:
                 final_message: Message = await stream.get_final_message()
         except (APIStatusError, APIConnectionError) as sdk_exc:
@@ -308,18 +310,24 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
 
         return full_reply_content
 
-    def _request_header_kwargs(self, *, llm_job: LLMJob) -> dict[str, Any]:
-        """The per-request headers this call adds, as SDK keyword arguments: none, except behind Manifold.
+    def _request_extras_kwargs(self, *, llm_job: LLMJob, output_desc: str) -> dict[str, Any]:
+        """The per-request headers and body additions this call sends, as SDK keyword arguments.
 
-        Claude reaches the Pipelex Manifold service over this shared driver rather than over a
-        manifold sdk, so this is where the manifold dialect's `x-pipelex-metadata` header joins an
-        Anthropic request — per request, because it names the job, where the token is a client
-        default. Every other Anthropic backend is a direct provider SDK path and sends nothing of the
-        kind: the run's identity and labels are ours to forward to our own service, not to a vendor.
+        None without an extras factory, which is every direct Anthropic and Bedrock path. A plugin that
+        reaches a service of its own over the Anthropic protocol builds this worker with a
+        `BackendExtrasFactory`, the same seam the OpenAI-substrate workers take, and its factory decides
+        per request what joins the call: a header naming the job, for instance, where the credential is
+        a client default.
         """
-        if self.inference_model.backend_name != PipelexBackend.MANIFOLD:
+        if self.extras_factory is None:
             return {}
-        return {"extra_headers": make_manifold_metadata_headers(job_metadata=llm_job.job_metadata)}
+        extra_headers, extra_body = self.extras_factory.make_extras(self.inference_model, inference_job=llm_job, output_desc=output_desc)
+        kwargs: dict[str, Any] = {}
+        if extra_headers:
+            kwargs["extra_headers"] = extra_headers
+        if extra_body:
+            kwargs["extra_body"] = extra_body
+        return kwargs
 
     def _structure_method_kwargs(self) -> dict[str, Any]:
         """What the structured call sends, beyond what instructor's mode sets, for the model's structure method.
@@ -377,7 +385,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 max_tokens=effective_max_tokens,
                 timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
                 **self._structure_method_kwargs(),
-                **self._request_header_kwargs(llm_job=llm_job),
+                **self._request_extras_kwargs(llm_job=llm_job, output_desc=schema.__name__),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying
