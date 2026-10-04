@@ -29,13 +29,9 @@ MANIFOLD_AUTH_HEADER = "x-pipelex-api-key"
 # the vendor's vocabulary it does not have to.
 MANIFOLD_METADATA_HEADER = "x-pipelex-metadata"
 
-# The gateway's response headers are named in `cogt/inference/error_classification.py`, not here.
-# `MANIFOLD_TRACE_ID_HEADER` and `MANIFOLD_VENDOR_TRACE_ID_HEADER` are the two spellings it stamps
-# its trace id on, and `extract_manifold_metadata` — the native routes' distiller, which is in
-# `cogt`, and `cogt` may not import this package — is the only reader of those two names. The vendor
-# spelling itself has a second reader that does not go through them: `extract_gateway_metadata`
-# holds it as a literal, and that is the function the manifold *image* path distils its failures
-# through, because that path still travels on `portkey_ai`. This file names what the dialect *sends*.
+# The gateway's response headers, the two spellings of its trace id, are named in
+# `manifold_error_metadata`, beside the distiller that reads them. This file names what the dialect
+# *sends*.
 
 # The OpenAI and Portkey SDKs both expect their `base_url` to already carry the API version segment
 # (`AsyncOpenAI`'s default is `https://api.openai.com/v1`, `AsyncPortkey`'s is

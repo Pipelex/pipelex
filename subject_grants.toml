@@ -1708,11 +1708,11 @@ rationale = "Predicate on the error_message; single operand."
 param = "response"
 rationale = "Parses the response; single operand."
 
-["pipelex/cogt/inference/error_classification.py::_parse_retry_after_seconds"]
+["pipelex/cogt/inference/error_classification.py::parse_retry_after_seconds"]
 param = "value"
 rationale = "Parses the value; single operand."
 
-["pipelex/cogt/inference/error_classification.py::_pipelex_service_error_code_from_body"]
+["pipelex/cogt/inference/error_classification.py::error_code_from_body_code_first"]
 param = "body"
 rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
 

@@ -72,6 +72,33 @@ class DuplicateModelListerError(PluginError):
         super().__init__(message)
 
 
+class DuplicateServiceErrorCodeError(PluginError):
+    """Two plugins contributed the same service error code."""
+
+    def __init__(self, *, code: str, first_plugin: str, second_plugin: str):
+        self.code = code
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Service error code '{code}' is contributed by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            f"Each code must mean one thing, so it must have a single contributor."
+        )
+        super().__init__(message)
+
+
+class ReservedServiceErrorCodeError(PluginError):
+    """A plugin contributed a service error code the runtime classifies itself."""
+
+    def __init__(self, *, code: str, plugin: str):
+        self.code = code
+        self.plugin = plugin
+        message = (
+            f"Plugin '{plugin}' contributes service error code '{code}', which the runtime already classifies itself. "
+            f"A contributed code must not compete with the runtime's own reading of it."
+        )
+        super().__init__(message)
+
+
 class DuplicateOrchestratorError(PluginError):
     """Two plugins registered an orchestrator for the same orchestration mode."""
 

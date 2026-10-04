@@ -20,6 +20,7 @@ from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.inference_backend_registry import InferenceFamily, require_sdk
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.providers.manifold.manifold_constants import ManifoldSdk
+from pipelex.providers.manifold.manifold_error_codes import MANIFOLD_SERVICE_ERROR_CODES
 
 if TYPE_CHECKING:
     from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -196,6 +197,7 @@ class ManifoldPlugin:
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
+        registrar.add_service_error_codes(codes=MANIFOLD_SERVICE_ERROR_CODES)
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk=ManifoldSdk.ANTHROPIC, make_worker=_make_manifold_anthropic_worker)
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk=ManifoldSdk.COMPLETIONS, make_worker=_make_manifold_completions_worker)
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk=ManifoldSdk.RESPONSES, make_worker=_make_manifold_responses_worker)

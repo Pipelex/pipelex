@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import ErrorReport
+from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR_CODES
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
 from pipelex.plugins.exceptions import (
@@ -19,9 +20,11 @@ from pipelex.plugins.exceptions import (
     DuplicateOrchestratorError,
     DuplicatePipeFuncExecutorError,
     DuplicateSecretsProviderError,
+    DuplicateServiceErrorCodeError,
     DuplicateStorageProviderError,
     HubSlotAlreadyClaimedError,
     PluginLayerViolationError,
+    ReservedServiceErrorCodeError,
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
 from pipelex.plugins.log_sink_registry import LogSinkFactoryFn
@@ -35,6 +38,9 @@ from pipelex.plugins.storage_provider_registry import StorageProviderFactoryFn
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorCode
     from pipelex.system.configuration.configs import PipelexConfig
 
 
@@ -170,6 +176,7 @@ class PluginRegistrar:
         # Plain data, read once by ``make_model_declarations`` for the model manager to merge at boot.
         self.internal_models: dict[str, dict[str, Any]] = {}
         self.doc_gen_defaults: dict[tuple[DocGenFormat, DocGenSource], str] = {}
+        self.service_error_codes: dict[str, ServiceErrorCode] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -187,6 +194,7 @@ class PluginRegistrar:
         self._pipe_func_executor_sources: dict[str, str] = {}
         self._internal_model_sources: dict[str, str] = {}
         self._doc_gen_default_sources: dict[tuple[DocGenFormat, DocGenSource], str] = {}
+        self._service_error_code_sources: dict[str, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -364,6 +372,31 @@ class PluginRegistrar:
                 second_plugin=second_plugin,
             ),
         )
+
+    def add_service_error_codes(self, *, codes: "Iterable[ServiceErrorCode]") -> None:
+        """Contribute the error codes a service this plugin speaks to emits on its own, and what each one means.
+
+        For a plugin whose backend is a gateway or a hosted service that refuses some requests itself,
+        before any provider sees them, under codes of its own. Boot freezes every contribution into the
+        hub's `ServiceErrorVocabulary`, which `classify_inference_error` consults ahead of the status
+        ladder: a contributed code decides the error's category, its action and its advice, whatever the
+        status it arrived on. Plain data, stored and nothing else. Fail-loud on a code another plugin
+        contributed, naming both plugins, and on a code the runtime classifies itself.
+        """
+        contributed: list[str] = []
+        for service_error_code in codes:
+            code = service_error_code.code
+            if code in RUNTIME_CLASSIFIED_ERROR_CODES:
+                raise ReservedServiceErrorCodeError(code=code, plugin=self._active.name)
+            if code in self.service_error_codes:
+                raise DuplicateServiceErrorCodeError(
+                    code=code, first_plugin=self._service_error_code_sources[code], second_plugin=self._active.name
+                )
+            self.service_error_codes[code] = service_error_code
+            self._service_error_code_sources[code] = self._active.name
+            contributed.append(code)
+        if contributed:
+            self._active.contributions.append(f"service error codes {', '.join(contributed)}")
 
     def add_pipe_func_executor(self, *, mode: str, factory: PipeFuncExecutorFactoryFn) -> None:
         """Contribute a factory for one PipeFunc execution mode, keyed by an open ``mode`` token.

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from pipelex.cogt.inference.error_classification import extract_manifold_metadata
+from pipelex.providers.manifold.manifold_error_metadata import extract_manifold_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.transport_retry import request_with_transport_retry
