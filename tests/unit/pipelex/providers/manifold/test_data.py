@@ -82,8 +82,7 @@ class ManifoldExtrasBySpecTestData:
         ),
     ]
 
-    # (topic, handle, catalog entry): image models whose spec names no Gemini taxonomy get no `image_config`,
-    # whatever their name or model id says.
+    # (topic, handle, catalog entry): image models whose rules name a non-Gemini taxonomy get no `image_config`.
     NON_GEMINI_IMAGE_CASES: ClassVar[list[tuple[str, str, dict[str, Any]]]] = [
         (
             "gpt_image_legacy",
@@ -95,19 +94,31 @@ class ManifoldExtrasBySpecTestData:
             "gpt-image-2",
             {"model_type": "img_gen", "sdk": "manifold_img_gen", "rules": {"model_choice": "model_name", "aspect_ratio": "gpt_image_2"}},
         ),
+    ]
+
+    # (topic, handle, catalog entry, error match): an image spec that cannot say whether it is a Gemini one is refused rather
+    # than read as non-Gemini, since that would drop the requested ratio and size without a word. An `aspect_ratio` value
+    # this release does not know may name a newer Gemini taxonomy, and a spec declaring no `aspect_ratio` says nothing.
+    UNDECIDABLE_IMAGE_CASES: ClassVar[list[tuple[str, str, dict[str, Any], str]]] = [
+        (
+            "unknown_taxonomy",
+            "nano-banana-next",
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"aspect_ratio": "gemini_from_the_future"}},
+            "unknown aspect_ratio taxonomy 'gemini_from_the_future'",
+        ),
         (
             "gemini_id_without_rules",
             "gemini-lookalike",
             {"model_type": "img_gen", "sdk": "manifold_completions", "model_id": "gemini-2.5-flash-image"},
+            "declares no aspect_ratio rule",
+        ),
+        (
+            "rules_without_aspect_ratio",
+            "nano-banana-bare",
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"prompt": "positive_only"}},
+            "declares no aspect_ratio rule",
         ),
     ]
-
-    # An `aspect_ratio` value this release does not know may name a newer Gemini taxonomy, so it is refused rather than read as non-Gemini.
-    UNKNOWN_TAXONOMY_ENTRY: ClassVar[dict[str, Any]] = {
-        "model_type": "img_gen",
-        "sdk": "manifold_completions",
-        "rules": {"aspect_ratio": "gemini_from_the_future"},
-    }
 
     # (topic, handle, catalog entry, whether the job gets a seed): the Mistral seed still keys on the model id's prefix,
     # which the one manifold Mistral handle carries whether or not the entry names the provider's id.

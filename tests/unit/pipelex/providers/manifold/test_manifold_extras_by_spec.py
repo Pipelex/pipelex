@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobConfig, ImgGenJobParams, ImgGenJobReport, SizeTier
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
@@ -83,7 +83,7 @@ class TestManifoldExtrasBySpec:
         handle: str,
         entry: dict[str, Any],
     ) -> None:
-        """Without a Gemini taxonomy in the rules no `image_config` is sent, even under a `gemini` model id."""
+        """A spec whose rules name a non-Gemini taxonomy gets no `image_config`."""
         spec = _spec(handle=handle, entry=entry)
 
         _, extra_body = ManifoldFactory.make_extras(
@@ -93,12 +93,25 @@ class TestManifoldExtrasBySpec:
         assert extra_body == {}
 
     @pytest.mark.parametrize("size", [None, SizeTier.ONE_K])
-    def test_unknown_taxonomy_is_refused(self, size: SizeTier | None) -> None:
-        """An aspect_ratio value this release does not know fails the job instead of dropping the ratio and size silently."""
-        spec = _spec(handle="nano-banana-next", entry=ManifoldExtrasBySpecTestData.UNKNOWN_TAXONOMY_ENTRY)
+    @pytest.mark.parametrize(
+        ("topic", "handle", "entry", "error_match"),
+        ManifoldExtrasBySpecTestData.UNDECIDABLE_IMAGE_CASES,
+    )
+    def test_undecidable_image_spec_is_refused_as_a_configuration_fault(
+        self,
+        topic: str,  # ruff: ignore[unused-method-argument]
+        handle: str,
+        entry: dict[str, Any],
+        error_match: str,
+        size: SizeTier | None,
+    ) -> None:
+        """A spec that cannot say whether it is a Gemini one fails the job instead of dropping the ratio and size silently, as the catalog's fault."""
+        spec = _spec(handle=handle, entry=entry)
 
-        with pytest.raises(ImgGenParameterError, match="unknown aspect_ratio taxonomy 'gemini_from_the_future'"):
+        with pytest.raises(ImgGenParameterError, match=error_match) as exc_info:
             ManifoldFactory.make_extras(spec, inference_job=_img_gen_job(aspect_ratio=AspectRatio.SQUARE, size=size), output_desc="Image")
+
+        assert exc_info.value.error_category == InferenceErrorCategory.CONFIGURATION
 
     def test_size_beyond_the_gemini_taxonomy_is_refused(self) -> None:
         """A handle-only Gemini spec still checks the request against its taxonomy's grids."""

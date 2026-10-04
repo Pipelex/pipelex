@@ -109,7 +109,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
     ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
 
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,

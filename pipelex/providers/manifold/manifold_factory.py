@@ -158,7 +158,8 @@ class ManifoldFactory:
         elif isinstance(inference_job, ImgGenJob):
             # Decided by the spec, not the name: the catalog may serve a Gemini image model under a
             # handle such as `nano-banana`, and the model id defaults to the handle when the catalog
-            # gives none. A Gemini taxonomy in the image rules is what makes it one.
+            # gives none. A Gemini taxonomy in the image rules is what makes it one, and a spec whose
+            # rules cannot say is refused rather than read as non-Gemini.
             if (gemini_taxonomy := ImgGenGeminiMapping.optional_gemini_taxonomy(inference_model)) is not None:
                 extra_body["image_config"] = cls._make_gemini_image_config(
                     gemini_taxonomy,

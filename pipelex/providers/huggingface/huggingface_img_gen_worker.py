@@ -6,7 +6,7 @@ from PIL import Image
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -40,7 +40,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
     ) -> Image.Image:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
@@ -52,7 +52,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         model_id = args_dict.pop("model", None)
         if model_id is None:
             msg = f"Model '{self.inference_model.name}' rules must include a 'model_choice' entry"
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         try:
             return await self.hf_async_client.text_to_image(
                 prompt=prompt,

@@ -14,7 +14,7 @@ import operator
 from collections.abc import Mapping
 from typing import ClassVar, Literal, NamedTuple
 
-from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
@@ -132,7 +132,8 @@ class ImgGenGeminiMapping:
 
         Raises:
             ImgGenParameterError: If the model has no `aspect_ratio` rules configured
-                or the configured taxonomy value is unknown.
+                or the configured taxonomy value is unknown, in the `CONFIGURATION`
+                category since the rules are the model configuration's, not the caller's.
         """
         rules = inference_model.rules or {}
         taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)
@@ -141,12 +142,12 @@ class ImgGenGeminiMapping:
                 f"Google image model '{inference_model.name}' has no 'aspect_ratio' rules configured; "
                 f"set rules.aspect_ratio to a Gemini taxonomy (e.g. 'gemini_3_flash')"
             )
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         try:
             return AspectRatioTaxonomy(taxonomy_value)
         except ValueError as exc:
             msg = f"Google image model '{inference_model.name}' has an unknown aspect_ratio taxonomy '{taxonomy_value}'"
-            raise ImgGenParameterError(msg) from exc
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
 
     @classmethod
     def optional_img_gen_taxonomy(cls, inference_model: InferenceModelSpec) -> AspectRatioTaxonomy | None:
@@ -171,14 +172,17 @@ class ImgGenGeminiMapping:
 
         This is the spec-level test for "is this a Gemini image model": the rules name a Gemini
         taxonomy for exactly those models, whatever handle or model id the catalog gives them.
-        Missing rules and a non-Gemini taxonomy answer None. An `aspect_ratio` value this release
-        does not know raises: it may name a newer Gemini taxonomy, and answering None would drop
-        the requested ratio and size without a word.
+        A declared non-Gemini taxonomy answers None. A spec that declares no `aspect_ratio`, or a
+        value this release does not know, raises: the second may name a newer Gemini taxonomy,
+        the first says nothing either way, and answering None would drop the requested ratio and
+        size without a word. Both are the model configuration's fault, so they raise in the
+        `CONFIGURATION` category.
         """
         rules = inference_model.rules or {}
         taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)
         if taxonomy_value is None:
-            return None
+            msg = f"Image model '{inference_model.name}' declares no aspect_ratio rule, so whether it takes Google's image_config cannot be decided"
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         try:
             taxonomy = AspectRatioTaxonomy(taxonomy_value)
         except ValueError as exc:
@@ -186,7 +190,7 @@ class ImgGenGeminiMapping:
                 f"Image model '{inference_model.name}' has an unknown aspect_ratio taxonomy '{taxonomy_value}', "
                 "so whether it takes Google's image_config cannot be decided"
             )
-            raise ImgGenParameterError(msg) from exc
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
         if not taxonomy.is_gemini:
             return None
         return taxonomy
@@ -296,7 +300,7 @@ class ImgGenGeminiMapping:
                 | AspectRatioTaxonomy.QWEN_IMAGE
             ):
                 msg = f"Taxonomy '{taxonomy}' configured for model '{model_name}' is not a Google Gemini image generation taxonomy"
-                raise ImgGenParameterError(msg)
+                raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
 
     @classmethod
     def dimensions_for_aspect_ratio_and_size(
