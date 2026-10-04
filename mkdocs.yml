@@ -646,4 +646,5 @@ nav:
     - Error Responses: api-server/error-responses.md
     - Logging: api-server/logging.md
     - Storage Transport (Removed): api-server/storage-transport.md
+    - Pipe Builder (Removed): api-server/pipe-builder.md
     - Changelog to v0.33.2: api-server/changelog.md
