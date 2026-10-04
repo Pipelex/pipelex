@@ -25,7 +25,6 @@ from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import (
     CogtError,
-    GatewayUnknownModelError,
     InferenceBackendCredentialsError,
     InferenceBackendLibraryError,
     InferenceBackendLibraryNotFoundError,
@@ -64,15 +63,6 @@ from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_I
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import get_optional_env
-from pipelex.system.pipelex_service.exceptions import (
-    RemoteConfigUnavailableError,
-    RemoteConfigValidationError,
-)
-from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
-from pipelex.system.pipelex_service.pipelex_service_config import (
-    enabled_managed_gateway_sections,
-)
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import LogConfig
@@ -87,9 +77,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_base_and_overrides, loa
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from pipelex.cogt.model_backends.gateway_config import GatewayConfig
     from pipelex.plugins.registrar import PluginRegistrar
-    from pipelex.system.pipelex_service.types import RemoteConfigSource
     from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -1468,29 +1456,6 @@ def check_models(
             msg = f"Backend configuration error: {first_error}"
             return False, msg, backend_file_reports
 
-    # Fetch the managed gateways' model specs if any managed gateway backend is enabled.
-    # Probe the same backends document the doctor is reporting on (project-vs-global) instead
-    # of always defaulting to the global path — otherwise --global on a machine with a
-    # project-local backends.toml would mis-report the managed-gateway state because the
-    # layered `config_manager.backends_file_paths()` would still resolve its base to the
-    # project file.
-    managed_gateway_configs: dict[str, GatewayConfig] | None = None
-    gateway_config_source: RemoteConfigSource | None = None
-    try:
-        managed_gateway_sections = enabled_managed_gateway_sections(config_dir=config_dir)
-    except InferenceBackendLibraryValidationError as exc:
-        return False, f"Error checking models: {exc}", backend_file_reports
-    if managed_gateway_sections:
-        try:
-            result = RemoteConfigFetcher.fetch_remote_config()
-            gateway_config_source = result.source
-            managed_gateway_configs = build_managed_gateway_configs(
-                remote_config=result.config,
-                managed_gateway_sections=managed_gateway_sections,
-            )
-        except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
-            return False, f"Failed to fetch the Pipelex remote configuration: {exc}", backend_file_reports
-
     # When --global (config_dir set), pin every path so layered config_manager.X
     # resolution doesn't silently fall back to the project-local files. The two documents
     # are pinned as sequences: that directory's base file and its own override.
@@ -1517,8 +1482,6 @@ def check_models(
     try:
         models_manager.setup(
             secrets_provider=secrets_provider,
-            managed_gateway_configs=managed_gateway_configs,
-            gateway_config_source=gateway_config_source,
             plugin_model_declarations=plugin_model_declarations,
             backends_library_paths=backends_library_override,
             backends_dir_path=backends_dir_override,
@@ -1545,7 +1508,6 @@ def check_models(
         InferenceBackendLibraryValidationError,
         ModelDeckValidationError,
         InferenceBackendCredentialsError,
-        GatewayUnknownModelError,
         PluginModelDeclarationError,
     ) as exc:
         return False, f"Error checking models: {redacted_failure(exc=exc, log_config=log_config)}", backend_file_reports

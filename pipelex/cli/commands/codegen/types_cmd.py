@@ -49,9 +49,7 @@ def codegen_types_cmd(
     ] = None,
 ) -> None:
     """Project the crate's concept set into typed artifacts for the chosen target."""
-    # needs_model_specs=True (like `validate`): library validation checks pipe model pins
-    # against the deck, so the specs must be loaded even though codegen needs no inference.
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
     output_root = Path(output_dir).expanduser()
 
     try:

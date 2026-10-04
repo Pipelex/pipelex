@@ -42,17 +42,13 @@ default-extract-web-page = "linkup-fetch"
 # Waterfalls
 ####################################################################################################
 #
-# Each default resolves to the first entry an enabled backend serves: Azure Document Intelligence
-# through Pipelex Manifold, then Mistral OCR with your own Mistral key. Documents fall back last to
-# reading a PDF's text layer locally, which needs no key but recovers no text from a scanned page.
+# Each default resolves to the first entry an enabled backend serves: Mistral OCR with your own
+# Mistral key. Documents fall back to reading a PDF's text layer locally, which needs no key but
+# recovers no text from a scanned page.
 
 [extract.waterfalls]
-document-extractor = [
-  "azure-document-intelligence",
-  "mistral-ocr",
-  "pypdfium2-extract-pdf",
-]
-ocr-extractor = ["azure-document-intelligence", "mistral-ocr"]
+document-extractor = ["mistral-ocr", "pypdfium2-extract-pdf"]
+ocr-extractor = ["mistral-ocr"]
 
 ####################################################################################################
 # Extract Presets

@@ -15,13 +15,11 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     set_agent_cli_error_format,
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
-from pipelex.cli.commands.init.command import attempt_prime_remote_config_cache
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.pipelex_service_onboarding import update_inference_setup_completed
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -70,13 +68,7 @@ def _format_init_markdown(result: dict[str, Any]) -> str:
         f"**Backends enabled:** {', '.join(backends_enabled) or 'none'}",
         "",
         f"**Routing profile:** `{result['routing_profile']}`",
-        "",
-        f"**Inference setup completed:** {result.get('inference_setup_completed', False)}",
-        "",
-        f"**Remote config cache primed:** {result.get('cache_primed', False)}",
     ]
-    if result.get("cache_priming_error"):
-        lines.extend(["", f"> ⚠ Cache priming error: {result['cache_priming_error']}"])
     return "\n".join(lines)
 
 
@@ -388,26 +380,13 @@ def agent_init_cmd(
         # Step 3: Configure routing
         routing_profile = _configure_routing(backends_enabled, config=parsed_config, target_dir=target_dir)
 
-        # Step 4: Mark inference setup as completed
-        update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
-
-        # Step 5: Prime the remote-config cache so subsequent offline dry-runs can fall back.
-        # No-op when no managed gateway backend is enabled; surfaces failure as structured
-        # fields on the success envelope rather than crashing init. We forward the init target
-        # directory so the managed-gateway check inspects the backends.toml we just wrote, not a
-        # sibling layered config.
-        priming_result = attempt_prime_remote_config_cache(target_config_dir=target_dir)
         result_payload: dict[str, Any] = {
             "success": True,
             "target_dir": str(target_dir),
             "config_files_copied": config_files_copied,
             "backends_enabled": backends_enabled,
             "routing_profile": routing_profile,
-            "inference_setup_completed": True,
-            "cache_primed": priming_result.primed,
         }
-        if priming_result.error_message is not None:
-            result_payload["cache_priming_error"] = priming_result.error_message
 
         # Output result
         agent_success_formatted(result_payload, markdown_renderer=_format_init_markdown, output_format=output_format)

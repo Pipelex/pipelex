@@ -33,16 +33,19 @@ from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, CONFIG
 from pipelex.system.configuration.config_surface import (
     INFERENCE_BACKEND_CONFIG_SURFACE_ID,
     PIPELEX_CONFIG_SURFACE_ID,
-    PIPELEX_SERVICE_CONFIG_SURFACE_ID,
     TELEMETRY_CONFIG_SURFACE_ID,
 )
 from pipelex.system.configuration.configs import PipelexConfig
-from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
-from pipelex.system.pipelex_service.pipelex_service_onboarding import PIPELEX_SERVICE_CONFIG_FILE_NAME
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 PIPELEX_CONFIG_FILE_NAME = "pipelex.toml"
+
+# Files an earlier release wrote into a configuration directory that no surface owns any more. An
+# installation may still hold one, and it is inert: nothing reads it. It is claimed by no surface,
+# which matters because a retired name can still match a live surface's glob — `pipelex_service.toml`
+# is a `pipelex_*.toml` — and that surface's ledger must not be replayed over a document it never saw.
+RETIRED_CONFIG_FILE_NAMES: frozenset[str] = frozenset({"pipelex_service.toml"})
 
 # The package directory, `pipelex/` — this module sits one level under it.
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
@@ -132,7 +135,7 @@ class Surface(BaseModel):
 
     Empty for a surface that lives directly in `~/.pipelex/` or `.pipelex/`. A surface that owns a
     subdirectory owns it *one level deep and to the exclusion of every other surface*, which is
-    what makes `inference/backends/pipelex_manifold.toml` safe: its name matches the main
+    what makes a backend file named `inference/backends/pipelex_<name>.toml` safe: its name matches the main
     configuration's tier glob exactly, and only the directory it sits in says it is not a
     `pipelex.toml` tier file."""
 
@@ -469,11 +472,11 @@ class SurfaceRegistry(BaseModel):
 
         > **A file is claimed by the pair (directory, name).** Only the surfaces that own the
         > directory the file sits in are candidates; among those, exact filenames claim before
-        > globs.
+        > globs. A retired file name directly in a configuration directory is claimed by none.
 
-        Both halves are load-bearing and each answers a real collision. Without the *name* rule,
-        `pipelex_service.toml` is both the base file of one surface and a match for another's
-        `pipelex_*.toml`. Without the *directory* rule, `inference/backends/pipelex_manifold.toml`
+        Each rule answers a real collision. Without the *retired* rule, `pipelex_service.toml` — a
+        file earlier releases wrote and nothing reads any more — is a match for `pipelex_*.toml`.
+        Without the *directory* rule, a backend file named `inference/backends/pipelex_<name>.toml`
         is a `pipelex_*.toml` match too — and it is an inference backend definition, so the main
         configuration's ledger would be replayed over it and rewrite it.
 
@@ -489,6 +492,8 @@ class SurfaceRegistry(BaseModel):
                 contract's *a file claimed by two globs is a registry error* becomes enforceable,
                 by name, on the file that proves it.
         """
+        if subdirectory == Path() and file_name in RETIRED_CONFIG_FILE_NAMES:
+            return None
         candidates = [surface for surface in self.surfaces if surface.subdirectory == subdirectory]
         for surface in candidates:
             if surface.base_file == file_name:
@@ -577,14 +582,6 @@ def build_config_surface_registry() -> SurfaceRegistry:
                 config_model=TelemetryConfig,
                 defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
                 kit_template_path=_KIT_CONFIGS_DIR / TELEMETRY_CONFIG_FILE_NAME,
-            ),
-            Surface(
-                surface_id=PIPELEX_SERVICE_CONFIG_SURFACE_ID,
-                title="Pipelex service agreement and onboarding state",
-                base_file=PIPELEX_SERVICE_CONFIG_FILE_NAME,
-                config_model=PipelexServiceConfig,
-                defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
-                kit_template_path=_KIT_CONFIGS_DIR / PIPELEX_SERVICE_CONFIG_FILE_NAME,
             ),
             # **Every `*.toml` directly in `inference/backends/`, and nothing else.**
             #

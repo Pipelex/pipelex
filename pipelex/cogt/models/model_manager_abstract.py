@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -24,8 +22,6 @@ class ModelManagerAbstract(ABC):
         self,
         *,
         secrets_provider: SecretsProviderAbstract,
-        managed_gateway_configs: dict[str, GatewayConfig] | None,
-        gateway_config_source: RemoteConfigSource | None,
         plugin_model_declarations: PluginModelDeclarations,
         needs_inference: bool = True,
     ) -> None:

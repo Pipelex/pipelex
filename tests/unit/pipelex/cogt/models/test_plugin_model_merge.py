@@ -73,8 +73,6 @@ class TestPluginModelMerge:
         models_manager = ModelManager()
         models_manager.setup(
             secrets_provider=EnvSecretsProvider(),
-            managed_gateway_configs=None,
-            gateway_config_source=None,
             plugin_model_declarations=plugin_model_declarations,
             needs_inference=False,
             backends_library_paths=[inference_dir / "backends.toml"],

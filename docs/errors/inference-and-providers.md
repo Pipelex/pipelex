@@ -28,7 +28,6 @@ own page. Classes are grouped by subsystem.
 - [`ExtractModelNotFoundError`](extract-model-not-found-error.md) — Extract model not found
 - [`ExtractOutputError`](extract-output-error.md) — Extract output
 - [`FalCredentialsError`](fal-credentials-error.md) — Fal credentials
-- [`GatewayUnknownModelError`](gateway-unknown-model-error.md) — Gateway unknown model
 - [`GeneratedImageError`](generated-image-error.md) — Generated image
 - [`ImageContentError`](image-content-error.md) — Image content
 - [`ImgGenGeneratedTypeError`](img-gen-generated-type-error.md) — Img gen generated type

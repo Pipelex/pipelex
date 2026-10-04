@@ -25,7 +25,6 @@ class TestTheRealRegistry:
         assert [surface.surface_id for surface in registry.surfaces] == [
             "pipelex-config",
             "telemetry-config",
-            "pipelex-service-config",
             "inference-backend",
         ]
 

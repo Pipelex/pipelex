@@ -352,7 +352,7 @@ def trace_input_semantics_cmd(*, bundle_paths: list[Path], output_dir: Path, all
             console.print(f"[red]Bundle file not found: {bundle_path}[/red]")
             sys.exit(2)
 
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
     try:
         manifest = asyncio.run(
             trace_input_semantics(

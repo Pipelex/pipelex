@@ -179,10 +179,7 @@ extract_models = ["@from_pdf"]
 
 ### 1. Model Discovery
 
-The preprocessing command discovers available models from:
-
-- **Backend TOML files** in `inference/backends/*.toml`, resolved from the project `.pipelex/` directory if present there, otherwise from the global `~/.pipelex/` directory
-- **Pipelex Gateway** remote configuration
+The preprocessing command discovers available models from the backend TOML files in `inference/backends/*.toml`, resolved from the project `.pipelex/` directory if present there, otherwise from the global `~/.pipelex/` directory.
 
 ### 2. Profile Resolution
 
@@ -300,7 +297,7 @@ This is useful for:
 # Add a personal profile
 [profiles.my_local]
 description = "My local testing profile"
-backends = ["pipelex_manifold"]
+backends = ["anthropic", "openai"]
 llm_models = ["claude-4.5-sonnet", "gpt-4o"]
 img_gen_models = []
 extract_models = []

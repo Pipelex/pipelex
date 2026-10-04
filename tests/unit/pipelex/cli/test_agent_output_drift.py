@@ -23,7 +23,6 @@ _EXCEPTION_MODULES: tuple[str, ...] = (
     "pipelex.pipe_operators.exceptions",
     "pipelex.pipeline.exceptions",
     "pipelex.pipeline.validate_bundle",
-    "pipelex.system.pipelex_service.exceptions",
     "pipelex.system.telemetry.exceptions",
     "pipelex.tools.misc.json_utils",
     "pipelex.tools.misc.toml_utils",

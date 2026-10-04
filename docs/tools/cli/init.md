@@ -66,9 +66,6 @@ This command creates or resets a Pipelex config directory with:
 !!! warning "Init writes a fresh file — it does not update one"
     Every `init` target replaces the file with the template, so whatever was in it is gone. If a configuration file has simply fallen behind the current schema, [`pipelex migrate`](migrate.md) is the command: it rewrites the file in place and keeps every setting — your PostHog key, your Langfuse credentials, your exporters. `pipelex doctor` tells you which of the two you have.
 
-!!! note "Offline cache priming"
-    When any Pipelex-managed gateway backend is enabled, `pipelex init` also primes an on-disk copy of the published remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
-
 ## Interactive Setup Flow
 
 When you run `pipelex init`, Pipelex can guide you through:
@@ -105,7 +102,7 @@ All fields are optional:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`, `pipelex_manifold`). Omit to keep the template's enabled backends and its routing profile, which sends each model to the first of them that serves it. |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`). Omit to keep the template's enabled backends and its routing profile, which sends each model to the first of them that serves it. |
 | `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's backends to it first. |
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).

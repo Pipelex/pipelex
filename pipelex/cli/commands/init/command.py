@@ -4,7 +4,6 @@ import shutil
 from pathlib import Path
 
 import typer
-from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Confirm
@@ -23,97 +22,7 @@ from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
-from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
-from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
-
-
-class CachePrimingResult(BaseModel):
-    """Outcome of an attempt to prime the on-disk remote-config cache.
-
-    ``primed`` is ``True`` only when a fresh fetch succeeded *and* a usable cache exists on disk
-    afterwards. ``error_message`` is populated when the fetch was attempted but failed (offline at
-    init time) *or* when the fetch succeeded but the cache could not be persisted, read back, or
-    validated as a usable ``RemoteConfig`` (e.g. a read-only or full cache directory). ``None``
-    means priming was skipped (no managed gateway backend enabled) or that it succeeded.
-    """
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    primed: bool
-    error_message: str | None = None
-
-
-def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) -> CachePrimingResult:
-    """Prime the on-disk remote-config cache so later offline runs can fall back to it.
-
-    Pure-logic variant: no I/O on the way out, so both the interactive (`pipelex init`) and
-    machine (`pipelex-agent init`) surfaces can decide how to surface failure (Rich warning vs
-    structured JSON field).
-
-    Skipped (``primed=False, error_message=None``) when no managed gateway backend is enabled in
-    ``backends.toml``: BYOK has nothing to cache.
-
-    The question is the boot's — *any* managed gateway backend — because what gets cached is the
-    single published configuration carrying every managed backend's section.
-
-    Always passes ``require_fresh=True`` to the fetcher: priming's only job is to write a fresh
-    cache, so silently accepting an existing cached fallback would be a misleading success. When
-    the network is unreachable and only a stale cache exists, the fetcher raises
-    ``RemoteConfigUnavailableError`` and we surface that as ``error_message`` — the stale cache
-    on disk is left intact so subsequent offline dry-runs can still fall back to it.
-
-    ``RemoteConfigValidationError`` is intentionally NOT caught: a server-side schema break is a
-    real bug (we control the back-office) and should surface loudly rather than be hidden by the
-    priming step.
-
-    Args:
-        target_config_dir: When set, read the backends document *at that directory* (its
-            ``backends.toml`` and its own ``backends_override.toml``) to decide whether a managed
-            gateway backend is enabled. ``pipelex init`` and ``pipelex init --local`` target
-            different ``.pipelex/`` directories — using the layered/project-preferred config here
-            would let priming branch on the wrong file. ``None`` (default) falls back to the layered
-            document.
-    """
-    if not enabled_managed_gateway_sections(config_dir=target_config_dir):
-        return CachePrimingResult(primed=False)
-
-    try:
-        RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
-    except RemoteConfigUnavailableError as exc:
-        return CachePrimingResult(primed=False, error_message=str(exc))
-
-    # A successful fetch does NOT guarantee a usable cache. ``RemoteConfigFetcher`` treats the
-    # cache write as opportunistic and swallows OSErrors (read-only / full cache dir) with only a
-    # stderr warning, so read the cache back: a wrapper that loads holds the payload as a JSON
-    # object, which is all a ``RemoteConfig`` needs. Otherwise priming would misreport success and
-    # later offline runs would hit ``RemoteConfigUnavailableError``.
-    cached = RemoteConfigCache.load()
-    if cached is None:
-        msg = (
-            f"Remote config was fetched but the cache at {RemoteConfigCache.cache_path()} "
-            "could not be written, read back, or validated; offline dry-runs will not have a "
-            "fallback. Check that the directory is writable."
-        )
-        return CachePrimingResult(primed=False, error_message=msg)
-    return CachePrimingResult(primed=True)
-
-
-def prime_remote_config_cache(*, console: Console, target_config_dir: Path | None = None) -> None:
-    """Interactive-surface wrapper around :func:`attempt_prime_remote_config_cache`.
-
-    Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
-    silent. Used by ``pipelex init`` so the user knows priming didn't happen and how to retry.
-
-    ``target_config_dir`` is forwarded so the managed-gateway check inspects the directory
-    being initialized rather than the layered config (see ``attempt_prime_remote_config_cache``).
-    """
-    result = attempt_prime_remote_config_cache(target_config_dir=target_config_dir)
-    if result.error_message is not None:
-        console.print(f"[yellow]⚠ Could not prime remote config cache: {escape(result.error_message)}[/yellow]")
-        console.print("[dim]Re-run 'pipelex init' while online to prime the cache for offline dry-runs.[/dim]")
 
 
 def determine_needs(
@@ -344,12 +253,6 @@ def execute_initialization(
     # Step 4: Set up telemetry if needed
     if needs_telemetry:
         setup_telemetry(console=console, telemetry_config_path=telemetry_config_path, for_project=for_project)
-
-    # Step 5: Prime the remote-config cache so dry-runs and validate can fall back offline.
-    # No-op when no managed gateway backend is enabled. We forward ``target_config_dir`` so the
-    # managed-gateway check inspects the directory we just initialized (matters for ``--local``
-    # vs default init).
-    prime_remote_config_cache(console=console, target_config_dir=target_config_dir)
 
     console.print()
 

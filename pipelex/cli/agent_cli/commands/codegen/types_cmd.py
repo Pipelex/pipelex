@@ -72,9 +72,7 @@ def agent_codegen_types_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
     output_root = Path(output_dir).expanduser()
-    # needs_model_specs=True (like `validate`): library validation checks pipe model pins
-    # against the deck, so the specs must be loaded even though codegen needs no inference.
-    make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(needs_inference=False)
 
     try:
         combined_dirs: list[Path] = [*(paths or []), *(Path(lib_dir) for lib_dir in library_dir or [])]

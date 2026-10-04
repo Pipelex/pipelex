@@ -40,7 +40,6 @@ _TRACKED_CONFIG_FILES = [
     Path("pipelex/kit/configs/pipelex.toml"),
     Path("pipelex/kit/configs/telemetry.toml"),
     Path("pipelex/kit/configs/telemetry.project.toml"),
-    Path("pipelex/kit/configs/pipelex_service.toml"),
     Path("pipelex/kit/configs/plxt.toml"),
     Path(".pipelex/pipelex.toml"),
     Path(".pipelex/telemetry.toml"),

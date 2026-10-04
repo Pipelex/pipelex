@@ -311,8 +311,8 @@ def migrate_directories(
     particular model's refusal rather than migrating the machine. **It narrows the result, not the
     registry, and that distinction is the whole point**: which surface owns a file is decided
     across *all* of them — an exact base file claims before any glob — so a registry holding one
-    surface would hand `pipelex_service.toml` to `pipelex-config`'s `pipelex_*.toml` and replay
-    the wrong ledger over it. Arbitration first, then the filter.
+    surface could hand another surface's base file to its glob and replay the wrong ledger over
+    it. Arbitration first, then the filter.
     """
     stamp = moment if moment is not None else datetime.now(UTC)
     plans: list[MigrationPlan] = []

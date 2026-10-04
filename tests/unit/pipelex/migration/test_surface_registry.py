@@ -189,7 +189,7 @@ class TestRegistryConsistency:
             _surface(surface_id="a", base_file=base_file, tier_glob=tier_glob, subdirectory=BACKENDS)
 
     def test_a_base_file_matching_another_surfaces_glob_is_fine(self) -> None:
-        """This is the real configuration: `pipelex_service.toml` matches `pipelex_*.toml`.
+        """`pipelex_extra.toml` is one surface's base file and matches another's `pipelex_*.toml`.
 
         Exact filenames claim before globs across all surfaces, so the resolution rule separates
         them — which is exactly why it exists, and why this is not a registry error.
@@ -197,7 +197,7 @@ class TestRegistryConsistency:
         registry = SurfaceRegistry(
             surfaces=[
                 _surface(surface_id="a", base_file="pipelex.toml", tier_glob="pipelex_*.toml"),
-                _surface(surface_id="b", base_file="pipelex_service.toml"),
+                _surface(surface_id="b", base_file="pipelex_extra.toml"),
             ]
         )
         assert len(registry.surfaces) == 2

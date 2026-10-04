@@ -7,7 +7,6 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType
@@ -624,43 +623,3 @@ class ModelDeckNotFoundError(CogtError):
 
 class ModelDeckValidationError(CogtError):
     pass
-
-
-class GatewayUnknownModelError(CogtError):
-    """A model handle the active routing profile sends to a managed gateway is absent from its specs.
-
-    Carries the provenance of the gateway config (``FRESH`` vs ``CACHED``) so the message can
-    branch: a cached-source failure suggests stale gateway specs and points the user at
-    ``pipelex init`` to refresh while online; a fresh-source failure is a genuine
-    misconfiguration.
-
-    **And it carries the backend name**, because more than one managed gateway can be live at once
-    and "which one" is then a question the message has to answer — the handle may be perfectly
-    present in the other service's section, which is a legitimate configuration rather than a
-    contradiction.
-    """
-
-    error_category = InferenceErrorCategory.CONFIGURATION
-
-    def __init__(self, model_name: str, backend_name: str, source: RemoteConfigSource) -> None:
-        self.model_name = model_name
-        self.backend_name = backend_name
-        self.source = source
-        match source:
-            case RemoteConfigSource.FRESH:
-                msg = (
-                    f"Model handle '{model_name}' is routed to backend '{backend_name}' by the active routing profile, "
-                    f"but is not present in the model specs we just fetched for it. Either the model name is wrong, that "
-                    f"gateway no longer offers it, or your deck overrides need updating.\n"
-                    f"  - Run `pipelex doctor` to inspect the active gateway models.\n"
-                    f"  - Route this model to another backend in .pipelex/inference/routing_profiles.toml.\n"
-                    f"  - Or disable {backend_name} in .pipelex/inference/backends.toml to fall back to BYOK."
-                )
-            case RemoteConfigSource.CACHED:
-                msg = (
-                    f"Model handle '{model_name}' is routed to backend '{backend_name}' by the active routing profile, "
-                    f"but is not present in the model specs loaded for it from the on-disk cache. The cache may be stale.\n"
-                    f"  - Run `pipelex init` while online to refresh the cached gateway config.\n"
-                    f"  - Or disable {backend_name} in .pipelex/inference/backends.toml to operate offline (BYOK)."
-                )
-        super().__init__(msg)

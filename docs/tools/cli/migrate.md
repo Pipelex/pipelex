@@ -22,7 +22,7 @@ Two directories, and only those:
 - the global `~/.pipelex/`
 - the project `.pipelex/`, when the current directory is inside a project that has one
 
-Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers, `pipelex_service.toml` — and at the inference backend definitions in `inference/backends/`.
+Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers — and at the inference backend definitions in `inference/backends/`.
 
 It goes one level deep, and only into a directory some configuration family owns. `inference/backends/` is such a directory, so every `*.toml` in it is repaired the same way a `pipelex.toml` is. `inference/deck/` is not one, and neither is `inference/backends.toml`, which sits beside the backends directory rather than in it — neither is ever entered or rewritten by this command, and the model deck has its own `pipelex update`.
 

@@ -2,22 +2,16 @@
 
 import logging
 import sys
-import warnings
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, record_setup_warning
-from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
+from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
 from pipelex.system.console_target import ConsoleTarget
-from pipelex.system.pipelex_service.exceptions import (
-    RemoteConfigStaleWarning,
-    RemoteConfigUnavailableError,
-    RemoteConfigValidationError,
-)
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.log.log import log
@@ -159,9 +153,7 @@ def apply_agent_cli_output_discipline() -> None:
         hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
 
-def make_pipelex_for_agent_cli(
-    *, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True, needs_model_specs: bool | None = None
-) -> Pipelex:
+def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True) -> Pipelex:
     """Initialize Pipelex for agent CLI commands with JSON error output.
 
     This is the agent CLI counterpart of ``make_pipelex_for_cli`` in
@@ -189,8 +181,7 @@ def make_pipelex_for_agent_cli(
 
     Args:
         library_dirs: Optional library directories to use for the Pipelex instance.
-        needs_inference: When False, skip inference setup (credentials, managed gateways, telemetry).
-        needs_model_specs: When True, load real model specs even without inference.
+        needs_inference: When False, skip inference setup (credentials, telemetry).
 
     Returns:
         Initialized Pipelex instance.
@@ -202,34 +193,14 @@ def make_pipelex_for_agent_cli(
     # log line (anthropic/httpx/botocore credential probes, telemetry setup, etc.).
     silence_logging_for_agent_cli()
     try:
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always", RemoteConfigStaleWarning)
-            pipelex_instance = Pipelex.make(
-                integration_mode=IntegrationMode.CLI,
-                library_dirs=library_dirs,
-                needs_inference=needs_inference,
-                needs_model_specs=needs_model_specs,
-                config_overrides=dict(AGENT_CLI_CONFIG_OVERRIDES),
-            )
-        # Surface a structured ``RemoteConfigStale`` entry so JSON consumers can react to
-        # stale-cache operation without parsing stderr.
-        for item in caught:
-            if issubclass(item.category, RemoteConfigStaleWarning):
-                record_setup_warning({"type": "RemoteConfigStale", "message": str(item.message)})
+        pipelex_instance = Pipelex.make(
+            integration_mode=IntegrationMode.CLI,
+            library_dirs=library_dirs,
+            needs_inference=needs_inference,
+            config_overrides=dict(AGENT_CLI_CONFIG_OVERRIDES),
+        )
     except TelemetryConfigValidationError as exc:
         agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
-    except RemoteConfigUnavailableError as exc:
-        agent_error(exc.message, error_type="RemoteConfigUnavailableError", cause=exc)
-    except RemoteConfigValidationError as exc:
-        agent_error(exc.message, error_type="RemoteConfigValidationError", cause=exc)
-    except GatewayUnknownModelError as exc:
-        agent_error(
-            exc.message,
-            error_type="GatewayUnknownModelError",
-            cause=exc,
-            model_name=exc.model_name,
-            source=exc.source,
-        )
     except ModelDeckPresetValidatonError as exc:
         agent_error(
             exc.message,

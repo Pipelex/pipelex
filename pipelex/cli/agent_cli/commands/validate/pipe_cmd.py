@@ -76,7 +76,7 @@ def validate_pipe_cmd(
         if pipe_code:
             agent_error("--all cannot be used with a pipe code", error_type="ArgumentError", exit_code=2)
 
-        make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
+        make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
 
         try:
             result = asyncio.run(validate_all_core(library_dirs=library_dirs, allow_signatures=allow_signatures))
@@ -159,7 +159,7 @@ def validate_pipe_cmd(
         else:
             library_dirs = [*export_paths, *library_dirs]
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
 
     try:
         result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs, allow_signatures=allow_signatures))

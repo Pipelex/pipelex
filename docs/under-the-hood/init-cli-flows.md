@@ -16,7 +16,7 @@ The `.pipelex/` directory contains two categories of files with different lifecy
 1. **Config files** (`pipelex.toml`, `plxt.toml`) — static templates copied verbatim from the kit (no interactive customization); re-running init overwrites them (full reset).
 2. **Inference files** (`inference/backends.toml`, `inference/routing_profiles.toml`, `inference/backends/*.toml`, `inference/deck/*.toml`) — interactive setup, customized per-project based on which AI backends the user selects.
 
-These two categories are managed by separate steps. `init_config()` copies only config files (skipping the `inference/` directory entirely). The inference step handles its own template copying and then runs interactive backend selection and routing customization. Each file is owned by exactly one step — `init_config()` explicitly skips the `inference/` directory via `INIT_SKIP_DIRS`, and skips `telemetry.toml` and `pipelex_service.toml` via `INIT_SKIP_FILES`. This separation ensures that re-running `pipelex init config` never overwrites a user's carefully tuned inference setup.
+These two categories are managed by separate steps. `init_config()` copies only config files (skipping the `inference/` directory entirely). The inference step handles its own template copying and then runs interactive backend selection and routing customization. Each file is owned by exactly one step — `init_config()` explicitly skips the `inference/` directory via `INIT_SKIP_DIRS`, and skips `telemetry.toml` via `INIT_SKIP_FILES`. This separation ensures that re-running `pipelex init config` never overwrites a user's carefully tuned inference setup.
 
 ---
 
@@ -253,7 +253,6 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 | `inference/deck/*.toml` | Inference step | Model deck definitions |
 | `inference/routing_profiles.toml` | Inference step | Routing profile definitions |
 | `telemetry.toml` | Telemetry step | Telemetry export configuration |
-| `pipelex_service.toml` | `pipelex-agent init` | The inference setup state that `pipelex-agent init` records |
 
 ### Skip Lists
 
@@ -320,7 +319,7 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ### Global Config Bootstrap
 
-`ensure_global_config_exists()` creates `~/.pipelex/` with kit template files on first use (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_service.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
+`ensure_global_config_exists()` creates `~/.pipelex/` with kit template files on first use (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
 
 ### Config Loading Chain
 
@@ -370,9 +369,7 @@ flowchart TD
     STEP15 --> STEP16["Step 1.6: Copy telemetry template<br/>(global: active defaults; project: commented-out)"]
     STEP16 --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
     STEP2 --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile<br/>(the template's, when the config names neither field)"]
-    STEP3 --> STEP4["Step 4: Mark inference setup completed<br/>(written to ~/.pipelex/)"]
-    STEP4 --> STEP5["Step 5: Prime remote-config cache<br/>(no-op when no managed gateway is enabled)"]
-    STEP5 --> OUTPUT["Output result<br/>(Markdown, or JSON via --format json)"]
+    STEP3 --> OUTPUT["Output result<br/>(Markdown, or JSON via --format json)"]
 ```
 
 !!! note "No credentials step"

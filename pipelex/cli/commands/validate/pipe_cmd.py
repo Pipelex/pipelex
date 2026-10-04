@@ -72,7 +72,6 @@ def validate_pipe_cmd(
                 context=ErrorContext.VALIDATION,
                 library_dirs=library_dirs_paths,
                 needs_inference=False,
-                needs_model_specs=True,
                 boot_orchestrator=orchestrator,
             )
             do_validate_all_libraries_and_dry_run(

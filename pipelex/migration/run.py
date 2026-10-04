@@ -22,7 +22,7 @@ user would be told one thing by their boot and another by their tool.
 > `inference/deck/` — is never entered at all.
 >
 > **A file is claimed by the pair (directory, name), never by its name alone.**
-> `.pipelex/inference/backends/pipelex_manifold.toml` is the specimen: its name matches the
+> A backend file named `.pipelex/inference/backends/pipelex_<name>.toml` is the specimen: its name matches the
 > `pipelex-config` tier glob `pipelex_*.toml` exactly, and the directory it sits in is what says
 > it belongs to `inference-backend` instead. Depth used to be what protected it, back when no
 > surface owned a subdirectory; now the claim rule is.
@@ -112,8 +112,8 @@ def scan_config_surface(*, surface_id: str, config_dirs: list[Path] | None = Non
 
     The scoping is a filter on the *answer*, and the full registry still decides which surface
     owns which file — see `migrate_directories`. Handing it a one-surface registry instead looks
-    equivalent and is not: `pipelex_service.toml` is another surface's base file *and* a match for
-    `pipelex-config`'s `pipelex_*.toml`, and with that other surface absent the glob wins.
+    equivalent and is not: arbitration between surfaces — exact base files before globs, retired
+    file names claimed by none — needs every surface in the registry to decide.
 
     Args:
         surface_id: The surface to answer for.

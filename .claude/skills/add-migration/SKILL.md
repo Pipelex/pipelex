@@ -15,7 +15,7 @@ description: >
 # Add a Migration Entry
 
 A configuration **surface** — `pipelex.toml` and its tiers, `telemetry.toml`,
-`pipelex_service.toml`, the inference backend definitions in
+the inference backend definitions in
 `inference/backends/` — ships a checked-in ledger at
 `pipelex/migration/ledgers/<surface-id>.toml` recording, as data, every shape
 change it has ever undergone. A user's existing file is repaired by replaying that

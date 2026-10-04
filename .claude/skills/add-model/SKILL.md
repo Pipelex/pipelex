@@ -16,7 +16,7 @@ description: >
 
 A model is added once per backend that serves it. Each backend TOML under `.pipelex/inference/backends/` declares the models that backend can call, the kit copy under `pipelex/kit/configs/` is what ships in the package, and `.pipelex-dev/test_profiles.toml` decides which models the parametrized inference tests can select. Those are the files that declare a model; the steps below also write the changelog, and regenerate the goldens and references that follow from them.
 
-One backend is different: `pipelex_manifold` takes its model catalog from the **remote config**, a versioned artifact the runtime fetches at boot from the URL in `pipelex/system/pipelex_service/pipelex_details.py` (overridable with `PIPELEX_REMOTE_CONFIG_URL`). Its local TOML only lets a user override `sdk` and `structure_method` per model, so a model cannot be added to it from here. See step 8.
+The Pipelex Manifold catalog is not in this repository: the hosted plane carries it. See step 8.
 
 ## 1. Establish the facts, from the provider
 
@@ -71,15 +71,13 @@ For an LLM, go past `TestLLMInference` and exercise what the entry declares: `Te
 
 ## 7. Deck, changelog, checks
 
-- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-gpt`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once a shipped backend serves the model: under the default `all_enabled_backends` routing, a preset or choice default reaching a handle no enabled backend serves is dropped from the deck with a warning, and under `all_pipelex_manifold` a handle the manifold catalog lacks raises `GatewayUnknownModelError` at boot, so `make tb` turns red. An alias no preset or choice default reaches is not checked at all, so a dangling one ships silently: read the deck yourself rather than trusting the boot. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
+- **Deck.** Adding a model does not change the deck. Promoting it to an alias or preset in `.pipelex/inference/deck/` (`best-gpt`, `default-premium`, a preset's `model`) changes what existing methods run on, so it is a separate decision: ask, and if the answer is yes, edit the deck, then run `make ukc` again. Promote only once a shipped backend serves the model: under the default `all_enabled_backends` routing, a preset or choice default reaching a handle no enabled backend serves is dropped from the deck with a warning. An alias no preset or choice default reaches is not checked at all, so a dangling one ships silently: read the deck yourself rather than trusting the boot. Then grep `docs/` for the alias you moved: `docs/configuration/config-technical/inference-backend-config.md` mirrors the deck's aliases, and other pages quote single ones.
 - **Changelog.** One bullet under `## [Unreleased]` → `### Added` in `CHANGELOG.md`: the handle, the backends, what it takes and produces, and anything unusual such as a refused parameter.
 - **Checks.** `make tb` boots the config, which parses and validates the backends `backends.toml` enables — and only those, so an entry added to a disabled backend such as `vertexai` is never read. To validate one, enable that backend in the gitignored `.pipelex/inference/backends_override.toml` for the run, and delete the file afterwards. Then stage your changes (the drift digest reads the git index) and run `make agent-check`.
 
 ## 8. The manifold catalog
 
-This repository cannot add the model to `pipelex_manifold`: its catalog is published by the Pipelex team in the remote config. Tell the user so, and say which handle, model ids and capabilities the catalogs need. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
-
-Once a remote config carrying the model is published at the version this repository pins, `/test-model` on `pipelex_manifold` proves the model end to end through the service.
+This repository cannot add the model to Pipelex Manifold: its catalog lives with the hosted plane. Tell the user so, and say which handle, model ids and capabilities the catalog needs. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
 
 
 ## Checklist
@@ -94,4 +92,4 @@ Show this to the user at the end, each box ticked or explained:
 - [ ] Deck left alone, or the promotion decided by the user, made after a shipped backend serves the model, and mirrored in `docs/`
 - [ ] Changelog entry under `[Unreleased]`
 - [ ] `make tb` and `make agent-check` green
-- [ ] Manifold catalog handed off, and `/test-model` on `pipelex_manifold` run once it is published
+- [ ] Manifold catalog handed off to the hosted plane

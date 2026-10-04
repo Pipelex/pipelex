@@ -27,7 +27,7 @@ def has_diff_dirs(
     Args:
         dir1: First directory path.
         dir2: Second directory path.
-        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
+        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_override.toml"}).
         exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
         exclude_patterns: Set of glob patterns whose matching file names are excluded from
             comparison (e.g., {"*.bak.*"}). For artifacts whose names carry a timestamp or another
@@ -222,7 +222,7 @@ def make_diff_dirs_pretty(
     Args:
         dir1: First directory path.
         dir2: Second directory path.
-        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
+        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_override.toml"}).
         exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
         exclude_patterns: Set of glob patterns whose matching file names are excluded from
             comparison (e.g., {"*.bak.*"}). Keep it equal to what the matching `has_diff_dirs` call

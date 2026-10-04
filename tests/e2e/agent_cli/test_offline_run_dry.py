@@ -1,10 +1,8 @@
 """E2E tests for offline-mode dry-run via the agent CLI subprocess.
 
-These tests pin Phase 5 of the offline-mode plan: invoke the real ``pipelex-agent run
-bundle ... --dry-run --mock-inputs`` against the same surface that fails today in
-codex-sandbox handoffs, with the remote-config URL pointed at an unreachable address so
-the network behaviour is honest (real ``httpx.ConnectError``) rather than mocked. Each
-test gets its own ``HOME``; the ``conftest`` fixtures handle the .pipelex/ scaffolding.
+These tests invoke the real ``pipelex-agent run bundle ... --dry-run --mock-inputs`` against
+the same surface codex-sandbox handoffs use, with no network and dummy credentials. Each test
+gets its own ``HOME``; the ``conftest`` fixtures handle the .pipelex/ scaffolding.
 """
 
 from __future__ import annotations
@@ -16,15 +14,10 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from pipelex.cogt.models.model_reference import ModelReference
 from tests.e2e.agent_cli.conftest import (
     OFFLINE_BUNDLES_DIR,
     PIPELEX_AGENT_BIN,
-    load_kit_model_deck_blueprint,
-    manifold_model_specs_for_kit_deck,
-    set_manifold_enabled,
     write_active_routing_profile,
-    write_remote_config_cache,
 )
 
 if TYPE_CHECKING:
@@ -107,20 +100,6 @@ def _parse_agent_json(output: str) -> dict[str, object]:
     raise AssertionError(msg)
 
 
-def _cached_remote_config_payload() -> dict[str, object]:
-    """A structurally complete cached remote-config payload for the primed-cache scenarios.
-
-    The manifold section is derived from the shipped kit deck (see
-    ``manifold_model_specs_for_kit_deck``) so the gateway-membership check in
-    ``Pipelex.setup`` accepts the cache without a hand-maintained handle list that goes
-    stale whenever the deck promotes an alias to a new model.
-    """
-    return {
-        "manifold_model_specs": manifold_model_specs_for_kit_deck(),
-        "aws_region": "us-east-1",
-    }
-
-
 @pytest.mark.gha_disabled  # Slow subprocess-based E2E; runs locally and on PR-gated workflows.
 class TestOfflineDryRun:
     def test_parse_agent_json_returns_last_when_preamble_present(self) -> None:
@@ -146,7 +125,7 @@ class TestOfflineDryRun:
         """
         envelope = {
             "text": "mock result",
-            "warnings": [{"id": "WARN-1", "type": "RemoteConfigStale"}],
+            "warnings": [{"id": "WARN-1", "type": "SomeWarning"}],
         }
         parsed = _parse_agent_json(json.dumps(envelope, indent=2))
         assert parsed == envelope, parsed
@@ -154,9 +133,8 @@ class TestOfflineDryRun:
         assert "warnings" in parsed, f"the outer envelope (with 'warnings') must be returned: {parsed!r}"
 
     def test_byok_offline_succeeds(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """No managed gateway + no network + no cache → dry-run exits 0 with structured success JSON."""
+        """BYOK + no network → dry-run exits 0 with structured success JSON."""
         pipelex_dir = hermetic_home / ".pipelex"
-        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
         write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_anthropic")
 
         staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "byok_simple", hermetic_home)
@@ -168,129 +146,3 @@ class TestOfflineDryRun:
         # synthetic output under "text" (or a typed key) instead.
         assert "error" not in payload, payload
         assert "text" in payload, payload
-
-    def test_manifold_no_cache_no_network_fails_with_unavailable(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Manifold enabled + no network + no cache → ``RemoteConfigUnavailableError`` with remediation hint."""
-        pipelex_dir = hermetic_home / ".pipelex"
-        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
-        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
-
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_known_model", hermetic_home)
-        result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
-
-        assert result.returncode != 0, f"Manifold offline with no cache must fail.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
-        payload = _parse_agent_json(result.stderr or result.stdout)
-        assert payload.get("error_type") == "RemoteConfigUnavailableError", payload
-        message = str(payload.get("message", ""))
-        assert "pipelex init" in message.lower(), f"Error must mention `pipelex init` remediation; got: {message!r}"
-
-    def test_primed_cache_specs_track_kit_deck_premium_alias(self) -> None:
-        """Regression: the primed manifold cache is derived from the kit deck, so it tracks alias promotions.
-
-        Reads the deck's own ``default-premium`` target — whatever model it currently points
-        to — and asserts the derived manifold specs cover it, without hardcoding the model name.
-        If a future deck promotes the premium alias to a new handle this keeps passing; if the
-        derivation ever stops covering a referenced handle it fails fast here (a unit-speed
-        check) instead of deep inside a subprocess setup with an opaque GatewayUnknownModelError.
-        """
-        blueprint = load_kit_model_deck_blueprint()
-        premium_target = blueprint.llm.aliases["default-premium"]
-        specs = manifold_model_specs_for_kit_deck()
-        assert premium_target in specs, (
-            f"Derived manifold specs must cover the kit deck's default-premium target '{premium_target}'; got handles: {sorted(specs)}"
-        )
-
-    def test_primed_cache_excludes_software_only_internal_handles(self) -> None:
-        """Regression: the manifold cache must not claim software-only internal extractors as manifold models.
-
-        ``@default-no-inference`` / ``@default-text-from-pdf`` resolve to an extractor served by the
-        local ``internal`` backend (``PipelexBackend.INTERNAL`` — "runs internally, without AI"), which
-        Pipelex Manifold never provides. If the derived manifold specs claimed it, an offline dry-run
-        could resolve the alias to the fake ``manifold_extract`` worker instead of exercising the real
-        internal backend. The companion assertion guards the other direction: a genuinely manifold-served
-        extract model (the first choice of the ``default-extract-document`` waterfall) must stay covered, so the exclusion does
-        not over-reach onto provider-backed models the manifold does proxy.
-        """
-        blueprint = load_kit_model_deck_blueprint()
-        software_only_target = blueprint.extract.aliases["default-no-inference"]
-        document_waterfall = ModelReference.parse(blueprint.extract.aliases["default-extract-document"])
-        manifold_extract_target = blueprint.extract.waterfalls[document_waterfall.name][0]
-        specs = manifold_model_specs_for_kit_deck()
-        assert software_only_target not in specs, (
-            f"Derived manifold specs must exclude software-only internal handle '{software_only_target}'; got handles: {sorted(specs)}"
-        )
-        assert manifold_extract_target in specs, (
-            f"Manifold-served extract target '{manifold_extract_target}' must remain covered; got handles: {sorted(specs)}"
-        )
-
-    def test_manifold_known_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Manifold enabled + no network + primed cache → dry-run exits 0 with stale-cache warning."""
-        pipelex_dir = hermetic_home / ".pipelex"
-        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
-        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
-        write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
-
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_known_model", hermetic_home)
-        result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
-
-        assert result.returncode == 0, f"Manifold dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
-        payload = _parse_agent_json(result.stdout)
-        assert "error" not in payload, payload
-        rendered = json.dumps(payload)
-        assert '"type": "RemoteConfigStale"' in rendered, (
-            f"Cached-source setup must surface a RemoteConfigStale warning on the envelope; got: {payload!r}"
-        )
-
-    def test_manifold_img_gen_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Manifold enabled + no network + primed cache → an image-gen pipe dry-runs offline.
-
-        Companion to ``test_manifold_known_with_cache_succeeds_offline``, but the bundle's pipe is a
-        ``PipeImgGen`` referencing a manifold image handle (``gpt-image-2``). It proves the derived
-        cache covers img_gen handles too — not just LLMs — so the gateway-membership check passes for
-        an image model and the offline dry-run completes.
-
-        Scope note: dry-run mocks image generation at the cogt leaf, so this does NOT build
-        the img-gen worker and therefore does not exercise the spec's ``sdk`` -> worker-factory mapping;
-        it covers membership + handle resolution for image models. The sdk-vs-factory contract is a
-        runtime (non-dry) concern.
-        """
-        pipelex_dir = hermetic_home / ".pipelex"
-        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
-        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
-        write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
-
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_img_gen_model", hermetic_home)
-        result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
-
-        assert result.returncode == 0, (
-            f"Manifold img-gen dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
-        )
-        payload = _parse_agent_json(result.stdout)
-        assert "error" not in payload, payload
-
-    def test_manifold_unknown_with_cache_fails_with_clear_error(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
-        """Bundle pipe references a model absent from the cached manifold specs → clear error.
-
-        The default kit deck only references "known" manifold handles, so this scenario fires
-        at the pipe-operator layer (the membership check at ``ModelManager.setup`` looks at
-        deck presets/choice defaults, not raw per-pipe model strings). Either way the agent
-        CLI must surface a structured error with the unknown handle visible — that is the
-        user-facing contract.
-        """
-        pipelex_dir = hermetic_home / ".pipelex"
-        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
-        write_active_routing_profile(pipelex_dir / "inference" / "routing_profiles.toml", "all_pipelex_manifold")
-        write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
-
-        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "manifold_unknown_model", hermetic_home)
-        result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
-
-        assert result.returncode != 0, f"Unknown-model bundle must fail.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
-        payload = _parse_agent_json(result.stderr or result.stdout)
-        # The unknown handle should appear somewhere visible in the JSON envelope (message
-        # or a structured field). Don't pin the error_type — the failure can surface either
-        # as ``GatewayUnknownModelError`` (if the deck reaches the membership check) or as
-        # ``PipeOperatorModelAvailabilityError`` (raw model string in the pipe). Both carry
-        # the model name; what matters is that the agent gets a clear, structured signal.
-        rendered = json.dumps(payload)
-        assert "gpt-future-fake-99" in rendered, f"Unknown-model error must surface the model name in the JSON envelope; got: {payload!r}"

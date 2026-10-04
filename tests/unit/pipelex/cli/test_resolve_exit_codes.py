@@ -97,7 +97,6 @@ class TestResolveExitCodes:
         mocker.patch(f"{MODULE}.encode_crate", return_value="{}")
         resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
         assert boot.call_args.kwargs["needs_inference"] is False
-        assert boot.call_args.kwargs["needs_model_specs"] is True
 
     def test_home_relative_library_dirs_are_expanded(self, mocker: MockerFixture) -> None:
         activate = mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", return_value="lib-1")
