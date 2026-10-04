@@ -1,14 +1,20 @@
 """OpenTelemetry constants for GenAI-compliant tracing.
 
 This module defines attribute keys used for instrumenting LLM operations
-with OpenTelemetry, following the GenAI semantic conventions.
+with OpenTelemetry, following the GenAI semantic conventions. The keys and values are written out
+rather than imported: `opentelemetry-semantic-conventions` deprecated its whole GenAI namespace when
+those conventions moved to their own repository, which publishes no Python package.
 """
 
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
-
-from opentelemetry.semconv._incubating.attributes import gen_ai_attributes as otel_gen_ai_attributes  # ruff: ignore[import-private-name]
+from typing import TypeAlias
 
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
+
+# OpenTelemetry's own `AttributeValue` is a chained assignment (`AnyValue = AttributeValue = ...`),
+# which mypy refuses as a type; this alias spells out the same recursive union.
+OTelAttributeValue: TypeAlias = str | bool | int | float | bytes | Sequence["OTelAttributeValue"] | Mapping[str, "OTelAttributeValue"] | None
 
 
 class OTelConstants:
@@ -37,18 +43,18 @@ class OTelConstants:
 class GenAISpanAttr(StrEnum):
     """OpenTelemetry GenAI semantic convention attribute keys."""
 
-    OPERATION_NAME = otel_gen_ai_attributes.GEN_AI_OPERATION_NAME
-    PROVIDER_NAME = otel_gen_ai_attributes.GEN_AI_PROVIDER_NAME
+    OPERATION_NAME = "gen_ai.operation.name"
+    PROVIDER_NAME = "gen_ai.provider.name"
 
-    REQUEST_MODEL = otel_gen_ai_attributes.GEN_AI_REQUEST_MODEL
-    REQUEST_MAX_TOKENS = otel_gen_ai_attributes.GEN_AI_REQUEST_MAX_TOKENS
-    REQUEST_TEMPERATURE = otel_gen_ai_attributes.GEN_AI_REQUEST_TEMPERATURE
-    REQUEST_SEED = otel_gen_ai_attributes.GEN_AI_REQUEST_SEED
+    REQUEST_MODEL = "gen_ai.request.model"
+    REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
+    REQUEST_TEMPERATURE = "gen_ai.request.temperature"
+    REQUEST_SEED = "gen_ai.request.seed"
 
-    RESPONSE_MODEL = otel_gen_ai_attributes.GEN_AI_RESPONSE_MODEL
-    OUTPUT_TYPE = otel_gen_ai_attributes.GEN_AI_OUTPUT_TYPE
-    USAGE_INPUT_TOKENS = otel_gen_ai_attributes.GEN_AI_USAGE_INPUT_TOKENS
-    USAGE_OUTPUT_TOKENS = otel_gen_ai_attributes.GEN_AI_USAGE_OUTPUT_TOKENS
+    RESPONSE_MODEL = "gen_ai.response.model"
+    OUTPUT_TYPE = "gen_ai.output.type"
+    USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
+    USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
 
     # Content attributes for PostHog compatibility (not in standard semconv)
     # PostHog UI expects these as span attributes, not events
@@ -91,18 +97,26 @@ class PostHogEvent(StrEnum):
     GENERATION = "$ai_generation"
 
 
-def make_otel_gen_ai_output_type(output_type: str) -> otel_gen_ai_attributes.GenAiOutputTypeValues:
+class GenAIOutputType(StrEnum):
+    """OpenTelemetry GenAI semantic convention values of `gen_ai.output.type`."""
+
+    TEXT = "text"
+    JSON = "json"
+    IMAGE = "image"
+
+
+def make_otel_gen_ai_output_type(output_type: str) -> GenAIOutputType:
     try:
         llm_output_type = InferenceOutputType(output_type)
         match llm_output_type:
             case InferenceOutputType.TEXT:
-                return otel_gen_ai_attributes.GenAiOutputTypeValues.TEXT
+                return GenAIOutputType.TEXT
             case InferenceOutputType.OBJECT:
-                return otel_gen_ai_attributes.GenAiOutputTypeValues.JSON
+                return GenAIOutputType.JSON
             case InferenceOutputType.IMAGE:
-                return otel_gen_ai_attributes.GenAiOutputTypeValues.IMAGE
+                return GenAIOutputType.IMAGE
             case InferenceOutputType.PAGES:
-                return otel_gen_ai_attributes.GenAiOutputTypeValues.JSON
+                return GenAIOutputType.JSON
     except ValueError as exc:
         msg = f"Invalid LLM output type: {output_type}, and we only support LLM output types for now in OpenTelemetry"
         raise ValueError(msg) from exc

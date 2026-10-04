@@ -57,6 +57,18 @@ def is_method_fetch_on_miss_enabled() -> bool:
     return optional_config.interpreter.methods.fetch_on_miss
 
 
+def is_fetch_ssrf_guard_enabled() -> bool:
+    """Whether fetching a URL's bytes goes through the SSRF guard in this process (non-raising).
+
+    The config's ``runtime.network.is_fetch_ssrf_guard_enabled``, defaulting to enabled when no
+    config is set: a process that fetches before, or without, loading the config fails closed.
+    """
+    optional_config = get_optional_config()
+    if not isinstance(optional_config, PipelexConfig):
+        return True
+    return optional_config.runtime.network.is_fetch_ssrf_guard_enabled
+
+
 def is_pipe_func_sandbox_hosted() -> bool:
     """Whether PipeFunc runs out-of-process in this process (non-raising; defaults to local).
 

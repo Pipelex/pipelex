@@ -6,7 +6,7 @@ These tests verify that all plugins can handle images stored via pipelex-storage
 import pytest
 import pytest_asyncio
 from google.genai import types as genai_types
-from mistralai.models import ImageURLChunk
+from mistralai.client.models import ImageURLChunk
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.image.prompt_image import PromptImageUri

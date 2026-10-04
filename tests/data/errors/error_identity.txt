@@ -54,6 +54,10 @@ CsvFlatnessError | CSV flatness error | https://docs.pipelex.com/latest/errors/c
 CsvReadError | CSV read error | https://docs.pipelex.com/latest/errors/csv-read-error/
 DateContentError | Date content | https://docs.pipelex.com/latest/errors/date-content-error/
 DeliveryError | Delivery | https://docs.pipelex.com/latest/errors/delivery-error/
+DocGenEngineMissingError | Doc gen engine missing | https://docs.pipelex.com/latest/errors/doc-gen-engine-missing-error/
+DocGenHandleNotFoundError | Doc gen handle not found | https://docs.pipelex.com/latest/errors/doc-gen-handle-not-found-error/
+DocGenModelCapabilityError | Doc gen model capability | https://docs.pipelex.com/latest/errors/doc-gen-model-capability-error/
+DocGenRenderError | Doc gen render | https://docs.pipelex.com/latest/errors/doc-gen-render-error/
 DomainCodeError | Domain code | https://docs.pipelex.com/latest/errors/domain-code-error/
 DomainFactoryError | Domain factory | https://docs.pipelex.com/latest/errors/domain-factory-error/
 DomainLibraryError | Domain library | https://docs.pipelex.com/latest/errors/domain-library-error/
@@ -67,8 +71,11 @@ DryRunGraphNotProducedError | Dry run graph not produced | https://docs.pipelex.
 DryRunMockBuildError | Dry run mock build | https://docs.pipelex.com/latest/errors/dry-run-mock-build-error/
 DryRunObjectFidelityError | Dry run object fidelity | https://docs.pipelex.com/latest/errors/dry-run-object-fidelity-error/
 DuplicateBundleValidatorError | Duplicate bundle validator | https://docs.pipelex.com/latest/errors/duplicate-bundle-validator-error/
+DuplicateDocGenDefaultError | Duplicate doc gen default | https://docs.pipelex.com/latest/errors/duplicate-doc-gen-default-error/
 DuplicateHttpErrorMapperError | Duplicate http error mapper | https://docs.pipelex.com/latest/errors/duplicate-http-error-mapper-error/
 DuplicateInferenceBackendError | Duplicate inference backend | https://docs.pipelex.com/latest/errors/duplicate-inference-backend-error/
+DuplicateInternalModelError | Duplicate internal model | https://docs.pipelex.com/latest/errors/duplicate-internal-model-error/
+DuplicateLogSinkError | Duplicate log sink | https://docs.pipelex.com/latest/errors/duplicate-log-sink-error/
 DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/
 DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
 DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
@@ -85,6 +92,7 @@ ExplicitConceptIncompatibleError | Explicit concept incompatible | https://docs.
 ExtractCapabilityError | Extract capability | https://docs.pipelex.com/latest/errors/extract-capability-error/
 ExtractHandleNotFoundError | Extract handle not found | https://docs.pipelex.com/latest/errors/extract-handle-not-found-error/
 ExtractInputError | Extract input | https://docs.pipelex.com/latest/errors/extract-input-error/
+ExtractInputFormatError | Extract input format | https://docs.pipelex.com/latest/errors/extract-input-format-error/
 ExtractJobFailureError | Extract job failure | https://docs.pipelex.com/latest/errors/extract-job-failure-error/
 ExtractModelNotFoundError | Extract model not found | https://docs.pipelex.com/latest/errors/extract-model-not-found-error/
 ExtractOutputError | Extract output | https://docs.pipelex.com/latest/errors/extract-output-error/
@@ -96,6 +104,7 @@ FixWriteConflictError | Fix write conflict | https://docs.pipelex.com/latest/err
 FuncRegistryError | Func registry | https://docs.pipelex.com/latest/errors/func-registry-error/
 GatewayConfigMergeError | Gateway config merge | https://docs.pipelex.com/latest/errors/gateway-config-merge-error/
 GatewayUnknownModelError | Gateway unknown model | https://docs.pipelex.com/latest/errors/gateway-unknown-model-error/
+GcpLogSinkCredentialsError | Log sink credentials missing or refused | https://docs.pipelex.com/latest/errors/gcp-log-sink-credentials-error/
 GeneratedImageError | Generated image | https://docs.pipelex.com/latest/errors/generated-image-error/
 GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/
 GoogleLLMWorkerError | Google LLM worker | https://docs.pipelex.com/latest/errors/google-llm-worker-error/
@@ -124,10 +133,18 @@ InputStuffSpecsFactoryError | Input stuff specs factory | https://docs.pipelex.c
 Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/jinja2-context-error/
 Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
 Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/
+Jinja2TemplateBudgetError | Template render budget exceeded | https://docs.pipelex.com/latest/errors/jinja2-template-budget-error/
 Jinja2TemplateRenderError | Jinja 2 template render | https://docs.pipelex.com/latest/errors/jinja2-template-render-error/
+Jinja2TemplateSecurityError | Jinja 2 template security | https://docs.pipelex.com/latest/errors/jinja2-template-security-error/
 Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/
 JobMetadataError | Job metadata | https://docs.pipelex.com/latest/errors/job-metadata-error/
 JsonTypeError | Json type | https://docs.pipelex.com/latest/errors/json-type-error/
+JudgmentAnswerMismatchError | Judgment answer mismatch | https://docs.pipelex.com/latest/errors/judgment-answer-mismatch-error/
+JudgmentCapabilityError | Judgment capability | https://docs.pipelex.com/latest/errors/judgment-capability-error/
+JudgmentHandleNotFoundError | Judgment handle not found | https://docs.pipelex.com/latest/errors/judgment-handle-not-found-error/
+JudgmentJobFailureError | Judgment job failure | https://docs.pipelex.com/latest/errors/judgment-job-failure-error/
+JudgmentModelMissingError | Judgment model missing | https://docs.pipelex.com/latest/errors/judgment-model-missing-error/
+JudgmentModelNotFoundError | Judgment model not found | https://docs.pipelex.com/latest/errors/judgment-model-not-found-error/
 KitError | Kit | https://docs.pipelex.com/latest/errors/kit-error/
 KitIndexLoadingError | Kit index loading | https://docs.pipelex.com/latest/errors/kit-index-loading-error/
 LLMAssignmentError | LLM assignment | https://docs.pipelex.com/latest/errors/llm-assignment-error/
@@ -146,6 +163,8 @@ LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
 LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
+LogSinkHeaderValueError | Log sink header value holds a line break | https://docs.pipelex.com/latest/errors/log-sink-header-value-error/
+LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
 ManifoldCredentialsError | Manifold credentials | https://docs.pipelex.com/latest/errors/manifold-credentials-error/
 ManifoldEndpointError | Manifold endpoint | https://docs.pipelex.com/latest/errors/manifold-endpoint-error/
 ManifoldError | Manifold | https://docs.pipelex.com/latest/errors/manifold-error/
@@ -202,6 +221,10 @@ PipeComposeFactoryError | Pipe compose factory | https://docs.pipelex.com/latest
 PipeConditionFactoryError | Pipe condition factory | https://docs.pipelex.com/latest/errors/pipe-condition-factory-error/
 PipeControllerError | Pipe controller | https://docs.pipelex.com/latest/errors/pipe-controller-error/
 PipeControllerOutputConceptMismatchError | Pipe controller output concept mismatch | https://docs.pipelex.com/latest/errors/pipe-controller-output-concept-mismatch-error/
+PipeDocGenFactoryError | Pipe doc gen factory | https://docs.pipelex.com/latest/errors/pipe-doc-gen-factory-error/
+PipeDocGenRunError | Pipe doc gen run | https://docs.pipelex.com/latest/errors/pipe-doc-gen-run-error/
+PipeDocGenTemplateCheckError | Pipe doc gen template check | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-check-error/
+PipeDocGenUndefinedValueError | Pipe doc gen undefined value | https://docs.pipelex.com/latest/errors/pipe-doc-gen-undefined-value-error/
 PipeExecutionError | Pipe execution | https://docs.pipelex.com/latest/errors/pipe-execution-error/
 PipeExtractFactoryError | Pipe extract factory | https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/
 PipeFactoryError | Pipe factory | https://docs.pipelex.com/latest/errors/pipe-factory-error/
@@ -213,8 +236,11 @@ PipeImgGenRunError | Pipe img gen run | https://docs.pipelex.com/latest/errors/p
 PipeInputError | Pipe input | https://docs.pipelex.com/latest/errors/pipe-input-error/
 PipeInputsFactoryError | Pipe inputs factory | https://docs.pipelex.com/latest/errors/pipe-inputs-factory-error/
 PipeJobError | Pipe job | https://docs.pipelex.com/latest/errors/pipe-job-error/
+PipeJudgeError | Pipe judge | https://docs.pipelex.com/latest/errors/pipe-judge-error/
+PipeJudgeInputCapabilityError | Pipe judge input capability | https://docs.pipelex.com/latest/errors/pipe-judge-input-capability-error/
 PipeLLMFactoryError | Pipe LLM factory | https://docs.pipelex.com/latest/errors/pipe-llm-factory-error/
 PipeLibraryError | Pipe library | https://docs.pipelex.com/latest/errors/pipe-library-error/
+PipeLoadRefusalError | Pipe load refusal | https://docs.pipelex.com/latest/errors/pipe-load-refusal-error/
 PipeLoadingError | Pipe loading | https://docs.pipelex.com/latest/errors/pipe-loading-error/
 PipeNotFoundError | Pipe not found | https://docs.pipelex.com/latest/errors/pipe-not-found-error/
 PipeOperatorModelAvailabilityError | Pipe operator model availability | https://docs.pipelex.com/latest/errors/pipe-operator-model-availability-error/
@@ -242,6 +268,9 @@ PipelexSetupError | Pipelex setup | https://docs.pipelex.com/latest/errors/pipel
 PipelexUnexpectedError | Unexpected internal error | https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/
 PipelineExecutionError | Pipeline execution | https://docs.pipelex.com/latest/errors/pipeline-execution-error/
 PipelineInputContentError | Pipeline input content | https://docs.pipelex.com/latest/errors/pipeline-input-content-error/
+PipelineInputFormatError | Pipeline input format | https://docs.pipelex.com/latest/errors/pipeline-input-format-error/
+PipelineInputFormatUnsupportedError | Pipeline input format unsupported | https://docs.pipelex.com/latest/errors/pipeline-input-format-unsupported-error/
+PipelineInputNotAnImageError | Pipeline input not an image | https://docs.pipelex.com/latest/errors/pipeline-input-not-an-image-error/
 PipelineInputUrlInvalidError | Pipeline input url invalid | https://docs.pipelex.com/latest/errors/pipeline-input-url-invalid-error/
 PipelineInputUrlMissingError | Pipeline input url missing | https://docs.pipelex.com/latest/errors/pipeline-input-url-missing-error/
 PipelineManagerAlreadyExistsError | Pipeline manager already exists | https://docs.pipelex.com/latest/errors/pipeline-manager-already-exists-error/
@@ -250,10 +279,12 @@ PluginApiVersionMismatchError | Plugin api version mismatch | https://docs.pipel
 PluginDeclaredInMultipleGroupsError | Plugin declared in multiple groups | https://docs.pipelex.com/latest/errors/plugin-declared-in-multiple-groups-error/
 PluginError | Plugin error | https://docs.pipelex.com/latest/errors/plugin-error/
 PluginLayerViolationError | Plugin layer violation | https://docs.pipelex.com/latest/errors/plugin-layer-violation-error/
+PluginModelDeclarationError | Plugin model declaration | https://docs.pipelex.com/latest/errors/plugin-model-declaration-error/
 PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/errors/portkey-credentials-error/
 PortkeyError | Portkey | https://docs.pipelex.com/latest/errors/portkey-error/
 PortkeyFactoryError | Portkey factory | https://docs.pipelex.com/latest/errors/portkey-factory-error/
 PromptDocumentFactoryError | Prompt document factory | https://docs.pipelex.com/latest/errors/prompt-document-factory-error/
+PromptDocumentFormatError | Prompt document format | https://docs.pipelex.com/latest/errors/prompt-document-format-error/
 PromptImageFactoryError | Prompt image factory | https://docs.pipelex.com/latest/errors/prompt-image-factory-error/
 PromptImageFormatError | Prompt image format | https://docs.pipelex.com/latest/errors/prompt-image-format-error/
 PyPdfium2RendererError | Py pdfium 2 renderer | https://docs.pipelex.com/latest/errors/py-pdfium2-renderer-error/
@@ -305,14 +336,18 @@ TemplateSigilSyntaxError | Template sigil syntax | https://docs.pipelex.com/late
 TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error/
 ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
+TypesafeError | Typesafe | https://docs.pipelex.com/latest/errors/typesafe-error/
+TypesafeJudgmentResponseError | Typesafe judgment response | https://docs.pipelex.com/latest/errors/typesafe-judgment-response-error/
+TypesafeQuestionUnsupportedError | Typesafe question unsupported | https://docs.pipelex.com/latest/errors/typesafe-question-unsupported-error/
 UnknownBootOrchestratorError | Unknown boot orchestrator | https://docs.pipelex.com/latest/errors/unknown-boot-orchestrator-error/
 UnknownInputNameError | Unknown input name | https://docs.pipelex.com/latest/errors/unknown-input-name-error/
+UnknownLogSinkError | Unknown log sink | https://docs.pipelex.com/latest/errors/unknown-log-sink-error/
 UnknownPipeFuncExecutionModeError | Unknown pipe func execution mode | https://docs.pipelex.com/latest/errors/unknown-pipe-func-execution-mode-error/
 UnknownSecretsMethodError | Unknown secrets method | https://docs.pipelex.com/latest/errors/unknown-secrets-method-error/
 UnknownStorageMethodError | Unknown storage method | https://docs.pipelex.com/latest/errors/unknown-storage-method-error/
 UnknownVarPrefixError | Unknown var prefix | https://docs.pipelex.com/latest/errors/unknown-var-prefix-error/
 UnsafeSchemaError | Unsafe schema | https://docs.pipelex.com/latest/errors/unsafe-schema-error/
-UnusedInputError | Unused input | https://docs.pipelex.com/latest/errors/unused-input-error/
+UriReadRefusedError | Read outside the run's scope refused | https://docs.pipelex.com/latest/errors/uri-read-refused-error/
 ValidateBundleError | Validate bundle | https://docs.pipelex.com/latest/errors/validate-bundle-error/
 VarFallbackPatternError | Var fallback pattern | https://docs.pipelex.com/latest/errors/var-fallback-pattern-error/
 VarNotFoundError | Var not found | https://docs.pipelex.com/latest/errors/var-not-found-error/

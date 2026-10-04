@@ -49,6 +49,15 @@ Custom telemetry is configured in `.pipelex/telemetry.toml` and allows you to se
 
 Custom telemetry is completely independent from Gateway telemetry—you can use both, either, or neither.
 
+### Pipelex's spans in your process
+
+Either stream makes Pipelex trace a run: the Gateway stream whenever it is on, and yours when AI span tracing is enabled on your PostHog. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **Pipelex never makes its spans current in your process's OpenTelemetry context**:
+
+- Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
+- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
+- The standard trace fields of a log line, `trace_id` and `span_id` in the `json` sink, the record's trace context in the `otlp` sink and the entry's `trace` in the `gcp` sink, name your current span, inside a Pipelex run as outside one, so your log backend files a line under your own trace. The Pipelex span a line was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, rides beside them as `pipelex.trace_id` and `pipelex.span_id`, as [Logging](../tools/logging.md#the-trace-context) describes.
+- If you export Pipelex's spans to your own backend, through your PostHog or an OTLP destination, they arrive in a trace of their own, not yours, so a line inside a run joins them on `pipelex.trace_id` and `pipelex.span_id` rather than on the standard fields, which a backend's trace view follows by itself.
+
 ## Quick Setup
 
 When you run `pipelex init`, a default `telemetry.toml` configuration file is created:
@@ -121,6 +130,12 @@ On **your own** PostHog stream, every span and every event the run produces is t
 Anything that names no caller of its own keeps reporting under the `user_id` you configured in `telemetry.toml`, which is what that setting now means: the identity of everything that is not one caller's run. That covers an event outside any run — a CLI command listing your pipes — and a run whose caller is not a distinguishable person either: a run on your own machine is attributed to the literal `local`, the same string on every machine, so Pipelex declines it as an identity and uses your configured id instead. The same goes for `single-tenant`, which pipelex-api states for every run when it is deployed with no users. Per-run attribution is for a host that passes a real `user_id` per run.
 
 The extras do not depend on that. A run that leaves `user_id` at its default still carries its `extras` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
+
+The extras also travel with the run's inference calls when they go through Pipelex Manifold. Every request the Manifold backend makes carries one `x-pipelex-metadata` header: a flat JSON object holding the run's extras as they are, plus the run's `user_id` and `pipeline_run_id` and the step's `pipe_run_id`, `pipe_code` and `content_generation_job_id` when it has them, so the service can attribute and log each call. If an extras key has the same name as one of those ids, the run's own value is the one sent, since the extras are yours to set and must not be able to restate whose run it is. No other backend receives this header: a provider you reach directly with your own key gets none of your labels.
+
+```text
+x-pipelex-metadata: {"org_id":"org_acme","user_id":"user_42","pipeline_run_id":"run_abc","pipe_run_id":"0123456789abcdef","pipe_code":"summarize_doc"}
+```
 
 ### Work that is not a run, and crashes
 

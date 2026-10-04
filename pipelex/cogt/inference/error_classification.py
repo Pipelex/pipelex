@@ -10,6 +10,7 @@ import json
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from enum import StrEnum
+from http import HTTPStatus
 from typing import Any, TypeAlias, cast
 
 import httpx
@@ -237,7 +238,11 @@ class GatewayRoutingRefusal(StrEnum):
 
     Each member corresponds to one of the gateway's own error codes, which is the
     contract between the two repositories — the wording of a refusal is free to
-    change, the code is not.
+    change, the code is not. All but one are the gateway's ``pig-`` codes, at HTTP
+    400. ``MODEL_NOT_ALLOWED`` is keyed on the code of the Portkey substrate the
+    gateway is built on, which answers it at HTTP 412 from the middleware the
+    gateway vendors; Portkey's cloud answers it the same way for a caller's own
+    workspace behind the ``portkey`` backend.
     """
 
     #: ``pig-01`` at HTTP 400 — the request body names one that no integration
@@ -275,6 +280,16 @@ class GatewayRoutingRefusal(StrEnum):
     #: model named on a pipe it cannot serve: the message names the integration,
     #: the provider and the capability.
     UNSERVED_CAPABILITY = "unserved_capability"
+    #: ``model_not_allowed_error`` at HTTP 412 — an integration serves the model
+    #: but does not allow it for this caller. The substrate raises it in two
+    #: cases: the integration does not allow every model and does not list this
+    #: one, or it lists it as archived. The caller can pick another model; for
+    #: whoever operates the gateway, it means the model deck and the integration's
+    #: allow-list disagree. The gateway's message names only the backend's wire
+    #: id, which the method's author never wrote, so this is the one member whose
+    #: advice names the model handle the deck resolved to (see
+    #: ``_render_gateway_routing_refusal_detail``).
+    MODEL_NOT_ALLOWED = "model_not_allowed"
 
 
 # The gateway's routing-refusal codes, mapped to what the runtime does about them.
@@ -286,6 +301,17 @@ class GatewayRoutingRefusal(StrEnum):
 # ``GATEWAY``, plain ``httpx`` on the native routes reports ``GATEWAY`` too, and
 # Claude travels on the shared Anthropic driver — while ``pig-`` is the gateway's
 # own code namespace and no vendor emits into it.
+#
+# **``model_not_allowed_error`` is the one code outside that namespace**, and it is
+# matched on the code alone for a reason of its own: it is the code of Portkey, the
+# substrate the gateway is built on, and no model vendor uses it. Portkey's cloud
+# emits it for a caller's own workspace behind the ``portkey`` backend, and so does
+# the middleware the manifold vendors from it. The refusal means the same thing and calls for the same
+# move whichever of them raised it, so only the advice has to hold for both. Both
+# raise sites answer 412, so checking the status too would add nothing. It arrives with
+# the code in ``type`` and ``code`` null, and every Extract hop recovers it from
+# there: the vendor-facing hops read ``type`` first, and the two Pipelex-service
+# hops fall back to it.
 #
 # **Two of the gateway's routing codes are deliberately absent**, and the omission
 # is the scope decision rather than an oversight:
@@ -318,6 +344,7 @@ _GATEWAY_ROUTING_REFUSAL_BY_CODE: dict[str, GatewayRoutingRefusal] = {
     "pig-02": GatewayRoutingRefusal.DISABLED_INTEGRATION,
     "pig-05": GatewayRoutingRefusal.WRONG_PROTOCOL,
     "pig-06": GatewayRoutingRefusal.UNSERVED_CAPABILITY,
+    "model_not_allowed_error": GatewayRoutingRefusal.MODEL_NOT_ALLOWED,
 }
 
 
@@ -383,7 +410,13 @@ class ProviderErrorMetadata(BaseModel):
             case ProviderName.GATEWAY:
                 return _is_quota_exhaustion_gateway(self.message, status_code=self.status_code or 0)
             case (
-                ProviderName.AZURE | ProviderName.FAL | ProviderName.HUGGINGFACE | ProviderName.LINKUP | ProviderName.DOCLING | ProviderName.PYPDFIUM2
+                ProviderName.AZURE
+                | ProviderName.FAL
+                | ProviderName.HUGGINGFACE
+                | ProviderName.LINKUP
+                | ProviderName.TYPESAFE
+                | ProviderName.DOCLING
+                | ProviderName.PYPDFIUM2
             ):
                 return False
 
@@ -434,8 +467,8 @@ class ProviderErrorMetadata(BaseModel):
         above do, and for the same reason: the gateway can refuse to route a
         request before any provider sees it, and the code is the only thing that
         says so. Without this the whole family falls through to the status ladder's
-        400 arm and a caller who named a model the deployment does not serve is
-        told to review their prompt.
+        4xx arms and a caller who named a model the deployment does not serve, or
+        may not use, is told to review their prompt.
 
         Disjoint from both other families by construction, so the Classify step may
         read the three in any order. Returns ``None`` for every other refusal,
@@ -642,13 +675,15 @@ def _stringify_for_scan(body: Any) -> str:
 
 
 def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | None:
-    """Recover the SDK exception that caused an ``InstructorRetryException``.
+    """Recover the exception that ended instructor's retry loop, from an ``InstructorRetryException``.
 
-    instructor's retry loop wraps the last failed attempt's exception inside
-    ``InstructorRetryException``. We prefer ``failed_attempts[-1].exception``
-    (the documented public attribute) and fall back to walking ``__cause__``
-    (a tenacity ``RetryError`` whose ``last_attempt._exception`` holds the
-    original exception) when ``failed_attempts`` is unset.
+    instructor raises ``InstructorRetryException`` ``from`` the last exception its loop saw. With the
+    schema-only retrying pipelex passes, that is either the raw SDK exception of a call that failed in
+    transport, which is never re-asked, or tenacity's ``RetryError`` once the re-ask budget is spent,
+    whose last attempt holds the final parse failure. So ``__cause__`` is read first.
+    ``failed_attempts`` records only the attempts whose response failed to parse: after a re-ask, a
+    transport failure that follows is not in it, and its last entry would name the wrong exception.
+    It remains the fallback for a wrapper that carries no cause.
 
     Args:
         instructor_exc: The ``InstructorRetryException`` to unwrap. Typed as
@@ -656,25 +691,27 @@ def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | Non
             just for the call site, and so malformed inputs are tolerated.
 
     Returns:
-        The underlying SDK exception when one can be recovered, ``None`` when
+        The underlying exception when one can be recovered, ``None`` when
         neither path yields a ``BaseException``.
     """
+    cause: Any = getattr(instructor_exc, "__cause__", None)
+    retry_last_attempt: Any = getattr(cause, "last_attempt", None)
+    if retry_last_attempt is not None:
+        underlying = getattr(retry_last_attempt, "_exception", None)
+        if isinstance(underlying, BaseException):
+            return underlying
+    elif isinstance(cause, BaseException):
+        return cause
     failed_attempts: Any = getattr(instructor_exc, "failed_attempts", None)
     if failed_attempts:
         try:
-            last_attempt = failed_attempts[-1]
+            last_failed_attempt = failed_attempts[-1]
         except (TypeError, KeyError, IndexError):
-            last_attempt = None
-        if last_attempt is not None:
-            last_exc = getattr(last_attempt, "exception", None)
+            last_failed_attempt = None
+        if last_failed_attempt is not None:
+            last_exc = getattr(last_failed_attempt, "exception", None)
             if isinstance(last_exc, BaseException):
                 return last_exc
-    cause: Any = getattr(instructor_exc, "__cause__", None)
-    last_attempt = getattr(cause, "last_attempt", None)
-    if last_attempt is not None:
-        underlying = getattr(last_attempt, "_exception", None)
-        if isinstance(underlying, BaseException):
-            return underlying
     return None
 
 
@@ -1352,6 +1389,76 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds=None,
         provider_error_code=type(exc).__name__,
         body=None,
+    )
+
+
+# The ``error_type`` values TypeSafe puts in an object-shaped ``detail``. Spelled here rather than
+# in the provider package because ``provider_error_code`` is this module's field and the classifier
+# reads it: a value that never appears here is a value nothing downstream can branch on.
+TYPESAFE_AUTHENTICATION_ERROR_TYPE = "authentication_error"
+TYPESAFE_MAX_TOKENS_EXCEEDED_ERROR_TYPE = "max_tokens_exceeded"
+TYPESAFE_API_USAGE_ERROR_TYPE = "api_usage_error"
+
+# What a bare-string ``detail`` on a ``400`` is reported as. TypeSafe answers 400 with a plain sentence for the
+# question-shape refusals — "Noul question must have criteria or instructions: q", "Too many score
+# levels. Must have at most 10 levels." — and carries no ``error_type`` at all. The absence is the
+# signal, so it is given a code of its own instead of leaving ``provider_error_code`` empty, which
+# would make "the body said nothing" indistinguishable from "there was no body".
+TYPESAFE_MALFORMED_REQUEST_CODE = "pipelex_typesafe_malformed_request"
+
+
+def _typesafe_detail(*, body: Any) -> Any | None:
+    """The ``detail`` member of a TypeSafe error body, whatever shape it has."""
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(body, dict):
+        return cast("dict[str, Any]", body).get("detail")
+    return None
+
+
+def extract_typesafe_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a TypeSafe SDK exception into a ``ProviderErrorMetadata``.
+
+    Two exception shapes reach here and they carry different things. A ``TypeSafeAPIError``
+    subclass reached the server and carries ``status``, ``body``, ``endpoint`` and a ``request_id``
+    that is declared ``str | None`` and safe to read plainly. A bare ``TypeSafeError`` is the SDK
+    refusing before it sent anything — no status, no body, no request id — and the absent status is
+    what routes it to the status-less arm of the classifier.
+
+    ``provider_error_code`` is the discriminator the status cannot supply. Every validation failure
+    this API produces is a ``400``, covering an illegal question, an oversized state and an unknown
+    model alike, so the code is lifted out of the body: the ``error_type`` of an object-shaped
+    ``detail``, or ``TYPESAFE_MALFORMED_REQUEST_CODE`` when a ``400``'s ``detail`` is a bare
+    sentence. A bare sentence on any other status says nothing the status does not, so a rate limit
+    or an outage answered in that shape keeps the status ladder's verdict.
+    """
+    body = getattr(exc, "body", None)
+    status_code = getattr(exc, "status", None)
+    detail = _typesafe_detail(body=body)
+    provider_error_code: str | None = None
+    if isinstance(detail, dict):
+        error_type = cast("dict[str, Any]", detail).get("error_type")
+        if isinstance(error_type, str):
+            provider_error_code = error_type
+    elif isinstance(detail, str) and status_code == HTTPStatus.BAD_REQUEST:
+        provider_error_code = TYPESAFE_MALFORMED_REQUEST_CODE
+    request_id = getattr(exc, "request_id", None)
+    headers = getattr(exc, "headers", None)
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    return ProviderErrorMetadata(
+        provider=ProviderName.TYPESAFE,
+        sdk_exception_type=type(exc).__name__,
+        message=str(exc),
+        status_code=status_code,
+        request_id=request_id if isinstance(request_id, str) else None,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=body,
     )
 
 

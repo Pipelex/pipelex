@@ -17,9 +17,11 @@ from pipelex.builder.operations.pipe_ops import parse_pipe_spec
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.builder.pipe.pipe_doc_gen_spec import PipeDocGenSpec
 from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
+from pipelex.builder.pipe.pipe_judge_spec import PipeJudgeSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
@@ -93,6 +95,17 @@ def _add_type_specific_fields(*, pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDo
     elif isinstance(pipe_spec, PipeStructureSpec):
         if pipe_spec.model:
             pipe_table.add("model", pipe_spec.model)
+
+    elif isinstance(pipe_spec, PipeDocGenSpec):
+        pipe_table.add("format", str(pipe_spec.format))
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
+        if pipe_spec.template is not None:
+            pipe_table.add("template", format_toml_string(pipe_spec.template))
+        if pipe_spec.template_file is not None:
+            pipe_table.add("template_file", pipe_spec.template_file)
+        if pipe_spec.filename is not None:
+            pipe_table.add("filename", pipe_spec.filename)
 
     elif isinstance(pipe_spec, PipeComposeSpec):
         if pipe_spec.construct_spec is not None:
@@ -177,6 +190,26 @@ def _add_type_specific_fields(*, pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDo
             pipe_table.add("exclude_domains", pipe_spec.exclude_domains)
         if pipe_spec.max_results is not None:
             pipe_table.add("max_results", pipe_spec.max_results)
+
+    elif isinstance(pipe_spec, PipeJudgeSpec):
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
+        # A tool that writes a PipeJudge writes `question`, never its `prompt` synonym.
+        pipe_table.add("question", format_toml_string(pipe_spec.question))
+        if pipe_spec.options is not None:
+            options_table = tomlkit.inline_table()
+            for option, description in pipe_spec.options.items():
+                options_table.append(option, description)
+            pipe_table.add("options", options_table)
+        if pipe_spec.levels is not None:
+            pipe_table.add("levels", pipe_spec.levels)
+        if pipe_spec.criteria is not None:
+            criteria_table = tomlkit.inline_table()
+            for verdict, criterion in pipe_spec.criteria.model_dump(exclude_none=True).items():
+                criteria_table.append(verdict, criterion)
+            pipe_table.add("criteria", criteria_table)
+        if pipe_spec.threshold is not None:
+            pipe_table.add("threshold", pipe_spec.threshold)
 
     elif isinstance(pipe_spec, PipeSignatureSpec):
         if pipe_spec.signature_for is not None:

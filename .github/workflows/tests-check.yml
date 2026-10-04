@@ -106,20 +106,108 @@ jobs:
         run: make test-ts-gates
 
 # --------------------------------------------------------------------------
-# 3.  Aggregator job — the *single* required status check
-#     Guards against a silently-dropped shard: fails unless ALL 8 succeed.
+# 3.  The API server (`api/`, the `pipelex-api` workspace member) — its unit
+#     tests, in its own environment (`api/.venv`) against the pipelex of this
+#     commit. No path filter, for the reason `Lint (api)` gives: a library change
+#     can break the server. Floor Python only; the pre-main gate
+#     (`tests-full-check.yml`) runs every supported version.
+# --------------------------------------------------------------------------
+  api-tests:
+    name: Tests (api)
+    runs-on: ubuntu-latest
+    env:
+      ENV: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install the server's environment
+        run: PYTHON_VERSION=3.11 make -C api install
+
+      - name: Run the server's tests
+        run: make -C api gha-tests
+
+# --------------------------------------------------------------------------
+# 4.  The release's packages, built as the release builds them but published
+#     nowhere: the `pipelex` and `pipelex-api` wheels and sdists, the exact pin
+#     the `pipelex-api` metadata must carry on the `pipelex` of the same version
+#     (`api/scripts/check_lockstep_pin.py`, which `publish-pypi.yml` runs before
+#     it uploads), and the two wheels installed together into a bare environment
+#     with the server imported from it, as `pip install pipelex-api` does once
+#     both are on PyPI. The third-party versions are the lock's, so an upstream
+#     release cannot fail this gate; catching that is `dependency-canary.yml`'s job.
+# --------------------------------------------------------------------------
+  packages:
+    name: Tests (packages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Build the pipelex and pipelex-api distributions
+        run: |
+          uv build --package pipelex --out-dir dist
+          uv build --package pipelex-api --out-dir dist
+
+      - name: Check that the pipelex-api distributions pin pipelex exactly
+        run: python3 api/scripts/check_lockstep_pin.py dist
+
+      - name: Install the two wheels together and import the server
+        run: |
+          uv export --frozen --no-hashes --no-dev --no-emit-workspace --package pipelex-api -o "$RUNNER_TEMP/locked-versions.txt"
+          uv venv "$RUNNER_TEMP/packages-venv" --python 3.11
+          uv pip install --python "$RUNNER_TEMP/packages-venv/bin/python" --constraint "$RUNNER_TEMP/locked-versions.txt" \
+            dist/pipelex-*.whl dist/pipelex_api-*.whl
+          "$RUNNER_TEMP/packages-venv/bin/python" -c "import pipelex_api.main"
+
+# --------------------------------------------------------------------------
+# 5.  The server's image, built from the repository root as the release builds
+#     it (`make -C api docker-build`) and smoke-tested (`make -C api
+#     docker-smoke`): it boots, answers /health, and reports this version for
+#     both the server and the pipelex it runs. Nothing is pushed; the push is
+#     `publish-docker-hub.yml`, from the release commit.
+# --------------------------------------------------------------------------
+  api-image:
+    name: Tests (api image)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: make -C api docker-build
+
+      - name: Boot the image and check the versions it reports
+        run: make -C api docker-smoke
+
+# --------------------------------------------------------------------------
+# 6.  Aggregator job — the *single* required status check
+#     Guards against a silently-dropped shard: fails unless ALL 8 succeed, and
+#     carries every other test job above into the required check with them.
 # --------------------------------------------------------------------------
   tests-all:
     name: Tests (all)
     runs-on: ubuntu-latest
-    needs: [matrix-test, ts-emission-gates]
+    needs: [matrix-test, ts-emission-gates, api-tests, packages, api-image]
     if: always()
 
     steps:
       - name: Fail if any test job failed
         run: |
           if [ "${{ needs.matrix-test.result }}" != "success" ] || \
-             [ "${{ needs.ts-emission-gates.result }}" != "success" ]; then
+             [ "${{ needs.ts-emission-gates.result }}" != "success" ] || \
+             [ "${{ needs.api-tests.result }}" != "success" ] || \
+             [ "${{ needs.packages.result }}" != "success" ] || \
+             [ "${{ needs.api-image.result }}" != "success" ]; then
             echo "::error::At least one test job failed."
             exit 1
           fi

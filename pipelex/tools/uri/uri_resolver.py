@@ -1,12 +1,7 @@
 import urllib.parse
 from pathlib import Path
 
-from pipelex.tools.misc.base64_utils import (
-    make_base64_url_from_bytes,
-    make_base64_url_from_http_url,
-    make_base64_url_from_path,
-)
-from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
@@ -205,43 +200,3 @@ def _resolve_base64_data_url(uri: str) -> ResolvedBase64DataUrl:
         mime_type=mime_type,
         base64_data=base64_data,
     )
-
-
-async def make_base64_url_from_any_uri(
-    uri: str,
-    *,
-    storage_provider: StorageProviderAbstract | None = None,
-) -> str:
-    """Convert a URI to a base64 data URL.
-
-    Resolves the URI and fetches/converts content to base64 format.
-    If the URI is already a data URL, returns it as-is.
-
-    Args:
-        uri: A URI string (http://, local path, data: URL, or pipelex-storage://)
-        storage_provider: Optional storage provider for resolving pipelex-storage:// URIs.
-            Required when the URI is a pipelex-storage:// URI.
-
-    Returns:
-        A base64 data URL string containing the base64-encoded data, whichever way we got it.
-
-    Raises:
-        ValueError: If the URI is a pipelex-storage:// URI and no storage provider is given.
-    """
-    base64_url: str
-    resolved_uri = resolve_uri(uri)
-    match resolved_uri:
-        case ResolvedBase64DataUrl():
-            # Already a data URL, return as-is
-            base64_url = resolved_uri.original
-        case ResolvedHttpUrl():
-            base64_url = await make_base64_url_from_http_url(url=resolved_uri.url)
-        case ResolvedLocalPath():
-            base64_url = await make_base64_url_from_path(path=Path(resolved_uri.path))
-        case ResolvedPipelexStorage():
-            if storage_provider is None:
-                msg = f"Cannot convert pipelex-storage:// URI to base64 without a storage provider: {uri}"
-                raise ValueError(msg)
-            raw_bytes = await storage_provider.load(uri=resolved_uri.storage_uri)
-            base64_url = make_base64_url_from_bytes(raw_bytes=raw_bytes)
-    return base64_url

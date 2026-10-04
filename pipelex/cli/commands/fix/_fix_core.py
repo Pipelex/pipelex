@@ -124,10 +124,10 @@ def _render_fix_result(*, console: Console, result: FixBundleResult, bundle_path
         console.print("[bold cyan]Remaining errors:[/bold cyan]\n")
         display_validation_error_items(console=console, items=result.remaining_errors)
 
-    # A remaining error can still carry a 💡 suggested-fix line — dropped by --select/--ignore,
+    # A remaining error can still carry a safe 💡 suggested-fix line — dropped by --select/--ignore,
     # left outside the write scope, or unconverged when the loop bailed. Claiming "no safe fix"
     # there contradicts the line just printed, so only say it when nothing fixable remains.
-    if any(item.suggested_fix is not None for item in result.remaining_errors):
+    if any(item.suggested_fix is not None and item.suggested_fix.safety.is_safe for item in result.remaining_errors):
         console.print(
             "[bold green]💡 Tip:[/bold green] Some remaining errors above still show a suggested fix that was not applied — "
             "they were skipped by --select/--ignore, fell outside the write scope, or the loop stopped early (see the reason above). "

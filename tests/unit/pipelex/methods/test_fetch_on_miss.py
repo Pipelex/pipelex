@@ -19,6 +19,7 @@ from pipelex.methods.exceptions import (
 from pipelex.methods.fetch_on_miss import resolve_address_based_method
 from pipelex.methods.fetching import FetchedMethodPackage, MethodProvenance
 from pipelex.methods.method_ref import parse_method_ref
+from pipelex.methods.structures_check import STRUCTURES_REFUSAL_REMEDY
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,6 +39,14 @@ main_pipe = "compute"
 
 [exports.scoring]
 pipes = ["compute"]
+"""
+
+STRUCTURES_MODULE = """\
+from pipelex.core.stuffs.structured_content import StructuredContent
+
+
+class Invoice(StructuredContent):
+    total: float
 """
 
 
@@ -197,6 +206,24 @@ class TestResolveAddressBasedMethod:
 
         assert exc_info.value is refusal
         assert fetch_mock.call_args.kwargs["refuse_structures"] is True
+
+    @pytest.mark.usefixtures("isolated_methods_dirs")
+    def test_local_fetch_of_structures_warns_with_the_remedy(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Locally a structure-declaring package still installs, and the warning predicting the hosted refusal gives its remedy."""
+        mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=True)
+        mocker.patch("pipelex.methods.fetch_on_miss.is_pipe_func_sandbox_hosted", return_value=False)
+        package_dir = _make_package_dir(tmp_path)
+        (package_dir / "structures.py").write_text(STRUCTURES_MODULE, encoding="utf-8")
+        mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package", return_value=_make_fetched(package_dir))
+        warning_spy = mocker.patch("pipelex.methods.fetch_on_miss.log.warning")
+
+        resolved = resolve_address_based_method(full_address=FULL_ADDRESS)
+
+        assert (resolved.path / "structures.py").is_file()
+        warning_messages = [call.args[0] for call in warning_spy.call_args_list if "hosted execution would refuse" in call.args[0]]
+        assert len(warning_messages) == 1
+        assert "Invoice" in warning_messages[0]
+        assert STRUCTURES_REFUSAL_REMEDY in warning_messages[0]
 
     @pytest.mark.usefixtures("isolated_methods_dirs")
     def test_fetched_provenance_records_the_bare_address_fetch(self, tmp_path: Path, mocker: MockerFixture) -> None:

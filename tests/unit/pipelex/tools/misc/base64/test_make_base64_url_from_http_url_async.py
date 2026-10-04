@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.tools.misc.base64_utils import make_base64_url_from_http_url
+from pipelex.tools.uri.uri_base64 import make_base64_url_from_http_url
 from pipelex.urls import URLs
 from tests.cases import ImageTestCases
 
@@ -21,7 +21,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
 
         # Mock the HTTP fetch to return PNG bytes
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             return_value=png_bytes,
         )
 
@@ -41,7 +41,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
 
         # Mock the HTTP fetch to return JPEG bytes
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             return_value=jpeg_bytes,
         )
 
@@ -56,7 +56,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
     async def test_propagates_http_error_on_404(self, mocker: MockerFixture) -> None:
         """Test that HTTP 404 errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="404 Not Found",
                 request=httpx.Request("GET", URLs.png_example_1),
@@ -72,7 +72,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
     async def test_propagates_http_error_on_500(self, mocker: MockerFixture) -> None:
         """Test that HTTP 500 errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="500 Internal Server Error",
                 request=httpx.Request("GET", URLs.png_example_1),
@@ -88,7 +88,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
     async def test_propagates_connection_error(self, mocker: MockerFixture) -> None:
         """Test that connection errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.ConnectError("Connection refused"),
         )
 
@@ -98,7 +98,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
     async def test_propagates_timeout_error(self, mocker: MockerFixture) -> None:
         """Test that timeout errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.TimeoutException("Request timed out"),
         )
 
@@ -125,7 +125,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
 
         # Mock with a misleading URL extension
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             return_value=file_bytes,
         )
 

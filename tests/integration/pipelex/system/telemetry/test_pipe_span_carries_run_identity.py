@@ -50,6 +50,7 @@ async def _make_pipe_job(*, extras: dict[str, str] | None = None) -> PipeJob:
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
     pipe_job, _, _ = await pipeline_run_setup(
         storage_scope="test/scope",
+        read_scope=None,
         user_id="user-42",
         execution_config=execution_config,
         mthds_contents=[_MINIMAL_MTHDS],

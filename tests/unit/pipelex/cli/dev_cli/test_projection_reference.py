@@ -217,6 +217,59 @@ class TestOutOfMatrixNatives:
         projected = project_inputs_template(descriptor=_descriptor(date_slot), explicit=False)["date_in"]
         assert projected == {"concept": "native.Date", "content": {"date": "2026-01-01", "time": "12:00:00"}}
 
+    @pytest.mark.parametrize(
+        ("native_ref", "fields", "expected_content"),
+        [
+            (
+                "native.Choice",
+                [
+                    {"kind": "text", "name": "choice", "required": True},
+                    {"kind": "number", "name": "confidence", "required": False, "integer": False},
+                ],
+                {"choice": "choice_value", "confidence": 0.0},
+            ),
+            (
+                "native.Rating",
+                [
+                    {"kind": "number", "name": "level", "required": True, "integer": True},
+                    {"kind": "number", "name": "position", "required": False, "integer": False},
+                ],
+                {"level": 0, "position": 0.0},
+            ),
+        ],
+    )
+    def test_a_verdict_object_native_keeps_its_envelope(self, native_ref: str, fields: list[dict[str, Any]], expected_content: dict[str, Any]):
+        """`Choice` and `Rating` are objects in the descriptor, so they keep their envelope with no entry in the out-of-matrix set."""
+        verdict_slot = {"kind": "object", "name": "verdict_in", "concept_ref": native_ref, "required": True, "fields": fields}
+        projected = project_inputs_template(descriptor=_descriptor(verdict_slot), explicit=False)["verdict_in"]
+        assert projected == {"concept": native_ref, "content": expected_content}
+
+    def test_a_yes_no_slot_stays_the_bare_boolean(self):
+        """The input side states `YesNo` as a `boolean`, so its compact template is the verdict alone, probability or not."""
+        yes_no_slot = {"kind": "boolean", "name": "approved_in", "concept_ref": "native.YesNo", "required": True}
+        assert project_inputs_template(descriptor=_descriptor(yes_no_slot), explicit=False) == {"approved_in": False}
+
+    def test_a_json_slot_unwraps_to_its_object_in_the_compact_shape(self):
+        """`native.JSON` is not out of matrix: the shaper reads a bare object there literally, so the
+        compact shape is the object its `json_obj` holds, and the explicit shape keeps the content form.
+        """
+        json_node: dict[str, Any] = {
+            "kind": "object",
+            "concept_ref": "native.JSON",
+            "required": True,
+            "fields": [{"kind": "unknown", "name": "json_obj", "required": True}],
+        }
+        single = {**json_node, "name": "payload"}
+        plural = {"kind": "list", "name": "records", "concept_ref": "native.JSON", "required": True, "item": json_node}
+        descriptor = _descriptor(single, plural)
+
+        compact = project_inputs_template(descriptor=descriptor, explicit=False)
+        explicit = project_inputs_template(descriptor=descriptor, explicit=True)
+
+        assert compact == {"payload": {}, "records": [{}]}
+        assert explicit["payload"] == {"concept": "native.JSON", "content": {"json_obj": {}}}
+        assert explicit["records"] == {"concept": "native.JSON", "content": [{"json_obj": {}}]}
+
     def test_a_nested_field_naming_a_native_holds_that_native_s_content_object(self):
         """A nested `native.Text` is a `TextContent`, so the payload carries `{"text": ...}` there —
         where an authored `type = "text"` field beside it carries the bare value. The descriptor

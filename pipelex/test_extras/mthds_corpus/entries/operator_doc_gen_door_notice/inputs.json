@@ -1,0 +1,10 @@
+{
+  "notice": {
+    "concept": "shop_notices.OpeningNotice",
+    "content": {
+      "shop_name": "Boulangerie Kerlann",
+      "weekdays": "7:00 to 19:30",
+      "weekend": "7:30 to 13:00"
+    }
+  }
+}

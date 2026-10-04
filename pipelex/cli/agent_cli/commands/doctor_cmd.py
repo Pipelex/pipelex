@@ -14,8 +14,11 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
+    PluginsCheck,
+    SecretsProviderCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     check_backend_credentials,
@@ -28,6 +31,7 @@ from pipelex.cli.commands.doctor_cmd import (
 )
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.tools.log.log import log
 
 
 def _status_icon(*, healthy: bool) -> str:
@@ -125,6 +129,24 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     lines.append(f"\n## Telemetry \u2014 {_status_icon(healthy=telemetry_check['healthy'])}\n")
     lines.append(telemetry_check["message"])
 
+    # Plugins, present only when the runtime setup discovered them
+    plugins_check = checks.get("plugins")
+    if plugins_check is not None:
+        lines.append(f"\n## Plugins \u2014 {_status_icon(healthy=plugins_check['healthy'])}\n")
+        lines.append(plugins_check["message"])
+
+    # Secrets Provider, present only when the runtime setup ran
+    secrets_provider_check = checks.get("secrets_provider")
+    if secrets_provider_check is not None:
+        lines.append(f"\n## Secrets Provider \u2014 {_status_icon(healthy=secrets_provider_check['healthy'])}\n")
+        lines.append(secrets_provider_check["message"])
+
+    # Log Sink, present only when the runtime setup ran
+    log_sink_check = checks.get("log_sink")
+    if log_sink_check is not None:
+        lines.append(f"\n## Log Sink \u2014 {_status_icon(healthy=log_sink_check['healthy'])}\n")
+        lines.append(log_sink_check["message"])
+
     # Backend Credentials
     creds_check = checks["backend_credentials"]
     lines.append(f"\n## Backend Credentials \u2014 {_status_icon(healthy=creds_check['healthy'])}\n")
@@ -198,6 +220,19 @@ def agent_doctor_cmd(
     Target directory: auto-detects project .pipelex/ if present, else ~/.pipelex/.
     Use --global/-g to force checking the global ~/.pipelex/ directory.
     """
+    # The doctor configures logging and installs a sink for its own report; once the report is out,
+    # it releases them, so an ``otlp`` sink's exporter and the hook it registered at exit go with the
+    # command rather than outliving it. Logging an embedder configured before calling in is left alone.
+    logging_was_configured = log.is_configured
+    try:
+        _do_agent_doctor_cmd(global_=global_, output_format=output_format, error_format=error_format)
+    finally:
+        if not logging_was_configured:
+            log.reset()
+
+
+def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error_format: CliOutputFormat | None) -> None:
+    """The report itself; ``agent_doctor_cmd`` is the entry point that releases what this configured."""
     set_agent_cli_error_format(error_format or output_format)
     # Process-global logging cutoff, BEFORE setup_doctor_runtime / check_* can trigger
     # any third-party log line.
@@ -239,9 +274,15 @@ def agent_doctor_cmd(
         models_healthy: bool
         models_message: str
         backend_file_reports: dict[str, BackendFileReport]
+        log_sink_check: LogSinkCheck | None = None
+        plugins_check: PluginsCheck | None = None
+        secrets_provider_check: SecretsProviderCheck | None = None
         if config_healthy:
             try:
-                setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
+                runtime_setup = setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
+                log_sink_check = runtime_setup.log_sink
+                plugins_check = runtime_setup.plugins
+                secrets_provider_check = runtime_setup.secrets_provider
                 # Pin discipline BEFORE check_models. setup_doctor_runtime uses
                 # log.configure_if_unset(), which no-ops when a prior process already configured
                 # logging (embedded reuse, interleaved tests) — in that case AGENT_CLI_STDERR_LOG_FIELDS
@@ -249,7 +290,9 @@ def agent_doctor_cmd(
                 # apply_agent_cli_output_discipline mutates the existing handler unconditionally via
                 # log.redirect_to_stderr, closing that window before any check fires.
                 apply_agent_cli_output_discipline()
-                models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
+                models_healthy, models_message, backend_file_reports = check_models(
+                    secrets_provider=runtime_setup.built_secrets_provider, config_dir=config_dir
+                )
             except PipelexConfigError as exc:
                 # A config can pass check_config_files's shape check and still fail full validation
                 # inside setup_doctor_runtime (e.g. a layered override file). Surface the translated
@@ -273,7 +316,16 @@ def agent_doctor_cmd(
     # installed a hub or configured log — the helper guards both internally).
     apply_agent_cli_output_discipline()
 
-    all_healthy = config_healthy and pending_migrations_check.is_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy
+    all_healthy = (
+        config_healthy
+        and pending_migrations_check.is_healthy
+        and telemetry_check.is_healthy
+        and backends_healthy
+        and models_healthy
+        and (log_sink_check is None or log_sink_check.is_healthy)
+        and (plugins_check is None or plugins_check.is_healthy)
+        and (secrets_provider_check is None or secrets_provider_check.is_healthy)
+    )
 
     # Build backend credential details
     backends_list: list[dict[str, Any]] = []
@@ -332,6 +384,16 @@ def agent_doctor_cmd(
                 recommended_actions.append(
                     f"Manually fix backend configuration in {config_location.config_dir}/inference/backends/{file_report.backend_name}.toml"
                 )
+    if plugins_check is not None and not plugins_check.is_healthy:
+        recommended_actions.append(
+            "Fix, upgrade or uninstall the plugin the plugins check names, or take a core plugin out of runtime.plugins.disabled"
+        )
+    if secrets_provider_check is not None and not secrets_provider_check.is_healthy:
+        recommended_actions.append(
+            "Set 'method' in [runtime.secrets] to a registered secrets provider, or fix what the secrets_provider check says stopped it"
+        )
+    if log_sink_check is not None and not log_sink_check.is_healthy:
+        recommended_actions.append("Set 'sink' in [runtime.log] to a registered log sink, or fix what the log_sink check says stopped it")
 
     result: dict[str, Any] = {
         "success": True,
@@ -368,6 +430,12 @@ def agent_doctor_cmd(
             },
         },
     }
+    if plugins_check is not None:
+        result["checks"]["plugins"] = {"healthy": plugins_check.is_healthy, "message": plugins_check.message}
+    if secrets_provider_check is not None:
+        result["checks"]["secrets_provider"] = {"healthy": secrets_provider_check.is_healthy, "message": secrets_provider_check.message}
+    if log_sink_check is not None:
+        result["checks"]["log_sink"] = {"healthy": log_sink_check.is_healthy, "message": log_sink_check.message}
 
     if recommended_actions:
         result["recommended_actions"] = recommended_actions

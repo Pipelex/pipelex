@@ -58,13 +58,6 @@ class TestDoclingWorkerSemantic:
         worker = _make_worker(mocker)
         sdk_exc = exception_class(exception_message)
 
-        from pipelex.tools.uri.prepared_file import PreparedFileLocalPath  # ruff: ignore[import-outside-top-level]
-
-        mocker.patch(
-            "pipelex.providers.docling.docling_extract_worker.prepare_file_from_uri",
-            new_callable=mocker.AsyncMock,
-            return_value=PreparedFileLocalPath(path="/tmp/test.pdf"),  # ruff: ignore[hardcoded-temp-file]
-        )
         mocker.patch(
             "pipelex.providers.docling.docling_extract_worker.asyncio.to_thread",
             new_callable=mocker.AsyncMock,

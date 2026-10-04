@@ -12,7 +12,7 @@ This guide provides an overview of how to design your pipelines.
 
 A pipeline is composed of pipes. There are two fundamental types of pipes you will use to build your methods:
 
-*   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), searching the web (`PipeSearch`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
+*   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), searching the web (`PipeSearch`), answering a closed question with a verdict (`PipeJudge`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
 *   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your method, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
 A third, design-time-only kind of pipe — **[Signature Pipes](./signature-pipes.md)** — lets you stub a pipe's contract (inputs and output) by declaring it with no `type` and no implementation: a typeless, contract-only pipe *is* a signature. Signatures dry-run as mocks under `--allow-signatures`, so you can sketch a pipeline top-down before writing each operator. Strict validation refuses pipelines that still depend on a signature.

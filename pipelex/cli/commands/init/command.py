@@ -19,7 +19,7 @@ from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.telemetry import setup_telemetry
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
+from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
@@ -304,9 +304,9 @@ def execute_initialization(
                     dst_path = target_deck_dir / deck_file.name
                     shutil.copy2(deck_file, dst_path)
 
-            # Stamp the deck manifest so future updates can detect drift and
-            # `pipelex update` knows the exact kit version this install came from.
-            write_manifest(compute_kit_manifest(), deck_dir=target_deck_dir)
+            # Stamp the kit manifests of the deck and of backends/internal.toml so future updates can
+            # detect drift and `pipelex update` knows the exact kit version this install came from.
+            stamp_kit_manifests(inference_dir=target_inference_dir)
 
             # Reset routing_profiles.toml
             template_routing_path = template_inference_dir / "routing_profiles.toml"

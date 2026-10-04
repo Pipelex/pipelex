@@ -13,12 +13,14 @@ from pipelex.cogt.exceptions import (
     InferenceBackendLibraryNotFoundError,
     InferenceBackendLibraryValidationError,
     InferenceModelSpecError,
+    PluginModelDeclarationError,
 )
-from pipelex.cogt.model_backends.backend import InferenceBackend, resolve_model_specs_section
+from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend, resolve_model_specs_section
 from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
 )
+from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig, drop_unknown_gateway_defaults
 from pipelex.cogt.model_backends.model_spec_document import MODEL_SPEC_DEFAULTS_TABLE
 from pipelex.cogt.model_backends.model_spec_factory import (
@@ -28,6 +30,7 @@ from pipelex.cogt.model_backends.model_spec_factory import (
 )
 from pipelex.cogt.model_backends.model_spec_keys import ModelSpecSource, describe_rejected_keys, split_model_spec_keys
 from pipelex.migration.plan import MigrationPlan
+from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_surface import (
     INFERENCE_BACKEND_CONFIG_SURFACE_ID,
@@ -333,7 +336,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         backend_name=backend_name,
                         backend_config_source=backend_config_source,
                         model_spec_source=model_spec_source,
-                        backend_blueprint=backend_blueprint,
+                        backend_listed_constraints=backend_blueprint.listed_constraints,
+                        backend_valued_constraints=backend_blueprint.valued_constraints,
                     )
                 except InferenceBackendLibraryError:
                     recovered = self._local_model_specs_the_ledger_can_explain(
@@ -385,13 +389,15 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backend_name: str,
         backend_config_source: str,
         model_spec_source: ModelSpecSource,
-        backend_blueprint: InferenceBackendBlueprint,
+        backend_listed_constraints: list[ListedConstraint],
+        backend_valued_constraints: dict[ValuedConstraint, Any],
     ) -> "dict[str, InferenceModelSpec]":
         """Turn one backend's raw tables into model specs: pop `[defaults]`, split, merge, validate.
 
         Its own method so the boot-tolerance retry can run it a second time over a migrated document
-        without duplicating a line of it. The read is non-destructive — `[defaults]` is popped from a
-        copy — because the caller may still need the original tables when this raises.
+        without duplicating a line of it, and so a plugin's internal models are built by the very path
+        a backend file's are. The read is non-destructive — `[defaults]` is popped from a copy —
+        because the caller may still need the original tables when this raises.
         """
         remaining_tables = dict(model_specs_dict)
         defaults_dict: dict[str, Any] = remaining_tables.pop(MODEL_SPEC_DEFAULTS_TABLE, {})
@@ -408,7 +414,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 key_split = split_model_spec_keys(model_spec_dict=model_spec_dict)
                 if key_split.rejected:
                     match model_spec_source:
-                        case ModelSpecSource.LOCAL_FILE:
+                        case ModelSpecSource.LOCAL_FILE | ModelSpecSource.PLUGIN:
                             # Fatal in lenient mode too: leniency covers credentials only (see the docstring),
                             # and this is not a credentials error, so the lenient `except` in `load` lets it
                             # through. What may still catch it is the ledger, one level up.
@@ -430,8 +436,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     backend_name=backend_name,
                     name=model_spec_name,
                     blueprint=model_spec_blueprint,
-                    backend_listed_constraints=backend_blueprint.listed_constraints,
-                    backend_valued_constraints=backend_blueprint.valued_constraints,
+                    backend_listed_constraints=backend_listed_constraints,
+                    backend_valued_constraints=backend_valued_constraints,
                     extra_headers=key_split.headers,
                 )
                 backend_model_specs[model_spec_name] = model_spec
@@ -473,7 +479,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         — but at boot there is nothing there to carry forward.
         """
         match model_spec_source:
-            case ModelSpecSource.REMOTE_GATEWAY:
+            case ModelSpecSource.REMOTE_GATEWAY | ModelSpecSource.PLUGIN:
+                # A plugin's table is never read from a file, and never retried here: it is built after the load.
                 return None
             case ModelSpecSource.LOCAL_FILE:
                 pass
@@ -494,7 +501,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 backend_name=backend_name,
                 backend_config_source=backend_config_source,
                 model_spec_source=model_spec_source,
-                backend_blueprint=backend_blueprint,
+                backend_listed_constraints=backend_blueprint.listed_constraints,
+                backend_valued_constraints=backend_blueprint.valued_constraints,
             )
         except (InferenceBackendLibraryError, InferenceModelSpecError, InferenceBackendCredentialsError):
             return None
@@ -629,6 +637,63 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 message=msg,
                 key_name=unknown_var_prefix_exc.var_name,
             ) from unknown_var_prefix_exc
+
+    def merge_plugin_internal_models(self, *, plugin_model_declarations: PluginModelDeclarations, backends_dir_path: str) -> bool:
+        """Merge the internal models the plugins declared into the internal backend, or report there is none to merge into.
+
+        Each table is built by the path a backend file's tables take, as a `PLUGIN` source: a key the model spec
+        does not know is the plugin author's mistake and fatal, as it is in a local file. The table is complete on
+        its own, so the `[defaults]` of `internal.toml` is not applied to it.
+
+        **A name the installation's `internal.toml` already declares is refused rather than overridden**, naming
+        the plugin and the file: which of the two declarations a boot would run would otherwise depend on nothing
+        the user can see. Model names are not global across backends — the same name in several backend files is
+        the ordinary case, and the routing profile picks one — so a name another backend declares is left to the
+        routing, exactly as it is for a model the file declares.
+
+        Returns:
+            Whether this load has an internal backend. `False` when the installation disables it, or declares none:
+            the plugins' models are then not merged, as a disabled backend's own models are not loaded, and the
+            caller leaves the plugins' model deck defaults out for the same reason.
+
+        Raises:
+            PluginModelDeclarationError: a plugin declares a model `internal.toml` declares too, or one whose table
+                is not a valid model spec.
+        """
+        internal_backend = self.root.get(PipelexBackend.INTERNAL)
+        if internal_backend is None:
+            return False
+        internal_file_path = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=PipelexBackend.INTERNAL)
+        merged_model_specs = dict(internal_backend.model_specs)
+        for model_name, plugin_model in plugin_model_declarations.internal_models.items():
+            if model_name == MODEL_SPEC_DEFAULTS_TABLE:
+                msg = (
+                    f"Plugin '{plugin_model.plugin}' declares an internal model named '{model_name}', which is the name of a backend "
+                    "file's table of defaults, so it cannot name a model."
+                )
+                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
+            if model_name in internal_backend.model_specs:
+                msg = (
+                    f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}', which '{internal_file_path}' declares too. "
+                    "Remove it from that file, or run `pipelex update` to refresh the file from the kit: the plugin's declaration is the one "
+                    "that ships with its engine."
+                )
+                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
+            try:
+                plugin_model_specs = self._build_backend_model_specs(
+                    model_specs_dict={model_name: plugin_model.spec},
+                    backend_name=PipelexBackend.INTERNAL,
+                    backend_config_source=f"plugin '{plugin_model.plugin}'",
+                    model_spec_source=ModelSpecSource.PLUGIN,
+                    backend_listed_constraints=internal_backend.listed_constraints,
+                    backend_valued_constraints=internal_backend.valued_constraints,
+                )
+            except InferenceBackendLibraryError as exc:
+                msg = f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}' with a table that is not a valid model spec: {exc}"
+                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin) from exc
+            merged_model_specs.update(plugin_model_specs)
+        self.root[PipelexBackend.INTERNAL] = internal_backend.model_copy(update={"model_specs": merged_model_specs})
+        return True
 
     def list_backend_names(self) -> list[str]:
         return list(self.root.keys())

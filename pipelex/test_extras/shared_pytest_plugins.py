@@ -4,11 +4,11 @@ from enum import StrEnum
 import pytest
 from pytest import Config, FixtureRequest, Parser
 
-from pipelex.runtime_hub import get_console
 from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 
 class ClassRegistryMode(StrEnum):
@@ -49,6 +49,7 @@ ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
     "LINKUP_API_KEY",
     "OPENROUTER_API_KEY",
     "MINIMAX_API_KEY",
+    "TYPESAFE_API_KEY",
 ]
 
 
@@ -125,7 +126,9 @@ def _setup_env_var_placeholders(env_var_keys: list[str]) -> None:
             substitutions_counter += 1
 
     if substitutions_counter > 0:
-        get_console().print(f"[yellow]Set {substitutions_counter} placeholder environment variables[/yellow]")
+        # A plain line rather than a console one: this plugin loads in every session of every project that
+        # registers it, and a CI diagnostic must never be the reason a suite cannot run.
+        print_to_stderr(f"Set {substitutions_counter} placeholder environment variables")
 
 
 def _cleanup_placeholder_env_vars(env_var_keys: list[str]) -> None:
@@ -148,7 +151,8 @@ def _cleanup_placeholder_env_vars(env_var_keys: list[str]) -> None:
             removed_counter += 1
 
     if removed_counter > 0:
-        get_console().print(f"[yellow]Cleaned up {removed_counter} placeholder environment variables[/yellow]")
+        # As above: a plain line, for the same reason.
+        print_to_stderr(f"Cleaned up {removed_counter} placeholder environment variables")
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -5,7 +5,7 @@ description: "How Pipelex discovers inference backends through the plugin seam, 
 
 # Inference Backend Plugins
 
-Every model call in Pipelex — an LLM completion, an image generation, a document extraction, a web search — is served by an **inference worker**. Which worker handles a given model is decided entirely by data: a model's `sdk` field selects a backend, and a **backend plugin** is what teaches Pipelex how to build the worker for that `sdk`.
+Every model call in Pipelex — an LLM completion, an image generation, a document extraction, a web search, a judgment — is served by an **inference worker**. Which worker handles a given model is decided entirely by data: a model's `sdk` field selects a backend, and a **backend plugin** is what teaches Pipelex how to build the worker for that `sdk`.
 
 Core names no backend by import or by string. The built-in drivers (OpenAI, Gateway, Anthropic, Mistral, Bedrock, Google, FAL, HuggingFace, Docling, …) are plugins too — they ride the exact same seam an out-of-tree plugin would. This page documents that seam, the **Inference SPI** a plugin compiles against, and how to write one.
 
@@ -29,7 +29,7 @@ run time (e.g. LLMWorkerFactory.make_llm_worker)
   └─ worker = make_worker(inference_model=…, backend=…, sdk_clients=…, reporting_delegate=…)
 ```
 
-The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
+The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`, `DocGenWorkerFactory`, `JudgmentWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
 
 ---
 
@@ -57,7 +57,7 @@ A backend plugin's `register` calls one menu method per `(family, sdk)` it serve
 
 ```python
 registrar.add_inference_backend(
-    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH
+    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH | DOC_GEN | JUDGMENT
     sdk="acme",  # the model's `sdk` string
     make_worker=_make_acme_worker,  # a MakeWorkerFn (a plain callable)
 )
@@ -65,7 +65,9 @@ registrar.add_inference_backend(
 
 A registry key is `(family, sdk)`. The same `sdk` string may appear in two families (e.g. `google` serves both `LLM` and `IMG_GEN`); they are distinct keys. A duplicate `(family, sdk)` fails loud with `DuplicateInferenceBackendError` naming **both** contributing plugins.
 
-One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves all four, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`. This is the cross-family-vendor coordination point: one plugin, many backends.
+One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves the four inference families, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`, and `typesafe` serves `JUDGMENT` alone. This is the cross-family-vendor coordination point: one plugin, many backends. `DOC_GEN` is the family of the document engines a `PipeDocGen` step prints with, local libraries rather than inference, which the built-in `reportlab` plugin and the Pipelex document generation plugin serve (see [Document Engine Plugins](document-engine-plugins.md)).
+
+A plugin whose backend runs without an external service, such as a document engine, may also declare the models it serves rather than leave them to a backend file. `add_internal_model(name=…, spec=…)` declares a model in the `internal` backend, the spec being the table a backend file would hold for it, and `add_doc_gen_default(doc_gen_format=…, source=…, model=…)` declares the model deck's default engine for a document format and source. Both are stored at registration and merged by the model manager at boot, and [Document Engine Plugins](document-engine-plugins.md#registering-an-engine) gives their rules.
 
 ---
 
@@ -87,7 +89,7 @@ The factory always passes all four keyword arguments. A stateless backend simply
 
 Two invariants shape what goes *inside* the closure:
 
-- **Import-light.** The plugin module must import no backend SDK at module load. Do the SDK import **inside** the closure (`# noqa: PLC0415`), so merely discovering the plugin never pulls a heavy/optional dependency. Booting Pipelex with the built-ins registered imports none of `anthropic`, `mistralai`, `google.genai`, `boto3`, `fal_client`, `huggingface_hub`, `docling`, `linkup`, … — enforced by a subprocess import-blocker guard.
+- **Import-light.** The plugin module must import no backend SDK at module load. Do the SDK import **inside** the closure (`# noqa: PLC0415`), so merely discovering the plugin never pulls a heavy/optional dependency. Booting Pipelex with the built-ins registered imports none of `anthropic`, `mistralai`, `google.genai`, `boto3`, `fal_client`, `huggingface_hub`, `docling`, `linkup`, `typesafe_sdk`, … — enforced by a subprocess import-blocker guard.
 - **Fail at use, not at boot.** Guard an optional dependency with `require_sdk(...)` *inside* the closure. A missing extra then raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) only when the backend is actually used.
 
 Client memoization goes through `sdk_clients.get_or_create(handle=…, build=lambda: …)` — the registry caches one SDK client per `ModelHandle`, so repeated worker construction reuses the connection.
@@ -123,6 +125,8 @@ The same import-light / fail-at-use rules apply: a missing optional extra must r
 ---
 
 ## Authoring a backend plugin (minimal example)
+
+[Writing an Inference Plugin](writing-an-inference-plugin.md) walks through a complete plugin you can install and run with no API key, from its entry point to a method served by its model. The example below shows what a plugin wrapping a real SDK adds to that.
 
 A complete LLM backend plugin for a hypothetical `acme` SDK:
 
@@ -223,7 +227,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `SdkClientRegistry` | `pipelex.plugins.sdk_client_registry` | per-handle client memoization |
 | `InferenceModelSpec` | `pipelex.cogt.model_backends.model_spec` | the resolved model record |
 | `InferenceBackend` | `pipelex.cogt.model_backends.backend` | the backend config record (api key, extras) |
-| `InferenceWorkerAbstract` and the `{LLM,ImgGen,Extract,Search}WorkerAbstract` subclasses | `pipelex.cogt.…` | the worker contracts a plugin returns |
+| `InferenceWorkerAbstract` and the `{LLM,ImgGen,Extract,Search,Judgment}WorkerAbstract` subclasses | `pipelex.cogt.…` | the worker contracts a plugin returns |
 | `MissingDependencyError` | `pipelex.exceptions` | raised by `require_sdk` |
 
 The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_VERSION` — not an `__init__.py` re-export shim (the repo bans re-exports; import by full path). Anything a plugin needs to import outside this surface is a design gap to resolve, not an accident to live with.
@@ -248,6 +252,7 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 
 ## Related
 
+- [Writing an Inference Plugin](writing-an-inference-plugin.md) — a complete plugin, installed and run end to end with no API key
 - [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, riding the same discovery/denylist machinery
 - [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `runtime.storage.method`)
 - [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `runtime.secrets.method`)

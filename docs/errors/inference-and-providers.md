@@ -14,11 +14,16 @@ own page. Classes are grouped by subsystem.
 
 - [`CogtError`](cogt-error.md) — AI inference failed
 - [`CostRegistryError`](cost-registry-error.md) — Cost registry
+- [`DocGenEngineMissingError`](doc-gen-engine-missing-error.md) — Doc gen engine missing
+- [`DocGenHandleNotFoundError`](doc-gen-handle-not-found-error.md) — Doc gen handle not found
+- [`DocGenModelCapabilityError`](doc-gen-model-capability-error.md) — Doc gen model capability
+- [`DocGenRenderError`](doc-gen-render-error.md) — Doc gen render
 - [`DryRunMockBuildError`](dry-run-mock-build-error.md) — Dry run mock build
 - [`DryRunObjectFidelityError`](dry-run-object-fidelity-error.md) — Dry run object fidelity
 - [`ExtractCapabilityError`](extract-capability-error.md) — Extract capability
 - [`ExtractHandleNotFoundError`](extract-handle-not-found-error.md) — Extract handle not found
 - [`ExtractInputError`](extract-input-error.md) — Extract input
+- [`ExtractInputFormatError`](extract-input-format-error.md) — Extract input format
 - [`ExtractJobFailureError`](extract-job-failure-error.md) — Extract job failure
 - [`ExtractModelNotFoundError`](extract-model-not-found-error.md) — Extract model not found
 - [`ExtractOutputError`](extract-output-error.md) — Extract output
@@ -38,6 +43,12 @@ own page. Classes are grouped by subsystem.
 - [`InferenceBackendLibraryNotFoundError`](inference-backend-library-not-found-error.md) — Inference backend library not found
 - [`InferenceBackendLibraryValidationError`](inference-backend-library-validation-error.md) — Inference backend library validation
 - [`InferenceModelSpecError`](inference-model-spec-error.md) — Inference model spec
+- [`JudgmentAnswerMismatchError`](judgment-answer-mismatch-error.md) — Judgment answer mismatch
+- [`JudgmentCapabilityError`](judgment-capability-error.md) — Judgment capability
+- [`JudgmentHandleNotFoundError`](judgment-handle-not-found-error.md) — Judgment handle not found
+- [`JudgmentJobFailureError`](judgment-job-failure-error.md) — Judgment job failure
+- [`JudgmentModelMissingError`](judgment-model-missing-error.md) — Judgment model missing
+- [`JudgmentModelNotFoundError`](judgment-model-not-found-error.md) — Judgment model not found
 - [`LLMAssignmentError`](llm-assignment-error.md) — LLM assignment
 - [`LLMCapabilityError`](llm-capability-error.md) — LLM capability
 - [`LLMCompletionError`](llm-completion-error.md) — LLM completion
@@ -59,7 +70,9 @@ own page. Classes are grouped by subsystem.
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
 - [`NeitherUrlNorDataError`](neither-url-nor-data-error.md) — Neither url nor data
 - [`OutputStructureSchemaError`](output-structure-schema-error.md) — Output structure schema
+- [`PluginModelDeclarationError`](plugin-model-declaration-error.md) — Plugin model declaration
 - [`PromptDocumentFactoryError`](prompt-document-factory-error.md) — Prompt document factory
+- [`PromptDocumentFormatError`](prompt-document-format-error.md) — Prompt document format
 - [`PromptImageFactoryError`](prompt-image-factory-error.md) — Prompt image factory
 - [`PromptImageFormatError`](prompt-image-format-error.md) — Prompt image format
 - [`ReportingManagerError`](reporting-manager-error.md) — Reporting manager
@@ -103,6 +116,9 @@ own page. Classes are grouped by subsystem.
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
+- [`TypesafeError`](typesafe-error.md) — Typesafe
+- [`TypesafeJudgmentResponseError`](typesafe-judgment-response-error.md) — Typesafe judgment response
+- [`TypesafeQuestionUnsupportedError`](typesafe-question-unsupported-error.md) — Typesafe question unsupported
 - [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
 - [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
 
@@ -111,8 +127,11 @@ own page. Classes are grouped by subsystem.
 - [`BrokenPluginError`](broken-plugin-error.md) — Broken plugin
 - [`CoreUnconditionalPluginDisabledError`](core-unconditional-plugin-disabled-error.md) — Core unconditional plugin disabled
 - [`DuplicateBundleValidatorError`](duplicate-bundle-validator-error.md) — Duplicate bundle validator
+- [`DuplicateDocGenDefaultError`](duplicate-doc-gen-default-error.md) — Duplicate doc gen default
 - [`DuplicateHttpErrorMapperError`](duplicate-http-error-mapper-error.md) — Duplicate http error mapper
 - [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
+- [`DuplicateInternalModelError`](duplicate-internal-model-error.md) — Duplicate internal model
+- [`DuplicateLogSinkError`](duplicate-log-sink-error.md) — Duplicate log sink
 - [`DuplicateModelListerError`](duplicate-model-lister-error.md) — Duplicate model lister
 - [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator
 - [`DuplicatePipeFuncExecutorError`](duplicate-pipe-func-executor-error.md) — Duplicate pipe func executor
@@ -126,6 +145,7 @@ own page. Classes are grouped by subsystem.
 - [`PluginLayerViolationError`](plugin-layer-violation-error.md) — Plugin layer violation
 - [`RetiredPluginEntryPointGroupError`](retired-plugin-entry-point-group-error.md) — Retired plugin entry point group
 - [`UnknownBootOrchestratorError`](unknown-boot-orchestrator-error.md) — Unknown boot orchestrator
+- [`UnknownLogSinkError`](unknown-log-sink-error.md) — Unknown log sink
 - [`UnknownPipeFuncExecutionModeError`](unknown-pipe-func-execution-mode-error.md) — Unknown pipe func execution mode
 - [`UnknownSecretsMethodError`](unknown-secrets-method-error.md) — Unknown secrets method
 - [`UnknownStorageMethodError`](unknown-storage-method-error.md) — Unknown storage method

@@ -200,21 +200,21 @@ def doctor_command(
     doctor_cmd(fix=fix)
 
 
-@app.command(name="update", help="Update the model deck to match the installed pipelex version")
+@app.command(name="update", help="Update the model deck and backends/internal.toml to match the installed pipelex version")
 def update_command(
     local: Annotated[
         bool,
         typer.Option(
             "--local",
             "-l",
-            help="Force the project-local .pipelex/ deck. Default targets the resolved deck dir (project if .pipelex/ exists, else global)",
+            help="Force the project-local .pipelex/ files. Default targets the resolved dirs (project if .pipelex/ has them, else global)",
         ),
     ] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Apply updates without the interactive confirmation prompt")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the planned actions without modifying any file")] = False,
-    no_backup: Annotated[bool, typer.Option("--no-backup", help="Skip .bak files when overwriting locally-modified deck files")] = False,
+    no_backup: Annotated[bool, typer.Option("--no-backup", help="Skip .bak files when overwriting locally-modified managed files")] = False,
 ) -> None:
-    """Refresh the installed deck to match the kit shipped with the running pipelex version."""
+    """Refresh the installed deck and backends/internal.toml to match the kit shipped with the running pipelex version."""
     update_cmd(local=local, yes=yes, dry_run=dry_run, no_backup=no_backup)
 
 

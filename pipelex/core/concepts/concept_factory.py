@@ -122,6 +122,16 @@ class ConceptFactory:
                     description="A text",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.MARKDOWN:
+                # The one native refining another (`NativeConceptCode.refined_native`): the declaration is
+                # what lets a Markdown value stand in for a Text, established without resolving any class.
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A text written in Markdown",
+                    structure_class_name=structure_class_name,
+                    refines=NativeConceptCode.TEXT.concept_ref,
+                )
             case NativeConceptCode.IMAGE:
                 return Concept(
                     code=native_concept_code,
@@ -204,6 +214,20 @@ class ConceptFactory:
                     code=native_concept_code,
                     domain_code=SpecialDomain.NATIVE,
                     description="A search result with answer and sources",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.CHOICE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="One option picked out of a declared set",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.RATING:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A position on an ordered scale of described levels",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.COMPOSITE:

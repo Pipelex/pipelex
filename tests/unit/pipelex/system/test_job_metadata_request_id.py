@@ -1,5 +1,6 @@
-"""Unit tests for ``JobMetadata.request_id`` — the API-inbound ``X-Request-ID``
-that rides the workflow input across the Temporal serialization boundary.
+"""Unit tests for ``RunMetadata.request_id`` — the API-inbound ``X-Request-ID``
+that rides the workflow input across the Temporal serialization boundary,
+reached from a ``JobMetadata`` through its ``run_metadata``.
 """
 
 import pytest
@@ -10,8 +11,8 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 class TestJobMetadataRequestId:
     def test_request_id_defaults_to_none(self) -> None:
-        """``JobMetadata`` constructed without ``request_id`` carries ``None``."""
-        meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r"))
+        """A ``RunMetadata`` constructed without ``request_id`` carries ``None``."""
+        meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="r"))
         assert meta.run_metadata.request_id is None
 
     def test_request_id_round_trips_through_json(self) -> None:
@@ -20,14 +21,18 @@ class TestJobMetadataRequestId:
         Temporal's data converter serializes activity args as JSON; this pins
         the contract that ``request_id`` reaches the worker intact.
         """
-        meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id="r-abc-123"))
+        meta = JobMetadata(
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="r", request_id="r-abc-123")
+        )
         recovered = JobMetadata.model_validate_json(meta.model_dump_json())
         assert recovered.run_metadata.request_id == "r-abc-123"
         assert recovered == meta
 
     def test_copy_with_update_preserves_request_id(self) -> None:
         """``copy_with_update`` inherits ``request_id`` from the parent metadata."""
-        parent = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id="r-1"))
+        parent = JobMetadata(
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="r", request_id="r-1")
+        )
         child = parent.copy_with_update(otel_context=None)
         assert child.run_metadata.request_id == "r-1"
 
@@ -35,6 +40,8 @@ class TestJobMetadataRequestId:
         "bad_request_id",
         [
             "abc\ndef",  # newline (CRLF log injection)
+            "abc\n",  # trailing newline (a `$` anchor under `re.match` would admit it)
+            "",  # empty
             "abc\rdef",  # carriage return
             "abc\x1b[31mfake",  # ANSI escape (log forgery)
             "abc\x00def",  # NUL byte
@@ -52,7 +59,9 @@ class TestJobMetadataRequestId:
         ``ErrorReport`` envelopes that quote it.
         """
         with pytest.raises(ValidationError):
-            JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id=bad_request_id))
+            JobMetadata(
+                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="r", request_id=bad_request_id)
+            )
 
     @pytest.mark.parametrize(
         "good_request_id",
@@ -65,5 +74,7 @@ class TestJobMetadataRequestId:
     )
     def test_request_id_accepts_well_formed_input(self, good_request_id: str) -> None:
         """Common ``X-Request-ID`` shapes (UUID, hyphenated, dot-separated) round-trip cleanly."""
-        meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id=good_request_id))
+        meta = JobMetadata(
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="r", request_id=good_request_id)
+        )
         assert meta.run_metadata.request_id == good_request_id

@@ -1,0 +1,10 @@
+name = "native_rating_damage_report"
+description = "A claim note written from the level a rating verdict placed a damaged parcel at"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.rating",
+]

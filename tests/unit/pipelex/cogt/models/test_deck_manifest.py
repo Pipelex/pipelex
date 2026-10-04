@@ -10,14 +10,16 @@ from pipelex.cogt.models.deck_manifest import (
     MANIFEST_FILENAME,
     DeckFileStatus,
     DeckManifest,
-    compute_deck_sync_report,
+    KitManagedArea,
     compute_file_sha256,
     compute_kit_manifest,
+    compute_sync_report,
     is_deck_stale_fast,
     list_managed_installed_files,
     list_managed_kit_files,
     manifest_path,
     read_manifest,
+    stamp_kit_manifests,
     suggest_x_custom_filename,
     write_manifest,
 )
@@ -45,7 +47,7 @@ class TestDeckManifest:
     def test_manifest_round_trip(self, tmp_path: Path) -> None:
         manifest = DeckManifest(kit_version="1.2.3", files={"1_llm_deck.toml": "hash-a", "2_img_gen_deck.toml": "hash-b"})
         deck_dir = tmp_path / "deck"
-        write_manifest(manifest, deck_dir=deck_dir)
+        write_manifest(manifest, installed_dir=deck_dir)
         assert manifest_path(deck_dir).is_file()
 
         reloaded = read_manifest(deck_dir)
@@ -89,7 +91,7 @@ class TestDeckManifest:
                 ".DS_Store": "junk",
             },
         )
-        kit_files = list_managed_kit_files()
+        kit_files = list_managed_kit_files(area=KitManagedArea.DECK)
         assert set(kit_files.keys()) == {"1_llm_deck.toml", "2_img_gen_deck.toml"}
 
     def test_list_managed_installed_files_filters_same_way(self, tmp_path: Path) -> None:
@@ -102,7 +104,7 @@ class TestDeckManifest:
                 "cookbook.toml": "c",
             },
         )
-        installed = list_managed_installed_files(deck_dir)
+        installed = list_managed_installed_files(deck_dir, area=KitManagedArea.DECK)
         assert set(installed.keys()) == {"1_llm_deck.toml"}
 
     def test_list_managed_installed_files_ignores_non_numbered_user_tomls(self, tmp_path: Path) -> None:
@@ -119,18 +121,18 @@ class TestDeckManifest:
                 "notes.toml": "user-authored",
             },
         )
-        installed = list_managed_installed_files(deck_dir)
+        installed = list_managed_installed_files(deck_dir, area=KitManagedArea.DECK)
         assert set(installed.keys()) == {"1_llm_deck.toml"}
 
     def test_list_managed_installed_files_missing_dir(self, tmp_path: Path) -> None:
-        assert list_managed_installed_files(tmp_path / "absent") == {}
+        assert list_managed_installed_files(tmp_path / "absent", area=KitManagedArea.DECK) == {}
 
     def test_compute_kit_manifest_stamps_version(self, mocker: MockerFixture, tmp_path: Path) -> None:
         kit_dir = tmp_path / "kit"
         self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "content-a"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="9.9.9")
 
-        manifest = compute_kit_manifest()
+        manifest = compute_kit_manifest(area=KitManagedArea.DECK)
         assert manifest.kit_version == "9.9.9"
         assert "1_llm_deck.toml" in manifest.files
 
@@ -141,9 +143,9 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, contents)
         self._seed_installed(deck_dir, contents)
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(compute_kit_manifest(), deck_dir=deck_dir)
+        write_manifest(compute_kit_manifest(area=KitManagedArea.DECK), installed_dir=deck_dir)
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert report.is_clean()
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.UP_TO_DATE
 
@@ -153,13 +155,13 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "old"})
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "old"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(compute_kit_manifest(), deck_dir=deck_dir)
+        write_manifest(compute_kit_manifest(area=KitManagedArea.DECK), installed_dir=deck_dir)
 
         # Simulate a kit upgrade — the file content has moved on but the user has not edited theirs.
         (kit_dir / "1_llm_deck.toml").write_text("new", encoding="utf-8")
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.1.0")
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.CLEAN_BEHIND
         assert not report.is_clean()
         assert report.installed_kit_version == "1.0.0"
@@ -170,12 +172,12 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "kit-version"})
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "kit-version"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(compute_kit_manifest(), deck_dir=deck_dir)
+        write_manifest(compute_kit_manifest(area=KitManagedArea.DECK), installed_dir=deck_dir)
 
         # User edits their installed file, kit unchanged.
         (deck_dir / "1_llm_deck.toml").write_text("user-edited", encoding="utf-8")
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.LOCALLY_MODIFIED
 
     def test_sync_report_kit_added(self, mocker: MockerFixture, tmp_path: Path) -> None:
@@ -186,10 +188,10 @@ class TestDeckManifest:
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
         # Manifest captures only the file that existed at install time.
         write_manifest(
-            DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": compute_file_sha256(deck_dir / "1_llm_deck.toml")}), deck_dir=deck_dir
+            DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": compute_file_sha256(deck_dir / "1_llm_deck.toml")}), installed_dir=deck_dir
         )
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert report.files["5_new_deck.toml"] == DeckFileStatus.KIT_ADDED
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.UP_TO_DATE
 
@@ -207,10 +209,10 @@ class TestDeckManifest:
                     "9_retired_deck.toml": compute_file_sha256(deck_dir / "9_retired_deck.toml"),
                 },
             ),
-            deck_dir=deck_dir,
+            installed_dir=deck_dir,
         )
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert report.files["9_retired_deck.toml"] == DeckFileStatus.KIT_REMOVED
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.UP_TO_DATE
 
@@ -220,9 +222,9 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "kit"})
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "kit", "cookbook.toml": "user-content"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(compute_kit_manifest(), deck_dir=deck_dir)
+        write_manifest(compute_kit_manifest(area=KitManagedArea.DECK), installed_dir=deck_dir)
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert "cookbook.toml" not in report.files
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.UP_TO_DATE
 
@@ -234,7 +236,7 @@ class TestDeckManifest:
         self._seed_installed(deck_dir, contents)
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert report.manifest_present is False
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.UP_TO_DATE
         # No manifest means the report still cannot be considered "clean" — boot warn still fires.
@@ -247,7 +249,7 @@ class TestDeckManifest:
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "drift"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
 
-        report = compute_deck_sync_report(deck_dir)
+        report = compute_sync_report(deck_dir, area=KitManagedArea.DECK)
         assert report.manifest_present is False
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.LOCALLY_MODIFIED
 
@@ -276,7 +278,7 @@ class TestDeckManifest:
     ) -> None:
         deck_dir = tmp_path / "deck"
         deck_dir.mkdir()
-        write_manifest(DeckManifest(kit_version=manifest_version, files={}), deck_dir=deck_dir)
+        write_manifest(DeckManifest(kit_version=manifest_version, files={}), installed_dir=deck_dir)
         mocker.patch.object(deck_manifest, "get_package_version", return_value=current_version)
 
         assert is_deck_stale_fast(deck_dir) is expected_stale
@@ -301,3 +303,37 @@ class TestDeckManifest:
     )
     def test_suggest_x_custom_filename(self, numbered_filename: str, expected_override: str) -> None:
         assert suggest_x_custom_filename(numbered_filename) == expected_override
+
+    def test_only_internal_toml_is_managed_in_the_backends_area(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The kit's other backend files and a user's own are never the update's: only internal.toml is hashed, on either side."""
+        kit_backends_dir = tmp_path / "kit-backends"
+        kit_backends_dir.mkdir()
+        for filename in ("internal.toml", "openai.toml", "models_reference.md"):
+            (kit_backends_dir / filename).write_text(f"kit {filename}", encoding="utf-8")
+        mocker.patch.object(deck_manifest, "kit_backends_dir", return_value=kit_backends_dir)
+        backends_dir = tmp_path / "backends"
+        backends_dir.mkdir()
+        for filename in ("internal.toml", "openai.toml", "my_backend.toml"):
+            (backends_dir / filename).write_text(f"user {filename}", encoding="utf-8")
+
+        assert list(list_managed_kit_files(area=KitManagedArea.BACKENDS)) == ["internal.toml"]
+        assert list(list_managed_installed_files(backends_dir, area=KitManagedArea.BACKENDS)) == ["internal.toml"]
+
+    def test_stamping_writes_a_manifest_per_area(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        self._seed_kit(mocker, tmp_path / "kit-deck", {"1_llm_deck.toml": "deck"})
+        kit_backends_dir = tmp_path / "kit-backends"
+        kit_backends_dir.mkdir()
+        (kit_backends_dir / "internal.toml").write_text("internal", encoding="utf-8")
+        mocker.patch.object(deck_manifest, "kit_backends_dir", return_value=kit_backends_dir)
+        mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
+        inference_dir = tmp_path / "inference"
+
+        stamp_kit_manifests(inference_dir=inference_dir)
+
+        deck_manifest_written = read_manifest(inference_dir / "deck")
+        backends_manifest_written = read_manifest(inference_dir / "backends")
+        assert deck_manifest_written is not None
+        assert list(deck_manifest_written.files) == ["1_llm_deck.toml"]
+        assert backends_manifest_written is not None
+        assert backends_manifest_written.kit_version == "1.0.0"
+        assert backends_manifest_written.files == {"internal.toml": compute_file_sha256(kit_backends_dir / "internal.toml")}

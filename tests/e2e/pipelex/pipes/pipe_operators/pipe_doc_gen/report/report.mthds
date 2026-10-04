@@ -1,0 +1,39 @@
+domain      = "report_rendering"
+description = "An LLM writes a Markdown report, and the last step prints it as a PDF"
+main_pipe   = "write_and_render_report"
+
+[concept.ReportPdf]
+description = "A report printed as a PDF"
+refines     = "Document"
+
+[pipe.write_and_render_report]
+type = "PipeSequence"
+description = "Write a Markdown report on the topic, then print it as a PDF"
+inputs = { topic = "Text" }
+output = "ReportPdf"
+steps = [
+  { pipe = "write_report", result = "report" },
+  { pipe = "render_report_pdf", result = "report_pdf" },
+]
+
+[pipe.write_report]
+type = "PipeLLM"
+description = "Write a structured report in Markdown"
+inputs = { topic = "Text" }
+output = "Markdown"
+model = "$writing-factual"
+prompt = """
+Write a report of about a thousand words on this topic:
+
+@topic
+
+Write it in Markdown: a title as a level-one heading, an executive summary, four to six sections with level-two headings, at least one bulleted list and one table, and a short conclusion. Return only the Markdown.
+"""
+
+[pipe.render_report_pdf]
+type        = "PipeDocGen"
+description = "Print the Markdown report as a PDF, formatted"
+inputs      = { report = "Markdown" }
+output      = "ReportPdf"
+format      = "pdf"
+filename    = "report"

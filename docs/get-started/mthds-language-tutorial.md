@@ -10,10 +10,12 @@ This tutorial walks you through writing `.mthds` files manually, step by step.
 Set up your project and get free AI access:
 
 ```bash
-uv tool install pipelex
+uv tool install "pipelex[cli]"
 pipelex init
 pipelex login
 ```
+
+The `cli` extra installs Rich, which the `pipelex` command renders its output through.
 
 `pipelex init` creates your project configuration. `pipelex login` opens your browser to authenticate with Pipelex Gateway (free). See [Configure AI Providers](./configure-ai-providers.md) for other options: bring your own keys, local AI, etc.
 
@@ -222,8 +224,8 @@ Learn more about concepts in [Define Your Concepts](../building-methods/concepts
 
 You now understand the building blocks: pipes, sequences, inputs, and structured outputs.
 
-- **Tutorial** — more lessons in the [Cookbook](../cookbook/index.md) (document extraction, batch processing, and more)
+- **Tutorial** — more lessons in the [cookbook's tutorial](https://github.com/Pipelex/pipelex-cookbook/tree/main/tutorial), from structured outputs to model settings, batches and parallel steps
 - **Build Reliable AI Methods** — deep dive into [method project design](../building-methods/kick-off-a-methods-project.md)
 - **Pipe Operators & Controllers** — reference for [pipe operators](../building-methods/pipes/pipe-operators/index.md) (PipeLLM, PipeExtract, PipeCompose, ...) and [pipe controllers](../building-methods/pipes/pipe-controllers/index.md) (PipeSequence, PipeParallel, PipeBatch, PipeCondition)
-- **Cookbook Examples** — real-world [examples and patterns](../cookbook/index.md)
+- **The Cookbook** — [example methods](../cookbook/index.md) you run by their address, with every way to use each one
 - **CLI Reference** — full [command-line reference](../tools/cli/index.md)

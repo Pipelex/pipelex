@@ -167,7 +167,7 @@ The remaining findings are artifacts of *how* you lint, not of file content. Non
 
 ## Serving the engine over HTTP
 
-The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen`, and the re-pointed `/v1/build/*` — the route envelopes are documented in `pipelex-api`'s `docs/codegen.md`). Two host-facing cores make that possible without any CLI plumbing:
+The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen` and `POST /v1/pipe-io` — the route envelopes are documented on the API server's [Resolve & Codegen](../api-server/codegen.md) and [Pipe I/O](../api-server/pipe-io.md) pages). Two host-facing cores make that possible without any CLI plumbing:
 
 - **`pipelex.pipeline.resolve_bundle.resolve_crate_from_contents`** resolves **in-memory** MTHDS contents (strings, with optional per-content sources) into the normalized crate. It mirrors `validate_bundle`'s in-memory arm — the same `translate_to_validate_bundle_error` cascade, so an invalid library raises the one shared `ValidateBundleError` and a resolve verdict cannot drift from a validate verdict — and the same **loaded-on-success contract**: the library is left loaded and current for the host to read live pipes from, and the host owns its teardown. Resolution is static (no dry-run sweep), matching `pipelex resolve`.
 - **`build_stamped_projection`** (above) gives the host the stamped artifact set plus the lock as pure content. A client that writes the served files and lock verbatim reproduces a local run byte-for-byte — the offline `codegen check` passes on the written tree exactly as it would locally. There is deliberately no server-side check route: the check is offline by design.

@@ -1,0 +1,22 @@
+{
+  "answers": {
+    "q": {
+      "confidence": 1.0,
+      "legend": {
+        "0": "Minor",
+        "1": "Severe"
+      },
+      "probabilities": {
+        "0": 0.0,
+        "1": 1.0
+      },
+      "score": 1.0,
+      "type": "score"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 336,
+    "output_tokens": 17
+  }
+}

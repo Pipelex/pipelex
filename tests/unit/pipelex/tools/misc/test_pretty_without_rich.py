@@ -19,6 +19,40 @@ def widths() -> tuple[int, int]:
     return (100, 150)
 
 
+class TestPrettyPrintUrlWithoutRich:
+    def test_the_inner_title_reaches_the_poor_url_frame(self, widths: tuple[int, int], capsys: CaptureFixture[str]):
+        """A url loses its inner title in no mode: the framed printer renders it, so the url printer does too."""
+        width, console_width = widths
+        PrettyPrinter.pretty_print_url_without_rich(
+            "https://pipelex.com",
+            title="the title",
+            inner_title="the inner title",
+            width=width,
+            console_width=console_width,
+        )
+
+        output = remove_ansi_escape_codes(capsys.readouterr().err)
+
+        assert "the title" in output
+        assert "the inner title" in output, f"the inner title was dropped:\n{output}"
+        assert "https://pipelex.com" in output
+
+    def test_a_bare_url_handed_to_the_framed_printer_keeps_its_inner_title(self, widths: tuple[int, int], capsys: CaptureFixture[str]):
+        """The framed printer hands a bare url to the url printer, and that hand-off carries the inner title too."""
+        width, console_width = widths
+        PrettyPrinter.pretty_print_without_rich(
+            content="https://pipelex.com",
+            title="the title",
+            inner_title="the inner title",
+            width=width,
+            console_width=console_width,
+        )
+
+        output = remove_ansi_escape_codes(capsys.readouterr().err)
+
+        assert "the inner title" in output, f"the inner title was dropped on the bare-url path:\n{output}"
+
+
 class TestPrettyPrintWithoutRich:
     def test_pretty_without_rich_empty_content(self, widths: tuple[int, int], capsys: CaptureFixture[str]):
         width, console_width = widths

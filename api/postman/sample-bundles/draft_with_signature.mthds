@@ -1,0 +1,30 @@
+domain      = "draft_with_signature"
+description = "In-progress method — one step is still a forward-declared PipeSignature, so it is valid but not runnable"
+main_pipe   = "summarize_then_translate"
+
+[concept.Summary]
+description = "A short summary of a document"
+refines     = "Text"
+
+[pipe.summarize_then_translate]
+type = "PipeSequence"
+description = "Summarize a document, then translate the summary to French"
+inputs = { document = "Text" }
+output = "Summary"
+steps = [
+  { pipe = "summarize_document", result = "summary" },
+  { pipe = "translate_summary", result = "translated" },
+]
+
+[pipe.summarize_document]
+type        = "PipeLLM"
+description = "Summarize the document in two sentences"
+inputs      = { document = "Text" }
+output      = "Summary"
+prompt      = "Summarize the following document in two sentences:\n\n@document"
+
+[pipe.translate_summary]
+description   = "Translate the summary to French (contract only — not yet implemented)"
+inputs        = { summary = "Summary" }
+output        = "Summary"
+signature_for = "PipeLLM"

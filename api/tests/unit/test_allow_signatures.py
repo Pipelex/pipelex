@@ -1,0 +1,69 @@
+"""`allow_signatures` is sweep-mechanics, not a gate (D-B: signatures-as-data).
+
+After the signatures-as-data reframe, an unimplemented `PipeSignature` is **never** a validation
+error — it is a *runnability fact*. `allow_signatures` no longer gates acceptance; it only controls
+whether signature pipes are mock-run during the dry-run sweep (and therefore listed in
+`validated_pipes`). So a bundle containing a signature is accepted in BOTH modes on `/validate`, the
+one route that runs that sweep. The outstanding signature surfaces as `pending_signatures` +
+`is_runnable: false` (a 200 `ValidReport`, since the verdict is "sound but not runnable"), and the
+only mode difference is whether the signature pipe appears in `validated_pipes`.
+
+The static crate routes run no sweep, so they do not take the flag at all.
+
+(`SignaturesNotAllowedError` — the strict-mode rejection this module used to assert — was removed
+with the de-raise.)
+"""
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.routes import router as api_router
+from tests.unit._constants import SIGNATURE_MTHDS
+
+
+def _build_client() -> TestClient:
+    app = FastAPI()
+    app.include_router(api_router, prefix="/v1")
+    register_exception_handlers(app)
+    return TestClient(app)
+
+
+class TestAllowSignatures:
+    @pytest.mark.parametrize("allow_signatures", [False, True], ids=["strict", "lenient"])
+    def test_signature_bundle_accepted_in_both_modes(self, allow_signatures: bool):
+        # An unimplemented signature is never a rejection (D-B): both modes answer 200. Strict no
+        # longer differs from lenient on acceptance.
+        client = _build_client()
+        response = client.post("/v1/validate", json={"mthds_contents": [SIGNATURE_MTHDS], "allow_signatures": allow_signatures})
+        assert response.status_code == 200, response.text
+
+    @pytest.mark.parametrize("allow_signatures", [False, True], ids=["strict", "lenient"])
+    def test_validate_reports_pending_signature_in_both_modes(self, allow_signatures: bool):
+        # The verdict is "valid but not runnable" regardless of the flag: the outstanding signature
+        # rides `pending_signatures` + `is_runnable: false` on a 200 `ValidReport` (is_valid: true).
+        client = _build_client()
+        response = client.post("/v1/validate", json={"mthds_contents": [SIGNATURE_MTHDS], "allow_signatures": allow_signatures})
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["is_valid"] is True
+        assert body["is_runnable"] is False
+        assert body["pending_signatures"] == ["sig_api.summary_sig"]
+
+    def test_allow_signatures_only_changes_validated_pipes_inclusion(self):
+        # The single behavioral effect of the flag (D-B): the signature pipe is mock-run and listed in
+        # `validated_pipes` only in lenient mode. The verdict (`pending_signatures`, `is_runnable`) is
+        # identical either way — `allow_signatures` is sweep-mechanics, not a verdict knob.
+        client = _build_client()
+        strict = client.post("/v1/validate", json={"mthds_contents": [SIGNATURE_MTHDS]}).json()
+        lenient = client.post("/v1/validate", json={"mthds_contents": [SIGNATURE_MTHDS], "allow_signatures": True}).json()
+
+        strict_refs = {entry["pipe_ref"] for entry in strict["validated_pipes"]}
+        lenient_refs = {entry["pipe_ref"] for entry in lenient["validated_pipes"]}
+        assert strict_refs == {"sig_api.caller_seq"}
+        assert lenient_refs == {"sig_api.caller_seq", "sig_api.summary_sig"}
+        # The verdict is the same in both modes.
+        assert strict["pending_signatures"] == lenient["pending_signatures"] == ["sig_api.summary_sig"]
+        assert strict["is_runnable"] is False
+        assert lenient["is_runnable"] is False

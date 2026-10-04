@@ -22,6 +22,7 @@ from pipelex.cogt.inference.error_classification import (
     extract_local_extract_metadata,
     extract_mistral_metadata,
     extract_openai_metadata,
+    extract_typesafe_metadata,
 )
 from pipelex.cogt.inference.provider_name import ProviderName
 
@@ -39,6 +40,7 @@ _PROVIDER_TO_EXTRACT_FN: dict[ProviderName, Callable[..., ProviderErrorMetadata]
     ProviderName.HUGGINGFACE: extract_huggingface_metadata,
     ProviderName.GATEWAY: extract_gateway_metadata,
     ProviderName.LINKUP: extract_linkup_metadata,
+    ProviderName.TYPESAFE: extract_typesafe_metadata,
     ProviderName.DOCLING: extract_local_extract_metadata,
     ProviderName.PYPDFIUM2: extract_local_extract_metadata,
 }

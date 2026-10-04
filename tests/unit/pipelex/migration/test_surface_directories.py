@@ -23,7 +23,7 @@ BACKENDS = Path("inference") / "backends"
 class TestADirectoryIsHalfTheClaim:
     @staticmethod
     def _registry(build_surface: SurfaceBuilder) -> SurfaceRegistry:
-        """The shape the real registry has after S7b: a root family and a subdirectory family."""
+        """The shape the real registry has since the inference-backend surface joined it: a root family and a subdirectory family."""
         return SurfaceRegistry(
             surfaces=[
                 build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml"),

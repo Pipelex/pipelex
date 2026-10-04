@@ -26,7 +26,7 @@ class ImageRenderable(Protocol):
     with image tokens ([Image N]) in place of actual images.
 
     Implementations:
-    - StuffContent (base): iterates model fields, recurses into nested content
+    - StructuredContent (base of structured concepts): iterates model fields, recurses into nested content
     - ImageContent: registers itself and returns [Image N] token
     - ListContent: renders each item with images
     - TextAndImagesContent: renders text, then registers images

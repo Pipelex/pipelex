@@ -4,21 +4,22 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiofiles
-import mistralai
-from mistralai import Mistral
-from mistralai.models import (
+from mistralai.client import Mistral
+from mistralai.client.models import (
+    ChatCompletionRequestMessage,
     ContentChunk,
     DocumentURLChunk,
     DocumentURLChunkTypedDict,
     ImageURLChunk,
     ImageURLChunkTypedDict,
-    Messages,
+    OCRImageObject,
+    OCRResponse,
     SystemMessage,
     TextChunk,
     UsageInfo,
     UserMessage,
 )
-from mistralai.utils import BackoffStrategy, RetryConfig
+from mistralai.client.utils import BackoffStrategy, RetryConfig
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -70,9 +71,9 @@ class MistralFactory:
     # Message
     #########################################################
 
-    async def make_simple_messages(self, llm_job: LLMJob) -> list[Messages]:
+    async def make_simple_messages(self, llm_job: LLMJob) -> list[ChatCompletionRequestMessage]:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
-        messages: list[Messages] = []
+        messages: list[ChatCompletionRequestMessage] = []
         if system_text := llm_job.llm_prompt.system_text:
             messages.append(SystemMessage(content=system_text))
 
@@ -196,7 +197,7 @@ class MistralFactory:
     @classmethod
     async def make_extract_output_from_mistral_response(
         cls,
-        mistral_extract_response: mistralai.OCRResponse,
+        mistral_extract_response: OCRResponse,
     ) -> ExtractOutput:
         """Convert Mistral OCR response to ExtractOutput.
 
@@ -277,7 +278,7 @@ class MistralFactory:
     @classmethod
     def make_extracted_image_from_page_from_mistral_ocr_image_obj(
         cls,
-        mistral_ocr_image_obj: mistralai.OCRImageObject,
+        mistral_ocr_image_obj: OCRImageObject,
     ) -> ExtractedImageFromPage:
         if not mistral_ocr_image_obj.image_base64:
             msg = "Mistral OCR image object does not have an image base64"

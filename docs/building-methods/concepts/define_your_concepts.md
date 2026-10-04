@@ -147,7 +147,7 @@ The refined concept inherits the structure of the base concept while adding sema
 
 ## Native Concepts
 
-Pipelex includes these built-in native concepts: `Text`, `Image`, `Document`, `TextAndImages`, `Number`, `YesNo`, `Date`, `Time`, `Page`, `Dynamic`, `JSON`, `Html`, `SearchResult`, `Composite`, and `Anything`.
+Pipelex includes these built-in native concepts: `Text`, `Markdown`, `Image`, `Document`, `TextAndImages`, `Number`, `YesNo`, `Choice`, `Rating`, `Date`, `Time`, `Page`, `Dynamic`, `JSON`, `Html`, `SearchResult`, `Composite`, and `Anything`. Their names are reserved: a bundle declaring a concept named `Choice` or `Rating` is refused, as for every native.
 
 These concepts are automatically available in all pipelines—no setup required. You can use them directly in your pipes or refine them to create more specific concepts.
 

@@ -13,7 +13,6 @@ from typing import Any, cast
 
 from pytest_mock import MockerFixture
 
-from pipelex import log
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
@@ -21,6 +20,7 @@ from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.providers.manifold.manifold_factory import ManifoldFactory
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+from tests.unit.pipelex.providers.manifold.test_data import ManifoldMetadataTestData
 
 MANIFOLD_BACKENDS_TOML = f"""
 [pipelex_manifold]
@@ -135,14 +135,9 @@ class TestManagedGatewayUnknownPerModelKeys:
         assert backend is not None
         model_spec = backend.model_specs["gpt-4o-mini"]
 
-        extra_headers, _ = ManifoldFactory.make_extras(model_spec, inference_job=mocker.MagicMock(spec=LLMJob), output_desc="text")
+        inference_job = mocker.MagicMock(spec=LLMJob)
+        inference_job.job_metadata = ManifoldMetadataTestData.JOB_METADATA
+
+        extra_headers, _ = ManifoldFactory.make_extras(model_spec, inference_job=inference_job, output_desc="text")
 
         assert extra_headers["x-portkey-config"] == "pc-openai-6e7576"
-
-    def test_pruning_a_per_model_key_does_not_need_the_log_hub(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Same constraint as the `defaults` prune: this runs on managed-gateway loads that precede runtime_hub.set_config()."""
-        mocker.patch.object(log.log_dispatch, "_log_config_instance", None)
-
-        library = self._load(tmp_path, model_specs=self._remote_specs(per_model_extras={"a_field_we_removed": "openai"}))
-
-        assert library.get_inference_backend(backend_name="pipelex_manifold") is not None

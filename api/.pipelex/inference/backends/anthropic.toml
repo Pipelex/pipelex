@@ -1,0 +1,186 @@
+################################################################################
+# Anthropic Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Anthropic Claude models.
+# It contains model definitions for various Claude language models
+# accessible through the Anthropic API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["claude-3.5-sonnet"])
+# - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "anthropic"
+structure_method = "instructor/anthropic_tools"
+thinking_mode = "manual"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Claude 3 Series ----------------------------------------------------------
+[claude-3-haiku]
+model_id = "claude-3-haiku-20240307"
+max_tokens = 4096
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 0.25, output = 1.25 }
+thinking_mode = "none"
+
+# --- Claude 3.7 Series --------------------------------------------------------
+["claude-3.7-sonnet"]
+model_id = "claude-3-7-sonnet-20250219"
+max_tokens = 8192
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+# --- Claude 4 Series ----------------------------------------------------------
+[claude-4-sonnet]
+model_id = "claude-sonnet-4-20250514"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+[claude-4-opus]
+model_id = "claude-opus-4-20250514"
+max_tokens = 32000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+# --- Claude 4.1 Series --------------------------------------------------------
+["claude-4.1-opus"]
+model_id = "claude-opus-4-1-20250805"
+max_tokens = 32000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+# --- Claude 4.5 Series --------------------------------------------------------
+["claude-4.5-sonnet"]
+model_id = "claude-sonnet-4-5-20250929"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+["claude-4.5-haiku"]
+model_id = "claude-haiku-4-5-20251001"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 1.0, output = 5.0 }
+
+["claude-4.5-opus"]
+model_id = "claude-opus-4-5-20251101"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+
+["claude-4.6-sonnet"]
+model_id = "claude-sonnet-4-6"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+thinking_mode = "adaptive"
+
+["claude-4.6-opus"]
+model_id = "claude-opus-4-6"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+
+# --- Claude 4.7 Series --------------------------------------------------------
+["claude-4.7-opus"]
+model_id = "claude-opus-4-7"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+# --- Claude 4.8 Series --------------------------------------------------------
+["claude-4.8-opus"]
+model_id = "claude-opus-4-8"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+# --- Claude 5 Series ----------------------------------------------------------
+[claude-5-sonnet]
+model_id = "claude-sonnet-5"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 2.0, output = 10.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+[claude-5-opus]
+model_id = "claude-opus-5"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+[claude-5-fable]
+model_id = "claude-fable-5"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 10.0, output = 50.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]
+
+# --- Claude 5.1 Series --------------------------------------------------------
+["claude-5.1-fable"]
+model_id = "claude-fable-5-1"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 10.0, output = 50.0 }
+thinking_mode = "adaptive"
+# Fable 5.1 refuses tool_choice "tool" and "any", which is what the section default
+# instructor/anthropic_tools forces; the reasoning variant leaves tool_choice on auto.
+structure_method = "instructor/anthropic_reasoning_tools"
+listed_constraints = ["temperature_unsupported"]

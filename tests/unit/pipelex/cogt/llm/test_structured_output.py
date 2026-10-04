@@ -1,9 +1,16 @@
+import warnings
+
+import instructor
+import openai
 import pytest
 from instructor import Mode as InstructorMode
+from instructor.v2.core.mode import DEPRECATED_TO_CORE
 
 from pipelex.cogt.llm.structured_output import StructureMethod
 
-EXPECTED_INSTRUCTOR_MODES: dict[StructureMethod, InstructorMode] = {
+# The provider-specific instructor mode each structure method is named after. instructor deprecates all but the
+# core ones, because the provider now comes from the client, and resolves each to the core mode it stands for.
+LEGACY_INSTRUCTOR_MODES: dict[StructureMethod, InstructorMode] = {
     # generic
     StructureMethod.INSTRUCTOR_JSON: InstructorMode.JSON,
     StructureMethod.INSTRUCTOR_MD_JSON: InstructorMode.MD_JSON,
@@ -48,15 +55,25 @@ EXPECTED_INSTRUCTOR_MODES: dict[StructureMethod, InstructorMode] = {
 
 
 class TestStructureMethod:
-    def test_expected_modes_cover_every_member(self):
-        """Completeness guard: a new StructureMethod member must be added to the expected mapping."""
-        assert set(EXPECTED_INSTRUCTOR_MODES) == set(StructureMethod)
+    def test_legacy_modes_cover_every_member(self):
+        """Completeness guard: a new StructureMethod member must be added to the legacy mapping."""
+        assert set(LEGACY_INSTRUCTOR_MODES) == set(StructureMethod)
 
     @pytest.mark.parametrize(
-        ("structure_method", "expected_mode"),
-        list(EXPECTED_INSTRUCTOR_MODES.items()),
-        ids=[str(member) for member in EXPECTED_INSTRUCTOR_MODES],
+        ("structure_method", "legacy_mode"),
+        list(LEGACY_INSTRUCTOR_MODES.items()),
+        ids=[str(member) for member in LEGACY_INSTRUCTOR_MODES],
     )
-    def test_as_instructor_mode(self, structure_method: StructureMethod, expected_mode: InstructorMode):
-        """Each structure method maps to its exact instructor Mode."""
-        assert structure_method.as_instructor_mode() is expected_mode
+    def test_as_instructor_mode_is_the_core_mode_instructor_resolves_it_to(self, structure_method: StructureMethod, legacy_mode: InstructorMode):
+        """Each structure method maps to the core mode instructor itself resolves its provider-specific mode to."""
+        assert structure_method.as_instructor_mode() is DEPRECATED_TO_CORE.get(legacy_mode, legacy_mode)
+
+    @pytest.mark.parametrize("structure_method", list(StructureMethod), ids=[str(member) for member in StructureMethod])
+    def test_every_structure_method_is_accepted_on_the_openai_sdk(self, structure_method: StructureMethod):
+        """A gateway serves every model through an OpenAI client, whichever provider's method its spec names.
+
+        instructor refuses another provider's mode on an OpenAI client, and warns on a deprecated one.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            instructor.from_openai(client=openai.AsyncOpenAI(api_key="unused"), mode=structure_method.as_instructor_mode())

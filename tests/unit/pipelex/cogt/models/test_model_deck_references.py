@@ -4,12 +4,15 @@ This test suite systematically validates that model deck references point to val
 preventing configuration errors from being discovered at runtime.
 """
 
+from collections.abc import Mapping
 from typing import cast
 
 import pytest
 
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -115,7 +118,7 @@ class TestModelDeckReferences:
 
     def _find_invalid_preset_references(
         self,
-        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting],
+        presets: Mapping[str, LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | JudgmentSetting],
         all_aliases: dict[str, str],
         all_waterfalls: dict[str, list[str]],
         known_model_handles: dict[str, ModelType],
@@ -178,6 +181,10 @@ class TestModelDeckReferences:
                 return model_deck_blueprint.img_gen
             case ModelType.SEARCH:
                 return model_deck_blueprint.search
+            case ModelType.DOC_GEN:
+                return model_deck_blueprint.doc_gen
+            case ModelType.JUDGMENT:
+                return model_deck_blueprint.judgment
 
     @pytest.mark.parametrize(
         ("model_type", "deck_name"),
@@ -186,6 +193,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_aliases_reference_valid_targets(
@@ -219,6 +228,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_presets_reference_valid_models(
@@ -252,6 +263,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_waterfalls_contain_valid_models(
@@ -284,6 +297,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_aliases_no_circular_references(

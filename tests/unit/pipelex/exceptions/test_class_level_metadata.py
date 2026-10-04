@@ -75,8 +75,12 @@ class TestClassLevelMetadata:
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_detail"),
         [
-            ("pipeline_execution", _PIPELINE_EXEC_ERROR, "Check pipe_stack to identify which pipe failed"),
-            ("validate_bundle", ValidateBundleError("boom"), "Check the validation_errors array for specific issues"),
+            ("pipeline_execution", _PIPELINE_EXEC_ERROR, "The run of 'some_pipe' failed: the message gives the cause."),
+            (
+                "validate_bundle",
+                ValidateBundleError("boom"),
+                "Edit the bundle as each validation error says: apply its suggested fix where it has one, after confirming an unsafe one",
+            ),
             (
                 "entry_pipe_not_found",
                 EntryPipeNotFoundError("boom"),

@@ -36,7 +36,7 @@ class TestCheckDeckSync:
             manifest_present=True,
             files={"deck.toml": DeckFileStatus.UP_TO_DATE},
         )
-        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_deck_sync_report", return_value=clean_report)
+        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_sync_report", return_value=clean_report)
 
         healthy, report, message = check_deck_sync(config_dir=tmp_path)
 
@@ -53,7 +53,7 @@ class TestCheckDeckSync:
             manifest_present=False,
             files={"deck.toml": DeckFileStatus.LOCALLY_MODIFIED},
         )
-        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_deck_sync_report", return_value=dirty_report)
+        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_sync_report", return_value=dirty_report)
 
         healthy, _, message = check_deck_sync(config_dir=tmp_path)
 
@@ -74,7 +74,7 @@ class TestCheckDeckSync:
                 "ok.toml": DeckFileStatus.UP_TO_DATE,
             },
         )
-        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_deck_sync_report", return_value=dirty_report)
+        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_sync_report", return_value=dirty_report)
 
         healthy, _, message = check_deck_sync(config_dir=tmp_path)
 
@@ -90,7 +90,7 @@ class TestCheckDeckSync:
             manifest_present=True,
             files={"deck.toml": DeckFileStatus.LOCALLY_MODIFIED},
         )
-        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_deck_sync_report", return_value=dirty_report)
+        mocker.patch("pipelex.cli.commands.doctor_cmd.compute_sync_report", return_value=dirty_report)
 
         healthy, _, message = check_deck_sync(config_dir=tmp_path)
 

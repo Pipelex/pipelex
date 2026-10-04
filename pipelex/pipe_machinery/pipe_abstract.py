@@ -9,6 +9,7 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -23,6 +24,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
+from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
@@ -33,6 +35,7 @@ from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identit
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry
+from pipelex.system.telemetry.current_span import pipelex_span_active
 from pipelex.system.telemetry.otel_constants import (
     LangfuseSpanAttr,
     OTelConstants,
@@ -491,11 +494,19 @@ class PipeAbstract(ABC, BaseModel):
             ]
             if optional_input_names:
                 msg += f" These optional inputs may be omitted: {', '.join(optional_input_names)}."
+            # Whether the caller left the inputs out of the request or an earlier step of their
+            # method did not produce them, the fault is in the caller's own request or method, and
+            # the message names only the pipe and its input names.
             raise PipeRunInputsError(
                 message=msg,
                 run_mode=pipe_run_params.run_mode,
                 pipe_code=self.code,
                 missing_inputs=presence_scan.missing_names,
+            ).as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Provide the missing required inputs of '{self.code}': {', '.join(presence_scan.missing_names)}.",
+                )
             )
 
         # The pipe is about to be lifted (skipped): per-pipe validation and resource checks are
@@ -505,7 +516,11 @@ class PipeAbstract(ABC, BaseModel):
 
         # Validate external resources (URLs, file paths) referenced by input contents.
         # Skipped in dry-run mode because inputs are mock-generated with fake URLs.
-        if not pipe_run_params.run_mode.is_dry:
+        # Skipped on a run with a read scope too: the only thing this checks is that a local path
+        # exists, and such a run reads no local path at all, which the leaves refuse before any IO.
+        # Checking first would stat the host's disk on the method's say-so, and a missing path failing
+        # here while an existing one is refused later would tell the caller which files exist.
+        if not pipe_run_params.run_mode.is_dry and job_metadata.run_metadata.read_scope is None:
             for named_stuff_spec in self.needed_inputs().named_stuff_specs:
                 variable_name = named_stuff_spec.variable_name
                 stuff = working_memory.get_optional_stuff(variable_name)
@@ -513,6 +528,9 @@ class PipeAbstract(ABC, BaseModel):
                     try:
                         stuff.content.validate_resources()
                     except ValueError as exc:
+                        # Not classified as the caller's fault, although the resource is the
+                        # caller's: the check's message names the path as resolved on this host,
+                        # which STRICT disclosure must not show, as `PipelineInputContentError`'s.
                         msg = f"Input '{variable_name}' of pipe '{self.code}' references an invalid resource: {exc}"
                         raise PipeRunInputsError(
                             message=msg,
@@ -669,14 +687,10 @@ class PipeAbstract(ABC, BaseModel):
                         # then discarded. The lightweight IOSpec (name/concept/content_type/digest) is kept
                         # so node ids and usage-event correlation are unaffected.
                         include_graph_data = parent_trace_context.emit_graph_events
-                        input_spec = IOSpec(
+                        input_spec = make_stuff_io_spec(
                             name=var_name,
-                            concept=stuff.concept.code,
-                            content_type=stuff.content.content_type,
-                            digest=stuff.stuff_code,
-                            data=stuff.content.smart_dump()
-                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content)
-                            else None,
+                            stuff=stuff,
+                            include_data=include_graph_data and parent_trace_context.data_inclusion.stuff_json_content,
                         )
                         input_specs.append(input_spec)
 
@@ -777,15 +791,13 @@ class PipeAbstract(ABC, BaseModel):
                 main_stuff = main_resolved
                 # E1: same gating as the input block — skip the discarded payload dumps in costs-only mode.
                 include_graph_data = parent_trace_context.emit_graph_events
-                output_spec = IOSpec(
+                output_spec = make_stuff_io_spec(
                     name=output_name or main_stuff.stuff_name or "main_stuff",
-                    concept=main_stuff.concept.code,
-                    content_type=main_stuff.content.content_type,
-                    digest=main_stuff.stuff_code,
-                    data=main_stuff.content.smart_dump() if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content) else None,
+                    stuff=main_stuff,
+                    include_data=include_graph_data and parent_trace_context.data_inclusion.stuff_json_content,
                     # The optional-edge marker (D8): a data edge fed by this output reports that the
                     # value may be absent in other runs.
-                    extra={"optional": True} if self.output.presence.is_optional else {},
+                    extra={"optional": True} if self.output.presence.is_optional else None,
                 )
 
                 # Serialize output concept for registry if enabled (E1: also gated on emit_graph_events).
@@ -814,11 +826,10 @@ class PipeAbstract(ABC, BaseModel):
                         tracer_manager.register_controller_output(
                             lookup_key=parent_trace_context.lookup_key,
                             node_id=graph_node_id,
-                            output_spec=IOSpec(
+                            output_spec=make_stuff_io_spec(
                                 name=companion_slot.slot_name,
-                                concept=companion_stuff.concept.code,
-                                content_type=companion_stuff.content.content_type,
-                                digest=companion_stuff.stuff_code,
+                                stuff=companion_stuff,
+                                include_data=False,
                             ),
                         )
             else:
@@ -923,66 +934,79 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
         library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
-        log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
-
-        # Handle telemetry ------------------------------------------------------------
-
         # Generate pipe_run_id (business ID, always set)
         this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
-        # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
-        # The trace_id comes from parent's otel_context (already computed at pipeline start)
-        this_otel_context: OtelContext | None = None
-        span: Span | None = None
-        is_root_span: bool = False
+        # The pipe run's id exists from here on, so this is where the log context takes it: every
+        # record emitted during the run, its announcement, its span lines and its failure included,
+        # names the pipe run it belongs to, a nested pipe's until it binds its own. The outer binding
+        # comes back when the pipe returns, however it returns. A pipe lifted for absent optional
+        # inputs never gets here: it has no run and no id, and its skip line carries the enclosing binding.
+        with log.context(pipe_run_id=this_pipe_run_id):
+            log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
 
-        parent_otel_context = job_metadata.otel_context
-        if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
-            # Start OTel span first
-            span, is_root_span = self._start_pipe_span(
-                parent_otel_context=parent_otel_context,
-                run_metadata=job_metadata.run_metadata,
-                working_memory=working_memory,
-            )
-            # Get the actual span_id from OTel (OTel generates its own span_id)
-            if span:
-                span_context = span.get_span_context()
-                this_otel_context = OtelContext(
-                    trace_id=parent_otel_context.trace_id,
-                    trace_name=parent_otel_context.trace_name,
-                    trace_name_redacted=parent_otel_context.trace_name_redacted,
-                    span_id=span_context.span_id,
+            # Handle telemetry ------------------------------------------------------------
+
+            # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
+            # The trace_id comes from parent's otel_context (already computed at pipeline start)
+            this_otel_context: OtelContext | None = None
+            span: Span | None = None
+            is_root_span: bool = False
+
+            parent_otel_context = job_metadata.otel_context
+            if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
+                # Start OTel span first
+                span, is_root_span = self._start_pipe_span(
+                    parent_otel_context=parent_otel_context,
+                    run_metadata=job_metadata.run_metadata,
+                    working_memory=working_memory,
                 )
+                # Get the actual span_id from OTel (OTel generates its own span_id)
+                if span:
+                    span_context = span.get_span_context()
+                    this_otel_context = OtelContext(
+                        trace_id=parent_otel_context.trace_id,
+                        trace_name=parent_otel_context.trace_name,
+                        trace_name_redacted=parent_otel_context.trace_name_redacted,
+                        span_id=span_context.span_id,
+                    )
 
-        # Create child metadata with updated pipe_code and pipe_run_id
-        # This passes down a modified copy rather than mutating the original
-        # otel_context is passed separately because it must always be set explicitly
-        # (even when None in dry mode) to avoid inheriting stale parent context
-        child_metadata = job_metadata.copy_with_update(
-            otel_context=this_otel_context,
-            pipe_code=self.code,
-            pipe_run_id=this_pipe_run_id,
-        )
-
-        # Run pipe ------------------------------------------------------------
-
-        try:
-            pipe_output = await self._live_run_pipe(
-                job_metadata=child_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-                output_name=output_name,
-                library_crate=library_crate,
+            # Create child metadata with updated pipe_code and pipe_run_id
+            # This passes down a modified copy rather than mutating the original
+            # otel_context is passed separately because it must always be set explicitly
+            # (even when None in dry mode) to avoid inheriting stale parent context
+            child_metadata = job_metadata.copy_with_update(
+                otel_context=this_otel_context,
+                pipe_code=self.code,
+                pipe_run_id=this_pipe_run_id,
             )
-        except Exception as exc:
-            # Broad catch is intentional: the OTel span must be closed with ERROR status
-            # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
-            self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
-            raise
 
-        # Handle telemetry ------------------------------------------------------------
+            # Run pipe ------------------------------------------------------------
 
-        self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
+            # The span is the Pipelex span active here until it ends, whichever way it ends, so a log
+            # line inside the run names it under `pipelex.*`. OpenTelemetry's current context is left
+            # alone, so a host's own instrumentation is never re-parented and a line's standard trace
+            # fields keep naming the host's span, and the span's children still take their parent from
+            # `child_metadata`.
+            with pipelex_span_active(span=span):
+                try:
+                    pipe_output = await self._live_run_pipe(
+                        job_metadata=child_metadata,
+                        working_memory=working_memory,
+                        pipe_run_params=pipe_run_params,
+                        output_name=output_name,
+                        library_crate=library_crate,
+                    )
+                except BaseException as exc:
+                    # Broad catch is intentional: the OTel span must be closed with ERROR status
+                    # on any failure, a cancellation included, which is not an Exception.
+                    # Observes-and-re-raises — see note on the catch in _run_pipe_traced.
+                    self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
+                    raise
+
+                # Handle telemetry ------------------------------------------------------------
+
+                self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
 
         return pipe_output
 
@@ -1148,18 +1172,23 @@ class PipeAbstract(ABC, BaseModel):
             context=parent_ctx,
             attributes=span_attributes,
         )
+        # A tracer that records nothing, the no-op tracer `OTEL_SDK_DISABLED` hands out for one, gives back the
+        # parent it was handed rather than a span of its own; that is no span, exactly as with no tracer.
+        if span.get_span_context() == parent_span_context:
+            return None, False
 
-        # Debug logging
+        # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
         span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] PIPE SPAN STARTED:\n"
-            f"  pipe_code='{self.code}'\n"
-            f"  pipeline_run_id='{pipeline_run_id}'\n"
-            f"  trace_id={span_ctx.trace_id:032x}\n"
-            f"  span_id={span_ctx.span_id:016x}\n"
-            f"  parent_span_id={parent_span_id:016x}\n"
-            f"  is_root_span={is_root_span}"
-        )
+        with pipelex_span_active(span=span):
+            log.verbose(
+                f"[OTel] PIPE SPAN STARTED:\n"
+                f"  pipe_code='{self.code}'\n"
+                f"  pipeline_run_id='{pipeline_run_id}'\n"
+                f"  trace_id={span_ctx.trace_id:032x}\n"
+                f"  span_id={span_ctx.span_id:016x}\n"
+                f"  parent_span_id={parent_span_id:016x}\n"
+                f"  is_root_span={is_root_span}"
+            )
 
         return span, is_root_span
 
@@ -1197,7 +1226,7 @@ class PipeAbstract(ABC, BaseModel):
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
-    def _end_pipe_span_error(self, span: Span | None, *, error: Exception, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Span | None, *, error: BaseException, is_root_span: bool = False) -> None:
         """End the pipe's OTel span with error status. Safe to call if span is None.
 
         Args:

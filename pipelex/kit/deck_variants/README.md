@@ -1,6 +1,6 @@
 # Deck variants
 
-A deck variant is a complete set of the numbered model deck files (`1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`) kept as an alternative edition of the deck that the kit ships in `pipelex/kit/configs/inference/deck/`. Nothing loads a variant: `pipelex init` does not copy it, `pipelex update` and `pipelex doctor` do not diff against it, and the deck manifest does not know it exists. It is source code that is kept correct, not configuration that is applied.
+A deck variant is a complete set of the numbered model deck files (`1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`, `5_doc_gen_deck.toml`, `6_judgment_deck.toml`) kept as an alternative edition of the deck that the kit ships in `pipelex/kit/configs/inference/deck/`. Nothing loads a variant: `pipelex init` does not copy it, `pipelex update` and `pipelex doctor` do not diff against it, and the deck manifest does not know it exists. It is source code that is kept correct, not configuration that is applied.
 
 `multi_provider/` is the deck Pipelex shipped before the default moved to the models the Pipelex Gateway serves from Azure. It resolves the default aliases and presets to Anthropic, Google and OpenAI models, and it still defines the three provider-named aliases (`best-claude`, `best-gemini`, `best-mistral`) that the shipped deck no longer carries.
 

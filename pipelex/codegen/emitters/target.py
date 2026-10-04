@@ -38,6 +38,14 @@ class CodegenTarget(StrEnum):
     PYTHON_PYDANTIC = "python-pydantic"
     TS_ZOD = "ts-zod"
 
+    @property
+    def is_python_structures(self) -> bool:
+        match self:
+            case CodegenTarget.PYTHON_STRUCTURES:
+                return True
+            case CodegenTarget.PYTHON_PYDANTIC | CodegenTarget.TS_ZOD:
+                return False
+
 
 class EmittedFile(BaseModel):
     """One generated file: a filename relative to the output root and its full content."""

@@ -103,7 +103,7 @@ class MermaidflowFactory:
         # Build stuff registry as tuple format for compatibility with rendering code
         stuff_registry: dict[str, tuple[str, str | None]] = {}
         for digest, stuff_info in analysis.stuff_registry.items():
-            stuff_registry[digest] = (stuff_info.name, stuff_info.concept)
+            stuff_registry[digest] = (stuff_info.name, stuff_info.concept_label)
 
         # Will be populated during rendering
         stuff_id_mapping: dict[str, str] = {}
@@ -139,7 +139,7 @@ class MermaidflowFactory:
                 if controller_node:
                     for output_spec in controller_node.node_io.outputs:
                         if output_spec.digest and output_spec.digest in digest_map:
-                            digest_map[output_spec.digest] = (output_spec.name, output_spec.concept)
+                            digest_map[output_spec.digest] = (output_spec.name, output_spec.concept_label)
 
             # Render pipe nodes and their produced stuff within controller subgraphs
             lines.append("")
@@ -223,7 +223,7 @@ class MermaidflowFactory:
         for node in graph.nodes:
             for output_spec in node.node_io.outputs:
                 if output_spec.digest and output_spec.digest not in all_stuff_info:
-                    all_stuff_info[output_spec.digest] = (output_spec.name, output_spec.concept)
+                    all_stuff_info[output_spec.digest] = (output_spec.name, output_spec.concept_label)
 
         # Render edges: producer -> stuff
         lines.append("")

@@ -6,29 +6,37 @@ from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
+    JudgmentAssignment,
     LLMAssignment,
     ObjectAssignment,
+    RenderDocumentAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.doc_gen_generate import render_document_and_store
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_and_store
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
+from pipelex.cogt.content_generation.judgment_generate import judgment_gen_answers
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
 from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_object
 from pipelex.cogt.content_generation.render_generate import render_page_views_and_store
 from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured_object
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.config import get_config
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
@@ -239,6 +247,27 @@ class ContentGenerator(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
+    async def make_rendered_document(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
+        composition: DocumentComposition,
+        doc_gen_setting: DocGenSetting,
+    ) -> DocumentContent:
+        render_assignment = RenderDocumentAssignment(
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            composition=composition,
+            doc_gen_setting=doc_gen_setting,
+        )
+        return await render_document_and_store(
+            render_assignment=render_assignment,
+            generated_content_factory=self._generated_content_factory,
+        )
+
+    @override
+    @update_job_metadata
     async def make_extract_pages(
         self,
         *,
@@ -303,3 +332,10 @@ class ContentGenerator(ContentGeneratorProtocol):
         # `SearchObjectAssignment` is built here: that wire model ships the class's schema across a
         # boundary, and this arm has none to cross.
         return await search_gen_structured_object(search_assignment, output_class=output_structure_class)
+
+    @override
+    async def make_judgment_answers(
+        self,
+        judgment_assignment: JudgmentAssignment,
+    ) -> dict[str, JudgmentAnswer]:
+        return await judgment_gen_answers(judgment_assignment)

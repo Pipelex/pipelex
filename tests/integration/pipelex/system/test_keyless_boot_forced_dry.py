@@ -16,9 +16,11 @@ a keyless boot is exactly the boot ``pipelex/kernel/`` documents as its target.
 """
 
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 
+from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -28,6 +30,7 @@ from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execution_seams import load_libraries_and_activate, prepare_pipe_job
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_content_generator, is_dry_run_forced
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -74,6 +77,7 @@ class TestKeylessBootForcedDry:
             )
             pipe_job = await prepare_pipe_job(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 pipe=pipe,
                 library_id=library_id,
@@ -97,7 +101,7 @@ class TestKeylessBootForcedDry:
             self._boot_keyless()
             assert is_dry_run_forced()
 
-            kernel = PipelexKernel.make(storage_scope="test/scope", user_id="test-user")
+            kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, user_id="test-user")
 
             assert kernel.cogt_run_params.run_mode.is_dry
         finally:
@@ -115,7 +119,44 @@ class TestKeylessBootForcedDry:
             assert is_dry_run_forced()
 
             with pytest.raises(ValueError, match="is_mock_usage"):
-                PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
+                PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
+        finally:
+            Pipelex.teardown_if_needed()
+
+    def test_keyless_boot_needs_no_key_for_an_enabled_judgment_backend(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An enabled judgment backend whose key is unset is skipped by a keyless boot, as Linkup's is.
+
+        The kit ships `[typesafe]` enabled like every other bring-your-own-key backend, so a machine
+        without `TYPESAFE_API_KEY` must still validate and dry-run. The keyed boot is the one that
+        names the missing key, which the second half pins so the two postures cannot drift apart.
+        """
+        monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+        try:
+            self._boot_keyless()
+            assert is_dry_run_forced()
+        finally:
+            Pipelex.teardown_if_needed()
+
+        try:
+            with pytest.raises(PipelexSetupError, match="'typesafe'"):
+                Pipelex.make(integration_mode=_test_integration_mode())
+        finally:
+            Pipelex.teardown_if_needed()
+
+    @pytest.mark.asyncio
+    async def test_keyless_boot_validates_a_judge_whose_model_backend_it_skipped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A PipeJudge naming the TypeSafe model still loads and dry-runs when the keyless boot skipped TypeSafe.
+
+        The deck still names the alias, so the pipe names a model the deck knows; what the keyless boot
+        cannot read is the spec of a model whose backend it skipped, so it leaves what that model reads
+        to the keyed boot that runs the step.
+        """
+        monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+        bundle_path = Path("pipelex/test_extras/mthds_corpus/entries/operator_judge_urgent_message/bundle.mthds")
+        try:
+            self._boot_keyless()
+            result = await validate_bundle(mthds_file_path=bundle_path)
+            assert [pipe.code for pipe in result.pipes]
         finally:
             Pipelex.teardown_if_needed()
 

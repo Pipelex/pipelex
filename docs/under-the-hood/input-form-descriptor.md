@@ -1,6 +1,6 @@
 # Input-Form Descriptor
 
-Every valid `validate` report carries, beside `pipe_io_contracts`, an **input-form descriptor** per pipe: an ordered list of field descriptors a renderer can turn into a fill-in form with no schema heuristics, no hardcoded concept tables, and no description matching. The wire contract is the MTHDS spec `docs/specs/mthds-input-form-descriptor.md` at the workspace root; this page documents Pipelex's reference derivation of it.
+Every valid `validate` report carries, beside `pipe_io_contracts`, an **input-form descriptor** per pipe: an ordered list of field descriptors a renderer can turn into a fill-in form with no schema heuristics, no hardcoded concept tables, and no description matching. The wire contract is the MTHDS standard's [Input-Form Descriptor specification](https://mthds.ai/latest/spec/input-form-descriptor/); this page documents Pipelex's reference derivation of it.
 
 The descriptor exists because the emitted `json_schema` is a *payload* contract, and the projection that produces it loses facts a form needs: which concept a node is, what it refines, whether `!` or plain was authored, a fixed `[N]` count, an authored default, a one-member choice list. The descriptor reports those facts from where they still exist — the authored blueprints — and leaves the payload shape to the schema. It is presentation; it never changes what a caller submits.
 
@@ -34,18 +34,22 @@ Kinds are decided by chain membership and declared types — never by sniffing a
 
 The crate the deriver reads is the current library's accumulated one, which holds the validated bundle and every `library_dirs` bundle loaded beside it — so a concept from a library dir, or a local concept refining one, follows the same rules as a local concept. A concept absent from that crate altogether is `unknown`.
 
-The table and rules above ARE the no-hint kind assignment — stated rules, not heuristics: with no applicable intent hint, a node's kind is exactly what they produce. An applicable authored `intent` (spec: MTHDS `intent-hints.md`) *feeds* that assignment, never competes with it: on a **text-valued** node — one whose site is a `text` field, a `native.Text`-chained or description-only concept, judged per item on plural sites — an effective `intent = "prose"` yields `kind: "prose"` and `intent = "label"` yields `kind: "text"`; an absent, unknown, or inapplicable intent leaves the no-hint kind untouched. On a **number-valued** node, `rating` and `quantity` never change `kind` (both are `number`; the union has no finer kind) — they ride the `hints` slot for the renderer to honor. A time-formatted `text` node is *not* a text-valued site, so no intent word applies to it (and `native.Html`, being an `object` node, never reaches the text-valued judgment at all).
+The table and rules above ARE the no-hint kind assignment — stated rules, not heuristics: with no applicable intent hint, a node's kind is exactly what they produce. An applicable authored `intent` (spec: MTHDS `intent-hints.md`) *feeds* that assignment, never competes with it: on a **text-valued** node — one whose site is a `text` field, a concept chained to `native.Text` or `native.Markdown`, or a description-only concept, judged per item on plural sites — an effective `intent = "prose"` yields `kind: "prose"` and `intent = "label"` yields `kind: "text"`; an absent, unknown, or inapplicable intent leaves the no-hint kind untouched. On a **number-valued** node, `rating` and `quantity` never change `kind` (both are `number`; the union has no finer kind) — they ride the `hints` slot for the renderer to honor. A time-formatted `text` node is *not* a text-valued site, so no intent word applies to it (and `native.Html`, being an `object` node, never reaches the text-valued judgment at all).
 
 | Native concept | Kind |
 |---|---|
-| `Text` | `prose` |
+| `Text`, `Markdown` | `prose` |
 | `Number` | `number` with `integer: false` |
-| `YesNo` | `boolean` |
+| `YesNo` | `boolean` on the input side; `object` over `yes_no` and `probability` in an output descriptor |
 | `Time` | `text` with `format: "time"` |
 | `Document` | `document` |
 | `Image` | `image` |
-| `Date`, `Html`, `Page`, `TextAndImages`, `SearchResult` | `object` over the pinned blueprint's fields |
-| `Dynamic`, `Anything`, `JSON` | `unknown` |
+| `Date`, `Html`, `Page`, `TextAndImages`, `SearchResult`, `JSON`, `Choice`, `Rating` | `object` over the pinned blueprint's fields |
+| `Dynamic`, `Anything`, `Composite` | `unknown` |
+
+`JSON` is the one row where Pipelex departs from the published standard, which lists it as `unknown`: Pipelex derives it as an `object` over its pinned `json_obj` member, itself an `unknown` dict, because a template describing a `JSON` input as unknown renders `{}`, which `JSONContent` then refuses.
+
+`YesNo` is the one native read differently by position, as the standard states: a caller supplies the bare verdict, while a producer may report a probability beside it. The output descriptor is the same derivation (`InputFormDeriver`) told its position by `build_output_form`, and the position is read in `YesNo`'s row and nowhere else, so a `YesNo` is an `object` at every depth of an output node — at the top, as a nested field, as a list's item, through a reflected class field and through a class-backed concept.
 
 Nested structure fields map by their declared type: `text` → `text`; `integer` → `number` with `integer: true`; `number` → `number`; `boolean` → `boolean`; `date` → `date`; `datetime` → `date` with `datetime: true`; `time` → `text` with `format: "time"`; a field with `choices` → `enum` (choices win over `type`, matching the structure generator); `concept` → the concept's node, carrying its namespaced `concept_ref`; `list` → `list` whose `item` comes from `item_type` / `item_concept_ref` (a nested list's inner item is inexpressible and reports `unknown`; the `item` node carries no `name` member — a list's item has no authored name, and the index labels entries); `dict` → `unknown`. The shorthand `field = "description"` form is a required `text`. Nested fields take the blueprint field's description and `required` over the concept's; a scalar flattened at the top level keeps the concept's description.
 
@@ -73,4 +77,4 @@ Inapplicable slots are absent, never JSON `null`: the report's valid arm is dump
 
 ## What clients project from it
 
-The descriptor is what a client SDK renders a pipe's fill-in inputs template from — the hosted build routes no longer render one server-side. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.
+The descriptor is what a client SDK renders a pipe's fill-in inputs template from — no server route renders one. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.

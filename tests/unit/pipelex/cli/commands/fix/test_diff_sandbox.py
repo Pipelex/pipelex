@@ -130,6 +130,16 @@ class TestDiffSandbox:
 
         assert sandbox.to_original(str(ambient_file)) == str(ambient_file.resolve())
 
+    def test_a_dependency_bundle_named_by_its_address_passes_through_as_given(self, tmp_path: Path) -> None:
+        """A name that is not a path, like a dependency's bundle named by its package's address, is never resolved into a file."""
+        entry = tmp_path / "bundle.mthds"
+        entry.write_text('domain = "demo"\n', encoding="utf-8")
+        dependency_bundle = "github.com/acme/harbour-methods/tides/notices/tide_notices.mthds"
+
+        sandbox = mirror_bundle_for_preview(entry, library_dirs=None, sandbox_root=self._sandbox_root(tmp_path))
+
+        assert sandbox.to_original(dependency_bundle) == dependency_bundle
+
     def test_copy_uses_loader_exclusions(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()

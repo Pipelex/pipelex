@@ -1,0 +1,74 @@
+domain      = "pipe_judge_e2e"
+description = "Test PipeJudge with one question of each kind"
+
+[pipe.judge_urgent_e2e]
+type        = "PipeJudge"
+description = "Judge whether a message needs an answer today"
+inputs      = { message = "Text" }
+output      = "YesNo"
+model       = "@default-judgment"
+question    = "Does this message need an answer today?"
+criteria    = { yes = "Something is broken or blocked for the sender right now", no = "The sender can wait for a reply" }
+threshold   = 0.7
+
+[pipe.route_ticket_e2e]
+type = "PipeSequence"
+description = "Judge which team handles a ticket, then route it there"
+inputs = { ticket = "Text" }
+output = "Text"
+steps = [
+  { pipe = "judge_team_e2e", result = "routing" },
+  { pipe = "dispatch_ticket_e2e", result = "acknowledgement" },
+]
+
+[pipe.dispatch_ticket_e2e]
+type            = "PipeCondition"
+description     = "Send the ticket to the team the judgment chose"
+inputs          = { routing = "Choice", ticket = "Text" }
+output          = "Text"
+expression      = "routing.choice"
+outcomes        = { billing = "acknowledge_billing_e2e", technical = "acknowledge_technical_e2e" }
+default_outcome = "acknowledge_other_e2e"
+
+[pipe.acknowledge_billing_e2e]
+type        = "PipeCompose"
+description = "Acknowledge a ticket sent to billing"
+inputs      = { ticket = "Text" }
+output      = "Text"
+template    = "Sent to billing: $ticket"
+
+[pipe.acknowledge_technical_e2e]
+type        = "PipeCompose"
+description = "Acknowledge a ticket sent to the technical team"
+inputs      = { ticket = "Text" }
+output      = "Text"
+template    = "Sent to the technical team: $ticket"
+
+[pipe.acknowledge_other_e2e]
+type        = "PipeCompose"
+description = "Acknowledge a ticket no team owns"
+inputs      = { ticket = "Text" }
+output      = "Text"
+template    = "Sent to the front desk: $ticket"
+
+[pipe.judge_team_e2e]
+type        = "PipeJudge"
+description = "Judge which team should handle a support ticket"
+inputs      = { ticket = "Text" }
+output      = "Choice"
+model       = "@default-judgment"
+question    = "Which team should handle this support ticket?"
+options     = { billing = "Charges, invoices, refunds and subscriptions", technical = "Errors, outages and features that do not work", other = "" }
+
+[pipe.judge_severity_e2e]
+type = "PipeJudge"
+description = "Rate how severe a bug report is"
+inputs = { report = "Text" }
+output = "Rating"
+model = "@default-judgment"
+question = "How severe is the bug this report describes?"
+levels = [
+  "Cosmetic: nothing stops working",
+  "Degraded: a workaround exists",
+  "Blocking: users cannot do their work at all",
+]

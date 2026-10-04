@@ -43,6 +43,7 @@ class DirectBundleValidator:
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
+        graph_pipe_code: str | None,
     ) -> PipelexValidationReport | ErrorReport:
         try:
             return await validate_bundles_in_process(
@@ -50,6 +51,7 @@ class DirectBundleValidator:
                 mthds_sources=mthds_sources,
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
+                graph_pipe_code=graph_pipe_code,
                 log_context="API validate",
                 caller_identity=caller_identity,
             )

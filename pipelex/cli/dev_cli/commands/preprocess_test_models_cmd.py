@@ -34,7 +34,7 @@ TEST_PROFILES_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles.toml
 TEST_PROFILES_OVERRIDE_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles_override.toml"
 
 # Model types we care about
-MODEL_TYPES = ["llm", "img_gen", "text_extractor", "search"]
+MODEL_TYPES = ["llm", "img_gen", "text_extractor", "search", "judgment"]
 
 # Default model type from backend config
 DEFAULT_MODEL_TYPE = "llm"
@@ -163,6 +163,7 @@ def _collect_all_model_availability() -> dict[str, Any]:
         "img_gen": {},
         "text_extractor": {},
         "search": {},
+        "judgment": {},
     }
 
     backends_dir = config_manager.backends_dir_path
@@ -391,6 +392,7 @@ def _filter_models_by_profile(
         "img_gen": [],
         "text_extractor": [],
         "search": [],
+        "judgment": [],
     }
 
     # If include_all is set, return all valid pairs
@@ -441,6 +443,7 @@ def _filter_models_by_profile(
         "img_gen_models": "img_gen",
         "extract_models": "text_extractor",
         "search_models": "search",
+        "judgment_models": "judgment",
     }
 
     # Model type to collection type mapping (internal name -> TOML section name)
@@ -449,6 +452,7 @@ def _filter_models_by_profile(
         "img_gen": "img_gen",
         "text_extractor": "extract",
         "search": "search",
+        "judgment": "judgment",
     }
 
     # Resolve model lists from profile using advanced specifiers
@@ -554,6 +558,14 @@ def _generate_fixtures_python(
     lines.append("]")
     lines.append("")
 
+    # Judgment combos
+    judgment_pairs = combo_pairs.get("judgment", [])
+    lines.append("JUDGMENT_COMBOS: list[ModelCombo] = [")
+    for model, backend in sorted(judgment_pairs):
+        lines.append(f"    ModelCombo({model!r}, {backend!r}),")
+    lines.append("]")
+    lines.append("")
+
     return "\n".join(lines)
 
 
@@ -595,11 +607,13 @@ def _display_summary(
     img_gen_total = sum(len(models) for models in availability.get("img_gen", {}).values())
     extract_total = sum(len(models) for models in availability.get("text_extractor", {}).values())
     search_total = sum(len(models) for models in availability.get("search", {}).values())
+    judgment_total = sum(len(models) for models in availability.get("judgment", {}).values())
 
     table.add_row("LLM Models", str(llm_total), str(len(combo_pairs.get("llm", []))))
     table.add_row("Image Gen Models", str(img_gen_total), str(len(combo_pairs.get("img_gen", []))))
     table.add_row("Extract Models", str(extract_total), str(len(combo_pairs.get("text_extractor", []))))
     table.add_row("Search Models", str(search_total), str(len(combo_pairs.get("search", []))))
+    table.add_row("Judgment Models", str(judgment_total), str(len(combo_pairs.get("judgment", []))))
     table.add_row("", "", "")
     table.add_row("Total Backends", str(len(total_backends)), "-")
     table.add_row("Total Model/Backend Pairs", str(total_models), str(filtered_models))

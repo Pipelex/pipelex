@@ -10,10 +10,9 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
-from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, emit_no_inputs_result, inputs_core
+from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -85,15 +84,8 @@ def inputs_pipe_cmd(
         agent_error(f"File not found: {exc}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
-
-    except NoInputsRequiredError as exc:
-        # Not really an error - just a pipe with no inputs
-        emit_no_inputs_result(pipe_code=pipe_code, message=str(exc), template_format=template_format)
+        # A failing dry run rides validation_errors as one located dry_run item per failing pipe.
+        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, validation_errors=extract_validation_errors(exc))
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

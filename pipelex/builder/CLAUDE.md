@@ -29,6 +29,9 @@ pipe/
   pipe_img_gen_spec.py         # PipeImgGen — image generation operator
   pipe_extract_spec.py         # PipeExtract — OCR/text extraction operator
   pipe_search_spec.py          # PipeSearch — web search operator
+  pipe_judge_spec.py           # PipeJudge — closed-question judgment operator
+  pipe_structure_spec.py       # PipeStructure — text-to-structure operator
+  pipe_doc_gen_spec.py         # PipeDocGen — document generation operator
   pipe_compose_spec.py         # PipeCompose — template/construct operator
   pipe_sequence_spec.py        # PipeSequence — sequential controller
   pipe_parallel_spec.py        # PipeParallel — concurrent controller
@@ -48,7 +51,7 @@ operations/
 
 All specs are Pydantic models (`StructuredContent` base). Two categories of pipes:
 
-**Operators** (data transformation): `PipeLLM`, `PipeFunc`, `PipeImgGen`, `PipeExtract`, `PipeSearch`, `PipeCompose`
+**Operators** (data transformation): `PipeLLM`, `PipeFunc`, `PipeImgGen`, `PipeExtract`, `PipeSearch`, `PipeJudge`, `PipeStructure`, `PipeDocGen`, `PipeCompose`
 
 **Controllers** (execution flow): `PipeSequence`, `PipeParallel`, `PipeCondition`, `PipeBatch`
 

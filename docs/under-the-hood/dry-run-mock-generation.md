@@ -47,7 +47,7 @@ flowchart TD
     J --> K[model_validate with resolved values]
 ```
 
-A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
+A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, judgment, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
 
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
@@ -118,7 +118,11 @@ class DryRunFactory:
 | `IGNORE` | Sets field to `Ignore()` | None/default | `default_value`, `structure` fields |
 | `DICT_SNAKE_KEY_PASCAL_VALUE` | `generate_dict_snake_key_pascal_value()` | `{mock_abcd: MockCdef}` | `inputs` dict in PipeSpec |
 | `DICT_SINGLE_EXTRACT_INPUT` | `generate_dict_single_extract_input()` | `{mock_abcd: "Image"}` | `inputs` dict in PipeExtract |
+| Image URL | `generate_mock_image_url()` | one of `inference.dry_run.image_urls` | `url` of an `ImageContent`, at any depth |
+| Document URL | `generate_mock_document_url()` | `data:application/pdf;base64,…` (a blank one-page PDF) | `url` of a `DocumentContent`, at any depth |
 | Random string | Polyfactory default | `uygNjiAuDMOtZEyibgHw` | All other string fields |
+
+A mocked image or document never carries a random string as its `url`, because `resolve_uri` takes a random string for a local path. A run with a read scope refuses to read a local path, and it checks before the dry-run branch, so a dry run on such a run would otherwise refuse its own mocks: a mocked input, or an image inside a structure a dry model call returned. An `https://` URL and a `data:` URL are read on nobody's leave, so they are what a mock carries. The providers are keyed on the class (`ImageContent`, `DocumentContent` and their subclasses), not on a field annotation, so they apply wherever such a class is nested. They also recognise a copy of either class rebuilt from a JSON schema, by its name and its `url` field: a worker running a dry model call out of process gets only the output's schema, and the nested file classes it rebuilds are no subclasses of the real ones.
 
 ---
 

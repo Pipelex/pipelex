@@ -48,6 +48,10 @@ def get_collection_keys(
                     return list(model_deck.img_gen_presets.keys())
                 case ModelType.SEARCH:
                     return list(model_deck.search_presets.keys())
+                case ModelType.DOC_GEN:
+                    return list(model_deck.doc_gen_presets.keys())
+                case ModelType.JUDGMENT:
+                    return list(model_deck.judgment_presets.keys())
         case ModelReferenceKind.ALIAS:
             match model_type:
                 case ModelType.LLM:
@@ -58,6 +62,10 @@ def get_collection_keys(
                     return list(model_deck.img_gen_aliases.keys())
                 case ModelType.SEARCH:
                     return list(model_deck.search_aliases.keys())
+                case ModelType.DOC_GEN:
+                    return list(model_deck.doc_gen_aliases.keys())
+                case ModelType.JUDGMENT:
+                    return list(model_deck.judgment_aliases.keys())
         case ModelReferenceKind.WATERFALL:
             match model_type:
                 case ModelType.LLM:
@@ -68,6 +76,10 @@ def get_collection_keys(
                     return list(model_deck.img_gen_waterfalls.keys())
                 case ModelType.SEARCH:
                     return list(model_deck.search_waterfalls.keys())
+                case ModelType.DOC_GEN:
+                    return list(model_deck.doc_gen_waterfalls.keys())
+                case ModelType.JUDGMENT:
+                    return list(model_deck.judgment_waterfalls.keys())
         case ModelReferenceKind.HANDLE:
             return sorted(handle for handle, spec in model_deck.inference_models.items() if spec.model_type == model_type)
 

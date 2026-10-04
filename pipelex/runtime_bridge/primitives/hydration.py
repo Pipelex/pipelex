@@ -47,7 +47,8 @@ def _validate_as_known_class(*, item_class: type[StuffContent], raw_item: StuffC
 
 
 def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffContent:
-    """Hydrate a single list item for Anything[] results.
+    """Hydrate one content that carries its own class markers: an item of an Anything[] list,
+    or the single content of a stuff whose concept names no content class (`native.Anything`).
 
     Resolves the item class from the pipelex-private ``__pipelex_class__`` /
     ``__pipelex_module__`` markers written by ``dump_for_transport``. Falls back
@@ -71,6 +72,10 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
     if class_name is not None:
         item_class = get_class_registry().get_required_subclass(name=class_name, base_class=StuffContent)
         clean_item = {key: val for key, val in raw_item.items() if key not in {"__pipelex_class__", "__pipelex_module__"}}
+        if issubclass(item_class, CompositeContent):
+            # A composite's components are extra="allow" fields with no annotations to drive
+            # validation, so each is rebuilt from its own markers first, at any depth.
+            clean_item = {component_name: _hydrate_composite_component(raw_value) for component_name, raw_value in clean_item.items()}
         return cast("StuffContent", item_class.model_validate(clean_item))
 
     # No __class__ metadata — fall back to TextContent for marker-less simple text dicts.
@@ -129,6 +134,10 @@ def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: C
             raw_items = cast("list[dict[str, Any]]", raw_content)
             items = [_hydrate_list_item(raw_item) for raw_item in raw_items]
         return ListContent(items=items)
+
+    if not concept.declares_a_structure_class:
+        # `native.Anything` names no content class: the single content carries its own markers.
+        return _hydrate_list_item(raw_content)
 
     if isinstance(raw_content, dict):
         structure_class = get_class_registry().get_class(name=concept.structure_class_name)

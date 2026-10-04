@@ -59,7 +59,7 @@ Match the value to the input's declared concept. The declared concept is applied
 | Declared concept refines… | Provide | Example |
 | --- | --- | --- |
 | `Text` | a string | `"What are the fees?"` |
-| `Number` | a number (not a boolean) | `42` or `3.14` |
+| `Number` | a finite number (not a boolean, not NaN or an infinity) | `42` or `3.14` |
 | `YesNo` | a boolean | `true` / `false` |
 | `Date` | an extended ISO 8601 date/datetime string (or a TOML date literal) | `"2026-09-01"` |
 | `Image` / `Document` | a URL or file path | `"photo.jpg"`, `"https://…/a.pdf"` |
@@ -84,8 +84,15 @@ Each value is typed as the **declared** concept — `question` becomes a `legal.
 !!! note "Numbers vs. booleans"
     A boolean is never read as a number, even though `true`/`false` look numeric to some languages. Provide `true`/`false` only for a `YesNo`-refining input; provide `42` for a `Number`-refining one.
 
+!!! note "`Anything` and `JSON` inputs"
+    An input declared `Anything` takes any JSON value but an array or null: a string, a number, a boolean or an object becomes the matching content (text, number, yes/no, JSON object), and the input keeps the `Anything` concept. Provide a typed envelope, `{"concept": "Text", "content": "hi"}`, to hand it a specific concept instead, which it keeps. `Anything[]` takes a list of such values. A working memory dumps an `Anything` stuff's content as its content class's fields, `{"text": "hi"}` for a string, so a `--with-memory` envelope piped into another method's `Anything` input hands it that object rather than the original value.
+
+    An input declared `JSON` takes a JSON object as it is, and `JSON[]` takes a list of them; its inputs template shows the bare object. A string or a number at a `JSON` input is refused.
+
+    In a bare list for `Anything[]` or `JSON[]`, an item shaped like an envelope (an object with `concept` and `content` keys) is refused rather than guessed at. To type a list, wrap the whole list in one envelope instead.
+
 !!! note "Concepts the signature can't shape"
-    A handful of concepts carry no single expected value shape — `Dynamic`, `Anything`, and the container/structural natives (`Html`, `JSON`, `Page`, `TextAndImages`, `SearchResult`, `Composite`). For an input declared as one of these, the signature can't guide interpretation, so the value is read by its own shape (a bare string becomes `native.Text`, and so on). Use the explicit format if you need a specific concept there.
+    A few concepts still carry no single expected value shape — `Dynamic`, the container natives (`Html`, `Page`, `TextAndImages`, `SearchResult`, `Composite`) and the verdicts `Choice` and `Rating`. For an input declared as one of these, the value is read by its own shape (a bare string reads as a `native.Text`, and so on). A `Dynamic` input keeps whatever its value reads as; any other refuses a value that reads as a concept it does not accept, so a bare `"billing"` at a `Choice` input is refused rather than handed on as a text, as is its content without the envelope, `{"choice": "billing"}`, or a bare level `2` at a `Rating` input, each with an error showing the expected shape; a value with no reading at all, such as a list of plain objects, is refused with an error naming the input and the declaration to change. Provide these in the explicit format: `{"concept": "native.Choice", "content": {"choice": "billing"}}`.
 
 ## Lists and multiplicity
 

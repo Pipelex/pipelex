@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -22,6 +23,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     consume_setup_warnings,
     extract_validation_errors,
     record_setup_warning,
+    run_failure_fields,
     set_agent_cli_error_format,
 )
 from pipelex.cogt.exceptions import (
@@ -33,7 +35,9 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -52,6 +56,17 @@ class TestAgentOutput:
         consume_setup_warnings()
         yield
         consume_setup_warnings()
+
+    @pytest.fixture(autouse=True)
+    def _restore_logging_cutoff(self) -> Iterator[None]:
+        """Restore the process-global ``logging.disable`` threshold after a test that runs the app.
+
+        The app callback arms the agent CLI cutoff through ``silence_logging_for_agent_cli``;
+        left in place it silences every log call of every test that runs after this module.
+        """
+        original_disable = logging.root.manager.disable
+        yield
+        logging.disable(original_disable)
 
     def test_agent_error_outputs_json_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should print valid JSON to stderr and exit with code 1."""
@@ -174,6 +189,25 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
         assert parsed["failed_at"] == "2026-02-09T14:00:00"
+
+    def test_run_failure_fields_name_the_location_and_the_root_fault(self) -> None:
+        """A failed run's fields carry the failing pipe, its path, and the root fault's identity and own message."""
+        root_fault = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+        located = PipeRouterError.make_located(
+            failure=root_fault, run_mode=PipeRunMode.LIVE, pipe_code="summarize", output_name=None, pipe_stack=["two_steps", "summarize"]
+        )
+        located.__cause__ = root_fault
+        run_failure = PipelineExecutionError.make_for_run_failure(
+            failure=located, run_mode=PipeRunMode.LIVE, entry_pipe_code="two_steps", output_name=None
+        )
+        run_failure.__cause__ = located
+
+        assert run_failure_fields(error=run_failure) == {
+            "pipe_code": "summarize",
+            "pipe_stack": ["two_steps", "summarize"],
+            "cause_type": "CogtError",
+            "cause_message": "rate limited",
+        }
 
     def test_extract_validation_errors_message_only(self) -> None:
         """A message-only error yields one ``blueprint_validation`` residual — the structured-info invariant is total.
@@ -357,7 +391,7 @@ class TestAgentOutput:
         """
         # An error_type in AGENT_ERROR_DOMAINS that is NOT a CogtError subclass, so no derived
         # domain can pre-empt the lookup.
-        error_type = "PipeOperatorModelChoiceError"
+        error_type = "PipeOperatorModelAvailabilityError"
         assert error_type in AGENT_ERROR_DOMAINS, "precondition: error_type must be in AGENT_ERROR_DOMAINS"
 
         cause = CogtError("model not found", error_category=InferenceErrorCategory.UNKNOWN)

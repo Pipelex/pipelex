@@ -11,9 +11,8 @@ import typer
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
-from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, emit_no_inputs_result, inputs_core
+from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -93,26 +92,19 @@ def inputs_bundle_cmd(
             error_type="ArgumentError",
         )
 
-    pipe_code: str | None = pipe
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
     make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
     try:
-        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=Path(bundle_path), library_dirs=library_dirs, explicit=explicit))  # type: ignore[arg-type]
+        result = asyncio.run(inputs_core(pipe_code=pipe, bundle_path=Path(bundle_path), library_dirs=library_dirs, explicit=explicit))  # type: ignore[arg-type]
         emit_inputs_result(result, template_format=template_format, explicit=explicit)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
-
-    except NoInputsRequiredError as exc:
-        emit_no_inputs_result(pipe_code=pipe_code, message=str(exc), template_format=template_format)
+        # A failing dry run rides validation_errors as one located dry_run item per failing pipe.
+        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, validation_errors=extract_validation_errors(exc))
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

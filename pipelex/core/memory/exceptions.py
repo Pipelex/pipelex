@@ -28,6 +28,9 @@ class WorkingMemoryStuffAttributeNotFoundError(WorkingMemoryVariableError):
 
 
 class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
+    # Not classified as the caller's fault: a step that names a variable nothing produces, a batch
+    # over one included, is refused when the bundle loads, so a miss at run time is the runtime's own
+    # bookkeeping going wrong, not a mistake in the caller's method.
     def __init__(self, message: str, variable_name: str, pipe_code: str | None = None, concept_code: str | None = None):
         super().__init__(message, variable_name)
         self.pipe_code = pipe_code
@@ -133,7 +136,13 @@ class StructureValidationError(InputShapingError):
 
     Covers a structured-concept dict missing a required field, a malformed ``{"url": ...}`` for a
     file concept, a non-ISO string for a Date concept — any value that is the right JSON kind but
-    does not build into the declared content class.
+    does not build into the declared content class. It also covers the bare values an input reading
+    values by their own shape refuses (R8): one it has no reading for, such as a list of plain objects
+    at a ``Dynamic`` input, where the fix is usually the input's declaration; one it reads as a concept
+    the input does not accept, such as a string at a ``Choice`` input; the content of the declared
+    concept sent without the envelope that names it, such as ``{"choice": "billing"}`` at a ``Choice``
+    input; and a scalar at an input of a verdict native, such as a bare level at a ``Rating`` input.
+    The last three are fixed in the value, sent in the expected shape.
     """
 
     @classmethod
@@ -149,6 +158,120 @@ class StructureValidationError(InputShapingError):
         user_action = UserAction(
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Fix input '{variable_name}' so it matches the expected shape for '{declared_concept_ref}'.",
+        )
+        return cls(message, variable_name=variable_name, user_action=user_action)
+
+    @classmethod
+    def make_for_unreadable_bare_value(
+        cls,
+        *,
+        variable_name: str,
+        declared_concept_ref: str,
+        provided_description: str,
+        suggested_declaration: str,
+        expected_shape: str,
+    ) -> "StructureValidationError":
+        """The refusal for a bare value that an input of this concept, which reads a value by its own shape, cannot read.
+
+        The advice names the declaration to change rather than an envelope, because the person who
+        sent the value usually also declared the input, and an envelope helps only a caller who knows
+        a concept both compatible with the input and able to hold the value. `suggested_declaration`
+        is the one that reads this value: `'JSON'` for an object, `'JSON[]'` for a list of objects,
+        `'Anything'` or `'Anything[]'` for anything else.
+        """
+        message = (
+            f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
+            f"and an input of this concept reads a bare value by its own shape, with no reading for this one.\nExpected shape:\n{expected_shape}"
+        )
+        user_action = UserAction(
+            kind=UserActionKind.CHANGE_INPUT,
+            detail=(
+                f"Declare input '{variable_name}' in the method as {suggested_declaration}, "
+                "or as a concept with a structure that describes the value."
+            ),
+        )
+        return cls(message, variable_name=variable_name, user_action=user_action)
+
+    @classmethod
+    def make_for_content_without_its_envelope(
+        cls,
+        *,
+        variable_name: str,
+        declared_concept_ref: str,
+        provided_description: str,
+        expected_shape: str,
+    ) -> "StructureValidationError":
+        """The refusal for the declared concept's own content, sent bare at an input that takes it in its envelope.
+
+        An input of a native read bottom-up takes its value in the `{"concept", "content"}` envelope, so
+        `{"choice": "billing"}` at a `Choice` input has no reading. The value is right in substance and
+        wrong in form, so the advice is the expected shape: a declaration that reads the bare object, such
+        as `JSON`, would discard the concept the method asked for.
+        """
+        message = (
+            f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
+            f"which is the content of a '{declared_concept_ref}' without the envelope that names its concept, "
+            f"and an input of this concept takes its value in that envelope.\nExpected shape:\n{expected_shape}"
+        )
+        user_action = UserAction(
+            kind=UserActionKind.CHANGE_INPUT,
+            detail=f"Send input '{variable_name}' in the expected shape, which names its concept and spells out its content.",
+        )
+        return cls(message, variable_name=variable_name, user_action=user_action)
+
+    @classmethod
+    def make_for_scalar_at_a_verdict_input(
+        cls,
+        *,
+        variable_name: str,
+        declared_concept_ref: str,
+        provided_description: str,
+        expected_shape: str,
+    ) -> "StructureValidationError":
+        """The refusal for a scalar, or a list of scalars, at an input of a verdict native.
+
+        A `Choice` or a `Rating` input takes its value in the `{"concept", "content"}` envelope, and a
+        caller naturally sends a rating's level alone, as a `Number` input would take it. A number or a
+        boolean has no reading there, since a verdict is more than its level, and a declaration that
+        reads it, such as `Anything`, would discard the verdict the method branches on: the advice is the
+        expected shape. A string, such as a choice's key, never reaches this refusal: it reads as a
+        `Text`, which `make_for_bare_value_of_another_concept` refuses.
+        """
+        message = (
+            f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
+            f"and an input of this concept takes its value in the envelope that names its concept, with its content spelled out."
+            f"\nExpected shape:\n{expected_shape}"
+        )
+        user_action = UserAction(
+            kind=UserActionKind.CHANGE_INPUT,
+            detail=f"Send input '{variable_name}' in the expected shape, which names its concept and spells out its content.",
+        )
+        return cls(message, variable_name=variable_name, user_action=user_action)
+
+    @classmethod
+    def make_for_bare_value_of_another_concept(
+        cls,
+        *,
+        variable_name: str,
+        declared_concept_ref: str,
+        provided_description: str,
+        built_concept_ref: str,
+        expected_shape: str,
+    ) -> "StructureValidationError":
+        """The refusal for a bare value the bottom-up fallback reads as a concept the input does not accept.
+
+        An input of a native read bottom-up (`Html`, `Page`, `SearchResult`, `Choice`, `Rating`) takes
+        its value in its envelope, so a bare string there reads as a `Text`, which is no such native.
+        The value is right in substance and wrong in form, so the advice is the expected shape, not a
+        different declaration.
+        """
+        message = (
+            f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
+            f"which reads as '{built_concept_ref}', and a '{built_concept_ref}' is not a '{declared_concept_ref}'.\nExpected shape:\n{expected_shape}"
+        )
+        user_action = UserAction(
+            kind=UserActionKind.CHANGE_INPUT,
+            detail=f"Send input '{variable_name}' in the expected shape, which names its concept and spells out its content.",
         )
         return cls(message, variable_name=variable_name, user_action=user_action)
 

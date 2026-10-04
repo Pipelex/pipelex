@@ -58,8 +58,8 @@ This command creates or resets a Pipelex config directory with:
 - **inference/** - AI backend and routing configuration
     - `backends.toml` - Backend provider settings
     - `routing_profiles.toml` - Model routing rules
-    - `backends/` - Individual backend configuration files
-    - `deck/` - AI model aliases and presets
+    - `backends/` - Individual backend configuration files, of which [`pipelex update`](update.md) keeps `internal.toml` current
+    - `deck/` - AI model aliases and presets, which [`pipelex update`](update.md) keeps current
 - **telemetry.toml** - Telemetry and observability settings
 - **.gitignore** - Keeps Pipelex's own transient copies out of your `git status` — the timestamped `.bak` files [`pipelex migrate`](migrate.md) leaves beside each file it rewrites. Commit it so your teammates get the same. It is written only when the directory has no `.gitignore`; one already there is never modified.
 

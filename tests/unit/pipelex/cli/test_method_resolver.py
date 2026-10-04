@@ -18,6 +18,7 @@ from pipelex.cli.method_resolver import (
     resolve_method_target,
 )
 from pipelex.methods.exceptions import MethodFetchError, MethodPackageNotFoundError, MethodRefParseError
+from pipelex.methods.structures_check import STRUCTURES_REFUSAL_REMEDY
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -168,6 +169,7 @@ class TestResolveMethodTarget:
         assert method.name == "remote_method"
         warning_calls = [call for call in secho_spy.call_args_list if "hosted execution would refuse" in str(call)]
         assert len(warning_calls) == 1
+        assert STRUCTURES_REFUSAL_REMEDY in warning_calls[0].args[0]
 
     def test_resolve_method_target_dispatches_bare_address(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A bare github.com address dispatches to the fetch arm, not the local-path arm."""

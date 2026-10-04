@@ -23,7 +23,7 @@
 [defaults]
 model_type = "llm"
 sdk = "google"
-structure_method = "instructor/genai_tools"
+structure_method = "instructor/genai_structured_outputs" # Gemini's native JSON output
 thinking_mode = "manual"
 
 ################################################################################

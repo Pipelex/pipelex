@@ -14,6 +14,7 @@ from pipelex.cli.commands.doctor_cmd import (
 )
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
     import pytest
@@ -45,6 +46,10 @@ def _write_backends_override(config_dir: Path, content: str) -> Path:
     override = config_dir / "inference" / "backends_override.toml"
     override.write_text(content, encoding="utf-8")
     return override
+
+
+# The provider the doctor's runtime setup built from ``[runtime.secrets]``.
+SECRETS_PROVIDER = EnvSecretsProvider()
 
 
 class TestDoctorBackendChecks:
@@ -106,7 +111,7 @@ class TestDoctorBackendChecks:
 
     def test_backend_files_no_backends_dir(self, tmp_path: Path) -> None:
         """A missing inference/backends directory is healthy (nothing to check)."""
-        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert reports == {}
@@ -116,7 +121,7 @@ class TestDoctorBackendChecks:
         """A backends dir without backends.toml is healthy (nothing to check)."""
         (tmp_path / "inference" / "backends").mkdir(parents=True)
 
-        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert reports == {}
@@ -127,7 +132,7 @@ class TestDoctorBackendChecks:
         _write_backends_toml(tmp_path, content="not [ valid toml")
         (tmp_path / "inference" / "backends").mkdir(parents=True)
 
-        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is False
         assert reports == {}
@@ -147,10 +152,11 @@ class TestDoctorBackendChecks:
         library_mock = mocker.Mock()
         mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
 
-        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert message == "All backend files are valid"
+        assert library_mock.load.call_args.kwargs["secrets_provider"] is SECRETS_PROVIDER
         assert reports["openai"].is_valid is True
         assert reports["openai"].error_message is None
         # openai ships in the kit, so the template is found by the real probe
@@ -163,7 +169,7 @@ class TestDoctorBackendChecks:
         library_mock.load.side_effect = InferenceBackendLibraryError("invalid model spec", backend_name="openai")
         mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
 
-        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is False
         assert message == "1 backend file(s) have validation errors"
@@ -177,7 +183,7 @@ class TestDoctorBackendChecks:
         library_mock.load.side_effect = InferenceBackendLibraryError("some unrelated failure")
         mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
 
-        healthy, reports, _ = check_backend_files(config_dir=tmp_path)
+        healthy, reports, _ = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert reports["openai"].is_valid is True
@@ -191,7 +197,7 @@ class TestDoctorBackendChecks:
         )
         mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
 
-        healthy, reports, _ = check_backend_files(config_dir=tmp_path)
+        healthy, reports, _ = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert reports["openai"].is_valid is True
@@ -221,7 +227,7 @@ class TestDoctorBackendChecks:
         self._copy_kit_inference(tmp_path)
         _write_backends_override(tmp_path, "[openai]\nenabled = false\n\n[vertexai]\nenabled = true\n")
 
-        healthy, reports, _ = check_backend_files(config_dir=tmp_path)
+        healthy, reports, _ = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert "openai" not in reports
@@ -233,7 +239,7 @@ class TestDoctorBackendChecks:
         """
         self._copy_kit_inference(tmp_path)
 
-        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is True
         assert message == "All backend files are valid"
@@ -246,7 +252,7 @@ class TestDoctorBackendChecks:
         anthropic_file = backends_dir / "anthropic.toml"
         anthropic_file.write_text(anthropic_file.read_text(encoding="utf-8") + '\n[bogus_key_table]\nfoo = "bar"\n', encoding="utf-8")
 
-        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+        healthy, reports, message = check_backend_files(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
 
         assert healthy is False
         assert message == "1 backend file(s) have validation errors"

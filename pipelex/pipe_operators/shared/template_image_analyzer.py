@@ -13,7 +13,7 @@ from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multipli
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
-from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
+from pipelex.pipe_operators.shared.exceptions import WithImagesFilterError
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_variable_references
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -133,43 +133,6 @@ class TemplateImageAnalyzer:
             # we don't include them (text-only rendering)
 
         return image_references
-
-    @classmethod
-    def validate_unused_inputs(
-        cls,
-        template_sources: list[str],
-        *,
-        input_specs: dict[str, str],
-        template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
-    ) -> None:
-        """Validate that all declared inputs are used in at least one template.
-
-        Args:
-            template_sources: List of template sources to check
-            input_specs: Mapping of variable names to concept codes
-            template_category: The template category (defaults to LLM_PROMPT for backwards compatibility)
-
-        Raises:
-            UnusedInputError: If any declared input is never referenced
-        """
-        referenced_roots: set[str] = set()
-        declared_inputs = set(input_specs.keys())
-
-        for template_source in template_sources:
-            preprocessed = preprocess_template(template_source, declared_inputs=declared_inputs)
-            variable_refs = detect_jinja2_variable_references(
-                template_category=template_category,
-                template_source=preprocessed,
-            )
-            for var_ref in variable_refs:
-                root_var = get_root_from_dotted_path(var_ref.path)
-                referenced_roots.add(root_var)
-
-        unused_inputs = declared_inputs - referenced_roots
-
-        if unused_inputs:
-            msg = f"Inputs declared but never used in templates: {sorted(unused_inputs)}"
-            raise UnusedInputError(msg)
 
     @classmethod
     def _resolve_concept(cls, concept_ref_or_code: str, *, domain_code: str) -> Concept:

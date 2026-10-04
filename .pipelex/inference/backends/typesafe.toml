@@ -1,0 +1,41 @@
+################################################################################
+# TypeSafe Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for TypeSafe judgment models.
+# TypeSafe's System One answers closed-form questions — yes/no, choice, rating —
+# over some material, and returns the probability behind each verdict.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "judgment"
+sdk = "typesafe"
+thinking_mode = "none"
+
+################################################################################
+# JUDGMENT MODELS
+################################################################################
+#
+# Always a VERSIONED id, never one of the provider's moving aliases: a verdict model that changes
+# under a method silently changes what every threshold in that method means.
+#
+# Finding the next version is a documentation read, not a lookup. `GET /v1/models` lists only the
+# aliases `jev-latest` and `jev-preview` and names no version anywhere in its body, so the versioned
+# id comes from the provider's own models page. A truncated id is refused outright.
+#
+# Output tokens are genuinely free at the time of writing, which is why they are priced at zero
+# rather than at an output rate. Prices are USD per million tokens.
+
+["jev-1.13.0"]
+model_id = "jev-1.13.0"
+inputs = ["text"]
+outputs = ["judgments"]
+costs = { input = 0.042, output = 0 }

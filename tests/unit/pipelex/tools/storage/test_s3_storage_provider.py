@@ -15,11 +15,11 @@ S3_TEST_REGION = "us-east-1"
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestS3StorageProvider:
-    """Unit tests for S3StorageProvider using mocks for aioboto3."""
+    """Unit tests for S3StorageProvider using mocks for aiobotocore."""
 
     @pytest.fixture
-    def mock_aioboto3(self, mocker: MockerFixture) -> dict[str, Any]:
-        """Mock aioboto3 session and client.
+    def mock_aiobotocore(self, mocker: MockerFixture) -> dict[str, Any]:
+        """Mock the aiobotocore session and client.
 
         Returns a dict containing the mocked session, client, and response objects
         for test assertions.
@@ -51,12 +51,13 @@ class TestS3StorageProvider:
 
         # Create mock session
         mock_session = mocker.MagicMock()
-        mock_session.client = mocker.MagicMock(return_value=mock_client_context)
+        mock_session.create_client = mocker.MagicMock(return_value=mock_client_context)
 
-        # Patch aioboto3.Session
-        mocker.patch("aioboto3.Session", return_value=mock_session)
+        # Patch the session factory the provider imports lazily
+        mock_get_session = mocker.patch("aiobotocore.session.get_session", return_value=mock_session)
 
         return {
+            "get_session": mock_get_session,
             "session": mock_session,
             "client": mock_client,
             "client_context": mock_client_context,
@@ -85,7 +86,7 @@ class TestS3StorageProvider:
     async def test_store_returns_uri_with_scheme(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],  # ruff: ignore[unused-method-argument]
+        mock_aiobotocore: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> None:
         """Test that store() returns a URI with the pipelex-storage:// scheme prefix."""
         test_data = b"Hello, World!"
@@ -99,7 +100,7 @@ class TestS3StorageProvider:
     async def test_store_calls_put_object(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that store() correctly calls the S3 put_object method."""
         test_data = b"Test data"
@@ -108,7 +109,7 @@ class TestS3StorageProvider:
 
         await s3_provider_no_signed_urls.store(data=test_data, key=key, content_type=content_type)
 
-        mock_aioboto3["client"].put_object.assert_called_once_with(
+        mock_aiobotocore["client"].put_object.assert_called_once_with(
             Bucket=S3_TEST_BUCKET,
             Key=key,
             Body=test_data,
@@ -119,11 +120,11 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that load() returns the data from S3."""
         expected_data = b"Test data \x00\x01\x02\xff"
-        mock_aioboto3["stream"].read = mocker.AsyncMock(return_value=expected_data)
+        mock_aiobotocore["stream"].read = mocker.AsyncMock(return_value=expected_data)
 
         uri = f"{PIPELEX_STORAGE_SCHEME}test/file.bin"
         loaded_data = await s3_provider_no_signed_urls.load(uri=uri)
@@ -134,10 +135,10 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that loading a non-existent object raises StorageFileNotFoundError."""
-        mock_aioboto3["client"].get_object = mocker.AsyncMock(side_effect=mock_aioboto3["exceptions"].NoSuchKey("Key not found"))
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=mock_aiobotocore["exceptions"].NoSuchKey("Key not found"))
         nonexistent_uri = f"{PIPELEX_STORAGE_SCHEME}nonexistent/file.bin"
 
         with pytest.raises(StorageFileNotFoundError) as exc_info:
@@ -148,7 +149,7 @@ class TestS3StorageProvider:
     async def test_store_raises_if_key_has_scheme_prefix(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],  # ruff: ignore[unused-method-argument]
+        mock_aiobotocore: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> None:
         """Test that passing a key with pipelex-storage:// prefix raises an error."""
         invalid_key = f"{PIPELEX_STORAGE_SCHEME}already/prefixed.bin"
@@ -161,7 +162,7 @@ class TestS3StorageProvider:
     async def test_public_url_returns_public_url_when_signed_urls_disabled(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],  # ruff: ignore[unused-method-argument]
+        mock_aiobotocore: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> None:
         """Test that public_url() returns a public URL when signed URLs are disabled."""
         key = "display/test.bin"
@@ -176,44 +177,27 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_with_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that public_url() returns a presigned URL when signed URLs are enabled."""
         key = "presigned/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
         expected_presigned = "https://test-bucket.s3.amazonaws.com/presigned/test.bin?X-Amz-Signature=xyz"
-        mock_aioboto3["client"].generate_presigned_url = mocker.AsyncMock(return_value=expected_presigned)
+        mock_aiobotocore["client"].generate_presigned_url = mocker.AsyncMock(return_value=expected_presigned)
 
         display = await s3_provider_with_signed_urls.public_url(uri=uri)
 
         assert display == expected_presigned
-        mock_aioboto3["client"].generate_presigned_url.assert_called_once_with(
+        mock_aiobotocore["client"].generate_presigned_url.assert_called_once_with(
             "get_object",
             Params={"Bucket": S3_TEST_BUCKET, "Key": key},
             ExpiresIn=3600,
         )
 
-    async def test_public_url_handles_sync_presigned_url(
-        self,
-        mocker: MockerFixture,
-        s3_provider_with_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
-    ) -> None:
-        """Test that public_url() handles sync presigned URL generation (non-awaitable)."""
-        key = "sync-presign/test.bin"
-        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
-        expected_presigned = "https://test-bucket.s3.amazonaws.com/sync-presign/test.bin?X-Amz-Signature=sync"
-        # Return a plain string (non-awaitable) to simulate sync behavior in some aioboto3 versions
-        mock_aioboto3["client"].generate_presigned_url = mocker.MagicMock(return_value=expected_presigned)
-
-        display = await s3_provider_with_signed_urls.public_url(uri=uri)
-
-        assert display == expected_presigned
-
     async def test_store_with_nested_path(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test storing data in a deeply nested path structure."""
         test_data = b"nested content"
@@ -222,12 +206,12 @@ class TestS3StorageProvider:
         returned_uri = await s3_provider_no_signed_urls.store(data=test_data, key=key)
 
         assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
-        mock_aioboto3["client"].put_object.assert_called_once()
+        mock_aiobotocore["client"].put_object.assert_called_once()
 
     async def test_store_empty_bytes(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test storing empty bytes."""
         key = "empty.bin"
@@ -235,7 +219,7 @@ class TestS3StorageProvider:
         returned_uri = await s3_provider_no_signed_urls.store(data=b"", key=key)
 
         assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
-        mock_aioboto3["client"].put_object.assert_called_once_with(
+        mock_aiobotocore["client"].put_object.assert_called_once_with(
             Bucket=S3_TEST_BUCKET,
             Key=key,
             Body=b"",
@@ -244,7 +228,7 @@ class TestS3StorageProvider:
     async def test_store_large_binary_data(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test storing larger binary data."""
         test_data = bytes(range(256)) * 1000  # ~256KB of data
@@ -253,16 +237,16 @@ class TestS3StorageProvider:
         returned_uri = await s3_provider_no_signed_urls.store(data=test_data, key=key)
 
         assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
-        mock_aioboto3["client"].put_object.assert_called_once()
+        mock_aiobotocore["client"].put_object.assert_called_once()
 
     async def test_store_bucket_not_found_raises_error(
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that storing to a non-existent bucket raises StorageS3Error."""
-        mock_aioboto3["client"].put_object = mocker.AsyncMock(side_effect=mock_aioboto3["exceptions"].NoSuchBucket("Bucket not found"))
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=mock_aiobotocore["exceptions"].NoSuchBucket("Bucket not found"))
 
         with pytest.raises(StorageS3Error) as exc_info:
             await s3_provider_no_signed_urls.store(data=b"test", key="test.bin")
@@ -273,10 +257,10 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that loading from a non-existent bucket raises StorageS3Error."""
-        mock_aioboto3["client"].get_object = mocker.AsyncMock(side_effect=mock_aioboto3["exceptions"].NoSuchBucket("Bucket not found"))
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=mock_aiobotocore["exceptions"].NoSuchBucket("Bucket not found"))
         uri = f"{PIPELEX_STORAGE_SCHEME}test.bin"
 
         with pytest.raises(StorageS3Error) as exc_info:
@@ -288,11 +272,11 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that ClientError with NoSuchKey code raises StorageFileNotFoundError."""
         error_response: Any = {"Error": {"Code": "NoSuchKey", "Message": "The specified key does not exist."}}
-        mock_aioboto3["client"].get_object = mocker.AsyncMock(side_effect=ClientError(error_response, "GetObject"))
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=ClientError(error_response, "GetObject"))
         uri = f"{PIPELEX_STORAGE_SCHEME}missing/file.bin"
 
         with pytest.raises(StorageFileNotFoundError) as exc_info:
@@ -304,11 +288,11 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that ClientError with AccessDenied code raises StorageS3Error."""
         error_response: Any = {"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}
-        mock_aioboto3["client"].get_object = mocker.AsyncMock(side_effect=ClientError(error_response, "GetObject"))
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=ClientError(error_response, "GetObject"))
         uri = f"{PIPELEX_STORAGE_SCHEME}forbidden/file.bin"
 
         with pytest.raises(StorageS3Error) as exc_info:
@@ -320,11 +304,11 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that ClientError during store raises StorageS3Error."""
         error_response: Any = {"Error": {"Code": "InvalidAccessKeyId", "Message": "Invalid access key"}}
-        mock_aioboto3["client"].put_object = mocker.AsyncMock(side_effect=ClientError(error_response, "PutObject"))
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=ClientError(error_response, "PutObject"))
 
         with pytest.raises(StorageS3Error) as exc_info:
             await s3_provider_no_signed_urls.store(data=b"test", key="test.bin")
@@ -335,10 +319,10 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that NoCredentialsError (a BotoCoreError subclass) raises StorageS3Error."""
-        mock_aioboto3["client"].get_object = mocker.AsyncMock(side_effect=NoCredentialsError())
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=NoCredentialsError())
         uri = f"{PIPELEX_STORAGE_SCHEME}test.bin"
 
         with pytest.raises(StorageS3Error) as exc_info:
@@ -351,10 +335,10 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that NoCredentialsError (a BotoCoreError subclass) during store raises StorageS3Error."""
-        mock_aioboto3["client"].put_object = mocker.AsyncMock(side_effect=NoCredentialsError())
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=NoCredentialsError())
 
         with pytest.raises(StorageS3Error) as exc_info:
             await s3_provider_no_signed_urls.store(data=b"test", key="test.bin")
@@ -366,10 +350,10 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that EndpointConnectionError (a BotoCoreError subclass) raises StorageS3Error."""
-        mock_aioboto3["client"].get_object = mocker.AsyncMock(side_effect=EndpointConnectionError(endpoint_url="https://s3.amazonaws.com"))
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=EndpointConnectionError(endpoint_url="https://s3.amazonaws.com"))
         uri = f"{PIPELEX_STORAGE_SCHEME}test.bin"
 
         with pytest.raises(StorageS3Error) as exc_info:
@@ -382,10 +366,10 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that ReadTimeoutError — the canonical transient-network BotoCoreError that used to escape — raises StorageS3Error."""
-        mock_aioboto3["client"].get_object = mocker.AsyncMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
         uri = f"{PIPELEX_STORAGE_SCHEME}slow/file.bin"
 
         with pytest.raises(StorageS3Error) as exc_info:
@@ -399,10 +383,10 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that ReadTimeoutError during store (slow upload, transient blip) raises StorageS3Error."""
-        mock_aioboto3["client"].put_object = mocker.AsyncMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
 
         with pytest.raises(StorageS3Error) as exc_info:
             await s3_provider_no_signed_urls.store(data=b"test", key="slow/upload.bin")
@@ -415,12 +399,12 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_with_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that public_url() falls back to public URL on a transport BotoCoreError, not just ClientError."""
         key = "fallback/timeout.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
-        mock_aioboto3["client"].generate_presigned_url = mocker.MagicMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
+        mock_aiobotocore["client"].generate_presigned_url = mocker.AsyncMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
 
         display = await s3_provider_with_signed_urls.public_url(uri=uri)
 
@@ -431,24 +415,21 @@ class TestS3StorageProvider:
         self,
         mocker: MockerFixture,
         s3_provider_with_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],
+        mock_aiobotocore: dict[str, Any],
     ) -> None:
         """Test that public_url() falls back to public URL on botocore ClientError."""
         key = "fallback/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
         error_response: Any = {"Error": {"Code": "SignatureDoesNotMatch", "Message": "Signature error"}}
-        mock_aioboto3["client"].generate_presigned_url = mocker.MagicMock(side_effect=ClientError(error_response, "GeneratePresignedUrl"))
+        mock_aiobotocore["client"].generate_presigned_url = mocker.AsyncMock(side_effect=ClientError(error_response, "GeneratePresignedUrl"))
 
         display = await s3_provider_with_signed_urls.public_url(uri=uri)
 
         expected_public_url = f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}"
         assert display == expected_public_url
 
-    @pytest.mark.usefixtures("mock_aioboto3")
-    async def test_session_is_reused(self) -> None:
+    async def test_session_is_reused(self, mock_aiobotocore: dict[str, Any]) -> None:
         """Test that the session is lazily initialized and reused."""
-        import aioboto3  # ruff: ignore[import-outside-top-level]
-
         provider = S3StorageProvider(
             bucket_name=S3_TEST_BUCKET,
             region=S3_TEST_REGION,
@@ -457,11 +438,62 @@ class TestS3StorageProvider:
 
         # First call initializes the session
         await provider.store(data=b"data1", key="file1.bin")
-        first_call_count: int = aioboto3.Session.call_count  # type: ignore[attr-defined] # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue,reportUnknownVariableType]
+        first_call_count: int = mock_aiobotocore["get_session"].call_count
 
         # Second call reuses the session
         await provider.store(data=b"data2", key="file2.bin")
-        second_call_count: int = aioboto3.Session.call_count  # type: ignore[attr-defined] # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue,reportUnknownVariableType]
+        second_call_count: int = mock_aiobotocore["get_session"].call_count
 
         assert first_call_count == 1
         assert second_call_count == 1  # Session should only be created once
+
+    async def test_load_head_sends_a_ranged_get(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """A head read asks S3 for the first bytes only, through an inclusive Range header."""
+        mock_aiobotocore["stream"].read = mocker.AsyncMock(return_value=b"%PDF-1.7")
+
+        head = await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf", nb_bytes=8192)
+
+        assert head == b"%PDF-1.7"
+        mock_aiobotocore["client"].get_object.assert_called_once_with(Bucket=S3_TEST_BUCKET, Key="test/file.pdf", Range="bytes=0-8191")
+
+    async def test_load_head_of_an_empty_object_is_empty(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """S3 answers a range over an empty object with InvalidRange, which is an empty head and not a failure."""
+        invalid_range = ClientError({"Error": {"Code": "InvalidRange", "Message": "The requested range is not satisfiable"}}, "GetObject")
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=invalid_range)
+
+        head = await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/empty.bin", nb_bytes=8192)
+
+        assert head == b""
+
+    async def test_load_head_of_a_missing_object_raises_not_found(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=mock_aiobotocore["exceptions"].NoSuchKey("Key not found"))
+
+        with pytest.raises(StorageFileNotFoundError, match=r"missing/file\.pdf"):
+            await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf", nb_bytes=8192)
+
+    async def test_load_head_maps_other_client_errors(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        access_denied = ClientError({"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}, "GetObject")
+        mock_aiobotocore["client"].get_object = mocker.AsyncMock(side_effect=access_denied)
+
+        with pytest.raises(StorageS3Error, match="AccessDenied"):
+            await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf", nb_bytes=8192)

@@ -18,7 +18,7 @@ from pipelex.cli.commands.init.backends import get_selected_backend_keys, update
 from pipelex.cli.commands.init.command import attempt_prime_remote_config_cache
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
-from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
+from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.pipelex_service_onboarding import update_inference_setup_completed
@@ -137,7 +137,7 @@ def _copy_inference_templates(target_dir: Path) -> None:
         if deck_file.suffix == ".toml":
             shutil.copy2(deck_file, target_deck_dir / deck_file.name)
 
-    write_manifest(compute_kit_manifest(), deck_dir=target_deck_dir)
+    stamp_kit_manifests(inference_dir=target_inference_dir)
 
     # Copy routing_profiles.toml
     template_routing_path = template_inference_dir / "routing_profiles.toml"

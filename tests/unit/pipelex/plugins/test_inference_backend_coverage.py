@@ -45,7 +45,7 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     (InferenceFamily.LLM, "bedrock_anthropic"),
     (InferenceFamily.LLM, "mistral"),
     (InferenceFamily.LLM, "bedrock_boto3"),
-    (InferenceFamily.LLM, "bedrock_aioboto3"),
+    (InferenceFamily.LLM, "bedrock_aioboto"),
     (InferenceFamily.LLM, "google"),
     # IMG_GEN
     (InferenceFamily.IMG_GEN, "manifold_img_gen"),
@@ -66,6 +66,8 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     # SEARCH
     (InferenceFamily.SEARCH, "linkup"),
     (InferenceFamily.SEARCH, "manifold_search"),
+    # JUDGMENT
+    (InferenceFamily.JUDGMENT, "typesafe"),
 ]
 
 

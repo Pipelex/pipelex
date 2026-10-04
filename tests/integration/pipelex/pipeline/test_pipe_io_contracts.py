@@ -182,8 +182,8 @@ class TestBuildPipeIOContracts:
         gate = io_contracts["optional_contracts_test.gate"]
         assert gate.output.optional is True
 
-    async def test_structureless_output_renders_permissively(self, load_empty_library: Callable[[], str]) -> None:
-        """A pipe RESOLVING TO `native.Anything` carries a permissive schema rather than failing the build.
+    async def test_structureless_output_renders_its_schema(self, load_empty_library: Callable[[], str]) -> None:
+        """A pipe RESOLVING TO `native.Anything` carries its schema rather than failing the build.
 
         `Anything` is the untyped vehicle: `structure_class` is `None` for it, so the
         `AnythingContent` name derived mechanically from its code has no class behind it
@@ -192,14 +192,14 @@ class TestBuildPipeIOContracts:
         raised `PipeIOContractError` naming a class that never existed, taking every OTHER
         pipe in the bundle down with it.
 
-        **The schema is permissive, not empty**, and the difference is the point. It carries
-        no constraint keyword — "any JSON value" is what an untyped vehicle means — but it
-        does carry the concept's identity annotations, because every rendered schema does
-        and an exception for this one would be a second rule. A bare `{}` would read the
-        same to a validator and tell a reader nothing about what they are looking at.
+        **The schema is nearly unconstrained, not empty**, and the difference is the point. It
+        excludes only array and null — a list is the multiplicity's to express, and null is
+        never a value — but it does carry the concept's identity annotations, because every
+        rendered schema does and an exception for this one would be a second rule. A bare
+        `{}` would tell a reader nothing about what they are looking at.
 
         Scoped to the OUTPUT side: the input side is covered by
-        `test_anything_input_publishes_permissive_schema` below, which reaches the plural
+        `test_anything_input_publishes_its_schema` below, which reaches the plural
         arms too. This one exists because an `Anything`-resolving `PipeCondition` — a router
         that resolves to whatever branch it took — is ordinary in a real method, and the
         output contract gained its schema after that test was written.
@@ -276,10 +276,10 @@ class TestBuildPipeIOContracts:
         one_schema = make_from_one.inputs["docs"].json_schema
         assert one_schema.get("type") != "array"
 
-    async def test_anything_input_publishes_permissive_schema(self, load_empty_library: Callable[[], str]) -> None:
+    async def test_anything_input_publishes_its_schema(self, load_empty_library: Callable[[], str]) -> None:
         """A `native.Anything` input renders instead of crashing: the contract publishes the
-        permissive schema — no constraint keywords, only the concept's identity annotations —
-        with multiplicity wrapping exactly as for class-backed concepts.
+        concept's identity annotations and excludes only array and null, with multiplicity
+        wrapping exactly as for class-backed concepts, so every item carries the exclusion.
         """
         outer_library_id = load_empty_library()
         try:
@@ -295,12 +295,14 @@ class TestBuildPipeIOContracts:
         assert single.multiplicity == IOMultiplicity.SINGLE
         assert single.json_schema["title"] == "native.Anything"
         assert single.json_schema["description"]
-        assert set(single.json_schema) == {"title", "description"}
+        assert set(single.json_schema) == {"title", "description", "not"}
+        assert single.json_schema["not"] == {"type": ["array", "null"]}
 
         batch = carry.inputs["batch_in"]
         assert batch.multiplicity == IOMultiplicity.VARIABLE
         assert batch.json_schema["type"] == "array"
         assert batch.json_schema["items"]["title"] == "native.Anything"
+        assert batch.json_schema["items"]["not"] == {"type": ["array", "null"]}
         assert "minItems" not in batch.json_schema
 
         pair = carry.inputs["pair_in"]

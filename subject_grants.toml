@@ -420,6 +420,10 @@ rationale = "Operates on the inputs_dict; single operand."
 param = "value"
 rationale = "Operates on the value; single operand."
 
+["pipelex/cli/commands/run/_main_stuff_file.py::_filename_from_url"]
+param = "url"
+rationale = "Derives a file name from one URL, its sole operand."
+
 ["pipelex/cli/commands/show_cmd.py::do_show_pipe"]
 param = "pipe_code"
 rationale = "Shows the pipe identified by pipe_code; single operand."
@@ -429,8 +433,8 @@ param = "status"
 rationale = "Renders the status; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_apply_updates"]
-param = "deck_dir"
-rationale = "Applies deck updates in the deck dir; single operand."
+param = "installed_dir"
+rationale = "Applies one kit-managed area's updates in its installed dir; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_print_status_table"]
 param = "report"
@@ -1212,6 +1216,10 @@ rationale = "Factory from source: builds the result from the object_class; singl
 param = "output_class"
 rationale = "Factory from source: builds the result from the output_class; single operand."
 
+["pipelex/cogt/content_generation/content_generator_protocol.py::ContentGeneratorProtocol.make_judgment_answers"]
+param = "judgment_assignment"
+rationale = "Worker verb-object: processes the judgment_assignment; single operand, mirroring make_search_sourced_answer."
+
 ["pipelex/cogt/content_generation/content_generator_protocol.py::ContentGeneratorProtocol.make_search_sourced_answer"]
 param = "search_assignment"
 rationale = "Factory from source: builds the result from the search_assignment; single operand."
@@ -1219,6 +1227,10 @@ rationale = "Factory from source: builds the result from the search_assignment; 
 ["pipelex/cogt/content_generation/content_generator_protocol.py::update_job_metadata"]
 param = "func"
 rationale = "Decorator: wraps the single func operand."
+
+["pipelex/cogt/content_generation/doc_gen_generate.py::render_document_and_store"]
+param = "render_assignment"
+rationale = "Content-generation leaf: renders and stores the one render assignment, like its sibling leaves."
 
 ["pipelex/cogt/content_generation/dry_mock.py::_dry_image_content"]
 param = "image_url"
@@ -1256,6 +1268,10 @@ rationale = "Consumes the extract_assignment; single operand."
 param = "img_gen_assignment"
 rationale = "Consumes the img_gen_assignment; single operand."
 
+["pipelex/cogt/content_generation/dry_mock.py::dry_judgment_gen_answers"]
+param = "judgment_assignment"
+rationale = "Worker verb-object: processes the judgment_assignment; single operand."
+
 ["pipelex/cogt/content_generation/dry_mock.py::dry_llm_gen_object"]
 param = "object_assignment"
 rationale = "Consumes the object_assignment; single operand."
@@ -1267,6 +1283,10 @@ rationale = "Consumes the object_assignment; single operand."
 ["pipelex/cogt/content_generation/dry_mock.py::dry_llm_gen_text"]
 param = "llm_assignment"
 rationale = "Consumes the llm_assignment; single operand."
+
+["pipelex/cogt/content_generation/dry_mock.py::dry_render_document"]
+param = "render_assignment"
+rationale = "Dry-run mock of the render leaf: mocks the one render assignment it is handed."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_render_page_views"]
 param = "render_assignment"
@@ -1392,6 +1412,18 @@ rationale = "Processes the img-gen assignment; single operand."
 param = "img_gen_assignment"
 rationale = "Processes the img-gen assignment; single operand."
 
+["pipelex/cogt/content_generation/judgment_generate.py::_make_judgment_job"]
+param = "judgment_assignment"
+rationale = "Factory from source: builds the job from the judgment_assignment; single operand."
+
+["pipelex/cogt/content_generation/judgment_generate.py::_make_judgment_worker"]
+param = "judgment_assignment"
+rationale = "Factory from source: builds the worker from the judgment_assignment; single operand."
+
+["pipelex/cogt/content_generation/judgment_generate.py::judgment_gen_answers"]
+param = "judgment_assignment"
+rationale = "Worker verb-object: processes the judgment_assignment; single operand."
+
 ["pipelex/cogt/content_generation/llm_generate.py::llm_gen_object"]
 param = "object_assignment"
 rationale = "Processes the object assignment; single operand."
@@ -1475,6 +1507,62 @@ rationale = "Worker verb–object: processes the search_assignment; single opera
 ["pipelex/cogt/content_generation/templating_generate.py::templating_gen_text"]
 param = "templating_assignment"
 rationale = "Processes the templating assignment; single operand."
+
+["pipelex/cogt/doc_gen/doc_gen_format.py::parse_doc_gen_choice_key"]
+param = "key"
+rationale = "Verb–object: parses the key of a doc gen default; single operand."
+
+["pipelex/cogt/doc_gen/input_shape.py::_content_leaf_kind"]
+param = "content_class"
+rationale = "Classifies one content class as a leaf kind."
+
+["pipelex/cogt/doc_gen/input_shape.py::_leaf"]
+param = "kind"
+rationale = "Builds the leaf shape of one kind."
+
+["pipelex/cogt/doc_gen/input_shape.py::_scalar_kind"]
+param = "annotation"
+rationale = "Classifies one field annotation as a scalar kind."
+
+["pipelex/cogt/doc_gen/input_shape.py::shape_of_class"]
+param = "content_class"
+rationale = "Describes the shape of one content class."
+
+["pipelex/cogt/doc_gen/layout_builder.py::_flat_columns"]
+param = "items"
+rationale = "Derives table columns from one list of items."
+
+["pipelex/cogt/doc_gen/layout_builder.py::_is_list_of_scalars"]
+param = "value"
+rationale = "Predicate over one value."
+
+["pipelex/cogt/doc_gen/layout_builder.py::_is_structure_input"]
+param = "content"
+rationale = "Predicate over one input content."
+
+["pipelex/cogt/doc_gen/layout_builder.py::_joined_scalars"]
+param = "items"
+rationale = "Joins one list of scalar items into text."
+
+["pipelex/cogt/doc_gen/layout_builder.py::_paragraphs"]
+param = "text"
+rationale = "Splits one text into paragraphs."
+
+["pipelex/cogt/doc_gen/layout_builder.py::_scalar"]
+param = "value"
+rationale = "Converts one value into a layout scalar."
+
+["pipelex/cogt/doc_gen/layout_builder.py::html_to_paragraphs"]
+param = "html"
+rationale = "Converts one HTML string into paragraphs."
+
+["pipelex/cogt/doc_gen/layout_builder.py::humanize"]
+param = "name"
+rationale = "Turns one field name into a label."
+
+["pipelex/cogt/doc_gen/plain_data.py::plain_data"]
+param = "value"
+rationale = "Converts one value into plain data."
 
 ["pipelex/cogt/document/prompt_document_utils.py::prep_prompt_documents"]
 param = "prompt_documents"
@@ -1804,6 +1892,10 @@ rationale = "Extracts from the exc; single operand."
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
+["pipelex/cogt/inference/error_classification.py::extract_typesafe_metadata"]
+param = "exc"
+rationale = "Extracts from the exc; single operand."
+
 ["pipelex/cogt/inference/error_classification.py::extract_underlying_sdk_exception"]
 param = "instructor_exc"
 rationale = "Extracts from the instructor_exc; single operand."
@@ -1871,6 +1963,26 @@ rationale = "Positional-Callable tenacity wait strategy: retry_state is the sing
 ["pipelex/cogt/inference/transport_retry.py::request_with_transport_retry"]
 param = "send_request"
 rationale = "Runs the send_request callable under transport retry; single operand."
+
+["pipelex/cogt/judgment/judgment_report.py::JudgmentTokenCostReportField.report_field_for_cost_by_category"]
+param = "token_category"
+rationale = "Formatter verb-object: renders the field name for the token_category; single operand."
+
+["pipelex/cogt/judgment/judgment_report.py::JudgmentTokenCostReportField.report_field_for_nb_tokens_by_category"]
+param = "token_category"
+rationale = "Formatter verb-object: renders the field name for the token_category; single operand."
+
+["pipelex/cogt/judgment/judgment_worker_abstract.py::JudgmentWorkerAbstract._judge"]
+param = "judgment_job"
+rationale = "Worker verb-object: processes the judgment_job; single operand."
+
+["pipelex/cogt/judgment/judgment_worker_abstract.py::JudgmentWorkerAbstract.judge"]
+param = "judgment_job"
+rationale = "Worker verb-object: processes the judgment_job; single operand."
+
+["pipelex/cogt/judgment/judgment_worker_factory.py::JudgmentWorkerFactory.make_judgment_worker"]
+param = "inference_model"
+rationale = "Factory from source: builds the worker from the inference_model; single operand."
 
 ["pipelex/cogt/llm/llm_job.py::LLMJob.llm_job_before_start"]
 param = "inference_model"
@@ -2024,10 +2136,6 @@ rationale = "Predicate on the manifest_version; single operand."
 param = "version"
 rationale = "Deck/file op on the version; single operand."
 
-["pipelex/cogt/models/deck_manifest.py::compute_deck_sync_report"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
-
 ["pipelex/cogt/models/deck_manifest.py::compute_file_sha256"]
 param = "path"
 rationale = "Deck/file op on the path; single operand."
@@ -2036,21 +2144,25 @@ rationale = "Deck/file op on the path; single operand."
 param = "data"
 rationale = "Deck/file op on the data; single operand."
 
+["pipelex/cogt/models/deck_manifest.py::compute_sync_report"]
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
+
 ["pipelex/cogt/models/deck_manifest.py::is_deck_stale_fast"]
 param = "deck_dir"
 rationale = "Predicate on the deck_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::list_managed_installed_files"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::manifest_path"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::read_manifest"]
-param = "deck_dir"
-rationale = "Deck/file op on the deck_dir; single operand."
+param = "installed_dir"
+rationale = "Kit-managed area op on the installed_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::status_rich_label"]
 param = "status"
@@ -2076,6 +2188,10 @@ rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
 param = "waterfall_name"
 rationale = "Operates on the waterfall_name; single operand (qualifiers keyword-only)."
 
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_doc_gen"]
+param = "name"
+rationale = "Verb–object: validates/checks the name; single operand."
+
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_extract"]
 param = "name"
 rationale = "Verb–object: validates/checks the name; single operand."
@@ -2083,6 +2199,10 @@ rationale = "Verb–object: validates/checks the name; single operand."
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_img_gen"]
 param = "name"
 rationale = "Verb–object: validates/checks the name; single operand."
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_judgment"]
+param = "name"
+rationale = "Predicate verb-object: warns about the name; single operand, mirroring the sibling per-family warners."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_llm"]
 param = "name"
@@ -2107,6 +2227,10 @@ rationale = "Keyed accessor by the extract_choice; single operand."
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_img_gen_setting"]
 param = "img_gen_choice"
 rationale = "Keyed accessor by the img_gen_choice; single operand."
+
+["pipelex/cogt/models/model_deck.py::ModelDeck.get_judgment_setting"]
+param = "judgment_choice"
+rationale = "Keyed accessor by the judgment_choice; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_llm_setting"]
 param = "llm_choice"
@@ -2143,6 +2267,10 @@ rationale = "Verb–object: validates/checks the extract_choice; single operand.
 ["pipelex/cogt/models/model_deck_check.py::check_img_gen_choice_with_deck"]
 param = "img_gen_choice"
 rationale = "Verb–object: validates/checks the img_gen_choice; single operand."
+
+["pipelex/cogt/models/model_deck_check.py::check_judgment_choice_with_deck"]
+param = "judgment_choice"
+rationale = "Verb-object: validates the judgment_choice; single operand."
 
 ["pipelex/cogt/models/model_deck_check.py::check_llm_choice_with_deck"]
 param = "llm_choice"
@@ -2588,9 +2716,17 @@ rationale = "Verb-object: renders the absence record; single operand."
 param = "absence_record"
 rationale = "Verb-object: renders the absence record; single operand."
 
+["pipelex/core/memory/input_shaper.py::InputShaper._build_anything_content"]
+param = "value"
+rationale = "Verb-object: builds the content for the raw value; the rest is context."
+
 ["pipelex/core/memory/input_shaper.py::InputShaper._build_item_content"]
 param = "value"
 rationale = "Verb-object: shapes the raw value into content; the rest is context."
+
+["pipelex/core/memory/input_shaper.py::InputShaper._build_json_object_content"]
+param = "json_object"
+rationale = "Verb-object: builds the content holding the JSON object; the concept and the rest are context."
 
 ["pipelex/core/memory/input_shaper.py::InputShaper._check_input_names"]
 param = "pipeline_inputs"
@@ -2599,6 +2735,10 @@ rationale = "Validator: the pipeline inputs are the operand checked against the 
 ["pipelex/core/memory/input_shaper.py::InputShaper._describe_value"]
 param = "value"
 rationale = "Noun-named derivation: describes the value; single operand."
+
+["pipelex/core/memory/input_shaper.py::InputShaper._is_envelope_dict"]
+param = "value"
+rationale = "Predicate on the value; single operand."
 
 ["pipelex/core/memory/input_shaper.py::InputShaper._is_explicit"]
 param = "value"
@@ -2639,6 +2779,10 @@ rationale = "Verb-object: shapes the raw value; the rest is context."
 ["pipelex/core/memory/input_shaper.py::InputShaper._try_shape_csv"]
 param = "value"
 rationale = "Verb-object: shapes the raw value; the rest is context."
+
+["pipelex/core/memory/input_shaper.py::InputShaper._try_shape_structureless_envelope"]
+param = "value"
+rationale = "Verb-object: shapes the raw value when it is a structureless envelope; the rest is context."
 
 ["pipelex/core/memory/input_shaper.py::InputShaper.resolve_input_kind"]
 param = "concept"
@@ -2684,6 +2828,10 @@ rationale = "Memory getter keyed by the stuff name; single operand."
 param = "name"
 rationale = "Memory getter keyed by the stuff name; content type stays keyword."
 
+["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_choice"]
+param = "name"
+rationale = "Entity-keyed getter on working memory."
+
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_date"]
 param = "name"
 rationale = "Entity-keyed getter on working memory."
@@ -2711,6 +2859,10 @@ rationale = "Memory getter keyed by the stuff name; single operand."
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_number"]
 param = "name"
 rationale = "Memory getter keyed by the stuff name; single operand."
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_rating"]
+param = "name"
+rationale = "Entity-keyed getter on working memory."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_str"]
 param = "name"
@@ -3732,10 +3884,6 @@ rationale = "Verb-object: loads the dependency library object; context stays key
 param = "library_id"
 rationale = "Verb-object: pops and tears down the library named by the id; single operand."
 
-["pipelex/libraries/library_manager.py::LibraryManager._rebuild_models_with_forward_refs"]
-param = "concepts"
-rationale = "Verb-object: rebuilds the given concepts' models; single operand."
-
 ["pipelex/libraries/library_manager.py::LibraryManager._remove_concepts_from_blueprint"]
 param = "blueprint"
 rationale = "Verb-object: strips concepts from the blueprint; single operand."
@@ -3912,10 +4060,6 @@ rationale = "Single-operand transformation of the code; the rest is context."
 param = "loc"
 rationale = "Verb-object: categorizes the error at the loc; context stays keyword."
 
-["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_input_validation_error"]
-param = "message"
-rationale = "Verb-object: categorizes the error message; context stays keyword."
-
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_syntax_validation_error"]
 param = "message"
 rationale = "Verb-object: categorizes the error message; context stays keyword."
@@ -3923,10 +4067,6 @@ rationale = "Verb-object: categorizes the error message; context stays keyword."
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_typeless_pipe_error"]
 param = "message"
 rationale = "Verb-object: categorizes the message; the rest is context."
-
-["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_variable_names_from_message"]
-param = "message"
-rationale = "Verb-object: extracts from the message; single operand."
 
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_invalid_pipe_code_syntax_error"]
 param = "error"
@@ -4184,6 +4324,30 @@ rationale = "Verb-object: resolves the field blueprint; context stays keyword."
 param = "item"
 rationale = "Verb-object: validates the item; expectations stay keyword."
 
+["pipelex/pipe_operators/doc_gen/pipe_doc_gen.py::PipeDocGen._named_contents"]
+param = "working_memory"
+rationale = "Reads the step's inputs out of one working memory."
+
+["pipelex/pipe_operators/doc_gen/pipe_doc_gen.py::PipeDocGen._title"]
+param = "named_contents"
+rationale = "Derives the document's title from its one mapping of named contents."
+
+["pipelex/pipe_operators/doc_gen/pipe_doc_gen_factory.py::bundle_dir_of_source"]
+param = "source"
+rationale = "Resolves the bundle directory of one source."
+
+["pipelex/pipe_operators/doc_gen/template_field_check.py::_describe_fields"]
+param = "model_class"
+rationale = "Lists the fields of one model class."
+
+["pipelex/pipe_operators/doc_gen/template_field_check.py::_list_item_type"]
+param = "annotation"
+rationale = "Reads the item type of one list annotation."
+
+["pipelex/pipe_operators/doc_gen/template_field_check.py::_unwrap"]
+param = "annotation"
+rationale = "Unwraps one annotation from Optional and Annotated."
+
 ["pipelex/pipe_operators/func/pipe_func_execution_transport.py::pipe_func_execution_result_from_response"]
 param = "response"
 rationale = "Converter: rebinds a transported response into a result; single self-labelling operand."
@@ -4223,10 +4387,6 @@ rationale = "Query accessor keyed by the variable path; context stays keyword."
 ["pipelex/pipe_operators/shared/template_image_analyzer.py::TemplateImageAnalyzer.analyze_template_for_images"]
 param = "template_source"
 rationale = "Verb-object: analyzes the template source; context stays keyword."
-
-["pipelex/pipe_operators/shared/template_image_analyzer.py::TemplateImageAnalyzer.validate_unused_inputs"]
-param = "template_sources"
-rationale = "Verb-object: validates the template sources; context stays keyword."
 
 ["pipelex/pipe_operators/structure/pipe_structure.py::PipeStructure._format_error_location"]
 param = "pipe_run_params"
@@ -4391,6 +4551,10 @@ rationale = "Verb-object: loads the given library dirs; options stay keyword."
 ["pipelex/pipeline/execution_seams.py::prepare_pipe_job"]
 param = "pipe"
 rationale = "Verb-object: prepares the job for the pipe; job fields stay keyword."
+
+["pipelex/pipeline/file_input_consumers.py::collect_file_input_consumers"]
+param = "entry_pipe"
+rationale = "Collects the file input consumers of the entry pipe, its single operand."
 
 ["pipelex/pipeline/fixes/applicability.py::is_safe_fix_for_load_scope"]
 param = "fix"
@@ -4560,29 +4724,21 @@ rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring bu
 param = "pipes"
 rationale = "The output twin of build_input_form; the two are called side by side and must read alike."
 
-["pipelex/pipeline/input_normalizer.py::_normalize_list"]
-param = "items"
-rationale = "Verb-object: normalizes the items; context stays keyword."
+["pipelex/pipeline/input_normalizer.py::_load_local_head"]
+param = "local_path"
+rationale = "Reads the head of the local file, its single operand."
 
-["pipelex/pipeline/input_normalizer.py::_normalize_list_content"]
-param = "list_content"
-rationale = "Verb-object: normalizes the list content; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::_normalize_structured_content"]
-param = "structured_content"
-rationale = "Verb-object: normalizes the structured content; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::_normalize_url_content"]
-param = "content"
-rationale = "Verb-object: normalizes the content; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::_normalize_value"]
-param = "value"
-rationale = "Verb-object: normalizes the value; context stays keyword."
-
-["pipelex/pipeline/input_normalizer.py::normalize_data_urls_to_storage"]
+["pipelex/pipeline/input_normalizer.py::collect_file_inputs"]
 param = "working_memory"
-rationale = "Verb-object: rewrites data URLs within the working memory; single operand."
+rationale = "Reads the file inputs out of the working memory, its single operand."
+
+["pipelex/pipeline/input_normalizer.py::format_file_input_path"]
+param = "path"
+rationale = "Renders the file input path, its single operand."
+
+["pipelex/pipeline/input_normalizer.py::prepare_file_inputs"]
+param = "working_memory"
+rationale = "Verb-object: prepares the file inputs within the working memory; single operand."
 
 ["pipelex/pipeline/liftable_pipes.py::build_liftable_pipes"]
 param = "taint_analyses"
@@ -4616,10 +4772,6 @@ rationale = "Factory from source: builds the result from the pipe output; single
 param = "extra"
 rationale = "Derivation: extracts from the extra mapping; single operand."
 
-["pipelex/pipeline/validate_bundle.py::_backfill_pipe_error_source"]
-param = "pipe_error"
-rationale = "Verb-object: backfills the pipe error in place; single operand."
-
 ["pipelex/pipeline/validate_bundle.py::_pipes_to_dry_run"]
 param = "loaded_pipes"
 rationale = "Verb-object: selects among the loaded pipes; the requested codes stay keyword."
@@ -4639,6 +4791,10 @@ rationale = "Verb-object: validates the bundle file at the path; options stay ke
 ["pipelex/pipeline/validate_bundle.py::validate_bundles_from_directory"]
 param = "directory"
 rationale = "Verb-object: validates bundles from the directory; options stay keyword."
+
+["pipelex/pipeline/validate_bundle_translation.py::_backfill_pipe_error_source"]
+param = "pipe_error"
+rationale = "Verb-object: backfills the pipe error in place; single operand."
 
 ["pipelex/pipeline/validation_render.py::_markdown_category_header"]
 param = "category"
@@ -4924,6 +5080,26 @@ rationale = "Plugin protocol register: the registrar is the sole sink the plugin
 param = "date_str"
 rationale = "Parses/consumes the date_str; single operand."
 
+["pipelex/providers/log_sinks/log_sink_plugin.py::LogSinkPlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol: registers into the registrar; single operand, consistent with sibling plugins."
+
+["pipelex/providers/log_sinks/log_sink_plugin.py::_make_console_log_sink"]
+param = "config"
+rationale = "Factory from source: builds the sink from the config; single operand, the LogSinkFactoryFn shape."
+
+["pipelex/providers/log_sinks/log_sink_plugin.py::_make_gcp_log_sink"]
+param = "config"
+rationale = "Factory from source: builds the sink from the config; single operand, the LogSinkFactoryFn shape."
+
+["pipelex/providers/log_sinks/log_sink_plugin.py::_make_json_log_sink"]
+param = "config"
+rationale = "Factory from source: builds the sink from the config; single operand, the LogSinkFactoryFn shape."
+
+["pipelex/providers/log_sinks/log_sink_plugin.py::_make_otlp_log_sink"]
+param = "config"
+rationale = "Factory from source: builds the sink from the config; single operand, the LogSinkFactoryFn shape."
+
 ["pipelex/providers/manifold/manifold_completions_factory.py::ManifoldCompletionsFactory.make_openai_client_for_completions"]
 param = "model_handle"
 rationale = "Factory from source: builds the result from the model_handle; single operand."
@@ -4979,10 +5155,6 @@ rationale = "Factory from source: builds the result from the model_handle; singl
 ["pipelex/providers/mistral/mistral_config.py::MistralConfig.get_reasoning_level"]
 param = "effort"
 rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
-
-["pipelex/providers/mistral/mistral_extract_worker.py::MistralExtractWorker._extract_page_from_image"]
-param = "image_uri"
-rationale = "Extracts from the image_uri; single operand (qualifiers keyword-only)."
 
 ["pipelex/providers/mistral/mistral_extract_worker.py::MistralExtractWorker._extract_pages_from_document"]
 param = "document_uri"
@@ -5071,18 +5243,6 @@ rationale = "Resolves the reasoning effort from the job params; single operand."
 ["pipelex/providers/openai/openai_config.py::OpenAIConfig.get_reasoning_level"]
 param = "effort"
 rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
-
-["pipelex/providers/openai/openai_func.py::create_openai_schema_from_function"]
-param = "func"
-rationale = "Factory from source: builds the OpenAI tool schema from the function; single operand."
-
-["pipelex/providers/openai/openai_func.py::create_pydantic_model_from_function"]
-param = "func"
-rationale = "Factory from source: builds the pydantic model from the function; single operand."
-
-["pipelex/providers/openai/openai_func.py::list_openai_tools"]
-param = "openai_message"
-rationale = "Derives the tool-call list from the OpenAI message; single operand."
 
 ["pipelex/providers/openai/openai_img_gen_worker.py::OpenAIImgGenWorker._get_requested_size"]
 param = "args_dict"
@@ -5180,6 +5340,10 @@ rationale = "Plugin protocol register: the registrar is the sole sink the plugin
 param = "pdf_uri"
 rationale = "Resolves the PDF URI to a readable local source; single operand."
 
+["pipelex/providers/reportlab/reportlab_plugin.py::ReportlabDocGenPlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates, as for every built-in plugin."
+
 ["pipelex/providers/secrets/secrets_plugin.py::SecretsPlugin.register"]
 param = "registrar"
 rationale = "Duck-typed plugin protocol: discovery invokes plugin.register(registrar) positionally."
@@ -5207,6 +5371,14 @@ rationale = "Positional-Callable protocol: registered as a StorageProviderFactor
 ["pipelex/providers/storage/storage_plugin.py::_make_s3_storage_provider"]
 param = "config"
 rationale = "Positional-Callable protocol: registered as a StorageProviderFactoryFn."
+
+["pipelex/providers/typesafe/typesafe_error_classification.py::classify_typesafe_error"]
+param = "metadata"
+rationale = "Classifies the metadata; single operand, mirroring classify_inference_error."
+
+["pipelex/providers/typesafe/typesafe_plugin.py::TypesafePlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/reporting/cost_report_renderer.py::render_cost_report_for_output"]
 param = "pipe_output"
@@ -5612,6 +5784,14 @@ rationale = "Setter: installs the run mode; single self-labelling operand."
 param = "worker_mode"
 rationale = "Setter: installs the worker mode; single self-labelling operand."
 
+["pipelex/system/telemetry/exception_capture.py::ExceptionCapture._capture_exception"]
+param = "exc_info"
+rationale = "Verb-object: captures the exc info; single operand."
+
+["pipelex/system/telemetry/exception_capture.py::ExceptionCapture._thread_exception_handler"]
+param = "args"
+rationale = "Positional Callable protocol: threading.excepthook handler, invoked hook(args)."
+
 ["pipelex/system/telemetry/otel_constants.py::make_otel_gen_ai_output_type"]
 param = "output_type"
 rationale = "Conversion: maps the output type; single operand."
@@ -5768,9 +5948,9 @@ rationale = "Factory from source: builds the result from the template_category; 
 param = "value"
 rationale = "Transforms the value; single operand."
 
-["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._assign_target_names"]
-param = "target"
-rationale = "Noun-named derivation: the assigned names of the target node; single operand."
+["pipelex/tools/jinja2/jinja2_filters.py::markdown_to_html"]
+param = "value"
+rationale = "Jinja filter: Jinja passes the filtered value positionally."
 
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._guard_vars"]
 param = "test_node"
@@ -5788,6 +5968,10 @@ rationale = "Verb-object: records the path; single operand."
 param = "body_nodes"
 rationale = "Visitor: walks the body nodes; guard sets stay keyword."
 
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_if"]
+param = "node"
+rationale = "Verb-object walk over one if node, like the walker's other walk methods; single operand."
+
 ["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_test"]
 param = "test_node"
 rationale = "Visitor: walks the test node; guard sets stay keyword."
@@ -5796,13 +5980,93 @@ rationale = "Visitor: walks the test node; guard sets stay keyword."
 param = "node"
 rationale = "Visitor: walks the node; guard sets stay keyword."
 
-["pipelex/tools/jinja2/jinja2_optional_guards.py::_build_full_path"]
-param = "node"
-rationale = "Noun-named derivation: the full dotted path of the node; single operand."
-
 ["pipelex/tools/jinja2/jinja2_parsing.py::check_jinja2_parsing"]
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::_compare_container_units"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each container positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::_compare_leaf_units"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each element positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::_repr_container_size"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each container positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::_repr_leaf_size"]
+param = "value"
+rationale = "Positional-Callable walk callback: the walk passes each element positionally."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::compare_weight"]
+param = "value"
+rationale = "Estimates what comparing the value costs; the limit stays keyword."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::escaped_length"]
+param = "text"
+rationale = "Measures the text it is given."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::is_lazy"]
+param = "value"
+rationale = "Predicate on the value it is given."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::json_string_length"]
+param = "text"
+rationale = "Measures the text it is given."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::produced_size"]
+param = "value"
+rationale = "Measures the value an operation produced."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::size_of"]
+param = "value"
+rationale = "Measures the value it is given; a hot path of every render."
+
+["pipelex/tools/jinja2/jinja2_render_budget.py::text_size"]
+param = "value"
+rationale = "Estimates the printed length of the value; the limit stays keyword."
+
+["pipelex/tools/jinja2/jinja2_render_charging.py::render_budget_of"]
+param = "context"
+rationale = "Reads the budget off the render context it is given."
+
+["pipelex/tools/jinja2/jinja2_render_costs.py::escaped_text_size"]
+param = "value"
+rationale = "Estimates the escaped length of the value, also passed as a positional measure; the limit stays keyword."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_comparison"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_concat"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_filter"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_item"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_literal"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_loop"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::_RenderBudgetRewriter._rewrite_output"]
+param = "node"
+rationale = "Jinja NodeVisitor dispatch: visit() calls the visitor get_visitor returns with the node positionally."
+
+["pipelex/tools/jinja2/jinja2_render_rewrite.py::rewrite_for_render_budget"]
+param = "template"
+rationale = "Rewrites the parsed template it is given."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_add_to_templating_context"]
 param = "templating_context"
@@ -5840,25 +6104,45 @@ rationale = "Jinja op on the template_source; single operand (context keyword-on
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
-["pipelex/tools/jinja2/jinja2_required_variables.py::_build_full_path"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_declarations_from_body"]
-param = "body"
-rationale = "Extracts/derives from the body; single operand."
-
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_full_variable_paths"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
-["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_variable_references"]
-param = "node"
-rationale = "Extracts/derives from the node; single operand."
-
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
 rationale = "Extracts/derives from the node; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::_frame_level_parts"]
+param = "statement"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::_loaded_names"]
+param = "expression"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::assigned_target_names"]
+param = "target"
+rationale = "Lists the names one assignment target binds."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::attribute_chain"]
+param = "node"
+rationale = "Reads the attribute chain of one Jinja node."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::definitely_assigned_names"]
+param = "statement"
+rationale = "Noun-named derivation: the names one statement binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::dotted_attribute_path"]
+param = "node"
+rationale = "Noun-named derivation: the dotted path of the node; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::frame_bound_names"]
+param = "statement"
+rationale = "Noun-named derivation: the names one statement binds in the frame it opens; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::names_assigned_by_statements"]
+param = "statements"
+rationale = "Noun-named derivation: the names a statement list binds for certain; single operand."
+
+["pipelex/tools/jinja2/jinja2_scopes.py::names_read_before_bound"]
+param = "statements"
+rationale = "Noun-named derivation over one Jinja AST operand; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.is_loaded"]
 param = "name"
@@ -5883,6 +6167,10 @@ rationale = "Predicate on the key; single operand."
 ["pipelex/tools/jinja2/jinja2_with_images_filter.py::_render_sequence_with_images"]
 param = "sequence"
 rationale = "Jinja op on the sequence; single operand (context keyword-only)."
+
+["pipelex/tools/jinja2/template_surface.py::get_template_surface"]
+param = "obj"
+rationale = "Reads as get the template surface of this value; the value is the single obvious operand."
 
 ["pipelex/tools/log/log.py::Log._should_ignore"]
 param = "problem_id"
@@ -5916,6 +6204,10 @@ rationale = "Logs the content; single operand (formatting keyword-only)."
 param = "content"
 rationale = "Logs the content; single operand (formatting keyword-only)."
 
+["pipelex/tools/log/log.py::Log.install_sink"]
+param = "sink"
+rationale = "Setter: installs the sink; single operand."
+
 ["pipelex/tools/log/log.py::Log.set_level"]
 param = "level"
 rationale = "Setter: installs the level; single operand."
@@ -5932,14 +6224,6 @@ rationale = "Setter: installs the package_name; single operand."
 param = "package_log_levels"
 rationale = "Setter: installs the package_log_levels; single operand."
 
-["pipelex/tools/log/log.py::Log.set_log_mode"]
-param = "mode"
-rationale = "Setter: installs the mode; single operand."
-
-["pipelex/tools/log/log.py::Log.set_poor_log_formatter"]
-param = "formatter"
-rationale = "Setter: installs the formatter; single operand."
-
 ["pipelex/tools/log/log.py::Log.verbose"]
 param = "content"
 rationale = "Logs the content; single operand (formatting keyword-only)."
@@ -5952,22 +6236,6 @@ rationale = "Logs the content; single operand (formatting keyword-only)."
 param = "key"
 rationale = "Factory from source: builds the result from the key; single operand."
 
-["pipelex/tools/log/log_config.py::RichLogConfig.make_rich_handler"]
-param = "target"
-rationale = "Factory from source: builds the result from the target; single operand."
-
-["pipelex/tools/log/log_dispatch.py::LogDispatch._log_data"]
-param = "data"
-rationale = "Logs the content; single operand (formatting keyword-only)."
-
-["pipelex/tools/log/log_dispatch.py::LogDispatch._log_message"]
-param = "message"
-rationale = "Logs the content; single operand (formatting keyword-only)."
-
-["pipelex/tools/log/log_dispatch.py::LogDispatch._log_to_console"]
-param = "message"
-rationale = "Transforms the message; single operand."
-
 ["pipelex/tools/log/log_dispatch.py::LogDispatch.configure"]
 param = "log_config"
 rationale = "Setter: installs the log_config; single operand."
@@ -5976,13 +6244,17 @@ rationale = "Setter: installs the log_config; single operand."
 param = "content"
 rationale = "Logs the content; single operand (formatting keyword-only)."
 
-["pipelex/tools/log/log_dispatch.py::LogDispatch.set_log_mode"]
-param = "mode"
-rationale = "Setter: installs the mode; single operand."
-
 ["pipelex/tools/log/log_formatter.py::emoji_for_channel"]
 param = "channel_name"
 rationale = "Renders the channel_name; single operand."
+
+["pipelex/tools/markdown/markdown_parser.py::_join_text_fragments"]
+param = "state"
+rationale = "markdown-it rule callback: the inline ruler calls each rule with its state positionally."
+
+["pipelex/tools/markdown/markdown_parser.py::render_markdown_as_html"]
+param = "markdown_text"
+rationale = "Renders one Markdown text as HTML."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::clean_str_for_mermaid_node_title"]
 param = "text"
@@ -6071,10 +6343,6 @@ rationale = "Factory from source: builds the result from the base64_data; single
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_bytes"]
 param = "raw_bytes"
 rationale = "Factory from source: builds the result from the raw_bytes; single operand."
-
-["pipelex/tools/misc/base64_utils.py::make_base64_url_from_http_url"]
-param = "url"
-rationale = "Factory from source: builds the result from the url; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_path"]
 param = "path"
@@ -6636,6 +6904,10 @@ rationale = "Positional-Callable re.sub repl: match is the single operand re pas
 param = "key"
 rationale = "Keyed accessor by the key; single operand."
 
+["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_head_sync"]
+param = "key"
+rationale = "Keyed accessor by the storage key, called positionally through asyncio.to_thread."
+
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_with_metadata_sync"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -6660,6 +6932,10 @@ rationale = "Factory from source: builds the result from the key; single operand
 param = "key"
 rationale = "Keyed accessor by the key; single operand."
 
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_head"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand."
+
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_with_metadata"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -6673,6 +6949,10 @@ param = "uri"
 rationale = "Keyed accessor by the uri; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load"]
+param = "uri"
+rationale = "Keyed accessor by the uri; single operand."
+
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_head"]
 param = "uri"
 rationale = "Keyed accessor by the uri; single operand."
 
@@ -6872,6 +7152,18 @@ rationale = "Predicate on the obj; single operand."
 param = "obj"
 rationale = "Predicate on the obj; single operand."
 
+["pipelex/tools/uri/uri_base64.py::make_base64_url_from_any_uri"]
+param = "uri"
+rationale = "Factory from source: builds the result from the uri; single operand."
+
+["pipelex/tools/uri/uri_base64.py::make_base64_url_from_http_url"]
+param = "url"
+rationale = "Factory from source: builds the result from the url; single operand."
+
+["pipelex/tools/uri/uri_bytes.py::load_bytes_from_any_uri"]
+param = "uri"
+rationale = "Loads the bytes one URI names."
+
 ["pipelex/tools/uri/uri_resolver.py::_resolve_base64_data_url"]
 param = "uri"
 rationale = "Parses/reads the uri; single operand."
@@ -6891,10 +7183,6 @@ rationale = "Extracts/derives from the uri; single operand."
 ["pipelex/tools/uri/uri_resolver.py::is_relative_local_path"]
 param = "uri"
 rationale = "Predicate on the uri; single operand."
-
-["pipelex/tools/uri/uri_resolver.py::make_base64_url_from_any_uri"]
-param = "uri"
-rationale = "Factory from source: builds the result from the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::resolve_local_path_reference"]
 param = "uri"

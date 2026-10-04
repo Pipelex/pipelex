@@ -29,6 +29,7 @@ def _metadata(extras: dict[str, str]) -> JobMetadata:
             user_id="u1",
             pipeline_run_id="run_1",
             storage_scope="tenant/run_1",
+            read_scope=None,
             extras=extras,
         )
     )
@@ -57,13 +58,13 @@ class TestRunExtras:
         it only leaves the group facet empty. The doctrine that made the other
         two required is about IDENTITY, and identity is still non-defaulting.
         """
-        run_metadata = RunMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope="tenant/run_1")
+        run_metadata = RunMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope="tenant/run_1", read_scope=None)
         assert run_metadata.extras == {}
 
     def test_two_run_metadatas_do_not_share_one_default_mapping(self) -> None:
         """A mutable default shared between instances would let one run's extras leak into another."""
-        first = RunMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope="tenant/run_1")
-        second = RunMetadata(user_id="u2", pipeline_run_id="run_2", storage_scope="tenant/run_2")
+        first = RunMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope="tenant/run_1", read_scope=None)
+        second = RunMetadata(user_id="u2", pipeline_run_id="run_2", storage_scope="tenant/run_2", read_scope=None)
         first.extras["organization"] = "org_acme"
         assert second.extras == {}
 

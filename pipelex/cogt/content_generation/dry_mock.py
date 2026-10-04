@@ -45,8 +45,10 @@ from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
+    JudgmentAssignment,
     LLMAssignment,
     ObjectAssignment,
+    RenderDocumentAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
     SearchObjectAssignment,
@@ -57,6 +59,15 @@ from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, OutputStructureSchemaError
 from pipelex.cogt.content_generation.object_class_resolution import resolve_object_class
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
+from pipelex.cogt.judgment.judgment_models import (
+    ChoiceAnswer,
+    ChoiceQuestion,
+    JudgmentAnswer,
+    RatingAnswer,
+    RatingQuestion,
+    YesNoAnswer,
+    YesNoQuestion,
+)
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobReport
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -408,12 +419,44 @@ def dry_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[
     return [_dry_image_content(image_url=image_urls[page_index % len(image_urls)]) for page_index in range(nb_pages)]
 
 
+def dry_render_document(render_assignment: RenderDocumentAssignment) -> DocumentContent:
+    """Dry leaf for document printing: a mock Document named as the live one would be, no engine, no storage IO.
+
+    Its URL is the blank one-page PDF every mocked document carries, whatever the format asked for.
+    """
+    composition = render_assignment.composition
+    log.verbose(f"🤡 DRY RUN: render_document '{composition.filename}' for '{render_assignment.job_metadata.run_metadata.pipeline_run_id}'")
+    return DocumentContent(url=DryRunFactory.generate_mock_document_url(), mime_type=composition.format.mime_type, filename=composition.filename)
+
+
 def dry_search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
     """Dry leaf for sourced-answer search: polyfactory-built result with mock sources, no provider."""
     log.verbose(f"🤡 DRY RUN: search_gen_sourced_answer for '{search_assignment.search_handle}'")
     nb_sources = get_config().inference.dry_run.nb_list_items
     mock_sources = build_mock_objects(DocumentContent, count=nb_sources)
     return build_mock_object(SearchResultContent, sources=mock_sources)
+
+
+def dry_judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentAnswer]:
+    """Dry leaf for a judgment: a deterministic verdict per question, with no uncertainty at all.
+
+    Every answer is the first thing its question allows — yes, the first option, the lowest level —
+    because a dry run must be reproducible and nothing here measured anything. The uncertainty
+    members are left absent for the same reason: the contract makes them optional precisely so a
+    producer that measured nothing can say so, and a mock probability would be the one number in the
+    whole family that nobody could tell apart from a real one.
+    """
+    log.verbose(f"🤡 DRY RUN: judgment_gen_answers for '{judgment_assignment.judgment_handle}'")
+    answers: dict[str, JudgmentAnswer] = {}
+    for question_key, question in judgment_assignment.questions.items():
+        match question:
+            case YesNoQuestion():
+                answers[question_key] = YesNoAnswer(yes_no=True)
+            case ChoiceQuestion():
+                answers[question_key] = ChoiceAnswer(choice=next(iter(question.options)))
+            case RatingQuestion():
+                answers[question_key] = RatingAnswer(level=0)
+    return answers
 
 
 def dry_search_gen_structured(search_object_assignment: SearchObjectAssignment) -> dict[str, Any]:

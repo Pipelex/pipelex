@@ -10,21 +10,36 @@ Example template usage:
     {{ my_stuff._stuff_name }}      # Access metadata
     {{ my_stuff | tag }}            # Use tag filter
     {{ my_stuff | with_images }}    # Use with_images filter
+
+Templates render under the Pipelex sandbox (`pipelex/tools/jinja2/jinja2_sandbox.py`), which lets a
+template read public data and call methods of plain values only. StuffArtefact declares its template
+surface: the dict-like accessors a template may call, and the metadata fields it may read although
+they start with an underscore.
+
+Printed as it is, `{{ my_stuff }}`, an artefact is its content's plain rendering, which an HTML template
+escapes. The exception is a content that knows its own HTML (`HtmlRenderable`, markupsafe's `__html__`),
+such as a Markdown stuff: the artefact answers `__html__` for it, so HTML autoescaping inserts the content's
+converted HTML instead. A template never calls `__html__` itself, since the sandbox refuses every
+underscore name; markupsafe does, when it escapes.
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 from typing_extensions import override
 
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.tools.jinja2.html_renderable import HtmlRenderable
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
+from pipelex.tools.jinja2.renderable_dispatch import type_implements
+from pipelex.tools.jinja2.template_surface import TemplateSurface
 from pipelex.tools.templating.text_format import TextFormat
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff import Stuff
+    from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.tools.jinja2.image_registry import ImageRegistry
 
 
@@ -33,14 +48,74 @@ class BaseStuffArtefactField(StrEnum):
 
     These fields are accessible via the artefact but are not part of the
     content model. They use underscore prefixes to avoid conflicts with
-    user-defined content fields.
+    user-defined content fields. They are scalars, and they are the only
+    underscore-prefixed names a template may read on an artefact: the raw
+    content object is deliberately not among them.
     """
 
     STUFF_NAME = "_stuff_name"
     CONTENT_CLASS = "_content_class"
     CONCEPT_CODE = "_concept_code"
     STUFF_CODE = "_stuff_code"
-    CONTENT = "_content"
+
+
+_METADATA_FIELD_NAMES = frozenset(field.value for field in BaseStuffArtefactField)
+
+
+def _public_extra_fields(*, content: StuffContent) -> dict[str, Any]:
+    """The public extra fields of a model that allows extras, which is where `CompositeContent` holds its parts.
+
+    They are read from `model_extra` and never with getattr, so a part named like a pydantic attribute
+    (`model_dump`, `model_extra`) resolves to the part and not to the attribute.
+    """
+    return {name: value for name, value in (content.model_extra or {}).items() if not name.startswith("_")}
+
+
+def _content_field_names(*, content: StuffContent) -> list[str]:
+    """The content fields a template reads: the declared ones, then the public extra fields."""
+    declared_names: list[str] = list(type(content).model_fields)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+    return [*declared_names, *_public_extra_fields(content=content)]
+
+
+def _get_template_value(*, stuff: Stuff, key: str) -> Any:
+    """Return what a template reads under `key`: a content field, else a metadata field.
+
+    This is the whole of what a string key resolves to, with a dot, with brackets or through `get`:
+    anything else (the wrapped Stuff, the artefact's own methods) raises KeyError.
+    """
+    content = stuff.content
+    if key in type(content).model_fields:
+        return getattr(content, key)
+    extra_fields = _public_extra_fields(content=content)
+    if key in extra_fields:
+        return extra_fields[key]
+    match key:
+        case BaseStuffArtefactField.STUFF_NAME:
+            return stuff.stuff_name
+        case BaseStuffArtefactField.CONTENT_CLASS:
+            return content.__class__.__name__
+        case BaseStuffArtefactField.CONCEPT_CODE:
+            return stuff.concept.code
+        case BaseStuffArtefactField.STUFF_CODE:
+            return stuff.stuff_code
+        case _:
+            raise KeyError(key)
+
+
+_HTML_DUNDER = "__html__"
+
+
+def _get_content_html(*, stuff: Stuff) -> Callable[[], str]:
+    """The `__html__` of the stuff's content, when the content's class defines it (`HtmlRenderable`).
+
+    Raises AttributeError otherwise, so that `hasattr(artefact, "__html__")` is False and markupsafe escapes
+    the artefact's plain rendering, as it always has. Decided from the content's class, never from the
+    instance, like every renderable the filters dispatch on (`renderable_dispatch.py`).
+    """
+    content = stuff.content
+    if isinstance(content, HtmlRenderable) and type_implements(value=content, protocol=HtmlRenderable):
+        return content.__html__
+    raise AttributeError(_HTML_DUNDER)
 
 
 # Attributes that should NOT be intercepted and delegated to content
@@ -58,7 +133,6 @@ _PASSTHROUGH_ATTRS = frozenset(
         "render_with_images",
         # Methods that must remain accessible (TextFormatRenderable protocol)
         "rendered_for_template_async",
-        "stuff",
         # Dict-like methods for template iteration
         "iter_keys",
         "iter_items",
@@ -99,12 +173,20 @@ class StuffArtefact:
         - TagRenderable protocol (render_for_tag_async, default_tag_name)
         - TextFormatRenderable protocol (rendered_for_template_async)
         - ImageRenderable protocol (render_with_images)
+        - HtmlRenderable protocol (`__html__`), only when its content does: see `_get_content_html`
 
     Attributes:
         _stuff: The underlying Stuff object being wrapped.
     """
 
     __slots__ = ("_stuff",)
+
+    # What a template may do beyond reading public data: call the dict-like accessors, and read the
+    # metadata fields although they start with an underscore.
+    __template_surface__ = TemplateSurface(
+        callable_names=frozenset({"get", "iter_keys", "iter_items", "iter_values"}),
+        private_names=_METADATA_FIELD_NAMES,
+    )
 
     def __init__(self, stuff: Stuff) -> None:
         """Initialize the artefact with a Stuff object.
@@ -113,6 +195,17 @@ class StuffArtefact:
             stuff: The Stuff object to wrap.
         """
         object.__setattr__(self, "_stuff", stuff)
+
+    @property
+    def __html__(self) -> Callable[[], str]:
+        """Markupsafe's `__html__`, present only for a content that knows its own HTML (a Markdown stuff).
+
+        HTML autoescaping then inserts that HTML, and escapes every other artefact's plain rendering as before:
+        for any other content this raises AttributeError, so `hasattr(artefact, "__html__")` is False. It is a
+        property of the class rather than an answer of `__getattr__` so that the filters, which license a call
+        by the value's class (`renderable_dispatch.py`), see it too.
+        """
+        return _get_content_html(stuff=self._stuff)
 
     # -------------------------------------------------------------------------
     # Attribute access for Jinja2 templates
@@ -141,33 +234,19 @@ class StuffArtefact:
         if key in _PASSTHROUGH_ATTRS or key.startswith("__"):
             return object.__getattribute__(self, key)
 
-        # Get the underlying stuff - use object.__getattribute__ to avoid recursion
+        # Content fields first (the most common access pattern in templates), then metadata fields,
+        # then normal attribute lookup for methods etc. Use object.__getattribute__ to avoid recursion.
         stuff = object.__getattribute__(self, "_stuff")
-        content = stuff.content
-
-        # Check content fields (most common access pattern in templates)
-        content_fields = type(content).model_fields  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        if key in content_fields:
-            return getattr(content, key)
-
-        # Metadata accessors (underscore-prefixed)
-        match key:
-            case "_stuff_name":
-                return stuff.stuff_name
-            case "_content_class":
-                return content.__class__.__name__
-            case "_concept_code":
-                return stuff.concept.code
-            case "_stuff_code":
-                return stuff.stuff_code
-            case "_content":
-                return content
-            case _:
-                # Fall back to normal attribute lookup for methods etc.
-                return object.__getattribute__(self, key)
+        try:
+            return _get_template_value(stuff=stuff, key=key)
+        except KeyError:
+            return object.__getattribute__(self, key)
 
     def __getitem__(self, key: str | int | slice) -> Any:
         """Support bracket notation: stuff['field'] or stuff[0] for list indexing.
+
+        A string key resolves to a content field or a metadata field only, never to the artefact's
+        own attributes: the template sandbox checks a bracketed name only when `obj[key]` fails.
 
         Args:
             key: String key for field access, or int/slice for list content indexing.
@@ -176,14 +255,11 @@ class StuffArtefact:
             The value for the key, or the indexed item(s) from list content.
 
         Raises:
-            KeyError: If string key is not found.
+            KeyError: If string key is not a content field or a metadata field.
             TypeError: If int/slice indexing on non-indexable content.
         """
         if isinstance(key, str):
-            try:
-                return getattr(self, key)
-            except AttributeError as exc:
-                raise KeyError(key) from exc
+            return _get_template_value(stuff=self._stuff, key=key)
         # Integer or slice - delegate to ListContent
         content = self._stuff.content
         if isinstance(content, ListContent):
@@ -193,18 +269,18 @@ class StuffArtefact:
         raise TypeError(msg)
 
     def get(self, key: str, *, default: Any = None) -> Any:
-        """Dict-like get method.
+        """Dict-like get method, resolving the same keys as bracket access.
 
         Args:
             key: The key to access.
             default: Value to return if key not found.
 
         Returns:
-            The value for the key, or default if not found.
+            The value for the key, or default if it is neither a content field nor a metadata field.
         """
         try:
-            return getattr(self, key)
-        except AttributeError:
+            return _get_template_value(stuff=self._stuff, key=key)
+        except KeyError:
             return default
 
     def __contains__(self, key: str) -> bool:
@@ -216,14 +292,12 @@ class StuffArtefact:
         Returns:
             True if the key is accessible, False otherwise.
         """
-        content_fields = type(self._stuff.content).model_fields  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-
         # Check content fields
-        if key in content_fields:
+        if key in _content_field_names(content=self._stuff.content):
             return True
 
         # Check metadata fields
-        return key in {"_stuff_name", "_content_class", "_concept_code", "_stuff_code", "_content"}
+        return key in _METADATA_FIELD_NAMES
 
     def __iter__(self) -> Iterator[Any]:
         """Enable direct iteration when content is ListContent.
@@ -289,7 +363,7 @@ class StuffArtefact:
             Field names from content, followed by metadata field names.
         """
         # Content fields (use self._stuff since it's in _PASSTHROUGH_ATTRS)
-        yield from type(self._stuff.content).model_fields  # pyright: ignore[reportUnknownMemberType]
+        yield from _content_field_names(content=self._stuff.content)
         # Metadata fields
         for field in BaseStuffArtefactField:
             yield field.value
@@ -388,19 +462,6 @@ class StuffArtefact:
             raise TypeError(msg)
         return content.render_with_images(registry=registry, text_format=text_format)
 
-    # -------------------------------------------------------------------------
-    # Access to underlying Stuff
-    # -------------------------------------------------------------------------
-
-    @property
-    def stuff(self) -> Stuff:
-        """Access the underlying Stuff object.
-
-        Returns:
-            The wrapped Stuff object.
-        """
-        return self._stuff  # type: ignore[no-any-return]
-
     @override
     def __str__(self) -> str:
         """Return plain text content for string conversion."""
@@ -411,3 +472,13 @@ class StuffArtefact:
     def __repr__(self) -> str:
         """Return string representation."""
         return f"StuffArtefact({self._stuff.stuff_name or 'unnamed'})"
+
+
+def unwrap_stuff_artefact(*, artefact: StuffArtefact) -> Stuff:
+    """Return the Stuff an artefact wraps, for Python code.
+
+    This is a function rather than a property on purpose: every public attribute of an artefact is
+    readable from a template, and the wrapped Stuff, with its raw content object, is not template data.
+    """
+    # The one read of the slot from outside the class, which is the point: the class exposes no accessor.
+    return artefact._stuff  # type: ignore[no-any-return]  # ruff: ignore[private-member-access]

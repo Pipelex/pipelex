@@ -24,7 +24,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.pipeline.validate_bundle import translate_to_validate_bundle_error
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 
 def resolve_crate_from_contents(*, mthds_contents: list[str], mthds_sources: Sequence[str | None] | None = None) -> LibraryCrate:

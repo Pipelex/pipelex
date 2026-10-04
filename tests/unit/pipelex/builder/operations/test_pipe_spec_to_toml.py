@@ -202,6 +202,36 @@ class TestPipeSpecToToml:
         toml = pipe_spec_to_toml(spec)
         assert "model" not in toml
 
+    # -- PipeDocGen -------------------------------------------------------
+
+    def test_doc_gen_model_in_toml(self) -> None:
+        spec = parse_pipe_spec(
+            {
+                "pipe_code": "print_invoice",
+                "description": "Print the invoice",
+                "inputs": {"invoice": "Invoice"},
+                "output": "Document",
+                "format": "docx",
+                "model": "pipelex-docx",
+                "template_file": "invoice.docx",
+                "filename": "invoice.docx",
+            },
+            pipe_type="PipeDocGen",
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert 'format = "docx"' in toml
+        assert 'model = "pipelex-docx"' in toml
+        assert 'template_file = "invoice.docx"' in toml
+        assert 'filename = "invoice.docx"' in toml
+
+    def test_doc_gen_no_model_omits_field(self) -> None:
+        spec = parse_pipe_spec(
+            {"pipe_code": "print_report", "description": "Print the report", "inputs": {"report": "Markdown"}, "output": "Document", "format": "pdf"},
+            pipe_type="PipeDocGen",
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "model" not in toml
+
     # -- PipeExtract ------------------------------------------------------
 
     def test_extract_model_in_toml(self) -> None:
@@ -498,3 +528,60 @@ class TestPipeSpecToToml:
         toml = pipe_spec_to_toml(spec)
         assert "target_format" not in toml
         assert "template" not in toml
+
+    # -- PipeJudge --------------------------------------------------------
+
+    def test_judge_choice_writes_question_and_options(self) -> None:
+        spec = parse_pipe_spec(
+            {
+                "pipe_code": "route_ticket",
+                "description": "Route a ticket",
+                "inputs": {"ticket": "Text"},
+                "output": "Choice",
+                "model": "@default-judgment",
+                "prompt": "Which team should handle the ticket?",
+                "options": {"billing": "Charges and invoices", "other": ""},
+            },
+            pipe_type="PipeJudge",
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert 'question = "Which team should handle the ticket?"' in toml
+        assert "prompt" not in toml, "A tool that writes a PipeJudge writes `question`"
+        assert 'model = "@default-judgment"' in toml
+        assert 'billing = "Charges and invoices"' in toml
+        assert 'other = ""' in toml
+
+    def test_judge_yes_no_writes_criteria_and_threshold(self) -> None:
+        spec = parse_pipe_spec(
+            {
+                "pipe_code": "is_urgent",
+                "description": "Judge urgency",
+                "inputs": {"message": "Text"},
+                "output": "YesNo",
+                "question": "Is the message urgent?",
+                "criteria": {"yes": "Needs an answer today"},
+                "threshold": 0.8,
+            },
+            pipe_type="PipeJudge",
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert 'yes = "Needs an answer today"' in toml
+        assert "no =" not in toml
+        assert "threshold = 0.8" in toml
+
+    def test_judge_rating_writes_levels(self) -> None:
+        spec = parse_pipe_spec(
+            {
+                "pipe_code": "rate_severity",
+                "description": "Rate severity",
+                "inputs": {"report": "Text"},
+                "output": "Rating",
+                "question": "How severe is it?",
+                "levels": ["Cosmetic", "A workaround exists", "Blocking"],
+            },
+            pipe_type="PipeJudge",
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "Cosmetic" in toml
+        assert "Blocking" in toml
+        assert "options" not in toml

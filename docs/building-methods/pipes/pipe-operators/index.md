@@ -20,8 +20,10 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeExtract`**](./PipeExtract.md): Performs Optical Character Recognition (OCR) on images and PDF documents to extract text and embedded images, and fetches and extracts content from web pages.
 -   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like GPT Image, Flux, or other image generation models.
 -   [**`PipeSearch`**](./PipeSearch.md): Searches the web using a configurable search provider and returns structured results with an answer and source citations.
+-   [**`PipeJudge`**](./PipeJudge.md): Asks a judgment model one closed question about its inputs, and returns a `YesNo`, a `Choice` or a `Rating` verdict with the probabilities the model measured.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
 -   [**`PipeCompose`**](./PipeCompose.md): Composes outputs deterministically from working memory — renders Jinja2 templates for formatted reports or complex prompts, or constructs structured objects by mapping fields from inputs, without an LLM.
+-   [**`PipeDocGen`**](./PipeDocGen.md): Generates a document file from its inputs, calling no AI model: a PDF laid out from a structure or formatted from a Markdown report, and with the Pipelex document generation plugin a PDF from an HTML template, an Excel workbook, a Word document or a PowerPoint deck.
 
 ## Overview
 
@@ -33,7 +35,9 @@ Pipelex provides the following pipe operators:
 - `PipeFunc`: For executing custom functions
 - `PipeImgGen`: For AI-powered image generation
 - `PipeSearch`: For web search with structured results
+- `PipeJudge`: For a closed question answered with a verdict and its probabilities
 - `PipeStructure`: For turning free-form text into structured data
+- `PipeDocGen`: For generating a document file, such as a PDF, from structured data
 
 ## PipeLLM
 
@@ -93,6 +97,17 @@ Generates and manipulates images.
 - Batch processing
 - Parameter customization
 
+## PipeDocGen
+
+Generates a document file from its inputs, calling no AI model.
+
+### Key Features
+
+- A PDF laid out from the inputs' structure, with tables, sections and page numbers
+- Markdown reports formatted, from a `Markdown` input
+- A file name built from the inputs
+- With the Pipelex document generation plugin: PDFs from HTML templates, Excel, Word and PowerPoint
+
 ## PipeSearch
 
 Searches the web and returns structured results with sources.
@@ -103,3 +118,13 @@ Searches the web and returns structured results with sources.
 - Structured results with answer and source citations
 - Dynamic prompt templates with `$variable` syntax
 - Standard and deep search models
+
+## PipeJudge
+
+Asks a judgment model one closed question about its inputs.
+
+### Key Features
+
+- Yes/no, choice and rating questions, the kind read from the fields the pipe declares
+- Verdicts carrying the probabilities the model measured, and a threshold for a yes/no
+- Every input sent to the model as material, images and documents as files for a model that reads them

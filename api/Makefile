@@ -1,0 +1,42 @@
+#################################################################################
+#################################    HELPERS    #################################
+#################################################################################
+
+# Print title for each section
+PRINT_TITLE = @echo "\n\033[1m>>> $1\033[0m\n"
+
+# Colorized variables
+YELLOW = \033[33m
+GREEN = \033[32m
+RESET = \033[0m
+
+# Unified help output
+help:
+	@echo "$(YELLOW)Available commands:$(RESET)"
+	@echo ""
+	@echo "$$HELP"
+	@echo ""
+	@echo "$$HELP_LOCAL"
+	@echo ""
+	@echo "$$HELP_DEPLOY_API"
+	@echo ""
+	@echo "$(YELLOW)Use 'make <command>' to run a specific command.$(RESET)"
+
+###########################################################################
+############################## Initialization #############################
+###########################################################################
+
+# Include the secrets of the .env file
+ifneq (,$(wildcard .env))
+    include .env
+    export $(shell sed 's/=.*//' .env)
+endif
+
+# The server takes the library's version, from the root `pyproject.toml` (see this member's `[tool.hatch.version]`).
+# Its form is checked where the release is cut, by the root's `version-check.yml` and `prerelease-version-check.yml`.
+$(eval VERSION=$(shell grep -m1 '^version' ../pyproject.toml | sed -E 's/version = "(.*)"/\1/'))
+
+
+-include Makefiles/Makefile_basics.mk
+-include Makefiles/Makefile.local.mk
+-include Makefiles/Makefile.deploy.api.mk

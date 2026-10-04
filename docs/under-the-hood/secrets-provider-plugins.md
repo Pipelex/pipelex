@@ -35,15 +35,17 @@ boot (Pipelex.setup)
                  └─ registrar.add_secrets_provider(method=…, factory=…)
   └─ SecretsProviderRegistry(registrar.secrets_providers)    # stored on the hub
   └─ secrets_provider = registry.get_required(method=runtime.secrets.method)(runtime.secrets)
-  └─ set_secrets_provider(secrets_provider)          # the one provider every consumer reads
+  └─ log sink factory(runtime.log, secrets_provider=secrets_provider)   # the first consumer, handed it
+  └─ set_secrets_provider(secrets_provider)          # the one provider every later consumer reads
 ```
 
 There is no `match runtime.secrets.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (`get_secret(...)`, telemetry credentials, the storage `gcp` arm, search/extract workers) keeps calling `get_secrets_provider()` and is unaffected by which method was selected.
 
 ### Where in boot secrets is resolved
 
-Secrets is resolved **early** — right after plugin discovery, after the gateway/terms precondition gate but before the telemetry factory (its first in-process consumer) and well before storage selection. Two consequences that this ordering guarantees:
+Secrets is the **first capability resolved out of the registrar** — right after plugin discovery, after the gateway/terms precondition gate, before the log sink and well before storage selection. Three consequences that this ordering guarantees:
 
+- **The log sink**, its first consumer, receives the provider as the `secrets_provider` keyword of its factory, so a sink's settings can name secrets: the built-in `otlp` sink's header values and the `gcp` sink's key path accept `${…}` placeholders (see [Log Sink Plugins](log-sink-plugins.md#logsinkfactoryfn)). The provider goes on the hub only after the sink is installed, so the keyword is the one way a sink reaches it. Because the sink does not exist yet, what the provider logs while it is built is held and replayed into the sink, and a provider whose factory raises stops the boot with those held lines written to stderr, redacted, rather than through the configured sink.
 - **Telemetry** receives the config-selected secrets provider when it is constructed.
 - **Storage's `gcp` factory** reads the config-selected secrets provider from the hub at *its* apply-point (it resolves `GCP_CREDENTIALS_FILE_PATH`) — secrets is already on the hub by then. This ordering is pinned by an integration test that boots a non-`env` secrets method alongside `gcp` storage and asserts the gcp arm read the external provider.
 
@@ -81,7 +83,7 @@ registrar.add_secrets_provider(method="vault", factory=_make_vault_secrets_provi
 The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
 
 - **Import-light.** The plugin module must import no backend SDK at module load. The built-in `SecretsPlugin` needs none (the `env` provider reads environment variables); an out-of-tree `pipelex-secrets-vault` plugin must keep its `hvac`/`boto3`/etc. import *inside* the provider's methods (or its factory), never at module top-level, so discovery stays import-light even when the extra is installed.
-- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
+- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected. `pipelex doctor` resolves the backends' credentials through the provider the configuration selects, so a lookup that raises, whatever the exception, is reported in its Models row, scrubbed with the log redaction patterns, rather than stopping the report.
 
 ---
 
@@ -111,7 +113,7 @@ def _make_env_secrets_provider(config: SecretsProviderConfig) -> SecretsProvider
 
 ## Selecting a method by config
 
-`runtime.secrets.method` is an **open `str` token** (Decision S1), not a closed enum. The built-in uses `"env"`; an external `pipelex-secrets-<backend>` plugin registers its own (e.g. `"vault"`). A config naming an external method **parses fine** — the token is stored verbatim and its installability is validated later, at registry lookup:
+`runtime.secrets.method` is an **open `str` token**, not a closed enum. The built-in uses `"env"`; an external `pipelex-secrets-<backend>` plugin registers its own (e.g. `"vault"`). A config naming an external method **parses fine** — the token is stored verbatim and its installability is validated later, at registry lookup:
 
 ```toml
 # .pipelex/pipelex.toml
@@ -122,7 +124,7 @@ method = "vault"          # an out-of-tree provider — selected iff its plugin 
 Whether that token names an *installed* provider is validated at **registry lookup**, not at parse: an unknown method surfaces as `UnknownSecretsMethodError` at boot, which is the right layer — it lists the registered methods so the fix is obvious.
 
 !!! note "External-provider config surface is a scoped follow-up"
-    `SecretsProviderConfig` today carries only `method` — the built-in `env` backend needs no per-method sub-config. An out-of-tree `vault` provider has nowhere to read *its* structured config yet; a generic passthrough for external providers is a captured follow-up (Decision S4), not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file.
+    `SecretsProviderConfig` today carries only `method` — the built-in `env` backend needs no per-method sub-config. An out-of-tree `vault` provider has nowhere to read *its* structured config yet; a generic passthrough for external providers is a possible follow-up, not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file.
 
 ---
 
@@ -130,7 +132,7 @@ Whether that token names an *installed* provider is validated at **registry look
 
 | Condition | Error |
 |-----------|-------|
-| `runtime.secrets.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods) |
+| `runtime.secrets.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods), raised before any log sink exists, so it reaches stderr |
 | published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateSecretsProviderError` (names both plugins) |
 | `name` (`"secrets"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |

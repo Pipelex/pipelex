@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mistralai.utils import RetryConfig
+from mistralai.client.utils import RetryConfig
 
 from pipelex.providers.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.providers.google.google_factory import GoogleFactory

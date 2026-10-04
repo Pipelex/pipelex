@@ -25,6 +25,8 @@ _PIPE_KIND_EXTRA_FIELDS: dict[str, dict[str, Any]] = {
     "PipeExtract": {},
     "PipeSearch": {"prompt": "find it"},
     "PipeStructure": {},
+    "PipeDocGen": {"format": "pdf"},
+    "PipeJudge": {"question": "is it?"},
     "PipeBatch": {"branch_pipe_code": "sub_pipe", "input_list_name": "items", "input_item_name": "item"},
     "PipeCondition": {"default_outcome": "fallback_pipe", "outcomes": {"yes": "yes_pipe"}},
     "PipeParallel": {"branches": [{"pipe": "sub_pipe"}]},
@@ -282,6 +284,23 @@ class TestMthdsSchemaGeneration:
         table = _minimal_pipe_table(pipe_type)
         errors = sorted(validator.iter_errors(table), key=str)
         assert not errors, f"{pipe_type} table should match exactly one oneOf arm, got errors: {[e.message for e in errors]}"
+
+    @pytest.mark.parametrize(
+        ("question_fields", "should_validate"),
+        [
+            pytest.param({"question": "is it?"}, True, id="question"),
+            pytest.param({"prompt": "is it?"}, True, id="prompt-synonym"),
+            pytest.param({"question": "is it?", "prompt": "is it?"}, False, id="both"),
+            pytest.param({}, False, id="neither"),
+        ],
+    )
+    def test_pipe_judge_takes_its_question_or_the_prompt_synonym(
+        self, schema: dict[str, Any], question_fields: dict[str, Any], should_validate: bool
+    ) -> None:
+        """A PipeJudge writes its question as `question` or as `prompt`, exactly one, as its blueprint reads it."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {"type": "PipeJudge", "description": "A judge", "output": "YesNo", **question_fields}
+        assert validator.is_valid(table) is should_validate, f"{sorted(question_fields)} should {'' if should_validate else 'not '}validate"
 
     @pytest.mark.parametrize(
         ("size_value", "should_validate"),

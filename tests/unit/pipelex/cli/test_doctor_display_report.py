@@ -10,8 +10,11 @@ from rich.console import Console
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
+    PluginsCheck,
+    SecretsProviderCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     display_health_report,
@@ -62,6 +65,9 @@ def _healthy_report_kwargs() -> dict[str, Any]:
         "deck_healthy": True,
         "deck_message": "Deck is up to date with pipelex 1.2.0",
         "deck_report": CLEAN_DECK,
+        "internal_backend_healthy": True,
+        "internal_backend_message": "backends/internal.toml is up to date with pipelex 1.2.0",
+        "internal_backend_report": CLEAN_DECK,
         "config_location": PROJECT_LOCATION,
     }
 
@@ -94,6 +100,60 @@ class TestDoctorDisplayReport:
         assert "Models are valid" in output
         assert "Deck is up to date with pipelex 1.2.0" in output
         assert "Possible Solutions" not in output
+
+    def test_an_unregistered_log_sink_is_a_row_of_its_own_and_flags_the_report(self, console: Console) -> None:
+        """The report still renders, on the console sink, and says which token was set and which sinks exist."""
+        kwargs = _healthy_report_kwargs()
+        kwargs["log_sink_check"] = LogSinkCheck(is_healthy=False, message="No log sink is registered for 'jsn'; registered: console, json")
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Overall Status: ⚠️  Issues Found" in output
+        assert "Log Sink" in output
+        assert "No log sink is registered for 'jsn'" in output
+        assert "Set sink in [runtime.log]" in output
+
+    def test_without_a_runtime_setup_there_is_no_log_sink_row(self, console: Console) -> None:
+        display_health_report(**_healthy_report_kwargs())
+
+        assert "Log Sink" not in console.export_text()
+
+    def test_a_plugin_registry_that_did_not_build_is_a_row_of_its_own_and_flags_the_report(self, console: Console) -> None:
+        kwargs = _healthy_report_kwargs()
+        kwargs["plugins_check"] = PluginsCheck(is_healthy=False, message="The plugin registry did not build: Plugin 'storage' is required by core")
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Overall Status: ⚠️  Issues Found" in output
+        assert "Plugins" in output
+        assert "Plugin 'storage' is required by core" in output
+        assert "plugin named in the Plugins row" in output
+
+    def test_a_secrets_provider_that_did_not_build_is_a_row_of_its_own_and_flags_the_report(self, console: Console) -> None:
+        kwargs = _healthy_report_kwargs()
+        kwargs["secrets_provider_check"] = SecretsProviderCheck(
+            is_healthy=False, message="The secrets provider 'vault' could not be built: the vault did not answer"
+        )
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Overall Status: ⚠️  Issues Found" in output
+        assert "Secrets Provider" in output
+        assert "the vault did not answer" in output
+        assert "Set method in [runtime.secrets] to a registered secrets provider" in output
+
+    def test_without_a_runtime_setup_there_is_no_secrets_provider_row(self, console: Console) -> None:
+        display_health_report(**_healthy_report_kwargs())
+
+        assert "Secrets Provider" not in console.export_text()
+
+    def test_without_a_plugin_discovery_there_is_no_plugins_row(self, console: Console) -> None:
+        display_health_report(**_healthy_report_kwargs())
+
+        assert "Plugins" not in console.export_text()
 
     def test_global_location_rendered(self, console: Console) -> None:
         """Without a project .pipelex/, the global location line is rendered."""

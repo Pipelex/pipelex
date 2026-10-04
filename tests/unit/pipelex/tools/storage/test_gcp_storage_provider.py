@@ -43,7 +43,7 @@ class TestGcpStorageProvider:
         for test assertions.
         """
         # Import the module first so it can be patched
-        from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+        from google.cloud import storage  # type: ignore[import-untyped, attr-defined]  # ruff: ignore[import-outside-top-level]
 
         # Create mock objects
         mock_blob = mocker.MagicMock()
@@ -191,6 +191,18 @@ class TestGcpStorageProvider:
         expected_url = f"https://storage.googleapis.com/{gcp_bucket_name}/{key}"
         assert display == expected_url
 
+    async def test_public_url_percent_encodes_the_key_when_signed_urls_disabled(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        gcp_bucket_name: str,
+    ) -> None:
+        """A key holding a space, '+', '#' or '?' is percent-encoded as GCS signs it, so the link names the object and not a fragment or query."""
+        uri = f"{PIPELEX_STORAGE_SCHEME}org/uploads/My Photo+#1?.png"
+
+        display = await gcp_provider_no_signed_urls.public_url(uri=uri)
+
+        assert display == f"https://storage.googleapis.com/{gcp_bucket_name}/org/uploads/My%20Photo%2B%231%3F.png"
+
     async def test_public_url_returns_signed_url_when_signed_urls_enabled(
         self,
         gcp_provider_with_signed_urls: GcpStorageProvider,
@@ -267,3 +279,43 @@ class TestGcpStorageProvider:
 
         # Client should only be created once (lazy initialization)
         mock_gcp_storage["from_service_account_json"].assert_called_once()
+
+    async def test_load_head_downloads_a_byte_range(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        """A head read asks GCS for the first bytes only, through an inclusive end offset."""
+        mock_gcp_storage["blob"].download_as_bytes.return_value = b"%PDF-1.7"
+
+        head = await gcp_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf", nb_bytes=8192)
+
+        assert head == b"%PDF-1.7"
+        mock_gcp_storage["bucket"].blob.assert_called_with("test/file.pdf")
+        mock_gcp_storage["blob"].download_as_bytes.assert_called_once_with(start=0, end=8191)
+
+    async def test_load_head_of_an_empty_object_is_empty(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        """GCS answers a range over an empty object with 416, which is an empty head and not a failure."""
+        from google.api_core.exceptions import RequestRangeNotSatisfiable  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+
+        mock_gcp_storage["blob"].download_as_bytes.side_effect = RequestRangeNotSatisfiable("Requested range not satisfiable")
+
+        head = await gcp_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/empty.bin", nb_bytes=8192)
+
+        assert head == b""
+
+    async def test_load_head_of_a_missing_object_raises_not_found(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        from google.api_core.exceptions import NotFound  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+
+        mock_gcp_storage["blob"].download_as_bytes.side_effect = NotFound("Object not found")
+
+        with pytest.raises(StorageFileNotFoundError, match=r"missing/file\.pdf"):
+            await gcp_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf", nb_bytes=8192)

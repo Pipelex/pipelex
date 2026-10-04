@@ -162,7 +162,29 @@ This works only if the main_stuff is (or refines) a `NumberContent` concept.
 verdict = pipe_output.main_stuff_as_yes_no.yes_no  # a bool
 ```
 
-This works only if the main_stuff is (or refines) a `YesNoContent` concept.
+This works only if the main_stuff is (or refines) a `YesNoContent` concept. Its `probability` is `None` unless the producer reported one.
+
+**`main_stuff_as_choice`** - Returns `ChoiceContent` object:
+
+```python
+team = pipe_output.main_stuff_as_choice.choice  # the selected option's key
+```
+
+**`main_stuff_as_rating`** - Returns `RatingContent` object:
+
+```python
+severity = pipe_output.main_stuff_as_rating.level  # the selected level's index
+```
+
+Each works only if the main_stuff is (or refines) the matching verdict native.
+
+**`main_stuff_as_markdown`** - Returns `MarkdownContent` object:
+
+```python
+report = pipe_output.main_stuff_as_markdown.text  # the Markdown source
+```
+
+This works only if the main_stuff is (or refines) a `MarkdownContent` concept.
 
 **`main_stuff_as_html`** - Returns `HtmlContent` object:
 

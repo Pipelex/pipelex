@@ -1,17 +1,16 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
-from rich.console import Group
-from rich.markup import escape
-from rich.panel import Panel
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeLLMSpec(PipeSpec):
@@ -85,7 +84,13 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
         return value
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.markup import escape
+        from rich.panel import Panel
+        from rich.text import Text
+
         # Get base pipe information from parent
         base_group = super().rendered_pretty(title=title, depth=depth)
 

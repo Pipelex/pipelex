@@ -17,7 +17,8 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipe_run.exceptions import DryRunError
+from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity, scoped_caller_identity
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -27,11 +28,17 @@ from pipelex.system.telemetry.events import EventName, EventProperty
 _CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
 
 
+def _failing_refs(dry_run_error: DryRunError) -> list[str]:
+    """The ``domain.code`` refs of the pipes a ``DryRunError`` reports as failing, in order."""
+    return [f"{failure.domain_code}.{failure.pipe_code}" for failure in dry_run_error.failures]
+
+
 class TestBundleValidator:
     def _make_pipe(self, mocker: MockerFixture, *, code: str, pipe_ref: str, is_signature: bool = False):
         pipe = mocker.MagicMock()
         pipe.code = code
         pipe.pipe_ref = pipe_ref
+        pipe.domain_code = pipe_ref.rsplit(".", maxsplit=1)[0]
         pipe.is_signature = is_signature
         pipe.pipe_dependencies.return_value = set()
         pipe.validate_with_libraries.return_value = None
@@ -123,7 +130,7 @@ class TestBundleValidator:
 
         with pytest.raises(DryRunError) as exc_info:
             await validator.validate_pipes([pipe], library_id="lib-1")
-        assert "dom.allowed_pipe" in str(exc_info.value)
+        assert _failing_refs(exc_info.value) == ["dom.allowed_pipe"]
 
     @pytest.mark.asyncio
     async def test_unexpected_validation_error_raises_dry_run_error(self, mocker: MockerFixture) -> None:
@@ -141,7 +148,7 @@ class TestBundleValidator:
 
         with pytest.raises(DryRunError) as exc_info:
             await validator.validate_pipes([pipe], library_id="lib-1")
-        assert "dom.bad_pipe" in str(exc_info.value)
+        assert _failing_refs(exc_info.value) == ["dom.bad_pipe"]
 
     @pytest.mark.asyncio
     async def test_widening_non_dependency_error_does_not_abort_remaining_pipes(self, mocker: MockerFixture) -> None:
@@ -158,8 +165,7 @@ class TestBundleValidator:
 
         # The second pipe ran (no abort) — both were executed before the aggregate raise.
         assert pipe_run.run.call_count == 2
-        assert "dom.boom_pipe" in str(exc_info.value)
-        assert "dom.ok_pipe" not in str(exc_info.value)
+        assert _failing_refs(exc_info.value) == ["dom.boom_pipe"]
 
     @pytest.mark.asyncio
     async def test_collect_all_unexpected_failures_reported(self, mocker: MockerFixture) -> None:
@@ -172,9 +178,7 @@ class TestBundleValidator:
 
         with pytest.raises(DryRunError) as exc_info:
             await validator.validate_pipes([pipe_a, pipe_b], library_id="lib-1")
-        message = str(exc_info.value)
-        assert "dom.a_pipe" in message
-        assert "dom.b_pipe" in message
+        assert _failing_refs(exc_info.value) == ["dom.a_pipe", "dom.b_pipe"]
 
     @pytest.mark.asyncio
     async def test_strict_mode_excludes_signature_pipes_from_sweep(self, mocker: MockerFixture) -> None:
@@ -200,6 +204,23 @@ class TestBundleValidator:
 
         assert results["dom.sig_pipe"].status.is_success
         prepare_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_foreign_exception_located_by_the_router_propagates(self, mocker: MockerFixture) -> None:
+        """A programming bug a pipe raised, located by the router, is not recorded as the bundle's failure."""
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        unexpected_failure = make_unexpected_failure(error=KeyError("foo"))
+        located = PipeRouterError.make_located(
+            failure=unexpected_failure, run_mode=PipeRunMode.DRY, pipe_code="buggy_pipe", output_name=None, pipe_stack=["buggy_pipe"]
+        )
+        located.__cause__ = unexpected_failure
+        pipe_run.run = mocker.AsyncMock(side_effect=located)
+        pipe = self._make_pipe(mocker, code="buggy_pipe", pipe_ref="dom.buggy_pipe")
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert exc_info.value is located
 
     @pytest.mark.asyncio
     async def test_wiring_error_propagates(self, mocker: MockerFixture) -> None:

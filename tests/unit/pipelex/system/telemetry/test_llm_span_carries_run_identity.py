@@ -64,6 +64,7 @@ def _make_llm_job(*, extras: dict[str, str] | None = None) -> LLMJob:
             user_id="user-42",
             pipeline_run_id="run-1",
             storage_scope="tenant/run-1",
+            read_scope=None,
             extras=extras or {},
         ),
         pipe_code="some_pipe",
