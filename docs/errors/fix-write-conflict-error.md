@@ -7,7 +7,7 @@ description: "Reference for the `FixWriteConflictError` Pipelex error class."
 
 # Fix write conflict
 
-A bundle changed after autofix read it but before the atomic commit.
+A file changed after a fix or a migration read it but before the atomic commit.
 
 | Field | Value |
 |---|---|
@@ -15,7 +15,7 @@ A bundle changed after autofix read it but before the atomic commit.
 | `title` | Fix write conflict |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/fix-write-conflict-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.pipeline.exceptions` |
+| Defined in | `pipelex.fix_ops.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
 [Back to Error Reference](index.md)

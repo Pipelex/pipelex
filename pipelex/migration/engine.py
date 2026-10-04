@@ -10,7 +10,7 @@ that applied, rather than carried as a single long-lived DOM. That is not cautio
 measured requirement: tomlkit's position-preserving rename leaves the node's raw `dict` storage
 out of step with the body it renders from, so a later operation addressing the renamed key raises
 `KeyError` from deep inside the library (see
-`tests/unit/pipelex/pipeline/fixes/test_fix_applier_rename_dom_consistency.py`, which pins the
+`tests/unit/pipelex/fix_ops/test_fix_applier_rename_dom_consistency.py`, which pins the
 behaviour). Re-reading is exact — serialization is byte-faithful — and it costs a parse of a few
 hundred lines per *applied* operation, which under always-replay is almost never.
 
@@ -41,12 +41,12 @@ from collections.abc import Sequence
 import tomlkit
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.fix_ops.applier import FixOpApplication, apply_fix_ops
 from pipelex.migration.documents import document_carries_path, document_paths
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger
 from pipelex.migration.material import declared_path_spellings, spelling_after_replay, unsafe_op_variants
 from pipelex.migration.plan import BlockedEntry, BlockedEntryReason, MigrationStep
 from pipelex.migration.safety import MigrationSafety
-from pipelex.pipeline.fixes.applier import FixOpApplication, apply_fix_ops
 from pipelex.suggested_fix import MigrationOp
 
 

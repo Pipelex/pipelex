@@ -19,9 +19,9 @@ import pytest
 import tomlkit
 from tomlkit import TOMLDocument
 
+from pipelex.fix_ops.applier import FixOpOutcome, apply_fix_ops
 from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.ledger import load_ledger, packaged_migration_dir
-from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, SetKeyOp
 
 _KIT_TEMPLATE = Path("pipelex/kit/configs/pipelex.toml")
