@@ -256,7 +256,6 @@ from_pdf = [
   "mistral-ocr-2505",
   "mistral-ocr-2512",
   "mistral-document-ai-2505",
-  "azure-document-intelligence",
 ]
 
 # --- Image Extraction Models ---
@@ -267,7 +266,6 @@ from_image = [
   "mistral-ocr-2505",
   "mistral-ocr-2512",
   "deepseek-ocr",
-  "azure-document-intelligence",
 ]
 
 ################################################################################

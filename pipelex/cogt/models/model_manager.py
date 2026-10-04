@@ -86,7 +86,7 @@ class ModelManager(ModelManagerAbstract):
         # single copy, and by here logging is configured.
         if (stale_warning := self.inference_backend_library.take_stale_configuration_warning()) is not None:
             log.warning(stale_warning)
-        # The plugins' internal models join the internal backend before anything reads the library, so routing, the
+        # The plugins' internal models join the internal backend before anything reads the library, so routing
         # and the deck see them exactly as they see a model `internal.toml` declares.
         has_internal_backend = self.inference_backend_library.merge_plugin_internal_models(
             plugin_model_declarations=plugin_model_declarations,

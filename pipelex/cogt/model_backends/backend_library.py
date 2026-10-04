@@ -57,6 +57,9 @@ if TYPE_CHECKING:
 
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
 
+# A `backends.toml` key that named the remote-config section holding a backend's model specs.
+RETIRED_MODEL_SPECS_SECTION_KEY = "model_specs_section"
+
 
 class RecoveredModelSpecs(NamedTuple):
     """One backend's model specs rebuilt from a migrated file, and what the ledger did to get there."""
@@ -183,6 +186,18 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
             if not enabled and not include_disabled:
                 continue
+            if enabled and RETIRED_MODEL_SPECS_SECTION_KEY in backend_table:
+                # The key once pointed at specs the remote config served. Read as an extra key, it would
+                # boot the backend with whatever its own file lists — for a backend whose file was a
+                # comment-only template, nothing — and every model routed to it would go missing with no
+                # word on why. Fatal in both modes, like any document that is wrong.
+                msg = (
+                    f"Invalid inference backend '{backend_name}' in {library_paths_description}: "
+                    f"'{RETIRED_MODEL_SPECS_SECTION_KEY}' is no longer supported, because model specs are no longer "
+                    f"downloaded. List the backend's models in 'backends/{backend_name}.toml' and remove the key, "
+                    f"or disable the backend."
+                )
+                raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
             if runtime_manager.is_ci_testing and backend_name == "vertexai":
                 continue
             try:

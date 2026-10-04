@@ -363,13 +363,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # --- Pipelex Service and Telemetry --------------------------------------------------
-
         # --- Plugin discovery -----------------------------------------------------------------
         # Build the plugin registrar from the fully-resolved config (pure and import-light:
         # registering the built-ins imports no backend SDK, constructs no client, touches no hub).
-        # Built here — after the managed-gateway precondition gate above (so a first-run boot fails fast
-        # before any discovery work) and before the secrets provider and the log sink below, the first two
+        # Built here, before the secrets provider and the log sink below, the first two
         # capabilities resolved out of it: the built-in SecretsPlugin's factory (and any external
         # pipelex-secrets-<backend>) is looked up from the registrar-derived SecretsProviderRegistry, then
         # the sink from the LogSinkRegistry. The other registries

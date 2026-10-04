@@ -310,15 +310,17 @@ In `.pipelex/inference/routing_profiles.toml`:
 active = "hybrid"
 
 [profiles.hybrid]
-description = "Use Anthropic for most models, other providers for specific ones"
+description = "Claude on Anthropic, GPT on OpenAI, FLUX on fal"
 default = "anthropic"
 
 [profiles.hybrid.routes]
-# Use your own OpenAI key for GPT models
+# Use your own OpenAI key for GPT models and OpenAI image generation
 "gpt-*" = "openai"
 # Use your own FAL key for image generation (direct billing)
 "flux-*" = "fal"
 ```
+
+The `default` backend only serves the models it declares: Anthropic serves Claude models and nothing else, so a model with no route here that Anthropic does not serve, such as a Gemini or Mistral model, is left out of the deck. Give every model family you use a route, or list your backends in a `fallback_order` as the shipped `all_enabled_backends` profile does, so each model goes to the first enabled backend that serves it.
 
 ### Routing System Features
 
