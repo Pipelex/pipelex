@@ -1,0 +1,21 @@
+{
+  "parcel": {
+    "concept": "native.Text",
+    "content": {
+      "text": "A carton of glassware, delivered with one corner caved in."
+    }
+  },
+  "damage": {
+    "concept": "native.Rating",
+    "content": {
+      "level": 1,
+      "confidence": 0.64,
+      "probabilities": {
+        "0": 0.12,
+        "1": 0.71,
+        "2": 0.17
+      },
+      "position": 1.05
+    }
+  }
+}

@@ -1,0 +1,16 @@
+domain      = "damage_report"
+description = "Writing a claim note from how badly a parcel was damaged"
+main_pipe   = "write_claim_note"
+
+[pipe.write_claim_note]
+type = "PipeLLM"
+description = "Writes a claim note from the damage level a rating verdict placed the parcel at"
+inputs = { damage = "Rating", parcel = "Text" }
+output = "Text"
+prompt = """
+The parcel below was rated at damage level $damage, on a scale where 0 is intact, 1 is scuffed and 2 is crushed.
+
+$parcel
+
+Write a two-line claim note for the carrier.
+"""

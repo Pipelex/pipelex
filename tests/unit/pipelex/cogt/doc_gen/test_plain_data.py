@@ -2,12 +2,15 @@ import datetime
 from enum import StrEnum
 
 from pipelex.cogt.doc_gen.plain_data import plain_data
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
 class _Color(StrEnum):
@@ -38,3 +41,8 @@ class TestPlainData:
         assert plain_data(DateContent(date=datetime.date(2026, 9, 30))) == datetime.date(2026, 9, 30)
         with_time = DateContent(date=datetime.date(2026, 9, 30), time=datetime.time(9, 30))
         assert plain_data(with_time) == datetime.datetime(2026, 9, 30, 9, 30)
+
+    def test_a_verdict_is_its_verdict(self) -> None:
+        assert plain_data(YesNoContent(yes_no=True, probability=0.9)) is True
+        assert plain_data(ChoiceContent(choice="billing", confidence=0.7)) == "billing"
+        assert plain_data(RatingContent(level=2, position=1.8)) == 2

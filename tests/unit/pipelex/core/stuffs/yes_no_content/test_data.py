@@ -6,9 +6,9 @@ class TestData:
     SAMPLE_TRUE = True
     SAMPLE_FALSE = False
 
-    # Expected outputs for smart_dump
-    EXPECTED_SMART_DUMP_TRUE: ClassVar[dict[str, Any]] = {"yes_no": True}
-    EXPECTED_SMART_DUMP_FALSE: ClassVar[dict[str, Any]] = {"yes_no": False}
+    # Expected outputs for smart_dump: an unreported probability is written null, as an absent `Date.time` is
+    EXPECTED_SMART_DUMP_TRUE: ClassVar[dict[str, Any]] = {"yes_no": True, "probability": None}
+    EXPECTED_SMART_DUMP_FALSE: ClassVar[dict[str, Any]] = {"yes_no": False, "probability": None}
 
     # Expected outputs for render methods
     EXPECTED_RENDERED_PLAIN_TRUE = "yes"

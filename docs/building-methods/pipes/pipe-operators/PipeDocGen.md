@@ -23,6 +23,7 @@ With no template, the step lays its inputs out by itself, which is called the au
 - a `Text` input prints as paragraphs, and a [`Markdown`](../../concepts/native-concepts.md) input prints formatted, with its headings, emphasis, lists, tables, code blocks and links;
 - an `Html` input prints as its text with the tags removed, since the auto-layout does not interpret HTML, a table row on one line with its cells separated by `|`;
 - an `Image` prints as a picture, with its caption;
+- a verdict prints as its verdict alone, like any scalar: a `YesNo` as its answer, a `Choice` as its option key and a `Rating` as its level, without the probability or confidence a producer reported;
 - a list of images, of `Markdown` texts or of other native values prints item by item, each as it would print alone.
 
 A single input is the document itself: an invoice's fields fill the page. Several inputs each get a section, in the order the step declares them. Every page carries the document's title in a running header and "Page N of M" in its footer, on A4 portrait, in a font bundled with Pipelex so that a PDF looks the same on every machine.
@@ -118,7 +119,7 @@ A `pdf` step's `template`, or its `.html` `template_file`, is rendered with exac
 
 ### Office template files
 
-An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
+An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. In plain data a native value is its value, and a verdict is its verdict: a `YesNo` is its boolean, a `Choice` its option key and a `Rating` its level, so the file reads `team` rather than `team.choice`, and a verdict's probability or confidence does not reach it. A `pdf` template reads the verdict whole, `team.choice` and `team.confidence` included, as a `PipeCompose` template does. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
 
 A template file is found beside the bundle, so it works for a bundle loaded from a directory, a dependency package's included. A bundle loaded from a string, as the hosted API does, cannot name one: the step is refused at load. An inline `template` works on every load path.
 

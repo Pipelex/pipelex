@@ -119,3 +119,15 @@ description = "OUTPUT_pipe_output_native_image: a file-bearing output, whose con
 inputs      = { subject = "Text" }
 output      = "Image"
 prompt      = "$subject"
+
+# A verdict output. Where a producer reports a `native.YesNo`, the descriptor states it as an
+# object carrying `yes_no` and the optional `probability`, the reading the input side does not take.
+[pipe.output_native_yes_no]
+type = "PipeLLM"
+description = "OUTPUT_pipe_output_native_yes_no: a verdict output, an object where a slot is a bare boolean"
+inputs = { note = "Text" }
+output = "YesNo"
+prompt = """
+OUTPUT_prompt_output_native_yes_no
+@note
+"""

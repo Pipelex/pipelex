@@ -97,6 +97,15 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
         WrongScalarKindError,
         "wrap the whole list in one",
     ),
+    # A bare value the bottom-up fallback builds as another concept is refused, never kept as that concept:
+    # a bare string at a `Choice` slot used to become a `Text` stuff, and a `PipeCondition` routing on
+    # `team.choice` then met a text with no `choice` to read.
+    ("choice-bare-string", "native.Choice", None, "billing", StructureValidationError, "which reads as 'native.Text'"),
+    ("rating-bare-string", "native.Rating", None, "two", StructureValidationError, "which reads as 'native.Text'"),
+    ("html-bare-string", "native.Html", None, "<p>hi</p>", StructureValidationError, "which reads as 'native.Text'"),
+    ("search-result-bare-string-list", "native.SearchResult", True, ["a", "b"], StructureValidationError, "which reads as 'native.Text'"),
+    # The input side reads `YesNo` as a bare boolean: its object form, probability included, needs the envelope.
+    ("yes-no-object", "native.YesNo", None, {"yes_no": True, "probability": 0.9}, WrongScalarKindError, "expects a boolean"),
     # D6 an explicit envelope naming an incompatible concept.
     (
         "explicit-incompatible",

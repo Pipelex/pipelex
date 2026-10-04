@@ -14,7 +14,7 @@ standard's page itself, read live from the sibling `mthds/` checkout (the `MTHDS
 conformance` CI workflow runs it against a fresh checkout on every pull request), so the day the
 standard moves a definition, this repo goes red instead of a downstream port.
 
-The set below is the one the standard pinned at MTHDS 2.0.0, named by
+The set below is the one the standard pinned at MTHDS 3.0.0, named by
 `PINNED_NATIVES_MTHDS_VERSION`. Version-keyed lookup can come when a second pinned set exists;
 until then an implementation of standard version `V` materializes the greatest pinned set not
 above `V`, and this is the only one there is.
@@ -32,7 +32,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 # is the latest release of the standard. `tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py`
 # holds this value to the page; `test_pinned_natives_version.py` beside it holds it to the standard
 # version this engine implements, which is the reading that needs no sibling checkout.
-PINNED_NATIVES_MTHDS_VERSION = "2.0.0"
+PINNED_NATIVES_MTHDS_VERSION = "3.0.0"
 
 
 def make_pinned_native_blueprint(native_code: NativeConceptCode) -> ConceptBlueprint:
@@ -64,6 +64,10 @@ def _pinned_description(native_code: NativeConceptCode) -> str:
             return "A number"
         case NativeConceptCode.YES_NO:
             return "The answer to a yes/no question"
+        case NativeConceptCode.CHOICE:
+            return "One option picked out of a declared set"
+        case NativeConceptCode.RATING:
+            return "A position on an ordered scale of described levels"
         case NativeConceptCode.DATE:
             return "A calendar date, optionally with a time of day — as precise as its source states."
         case NativeConceptCode.TIME:
@@ -149,6 +153,32 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
                 "yes_no": ConceptStructureBlueprint(
                     description="Whether the answer is yes (true) or no (false).", type=ConceptStructureBlueprintFieldType.BOOLEAN, required=True
                 ),
+                "probability": _number_field(
+                    description="The probability that the answer is yes, from 0 to 1, when the producer reports one.",
+                ),
+            }
+        case NativeConceptCode.CHOICE:
+            return {
+                "choice": _text_field(description="The key of the selected option.", required=True),
+                "confidence": _number_field(description="The producer's confidence in the choice, from 0 to 1, when it reports one."),
+                "probabilities": _number_dict_field(
+                    description="The probability of each option, keyed by option key, when the producer measures a distribution.",
+                ),
+            }
+        case NativeConceptCode.RATING:
+            return {
+                "level": ConceptStructureBlueprint(
+                    description="The index of the selected level, 0 being the first level declared.",
+                    type=ConceptStructureBlueprintFieldType.INTEGER,
+                    required=True,
+                ),
+                "confidence": _number_field(description="The producer's confidence in the level, from 0 to 1, when it reports one."),
+                "probabilities": _number_dict_field(
+                    description="The probability of each level, keyed by level index written as text, when the producer measures a distribution.",
+                ),
+                "position": _number_field(
+                    description="A continuous position on the scale, from 0 to the index of the last level, when the producer measures one.",
+                ),
             }
         case NativeConceptCode.DATE:
             return {
@@ -213,3 +243,16 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
 
 def _text_field(*, description: str, required: bool = False) -> ConceptStructureBlueprint:
     return ConceptStructureBlueprint(description=description, type=ConceptStructureBlueprintFieldType.TEXT, required=required)
+
+
+def _number_field(*, description: str) -> ConceptStructureBlueprint:
+    return ConceptStructureBlueprint(description=description, type=ConceptStructureBlueprintFieldType.NUMBER)
+
+
+def _number_dict_field(*, description: str) -> ConceptStructureBlueprint:
+    return ConceptStructureBlueprint(
+        description=description,
+        type=ConceptStructureBlueprintFieldType.DICT,
+        key_type="text",
+        value_type=ConceptStructureBlueprintFieldType.NUMBER.value,
+    )

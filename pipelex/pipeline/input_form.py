@@ -40,6 +40,7 @@ registry, and bundle-defined classes are only reliably current while their libra
 """
 
 from collections.abc import Mapping, Sequence
+from enum import StrEnum
 from typing import Any, get_origin
 
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
@@ -171,7 +172,7 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, qualified_crate: Qualifie
         `pipe_ref` → `PipeInputFormDescriptor` for every given pipe.
     """
     qualified = qualified_crate if qualified_crate is not None else qualify_current_library_crate()
-    deriver = InputFormDeriver(concepts=qualified.concepts)
+    deriver = InputFormDeriver(concepts=qualified.concepts, position=FormPosition.INPUT)
     input_form: InputForm = {}
     for pipe in pipes:
         # Slot hints come from the qualified blueprint, not the runtime spec: `StuffSpec` stays
@@ -191,9 +192,11 @@ def build_output_form(pipes: Sequence[PipeAbstract], *, qualified_crate: Qualifi
     """Derive the `output_form` descriptors of loaded pipes — what each pipe RESOLVES TO, described.
 
     The twin of `build_input_form`, iterating the same pipes in the same order so all three
-    validate artifacts share one key set, and reusing the same deriver: an output is a concept ref
-    exactly like an input is, so its kinds, its nesting and its constraints are the same questions
-    with the same answers. `derive_concept` is the entry point that describes a concept on its own,
+    validate artifacts share one key set, and reusing the same derivation told its position: an
+    output is a concept ref exactly like an input is, so its kinds, its nesting and its constraints
+    are the same questions with the same answers, except for `YesNo`, which the output position
+    states as an `object` carrying its probability where the input position takes the bare boolean.
+    `derive_concept` is the entry point that describes a concept on its own,
     which is precisely what an output is — a node belonging to no slot. It is not a new code path
     either: it is what runs for every nested concept field of every input.
 
@@ -224,7 +227,7 @@ def build_output_form(pipes: Sequence[PipeAbstract], *, qualified_crate: Qualifi
         `pipe_ref` → `PipeOutputFormDescriptor` for every given pipe.
     """
     qualified = qualified_crate if qualified_crate is not None else qualify_current_library_crate()
-    deriver = InputFormDeriver(concepts=qualified.concepts)
+    deriver = InputFormDeriver(concepts=qualified.concepts, position=FormPosition.OUTPUT)
     output_form: OutputForm = {}
     for pipe in pipes:
         node = deriver.derive_concept(name=_OUTPUT_NODE_NAME, concept_ref=pipe.output.concept.concept_ref)
@@ -260,11 +263,27 @@ def _slot_hints_of(slot_value: "str | InputSlotBlueprint | None") -> dict[str, s
     return slot_value.hints if isinstance(slot_value, InputSlotBlueprint) else None
 
 
+class FormPosition(StrEnum):
+    """Which side of a pipe a deriver describes.
+
+    The standard reads one native differently by position: a caller supplies a `YesNo` as its bare
+    verdict, so the input-form descriptor states it as a `boolean`, while a producer may report a
+    probability beside the verdict, so the output-form descriptor states it as an `object` carrying
+    `yes_no` and `probability`, at every depth of an output node. It is one derivation reading a
+    different row of the native table, never a second derivation, and `YesNo` is the only native
+    whose row differs.
+    """
+
+    INPUT = "input"
+    OUTPUT = "output"
+
+
 class InputFormDeriver:
     """Derives field descriptors over one qualified crate's concepts (`QualifiedCrateContent.concepts`)."""
 
-    def __init__(self, *, concepts: dict[str, ConceptBlueprint | str]) -> None:
+    def __init__(self, *, concepts: dict[str, ConceptBlueprint | str], position: FormPosition) -> None:
         self._concepts = concepts
+        self._position = position
 
     # ---- Pipe slots -------------------------------------------------------------------------------
 
@@ -398,7 +417,13 @@ class InputFormDeriver:
             case NativeConceptCode.NUMBER:
                 return NumberField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, integer=False)
             case NativeConceptCode.YES_NO:
-                return BooleanField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
+                match self._position:
+                    case FormPosition.INPUT:
+                        # A caller supplies the verdict alone, so the slot is the bare boolean.
+                        return BooleanField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
+                    case FormPosition.OUTPUT:
+                        # A producer may report a probability beside the verdict: the pinned object.
+                        return self._pinned_object_node(name=name, node_ref=node_ref, refines=refines, description=text, pinned=pinned, seen=seen)
             case NativeConceptCode.TIME:
                 return TextField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, format="time")
             case NativeConceptCode.DOCUMENT:
@@ -406,22 +431,16 @@ class InputFormDeriver:
             case NativeConceptCode.IMAGE:
                 return ImageField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
             case (
-                NativeConceptCode.DATE
+                NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
+                | NativeConceptCode.DATE
                 | NativeConceptCode.HTML
                 | NativeConceptCode.JSON
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.SEARCH_RESULT
             ):
-                pinned_structure = pinned.structure if isinstance(pinned.structure, dict) else {}
-                return ObjectField(
-                    name=name,
-                    concept_ref=node_ref,
-                    refines=refines,
-                    description=text,
-                    required=True,
-                    fields=[self._structure_field(name=field_name, field=field, seen=seen) for field_name, field in pinned_structure.items()],
-                )
+                return self._pinned_object_node(name=name, node_ref=node_ref, refines=refines, description=text, pinned=pinned, seen=seen)
             case NativeConceptCode.DYNAMIC | NativeConceptCode.ANYTHING | NativeConceptCode.COMPOSITE:
                 # The three natives that declare no pinned structure: `_pinned_structure` returns
                 # None for exactly these, so there is no authored shape to expand and `unknown` states
@@ -431,6 +450,20 @@ class InputFormDeriver:
                 # until its pinned `json_obj` was noticed, and a template describing it as unknown
                 # rendered `{}`, which `JSONContent` then refused.
                 return UnknownField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
+
+    def _pinned_object_node(
+        self, *, name: str, node_ref: str, refines: list[str] | None, description: str, pinned: ConceptBlueprint, seen: frozenset[str]
+    ) -> InputFormField:
+        """A native stated as an `object` over its pinned structure's fields."""
+        pinned_structure = pinned.structure if isinstance(pinned.structure, dict) else {}
+        return ObjectField(
+            name=name,
+            concept_ref=node_ref,
+            refines=refines,
+            description=description,
+            required=True,
+            fields=[self._structure_field(name=field_name, field=field, seen=seen) for field_name, field in pinned_structure.items()],
+        )
 
     def _class_backed_node(
         self,

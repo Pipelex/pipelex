@@ -41,6 +41,12 @@ code = "Number"
 [native.yes_no]
 code = "YesNo"
 
+[native.choice]
+code = "Choice"
+
+[native.rating]
+code = "Rating"
+
 [native.date]
 code = "Date"
 

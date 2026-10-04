@@ -63,7 +63,9 @@ def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
     Mirrors the deriver's `_class_backed_node` lookup: `TextContent` is the native Text payload and
     `MarkdownContent` the native Markdown one, which refines Text (both text-valued, both `prose` in the
     descriptor), `NumberContent` the native Number payload (number-valued). Every other class — the
-    remaining natives and registered project classes alike — is not a hint-applicable site.
+    remaining natives and registered project classes alike — is not a hint-applicable site. The verdict
+    natives `YesNo`, `Choice` and `Rating` are structured sites where no intent word applies, `Rating`
+    included despite its number-valued level.
     One divergence is open (L-260930-173b03): the deriver reflects a registered `RootModel` over a
     scalar as its root value, which this lookup still classifies as OTHER.
     """
@@ -80,6 +82,8 @@ def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
             | NativeConceptCode.HTML
             | NativeConceptCode.TEXT_AND_IMAGES
             | NativeConceptCode.YES_NO
+            | NativeConceptCode.CHOICE
+            | NativeConceptCode.RATING
             | NativeConceptCode.DATE
             | NativeConceptCode.TIME
             | NativeConceptCode.PAGE

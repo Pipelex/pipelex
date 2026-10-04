@@ -2892,6 +2892,10 @@ rationale = "Memory getter keyed by the stuff name; single operand."
 param = "name"
 rationale = "Memory getter keyed by the stuff name; content type stays keyword."
 
+["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_choice"]
+param = "name"
+rationale = "Entity-keyed getter on working memory."
+
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_date"]
 param = "name"
 rationale = "Entity-keyed getter on working memory."
@@ -2919,6 +2923,10 @@ rationale = "Memory getter keyed by the stuff name; single operand."
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_number"]
 param = "name"
 rationale = "Memory getter keyed by the stuff name; single operand."
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_rating"]
+param = "name"
+rationale = "Entity-keyed getter on working memory."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_str"]
 param = "name"
