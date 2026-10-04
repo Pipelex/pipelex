@@ -4630,9 +4630,9 @@ components:
             minLength: 1
           - type: 'null'
           title: Pipe Ref
-          description: Qualified pipe ref (`domain.pipe_code`) to project. Optional — defaults to the fetched package manifest's
+          description: Qualified pipe ref (`domain.pipe_code`) to select. Optional — defaults to the fetched package manifest's
             `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, or
-            several, with no manifest `main_pipe` to settle it, requires it explicitly.
+            several, with no manifest `main_pipe` to settle it, requires it unless `all_pipes` is set.
         all_pipes:
           type: boolean
           title: All Pipes

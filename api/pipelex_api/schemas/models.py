@@ -576,8 +576,10 @@ class MthdsPipeRequest(MthdsFilesRequest):
     `method_ref` request, to the fetched package manifest's `main_pipe` (the package author's declared
     entry pipe); otherwise to the closure's declared `main_pipe`, which is what a single-bundle caller
     almost always wants. A closure that declares no `main_pipe` — or several, across domains — cannot
-    be defaulted from its own declarations, so an omitted selector is a request-shape 422 there when
-    no manifest `main_pipe` settles it (the same two arms the CLI rejects on).
+    be defaulted from its own declarations, so when no manifest `main_pipe` settles it a route that
+    needs one pipe refuses the omitted selector with an input 422, `EntryPipeNotFoundError` or
+    `EntryPipeAmbiguousError` (`crate_ops.resolve_requested_pipe`), never the request-shape
+    `ValidationError` of a malformed body.
     """
 
     pipe_ref: str | None = Field(
@@ -585,9 +587,9 @@ class MthdsPipeRequest(MthdsFilesRequest):
         min_length=1,
         max_length=MAX_PIPE_CODE_LEN,
         description=(
-            "Qualified pipe ref (`domain.pipe_code`) to project. Optional — defaults to the fetched package manifest's "
+            "Qualified pipe ref (`domain.pipe_code`) to select. Optional — defaults to the fetched package manifest's "
             "`main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, "
-            "or several, with no manifest `main_pipe` to settle it, requires it explicitly."
+            "or several, with no manifest `main_pipe` to settle it, requires it unless `all_pipes` is set."
         ),
     )
 

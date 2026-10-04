@@ -382,9 +382,10 @@ class TestPipeIoRoute:
         _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
 
     def test_a_bare_pipe_code_resolves_but_is_answered_qualified(self):
-        # The engine's entry lookup accepts a bare code, falling back across domains. The valid arm
-        # promises a qualified ref, so the answer is read off the resolved pipe, never echoed from
-        # the request's own bare spelling.
+        # The engine's entry lookup still accepts a bare request code, falling back across domains, until
+        # `resolve_requested_pipe` refuses one as the pipe-selector ruling asks; that change flips this
+        # test. Meanwhile the valid arm promises a qualified ref, so the answer is read off the resolved
+        # pipe, never echoed from the request's own bare spelling.
         client = _build_client()
         body = _valid_arm(client, {"files": _files(VALID_MTHDS, SIBLING_MTHDS), "pipe_ref": "wrap_echo"})
         assert body["pipe_ref"] == "smoke.wrap_echo"
