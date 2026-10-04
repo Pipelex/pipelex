@@ -28,12 +28,12 @@ class PipeJudgeInputCapabilityError(PipeJudgeError):
         self.model_name = model_name
         self.model_inputs = model_inputs
         message = (
-            f"PipeJudge '{pipe_code}' judges input '{input_name}', which is {_with_article(file_kind)}, and its judgment model "
+            f"PipeJudge '{pipe_code}' judges input '{input_name}', which is {_with_article(noun=file_kind)}, and its judgment model "
             f"'{model_name}' does not read {file_kind}s: it reads {', '.join(model_inputs)}. Name a judgment model that reads "
             f"{file_kind}s, or turn the {file_kind} into text with a step before this one."
         )
         super().__init__(message)
 
 
-def _with_article(noun: str) -> str:
+def _with_article(*, noun: str) -> str:
     return f"an {noun}" if noun[0] in "aeiou" else f"a {noun}"

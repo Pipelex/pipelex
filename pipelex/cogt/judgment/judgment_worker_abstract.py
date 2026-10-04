@@ -66,7 +66,7 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
 
         return answers
 
-    def _check_can_read_files(self, judgment_job: JudgmentJob) -> None:
+    def _check_can_read_files(self, *, judgment_job: JudgmentJob) -> None:
         """Refuse a job carrying files the model does not read, before the backend is called.
 
         The model's spec states what it reads in `inputs`, in the LLM vocabulary: `images` for vision,

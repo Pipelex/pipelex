@@ -131,7 +131,7 @@ So a pipe with `templating_style = "no_tag"` and one with `$article` instead of 
 ## Beyond PipeLLM
 
 - **[`PipeCompose`](pipes/pipe-operators/PipeCompose.md)** takes `templating_style` on its `[pipe.name.template]` section, for templates that use the `tag` or `format` filters directly. A compose pipe that declares nothing renders under the same runtime default.
-- **`PipeImgGen` and `PipeSearch`** have no authored style of their own — their prompts render under the runtime default. Image and search prompts rarely benefit from tagging, but they do render under a real style rather than an invisible fallback.
+- **`PipeImgGen`, `PipeSearch` and `PipeJudge`** have no authored style of their own — their prompts and questions render under the runtime default. Image and search prompts rarely benefit from tagging, but they do render under a real style rather than an invisible fallback.
 - **Construct-mode template fields** and the built-in structuring prompts likewise resolve a real style, so a template of yours that uses `| tag` behaves the same everywhere.
 
 !!! warning "A style is always required, and never invented"

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:ad09974548259c9bd0b110aaabf7a1c052d58dde77601936940d6e5f499d55e9"
+digest = "sha256:cadd09e33b7f32258183fed5533b8ca706a3254088eb806016991feef15abb4b"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-03T15:51:48Z"
-rationale = "clean-pass: the models --type help now names judgment beside the other categories; docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md never list the --type values, they point at pipelex-agent models -t <type>, so nothing there went stale."
+reviewed_at = "2026-10-04T00:24:06Z"
+rationale = "clean-pass: pipe_cmd.py gains the PipeJudge emission branch writing question, model, options, levels, criteria and threshold; docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md describe the pipe command without listing pipe types or their fields, so nothing there went stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -35,7 +35,7 @@ rationale = "clean-pass: the models --type help now names judgment beside the ot
 "pipelex/cli/agent_cli/commands/lint_cmd.py" = "blob:91ad9cb4d618ba4c0b7da366cde2f74f38d350df"
 "pipelex/cli/agent_cli/commands/migrate_cmd.py" = "blob:ce733b78df03e65c3c8a10d46b27b57c05ec054c"
 "pipelex/cli/agent_cli/commands/models_cmd.py" = "blob:5678c00ab389b0a433c080be3454c7905e569308"
-"pipelex/cli/agent_cli/commands/pipe_cmd.py" = "blob:9bf0480fcd1164ec1120b2514724fc0f5fefd30e"
+"pipelex/cli/agent_cli/commands/pipe_cmd.py" = "blob:b040d1f71b1f3e0a1e2d6c03e8fc9929431e01de"
 "pipelex/cli/agent_cli/commands/plxt_passthrough.py" = "blob:a1c530d110482485ce462f199b9e79fac29f8896"
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:40ed1700e0d5e86d7696eadd7f9887baeb8059f6"
