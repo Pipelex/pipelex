@@ -12,7 +12,7 @@ Most of the list is enforced by the type checker: the matches over the family en
 
 1. **The family's package**, `pipelex/cogt/<family>/`, mirroring `pipelex/cogt/search/`: the question/request and answer models, the setting and its model-choice union, the job, the job factory, the usage report, the worker contract (`<Family>WorkerAbstract` with one template method and one abstract hook) and the worker factory, which resolves its worker through the inference-backend registry and holds no `match` over SDK strings.
 
-2. **The family enums, together.** `InferenceFamily` in `pipelex/plugins/inference_backend_registry.py`, `ModelType` in `pipelex/cogt/model_backends/model_type.py`, `InferenceErrorFamily` in `pipelex/cogt/inference/error_render.py` with an entry in both its failure-class and not-found-class tables, and `ModelCategory` in `pipelex/builder/operations/models_ops.py`, which is what `pipelex-agent models` and `check-model` list from.
+2. **The family enums, together.** `InferenceFamily` in `pipelex/plugins/inference_backend_registry.py`, `ModelType` in `pipelex/cogt/model_backends/model_type.py`, `InferenceErrorFamily` in `pipelex/cogt/inference/error_render.py` with an entry in both its failure-class and not-found-class tables, and `ModelCategory` in `pipelex/cogt/models/model_listing.py`, which is what `pipelex-agent models` and `check-model` list from.
 
 3. **The error classes** in `pipelex/cogt/exceptions.py`: a job failure, a model-not-found (subclassing `ModelNotFoundError`) and a handle-not-found. Then regenerate the error pages and the identity snapshot (`make gep`, `make gei`); the snapshot test fails until you do.
 

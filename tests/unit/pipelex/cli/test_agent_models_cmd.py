@@ -9,13 +9,13 @@ if TYPE_CHECKING:
     import pytest
     from pytest_mock import MockerFixture
 
-from pipelex.builder.operations.models_ops import ModelCategory
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_listing import ModelCategory
 
 CMD_MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
-OPS_MODULE_PATH = "pipelex.builder.operations.models_ops"
+OPS_MODULE_PATH = "pipelex.cogt.models.model_listing"
 
 
 class _FakeSetting:

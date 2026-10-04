@@ -46,8 +46,6 @@ class PipeValidationErrorType(StrEnum):
     INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
     INADEQUATE_OUTPUT_MULTIPLICITY = "inadequate_output_multiplicity"
 
-    CIRCULAR_DEPENDENCY_ERROR = "circular_dependency_error"
-
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
     UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
@@ -117,7 +115,6 @@ class PipeValidationErrorType(StrEnum):
             case (
                 PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -149,7 +146,6 @@ class PipeValidationErrorType(StrEnum):
                 PipeValidationErrorType.MISSING_INPUT_VARIABLE
                 | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -188,7 +184,6 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -222,7 +217,6 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -260,7 +254,6 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
@@ -293,7 +286,6 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE

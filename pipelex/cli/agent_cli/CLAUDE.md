@@ -11,7 +11,7 @@ Two independent options control the two output streams:
 
 Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
 
-`concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` are **always JSON / raw passthrough** — they have neither `--format` nor `--error-format`. Their errors keep flowing through the ContextVar's JSON default.
+`fmt`, `lint`, `accept-gateway-terms` are **always JSON / raw passthrough** — they have neither `--format` nor `--error-format`. Their errors keep flowing through the ContextVar's JSON default.
 
 `inputs` is a deliberate deviation: its `--format` takes `json|toml` (an `InputsTemplateFormat`, NOT the `markdown|json` `CliOutputFormat` pair) because it selects the **template serialization**, not a presentation style. `json` (default) keeps the structured success envelope; `toml` prints the raw TOML template to stdout, in the same spirit as the `concept`/`pipe` raw-TOML passthrough. A pipe with no inputs prints a TOML comment line in `toml` mode (valid TOML, loads back as an empty dict). `inputs` still has no `--error-format` — its errors keep flowing through the ContextVar's JSON default.
 
@@ -72,8 +72,6 @@ commands/
   fmt_cmd.py                   # fmt — format file via plxt passthrough
   lint_cmd.py                  # lint — lint file via plxt passthrough
   plxt_passthrough.py          # Shared helper for plxt subprocess delegation
-  concept_cmd.py               # concept — JSON spec → raw TOML to stdout
-  pipe_cmd.py                  # pipe — JSON spec → raw TOML to stdout
   models_cmd.py                # models — list presets, aliases, waterfalls
   check_model_cmd.py           # check-model — validate model reference with fuzzy suggestions
   init_cmd.py                  # init — non-interactive config setup (--global/-g, --config/-c)
@@ -92,8 +90,6 @@ commands/
 | `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
 | `inputs` | Generates an example inputs template for a pipe/bundle/method (pipe\|bundle\|method subcommands). `--format json\|toml` (template serialization, default: json — NOT the markdown\|json pair); `toml` prints raw TOML to stdout |
 | `codegen` | Agent mirror of the bare `pipelex codegen` family (types\|check subcommands). `types --target <flavor>` resolves the closure into the normalized crate and writes stamped typed artifacts + `codegen.lock` (write-if-changed); `check` is the offline drift check (pure hashing, no Pipelex boot — exit 0 current, 1 drift as a structured `CodegenDriftError` with `drifts[]`, 2 no/unreadable lock). Both: `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
-| `concept` | Converts a JSON concept spec into raw TOML (stdout) |
-| `pipe` | Converts a JSON pipe spec into raw TOML (stdout). A spec with a `type` (via `--type` or a `type` key) is that concrete pipe; a **typeless** spec (no `type`) is a signature and renders a `[pipe.x]` section with no type line. An explicit `type = "PipeSignature"` is rejected with a migration error — `PipeSignature` is not a type. |
 | `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `check-model` | Validates a model reference and suggests alternatives if invalid. `--type`/`-t` for model category, `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `migrate` | Migrates this machine's configuration files (global `~/.pipelex/` and project `.pipelex/`, non-recursively) to the current schema by replaying each surface's ledger. Does **not** boot — it is the command for a configuration that cannot load. Writes only with `--yes`; `--dry-run` plans and is the default; the two together are refused with exit 2. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json`. The verdict is the structured `needs_attention`, not the exit code. |

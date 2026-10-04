@@ -28,98 +28,6 @@ rationale = "Conversion: maps the error domain to a status; single operand."
 param = "exc"
 rationale = "Verb-object: iterates the exception's cause chain; single operand."
 
-["pipelex/builder/concept/concept_spec.py::ConceptSpec._format_type_display"]
-param = "field_spec"
-rationale = "Verb-object: formats the field spec's type display; single operand."
-
-["pipelex/builder/operations/concept_ops.py::concept_spec_to_toml"]
-param = "concept_spec"
-rationale = "Conversion: the concept spec being rendered to TOML; single operand."
-
-["pipelex/builder/operations/concept_ops.py::parse_concept_spec"]
-param = "spec_data"
-rationale = "Verb-object: parses the raw spec data; single operand."
-
-["pipelex/builder/operations/concept_ops.py::structure_field_to_dict"]
-param = "field_spec"
-rationale = "Conversion: the field spec being dictified; single operand."
-
-["pipelex/builder/operations/models_ops.py::_filter_aliases_by_backend"]
-param = "aliases"
-rationale = "Verb-object: the alias mapping being filtered; backend context stays keyword."
-
-["pipelex/builder/operations/models_ops.py::_filter_presets_by_backend"]
-param = "presets_list"
-rationale = "Verb-object: the preset list being filtered; backend context stays keyword."
-
-["pipelex/builder/operations/models_ops.py::_filter_waterfalls_by_backend"]
-param = "waterfalls"
-rationale = "Verb-object: the waterfall mapping being filtered; backend context stays keyword."
-
-["pipelex/builder/operations/models_ops.py::_should_include"]
-param = "category"
-rationale = "Predicate on the candidate category; the filter list stays keyword."
-
-["pipelex/builder/operations/models_ops.py::format_models_markdown"]
-param = "result"
-rationale = "Verb-object: formats the list_models result dict; single operand."
-
-["pipelex/builder/operations/pipe_ops.py::_normalize_output"]
-param = "data"
-rationale = "Single-operand normalization of the raw spec data."
-
-["pipelex/builder/operations/pipe_ops.py::_normalize_pipe_code_aliases"]
-param = "data"
-rationale = "Verb-object: normalizes the dict in place; single operand."
-
-["pipelex/builder/operations/pipe_ops.py::_normalize_prompt_aliases"]
-param = "data"
-rationale = "Verb-object: normalizes the dict in place; single operand."
-
-["pipelex/builder/operations/pipe_ops.py::_normalize_sub_pipe_dict"]
-param = "data"
-rationale = "Verb-object: normalizes the step/branch dict in place; single operand."
-
-["pipelex/builder/operations/pipe_ops.py::_normalize_sub_pipe_list"]
-param = "raw_value"
-rationale = "Verb-object: the raw steps/branches value being normalized; field_name stays keyword."
-
-["pipelex/builder/operations/pipe_ops.py::parse_pipe_spec"]
-param = "spec_data"
-rationale = "Verb-object: parses the raw spec data; pipe_type stays keyword."
-
-["pipelex/builder/operations/pipe_ops.py::pipe_spec_to_toml"]
-param = "pipe_spec"
-rationale = "Conversion: the pipe spec being rendered to TOML; single operand."
-
-["pipelex/builder/operations/validate_ops.py::validate_bundle_content"]
-param = "mthds_contents"
-rationale = "Verb-object: validates the given .mthds contents; single operand."
-
-["pipelex/builder/operations/validate_ops.py::validate_bundle_file"]
-param = "bundle_path"
-rationale = "Verb-object: validates the bundle at the given path; library_dirs stays keyword."
-
-["pipelex/builder/operations/validate_ops.py::validate_pipe"]
-param = "pipe_code"
-rationale = "Verb-object: validates the pipe named by the code; single operand."
-
-["pipelex/builder/pipe/pipe_spec.py::PipeSpec.validate_pipe_code_syntax"]
-param = "pipe_code"
-rationale = "Verb-object: validates/normalizes the pipe code; also invoked positionally by the field validator."
-
-["pipelex/builder/runner_code.py::_collect_imports_for_inputs"]
-param = "inputs"
-rationale = "Verb-object: collects imports for the pipe inputs; single operand."
-
-["pipelex/builder/runner_code.py::_format_representation_as_python"]
-param = "representation"
-rationale = "Verb-object: formats the representation dict as Python; is_multiple stays keyword."
-
-["pipelex/builder/runner_code.py::generate_runner_code"]
-param = "pipe"
-rationale = "Verb-object: generates runner code for the pipe; single obvious operand."
-
 ["pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"]
 param = "message"
 rationale = "Builds the error JSON around the message; single operand."
@@ -196,10 +104,6 @@ rationale = "Positional-Callable protocol: passed as markdown_renderer, invoked 
 param = "result"
 rationale = "Positional-Callable protocol: passed as markdown_renderer, invoked renderer(result)."
 
-["pipelex/cli/agent_cli/commands/concept_cmd.py::_concept_spec_to_toml"]
-param = "concept_spec"
-rationale = "Serializes the concept_spec to TOML; single operand."
-
 ["pipelex/cli/agent_cli/commands/doctor_cmd.py::_format_doctor_markdown"]
 param = "result"
 rationale = "Renders the result; single operand."
@@ -243,10 +147,6 @@ rationale = "Verb-object: emits the result; format options stay keyword."
 ["pipelex/cli/agent_cli/commands/migrate_cmd.py::_render_markdown"]
 param = "result"
 rationale = "Positional-Callable protocol: passed as markdown_renderer, invoked renderer(result)."
-
-["pipelex/cli/agent_cli/commands/pipe_cmd.py::_pipe_spec_to_toml"]
-param = "pipe_spec"
-rationale = "Serializes the pipe_spec to TOML; single operand."
 
 ["pipelex/cli/agent_cli/commands/plxt_passthrough.py::run_plxt"]
 param = "subcommand"
@@ -936,10 +836,6 @@ rationale = "Predicate on the type name; used_symbols is context."
 param = "library"
 rationale = "Single-operand transformation: derives the name mapping over the whole library."
 
-["pipelex/codegen/emitters/naming.py::runtime_to_emitted_class_names"]
-param = "library"
-rationale = "Single-operand transformation: derives the class-name mapping over the whole library."
-
 ["pipelex/codegen/emitters/naming.py::snake_to_pascal"]
 param = "name"
 rationale = "Single-operand conversion of the name."
@@ -1375,10 +1271,6 @@ rationale = "Positional-Callable reporter protocol (_ReportLLMJobFunc.__call__):
 ["pipelex/cogt/content_generation/dry_mock.py::report_mock_usage_llm_job"]
 param = "job_metadata"
 rationale = "Positional-Callable reporter protocol (_ReportLLMJobFunc.__call__): job_metadata stays positional to match report_func(job_metadata, ...)."
-
-["pipelex/cogt/content_generation/dry_mock.py::stamp_mock_main_coordination"]
-param = "items"
-rationale = "Consumes the items; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._create_nested_factory"]
 param = "nested_class"
@@ -2352,6 +2244,26 @@ rationale = "Verb–object: validates/checks the search_choice; single operand."
 param = "model_deck_paths"
 rationale = "Deck/file op on the model_deck_paths; single operand."
 
+["pipelex/cogt/models/model_listing.py::_filter_aliases_by_backend"]
+param = "aliases"
+rationale = "Verb-object: the alias mapping being filtered; backend context stays keyword."
+
+["pipelex/cogt/models/model_listing.py::_filter_presets_by_backend"]
+param = "presets_list"
+rationale = "Verb-object: the preset list being filtered; backend context stays keyword."
+
+["pipelex/cogt/models/model_listing.py::_filter_waterfalls_by_backend"]
+param = "waterfalls"
+rationale = "Verb-object: the waterfall mapping being filtered; backend context stays keyword."
+
+["pipelex/cogt/models/model_listing.py::_should_include"]
+param = "category"
+rationale = "Predicate on the candidate category; the filter list stays keyword."
+
+["pipelex/cogt/models/model_listing.py::format_models_markdown"]
+param = "result"
+rationale = "Verb-object: formats the list_models result dict; single operand."
+
 ["pipelex/cogt/models/model_manager.py::ModelManager._collect_candidates"]
 param = "ref"
 rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
@@ -3015,10 +2927,6 @@ rationale = "Single-operand conversion of the composite content."
 ["pipelex/core/memory/working_memory.py::_encode_content_with_class_markers"]
 param = "content"
 rationale = "Single-operand conversion of the content."
-
-["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory._get_mockable_class"]
-param = "structure_class"
-rationale = "Derivation from the structure class; single operand."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.convert_stuff_spec_to_typed_named"]
 param = "stuff_spec"
@@ -4099,14 +4007,6 @@ rationale = "Predicate on the file path; single operand."
 ["pipelex/mthds_parsing/parser.py::MthdsParser.make_pipelex_bundle_blueprint"]
 param = "bundle_path"
 rationale = "Factory from source: parses the bundle at the path; options stay keyword."
-
-["pipelex/mthds_parsing/pipe_sorter.py::sort_pipes_by_dependencies"]
-param = "pipes"
-rationale = "Verb-object: sorts the pipes; single operand."
-
-["pipelex/mthds_parsing/pipe_sorter.py::sort_pipes_by_dependencies.visit"]
-param = "pipe_code"
-rationale = "Nested DFS visitor on the pipe code; single operand."
 
 ["pipelex/mthds_parsing/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_concept"]
 param = "concept_code"
@@ -7248,14 +7148,6 @@ rationale = "Inspects the file_path; single operand."
 param = "file_path"
 rationale = "Inspects the file_path; single operand."
 
-["pipelex/tools/typing/pydantic_utils.py::_serialize_context"]
-param = "ctx"
-rationale = "Transforms the ctx; single operand."
-
-["pipelex/tools/typing/pydantic_utils.py::_serialize_input_value"]
-param = "value"
-rationale = "Transforms the value; single operand."
-
 ["pipelex/tools/typing/pydantic_utils.py::_truncated_rich_repr_from_items"]
 param = "rich_repr_items"
 rationale = "Transforms the rich_repr_items; single operand."
@@ -7281,10 +7173,6 @@ param = "_"
 rationale = "Factory from source: builds the result from the _; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::format_pydantic_validation_error"]
-param = "exc"
-rationale = "Validates/checks the exc; single operand."
-
-["pipelex/tools/typing/pydantic_utils.py::format_pydantic_validation_error_for_agent"]
 param = "exc"
 rationale = "Validates/checks the exc; single operand."
 

@@ -7,8 +7,8 @@ execution time whatever is loaded — the **kernel layer**, in the language-impl
 
 **The one rule:** ``interpreter_hub`` imports ``runtime_hub``; ``runtime_hub`` must never import
 ``interpreter_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
-``codegen``, ``builder``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature``,
-``mthds_parsing``, ``pipeline`` or ``pipe_run`` at module level. That list is the interpreter's
+``codegen``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature``, ``mthds_parsing``,
+``pipeline`` or ``pipe_run`` at module level. That list is the interpreter's
 top-level packages — all of them, with no qualification — so the property it buys is stated
 outright: **importing the Pipelex kernel layer loads zero interpreter modules.** It used to have to trail
 "…or the Pipe-touching modules of ``core.pipes``", because some of what it forbids lived under a

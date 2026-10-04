@@ -1,4 +1,7 @@
-"""Core operation for listing model presets, aliases, and waterfalls."""
+"""The model listing: the deck's presets, aliases and waterfalls, by category.
+
+Behind `pipelex-agent models`, `pipelex-agent check-model` and the runner's model listing.
+"""
 
 from enum import StrEnum
 from typing import Any

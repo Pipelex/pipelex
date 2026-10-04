@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:644cc1387406a8e2c330a76f4139ec25318bd56a7d78caa46f9bb54f2bf7b682"
+digest = "sha256:717ab382b52b2fa43c750bd30036428fb9d363cd0a5f8e86faffb4ebc0d86f3f"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T00:24:05Z"
-rationale = "clean-pass: runtime_hub.py changed only in a docstring, which adds PipeJudge to the list of inference operators resolving the content generator; no layer placement or hub member moved, so docs/contribute/hub-layering.md is unaffected."
+reviewed_at = "2026-10-04T14:31:48Z"
+rationale = "real-catch: runtime_hub.py's docstring dropped builder from the interpreter packages it may not name, since pipelex.builder no longer exists. docs/contribute/hub-layering.md named it in the same list and in its verification snippet's INTERPRETER set, which the closure test compares against INTERPRETER_PACKAGES, and listed builder/runner_code among the interpreter callers that supply get_concept_library(); all three now leave it out."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:b6dcef79b73d5ce05669c478bff9dc4b367696e5"
+"pipelex/runtime_hub.py" = "blob:485fefa16424ad368e80a5008beab7bd5bf86305"

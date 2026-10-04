@@ -1,4 +1,4 @@
-"""Core operations for generating input JSON for pipes."""
+"""The inputs template engine behind `pipelex-agent inputs`: load a pipe and render the inputs it expects."""
 
 from __future__ import annotations
 

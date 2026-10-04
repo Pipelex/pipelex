@@ -16,7 +16,7 @@ from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
 from mthds.protocol.protocol import PROTOCOL_VERSION
 
-from pipelex.builder.operations.models_ops import ModelCategory
+from pipelex.cogt.models.model_listing import ModelCategory
 from pipelex.pipeline.runner import (
     PipelexModelDeck,
     PipelexMTHDSProtocol,

@@ -33,7 +33,6 @@ class than the one the provider is constrained by. Exotic format constraints
 must declare ``examples`` / ``mock_format`` — see ``DryRunObjectFidelityError``.
 """
 
-from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -85,10 +84,6 @@ from pipelex.runtime_hub import get_report_delegate
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-# The pipe code every mocked bundle answers to — shared with BundleHeaderSpec.main_pipe's
-# examples so bundle dry-validation's mocked header names a pipe that exists (D3).
-MOCK_MAIN_PIPE_CODE = "mock_main"
 
 # Sentinel model identifiers so a synthetic usage record is never confused with real inference.
 DRY_RUN_INFERENCE_MODEL_NAME = "dry_run"
@@ -211,29 +206,6 @@ def build_mock_objects(model_class: type[BaseModelTypeVar], *, count: int) -> li
         raise DryRunMockBuildError.for_object_class(model_class.__name__) from exc
 
 
-def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
-    """Set the first item's ``pipe_code`` to ``"mock_main"`` — the single home of this coordination (D3).
-
-    WHY: bundle dry-validation mocks a ``BundleHeaderSpec`` whose ``main_pipe`` field declares
-    ``examples=["mock_main"]`` (``pipelex/builder/bundle_header_spec.py``), so the polyfactory mock
-    header names ``mock_main`` as the bundle's main pipe. Every mock that fabricates a *list of pipe
-    specs* must therefore make its first item answer to that name, or the mocked bundle fails its own
-    main-pipe check. Callers: the mock-input factory (``working_memory_factory``), the batch
-    controller's dry aggregation (``pipe_batch``), and the dry object-list leaf mock
-    (:func:`dry_llm_gen_object_list`). The stamp is a no-op for items without a ``pipe_code`` field.
-
-    The item is now the *caller's own* class, not a throwaway schema rebuild, so the assignment can hit
-    a model config the caller chose — ``frozen=True`` or ``validate_assignment`` — and raise. Surface
-    that as the same typed :class:`DryRunMockBuildError` the surrounding mock build uses, rather than
-    letting a raw ``ValidationError`` escape from a mutation the caller never asked for.
-    """
-    if items and hasattr(items[0], "pipe_code"):
-        try:
-            items[0].pipe_code = MOCK_MAIN_PIPE_CODE
-        except ValidationError as exc:
-            raise DryRunMockBuildError.for_object_class(type(items[0]).__name__) from exc
-
-
 def _nb_list_items(object_assignment: ObjectAssignment) -> int:
     """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11), including 0."""
     if object_assignment.nb_items is not None:
@@ -322,17 +294,9 @@ def dry_llm_gen_object(object_assignment: ObjectAssignment, *, object_class: typ
 
 
 def dry_llm_gen_object_list(object_assignment: ObjectAssignment, *, object_class: type[BaseModel] | None = None) -> list[BaseModel]:
-    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` mocks + one synthetic report.
-
-    Applies :func:`stamp_mock_main_coordination` so bundle dry-validation's mocked
-    ``BundleHeaderSpec.main_pipe`` check passes through the leaf mock (D3). The stamp is
-    unconditional on ``is_mock_usage`` — it only matters to bundle dry-validation and is
-    harmless elsewhere.
-    """
+    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` mocks + one synthetic report."""
     log.verbose(f"🤡 DRY RUN: llm_gen_object_list for '{object_assignment.object_class_name}'")
-    items = _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
-    stamp_mock_main_coordination(items)
-    return items
+    return _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
 
 
 def dry_templating_gen_text(templating_assignment: TemplatingAssignment) -> str:

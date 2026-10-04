@@ -56,7 +56,7 @@ class ValidatedPipeEntry(TypedDict):
 
 
 def build_validated_pipes(dry_run_result: dict[str, DryRunOutput]) -> list[ValidatedPipeEntry]:
-    """Project a dry-run result map into the ``validated_pipes`` JSON list (agent CLI + builder ops).
+    """Project a dry-run result map into the ``validated_pipes`` JSON list (agent CLI).
 
     Each entry is built from the real per-pipe outcome, so allowed-to-fail FAILUREs and cross-package
     SKIPPEDs are reported truthfully rather than flattened to SUCCESS. The entry id is the namespaced

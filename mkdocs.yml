@@ -302,7 +302,6 @@ plugins:
         - tools/cli/show.md: "CLI Show"
         - tools/cli/pkg.md: "CLI Pkg"
         - tools/cli/build/index.md: "CLI Build Overview"
-        - tools/cli/build/runner.md: "CLI Build Runner"
         - tools/cli/build/structures.md: "CLI Build Structures"
         - tools/cli/build/inputs.md: "CLI Build Inputs"
         - tools/cli/build/output.md: "CLI Build Output"
@@ -544,10 +543,10 @@ nav:
       - Pkg: tools/cli/pkg.md
       - Build:
         - Overview: tools/cli/build/index.md
-        - Runner: tools/cli/build/runner.md
         - Structures: tools/cli/build/structures.md
         - Inputs: tools/cli/build/inputs.md
         - Output: tools/cli/build/output.md
+        - Runner (Removed): tools/cli/build/runner.md
       - Agent CLI: tools/cli/agent-cli.md
     - Tools:
       - plxt (Formatter & Linter): tools/plxt.md

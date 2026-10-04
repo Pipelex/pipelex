@@ -1,21 +1,14 @@
 ---
-title: "Concept spec"
-description: "Reference for the `ConceptSpecError` Pipelex error class."
+title: "Concept spec (removed)"
+description: "The `ConceptSpecError` Pipelex error class no longer exists."
 ---
 
-<!-- pipelex:generated -->
+<!-- pipelex:authored -->
 
-# Concept spec
+# Concept spec (removed)
 
-Raised when a concept spec is malformed against its authoring contract.
+**`ConceptSpecError` is no longer raised.** It reported a malformed concept spec, the JSON authoring format that `pipelex-agent concept` and the `POST /v1/build/concept` route converted into MTHDS TOML. The command, the route and the concept spec are all gone: a concept is written in MTHDS directly, in a `[concept.<Code>]` section, and checked with `pipelex validate bundle` or [`POST /v1/validate`](../api-server/pipe-validate.md).
 
-| Field | Value |
-|---|---|
-| `error_type` | `ConceptSpecError` |
-| `title` | Concept spec |
-| `type_uri` | `https://docs.pipelex.com/latest/errors/concept-spec-error/` |
-| `error_domain` | `input` |
-| Defined in | `pipelex.builder.concept.exceptions` |
-| Parent class | [`PipelexError`](pipelex-error.md) |
+This page stays at the URL the error's `type_uri` published, so a link recorded from an earlier response still resolves.
 
 [Back to Error Reference](index.md)

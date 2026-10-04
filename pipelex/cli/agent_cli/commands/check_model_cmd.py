@@ -4,10 +4,10 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.builder.operations.models_ops import CATEGORY_TO_MODEL_TYPE, ModelCategory
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
+from pipelex.cogt.models.model_listing import CATEGORY_TO_MODEL_TYPE, ModelCategory
 from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.cogt.models.model_suggestion import (
     KIND_LABELS,

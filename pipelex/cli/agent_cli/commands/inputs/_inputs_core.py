@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.builder.operations.inputs_ops import build_inputs_for_pipe
 from pipelex.cli.agent_cli.commands.agent_output import agent_success
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, serialize_inputs_template_to_toml
+from pipelex.pipeline.inputs_template import build_inputs_for_pipe
 
 if TYPE_CHECKING:
     from pathlib import Path

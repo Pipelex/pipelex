@@ -139,8 +139,8 @@ A `# kw-only: ignore` comment on the `def` line (or the `async def` line) suppre
 A subject plus options — the canonical shape, legal only with a grant:
 
 ```python
-# subject_grants.toml carries: ["pipelex/builder/build.py::build_pipe"] param = "spec" rationale = "…"
-def build_pipe(spec, *, dry_run, retries, validate): ...  # build_pipe(my_spec, dry_run=True, retries=3, validate=False)
+# subject_grants.toml carries: ["pipelex/pipeline/publish.py::publish_bundle"] param = "bundle" rationale = "…"
+def publish_bundle(bundle, *, dry_run, retries, validate): ...  # publish_bundle(my_bundle, dry_run=True, retries=3, validate=False)
 ```
 
 A single subject and nothing else — needs a grant too (strict-all scope; lone-subject defs are not implicitly exempt):

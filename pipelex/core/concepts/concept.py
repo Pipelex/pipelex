@@ -183,7 +183,6 @@ class Concept(ConceptAbstract):
         structure_class: type[StuffContent],
         output_format: ConceptRepresentationFormat,
         multiplicity: VariableMultiplicity | None = None,
-        class_name_overrides: dict[str, str] | None = None,
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for this concept.
 
@@ -196,8 +195,6 @@ class Concept(ConceptAbstract):
                 variable-length list, an int for a fixed count. A list-shaped multiplicity wraps
                 the content in a list/array, and a fixed count reaches the SCHEMA render as
                 `minItems`/`maxItems` bounds.
-            class_name_overrides: Optional runtime-class-name -> rendered-name mapping applied to
-                Python instantiation code and imports (see ConceptRepresentationGenerator)
 
         Returns:
             Tuple of (representation dict, imports_needed set)
@@ -209,7 +206,7 @@ class Concept(ConceptAbstract):
             case ConceptRepresentationFormat.SCHEMA:
                 return self._render_schema_representation(structure_class=structure_class, multiplicity=multiplicity)
             case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
-                generator = ConceptRepresentationGenerator(output_format, class_name_overrides=class_name_overrides)
+                generator = ConceptRepresentationGenerator(output_format)
                 # For inputs, we only want required fields (not optional ones)
                 result = generator.generate_representation(self.concept_ref, structure_class=structure_class, include_optional=False)
 

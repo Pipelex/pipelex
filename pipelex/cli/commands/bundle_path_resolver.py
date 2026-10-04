@@ -10,13 +10,13 @@ from typing import NoReturn
 
 import typer
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.bundle_target_resolution import (
     BundleTargetResolutionError,
     BundleTargetResolutionErrorKind,
     BundleTargetResolutionSuccess,
     resolve_bundle_target_core,
 )
+from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 
 
 def _stringify_library_dirs(library_dirs: list[Path] | None) -> list[str] | None:

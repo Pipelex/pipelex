@@ -13,9 +13,9 @@ Two independent format axes:
   ``ContextVar``. JSON is the default so any error raised before a command opts
   in stays machine-parseable.
 
-Commands that don't accept ``--format`` (``inputs``, ``concept``, ``pipe``,
-``fmt``, ``lint``, ``accept-gateway-terms``) never touch the ContextVar and
-therefore emit JSON errors via the default.
+Commands that don't accept ``--format`` (``inputs``, ``fmt``, ``lint``,
+``accept-gateway-terms``) never touch the ContextVar and therefore emit JSON
+errors via the default.
 """
 
 import sys
