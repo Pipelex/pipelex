@@ -125,7 +125,7 @@ key = "verbose_enabled"
 [[migration]]
 id = "telemetry-config@3"
 to_schema_version = 3
-introduced_in = "0.62.0"
+introduced_in = "0.73.0"
 breaking = true
 safety = "safe"
 title = "Drop the maintainer-only [pipelex_gateway] telemetry section"

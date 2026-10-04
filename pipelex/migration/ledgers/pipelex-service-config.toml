@@ -15,7 +15,7 @@ min_supported_schema_version = 0
 [[migration]]
 id = "pipelex-service-config@2"
 to_schema_version = 2
-introduced_in = "0.62.0"
+introduced_in = "0.73.0"
 breaking = true
 safety = "safe"
 title = "Drop the [agreement] section with the Pipelex Gateway"
