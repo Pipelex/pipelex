@@ -212,12 +212,12 @@ Your agent builds these too, and each can also be done by hand.
 
 ### As a webapp
 
-Ask your agent for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. By hand, the same app takes these commands:
+Ask your agent for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-sdk/tree/main/method-apps) and leaves it running on your machine. By hand, the same app takes these commands:
 
 ```bash
 src=$(mktemp -d)
-git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$src"
-mkdir -p my-app && cp -R "$src/webapp-js/." my-app/
+git clone --depth 1 https://github.com/Pipelex/pipelex-sdk.git "$src"
+mkdir -p my-app && cp -R "$src/method-apps/webapp-js/." my-app/
 cd my-app && git init
 
 export PIPELEX_API_KEY=plx_sk_...
@@ -277,7 +277,7 @@ export PIPELEX_API_KEY=plx_sk_...
     console.log(result.main_stuff);
     ```
 
-    More in the [`@pipelex/sdk` reference](https://github.com/Pipelex/pipelex-sdk-js/tree/main/docs).
+    More in the [`@pipelex/sdk` reference](https://github.com/Pipelex/pipelex-sdk/tree/main/js/docs).
 
 === "Python"
 
@@ -308,7 +308,7 @@ export PIPELEX_API_KEY=plx_sk_...
     asyncio.run(main())
     ```
 
-    More in the [`pipelex-sdk` reference](https://github.com/Pipelex/pipelex-sdk-python/tree/main/docs).
+    More in the [`pipelex-sdk` reference](https://github.com/Pipelex/pipelex-sdk/tree/main/python/docs).
 
 **Next:** [what Pipelex is](https://go.pipelex.com/product) · [documentation](https://go.pipelex.com/docs) · [your console](https://app.pipelex.com) · [Discord](https://go.pipelex.com/discord)
 
@@ -790,6 +790,7 @@ By default, this creates the global `~/.pipelex/` directory with:
     │   ├── 3_extract_deck.toml        # Document extraction config
     │   ├── 4_search_deck.toml         # Search config
     │   ├── 5_doc_gen_deck.toml        # Document engines, by format and source
+    │   ├── 6_judgment_deck.toml       # Judgment config
     │   ├── x_custom_llm_deck.toml     # Custom LLM configurations
     │   └── x_custom_extract_deck.toml # Custom extract configurations
     └── routing_profiles.toml # Model routing configuration
@@ -1317,7 +1318,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Pipe Operators](pipe-operators.md)**
 
-    The workers that do the actual processing: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc.
+    The workers that do the actual processing: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeJudge, PipeCompose, PipeDocGen, and PipeFunc.
 
 -   **[Pipeline Orchestration](pipeline-orchestration.md)**
 
@@ -1350,6 +1351,10 @@ This section covers all Pipelex capabilities, organized by area.
 -   **[Web Search](web-search.md)**
 
     Structured web search results with source citations and advanced filters via PipeSearch.
+
+-   **[Judgment](judgment.md)**
+
+    Closed questions answered with a verdict and its probabilities via PipeJudge: yes or no, one option out of a set, or a level on a scale.
 
 </div>
 
@@ -1485,7 +1490,9 @@ Pre-built universal concepts available in every Pipelex project:
 - **Html** — HTML content
 - **TextAndImages** — Combined text and image content in a single structure
 - **Number** — Numeric value
-- **YesNo** — The answer to a yes/no question
+- **YesNo** — The answer to a yes/no question, with an optional probability
+- **Choice** — One option picked out of a declared set, with optional confidence and probabilities
+- **Rating** — A level on an ordered scale of described levels, with optional measures of uncertainty
 - **Date** — A calendar date, optionally with a time of day
 - **Time** — A time of day, optionally with a UTC offset
 - **Page** — A single page extracted from a document, with markdown text and optional images
@@ -1521,7 +1528,7 @@ The workers that perform the actual processing in your pipelines.
 
 ## Overview
 
-Pipe operators are the building blocks of Pipelex methods. Each operator performs a specific type of work: calling an LLM, structuring text into typed data, extracting text from documents, generating images, searching the web, composing data, or running custom code. Operators declare their input and output concepts, and the runtime validates type compatibility at definition time.
+Pipe operators are the building blocks of Pipelex methods. Each operator performs a specific type of work: calling an LLM, structuring text into typed data, extracting text from documents, generating images, searching the web, judging, composing data, or running custom code. Operators declare their input and output concepts, and the runtime validates type compatibility at definition time.
 
 ## PipeLLM
 
@@ -1552,6 +1559,12 @@ See [PipeImgGen reference](../building-methods/pipes/pipe-operators/PipeImgGen.m
 Web search with structured results and source citations. Powered by Linkup or Pipelex Gateway, results come back as typed SearchResult concepts ready for downstream processing.
 
 See [PipeSearch reference](../building-methods/pipes/pipe-operators/PipeSearch.md).
+
+## PipeJudge
+
+One closed question asked of a judgment model about the step's inputs: yes or no, one option out of a set, or a level on a scale. The verdict comes back as a typed `YesNo`, `Choice` or `Rating` carrying the probabilities the model measured, ready to route a `PipeCondition` or gate a step on a threshold.
+
+See [PipeJudge reference](../building-methods/pipes/pipe-operators/PipeJudge.md).
 
 ## PipeCompose
 
@@ -1737,6 +1750,21 @@ Unlike LLM APIs (partly standardized around OpenAI's completions API), the OCR l
 | **Deepseek-OCR** | Gateway | Open-source model optimized for markdown extraction from images |
 | **Linkup Fetch** | Cloud API | Web page content extraction — fetches and extracts text from web URLs |
 
+## Formats Each Extractor Reads
+
+Each extract model declares the file formats it reads, and a `PipeExtract` step can only extract a file in one of those formats.
+
+| Extract model | Reads |
+|---------------|-------|
+| `pypdfium2-extract-pdf` | PDF |
+| `docling-extract-text` | PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), HTML, Markdown (`.md`), CSV, plain text (`.txt`), WebVTT captions (`.vtt`), email messages (`.eml`) and images |
+| Mistral OCR (`mistral-ocr` and its versions) | PDF and images |
+| `azure-document-intelligence` (Pipelex Gateway) | PDF and images |
+| `deepseek-ocr` (Pipelex Gateway) | Images |
+| `linkup-fetch` (Pipelex Gateway) | Web pages, fetched from their URL |
+
+A file in a format the step's model does not read is refused before the run starts, with an input error that names the input, its format, the step, the model and the formats that model reads. Give the file in a format the model reads, or choose a model that reads it. When the step can only be reached through a condition, the run starts, and the step refuses the file the same way when it gets to it. See [File formats are checked before the run](../building-methods/concepts/native-concepts.md#file-formats-are-checked-before-the-run).
+
 ## Key Capabilities
 
 - **Page view generation** — High-fidelity image rendering of extracted pages via pypdfium2
@@ -1820,6 +1848,37 @@ Use PipeSearch in a PipeSequence to retrieve information from the web and then p
 - [PipeSearch](../building-methods/pipes/pipe-operators/PipeSearch.md) - Operator reference and supported output shapes
 - [Pipeline Orchestration](./pipeline-orchestration.md) - Compose search with downstream pipes
 - [Working Memory](../building-methods/pipes/working-memory.md) - How search outputs flow through a method
+
+
+## Judgment
+
+# Judgment
+
+Closed questions about your data, answered with a verdict and how sure the model is.
+
+## Overview
+
+Many steps of a method come down to a closed question: is this message urgent, which team owns this ticket, how severe is this report. PipeJudge asks such a question of a judgment model, a model built to answer it with a verdict and the probabilities it measured rather than with free text. The verdict is a typed `YesNo`, `Choice` or `Rating`, so the steps after it read it like any other concept.
+
+## Key Capabilities
+
+- **Three kinds of question** — A yes/no question, a choice among declared options, or a rating on a scale of declared levels, the kind read from the fields the pipe declares
+- **Measured probabilities** — Each verdict carries the probabilities the model measured, so a method can act on how sure it is as well as on what it decided
+- **Thresholds** — A yes/no question can declare the probability at or above which its verdict is yes
+- **Material, not prompts** — Every input of the step is sent to the model as material to judge, images and documents as files for a model that reads them
+- **Checked when the method loads** — A step with no model, an output that disagrees with its kind of question, or a file input its model does not read is refused before any run spends anything
+
+## Usage in Pipelines
+
+Put a PipeJudge where a method needs a decision, then route on the verdict: a `PipeCondition` whose expression is `routing.choice` sends each item to the branch its judgment chose, and one comparing `approved.probability` with a bound gates a step on the model's certainty. To judge every item of a list, map the PipeJudge over it with a `PipeBatch`.
+
+No judgment model is served out of the box: a judgment names its model, such as the deck's `@default-judgment` alias for TypeSafe's model, which needs a `TYPESAFE_API_KEY`.
+
+## Related Documentation
+
+- [PipeJudge](../building-methods/pipes/pipe-operators/PipeJudge.md) - Operator reference and authoring guidance
+- [Native concepts](../building-methods/concepts/native-concepts.md) - The `YesNo`, `Choice` and `Rating` verdicts
+- [Pipeline Orchestration](./pipeline-orchestration.md) - Route and gate steps on a verdict
 
 
 ## Pipelex Plugin
@@ -2046,7 +2105,7 @@ Check pipeline syntax, structure, and compatibility without execution:
 - **Syntax validation** — Catch MTHDS language errors via plxt linting
 - **Structure validation** — Resolve pipe and concept references in the loaded library, refuse concepts whose structures form a cycle or whose fields name a concept that cannot be found, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
 - **Input validation** — Ensure required inputs are provided and correctly typed, and that every variable a step reads is bound by the time that step runs
-- **Declared inputs are read** — For `PipeLLM`, `PipeCompose`, `PipeSearch` and `PipeImgGen`, every variable a template reads must be declared in `inputs` (`missing_input_variable`), and every declared input must be read by one of the pipe's templates (`extraneous_input_variable`): the prompt and system prompt of a `PipeLLM`, the template or the construct of a `PipeCompose`, the prompt of a `PipeSearch`, the prompt and negative prompt of a `PipeImgGen`. An unread input is refused on the pipe that declares it, before any controller above it is asked to supply it
+- **Declared inputs are read** — For `PipeLLM`, `PipeCompose`, `PipeSearch` and `PipeImgGen`, every variable a template reads must be declared in `inputs` (`missing_input_variable`), and every declared input must be read by one of the pipe's templates (`extraneous_input_variable`): the prompt and system prompt of a `PipeLLM`, the template or the construct of a `PipeCompose`, the prompt of a `PipeSearch`, the prompt and negative prompt of a `PipeImgGen`. An unread input is refused on the pipe that declares it, before any controller above it is asked to supply it. A `PipeJudge` is the exception on that second rule: every input it declares is material for its model, so only the variables its `question` reads must be declared. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 A pipe that references a sub-pipe from a package that isn't loaded is reported as **skipped** rather than validated, so a passing run is not proof that every cross-package dependency resolves.
 
@@ -3024,7 +3083,7 @@ The refined concept inherits the structure of the base concept while adding sema
 
 ## Native Concepts
 
-Pipelex includes these built-in native concepts: `Text`, `Markdown`, `Image`, `Document`, `TextAndImages`, `Number`, `YesNo`, `Date`, `Time`, `Page`, `Dynamic`, `JSON`, `Html`, `SearchResult`, `Composite`, and `Anything`.
+Pipelex includes these built-in native concepts: `Text`, `Markdown`, `Image`, `Document`, `TextAndImages`, `Number`, `YesNo`, `Choice`, `Rating`, `Date`, `Time`, `Page`, `Dynamic`, `JSON`, `Html`, `SearchResult`, `Composite`, and `Anything`. Their names are reserved: a bundle declaring a concept named `Choice` or `Rating` is refused, as for every native.
 
 These concepts are automatically available in all pipelines—no setup required. You can use them directly in your pipes or refine them to create more specific concepts.
 
@@ -3702,11 +3761,13 @@ Here are all the native concepts you can use out of the box:
 |-----------------|-------------|---------------------|
 | `Text` | A text | `TextContent` |
 | `Markdown` | A text written in Markdown, which refines `Text` | `MarkdownContent` |
-| `Image` | An image | `ImageContent` |
-| `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
+| `Image` | An image file | `ImageContent` |
+| `Document` | A document: PDF, Office (Word, PowerPoint, Excel), web page, or a text file such as Markdown or CSV | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
-| `YesNo` | The answer to a yes/no question | `YesNoContent` |
+| `YesNo` | The answer to a yes/no question, with an optional probability | `YesNoContent` |
+| `Choice` | One option picked out of a declared set | `ChoiceContent` |
+| `Rating` | A position on an ordered scale of described levels | `RatingContent` |
 | `Date` | A calendar date, optionally with a time of day | `DateContent` |
 | `Time` | A time of day, optionally with a UTC offset | `TimeContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
@@ -3830,15 +3891,17 @@ class ImageContent(StuffContent):
 - `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes, passed alone, in a list or in a structured field: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
 - `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
-- `mime_type`: Optional MIME type of the image
+- `mime_type`: The MIME type of the image. For every image input, the runtime sets it at the start of the run from the file's own bytes, which win over a declared type (see [File formats are checked before the run](#file-formats-are-checked-before-the-run))
 - `width` / `height`: Pixel dimensions — present together or not at all
 - `filename`: Optional original filename
 
 **Use for:** Photos, generated images, diagrams, screenshots.
 
+An `Image` must hold an image file, such as PNG, JPEG or WebP. A run whose `Image` input, or an input of a concept refining `Image`, holds a file whose bytes say it is something else, a PDF for one, is refused before it starts. A scanned letter that arrives as a PDF belongs in a `Document` input.
+
 ### DocumentContent
 
-Represents a document (PDF, DOCX, PPTX, etc.):
+Represents a document: a PDF, an Office file (Word, PowerPoint, Excel), a web page, or a text file such as Markdown, CSV, plain text, WebVTT captions or an email message.
 
 ```python
 class DocumentContent(StuffContent):
@@ -3854,12 +3917,29 @@ class DocumentContent(StuffContent):
 
 - `url`: Location of the document file, storage URL, or web page URL
 - `public_url`: A URL a viewer can open, filled by the runtime for every document input it normalizes, exactly as for `ImageContent`: the storage provider's link for a stored file, which expires when signed URLs are configured, and the URL itself for an `http(s)` one
-- `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+- `mime_type`: The MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"). For every document input, the runtime sets it at the start of the run from the file's own bytes, and keeps the declared type only when the bytes do not identify the file, as for plain text, Markdown or HTML
 - `filename`: Optional filename of the document
 - `title`: Optional title of the document or source
 - `snippet`: Optional text snippet or excerpt from the document
 
 **Use for:** Contracts, invoices, reports, presentations, web pages, search source citations, any document file.
+
+Which document formats a method can take depends on the models that read them: a `PipeExtract` step reads the formats its extract model declares, and a `PipeLLM` step the document formats its model declares. A Word document works with an extract model that reads Word files, and fails with one that reads only PDF.
+
+### File formats are checked before the run
+
+At the start of every run, before any pipe runs, the runtime establishes the format of each image and document input, including the items of a list and the fields of a structured input:
+
+- A file given as a `data:` URL, a local path or a `pipelex-storage://` reference is identified from its first bytes. The identified type replaces any declared one, so a `data:image/png` URL holding a PDF is a PDF. An Office file whose bytes show only that it is a zip archive is known by its declared type or by its file name's extension (`.docx`, `.pptx`, `.xlsx`), and otherwise its format is unknown.
+- A file the bytes do not identify, such as plain text, Markdown, CSV or HTML, keeps the type it was declared with.
+- An `http(s)` URL is not fetched before the run, so its format is the type it was declared with, and only that type is checked. An `http(s)` URL with no declared type is not checked: the provider receives it as it is.
+
+The run is then refused, with an input error naming the input, when:
+
+- an `Image` input holds a file that is not an image, whatever reads it;
+- a document input is certain to reach a step whose model does not read its format: for example, Word transcripts batched into a `PipeExtract` whose extract model reads only PDF. The error names each input, its format, the step, the model and the formats that model reads.
+
+A step reached only through a `PipeCondition`, or a step that may be skipped because an optional input is absent, may never run, so the run is not refused on its account. If it does run, it refuses the file itself, with the same kind of input error. The same holds for files a run produces along the way.
 
 ### NumberContent
 
@@ -3874,14 +3954,15 @@ class NumberContent(StuffContent):
 
 ### YesNoContent
 
-Represents the answer to a yes/no question — a single boolean verdict:
+Represents the answer to a yes/no question — a boolean verdict, and the probability that the answer is yes when its producer reports one:
 
 ```python
 class YesNoContent(StuffContent):
     yes_no: bool
+    probability: float | None = None  # from 0 to 1
 ```
 
-Renders as `yes` or `no` when injected into a prompt. Especially handy as a `PipeLLM` output for judgments — `output = "YesNo"` makes the model return a typed boolean instead of free text answering "yes"/"no":
+Renders as `yes` or `no` when injected into a prompt, whatever the probability. Especially handy as a `PipeLLM` output for judgments — `output = "YesNo"` makes the model return a typed boolean instead of free text answering "yes"/"no":
 
 ```toml
 [pipe.judge_is_urgent]
@@ -3895,6 +3976,32 @@ prompt = "Is the following message urgent? Answer yes or no.\n\n$message"
 Read the verdict from a Python caller via `pipe_output.main_stuff_as_yes_no.yes_no`.
 
 **Use for:** Yes/no judgments, boolean classifications, presence/absence checks, pass/fail verdicts.
+
+### The verdict natives: `YesNo`, `Choice` and `Rating`
+
+`YesNo`, `Choice` and `Rating` are verdicts, and they follow one rule: **a verdict native requires its verdict and nothing else.** The verdict — the boolean, the option key, the level — is what every producer can state. Every measure of uncertainty beside it is optional and defined by what it means, never by how a producer computes it, so a producer that measures less fills in less, and one that measures nothing still writes a valid verdict. An unreported measure is absent: a bare yes is never a probability of 1.
+
+```python
+class ChoiceContent(StuffContent):
+    choice: str  # the key of the selected option
+    confidence: float | None = None  # from 0 to 1
+    probabilities: dict[str, float] | None = None  # keyed by option key
+
+
+class RatingContent(StuffContent):
+    level: int  # the index of the selected level, 0 being the first
+    confidence: float | None = None  # from 0 to 1
+    probabilities: dict[str, float] | None = None  # keyed by level index written as text: "0", "1", ...
+    position: float | None = None  # a continuous position, from 0 to the last level's index
+```
+
+A `Choice` renders as its key and a `Rating` as its level, so `$team` in a later prompt reads `billing` and `$severity` reads `2`. Branch on them with a `PipeCondition`: `expression = "team.choice"` routes by the key, and `expression = "'severe' if severity.level >= 2 else 'mild'"` by the level.
+
+A measure is only as good as its producer. A language model asked to fill a verdict — a `PipeLLM` whose output is `YesNo`, `Choice` or `Rating` — sees the uncertainty members, optional and described, and may fill them with its own estimate of its verdict. That estimate is worth having, and it is not the probability a dedicated judging model measures over the options it was given: a `Choice` written by a `PipeLLM` has no declared option set behind it, so its `probabilities` are keyed by whatever the model wrote. When a `PipeCondition` gates on a probability, read which producer wrote it, and guard against its absence: `approved.probability is not none and approved.probability >= 0.8`.
+
+**Where a caller supplies a verdict, and where a producer reports one.** An input declared `YesNo` takes the bare verdict, `true` or `false`, and builds a `YesNo` with no probability; send its object form inside the explicit envelope when you have a probability to pass on. A result is read the other way: a `YesNo` a pipe produces is an object carrying `yes_no` and, when reported, `probability`, at every depth of the result. A `Choice` or `Rating` input is provided in its envelope, `{"concept": "native.Choice", "content": {"choice": "billing"}}`, since a bare `"billing"` would read as a text.
+
+**Use for:** `Choice` for routing and classification over a declared set of options, `Rating` for grading on an ordered scale whose levels are described, and both wherever a method branches on a verdict and may weigh how sure its producer was.
 
 ### DateContent
 
@@ -4738,7 +4845,7 @@ This guide provides an overview of how to design your pipelines.
 
 A pipeline is composed of pipes. There are two fundamental types of pipes you will use to build your methods:
 
-*   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), searching the web (`PipeSearch`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
+*   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), searching the web (`PipeSearch`), answering a closed question with a verdict (`PipeJudge`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
 *   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your method, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
 A third, design-time-only kind of pipe — **[Signature Pipes](./signature-pipes.md)** — lets you stub a pipe's contract (inputs and output) by declaring it with no `type` and no implementation: a typeless, contract-only pipe *is* a signature. Signatures dry-run as mocks under `--allow-signatures`, so you can sketch a pipeline top-down before writing each operator. Strict validation refuses pipelines that still depend on a signature.
@@ -5750,7 +5857,7 @@ Each value is typed as the **declared** concept — `question` becomes a `legal.
     In a bare list for `Anything[]` or `JSON[]`, an item shaped like an envelope (an object with `concept` and `content` keys) is refused rather than guessed at. To type a list, wrap the whole list in one envelope instead.
 
 !!! note "Concepts the signature can't shape"
-    A few concepts still carry no single expected value shape — `Dynamic` and the container natives (`Html`, `Page`, `TextAndImages`, `SearchResult`, `Composite`). For an input declared as one of these, the value is read by its own shape (a bare string becomes `native.Text`, and so on), and a value with no reading, such as a list of plain objects, is refused with an error naming the input and the declaration to change. Use the explicit format if you need a specific concept there.
+    A few concepts still carry no single expected value shape — `Dynamic`, the container natives (`Html`, `Page`, `TextAndImages`, `SearchResult`, `Composite`) and the verdicts `Choice` and `Rating`. For an input declared as one of these, the value is read by its own shape (a bare string reads as a `native.Text`, and so on). A `Dynamic` input keeps whatever its value reads as; any other refuses a value that reads as a concept it does not accept, so a bare `"billing"` at a `Choice` input is refused rather than handed on as a text, as is its content without the envelope, `{"choice": "billing"}`, or a bare level `2` at a `Rating` input, each with an error showing the expected shape; a value with no reading at all, such as a list of plain objects, is refused with an error naming the input and the declaration to change. Provide these in the explicit format: `{"concept": "native.Choice", "content": {"choice": "billing"}}`.
 
 ## Lists and multiplicity
 
@@ -6128,7 +6235,21 @@ This works only if the main_stuff is (or refines) a `NumberContent` concept.
 verdict = pipe_output.main_stuff_as_yes_no.yes_no  # a bool
 ```
 
-This works only if the main_stuff is (or refines) a `YesNoContent` concept.
+This works only if the main_stuff is (or refines) a `YesNoContent` concept. Its `probability` is `None` unless the producer reported one.
+
+**`main_stuff_as_choice`** - Returns `ChoiceContent` object:
+
+```python
+team = pipe_output.main_stuff_as_choice.choice  # the selected option's key
+```
+
+**`main_stuff_as_rating`** - Returns `RatingContent` object:
+
+```python
+severity = pipe_output.main_stuff_as_rating.level  # the selected level's index
+```
+
+Each works only if the main_stuff is (or refines) the matching verdict native.
 
 **`main_stuff_as_markdown`** - Returns `MarkdownContent` object:
 
@@ -6691,7 +6812,7 @@ Write a brief about this topic: $topic
 - **A presence block** — `{% if enriched %} ... {% endif %}` (any reference inside the block is guarded, including `$enriched` and attribute access).
 - **An inline presence conditional** — `{{ enriched.text if enriched else "no enrichment" }}`.
 
-The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, and PipeImgGen.
+The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, PipeJudge (question), and PipeImgGen.
 
 ## Controllers Under Absence
 
@@ -6760,6 +6881,7 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeExtract`**](./PipeExtract.md): Performs Optical Character Recognition (OCR) on images and PDF documents to extract text and embedded images, and fetches and extracts content from web pages.
 -   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like GPT Image, Flux, or other image generation models.
 -   [**`PipeSearch`**](./PipeSearch.md): Searches the web using a configurable search provider and returns structured results with an answer and source citations.
+-   [**`PipeJudge`**](./PipeJudge.md): Asks a judgment model one closed question about its inputs, and returns a `YesNo`, a `Choice` or a `Rating` verdict with the probabilities the model measured.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
 -   [**`PipeCompose`**](./PipeCompose.md): Composes outputs deterministically from working memory — renders Jinja2 templates for formatted reports or complex prompts, or constructs structured objects by mapping fields from inputs, without an LLM.
 -   [**`PipeDocGen`**](./PipeDocGen.md): Generates a document file from its inputs, calling no AI model: a PDF laid out from a structure or formatted from a Markdown report, and with the Pipelex document generation plugin a PDF from an HTML template, an Excel workbook, a Word document or a PowerPoint deck.
@@ -6774,6 +6896,7 @@ Pipelex provides the following pipe operators:
 - `PipeFunc`: For executing custom functions
 - `PipeImgGen`: For AI-powered image generation
 - `PipeSearch`: For web search with structured results
+- `PipeJudge`: For a closed question answered with a verdict and its probabilities
 - `PipeStructure`: For turning free-form text into structured data
 - `PipeDocGen`: For generating a document file, such as a PDF, from structured data
 
@@ -6857,6 +6980,16 @@ Searches the web and returns structured results with sources.
 - Dynamic prompt templates with `$variable` syntax
 - Standard and deep search models
 
+## PipeJudge
+
+Asks a judgment model one closed question about its inputs.
+
+### Key Features
+
+- Yes/no, choice and rating questions, the kind read from the fields the pipe declares
+- Verdicts carrying the probabilities the model measured, and a threshold for a yes/no
+- Every input sent to the model as material, images and documents as files for a model that reads them
+
 
 ## PipeLLM
 
@@ -6875,7 +7008,7 @@ For structured outputs, you have two options:
 
 If you already have text from elsewhere (a PDF extraction, a search result, an upstream pipe), call [`PipeStructure`](./PipeStructure.md) directly — there's no need to wrap a `PipeLLM` around it.
 
-Every input the pipe declares must be read by `prompt` or `system_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither prompt reads as `extraneous_input_variable`, naming the input, so you either reference it in a prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+Every input the pipe declares must be read by `prompt` or `system_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither prompt reads as `extraneous_input_variable`, naming the input, so you either reference it in a prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`. A name a prompt sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 ## Working with Images (Vision Language Models)
 
@@ -7873,6 +8006,117 @@ When the output concept is compatible with `SearchResult`, the output contains t
 - [Web Search Feature](../../../features/web-search.md) - Overview of web search capabilities
 
 
+## PipeJudge
+
+# PipeJudge
+
+The `PipeJudge` operator asks a judgment model one closed question about its inputs, and stores the verdict it answers with: a `YesNo`, a `Choice` or a `Rating`, each carrying the probabilities the model measured. A judgment model is built for this kind of question: it answers with a verdict and the probabilities it measured, where a language model asked the same question writes its answer out as text.
+
+## How it works
+
+The fields a `PipeJudge` declares decide the kind of question it asks, and the kind decides its output:
+
+| Declares | Asks | Output |
+| -------- | ---- | ------ |
+| neither `options` nor `levels` | a yes/no question, which may carry `criteria` and a `threshold` | `YesNo` |
+| `options` | which option fits | `Choice` |
+| `levels` | which level fits, the levels being ordered from lowest to highest | `Rating` |
+
+The output must be that native or a concept refining it, and `Dynamic` is neither: a pipe declaring `options` whose output is `YesNo` is refused when the method loads, with a message naming both sides. A `PipeJudge` produces one verdict, so its output cannot be a list; to judge every item of a list, map the `PipeJudge` over it with a [`PipeBatch`](../pipe-controllers/PipeBatch.md).
+
+**Every input is material to judge.** The model receives each input the pipe declares, by name, whether or not the question mentions it: a `Text` as its text, a `Number` as its number, a `YesNo` as its boolean, a list as a list, and a structured concept as its fields. An optional input that is absent is left out. Each input is sent whole, so an input name cannot reach into a field with a dot, as `invoice.total` would: declare `invoice` instead. So, unlike the other operators, a `PipeJudge` does not have to read its inputs in its `question`; it may still interpolate one, which suits a short parameter such as `"Is the message about $topic?"`, and every variable the question reads must be a declared input.
+
+**Images and documents are sent as files.** An `Image` or a `Document` input, or a list of either, reaches the model as a file rather than as text. Whether a model reads files is stated in its model configuration, and a `PipeJudge` with an image or a document input is refused when the method loads if its model does not read that kind of file, with a message naming the input and what the model reads. An input declared `Dynamic` names no kind of value, so a file it holds is checked when the step runs instead. A document given to the run in a format the model does not read is refused when the run starts, before any step spends anything. TypeSafe's model reads text only, so turn a document into text with a [`PipeExtract`](PipeExtract.md) step first.
+
+**The verdict.** A yes/no question's verdict follows from its probability: yes when the probability of yes is at least the `threshold`, which defaults to `0.5`. A model that reports no probability gives its own verdict, and a declared threshold then cannot apply, which the run logs as a warning. A choice's verdict is the key of the option chosen, with the model's `confidence` and the `probabilities` of every option when it reports them. A rating's verdict is the index of the level chosen, `0` being the first level declared, with the model's `confidence`, the `probabilities` of every level keyed by its index written as text, and a continuous `position` on the scale, when it reports them.
+
+The [native concepts page](../../concepts/native-concepts.md) describes the fields of the three verdicts. A downstream pipe reads them like any other fields, for example a [`PipeCondition`](../pipe-controllers/PipeCondition.md) routing on `routing.choice`, or one gating on `approved.probability`.
+
+## Configuration
+
+### The judgment model
+
+No judgment model is served out of the box: the model deck names no default for judgments, so a `PipeJudge` names its model in its `model` field, and a `PipeJudge` that names none is refused when the method loads. The deck's `@default-judgment` alias points at TypeSafe's model, which works once a `TYPESAFE_API_KEY` is set (see [the inference backend configuration](../../../configuration/config-technical/inference-backend-config.md)). To let your pipes leave `model` out, set a `choice_default` under `[judgment]` in your model deck.
+
+### MTHDS Parameters
+
+| Parameter     | Type       | Description | Required |
+| ------------- | ---------- | ----------- | -------- |
+| `type`        | string     | The type of the pipe: `PipeJudge`. | Yes |
+| `description` | string     | A description of the judgment. | Yes |
+| `inputs`      | dictionary | The material to judge, as a dictionary mapping input names to concept codes. Every input is sent to the model. | No |
+| `output`      | string     | `YesNo`, `Choice` or `Rating`, according to the kind of question, or a concept refining it. | Yes |
+| `model`       | string     | The judgment model, alias or preset, such as `"@default-judgment"`. Required unless your model deck names a default for judgments. | No |
+| `question`    | string     | The one closed question to ask. It may interpolate an input with the `$` prefix. `prompt` is read as a synonym, but a pipe may not set both. | Yes |
+| `options`     | dictionary | For a choice question: each key is an option, each value describes it. An empty string leaves an option undescribed. At least two options. | No |
+| `levels`      | list of strings | For a rating question: the levels from lowest to highest. At least two. | No |
+| `criteria`    | dictionary | For a yes/no question: what a `yes` and what a `no` mean, either or both. | No |
+| `threshold`   | number     | For a yes/no question: the probability of yes at or above which the verdict is yes, strictly between 0 and 1. Defaults to `0.5`. | No |
+
+### Example: A yes/no question with a threshold
+
+```toml
+[pipe.judge_is_urgent]
+type        = "PipeJudge"
+description = "Judges whether a message needs an answer today"
+inputs      = { message = "Text" }
+output      = "YesNo"
+model       = "@default-judgment"
+question    = "Does this message need an answer today?"
+criteria    = { yes = "Something is broken or blocked for the sender right now", no = "The sender can wait for a reply" }
+threshold   = 0.7
+```
+
+### Example: A choice that routes a ticket
+
+```toml
+[pipe.judge_team]
+type        = "PipeJudge"
+description = "Judges which team should handle a support ticket"
+inputs      = { ticket = "Text" }
+output      = "Choice"
+model       = "@default-judgment"
+question    = "Which team should handle this support ticket?"
+options     = { billing = "Charges, invoices, refunds and subscriptions", technical = "Errors, outages and features that do not work", other = "" }
+
+[pipe.dispatch_ticket]
+type            = "PipeCondition"
+description     = "Sends the ticket to the team the judgment chose"
+inputs          = { routing = "Choice", ticket = "Text" }
+output          = "Text"
+expression      = "routing.choice"
+outcomes        = { billing = "acknowledge_billing", technical = "acknowledge_technical" }
+default_outcome = "acknowledge_other"
+```
+
+### Example: A rating on a scale
+
+```toml
+[pipe.rate_severity]
+type        = "PipeJudge"
+description = "Rates how severe a bug report is"
+inputs      = { report = "Text" }
+output      = "Rating"
+model       = "@default-judgment"
+question    = "How severe is the bug this report describes?"
+levels      = ["Cosmetic: nothing stops working", "Degraded: a workaround exists", "Blocking: users cannot do their work at all"]
+```
+
+## Writing good judgments
+
+- **Ask one narrow question per pipe.** A question that bundles two judgments ("is it urgent and about billing?") gets one verdict for both. Split it into two `PipeJudge` steps, and combine their verdicts downstream.
+- **Make levels describe situations, not degrees.** "Blocking: users cannot do their work at all" gives the model something to recognize, where "Very severe" only restates the scale. A long scale of thin levels buys resolution the model cannot supply, and TypeSafe's model reads at most ten levels.
+- **Give a choice a catch-all option** when the material may fit none of the others, such as `other = ""`, so the model is not forced to pick a wrong one.
+- **Leave counting, arithmetic and dates to code.** Whether an invoice is over a sum, or a date is past a deadline, is a comparison a [`PipeFunc`](PipeFunc.md) or a `PipeCondition` expression makes exactly.
+- **State the condition directly** in the question rather than through an indirection, and keep interpolated inputs to short parameters: the material reaches the model anyway.
+
+## Related Documentation
+
+- [Judgment Feature](../../../features/judgment.md) - Overview of judgments in a method
+- [Native concepts](../../concepts/native-concepts.md) - The `YesNo`, `Choice` and `Rating` verdicts
+- [PipeCondition](../pipe-controllers/PipeCondition.md) - Route on a verdict
+
+
 ## PipeCompose
 
 # PipeCompose
@@ -7913,7 +8157,7 @@ A template reads data and calls methods of plain values, and nothing else: it ca
 | `output`        | string            | The concept for the output                                                  | Yes      |
 | `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
 
-Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
+Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 *Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
 
@@ -7982,7 +8226,7 @@ template = """
 """
 ```
 
-**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through. A bare URL becomes a link only when it has a scheme, such as `https://example.com`, so a file name like `README.md` stays text; a link written in Markdown, such as `[the guide](docs/guide.md)`, is a link whatever its target. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template.
+**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through. A bare URL becomes a link only when it has a scheme, such as `https://example.com`, so a file name like `README.md` stays text; a link written in Markdown, such as `[the guide](docs/guide.md)`, is a link whatever its target. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template. Converting Markdown is charged to the template's [render budget](../../../under-the-hood/template-sandbox.md#the-render-budget), so one render converts at most about 65,000 characters of it, each conversion counting.
 
 ## Construct Mode
 
@@ -8059,6 +8303,8 @@ Conversion matrix:
 | `Time[]` | `type = "list"`, `item_type = "time"` | the list of times of day |
 
 When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
+
+`Choice` and `Rating` are not in the matrix: reach their verdict by path, `{ from = "team.choice" }` or `{ from = "severity.level" }`. A `YesNo` converts to its boolean and leaves its probability behind, so copy `{ from = "approved.probability" }` into a `number` field when you need it.
 
 One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp. The same guard applies per item when copying a `Date[]` into a list of `date` items.
 
@@ -8154,6 +8400,7 @@ With no template, the step lays its inputs out by itself, which is called the au
 - a `Text` input prints as paragraphs, and a [`Markdown`](../../concepts/native-concepts.md) input prints formatted, with its headings, emphasis, lists, tables, code blocks and links;
 - an `Html` input prints as its text with the tags removed, since the auto-layout does not interpret HTML, a table row on one line with its cells separated by `|`;
 - an `Image` prints as a picture, with its caption;
+- a verdict prints as its verdict alone, like any scalar: a `YesNo` as its answer, a `Choice` as its option key and a `Rating` as its level, without the probability or confidence a producer reported;
 - a list of images, of `Markdown` texts or of other native values prints item by item, each as it would print alone.
 
 A single input is the document itself: an invoice's fields fill the page. Several inputs each get a section, in the order the step declares them. Every page carries the document's title in a running header and "Page N of M" in its footer, on A4 portrait, in a font bundled with Pipelex so that a PDF looks the same on every machine.
@@ -8243,13 +8490,13 @@ A `Text` input prints as plain paragraphs, so a report whose output is `Text` pr
 
 A `pdf` step's `template`, or its `.html` `template_file`, is rendered with exactly the stack of a `PipeCompose` HTML template: `$x` and `@x`, the `format` and `tag` filters, HTML autoescaping, and the [template sandbox](../../../under-the-hood/template-sandbox.md). A template that is only a fragment is wrapped in the plugin's print stylesheet (A4, running headers, page numbers); a whole HTML document prints as written, with any page setup its CSS gives. Three differences from `PipeCompose` matter:
 
-- **A field a template names must exist.** Each path a template reads, such as `invoice.customer.name`, is checked against the inputs' concepts when the method loads, including a path through a loop variable: in `{% for item in invoice.line_items %}`, `item.amount` is checked against the line item's concept. What the load-time check cannot follow, such as a value set with `{% set %}`, fails when the template renders at the dry run, since a missing value is an error rather than empty text. An absent optional input can still be tested with `{% if notes %}` or `is defined`.
+- **A field a template names must exist.** Each path a template reads, such as `invoice.customer.name`, is checked against the inputs' concepts when the method loads, including a path through a loop variable: in `{% for item in invoice.line_items %}`, `item.amount` is checked against the line item's concept. A name the template sets with `{% set %}` is followed no further, so a field read through it is checked when the template renders at the dry run, where a missing value is an error rather than empty text; a name only some branches of an `{% if %}` set is still checked as the input of that name, which the template reads on the paths where no branch ran. An absent optional input can still be tested with `{% if notes %}` or `is defined`.
 - **Pipelex's `format` filter shadows Jinja's own.** To format a number, write `{{ '%.2f' % invoice.total }}` rather than `{{ '%.2f' | format(invoice.total) }}`.
 - **The `markdown` filter** turns Markdown held in a plain text field into HTML: `{{ invoice.notes | markdown }}`. A `Markdown` input needs no filter.
 
 ### Office template files
 
-An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
+An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. In plain data a native value is its value, and a verdict is its verdict: a `YesNo` is its boolean, a `Choice` its option key and a `Rating` its level, so the file reads `team` rather than `team.choice`, and a verdict's probability or confidence does not reach it. A `pdf` template reads the verdict whole, `team.choice` and `team.confidence` included, as a `PipeCompose` template does. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
 
 A template file is found beside the bundle, so it works for a bundle loaded from a directory, a dependency package's included. A bundle loaded from a string, as the hosted API does, cannot name one: the step is refused at load. An inline `template` works on every load path.
 
@@ -8277,7 +8524,10 @@ A dry run composes for real against mock inputs, which checks the templates and 
 
 # PipeFunc
 
-The `PipeFunc` operator provides an essential escape hatch, allowing you to execute arbitrary Python code from within a pipeline. This is useful for custom data manipulation, complex logic, or integrating with external services not supported by other operators.
+The `PipeFunc` operator provides an essential escape hatch, allowing you to execute arbitrary Python code from within a pipeline. It is for the work a model should not do: exact arithmetic, deterministic business rules, and reshaping data, for example with pandas or openpyxl.
+
+!!! note "Keep other services out of a PipeFunc"
+    A method receives its data through its inputs and hands its results to whatever runs it. Reading from a mailbox, a drive or a CRM, and writing back to one, belongs to that caller: an application using the SDK, an automation platform such as n8n, or an agent with its own connectors. A PipeFunc that calls another service works on your machine but fails on a sandbox-hosted deployment, where PipeFunc code runs in an isolated sandbox with no network access, no credentials and a short time limit. To read a web page or search the web, use [PipeExtract](PipeExtract.md) or [PipeSearch](PipeSearch.md).
 
 ## How it works
 
@@ -9274,6 +9524,7 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
 - `3_extract_deck.toml`: Document extraction configuration
 - `4_search_deck.toml`: Search configuration
 - `5_doc_gen_deck.toml`: The document engines `PipeDocGen` prints with, by format and source
+- `6_judgment_deck.toml`: Judgment configuration
 - `x_custom_extract_deck.toml`: Custom extraction waterfalls/overrides (loaded last)
 - `x_custom_llm_deck.toml`: Custom LLM waterfalls/overrides (loaded last)
 
@@ -9294,6 +9545,7 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
         ├── 3_extract_deck.toml        # Document extraction config
         ├── 4_search_deck.toml         # Search config
         ├── 5_doc_gen_deck.toml        # Document engines, by format and source
+        ├── 6_judgment_deck.toml       # Judgment config
         ├── x_custom_extract_deck.toml # Custom extraction waterfalls/overrides
         └── x_custom_llm_deck.toml     # Custom LLM waterfalls/overrides
 ```
@@ -9437,7 +9689,7 @@ So a pipe with `templating_style = "no_tag"` and one with `$article` instead of 
 ## Beyond PipeLLM
 
 - **[`PipeCompose`](pipes/pipe-operators/PipeCompose.md)** takes `templating_style` on its `[pipe.name.template]` section, for templates that use the `tag` or `format` filters directly. A compose pipe that declares nothing renders under the same runtime default.
-- **`PipeImgGen` and `PipeSearch`** have no authored style of their own — their prompts render under the runtime default. Image and search prompts rarely benefit from tagging, but they do render under a real style rather than an invisible fallback.
+- **`PipeImgGen`, `PipeSearch` and `PipeJudge`** have no authored style of their own — their prompts and questions render under the runtime default. Image and search prompts rarely benefit from tagging, but they do render under a real style rather than an invisible fallback.
 - **Construct-mode template fields** and the built-in structuring prompts likewise resolve a real style, so a template of yours that uses `| tag` behaves the same everywhere.
 
 !!! warning "A style is always required, and never invented"
@@ -9747,7 +9999,7 @@ Locally-modified files are preserved as `<file>.bak.<UTC-timestamp>` before the 
 
 Pipelex draws a sharp line between the files it owns and the files you own.
 
-- **Managed (pipelex-owned)** — the numbered deck files, `1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml` and `5_doc_gen_deck.toml`, and `backends/internal.toml`. These are refreshed by `pipelex update`. Local edits are preserved with a `.bak.<timestamp>` backup but will not survive future updates.
+- **Managed (pipelex-owned)** — the numbered deck files, `1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`, `5_doc_gen_deck.toml` and `6_judgment_deck.toml`, and `backends/internal.toml`. These are refreshed by `pipelex update`. Local edits are preserved with a `.bak.<timestamp>` backup but will not survive future updates.
 - **User overrides** — any file in the deck directory whose name starts with `x_custom_` (e.g. `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`). `pipelex update` never tracks, hashes, copies, or removes these, while `pipelex init`, a full reset, rewrites the two the kit ships. Add new ones whenever you need to override aliases, presets, or default choices for a backend.
 - **Every other backend file** — `openai.toml`, `anthropic.toml`, a backend of your own, and the rest of `backends/`. `pipelex update` never touches them; `pipelex init`, a full reset, rewrites the ones the kit ships, such as `openai.toml`, and leaves a backend of your own in place. Declare models of your own in a backend of your own rather than in `internal.toml`.
 
@@ -11461,11 +11713,23 @@ pipelex-agent inputs method <NAME> [OPTIONS]
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
+The JSON success envelope names the pipe the template was generated for as `pipe_ref`, the qualified `domain.pipe_code` of the pipe that was resolved, whether you named it with a bare code, a qualified ref, or let it default to the bundle's `main_pipe`. A pipe you reached through a dependency alias keeps that alias, `alias->domain.pipe_code`, since that is the ref that selects it again:
+
+```json
+{
+  "success": true,
+  "pipe_ref": "my_domain.main_pipe",
+  "inputs": { ... }
+}
+```
+
+A pipe that declares no inputs is not an error: the envelope carries `"inputs": {}` and the command exits `0`; under `--format toml` it prints the comment `# Pipe 'my_domain.main_pipe' declares no inputs.`
+
 !!! note "`inputs --format` is `json|toml`, not `markdown|json`"
     Unlike `run`/`validate`, the `inputs` command's `--format` selects the **template serialization**, not a presentation style. `json` (the default) emits the structured JSON success envelope; `toml` prints the raw TOML template straight to stdout (a pipe with no inputs prints a TOML comment line, which loads back as an empty dict). This mirrors the raw-TOML output of the `concept` and `pipe` commands. `inputs` has no `--error-format` — its errors stay JSON.
 
 !!! note "`--explicit` and concept hints"
-    The light `--format toml` template carries the declared concept for each key as a `# concept: ...` comment; the light `--format json` template (the default) cannot (JSON has no comments), so pass `--explicit` when you want the concept written out inline. The JSON success envelope shape (`success` / `pipe_code` / `inputs`) is unchanged — only the `inputs` payload flips between the light values and the envelope form.
+    The light `--format toml` template carries the declared concept for each key as a `# concept: ...` comment; the light `--format json` template (the default) cannot (JSON has no comments), so pass `--explicit` when you want the concept written out inline. The JSON success envelope shape (`success` / `pipe_ref` / `inputs`) is unchanged — only the `inputs` payload flips between the light values and the envelope form.
 
 ### Flat Commands
 
@@ -11804,7 +12068,7 @@ sink = "console"
 ```
 
 - Names the registered log sink boot installs on the root logger, the way `runtime.storage.method` names a storage backend
-- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the `json` alternative
+- `"console"`: the Rich handler, for a terminal. The default, so the CLI keeps its rendering. It needs Rich, which the `cli` extra (`pipelex[cli]`) declares, and a boot that selects it without Rich installed stops, naming the extra and the `json` alternative. The core dependencies `typer` and `instructor` install Rich anyway, so that refusal does not fire on an ordinary install: a server that forgot to select `json` boots on this sink
 - `"json"`: one JSON object per line, for a server behind a log agent
 - `"otlp"`: the OpenTelemetry logs signal, for a collector
 - `"gcp"`: Google Cloud Logging through the client library, for a process that must write to it directly
@@ -11828,10 +12092,10 @@ pretty_print_mode = "rich"
 ```
 
 - Controls the panels that `pretty_print(...)` renders, such as the "Output of pipe" panel shown after every operator pipe
-- `"rich"`: Rich tables and panels on the console print target. It needs the `cli` extra (`pipelex[cli]`), and a boot that selects it without Rich installed stops, naming the extra and the two modes below
+- `"rich"`: Rich tables and panels on the console print target. It needs Rich, which the `cli` extra (`pipelex[cli]`) declares, and a boot that selects it without Rich installed stops, naming the extra and the two modes below; as with the `console` sink, the core dependencies install Rich anyway, so that refusal does not fire on an ordinary install
 - `"poor"`: plain text in a drawn frame on stderr, with no Rich panel and no Rich import; a pipe's output prints as its plain rendering
 - `"silent"`: nothing is printed and no renderable is built, for a host with no console or one that must not spend time rendering on the thread that runs pipes
-- Default: `"rich"`. The agent CLI forces `"silent"`, and a server installed without the `cli` extra sets `"poor"` or `"silent"` beside `sink = "json"`
+- Default: `"rich"`. The agent CLI forces `"silent"`, and a server sets `"poor"` or `"silent"` beside `sink = "json"` in its own configuration, since nothing at boot sets either for it
 - Boot applies the key, replacing any `PrettyPrinter.mode` assigned in code before it, and teardown returns the printer to the mode the process held before that boot
 
 ### JSON Formatting
@@ -11971,11 +12235,11 @@ Configuration section: `[runtime.log.otlp]`, read only when `sink = "otlp"`.
 ```toml
 [runtime.log.otlp]
 endpoint = "http://collector:4318/v1/logs"
-headers = { Authorization = "Bearer ..." }
+headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 ```
 
 - `endpoint`: The collector's logs URL. Left unset, the exporter follows the OpenTelemetry environment conventions: `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`, then `OTEL_EXPORTER_OTLP_ENDPOINT` with the `/v1/logs` path, then the collector default on localhost
-- `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge
+- `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge. A value may name a secret rather than carry it, as the example's bearer token does, and the keys are taken as written: see [Secrets in Sink Settings](#secrets-in-sink-settings). This is the spelling `telemetry.toml` uses for the trace exporter's headers, so the two OTLP exporters of one process name the same credential the same way
 - The records are exported in batches on the OTLP HTTP protocol, with the same service identity as the spans the runtime already exports, so a collector files the two together
 - Each record carries the trace context of OpenTelemetry's current span, your own code's, so a collector files the record under your span; a record logged where no current span names a trace carries none. The Pipelex span active at the log call, the pipe's own or the LLM call's during a run, rides as the `pipelex.trace_id` and `pipelex.span_id` attributes, in hex. Pipelex never makes its own spans current in the process's OpenTelemetry context, so your own instrumentation is never re-parented under them
 - The keys the sink writes itself — the source location `code.file.path`, `code.function.name` and `code.line.number`, `pipelex.trace_id` and `pipelex.span_id`, and the `exception.*` keys — are reserved on every record whether or not it carries an exception or a Pipelex span, exactly as the `json` sink reserves its own keys: a field named like one of them is carried under the same `field_` prefix, so nothing is overwritten and a field keeps one wire name whichever sink is selected
@@ -11995,12 +12259,12 @@ Configuration section: `[runtime.log.gcp]`, read only when `sink = "gcp"`. The s
 [runtime.log.gcp]
 log_name = "pipelex"
 project_id = "my-project"
-credentials_file_path = "gcp_credentials.json"
+credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
 ```
 
 - `log_name`: the Cloud Logging log the entries land under. Default: `"pipelex"`
 - `project_id`: the project to write to. Left unset, the client library resolves it from the credentials or from the metadata server of the machine the process runs on
-- `credentials_file_path`: a service-account JSON file to build the client from. Left unset, authentication is Application Default Credentials, which is what a process already running on Google Cloud has. This is a plain config value rather than a secret id read through the secrets provider, because the log sink is the first capability boot resolves — deliberately ahead of the secrets provider, so that every later line of the boot goes through the sink the configuration chose — and there is no provider to ask when this section is read
+- `credentials_file_path`: a service-account JSON file to build the client from. Left unset, authentication is Application Default Credentials, which is what a process already running on Google Cloud has. The path may be written as it is, `"gcp_credentials.json"`, or name a secret, as the example does with `GCP_CREDENTIALS_FILE_PATH`, the secret the `gcp` storage provider reads, so that one secret serves both: see [Secrets in Sink Settings](#secrets-in-sink-settings). When the path came from a placeholder, the credential errors below name the placeholder beside the resolved path, so you know to fix the secret rather than the TOML
 
 ### Credentials are checked at boot
 
@@ -12021,6 +12285,17 @@ Each record becomes one Cloud Logging entry with a JSON payload:
 - The entries leave through the client library's background-thread transport, which batches them off the thread that logged, so no record costs an API round trip on the calling thread. The teardown flushes and closes it, and the flush carries a deadline of its own, five seconds, because the library's does not. A flush that runs out of time says so on stderr, that the transport was still writing and that what it still holds is lost unless it sends it while it closes, followed by what a fresh refresh of the credentials answers, a refresh given five seconds of its own, so such a flush returns within ten and the close then gives the transport the client library's own grace period: refused, with Google's answer, which is why the write is held; unreachable; or still accepted, in which case the Cloud Logging API or the network is what holds it. A handler that has closed does not flush again when the process exits
 - What the export path logs never leaves through the sink: the library reports a refused batch through a logger of its own, and a report exported through the pipeline it reports on would fail with it and be reported again. The handler rejects those records, and every record emitted on the library's export thread, before its lock is taken — the same guard the `otlp` sink carries, against the same deadlock at exit. What the sink's own credentials check logs while a teardown's flush waits on it is rejected the same way and printed on stderr, so the check still answers when the process's exit holds the handler's lock
 - A refused write is still said: the library marks a refused batch done, so the flush succeeds and nothing else would report it, and the entries in it are lost. The export path's warnings and errors are printed on stderr instead, the first one in each window of time with its traceback and the ones after it counted in a single line once that window has passed — with the next failure, on the next line the process logs, or at the teardown at the latest — so a process whose writes Cloud Logging refuses says so without printing once per line it logs
+
+## Secrets in Sink Settings
+
+The values of the `otlp` sink's `headers` and the `gcp` sink's `credentials_file_path` accept the `${…}` placeholders the [inference backends](../config-technical/inference-backend-config.md) use, resolved through the secrets provider `[runtime.secrets]` selects. Boot builds that provider before it installs the sink for this reason, and hands it to the sink's factory.
+
+- `${NAME}` and `${secret:NAME}` read `NAME` from the secrets provider, which with the default `env` method is the environment variable of that name
+- `${env:NAME}` reads the environment variable whatever the secrets method
+- `${env:NAME|secret:OTHER}` tries each in turn
+- A placeholder can sit inside a longer value, `"Bearer ${OTLP_AUTH_TOKEN}"`, and the rest of the value is kept as written
+
+The configuration keeps the placeholders, so nothing that prints the configuration can print a credential. A header's resolved value reaches the exporter alone, and the resolved key path reaches the Cloud Logging client and the `gcp` sink's credential errors, which quote it beside its placeholder. A placeholder that does not resolve stops the boot with `LogSinkVariableError`, whose message names the section, the key and the variable, never a value, rather than sending the placeholder to the collector as if it were the token and losing every record while the boot reports success; `pipelex doctor` reports the same message in its log-sink row. A header value that holds a line break once resolved stops the boot with `LogSinkHeaderValueError`, naming the key and never the value: no HTTP header can carry one, and the exporter would otherwise be installed and refuse every batch. A secret read from a file often ends with a newline, so store it without one. There is no escape syntax, so a header value that genuinely contains `${` cannot be written. A secrets provider that fails to build stops the boot before any sink exists, and the lines logged until then are written to stderr, redacted, as they are for any boot that dies before its sink. `pipelex doctor` quotes that failure in its Secrets Provider row, and a sink's failure in its log-sink row, scrubbed with the same redaction patterns, the configured `extra_patterns` included.
 
 ## Example Configuration
 
@@ -12085,7 +12360,8 @@ Two of those keys chose a behaviour their deletion undoes, and no operation in t
 
 2. **Production Environment**:
 
-    - Select the `json` sink behind a log agent, the `otlp` sink in front of a collector, or the `gcp` sink for a process that must write to Google Cloud Logging directly
+    - Prefer a sink that holds no credential: the `json` sink on stderr, shipped by a collector or by the platform's log agent, which authenticates on the process's behalf with the platform's own identity. Nothing in the process then holds a logging credential, and a misconfigured one cannot lose its records
+    - Select the `otlp` sink in front of a collector that needs a token, or the `gcp` sink for a process that must write to Google Cloud Logging directly, only when no agent can ship the lines; their credentials then belong in the secrets provider, named in [their settings](#secrets-in-sink-settings) rather than written there
     - Disable caller info for performance
     - Use INFO or higher log levels
 
@@ -12957,6 +13233,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── vertexai.toml       # Google Vertex AI models (LLMs)
     │   ├── fal.toml            # FAL models (image generation)
     │   ├── linkup.toml          # Linkup models (web search)
+    │   ├── typesafe.toml       # TypeSafe models (judgment)
     │   ├── internal.toml       # Internal/local models (text extraction, the built-in document engine), managed by `pipelex update`
     │   └── ...
     └── deck/                   # Model deck configurations
@@ -12965,6 +13242,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
         ├── 3_extract_deck.toml       # Document extraction config
         ├── 4_search_deck.toml        # Web search config
         ├── 5_doc_gen_deck.toml       # Document engines, by format and source
+        ├── 6_judgment_deck.toml      # Judgment config
         ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
         └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```
@@ -12972,7 +13250,7 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
 Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with custom/override files (`x_` prefix) loaded last.
 
 !!! tip "Numbered files are pipelex-managed; overrides go in `x_custom_*.toml`"
-    The numbered deck files (`1_llm_deck.toml`...`5_doc_gen_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
+    The numbered deck files (`1_llm_deck.toml`...`6_judgment_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
 
     To customize aliases, presets, or default choices without conflict, edit (or create) any file in this directory whose name starts with `x_custom_` — Pipelex never tracks or overwrites those. See [`pipelex update`](../../tools/cli/update.md) for the full workflow.
 
@@ -13142,6 +13420,8 @@ GCP_CREDENTIALS_FILE_PATH=gcp_credentials.json
 FAL_API_KEY=
 
 LINKUP_API_KEY=
+
+TYPESAFE_API_KEY=
 # ... (see .env.example for full list)
 ```
 
@@ -13170,12 +13450,18 @@ api_key = "${FAL_API_KEY}"
 enabled = true
 api_key = "${LINKUP_API_KEY}"
 
+[typesafe]
+enabled = true
+api_key = "${TYPESAFE_API_KEY}"
+
 [internal]
 enabled = true
 # No API key needed for internal/local processing
 ```
 
 The `${VARIABLE_NAME}` syntax automatically loads values from your `.env` file. Set `enabled = true` to activate a backend, or `false` to disable it.
+
+Judgment models are never served by the Pipelex Gateway, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
 
 ### Model Specifications
 
@@ -13210,6 +13496,26 @@ costs = { input = 0.04, output = 0.0 }
 ```
 
 The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
+
+#### Input formats
+
+`inputs` lists what a model reads. For files, its entries are format keys, the same keys the runtime derives from a file's MIME type to check, before a run starts, that every file reaches a model able to read it: every image type is the `image` family, and any other type is its extension.
+
+- **LLMs** declare `images` to read images (vision), and the document formats they read among `pdf`, `docx`, `pptx`, `xlsx` and `html`.
+- **Extract models** declare the file formats they read among `pdf`, `docx`, `pptx`, `xlsx`, `html`, `md`, `csv`, `txt`, `vtt`, `eml` and `image`, and `web_page` when they fetch a web page from its URL themselves.
+
+```toml
+# internal.toml
+[docling-extract-text]
+model_type = "text_extractor"
+sdk = "docling_sdk"
+model_id = "extract-text"
+inputs = ["pdf", "docx", "pptx", "xlsx", "html", "md", "csv", "txt", "vtt", "eml", "image"]
+outputs = ["pages"]
+costs = {}
+```
+
+A file whose format the consuming model does not declare is refused with an input error that names the input, the model and the formats it reads. A file whose format is unknown, with no type or the generic `application/octet-stream`, is left to the provider. Declare a format only once the model is known to read it.
 
 #### Structure methods
 
@@ -14614,7 +14920,7 @@ Logging is configured in two steps at boot. `log.configure` sets the levels and 
 
 ## Console rendering
 
-The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install and a server leaves out. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. A server without the extra also sets `pretty_print_mode` to `"poor"` or `"silent"`, since the `"rich"` panels are refused at boot the same way (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. That refusal is not what keeps a server off the console: `typer` and `instructor`, both core dependencies, require Rich, so it is installed even where the extra is not, and a server that forgot to select `json` boots on the `console` sink. A server therefore selects `json` in its own configuration, and sets `pretty_print_mode` to `"poor"` or `"silent"` beside it, since the boot makes neither choice for it (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
 
 ### Rich Formatting
 
@@ -15376,6 +15682,7 @@ Operators perform concrete actions:
 - **PipeFunc** - Execute custom Python functions
 - **PipeCompose** - Compose content from templates or construct structured objects
 - **PipeSearch** - Search the web for information
+- **PipeJudge** - Answer a closed question about the inputs with a verdict
 
 What an operator *does* — model-deck resolution, prompt assembly, generation, memory write-back — lives one layer down in [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel), as plain functions that take everything method-specific as an explicit argument and read only the kernel-layer services a boot stands up, such as the model deck and the content generator. The operator classes above hold what is specific to being a step in a method: blueprint resolution, input validation, error context, and execution-graph tracing. The split exists so the same semantics can be called without a loaded method, and so there is one implementation rather than two that drift. See [The Pipelex Kernel](./pipelex-kernel.md) for the layering contract, what a programmatic caller imports, and how it boots.
 
@@ -15474,6 +15781,7 @@ flowchart TB
             O4["PipeImgGen"]
             O5["PipeCompose"]
             O6["PipeSearch"]
+            O7["PipeJudge"]
         end
         subgraph Core["Core Domain"]
             CR1["Concepts"]
@@ -15595,6 +15903,7 @@ Both façade calls take the concept and the output class the caller wants, defau
 | `pipelex.kernel.extract_ops` | `resolve_extract_setting`, `build_extract_job_params`, `run_extract` |
 | `pipelex.kernel.img_gen_ops` | `resolve_img_gen_setting`, `resolve_default_size`, `build_img_gen_job_params`, `run_img_gen` |
 | `pipelex.kernel.search_ops` | `resolve_search_setting`, `run_search` |
+| `pipelex.kernel.judgment_ops` | `judgment_setting_of_choice`, `served_judgment_model`, `resolve_judgment_setting`, `build_judgment_material`, `material_value`, `make_verdict_content`, `run_judgment` |
 | `pipelex.kernel.compose_ops` | `build_compose_context`, `build_composed_content`, `run_compose_template` |
 | `pipelex.kernel.func_ops` | `call_registered_function`, `run_func` |
 | `pipelex.kernel.memory_ops` | `shape_inputs`, `store_result`, `extract_main_content` / `extract_named_content`, `extract_main_content_as_list` / `extract_named_content_as_list` |
@@ -15605,7 +15914,9 @@ Both façade calls take the concept and the output class the caller wants, defau
 
 The two `assemble_*` functions are there because `run_llm_text` and `run_img_gen` both take a *ready* prompt. A caller that could not build one would be holding an operator it cannot reach, which is what image generation was until `assemble_img_gen_prompt` existed: its only builder was an interpreter-layer blueprint. What they own is the part a caller must not re-derive — resolving `ImageReference` and `DocumentReference` out of working memory, and, on the image side, keeping the `[Image N]` tokens numbered from the same registry that orders `input_images`, since a mismatch mislabels which image the prompt is describing and nothing downstream can detect it.
 
-**Every entry point that renders a template takes a required `templating_style`** — `run_llm_text`, `run_llm_object`, `derive_structure_prompt`, `assemble_llm_prompt`, `assemble_img_gen_prompt`, `run_search`, `run_compose_template`. It is not nullable, and that is the contract: the Jinja2 filters that tag and format a value have no default of their own, so a call that omitted the style would render a prompt in a shape nobody chose. `resolve_templating_style(authored=...)` is what produces one — pass what the caller authored, or `None` to take the runtime default.
+`run_judgment` asks one question over the step's inputs by name, which it calls the material. `build_judgment_material` reads each input off its content's class, never off its concept, so the kernel stays free of the concept library: text is its string, a number its number, a yes/no its boolean, a date or a time its ISO string, a list the array of its items, any other structure its JSON object without its absent members, and an image or a document, or a list of either, travels beside that JSON state as prompt images and documents keyed by the input's name. An optional input that holds no value is left out, whether its absence was recorded or it was never written. A dotted input, such as `invoice.total`, is the value at its path, keyed by its full name, and is left out when the path holds nothing. `make_verdict_content` turns the answer into the verdict native: a yes/no answer's probability decides the verdict against the step's threshold, inclusive, or against 0.5 when none is declared; an answer with no probability keeps the model's own verdict, and when a threshold was declared a live run logs a warning and its `JudgmentResult` reports `threshold_applied` as false. A rating's distribution is keyed by the level index written as text. `judgment_setting_of_choice` gives the setting of the step's model, else of the deck's default, and raises `JudgmentModelMissingError` when neither names one, since the deck serves none by default. `served_judgment_model` gives the spec of the model a handle resolves to on this boot, or `None` when no backend serves one, a waterfall none of whose models is served included. `resolve_judgment_setting` then pins the setting to the handle the model resolves to; on a dry run, a model no backend serves on this boot keeps the deck's handle, since no judging worker is called.
+
+**Every entry point that renders a template takes a required `templating_style`** — `run_llm_text`, `run_llm_object`, `derive_structure_prompt`, `assemble_llm_prompt`, `assemble_img_gen_prompt`, `run_search`, `run_judgment`, `run_compose_template`. It is not nullable, and that is the contract: the Jinja2 filters that tag and format a value have no default of their own, so a call that omitted the style would render a prompt in a shape nobody chose. `resolve_templating_style(authored=...)` is what produces one — pass what the caller authored, or `None` to take the runtime default.
 
 There are **no re-exports**: `pipelex/kernel/__init__.py` holds doctrine and nothing else, and every symbol is imported from the module that defines it. For this package that is a layering property rather than a style one — a module that re-exports across layers is a layer boundary with the sign filed off.
 
@@ -15686,7 +15997,7 @@ Passing a `trace_context` adopts its `graph_id` as the run's `pipeline_run_id`, 
 
 A record emitted inside a `log.context` block carries the run's identifiers — `request_id`, `pipeline_run_id` and `pipe_run_id` — as fields a sink can filter on ([Logging](../tools/logging.md#the-run-scoped-context)). The interpreter binds them around a run and around each pipe; a program driving the kernel has no interpreter around it, so the kernel binds them itself, split the same way as the usage lifecycle above.
 
-- **Each step binds itself.** Every kernel function that takes a `job_metadata` — `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search` and `run_img_gen` — opens its body with `with job_metadata.log_context():`, so every line it emits, from prompt assembly to the memory write-back and any failure raised on the way, names the run and the step. A unit test sweeps `pipelex/kernel/` and fails on a function that takes a `job_metadata` without opening its body that way, so the rule holds for the next function added as well.
+- **Each step binds itself.** Every kernel function that takes a `job_metadata` — `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search`, `run_judgment` and `run_img_gen` — opens its body with `with job_metadata.log_context():`, so every line it emits, from prompt assembly to the memory write-back and any failure raised on the way, names the run and the step. A unit test sweeps `pipelex/kernel/` and fails on a function that takes a `job_metadata` without opening its body that way, so the rule holds for the next function added as well.
 - **The host binds the run.** `PipelexKernel.log_context()` binds `request_id` and `pipeline_run_id` and no step, and a host wraps its run in it. The kernel cannot do this for the host, for the reason it cannot own the usage lifecycle: a kernel call has no run boundary to hang the binding on. Inside the host's block, each step's binding merges over the run's for the length of the call, so a line the host emits between two calls names the run, and a line emitted during one names the step as well.
 
 ```python
@@ -15985,7 +16296,7 @@ The remaining findings are artifacts of *how* you lint, not of file content. Non
 
 ## Serving the engine over HTTP
 
-The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen`, and the re-pointed `/v1/build/*` — the route envelopes are documented on the API server's [Resolve & Codegen](../api-server/codegen.md) page). Two host-facing cores make that possible without any CLI plumbing:
+The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen` and `POST /v1/pipe-io` — the route envelopes are documented on the API server's [Resolve & Codegen](../api-server/codegen.md) and [Pipe I/O](../api-server/pipe-io.md) pages). Two host-facing cores make that possible without any CLI plumbing:
 
 - **`pipelex.pipeline.resolve_bundle.resolve_crate_from_contents`** resolves **in-memory** MTHDS contents (strings, with optional per-content sources) into the normalized crate. It mirrors `validate_bundle`'s in-memory arm — the same `translate_to_validate_bundle_error` cascade, so an invalid library raises the one shared `ValidateBundleError` and a resolve verdict cannot drift from a validate verdict — and the same **loaded-on-success contract**: the library is left loaded and current for the host to read live pipes from, and the host owns its teardown. Resolution is static (no dry-run sweep), matching `pipelex resolve`.
 - **`build_stamped_projection`** (above) gives the host the stamped artifact set plus the lock as pure content. A client that writes the served files and lock verbatim reproduces a local run byte-for-byte — the offline `codegen check` passes on the written tree exactly as it would locally. There is deliberately no server-side check route: the check is offline by design.
@@ -16069,12 +16380,16 @@ The table and rules above ARE the no-hint kind assignment — stated rules, not 
 |---|---|
 | `Text`, `Markdown` | `prose` |
 | `Number` | `number` with `integer: false` |
-| `YesNo` | `boolean` |
+| `YesNo` | `boolean` on the input side; `object` over `yes_no` and `probability` in an output descriptor |
 | `Time` | `text` with `format: "time"` |
 | `Document` | `document` |
 | `Image` | `image` |
-| `Date`, `Html`, `Page`, `TextAndImages`, `SearchResult` | `object` over the pinned blueprint's fields |
-| `Dynamic`, `Anything`, `JSON` | `unknown` |
+| `Date`, `Html`, `Page`, `TextAndImages`, `SearchResult`, `JSON`, `Choice`, `Rating` | `object` over the pinned blueprint's fields |
+| `Dynamic`, `Anything`, `Composite` | `unknown` |
+
+`JSON` is the one row where Pipelex departs from the published standard, which lists it as `unknown`: Pipelex derives it as an `object` over its pinned `json_obj` member, itself an `unknown` dict, because a template describing a `JSON` input as unknown renders `{}`, which `JSONContent` then refuses.
+
+`YesNo` is the one native read differently by position, as the standard states: a caller supplies the bare verdict, while a producer may report a probability beside it. The output descriptor is the same derivation (`InputFormDeriver`) told its position by `build_output_form`, and the position is read in `YesNo`'s row and nowhere else, so a `YesNo` is an `object` at every depth of an output node — at the top, as a nested field, as a list's item, through a reflected class field and through a class-backed concept.
 
 Nested structure fields map by their declared type: `text` → `text`; `integer` → `number` with `integer: true`; `number` → `number`; `boolean` → `boolean`; `date` → `date`; `datetime` → `date` with `datetime: true`; `time` → `text` with `format: "time"`; a field with `choices` → `enum` (choices win over `type`, matching the structure generator); `concept` → the concept's node, carrying its namespaced `concept_ref`; `list` → `list` whose `item` comes from `item_type` / `item_concept_ref` (a nested list's inner item is inexpressible and reports `unknown`; the `item` node carries no `name` member — a list's item has no authored name, and the index labels entries); `dict` → `unknown`. The shorthand `field = "description"` form is a required `text`. Nested fields take the blueprint field's description and `required` over the concept's; a scalar flattened at the top level keeps the concept's description.
 
@@ -16102,7 +16417,7 @@ Inapplicable slots are absent, never JSON `null`: the report's valid arm is dump
 
 ## What clients project from it
 
-The descriptor is what a client SDK renders a pipe's fill-in inputs template from — the hosted build routes no longer render one server-side. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.
+The descriptor is what a client SDK renders a pipe's fill-in inputs template from — no server route renders one. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.
 
 
 ## Per-Pipe IO Contracts
@@ -16211,7 +16526,7 @@ flowchart TD
     J --> K[model_validate with resolved values]
 ```
 
-A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
+A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, judgment, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
 
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
@@ -17054,12 +17369,12 @@ One record per inference call, in completion order:
 
 | field | type | semantics |
 |---|---|---|
-| `model_type` | string | Kind of inference: known values `llm`, `img_gen`, `extract`, `search`. Open set. |
+| `model_type` | string | Kind of inference: known values `llm`, `img_gen`, `extract`, `search`, `judgment`. Open set. |
 | `inference_model_name` | string | Human model name (e.g. `gpt-4o`). |
 | `inference_model_id` | string | Provider/platform model id (e.g. `gpt-4o-2024-11-20`). |
 | `pipe_code` | string \| null | Pipe that made the call — per-pipe cost attribution. |
-| `job_category` | string \| null | Known values: `llm_job`, `img_gen_job`, `extract_job`, `search_job`, `jinja2_job`, `mock_job`. Open set. |
-| `unit_job_id` | string \| null | Known values: `llm_gen_text`, `llm_gen_object`, `img_gen_text_to_image`, `extract_pages`, `search_sourced_answer`, `search_structured`. Open set. |
+| `job_category` | string \| null | Known values: `llm_job`, `img_gen_job`, `extract_job`, `search_job`, `judgment_job`, `jinja2_job`, `mock_job`. Open set. |
+| `unit_job_id` | string \| null | Known values: `llm_gen_text`, `llm_gen_object`, `img_gen_text_to_image`, `extract_pages`, `search_sourced_answer`, `search_structured`, `judgment_answer`. Open set. |
 | `nb_tokens_by_category` | object&lt;string, int&gt; | Raw provider-reported token counts, keyed by `TokenCategory` values (`input`, `input_cached`, `output`, ...). Open set. `input` is the joined total; `input_cached` is a subset of it, not additive. |
 | `cost` | number \| null | Computed USD cost of this call. `null` when the model has no rate table (own-GPU, mock, dry-run). |
 | `started_at` | string \| null | ISO 8601. |
@@ -18504,9 +18819,9 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 
 # Template Sandbox
 
-A method's templates are code. PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts, and PipeCondition expressions are all Jinja2 templates, and they render inside the process that runs the method. When that process is shared, as it is on a hosted runner, a template must not be able to reach anything but the data it was given.
+A method's templates are code. PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts, PipeJudge questions, and PipeCondition expressions are all Jinja2 templates, and they render inside the process that runs the method. When that process is shared, as it is on a hosted runner, a template must not be able to reach anything but the data it was given.
 
-Pipelex therefore renders every template, its own included, under one policy: **a template reads data and calls methods of plain values, and nothing else.**
+Pipelex therefore renders every template, its own included, under one policy: **a template reads data and calls methods of plain values, and nothing else.** And because a template that only reads data can still ask for a billion-character string, every render also spends from a [budget of work](#the-render-budget), and a render that would overdraw it is refused before it allocates.
 
 ## What a template may do
 
@@ -18516,7 +18831,7 @@ Pipelex therefore renders every template, its own included, under one policy: **
 | Read an input's metadata fields | `{{ invoice._stuff_name }}`, `{{ invoice._content_class }}`, `{{ invoice._concept_code }}`, `{{ invoice._stuff_code }}` |
 | Read any key of a plain dict with brackets, underscore keys included | `{{ record['_id'] }}`, `{{ record['__typename'] }}` |
 | Call the dict-like accessors of an input | `{{ invoice.get('total') }}`, `{% for key, value in invoice.iter_items() %}` |
-| Call methods of strings, numbers, dates and times, lists, tuples, dicts and sets | `{{ issued_at.isoformat() }}`, `{{ name.upper() }}`, `{{ record.get('a') }}` |
+| Call the methods of strings, numbers, dates and times, lists, tuples, dicts and sets that read them | `{{ issued_at.isoformat() }}`, `{{ name.upper() }}`, `{{ record.get('a') }}` |
 | Format a string, including with replacement fields | `{{ '{0} items'.format(count) }}` |
 | Use Jinja's own constructs and globals | macros and `caller()`, `loop.cycle()`, `namespace()`, `cycler()`, `joiner()`, `range()`, `dict()` |
 | Apply any filter | `{{ doc \| tag }}`, `{{ doc \| format }}`, `{{ page \| with_images }}`, `{{ items \| length }}` |
@@ -18530,6 +18845,8 @@ Pipelex therefore renders every template, its own included, under one policy: **
 | Call a method of anything that is not a plain value | `{{ pages[0].model_dump() }}`, `{{ photos[0].model_copy() }}` |
 | Call a class method, even through an instance | `{{ issued_at.now() }}` |
 | Change a list, a dict or a set | `{{ items.append(x) }}`, `{{ record.update(other) }}`, `{{ tags.intersection_update(other) }}` |
+| Encode a string, or turn an integer into bytes | `{{ name.encode('utf-8') }}`, `{{ (1).to_bytes(8) }}` |
+| Spend more than its render budget, or compute an integer wider than 64 bits | `{{ 'x' * 10 ** 9 }}`, `{{ 2 ** 70 }}` |
 | Store a callable in a `namespace()` | `{% set ns.f = name.upper %}`, `namespace(items=doc.get)` |
 | Include or extend another template | `{% include 'header.html' %}` |
 
@@ -18541,6 +18858,8 @@ Many refusals are visible in the template itself, and validation reports them be
 
 What validation cannot see, because it depends on the values at run time (a method call, a name computed while rendering, or a bracketed key, which is legitimate on a plain dict), is refused where it happens: the render raises [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md), whose message names the refused attribute or callable and the type it was reached on. A refusal never renders as an empty string, so a prompt is never sent with a hole in it.
 
+A render that would overdraw its budget raises [`Jinja2TemplateBudgetError`](../errors/jinja2-template-budget-error.md), in the input domain, whose message names the operation that was refused and what it would have spent, never the template or a value: for example, *the operator '\*' needs about 1,000,000,000, and 134,217,062 are left*. A template whose macros or includes nest deeper than Python allows raises the same error.
+
 ## How it is built
 
 Every environment comes from one factory, `make_jinja2_env_from_loader` in `pipelex/tools/jinja2/jinja2_environment.py`, and that factory builds a `PipelexTemplateEnvironment` (`pipelex/tools/jinja2/jinja2_sandbox.py`), a subclass of Jinja's `ImmutableSandboxedEnvironment`. Rendering, parsing and compiling all go through it, including the condition pipe's compile at load and the load-time template walkers.
@@ -18548,7 +18867,7 @@ Every environment comes from one factory, `make_jinja2_env_from_loader` in `pipe
 Jinja's stock sandbox refuses internals, but not public methods, and every pydantic model has public constructors. Under the stock sandbox a template could call `model_validate` on a content object and forge an image pointing at a storage key of its choosing. The Pipelex policy closes that by allowing calls by kind rather than by name:
 
 - **Jinja's own runtime**: macros, `caller`, `loop`, `cycler`, `joiner`, block references, and the environment's globals.
-- **Methods a plain value type defines**, bound to an instance of that type. A subclass of a plain type (a `StrEnum` member is a `str`) cannot add or override a callable method, and a class method is refused because it is bound to the class. A method that changes a list, a dict or a set in place is refused by a list Pipelex keeps itself, since Jinja's own misses `set.intersection_update`.
+- **Methods a plain value type defines**, bound to an instance of that type. A subclass of a plain type (a `StrEnum` member is a `str`) cannot add or override a callable method, and a class method is refused because it is bound to the class. The methods allowed are an audited list, `PLAIN_VALUE_METHOD_COSTS` in `pipelex/tools/jinja2/jinja2_render_costs.py`, which also gives each method's cost: a method that changes a list, a dict or a set in place, `str.encode` and `int.to_bytes` are left out, each with its reason in `REFUSED_PLAIN_VALUE_METHODS`, and a method a new Python release adds to a plain type is refused until it is classified.
 - **The sandbox's own `str.format` wrapper**, which resolves replacement fields through the same attribute and item checks. The raw `str.format` stays refused.
 - **The methods a type declares as its template surface** (`pipelex/tools/jinja2/template_surface.py`).
 
@@ -18560,19 +18879,39 @@ Filters are not calls in this sense: they are Pipelex's or Jinja's own code, reg
 
 Jinja's own filters and markupsafe keep that obligation only for values whose attributes the template cannot choose: they look `__html__` up on a value when escaping, and `items` in `dictsort` and `xmlattr`, and call what they find. A `namespace()` answers any name with whatever the template stored under it, so the environment's `namespace` holds data only, and storing a callable in one, at construction or with `{% set ns.x = … %}`, is refused.
 
+## The render budget
+
+The sandbox limits what a template can reach, not what it can spend, and a template needs no forbidden call to be expensive: `{{ 'x' * 10 ** 9 }}`, a width in `'%1000000000s' % x`, the `center`, `batch` or `format` filters, a string doubled with `~` in a loop, two empty nested loops and a recursive macro each spend what the template asks. Rendering runs in the process that runs the method, on its event loop and sometimes inside a Temporal workflow, so on a shared runner one method's template would stall or exhaust a process that serves others. A timeout cannot help: a render never yields to the event loop, so nothing can interrupt it.
+
+So every render gets a budget of work units, roughly one byte read or allocated each, and every operation spends from it. The default, `DEFAULT_RENDER_BUDGET_UNITS` in `pipelex/tools/jinja2/jinja2_render_budget.py`, is 128 Mi units: it prints about a hundred megabytes of text, and in the measurements behind it the slowest refusal of a hostile template took about half a second. A template included by another spends from its includer's budget, and a macro from its caller's, unless it was imported without `with context` (see below).
+
+Each operation is charged for its inputs before it runs and for its result after. An operation whose result can outgrow its inputs, such as `*`, `**`, `%`, a format width, `center`, `ljust`, `replace`, `join`, `batch`, `wordwrap` or `lipsum`, is estimated first and refused before it allocates anything. An operation that reads a fixed part of its value, such as `length`, `first`, `default` or `dict.get`, is charged a step and its arguments, whatever the size of the value. An object of the run's data, such as a text content, is converted to count its text when an estimate needs it, so repeating it (`([doc] * 20000) | join`) is refused like repeating a string. `str.format` charges each replacement field as it formats it, with its spec resolved, so a width passed as an argument or through `format_map` counts. A filter that orders or deduplicates its input, `sort`, `dictsort`, `groupby`, `min`, `max` or `unique`, is charged for its comparisons, each weighing the heaviest key, read the way the filter reads it, and so are a list's or a tuple's `count` and `index`. Work that grows faster than an operation's result, such as `striptags`, `wordwrap` on long words or `sum` over lists, is spent at every call, not only checked. Integer arithmetic stops at 64 bits, which also keeps a template from building the huge integers whose hashing and printing cost the square of their size. Jinja's own cap on `range` still applies: a range of more than a hundred thousand items fails the render with `Jinja2TemplateRenderError`.
+
+The environment charges through the sandbox's hooks and one rewrite, all in `PipelexTemplateEnvironment`. They rely on internals of Jinja 3.1, which is why Pipelex requires a Jinja below 3.2.
+
+- **Calls and operators** go through the sandbox's `call` and `call_binop` hooks, and every arithmetic operator is intercepted.
+- **Filters and tests** are wrapped before a template compiles. A filter or a test registered on the environment must have a cost in `FILTER_COSTS` or `TEST_COSTS` (`pipelex/tools/jinja2/jinja2_render_costs.py`), or the first compile fails with a `TypeError` naming it.
+- **Printed values** go through the environment's `finalize`, which charges the text it produces. A caller's own `finalize` is passed to the constructor and runs first.
+- **What no hook reaches**, which is loop iteration, `~`, comparisons, slices, list, tuple and dict literals and the template's static text, is routed through internal charging filters by a rewrite of the parsed template (`pipelex/tools/jinja2/jinja2_render_rewrite.py`). The rewrite changes what is charged, never what a template renders. A tuple used as a key, in a dict literal or an item read, is also charged for hashing, since a tuple hashes every element again each time.
+- **Converting Markdown to HTML** is charged where it happens, in `pipelex/tools/markdown/markdown_parser.py`, since markupsafe converts a Markdown value through its `__html__` wherever an HTML template prints, escapes, joins or formats one, and no hook sees that call. The template makes its budget the active one while it renders, and the conversion charges it 2,048 units for every character of its source and every cell of its tables before it parses, then checks that its output, bounded from the parsed tokens, fits what is left before it renders, since a reference link is printed at every use. A conversion costs microseconds a character, so a render converts at most about 65,000 characters of Markdown, a document printed twice counting twice.
+
+The budget is the same for every template category and is not a setting in `pipelex.toml`: it is a safety bound, not a tuning knob. `PipelexTemplateEnvironment` takes it as the `render_budget_units` constructor argument, which the tests use to exercise small budgets.
+
 ## Paths outside templates
 
 A method also writes dotted paths that are not templates: a PipeCompose construct field's `from` and its `list_to_dict_keyed_by`, a PipeBatch's list, and the image and document references of a prompt. The runtime walks these with `getattr`, so the same rule applies to them: a segment starting with an underscore is refused. A construct's `from` path and `list_to_dict_keyed_by` are refused when the bundle is validated, and every path is refused again when it is walked.
 
 ## What the sandbox does not cover
 
-- **Resource use.** The sandbox limits what a template can reach, not what it can spend. Jinja caps `range`, and a longer range fails the render with `Jinja2TemplateRenderError`, but nothing caps exponentiation, string repetition, nested loops or output size.
+- **What a whole run spends.** The budget is per render. A method that renders many templates, or a batch that renders one per item, spends one budget per render.
+- **Macros imported without context.** A macro imported with `{% import %}` or `{% from … import %}` and no `with context` spends from the budget of the module Jinja builds for the import, which Jinja caches on the imported template. Pipelex builds a new environment for every render, so that budget never outlives one render, and a customer template has no loader to import from.
 - **The URLs values carry.** A template cannot forge content under this policy, but a value can still carry a URL, and reading it is the storage layer's decision, not the template's.
 
 ## Related
 
 - [StuffArtefact & Image Rendering](stuffartefact-and-image-rendering.md): how inputs reach templates, and how images are extracted from them.
 - [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md): the error a refusal raises at render time.
+- [`Jinja2TemplateBudgetError`](../errors/jinja2-template-budget-error.md): the error a render raises when it would overdraw its budget.
 
 
 ## Test Profile Configuration
@@ -19746,7 +20085,7 @@ flowchart TB
 
 # Inference Backend Plugins
 
-Every model call in Pipelex — an LLM completion, an image generation, a document extraction, a web search — is served by an **inference worker**. Which worker handles a given model is decided entirely by data: a model's `sdk` field selects a backend, and a **backend plugin** is what teaches Pipelex how to build the worker for that `sdk`.
+Every model call in Pipelex — an LLM completion, an image generation, a document extraction, a web search, a judgment — is served by an **inference worker**. Which worker handles a given model is decided entirely by data: a model's `sdk` field selects a backend, and a **backend plugin** is what teaches Pipelex how to build the worker for that `sdk`.
 
 Core names no backend by import or by string. The built-in drivers (OpenAI, Gateway, Anthropic, Mistral, Bedrock, Google, FAL, HuggingFace, Docling, …) are plugins too — they ride the exact same seam an out-of-tree plugin would. This page documents that seam, the **Inference SPI** a plugin compiles against, and how to write one.
 
@@ -19770,7 +20109,7 @@ run time (e.g. LLMWorkerFactory.make_llm_worker)
   └─ worker = make_worker(inference_model=…, backend=…, sdk_clients=…, reporting_delegate=…)
 ```
 
-The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`, `DocGenWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
+The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`, `DocGenWorkerFactory`, `JudgmentWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
 
 ---
 
@@ -19798,7 +20137,7 @@ A backend plugin's `register` calls one menu method per `(family, sdk)` it serve
 
 ```python
 registrar.add_inference_backend(
-    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH | DOC_GEN
+    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH | DOC_GEN | JUDGMENT
     sdk="acme",  # the model's `sdk` string
     make_worker=_make_acme_worker,  # a MakeWorkerFn (a plain callable)
 )
@@ -19806,7 +20145,7 @@ registrar.add_inference_backend(
 
 A registry key is `(family, sdk)`. The same `sdk` string may appear in two families (e.g. `google` serves both `LLM` and `IMG_GEN`); they are distinct keys. A duplicate `(family, sdk)` fails loud with `DuplicateInferenceBackendError` naming **both** contributing plugins.
 
-One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves the four inference families, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`. This is the cross-family-vendor coordination point: one plugin, many backends. `DOC_GEN` is the family of the document engines a `PipeDocGen` step prints with, local libraries rather than inference, which the built-in `reportlab` plugin and the Pipelex document generation plugin serve (see [Document Engine Plugins](document-engine-plugins.md)).
+One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves the four inference families, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`, and `typesafe` serves `JUDGMENT` alone. This is the cross-family-vendor coordination point: one plugin, many backends. `DOC_GEN` is the family of the document engines a `PipeDocGen` step prints with, local libraries rather than inference, which the built-in `reportlab` plugin and the Pipelex document generation plugin serve (see [Document Engine Plugins](document-engine-plugins.md)).
 
 A plugin whose backend runs without an external service, such as a document engine, may also declare the models it serves rather than leave them to a backend file. `add_internal_model(name=…, spec=…)` declares a model in the `internal` backend, the spec being the table a backend file would hold for it, and `add_doc_gen_default(doc_gen_format=…, source=…, model=…)` declares the model deck's default engine for a document format and source. Both are stored at registration and merged by the model manager at boot, and [Document Engine Plugins](document-engine-plugins.md#registering-an-engine) gives their rules.
 
@@ -19830,7 +20169,7 @@ The factory always passes all four keyword arguments. A stateless backend simply
 
 Two invariants shape what goes *inside* the closure:
 
-- **Import-light.** The plugin module must import no backend SDK at module load. Do the SDK import **inside** the closure (`# noqa: PLC0415`), so merely discovering the plugin never pulls a heavy/optional dependency. Booting Pipelex with the built-ins registered imports none of `anthropic`, `mistralai`, `google.genai`, `boto3`, `fal_client`, `huggingface_hub`, `docling`, `linkup`, … — enforced by a subprocess import-blocker guard.
+- **Import-light.** The plugin module must import no backend SDK at module load. Do the SDK import **inside** the closure (`# noqa: PLC0415`), so merely discovering the plugin never pulls a heavy/optional dependency. Booting Pipelex with the built-ins registered imports none of `anthropic`, `mistralai`, `google.genai`, `boto3`, `fal_client`, `huggingface_hub`, `docling`, `linkup`, `typesafe_sdk`, … — enforced by a subprocess import-blocker guard.
 - **Fail at use, not at boot.** Guard an optional dependency with `require_sdk(...)` *inside* the closure. A missing extra then raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) only when the backend is actually used.
 
 Client memoization goes through `sdk_clients.get_or_create(handle=…, build=lambda: …)` — the registry caches one SDK client per `ModelHandle`, so repeated worker construction reuses the connection.
@@ -19968,7 +20307,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `SdkClientRegistry` | `pipelex.plugins.sdk_client_registry` | per-handle client memoization |
 | `InferenceModelSpec` | `pipelex.cogt.model_backends.model_spec` | the resolved model record |
 | `InferenceBackend` | `pipelex.cogt.model_backends.backend` | the backend config record (api key, extras) |
-| `InferenceWorkerAbstract` and the `{LLM,ImgGen,Extract,Search}WorkerAbstract` subclasses | `pipelex.cogt.…` | the worker contracts a plugin returns |
+| `InferenceWorkerAbstract` and the `{LLM,ImgGen,Extract,Search,Judgment}WorkerAbstract` subclasses | `pipelex.cogt.…` | the worker contracts a plugin returns |
 | `MissingDependencyError` | `pipelex.exceptions` | raised by `require_sdk` |
 
 The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_VERSION` — not an `__init__.py` re-export shim (the repo bans re-exports; import by full path). Anything a plugin needs to import outside this surface is a design gap to resolve, not an accident to live with.
@@ -20111,7 +20450,7 @@ class HelloInferencePlugin:
     name = "hello_inference"
     # The plugin API version this plugin was written against, as a literal: never import the
     # runtime's PLUGIN_API_VERSION here, or the check that catches a breaking runtime upgrade always passes.
-    targets_api = 4
+    targets_api = 5
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)
@@ -20786,15 +21125,17 @@ boot (Pipelex.setup)
                  └─ registrar.add_secrets_provider(method=…, factory=…)
   └─ SecretsProviderRegistry(registrar.secrets_providers)    # stored on the hub
   └─ secrets_provider = registry.get_required(method=runtime.secrets.method)(runtime.secrets)
-  └─ set_secrets_provider(secrets_provider)          # the one provider every consumer reads
+  └─ log sink factory(runtime.log, secrets_provider=secrets_provider)   # the first consumer, handed it
+  └─ set_secrets_provider(secrets_provider)          # the one provider every later consumer reads
 ```
 
 There is no `match runtime.secrets.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (`get_secret(...)`, telemetry credentials, the storage `gcp` arm, search/extract workers) keeps calling `get_secrets_provider()` and is unaffected by which method was selected.
 
 ### Where in boot secrets is resolved
 
-Secrets is resolved **early** — right after plugin discovery, after the gateway/terms precondition gate but before the telemetry factory (its first in-process consumer) and well before storage selection. Two consequences that this ordering guarantees:
+Secrets is the **first capability resolved out of the registrar** — right after plugin discovery, after the gateway/terms precondition gate, before the log sink and well before storage selection. Three consequences that this ordering guarantees:
 
+- **The log sink**, its first consumer, receives the provider as the `secrets_provider` keyword of its factory, so a sink's settings can name secrets: the built-in `otlp` sink's header values and the `gcp` sink's key path accept `${…}` placeholders (see [Log Sink Plugins](log-sink-plugins.md#logsinkfactoryfn)). The provider goes on the hub only after the sink is installed, so the keyword is the one way a sink reaches it. Because the sink does not exist yet, what the provider logs while it is built is held and replayed into the sink, and a provider whose factory raises stops the boot with those held lines written to stderr, redacted, rather than through the configured sink.
 - **Telemetry** receives the config-selected secrets provider when it is constructed.
 - **Storage's `gcp` factory** reads the config-selected secrets provider from the hub at *its* apply-point (it resolves `GCP_CREDENTIALS_FILE_PATH`) — secrets is already on the hub by then. This ordering is pinned by an integration test that boots a non-`env` secrets method alongside `gcp` storage and asserts the gcp arm read the external provider.
 
@@ -20832,7 +21173,7 @@ registrar.add_secrets_provider(method="vault", factory=_make_vault_secrets_provi
 The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
 
 - **Import-light.** The plugin module must import no backend SDK at module load. The built-in `SecretsPlugin` needs none (the `env` provider reads environment variables); an out-of-tree `pipelex-secrets-vault` plugin must keep its `hvac`/`boto3`/etc. import *inside* the provider's methods (or its factory), never at module top-level, so discovery stays import-light even when the extra is installed.
-- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
+- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected. `pipelex doctor` resolves the backends' credentials through the provider the configuration selects, so a lookup that raises, whatever the exception, is reported in its Models row, scrubbed with the log redaction patterns, rather than stopping the report.
 
 ---
 
@@ -20881,7 +21222,7 @@ Whether that token names an *installed* provider is validated at **registry look
 
 | Condition | Error |
 |-----------|-------|
-| `runtime.secrets.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods) |
+| `runtime.secrets.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods), raised before any log sink exists, so it reaches stderr |
 | published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateSecretsProviderError` (names both plugins) |
 | `name` (`"secrets"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
@@ -20930,7 +21271,7 @@ Every record the runtime emits, a `log.info(...)` in a pipe operator, a warning 
 
 Core names no sink by import or by string. The built-in sinks (`json`, `console`, `otlp`, `gcp`) are a plugin too, the always-on `LogSinkPlugin`, riding the exact same seam an out-of-tree package would. This page documents that seam, the contract a plugin registers, what a sink reads off a record, and how to write one.
 
-This is the third application of the mechanism the [storage provider](storage-provider-plugins.md) seam introduced and the [secrets provider](secrets-provider-plugins.md) seam reused; the three pages describe the same shape with the nouns swapped, and this one adds what is particular to logging: the sink is resolved after logging is already configured, and every sink shares one record contract.
+This is the third application of the mechanism the [storage provider](storage-provider-plugins.md) seam introduced and the [secrets provider](secrets-provider-plugins.md) seam reused; the three pages describe the same shape with the nouns swapped, and this one adds what is particular to logging: the sink is resolved after logging is already configured, it is handed the secrets provider built just before it, and every sink shares one record contract.
 
 ---
 
@@ -20955,8 +21296,9 @@ RuntimeBoot.setup
        └─ for each installed entry point in the requested groups
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_log_sink(method=…, factory=…)
+  └─ secrets_provider = …                  # setup()'s argument, else the runtime.secrets.method factory
   └─ LogSinkRegistry(registrar.log_sinks)
-  └─ sink = registry.get_required(method=runtime.log.sink)(runtime.log)
+  └─ sink = registry.get_required(method=runtime.log.sink)(runtime.log, secrets_provider=secrets_provider)
   └─ log.install_sink(sink)                # the sink's handler replaces the holding handler,
                                            # which replays what it held through it, in order
 teardown
@@ -20967,9 +21309,11 @@ teardown
 
 Logging is configured as soon as the configuration is read, in `RuntimeBoot.__init__`, so that everything the boot says afterwards is a record on a module-named logger at the configured level. The sink, though, is a plugin capability, and plugin discovery runs a little later, in `setup()`, once the boot knows which built-ins and which entry-point groups it reads. Rather than choose a default renderer for that window, `configure` installs a **holding handler** that keeps every record, and `install_sink` replays them through the selected sink's handler the moment it is installed, in the order they were emitted. A boot's own lines are therefore rendered by the sink the configuration chose, never dropped and never written in a shape nothing chose.
 
-The sink is the first capability resolved out of the registrar, ahead of secrets and storage, precisely so that every later line of the boot goes through it. A boot that dies before that point, on the gateway terms gate for instance, releases its process globals through `log.reset()`, which closes the holding handler: what it still holds gets the stdlib's last-resort treatment: every held record reaches stderr, since each passed the level the configuration set, and the redaction processor runs over each one first, behind the guard a sink's handler would have put it behind.
+The sink is the second capability resolved out of the registrar, right after the secrets provider and ahead of telemetry and storage, so that every later line of the boot goes through it while its own settings can still name a secret: an OTLP collector's bearer token, the path of the service-account key the `gcp` sink reads. Building the provider first costs nothing in kind, because the holding handler already covers the window: what the provider logs is held like every line before it, and the remote-config fetch and plugin discovery were in that window already. A boot that dies before the sink is installed, on the gateway terms gate or on a secrets provider that cannot be built for instance, releases its process globals through `log.reset()`, which closes the holding handler: what it still holds gets the stdlib's last-resort treatment: every held record reaches stderr, since each passed the level the configuration set, and the redaction processor runs over each one first, behind the guard a sink's handler would have put it behind. The only built-in secrets provider, `env`, does no I/O and logs nothing, so in practice only an external secrets plugin can fail there.
 
-`pipelex doctor`, which deliberately bypasses `Pipelex.make` to diagnose a broken configuration, selects its sink the same way: the pure `build_registrar` discovery, then the `runtime.log.sink` lookup. Where boot stops on a token nobody registered, the doctor installs the console sink instead and reports the token in a row of its own, naming the registered sinks, so the report it exists to produce is still produced.
+This is the usual order elsewhere. Spring Boot resolves its configuration, vault-backed properties included, before it initialises logging and replays what was logged meanwhile; ASP.NET Core reads Key Vault as a configuration source before logging is configured, with a bootstrap logger covering the gap.
+
+`pipelex doctor`, which deliberately bypasses `Pipelex.make` to diagnose a broken configuration, selects its sink the same way: the pure `build_registrar` discovery, the secrets provider `runtime.secrets.method` selects, then the `runtime.log.sink` lookup. Where boot stops on a token nobody registered, on a sink that fails to build or on a secrets provider that fails to build, the doctor installs the console sink instead and reports what stopped it in a row of its own, so the report it exists to produce is still produced. When the secrets provider does not build, the doctor does not try the sink against a stand-in: its row says it was not checked.
 
 ---
 
@@ -20977,13 +21321,18 @@ The sink is the first capability resolved out of the registrar, ahead of secrets
 
 ### `LogSinkFactoryFn`
 
-A sink is produced by a typed **callable**, whole log config in, sink out (`pipelex/plugins/log_sink_registry.py`):
+A sink is produced by a typed **callable**, whole log config and the boot's secrets provider in, sink out (`pipelex/plugins/log_sink_registry.py`):
 
 ```python
-LogSinkFactoryFn = Callable[[LogConfig], LogSink]
+class LogSinkFactoryFn(Protocol):
+    def __call__(self, config: LogConfig, /, *, secrets_provider: SecretsProviderAbstract) -> LogSink: ...
 ```
 
-Passing the whole `LogConfig` is deliberate: a factory reads whatever it needs, the stream target, its own settings section, at the boot apply-point, never at registration. A plugin contributes one factory per method it serves by calling the registrar menu in its `register`, passing the token as a raw string:
+Passing the whole `LogConfig` is deliberate: a factory reads whatever it needs, the stream target, its own settings section, at the boot apply-point, never at registration. The secrets provider is passed rather than read off the hub, because boot sets it on the hub only after the sink is installed: the keyword is the one way a factory reaches a secret, so the order is one the type checker enforces, and a factory that calls `get_secrets_provider()` instead fails loud at boot. A sink whose settings name no secret accepts the keyword and ignores it, as the built-in `json` and `console` factories do. The built-in `otlp` and `gcp` factories resolve the `${…}` placeholders in their header values and key path through it, on a copy of their settings, so the configuration keeps the placeholders; a placeholder that does not resolve raises `LogSinkVariableError`, naming the section, the key and the variable, and an `otlp` header value holding a line break once resolved raises `LogSinkHeaderValueError`, since the exporter would accept it and then refuse every batch. `config` is positional-only in the protocol, so an implementation names its first parameter as it likes.
+
+The keyword arrived with plugin API version 5. A factory written against version 4 would be called with a keyword it does not accept, so discovery refuses a plugin still declaring `targets_api = 4` with `PluginApiVersionMismatchError`, naming it, rather than letting the boot fail on a bare `TypeError`.
+
+A plugin contributes one factory per method it serves by calling the registrar menu in its `register`, passing the token as a raw string:
 
 ```python
 registrar.add_log_sink(method="gcp", factory=_make_gcp_log_sink)
@@ -21051,7 +21400,7 @@ The `otlp` factory imports the OpenTelemetry logs SDK when it runs, and the `gcp
 
 ### Why `console` is the default
 
-`pipelex/pipelex.toml` ships `sink = "console"`. A user who installs the CLI expects the rendering the CLI always had, the emoji, the colours, the clickable paths, and a default that changed it would be a regression for every terminal. A server is the process that must choose: it selects `json`, and the fail-loud factory is what makes the choice hard to forget. Rich is the `cli` extra, which a server installs pipelex without, so a server that forgot to select `json` refuses to boot with the extra and the `json` alternative named, rather than shipping ANSI to a log agent. How the rest of the runtime keeps Rich out of such a process, and the guard that holds it there, is in [Rich Imports](../contribute/rich-imports.md).
+`pipelex/pipelex.toml` ships `sink = "console"`. A user who installs the CLI expects the rendering the CLI always had, the emoji, the colours, the clickable paths, and a default that changed it would be a regression for every terminal. A server is the process that must choose, and it chooses in its own configuration: it selects `json` in its `pipelex.toml`, as the [API server](../api-server/logging.md) does. Nothing at boot catches a server that forgot. The `console` factory checks that Rich imports, and stops the boot naming the `cli` extra and the `json` alternative when it does not, but Rich is installed with or without the extra, because `typer` and `instructor`, both core dependencies, require it unconditionally. So a server that forgot to select `json` boots on the `console` sink and ships ANSI to its log agent. A host whose log pipeline depends on JSON asserts the effective sink at boot itself, after every configuration layer is merged, as our Temporal plugin does. How the rest of the runtime keeps Rich off a server's path, and why that is not the same as keeping it out of the install, is in [Rich Imports](../contribute/rich-imports.md).
 
 ---
 
@@ -21077,6 +21426,8 @@ An external sink has no settings section of its own in `LogConfig`, whose sub-mo
 |-----------|-------|
 | `runtime.log.sink` names no registered sink | `UnknownLogSinkError` (lists the registered tokens) |
 | the selected sink's package is not installed | `MissingDependencyError` (package + `pipelex[<extra>]` hint), raised at install, at boot |
+| a `${…}` placeholder in the `otlp` sink's headers or the `gcp` sink's key path does not resolve | `LogSinkVariableError` (names the section, the key and the variable, never a value) |
+| an `otlp` header value holds a line break once its placeholders resolve | `LogSinkHeaderValueError` (names the section and the key, never the value) |
 | two plugins register the same `method` | `DuplicateLogSinkError` (names both plugins) |
 | `name` (`"log_sinks"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
 | published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` |
@@ -21091,8 +21442,9 @@ The duplicate detection is the same fail-loud `_add` helper the storage and secr
 A third-party log sink plugin is a distribution that:
 
 1. implements a `LogSink` subclass whose `make_handler` builds the handler and performs whatever SDK import the handler needs, so the module stays import-light; the handler reads the record through `carried_attributes`, serializes on emit, and never raises;
-2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_log_sink(method="<token>", factory=...)` and nothing else;
-3. advertises itself under the `pipelex.plugins.kernel` entry-point group, a log sink being a kernel-layer capability (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means):
+2. defines a factory matching `LogSinkFactoryFn`, which takes the log config positionally and the secrets provider as the `secrets_provider` keyword, the way to read a credential the sink needs; `substitute_vars` in `pipelex/tools/secrets/secrets_utils.py` resolves a `${…}` placeholder through it with the syntax the built-in sinks accept;
+3. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_log_sink(method="<token>", factory=...)` and nothing else;
+4. advertises itself under the `pipelex.plugins.kernel` entry-point group, a log sink being a kernel-layer capability (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means):
 
 ```toml
 # pyproject.toml of your plugin package
@@ -21486,6 +21838,8 @@ own_domain = self.error_category.error_domain if self.error_category is not None
 ```
 
 The consequence worth knowing at the HTTP boundary: a **content-classified inference failure answers 422, not 500** — a content-policy refusal, a malformed prompt image, a bad prompt parameter are all properties of material the caller submitted. Everything else keeps the status it already had; only the report became truthful about why.
+
+The category a class declares is its default, and a raise site that knows better passes its own through the `error_category` argument. `ImgGenParameterError` is `CONTENT`, because an aspect ratio or a size the model's grid refuses is a property of the caller's request. A model spec its worker cannot use is not: no `rules`, a rule value this release does not know, a missing `model_choice` or `endpoint_path`, or, where a worker reads the Gemini geometry, a missing `aspect_ratio` taxonomy or one of another family. Those sites raise it with `error_category=InferenceErrorCategory.CONFIGURATION`, so the failure answers 500 and lands in server-error alerting like any other configuration fault, rather than a 422 telling the caller to change what they sent.
 
 #### Classified where it is raised
 
@@ -22094,7 +22448,7 @@ A third-party orchestrator compiles against the **open** surface only (the [Orch
 
 This page is for contributors working on Pipelex internals. For the capability overview, see the user-facing [Distributed Execution](../distributed-execution/index.md) page instead.
 
-When content generation (LLM structured output, image generation, PDF extraction, web search) runs on a separate worker process, two serialization problems appear that single-process execution never faces. This page covers them backend-neutrally — the mechanisms live in open core and are the same regardless of which host runtime carries the payload. The concrete activity dispatch is a [commercial platform capability](https://pipelex.com/products#durable-execution); each backend (Temporal, Mistral Workflows) realizes it in its own plugin.
+When content generation (LLM structured output, image generation, PDF extraction, web search, judgment) runs on a separate worker process, two serialization problems appear that single-process execution never faces. This page covers them backend-neutrally — the mechanisms live in open core and are the same regardless of which host runtime carries the payload. The concrete activity dispatch is a [commercial platform capability](https://pipelex.com/products#durable-execution); each backend (Temporal, Mistral Workflows) realizes it in its own plugin.
 
 !!! note "Every inference leaf goes through the same seam"
     All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction (`pipelex/cogt/content_generation/content_generator.py`): direct inline, or — on a host runtime — wrapped as an activity by the runtime's in-workflow content generator. The backend choice is independent of the run mode: under `run_mode=DRY` the chosen backend still dispatches and the leaf mocks inside it. Wrapping the leaf as a host-runtime activity is what makes it replay-safe (the result is recorded in the run's history) and lets a leaf failure cross the worker boundary as a classified error, instead of re-executing on every replay and hanging the submitter with an unclassified fault.
@@ -22214,6 +22568,10 @@ Structured web search (`PipeSearch` with a non-text output concept) faces the id
 
 The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
 
+### Judgments need neither mechanism
+
+A judgment's leaf, `judgment_gen_answers`, has one entry point where search has three, because nothing about it is dynamic. Its `JudgmentAssignment` carries the state as a JSON object, the image and document inputs as prompt files keyed by input name, which cross the boundary as an LLM prompt's files do, the questions as the family's own discriminated models and the resolved `JudgmentSetting`; its result is a map of answers that are plain models of the same package. No caller class travels down and no schema is shipped, so the in-process arm and the boundary arm would be the same function, and there is nothing to split.
+
 ---
 
 ## Large payload management
@@ -22253,6 +22611,7 @@ What gets stored vs. what crosses the boundary, by content type:
 | LLM object | Nothing (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
 | Search sourced answer | Nothing (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
+| Judgment answers | Nothing (verdicts are small) | `dict[str, JudgmentAnswer]` keyed as the questions were |
 
 Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
 
@@ -22305,6 +22664,7 @@ Resolution order:
 | Content generator (type bridge) | `pipelex/cogt/content_generation/content_generator.py` |
 | LLM generation functions | `pipelex/cogt/content_generation/llm_generate.py` |
 | Search generation functions | `pipelex/cogt/content_generation/search_generate.py` |
+| Judgment generation function | `pipelex/cogt/content_generation/judgment_generate.py` |
 | Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
 | Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |
@@ -23104,7 +23464,7 @@ Nothing a server needs. What needs Rich stops as early as it can, naming the ext
 | The stuff viewer page | The Pretty tab shows the JSON rendering. |
 | The `pipelex`, `pipelex-agent` and `pipelex-dev` commands | Would fail at import with a bare `ImportError`. Not reachable on a documented install, since `typer` and `instructor` keep Rich installed; a launcher that names the extra belongs with the work that removes them from the closure. |
 
-The boot checks the sink and the pretty-print mode together, in `runtime_boot.py`, so a server that forgot either setting fails at startup rather than at the first pipe that logs or prints its output.
+The boot checks the sink and the pretty-print mode together, in `runtime_boot.py`, so a process without Rich that selected either Rich surface fails at startup rather than at the first pipe that logs or prints its output. Since every install carries Rich, as described above, a server that forgot either setting passes that check and boots on the Rich surface: its configuration is the only thing that keeps it on `json` and a Rich-free mode.
 
 ## Enforcement
 
@@ -23319,6 +23679,61 @@ Steps 3 and 5 look like the same list written twice. They are not, and collapsin
 - **Specs are an authoring convenience for AI agents.** `PipeFooSpec` is a simplified shape with convenience fields that `to_blueprint()` transforms into blueprint fields. Spec-level fields deliberately differ from blueprint-level ones — `PipeComposeSpec.target_format` is a spec convenience with no blueprint counterpart, for instance.
 
 The two layers evolve for different reasons and answer to different consumers, so they carry their own unions. When adding validation or a field, decide which layer owns it first: language rules go on blueprints, authoring convenience goes on specs. `pipelex/builder/CLAUDE.md` is the canonical statement of that split.
+
+
+## Inference Family Surface
+
+# Inference family surface
+
+An inference family is a kind of model call — LLM completion, image generation, extraction, web search, judgment. Adding one is not one package: the family's name is spelled in several enums, its usage flows through reporting and cost, its models live in a deck, and each of those places is separate, with nothing inferring one from another. This page is the checklist, written from the judgment family's addition, and a sibling of [the registration surface](registration-surface.md) for pipe kinds.
+
+Most of the list is enforced by the type checker: the matches over the family enums are exhaustive with no `case _`, so adding the enum value walks you to their arms. The entries marked **silent** are the ones nothing walks you to, and they are the reason this page exists.
+
+## A new family
+
+1. **The family's package**, `pipelex/cogt/<family>/`, mirroring `pipelex/cogt/search/`: the question/request and answer models, the setting and its model-choice union, the job, the job factory, the usage report, the worker contract (`<Family>WorkerAbstract` with one template method and one abstract hook) and the worker factory, which resolves its worker through the inference-backend registry and holds no `match` over SDK strings.
+
+2. **The family enums, together.** `InferenceFamily` in `pipelex/plugins/inference_backend_registry.py`, `ModelType` in `pipelex/cogt/model_backends/model_type.py`, `InferenceErrorFamily` in `pipelex/cogt/inference/error_render.py` with an entry in both its failure-class and not-found-class tables, and `ModelCategory` in `pipelex/builder/operations/models_ops.py`, which is what `pipelex-agent models` and `check-model` list from.
+
+3. **The error classes** in `pipelex/cogt/exceptions.py`: a job failure, a model-not-found (subclassing `ModelNotFoundError`) and a handle-not-found. Then regenerate the error pages and the identity snapshot (`make gep`, `make gei`); the snapshot test fails until you do.
+
+4. **The job identity** in `pipelex/system/job_metadata.py`: a `JobCategory` member, a `UnitJobId` member and its display arm.
+
+5. **The deck.** A `<Family>DeckBlueprint`, its flat fields on `ModelDeck`, the setting getter, the preset validator, the choice check, the suggestion arms, and the model manager's handle collection and flattening. The kit deck is `pipelex/kit/configs/inference/deck/<n>_<family>_deck.toml` — the numeric prefix is what makes `pipelex update` manage it — mirrored into the repository's own `.pipelex/inference/deck/`.
+
+6. **Reporting and cost.** The usage and cost-report classes join both unions in `pipelex/reporting/reporting_types.py`, `ReportingManager` gets its dispatch arm, and `CostRegistry.compute_cost_report` gets an arm in its `match`, which closes with `assert_never` so a family that falls through fails the type check. Update the `model_type` comment on `ModelUsageSpec` in `pipelex/graph/graphspec.py` to say how the family is billed.
+
+7. **The content-generation leaf.** An assignment model in `pipelex/cogt/content_generation/assignment_models.py`, a `<family>_generate.py` module whose coroutine opens with the dry branch, the dry mock in `dry_mock.py`, and the method on `ContentGeneratorProtocol` with its `@override` in `ContentGenerator`. A host runtime's durable execution needs an activity and a queue for the new leaf in its own plugin.
+
+8. **Test infrastructure.** A pytest marker in `pyproject.toml` and its term in the default deselect expression; the family in every table of `pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py`; a `<family>_models` key on every profile in `.pipelex-dev/test_profiles.toml`; a combo getter in `tests/integration/pipelex/fixtures/model_selection.py`, a combo fixture in `combo_fixtures.py` and its re-export in `tests/integration/pipelex/conftest.py`.
+
+9. **The migration golden.** A new `ModelType` value changes the inference-backend surface's fingerprint; `make umig` records it, and the real-surfaces test fails until you do.
+
+10. **Silent: fakes that stand in for the deck.** Any test double that impersonates `ModelDeck` by attribute — the fake deck in `tests/unit/pipelex/cli/test_agent_models_cmd.py` is one — needs the new family's presets, aliases and waterfalls, or every case using it fails with an `AttributeError` far from the cause.
+
+11. **The MTHDS protocol's model categories.** `PipelexMTHDSProtocol.models()` in `pipelex/pipeline/runner.py` types each preset by the protocol's own `ModelCategory`, which carries every family this runtime serves, `judgment` included, through two exhaustive matches beside it: `_protocol_category_of` for the deck's entries and `_builder_category_of` for the `?type=` filter. A new member of the builder's `ModelCategory` (step 2) stops the type checker at the first of them, because a new family needs a protocol category too, which the standard adds in a protocol minor for each settings family it adds. Until the protocol defines one, the family's presets go under an extension property `PipelexModelDeck` adds for them, never under a category the protocol does not define, since a runner must not put such a value in a deck entry's `type`.
+
+12. **Files, when the family reads them.** The job and the assignment carry them keyed by input name, as `JudgmentJob` and `JudgmentAssignment` carry `images` and `documents`, and the assignment's `referenced_uris()` returns each one, or a scoped run's read authorization never sees them. The worker's template method checks that the model reads them before its hook runs, raising the family's capability error (`JudgmentWorkerAbstract._check_can_read_files`), and runs the per-file format checks in `pipelex/cogt/inference/prompt_file_checks.py`, which the LLM family shares. What a model reads is the `inputs` of its spec in the backend's model file, so the capability is configuration, and an operator that knows its model at load time refuses a file input there too, as `PipeJudge` does.
+
+13. **Silent: a default the gateway does not serve fails every boot.** The model manager checks, at boot, every handle a deck's presets and choice defaults name against the Pipelex Gateway's specs when the active routing profile sends that handle there. A family whose models only a bring-your-own-key backend serves must therefore ship **no** `choice_default` and **no** preset in the kit deck — an alias is fine, because aliases are not walked. Getting this wrong fails the boot of every installation, whether or not it ever uses the family.
+
+## A new backend for a family
+
+1. **The provider package**, `pipelex/providers/<vendor>/`: the plugin, the worker, the translation to and from the vendor's vocabulary, and a `<vendor>_exceptions.py`. The vendor's own limits are enforced in the translation, not in a blueprint.
+
+2. **Error classification.** An `extract_<vendor>_metadata` function and a `ProviderName` member in `pipelex/cogt/inference/`, with the member added to every exhaustive match over `ProviderName` and to the parity test in `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py`. When the vendor's status codes cannot separate its failures, the worker branches on the body before handing the rest to the shared classifier.
+
+3. **Registration.** The plugin joins `KERNEL_BUILTIN_PLUGINS` in `pipelex/providers/builtins.py`. Its `make_worker` closure calls `require_sdk` before importing the worker, and imports no SDK at module level. Record the `register` method's subject grant before `make agent-check`, whose keyword-only fixer would otherwise rewrite it into a signature the plugin protocol refuses.
+
+4. **Configuration.** The backend's table in the kit's `backends.toml`, its model file under `backends/`, and an `all_<vendor>` routing profile — which is also what the integration combo fixtures route to — all mirrored into `.pipelex/inference/`. Its API key variable goes in `.env.example`.
+
+5. **Silent: the default routing profile.** Under `all_pipelex_gateway` every handle routes to the gateway by default, and a handle the gateway does not serve is silently dropped from the deck — so a user who has the vendor's key still cannot use its models. Give the managed profiles an `optional_routes` entry sending the vendor's models to its backend; an optional route applies only while that backend is enabled.
+
+6. **Silent: the CI placeholder list.** CI runners hold no provider keys, and every test module boots live, so each variable an enabled kit backend references must be in `ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI` in `pipelex/test_extras/shared_pytest_plugins.py`. `tests/unit/pipelex/test_extras/test_ci_placeholder_keys.py` fails when one is missing. The agent CLI's end-to-end tests build their own hermetic environment, with a dummy value per variable, in the `offline_subprocess_env` fixture of `tests/e2e/agent_cli/conftest.py`, and nothing checks that list: a variable missing there only makes a dry run skip the backend.
+
+7. **Plugin surface tests.** The `(family, sdk)` pair in `tests/unit/pipelex/plugins/test_inference_backend_coverage.py`, a missing-extra guard test mirroring Linkup's, the SDK's import name in the blocked list of `tests/unit/pipelex/plugins/test_import_light_boot.py`, and an arm in `tests/integration/pipelex/system/test_keyless_boot_forced_dry.py` showing that a keyless boot does not need the key.
+
+8. **Live tests** under a test profile of their own, marked with the family's marker and `inference`, so that `make ti PROF=<profile>` runs them and every other profile skips them.
 
 
 ## Drift Contracts
@@ -23614,7 +24029,7 @@ The harness was built for the S1 input-semantics audit of the input-form program
 
 # Generating the Projection Fixture Corpus
 
-The MTHDS build routes no longer render a pipe's fill-in inputs template on the server. Each client SDK projects it from the input-form descriptor it already has — once in TypeScript (`mthds`) and once in Python (`mthds-python`) — and the two projections must agree **exactly**, TOML comment lines included, or the JS/Python asymmetry the change set out to remove is simply rebuilt one layer up.
+No server route renders a pipe's fill-in inputs template. Each client SDK projects it from the input-form descriptor it already has — once in TypeScript (`mthds`) and once in Python (`mthds-python`) — and the two projections must agree **exactly**, TOML comment lines included, or the JS/Python asymmetry the change set out to remove is simply rebuilt one layer up.
 
 `pipelex-dev generate-projection-corpus` writes the fixture corpus that makes that agreement checkable. It is the **sole producer** of the capture committed byte-identically in `mthds-js/tests/fixtures/protocol/` and `mthds-python/tests/fixtures/protocol/`; `trace-input-semantics` stays what its own page says it is, a debugging tracer.
 
@@ -23686,7 +24101,7 @@ A key is a whole template and never a slot, and the shaper stops at the first sl
 
 ## The bundles
 
-`tests/data/input_semantics/` holds the corpus bundles, and the command above names every one of them: a bundle that exists in that directory but is left off the command line does not appear in the capture, and the regeneration silently drops the pipes it contributed. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `output_bundle.mthds` covers the output form specifically, since every bundle before it resolved to `Text`; `scaffold_bundle.mthds` was added for this corpus and covers what the others do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept. Its `scaffold_open_natives` pipe holds the natives whose payload shape the descriptor states openly, at slot positions: `native.Dynamic`, `native.Composite` and `native.Anything`, which declare no pinned structure and whose node is therefore `unknown`, beside `native.JSON`, which does declare one — its pinned blueprint carries a required `json_obj`, so its explicit template expands like any other pinned native's, while its compact template is the bare object with `json_obj` unwrapped, and that dict is where `unknown-empty-object` is measured. Its `scaffold_dynamic_prompt` pipe puts a `native.Dynamic` slot at an LLM prompt position under both markers, which the corpus could not carry while the prompt analyzers read a dynamic concept's universal compatibility as identity and demanded an `ImageContent` for it.
+`tests/data/input_semantics/` holds the corpus bundles, and the command above names every one of them: a bundle that exists in that directory but is left off the command line does not appear in the capture, and the regeneration silently drops the pipes it contributed. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `output_bundle.mthds` covers the output form specifically, since every bundle before it resolved to `Text`; `scaffold_bundle.mthds` was added for this corpus and covers what the others do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept. Its `scaffold_open_natives` pipe holds the natives whose payload shape the descriptor states openly, at slot positions: `native.Dynamic`, `native.Composite` and `native.Anything`, which declare no pinned structure and whose node is therefore `unknown`, beside `native.JSON`, which does declare one — its pinned blueprint carries a required `json_obj`, so its explicit template expands like any other pinned native's, while its compact template is the bare object with `json_obj` unwrapped, and that dict is where `unknown-empty-object` is measured. Its `scaffold_dynamic_prompt` pipe puts a `native.Dynamic` slot at an LLM prompt position under both markers, which the corpus could not carry while the prompt analyzers read a dynamic concept's universal compatibility as identity and demanded an `ImageContent` for it. Its `scaffold_verdict_natives` pipe holds the verdict natives at slot positions: `native.YesNo`, which a slot reads as a bare boolean, beside `native.Choice` and `native.Rating`, which a slot takes in their envelope. `output_bundle.mthds` carries the other side in `output_native_yes_no`, whose `YesNo` output is the object holding `yes_no` and its optional `probability`, the one native whose output form differs from its input form.
 
 `native.Anything`'s compact template keeps its envelope, `{"concept": "native.Anything", "content": {}}`, in the engine and in every projection: its bare placeholder, `{}`, would read as "send an object", while the envelope names the concept that says any value goes. The input shaper takes that envelope back, reading its empty object as a JSON object under the `Anything` concept.
 
@@ -24568,11 +24983,11 @@ This server is the source-available reference implementation of the **[MTHDS Pro
 
 ```
 MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
-(the standard)     (protocol + build tooling)    (+ durable runs, catalog, account)
+(the standard)     (protocol + extensions)       (+ durable runs, catalog, account)
 ```
 
 - **MTHDS Protocol** — five routes: `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those five — the flag is how a conformance suite or a third-party runner extracts the portable subset.
-- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), build tooling (`/build/*`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
+- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
 - **Pipelex hosted API** (`api.pipelex.com/v1`) — everything here, same shapes, plus durable runs, the method catalog, and account management.
 
 All routes are served under the `/v1` base path (clients compose `{base}/v1/{endpoint}`).
@@ -24584,7 +24999,7 @@ The API currently allows you to:
 1. **Run** any Pipelex pipeline with flexible inputs (sync or async)
 2. **Validate** any Pipelex pipeline to ensure correctness
 3. **Resolve** a library closure into its normalized crate, and **codegen** typed artifacts from it (TypeScript/Zod, Pydantic, Pipelex structures)
-4. **Build** pipeline components — generate input schemas, output representations, runner code, concepts, and pipe specs
+4. **Describe** a method's inputs and output — its pipe I/O contracts, input form and output form, from which a client projects an inputs template
 5. **Lint and format** single `.mthds` files for editor workflows
 6. **List** available model presets and configurations
 
@@ -24732,20 +25147,9 @@ Lint and format single `.mthds` files without loading or executing a pipeline.
 
 [Learn more →](mthds-tools.md)
 
-### Pipe Builder
-Generate input templates, output representations, and runner code for one pipe of a library closure. All three take the same closure selector as `/v1/resolve` and `/v1/codegen` (inline `files[]` XOR `method_ref`), plus an optional qualified `pipe_ref` defaulting to the fetched package manifest's `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`.
+### Models
+List the models this runner can route to.
 
-- `POST /v1/build/inputs` — Generate an example inputs template for a pipe (JSON or TOML)
-- `POST /v1/build/output` — Generate an output representation (schema, JSON, or Python)
-- `POST /v1/build/runner` — Generate Python runner code for a pipe
-
-[Learn more →](pipe-builder.md)
-
-### Agent
-Tools for AI agents building pipelines programmatically.
-
-- `POST /v1/build/concept` — Convert a JSON concept spec to TOML
-- `POST /v1/build/pipe-spec` — Convert a JSON pipe spec to TOML
 - `GET /v1/models` — The protocol model deck this runner routes to (flat `models` list, plus category-keyed `aliases`/`waterfalls` routing extensions); optional single `?type=` category filter
 
 ### Uploader (removed)
@@ -25962,7 +26366,7 @@ The field exists because the canonical report is **manifest-blind**: `bundle_blu
 
 The graph follows the same precedence: on a `method_ref` request whose manifest names a `main_pipe`, the route hands that pipe to the runtime as the graph target, so `graph_spec` draws the pipe `default_pipe_ref` names — including for a package whose bundles declare no `main_pipe` at all, whose entry pipe only the manifest states. A manifest `main_pipe` the closure does not resolve leaves both fields `null` rather than graphing the closure's own `main_pipe`, which no run by that address executes. The target travels with the dispatch, so a validation sent to a worker is graphed the same way.
 
-It states the **run** default, which is looser than the `/build/*` routes' rule on one point: a closure whose domains each declare a `main_pipe` cannot be defaulted on `/build/*` (a `422`), but `/execute` and `/start` run its first declaring blueprint happily — so this field names that pipe rather than reporting `null`.
+It states the **run** default, which is looser than the [`/pipe-io`](pipe-io.md#pipe-selection) selection chain on one point: a closure whose domains each declare a `main_pipe` cannot be defaulted on `/pipe-io` (a `422`), but `/execute` and `/start` run its first declaring blueprint happily — so this field names that pipe rather than reporting `null`.
 
 The field rides the valid arm only. The invalid arm assembles no library, so there is no entry pipe to name and the field is absent, like the other structural artifacts.
 
@@ -26022,7 +26426,7 @@ Return a method's I/O artifacts — its pipe I/O contracts, its input form and i
 
 **Endpoint:** `POST /v1/pipe-io`
 
-The route resolves the closure through the same static core as [`POST /v1/resolve`](codegen.md#resolve), selects a pipe the way the [per-pipe build routes](pipe-builder.md) do, and derives the three artifacts with the builder that [`POST /v1/validate`](pipe-validate.md) and every run already call. It runs **no dry-run sweep**, so a call costs one load and one derivation, where `/v1/validate` mock-runs every pipe of the method. A caller that shows a method, prepares its inputs or generates types for it reads this route; a caller that needs the dry-run verdict or the dry-run graph stays on `/v1/validate`, whose `views` still attach both forms beside the verdict.
+The route resolves the closure through the same static core as [`POST /v1/resolve`](codegen.md#resolve), selects a pipe with the [selection chain](#pipe-selection) below, and derives the three artifacts with the builder that [`POST /v1/validate`](pipe-validate.md) and every run already call. It runs **no dry-run sweep**, so a call costs one load and one derivation, where `/v1/validate` mock-runs every pipe of the method. A caller that shows a method, prepares its inputs or generates types for it reads this route; a caller that needs the dry-run verdict or the dry-run graph stays on `/v1/validate`, whose `views` still attach both forms beside the verdict.
 
 It is a **Pipelex API extension**, not an MTHDS Protocol route: it is not tagged `x-mthds-protocol` in the [OpenAPI artifact](openapi/pipelex-api.openapi.yaml). The artifacts it carries are the standard's, under their neutral names — see the MTHDS specification's pages on [pipe I/O contracts, the input-form descriptor and the output-form descriptor](https://mthds.ai).
 
@@ -26049,7 +26453,7 @@ There is no `views` field, because the valid arm always carries all three artifa
 
 ## Pipe selection
 
-The selection chain is the one the build routes share: the request's `pipe_ref`; else a fetched package's manifest `main_pipe`; else the closure's own `main_pipe` declaration, when exactly one domain declares one. The chain stops at the first link that is present, so a manifest `main_pipe` the closure does not declare, or declares in several domains, is a failed selection rather than a fall-through to the closure's declarations.
+The selection chain takes the request's `pipe_ref`; else a fetched package's manifest `main_pipe`; else the closure's own `main_pipe` declaration, when exactly one domain declares one. The chain stops at the first link that is present, so a manifest `main_pipe` the closure does not declare, or declares in several domains, is a failed selection rather than a fall-through to the closure's declarations.
 
 The closure is resolved first, so an invalid closure answers its invalid verdict whatever `pipe_ref` names. For a valid closure these selections are refused with an input `422` `problem+json`. Its `error_type` is the pipelex entry-lookup class that names the failure, never the `ValidationError` of a malformed request, so a client tells a selection refusal from a request-shape one by that field:
 
@@ -26168,7 +26572,7 @@ Resolution is a first-class language operation alongside validation: the closure
 
 Resolves the closure exactly like `/resolve`, then projects the crate through the two explicit axes:
 
-- `kind` (string, required): what to project. Served: `types` (the crate's concept set as typed models). Membership follows the **trust chain** — a kind is served here exactly when its artifacts are stamped and locked, which is the promise the valid arm makes by carrying a `lock`. Input templates are user-editable scaffolds, never stamped or locked, so they cannot make that promise: they ride [`POST /v1/build/inputs`](pipe-builder.md) instead and `inputs` is deliberately **not** a kind here.
+- `kind` (string, required): what to project. Served: `types` (the crate's concept set as typed models). Membership follows the **trust chain** — a kind is served here exactly when its artifacts are stamped and locked, which is the promise the valid arm makes by carrying a `lock`. Input templates are user-editable scaffolds, never stamped or locked, so they cannot make that promise: a client projects one from the input form [`POST /v1/pipe-io`](pipe-io.md) serves, and `inputs` is deliberately **not** a kind here.
 - `target` (string, required): for whom. `ts-zod` (zod schemas + inferred types), `python-pydantic` (self-contained pydantic models), or `python-structures` (runtime `StructuredContent` classes, for a Pipelex host).
 - `pipe_ref` (string, optional): pipe selector for future per-pipe kinds — not accepted for `types` (request-shape `422`).
 
@@ -26207,194 +26611,6 @@ An unknown `kind` or `target` is a request-shape `422` problem+json, never a `20
 Every artifact ships **stamped** (source-crate fingerprint, engine version, projection, content hash) and the response carries the matching `codegen.lock`. A client that writes each `artifacts[]` entry and the `lock` **verbatim** reproduces a local `pipelex codegen types` run byte-for-byte — so the offline `pipelex codegen check` passes on the written tree exactly as it would on locally generated files.
 
 There is deliberately **no** server-side check route: the drift check is pure hashing over local files, offline by design.
-
-
-## Pipe Builder
-
-# Pipe Builder
-
-Generate input templates, output representations, and Python runner code for a pipe of an MTHDS library closure.
-
-All three build endpoints speak the same verdict discipline as [`POST /v1/validate`](pipe-validate.md): a **produced verdict is always a `200`** discriminated on the body's `is_valid` field. The valid arm carries the built artifact; the invalid arm carries the structured `validation_errors[]` built by pipelex's one shared error builder. Non-2xx is reserved for *no verdict could be produced* — request-shape `422`, auth `401`/`403`, server `5xx` — rendered as RFC 7807 `application/problem+json` (see [Error Responses](error-responses.md)).
-
-## The shared request envelope
-
-All three take the same **closure selector** as [`POST /v1/resolve` and `POST /v1/codegen`](codegen.md) — inline `files[]` **XOR** a `method_ref` — plus a **pipe selector**:
-
-- `files` (list, required unless `method_ref`): the inline MTHDS bundles forming the closure. Each item is `{ "content": "<mthds text>", "source": "<optional logical path>" }`. The optional `source` is threaded onto the blueprint, so diagnostics point at the owning file.
-- `method_ref` (string): a reference to a published method. The **address form** — `github.com/<owner>/<repo>` plus an optional package selector and `@<tag>` — is resolved server-side through the same fetch path as a [`method_ref` run](pipe-run.md#running-a-method-by-address-method_ref): the package's `.mthds` files feed the closure (only `.mthds` data travels — the package's Python never loads here), and the package manifest's `main_pipe` becomes the default pipe selector. The **registry form** (any non-address reference) answers `501` (`MethodRefNotSupported`) until method-registry resolution lands.
-- `pipe_ref` (string, **optional**): the qualified pipe ref `domain.pipe_code` to project — the same selector as `pipelex codegen inputs --pipe`. Omitted, it defaults with the same precedence as a run by address: on a `method_ref` request, to the fetched package manifest's `main_pipe` (the package author's declared entry pipe); otherwise to the closure's own declared `main_pipe`. A closure that declares **no** `main_pipe`, or **several** across domains, cannot be defaulted from its declarations, so when no manifest `main_pipe` settles it an omitted `pipe_ref` is a `422` there. Inline `files[]` carry no manifest, so for them the default is always the closure's declaration. Every selection refusal is an input `422` whose `error_type` is the pipelex entry-lookup class that names the failure, not the `ValidationError` of a malformed request: `EntryPipeNotFoundError` for a `pipe_ref` that names no pipe, a manifest `main_pipe` the closure does not declare, or an omitted `pipe_ref` over a closure declaring no `main_pipe`; `EntryPipeAmbiguousError` for a bare code, whether the request or the manifest spelled it, that matches pipes in several domains, or an omitted `pipe_ref` over a closure declaring several `main_pipe`s. An ambiguity's `detail` names the qualified refs to choose from. An unknown or ambiguous `pipe_ref` answers the `error_type` the run routes answer for the same `pipe_code`; the two omitted-`pipe_ref` refusals follow the pipe-selector design, since a run over such a closure has no matching refusal today.
-
-Every valid arm echoes both `pipe_ref` (the ref actually projected) and `requested_pipe_ref` (the ref as submitted — **absent** when it was omitted and defaulted), so a caller can always see which pipe it got. The echoed `pipe_ref` is **always qualified**, read back off the resolved pipe: a bare code still resolves (the engine's lookup falls back across domains), but you are told `smoke.echo`, not the `echo` you sent.
-
-## Static projections vs. the runner
-
-`/build/inputs` and `/build/output` are **static**: they resolve the closure to its normalized crate and read the requested pipe's **declared** IO. There is no dry-run sweep, and therefore no `allow_signatures` flag (it only ever parameterized that sweep). A valid verdict from them says the closure is structurally sound and the projection matches what the pipe *declares* — it is **not** a promise the pipe runs. Runnability is [`/validate`](pipe-validate.md)'s vocabulary; ask it.
-
-`/build/runner` is the exception. A runner script *is* a promise the pipe can run, so it keeps the dry-run sweep and keeps `allow_signatures`.
-
-## Build Inputs
-
-Generate an example inputs template for a pipe — the same projection `pipelex codegen inputs` writes, on both of its axes.
-
-**Endpoint:** `POST /v1/build/inputs`
-
-**Request Body:**
-
-```json
-{
-  "files": [
-    { "content": "domain = \"cv_matching\"\nmain_pipe = \"analyze_cv_job_match\"\n\n[pipe.analyze_cv_job_match]\ntype = \"PipeLLM\"\ndescription = \"Analyze CV against job offer\"\ninputs = { cv_text = \"native.Text\", job_offer = \"native.Text\" }\noutput = \"MatchAnalysis\"", "source": "cv_matching.mthds" }
-  ],
-  "pipe_ref": "cv_matching.analyze_cv_job_match"
-}
-```
-
-**Request Fields:** the shared envelope above, plus:
-
-- `format` (string, optional): `"json"` (default) or `"toml"`.
-- `explicit` (boolean, optional, default `false`): when `true`, emit the ceremonial `{concept, content}` envelope for every input. The default is the *light*, signature-driven shape — a bare string for a Text-refining input, a bare number for a Number-refining one, and so on — which is what smart inputs accepts.
-
-**The template rides the field its `format` names.** JSON is a parsed object in `inputs`; TOML is raw text in `inputs_toml`. TOML cannot ride as a parsed object without losing the concept comments and key order that are the reason to ask for it, and the JSON case must stay a real object because that is what clients feed straight into a run. The field the format did not select is **omitted from the body entirely**.
-
-**Response (valid verdict, default light JSON):**
-
-```json
-{
-  "is_valid": true,
-  "pipe_ref": "cv_matching.analyze_cv_job_match",
-  "requested_pipe_ref": "cv_matching.analyze_cv_job_match",
-  "format": "json",
-  "explicit": false,
-  "inputs": {
-    "cv_text": "text_value",
-    "job_offer": "text_value"
-  },
-  "message": "Inputs template generated successfully"
-}
-```
-
-With `"explicit": true`, each value becomes its `{ "concept": "native.Text", "content": { "text": "text_value" } }` envelope instead. With `"format": "toml"`, the body carries `inputs_toml` (a string) in place of `inputs`.
-
-A pipe that declares **no inputs** is a *valid* verdict, not an error: the template is simply empty (`{}` / `""`) and `message` says so — mirroring the CLI, which exits 0 on it.
-
-**Response (invalid verdict):** `200` with `is_valid: false` and `validation_errors[]` — the same invalid arm every build endpoint returns:
-
-```json
-{
-  "is_valid": false,
-  "validation_errors": [
-    { "category": "blueprint_validation", "message": "...", "source": "cv_matching.mthds" }
-  ],
-  "message": "..."
-}
-```
-
-An item may also carry a `suggested_fix` — a structured, deterministic repair the runtime derived for that error. See [Error Responses → Suggested fixes](error-responses.md#suggested-fixes).
-
----
-
-## Build Output
-
-Generate the output representation for a pipe in one of three formats.
-
-**Endpoint:** `POST /v1/build/output`
-
-**Request Body:**
-
-```json
-{
-  "files": [{ "content": "...your MTHDS content..." }],
-  "pipe_ref": "cv_matching.analyze_cv_job_match",
-  "format": "schema"
-}
-```
-
-**Request Fields:** the shared envelope above, plus:
-
-- `format` (string, optional): `"schema"` (default), `"json"`, or `"python"`. **Must be lowercase.**
-
-**Format Options:**
-
-- `schema` — JSON Schema representation of the output concept → parsed object in `output`
-- `json` — Example JSON instance of the output → parsed object in `output`
-- `python` — Python source defining the output class → raw text in `output_python`
-
-As with `/build/inputs`, the representation rides the field its `format` names, and the other is omitted.
-
-**Response (valid verdict, schema format):**
-
-```json
-{
-  "is_valid": true,
-  "pipe_ref": "cv_matching.analyze_cv_job_match",
-  "requested_pipe_ref": "cv_matching.analyze_cv_job_match",
-  "format": "schema",
-  "output": {
-    "concept": "MatchAnalysis",
-    "content": {
-      "type": "object",
-      "properties": {
-        "score": { "title": "Score", "type": "integer", "description": "Match score 0-100" }
-      },
-      "required": ["score"]
-    }
-  },
-  "message": "Output representation generated successfully"
-}
-```
-
-One no-verdict special case: a pipe whose output is `native.Anything` and whose concrete options cannot be determined has no representation to render — a request-shape `422`, since that is a fact about the requested pipe, not about the closure.
-
-The invalid verdict is the shared `is_valid: false` arm shown under Build Inputs.
-
----
-
-## Build Runner
-
-Generate a Python runner script for executing a pipe. The script's imports, example inputs, and output cast are spelled with the **emitted** class names of the typed-structures projection, and the response carries that projection alongside the script — the same stamped `structures.py` + `codegen.lock` a local `pipelex build runner` scaffolds (see [Resolve & Codegen](codegen.md) for the stamp/lock trust chain).
-
-**Endpoint:** `POST /v1/build/runner`
-
-**Request Body:**
-
-```json
-{
-  "files": [{ "content": "...your MTHDS content..." }],
-  "pipe_ref": "cv_matching.analyze_cv_job_match"
-}
-```
-
-**Request Fields:** the shared envelope above, plus:
-
-- `allow_signatures` (boolean, optional): tolerate unimplemented pipe signatures in the dry-run sweep (default `false`). This is the only build route that takes it — the only one that still sweeps.
-- `analytics_groups` (object | null, optional): the groups the caller belongs to, with the same rules and the same 422 `InvalidAnalyticsGroups` as [on `/validate`](pipe-validate.md#who-the-validation-is-done-for). The sweep is done for the authenticated user and these groups, so its telemetry is attributed to them.
-
-The sweep is scoped to the requested pipe, so unrelated broken siblings do not block a good pipe. When `pipe_ref` is omitted the scope is not settled before the closure loads, so the **whole closure** is swept and the pipe then defaults as described in the shared envelope above — the fetched manifest's `main_pipe` on a `method_ref` request, else the closure's own — a stricter verdict, and the honest one for a caller who did not say which pipe they meant.
-
-**Response (valid verdict):**
-
-```json
-{
-  "is_valid": true,
-  "pipe_ref": "cv_matching.analyze_cv_job_match",
-  "requested_pipe_ref": "cv_matching.analyze_cv_job_match",
-  "python_code": "import sys\nfrom pathlib import Path\n...",
-  "structures": {
-    "directory": "structures",
-    "artifacts": [
-      { "path": "structures.py", "content": "# >>> pipelex-codegen-stamp >>>\n..." }
-    ],
-    "lock": "# codegen.lock — generated artifact set (Pipelex codegen). Do not edit by hand.\n...",
-    "lock_filename": "codegen.lock"
-  },
-  "message": "Runner code generated successfully"
-}
-```
-
-To materialize a runnable tree, write `python_code` as the runner script and each `structures.artifacts[]` entry (plus `structures.lock` as `structures.lock_filename`) into the `structures.directory` beside it — the script imports from there (`from structures.structures import ...`).
-
-The invalid verdict — including a failed dry-run of the requested pipe — is the shared `is_valid: false` arm shown under Build Inputs. One no-verdict special case: a requested pipe whose cross-package dependencies are absent from the request (recorded SKIPPED by the sweep) is a request-shape `422`, since no runner can be honestly generated without its dependency closure.
 
 
 ## MTHDS Tools
@@ -26530,11 +26746,11 @@ A failure response looks like this:
 - `error_category` — finer classification when the originating error provides one (currently used by inference errors — see [`InferenceErrorCategory`](https://docs.pipelex.com/latest/errors/) upstream).
 - `user_action` — structured suggestion of what the caller should do next, when the error can author one.
 - `model`, `provider`, `provider_metadata` — populated when the failure originated in an upstream inference call. **Stripped under STRICT disclosure** (see [Disclosure modes](#disclosure-modes)).
-- `validation_errors` — structured per-error list carried by a `ValidateBundleError`. On the run routes (`/execute`, `/start`) it rides this 422 problem document; on the diagnostic routes (`/validate`, `/resolve`, `/codegen`, `/build/{inputs,output,runner}`) it rides the **200 `is_valid: false`** body instead (see [Pipe Validate](pipe-validate.md)). See [Structured validation errors](#structured-validation-errors).
+- `validation_errors` — structured per-error list carried by a `ValidateBundleError`. On the run routes (`/execute`, `/start`) it rides this 422 problem document; on the diagnostic routes (`/validate`, `/resolve`, `/codegen`, `/pipe-io`) it rides the **200 `is_valid: false`** body instead (see [Pipe Validate](pipe-validate.md)). See [Structured validation errors](#structured-validation-errors).
 
 ## Structured validation errors
 
-When a bundle fails validation, the `ValidateBundleError` carries a `validation_errors` array — the per-error diagnostics an editor maps to per-line problems. Where it surfaces depends on the endpoint: on the diagnostic routes (`/validate`, `/resolve`, `/codegen`, `/build/{inputs,output,runner}`) it rides the **200 `is_valid: false`** body (the diagnostic-endpoint contract — see [Pipe Validate](pipe-validate.md)); on the run routes (`/execute`, `/start`) — where an invalid bundle means the run cannot proceed — it rides the **422** problem document alongside the single human-readable `detail`. Built by pipelex's one shared builder, the items are identical wherever they appear (and to the agent CLI's). Each item is one categorized validation failure:
+When a bundle fails validation, the `ValidateBundleError` carries a `validation_errors` array — the per-error diagnostics an editor maps to per-line problems. Where it surfaces depends on the endpoint: on the diagnostic routes (`/validate`, `/resolve`, `/codegen`, `/pipe-io`) it rides the **200 `is_valid: false`** body (the diagnostic-endpoint contract — see [Pipe Validate](pipe-validate.md)); on the run routes (`/execute`, `/start`) — where an invalid bundle means the run cannot proceed — it rides the **422** problem document alongside the single human-readable `detail`. Built by pipelex's one shared builder, the items are identical wherever they appear (and to the agent CLI's). Each item is one categorized validation failure:
 
 | Field | Meaning |
 |---|---|
@@ -26664,15 +26880,15 @@ Every route that takes a JSON body refuses one whose arrays and objects nest mor
 
 The run routes read their body as plain JSON before anything else, and two refusals come from that step, both **422**. A body that is not valid UTF-8, not valid JSON, nested too deeply, or not a JSON object answers `InvalidJSON`. A body carrying, in any object at any depth, a key named `__class__` or `__module__`, or a key starting with `__kajson`, answers `ReservedObjectKey`, and the `detail` names the key, cut short when it is long. Those are the keys a kajson decoder reads as an order to import and instantiate a class, so the runner refuses them rather than carry them as data. Only keys are checked: a string value that mentions `__class__` is accepted.
 
-A pipe selection the server cannot make is an input **422** named for its failure, never the generic `ValidationError`: `EntryPipeNotFoundError` when the selector names no pipe, and `EntryPipeAmbiguousError` when a bare code matches pipes in several domains. The run routes answer an unknown or ambiguous `pipe_code` that way. `POST /v1/pipe-io` and the `/v1/build/*` routes answer every selection refusal that way, counting a request with no `pipe_ref` over a method that declares no `main_pipe` as `EntryPipeNotFoundError` and one over a method whose domains declare several as `EntryPipeAmbiguousError` (see [Pipe I/O](pipe-io.md#pipe-selection)).
+A pipe selection the server cannot make is an input **422** named for its failure, never the generic `ValidationError`: `EntryPipeNotFoundError` when the selector names no pipe, and `EntryPipeAmbiguousError` when a bare code matches pipes in several domains. The run routes answer an unknown or ambiguous `pipe_code` that way. `POST /v1/pipe-io` answers every selection refusal that way, counting a request with no `pipe_ref` over a method that declares no `main_pipe` as `EntryPipeNotFoundError` and one over a method whose domains declare several as `EntryPipeAmbiguousError` (see [Pipe I/O](pipe-io.md#pipe-selection)).
 
-The run routes' extension fields are validated before any method is fetched or any library loaded, and a failure there is a **422** whose `error_type` names the field that failed: `InvalidCallbackUrls` for `callback_urls`, `InvalidStorageScope` for `storage_scope`, `InvalidReadScope` for `read_scope`, `InvalidAnalyticsGroups` for `analytics_groups` (see [Pipe Run](pipe-run.md#host-supplied-run-context-storage_scope-and-analytics_groups)). A storage scope that does not lie under the run's read scope, whether either was sent or defaulted, is an `InvalidReadScope` as well. A failure on another extension field, or on more than one at once, carries the generic `ValidationError`, and the `detail` names every field that failed. `POST /v1/validate` and `POST /v1/build/runner` take `analytics_groups` too and classify it the same way: a body failing on that field alone answers `InvalidAnalyticsGroups`, and one failing on it and another field answers `ValidationError`.
+The run routes' extension fields are validated before any method is fetched or any library loaded, and a failure there is a **422** whose `error_type` names the field that failed: `InvalidCallbackUrls` for `callback_urls`, `InvalidStorageScope` for `storage_scope`, `InvalidReadScope` for `read_scope`, `InvalidAnalyticsGroups` for `analytics_groups` (see [Pipe Run](pipe-run.md#host-supplied-run-context-storage_scope-and-analytics_groups)). A storage scope that does not lie under the run's read scope, whether either was sent or defaulted, is an `InvalidReadScope` as well. A failure on another extension field, or on more than one at once, carries the generic `ValidationError`, and the `detail` names every field that failed. `POST /v1/validate` takes `analytics_groups` too and classifies it the same way: a body failing on that field alone answers `InvalidAnalyticsGroups`, and one failing on it and another field answers `ValidationError`.
 
 The HTTP status is the source of truth for success vs failure — there is no `success: true/false` field anywhere in the envelope.
 
 Which statuses a given route can actually produce is documented per operation in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), each as an `application/problem+json` `ProblemDocument`.
 
-**What is *not* an error status:** an invalid `.mthds` bundle. On the diagnostic routes — `/validate`, `/resolve`, `/codegen`, and `/build/{inputs,output,runner}` — a bundle that fails validation is the *successful product* of the call, so it rides a **200** discriminated on `is_valid: false`, carrying the same `validation_errors[]` described above. Non-2xx on those routes is reserved for *no verdict could be produced*. See [Pipe Validate](pipe-validate.md).
+**What is *not* an error status:** an invalid `.mthds` bundle. On the diagnostic routes — `/validate`, `/resolve`, `/codegen`, and `/pipe-io` — a bundle that fails validation is the *successful product* of the call, so it rides a **200** discriminated on `is_valid: false`, carrying the same `validation_errors[]` described above. Non-2xx on those routes is reserved for *no verdict could be produced*. See [Pipe Validate](pipe-validate.md).
 
 ## Disclosure modes
 
@@ -26811,7 +27027,7 @@ The server writes structured logs: one JSON object per line, on **stderr**, with
 An error response produces exactly one line. A caller mistake:
 
 ```json
-{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "API error 422: InvalidModelCategory", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "event": "api_error", "route": "/v1/models", "error_type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "status": 422, "detail": "Invalid model category. Valid values: extract, img_gen, llm, search"}
+{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "API error 422: InvalidModelCategory", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "event": "api_error", "route": "/v1/models", "error_type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "status": 422, "detail": "Invalid model category. Valid values: extract, img_gen, judgment, llm, search"}
 ```
 
 A server fault looks the same at `ERROR`, and carries the traceback under an `exception` key.
