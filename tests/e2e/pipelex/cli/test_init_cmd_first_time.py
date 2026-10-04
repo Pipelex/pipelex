@@ -10,6 +10,7 @@ from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.backends_ui import RECOMMENDED_INIT_BACKEND
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
 
@@ -26,7 +27,7 @@ class TestFirstTimeInitialization:
 
         # User inputs: confirm init, recommended default backend
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("")  # Empty = the recommended default (openrouter)
+        env.add_prompt_input("")  # Empty = the recommended default
 
         env.setup_mocks()
 
@@ -41,6 +42,10 @@ class TestFirstTimeInitialization:
         env.verify_backends_enabled([RECOMMENDED_INIT_BACKEND])
         env.verify_routing(f"all_{RECOMMENDED_INIT_BACKEND}")
         env.verify_telemetry("off")
+        # The boot's first-run check reads this flag before any live run on a Pipelex-managed backend
+        service_config = load_pipelex_service_config_if_exists(config_dir=env.pipelex_dir)
+        assert service_config is not None
+        assert service_config.onboarding.inference_setup_completed is True
 
     def test_init_with_multiple_backends_and_routing(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 1.2: Initialization with multiple backends."""

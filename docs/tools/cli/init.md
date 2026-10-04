@@ -74,7 +74,7 @@ This command creates or resets a Pipelex config directory with:
 When you run `pipelex init`, Pipelex can guide you through:
 
 1. **Config reset** - Recreate the selected config files
-2. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects the backends you enabled, or OpenRouter, the one-key path, on a first setup and while `backends.toml` still enables exactly what the template enables
+2. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default tier of the shipped model deck
 3. **Credential prompts** - Fill in missing keys when relevant
 4. **Routing configuration** - Set up how models are routed to backends
 5. **Telemetry setup** - Configure observability and analytics
@@ -105,8 +105,8 @@ All fields are optional:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`, `pipelex_manifold`). Omit to keep template defaults. |
-| `primary_backend` | `str` | Required only when 2+ backends are selected. |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`, `pipelex_manifold`). Omit to keep the template's enabled backends and its routing profile, which sends each model to the first of them that serves it. |
+| `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's backends to it first. |
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 
@@ -116,8 +116,8 @@ Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a
 # Initialize with OpenAI backend (project-level)
 pipelex-agent init --config '{"backends": ["openai"]}'
 
-# Initialize globally with OpenRouter, the one-key path
-pipelex-agent init -g --config '{"backends": ["openrouter"]}'
+# Initialize globally with OpenAI, whose one key serves every default tier of the model deck
+pipelex-agent init -g --config '{"backends": ["openai"]}'
 ```
 
 ## Related Configuration

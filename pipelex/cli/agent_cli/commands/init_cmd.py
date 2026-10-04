@@ -218,7 +218,7 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
 
     Args:
         selected_backend_keys: List of enabled backend keys.
-        config: Parsed config dict with optional 'primary_backend' key.
+        config: Parsed config dict with optional 'backends' and 'primary_backend' keys.
         target_dir: Target config directory.
 
     Returns:
@@ -230,6 +230,11 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
         agent_error("routing_profiles.toml not found after config initialization", error_type="InitConfigError")
 
     toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
+
+    # Template defaults with no primary named: the template's own profile already routes among
+    # every backend the template enables, so it stays active.
+    if config.get("backends") is None and config.get("primary_backend") is None:
+        return str(toml_doc["active"])
 
     # Case 1: Only one backend → use all_{backend_key}
     if len(selected_backend_keys) == 1:
@@ -305,8 +310,9 @@ def agent_init_cmd(
                 "Inline JSON string or path to a JSON file. "
                 'Schema: {"backends": list[str], "primary_backend": str}. '
                 "All fields are optional. "
-                "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'openrouter'). Omit to keep template defaults. "
-                "primary_backend: required only when 2+ backends are selected."
+                "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'openrouter'). Omit to keep template defaults "
+                "and the template's routing profile. "
+                "primary_backend: required when 2+ backends are named."
             ),
         ),
     ] = None,
@@ -343,9 +349,10 @@ def agent_init_cmd(
             "primary_backend": "openai"
         }
 
-    - backends: list of backend keys to enable. Omit to keep all template defaults.
-    - primary_backend: required when 2+ backends are selected. Auto-derived when only
-      1 backend is selected.
+    - backends: list of backend keys to enable. Omit to keep all template defaults and the
+      template's routing profile, which routes among every backend it enables.
+    - primary_backend: required when 2+ backends are named. Auto-derived when only
+      1 backend is selected. Named alone, it keeps the template's backends and routes to it first.
 
     Telemetry: global init seeds an active `telemetry.toml` template with all destinations
     off; project init drops in a commented-out template that inherits the user's global

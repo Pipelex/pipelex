@@ -76,7 +76,7 @@ class TestBackendCustomization:
         assert toml_doc[RECOMMENDED_INIT_BACKEND]["enabled"] is True  # type: ignore[index]
 
         # Other backends should be disabled
-        for backend in ["openai", "anthropic", "mistral", "fal"]:
+        for backend in ["openrouter", "anthropic", "mistral", "fal"]:
             if backend in toml_doc and "enabled" in toml_doc[backend]:  # type: ignore[operator]
                 assert toml_doc[backend]["enabled"] is False  # type: ignore[index]
 
@@ -129,8 +129,8 @@ class TestBackendCustomization:
         assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
 
-        # the recommended backend should be disabled
-        assert toml_doc[RECOMMENDED_INIT_BACKEND]["enabled"] is False  # type: ignore[index]
+        # An unselected backend should be disabled
+        assert toml_doc["openrouter"]["enabled"] is False  # type: ignore[index]
 
         # fal should be disabled
         assert toml_doc["fal"]["enabled"] is False  # type: ignore[index]
@@ -148,7 +148,7 @@ class TestBackendCustomization:
         shutil.copy2(actual_backends, test_backends)
 
         # Dynamically get indices for the backends we want to test
-        backend_names = [RECOMMENDED_INIT_BACKEND, "openai", "fal"]
+        backend_names = ["openrouter", "openai", "fal"]
         indices = get_backend_indices_helper(str(actual_backends), backend_names)
         indices_str = " ".join(str(idx) for idx in indices)
 
@@ -189,7 +189,7 @@ class TestBackendCustomization:
         toml_doc = load_toml_with_tomlkit(str(test_backends))
 
         # Selected backends should be enabled
-        assert toml_doc[RECOMMENDED_INIT_BACKEND]["enabled"] is True  # type: ignore[index]
+        assert toml_doc["openrouter"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["openai"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["fal"]["enabled"] is True  # type: ignore[index]
 

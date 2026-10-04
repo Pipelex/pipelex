@@ -16,8 +16,9 @@ active = "all_enabled_backends"
 
 # The default profile needs no Pipelex account: it routes each model to the first enabled backend
 # that serves it, in the order its `fallback_order` lists. `pipelex init` narrows this to the
-# backend you configure (`all_<backend>`), and the one-key path is OpenRouter: set
-# OPENROUTER_API_KEY in your .env file and switch to the "all_openrouter" profile.
+# backend you configure (`all_<backend>`). The model deck's default tiers point at OpenAI models,
+# which `openai` and `azure_openai` serve: with any other single backend, repoint the deck's
+# aliases at models it serves in `deck/x_custom_llm_deck.toml`.
 
 # =========================================================================================
 # Routing Profiles

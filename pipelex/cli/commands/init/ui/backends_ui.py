@@ -13,8 +13,8 @@ from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
-# The backend `pipelex init` pre-selects on a first-time setup: the one-key path to most of the catalog.
-RECOMMENDED_INIT_BACKEND = "openrouter"
+# The backend `pipelex init` pre-selects: the one key that serves every default tier of the shipped model deck.
+RECOMMENDED_INIT_BACKEND = "openai"
 
 
 def get_backend_options_from_toml(template_path: Path, *, existing_path: Path | None = None) -> list[tuple[str, str]]:
@@ -64,8 +64,9 @@ def get_backend_options_from_toml(template_path: Path, *, existing_path: Path | 
 def default_backend_index(*, backend_options: list[tuple[str, str]]) -> int:
     """The 0-based index of the backend a first-time setup pre-selects.
 
-    OpenRouter is the one-key path: a single key reaches most of the catalog, and it needs no
-    Pipelex account. Falls back to the first option when the template does not list it.
+    OpenAI serves every default language-model and image-generation tier of the shipped model deck,
+    so the recommended setup runs the deck's defaults on one key, with no Pipelex account. Falls back
+    to the first option when the template does not list it.
 
     Args:
         backend_options: List of tuples (backend_key, display_name).

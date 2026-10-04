@@ -96,8 +96,9 @@ flowchart TD
     COPY_INF --> CUST_BE[customize_backends_config<br/>Interactive backend selection]
     CUST_BE --> CHK_RT{check_routing?}
     CHK_RT -- "No (auto-route)" --> CUST_RT[customize_routing_profile<br/>Auto-routing based on selection]
-    CUST_RT --> S25
-    CHK_RT -- "Yes (focus=routing)" --> S25
+    CUST_RT --> ONBOARD["Mark inference setup completed<br/>(written to ~/.pipelex/)"]
+    CHK_RT -- "Yes (focus=routing)" --> ONBOARD
+    ONBOARD --> S25
 
     S2 -- No --> S25
 
@@ -357,8 +358,8 @@ If no project root is found and `--global` is not set, the command fails with an
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `"openai"`, `"anthropic"`, `"openrouter"`) |
-| `primary_backend` | `str` | Required when 2+ backends selected |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `"openai"`, `"anthropic"`, `"openrouter"`). Omitted, the template's enabled set and its routing profile are kept |
+| `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's enabled set to it first |
 
 ### Flow
 
@@ -370,7 +371,7 @@ flowchart TD
     STEP1 --> STEP15["Step 1.5: Copy inference templates<br/>(backends.toml, backends/*, deck/*, routing_profiles.toml)"]
     STEP15 --> STEP16["Step 1.6: Copy telemetry template<br/>(global: active defaults; project: commented-out)"]
     STEP16 --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
-    STEP2 --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile"]
+    STEP2 --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile<br/>(the template's, when the config names neither field)"]
     STEP3 --> STEP4["Step 4: Mark inference setup completed<br/>(written to ~/.pipelex/)"]
     STEP4 --> STEP5["Step 5: Prime remote-config cache<br/>(no-op when no managed gateway is enabled)"]
     STEP5 --> OUTPUT["Output result<br/>(Markdown, or JSON via --format json)"]
