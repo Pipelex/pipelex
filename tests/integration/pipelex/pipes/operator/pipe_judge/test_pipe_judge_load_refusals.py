@@ -53,6 +53,7 @@ class TestPipeJudgeLoadRefusals:
             ),
             pytest.param("Choice", 'levels = ["low", "high"]', "asks a rating question: its output must be `Rating`", id="rating_into_choice"),
             pytest.param("Text", "", "asks a yes/no question: its output must be `YesNo`", id="yes_no_into_text"),
+            pytest.param("Dynamic", "", "asks a yes/no question: its output must be `YesNo`", id="yes_no_into_dynamic"),
         ],
     )
     async def test_an_output_disagreeing_with_the_kind_is_refused_naming_both_sides(self, output: str, step_fields: str, asks: str) -> None:

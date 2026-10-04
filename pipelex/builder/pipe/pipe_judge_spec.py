@@ -23,7 +23,10 @@ class PipeJudgeSpec(PipeSpec):
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     model: str | None = Field(
         default=None,
-        description="Judgment model preset, alias, waterfall, or direct model handle. Use presets from 'pipelex-agent models'.",
+        description=(
+            "Judgment model preset, alias, waterfall, or direct model handle. Use presets from 'pipelex-agent models'. "
+            "Required unless the deck names a default judgment model (`choice_default` under `[judgment]`), which the shipped deck does not."
+        ),
     )
     question: str = Field(
         description="The one closed question to ask about the inputs: use `$` prefix for an inline parameter (e.g., `Is it about $topic?`).",
@@ -46,7 +49,7 @@ class PipeJudgeSpec(PipeSpec):
     @classmethod
     def reject_empty_model(cls, value: str | None) -> str | None:
         if isinstance(value, str) and not value.strip():
-            msg = "Model cannot be an empty string; omit the field to use defaults"
+            msg = "Model cannot be an empty string: name a judgment model, or omit the field only when the deck names a default one"
             raise ValueError(msg)
         return value
 

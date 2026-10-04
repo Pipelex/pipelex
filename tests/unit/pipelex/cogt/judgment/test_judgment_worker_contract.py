@@ -159,10 +159,16 @@ class TestJudgmentWorkerContract:
                 "position",
                 id="rating_infinite_position",
             ),
+            pytest.param(
+                RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                RatingAnswer(level=2, position=2.5),
+                "position of 2.5",
+                id="rating_position_past_the_last_level",
+            ),
         ],
     )
     async def test_it_refuses_a_measure_its_verdict_cannot_hold(self, question: JudgmentQuestion, answer: JudgmentAnswer, named: str) -> None:
-        """A probability outside the unit interval or a position that is not finite is refused as a mismatch, not left to the verdict's own model."""
+        """A probability outside the unit interval or a position off the scale is refused as a mismatch, not left to the verdict's own model."""
         job = make_fake_judgment_job({"verdict": question})
         worker = FakeJudgmentWorker(make_fake_judgment_model(), answers={"verdict": answer})
 

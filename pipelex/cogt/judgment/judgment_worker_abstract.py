@@ -163,8 +163,11 @@ def _check_answer_fits_question(*, question_key: str, question: JudgmentQuestion
                 )
                 raise JudgmentAnswerMismatchError(msg)
             _check_probabilities_are_probabilities(question_key=question_key, probabilities=answer.probabilities)
-            if answer.position is not None and not math.isfinite(answer.position):
-                msg = f"Judgment worker answered question '{question_key}' with a position of {answer.position}, which is not a position on its scale"
+            if answer.position is not None and not (math.isfinite(answer.position) and 0 <= answer.position <= nb_levels - 1):
+                msg = (
+                    f"Judgment worker answered question '{question_key}' with a position of {answer.position}, "
+                    f"which is not a position on its scale of {nb_levels} levels (0 to {nb_levels - 1})"
+                )
                 raise JudgmentAnswerMismatchError(msg)
 
 

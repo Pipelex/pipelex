@@ -5,7 +5,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.judgment.judgment_models import ChoiceQuestion, JudgmentKind, JudgmentQuestion, RatingQuestion, YesNoQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_judgment_choice_with_deck
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -14,13 +13,12 @@ from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
-from pipelex.kernel.judgment_ops import judgment_setting_of_choice, resolve_judgment_setting, run_judgment
+from pipelex.kernel.judgment_ops import judgment_setting_of_choice, resolve_judgment_setting, run_judgment, served_judgment_model
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.judge.exceptions import PipeJudgeInputCapabilityError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.runtime_hub import get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -108,13 +106,13 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         an `Image` or a `Document` input, or a list of either, is sent to the model as a file. Whether the
         model reads one is its own capability, stated in its spec's `inputs`: a model that does not is
         refused here, naming the input and what it reads. That needs the model's spec, which a boot that
-        skipped its backend, a keyless one with the backend's key unset, does not hold: the check is then
-        left to the worker when the step runs, as it is for a `Dynamic` input, whose declaration names no
-        kind of value.
+        skipped its backend, a keyless one with the backend's key unset, does not hold, and neither does
+        one serving none of a waterfall's models: the check is then left to the worker when the step runs,
+        as it is for a `Dynamic` input, whose declaration names no kind of value.
         """
         with self.locating_model_choice(field_name="model"):
             judgment_setting = judgment_setting_of_choice(judgment_choice=self.judgment_choice, pipe_code=self.code)
-        inference_model = get_model_deck().get_optional_inference_model(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT)
+        inference_model = served_judgment_model(model_handle=judgment_setting.model)
         if inference_model is None:
             return
         concept_library = get_concept_library()
@@ -150,9 +148,13 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
 
     @override
     def validate_output_with_library(self):
-        """The output agrees with the question's kind: its verdict native, or a concept refining it."""
+        """The output agrees with the question's kind: its verdict native, or a concept refining it.
+
+        `Dynamic` is compatible with every concept, but a judgment's verdict is always its kind's native,
+        so a `Dynamic` output is refused like any other that is not that native.
+        """
         verdict_native = verdict_native_for_kind(judgment_kind=self.judgment_kind)
-        if get_concept_library().is_compatible(
+        if not NativeConceptCode.is_dynamic_concept(concept_code=self.output.concept.code) and get_concept_library().is_compatible(
             tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=verdict_native),
             strict=True,

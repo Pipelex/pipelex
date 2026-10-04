@@ -18,7 +18,7 @@ from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
-from pipelex.cogt.exceptions import JudgmentAnswerMismatchError, JudgmentModelMissingError
+from pipelex.cogt.exceptions import JudgmentAnswerMismatchError, JudgmentModelMissingError, ModelNotFoundError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.judgment.judgment_models import (
@@ -30,6 +30,7 @@ from pipelex.cogt.judgment.judgment_models import (
     YesNoAnswer,
 )
 from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
@@ -76,6 +77,18 @@ def judgment_setting_of_choice(*, judgment_choice: JudgmentModelChoice | None = 
     return model_deck.get_judgment_setting(judgment_choice=resolved_choice)
 
 
+def served_judgment_model(*, model_handle: str) -> InferenceModelSpec | None:
+    """The spec of the judgment model a handle resolves to on this boot, `None` when no backend serves one.
+
+    The deck answers `None` for an alias or a handle it does not serve, but raises for a waterfall none of
+    whose models it serves, or whose fallbacks are disabled: here the two mean the same thing.
+    """
+    try:
+        return get_model_deck().get_optional_inference_model(model_handle=model_handle, model_type=ModelType.JUDGMENT)
+    except ModelNotFoundError:
+        return None
+
+
 def resolve_judgment_setting(
     *, judgment_choice: JudgmentModelChoice | None = None, pipe_code: str | None = None, is_dry: bool = False
 ) -> JudgmentSetting:
@@ -87,7 +100,7 @@ def resolve_judgment_setting(
     """
     model_deck = get_model_deck()
     judgment_setting = judgment_setting_of_choice(judgment_choice=judgment_choice, pipe_code=pipe_code)
-    if is_dry and model_deck.get_optional_inference_model(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT) is None:
+    if is_dry and served_judgment_model(model_handle=judgment_setting.model) is None:
         return judgment_setting
 
     inference_model = model_deck.get_required_inference_model(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT)

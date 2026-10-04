@@ -28,3 +28,14 @@ def no_judgment_default() -> Iterator[None]:
         yield
     finally:
         model_deck.judgment_choice_default = booted_default
+
+
+@pytest.fixture
+def unserved_judgment_waterfall() -> Iterator[str]:
+    """A judgment waterfall, for one test, whose only model no backend serves: its reference."""
+    model_deck = get_model_deck()
+    model_deck.judgment_waterfalls["unserved_judges"] = ["jev-0.0.0-unserved"]
+    try:
+        yield "~unserved_judges"
+    finally:
+        del model_deck.judgment_waterfalls["unserved_judges"]

@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelNotFoundError
+from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelNotFoundError, ModelWaterfallError
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.kernel.judgment_ops import resolve_judgment_setting
 
@@ -22,6 +22,16 @@ def _deck_serving_no_judgment_model(mocker: MockerFixture) -> Any:
     model_deck.get_required_inference_model.side_effect = ModelNotFoundError(
         message="Model handle 'jev-1.13.0' was not found in the model deck.", model_handle="jev-1.13.0"
     )
+    return model_deck
+
+
+def _deck_with_an_unserved_judgment_waterfall(mocker: MockerFixture) -> Any:
+    """A deck whose judgment waterfall names only models no backend serves, which the deck answers by raising."""
+    model_deck = mocker.Mock(judgment_choice_default=None)
+    model_deck.get_judgment_setting.return_value = JudgmentSetting(model="~judges")
+    waterfall_error = ModelWaterfallError(message="Model handle 'judges' is a waterfall", model_handle="judges", fallback_list=["jev-1.13.0"])
+    model_deck.get_optional_inference_model.side_effect = waterfall_error
+    model_deck.get_required_inference_model.side_effect = waterfall_error
     return model_deck
 
 
@@ -54,3 +64,16 @@ class TestResolveJudgmentSetting:
 
         with pytest.raises(ModelNotFoundError, match=r"jev-1\.13\.0"):
             resolve_judgment_setting(judgment_choice="@default-judgment", pipe_code="triage")
+
+    def test_a_dry_run_keeps_the_handle_of_a_waterfall_no_backend_serves(self, mocker: MockerFixture) -> None:
+        mocker.patch("pipelex.kernel.judgment_ops.get_model_deck", return_value=_deck_with_an_unserved_judgment_waterfall(mocker))
+
+        judgment_setting = resolve_judgment_setting(judgment_choice="~judges", pipe_code="triage", is_dry=True)
+
+        assert judgment_setting.model == "~judges"
+
+    def test_a_live_run_refuses_a_waterfall_no_backend_serves(self, mocker: MockerFixture) -> None:
+        mocker.patch("pipelex.kernel.judgment_ops.get_model_deck", return_value=_deck_with_an_unserved_judgment_waterfall(mocker))
+
+        with pytest.raises(ModelWaterfallError):
+            resolve_judgment_setting(judgment_choice="~judges", pipe_code="triage")
