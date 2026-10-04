@@ -6,7 +6,7 @@ from fal_client.client import FalClientError, FalClientHTTPError, FalClientTimeo
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -42,7 +42,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
     ) -> Any:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
@@ -53,7 +53,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         fal_application = args_dict.pop("model", None)
         if fal_application is None:
             msg = f"Model '{self.inference_model.name}' rules must include a 'model_choice' entry"
-            raise ImgGenParameterError(msg)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         try:
             handler = await self.fal_async_client.submit(
