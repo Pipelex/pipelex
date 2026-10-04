@@ -125,7 +125,7 @@ pipelex-agent inputs method <NAME> [OPTIONS]
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
-The JSON success envelope names the pipe the template was generated for as `pipe_ref`, the qualified `domain.pipe_code` of the pipe that was resolved, whether you named it with a bare code, a qualified ref, or let it default to the bundle's `main_pipe`:
+The JSON success envelope names the pipe the template was generated for as `pipe_ref`, the qualified `domain.pipe_code` of the pipe that was resolved, whether you named it with a bare code, a qualified ref, or let it default to the bundle's `main_pipe`. A pipe you reached through a dependency alias keeps that alias, `alias->domain.pipe_code`, since that is the ref that selects it again:
 
 ```json
 {

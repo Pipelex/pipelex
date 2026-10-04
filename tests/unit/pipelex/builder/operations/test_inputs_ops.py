@@ -166,8 +166,8 @@ class TestBuildInputsForPipe:
         }
 
     def test_pipe_without_inputs_answers_an_empty_template(self, ops_mocks: dict[str, Any], tmp_path: Path) -> None:
-        """A pipe that declares no inputs is an answer: empty inputs, the resolved pipe ref, and the renderer's message for the TOML path."""
-        ops_mocks["render_inputs"].side_effect = NoInputsRequiredError("Pipe 'demo_domain.bundle_main' declares no inputs.")
+        """A pipe that declares no inputs is an answer: empty inputs, the resolved pipe ref, and a message naming that ref for the TOML path."""
+        ops_mocks["render_inputs"].side_effect = NoInputsRequiredError("the renderer's own wording")
 
         result = asyncio.run(build_inputs_for_pipe(bundle_path=tmp_path / "demo.mthds"))
 
@@ -178,3 +178,19 @@ class TestBuildInputsForPipe:
             "concept_comments": {},
             "no_inputs_message": "Pipe 'demo_domain.bundle_main' declares no inputs.",
         }
+
+    def test_dependency_pipe_keeps_its_alias(self, ops_mocks: dict[str, Any]) -> None:
+        """A pipe reached through a dependency alias is reported under that alias, the only ref that selects it again."""
+        result = asyncio.run(build_inputs_for_pipe(pipe_code="github.com/acme/tools/summarizer->demo_domain.bundle_main"))
+
+        ops_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="github.com/acme/tools/summarizer->demo_domain.bundle_main")
+        assert result["pipe_ref"] == "github.com/acme/tools/summarizer->demo_domain.bundle_main"
+
+    def test_dependency_pipe_without_inputs_names_its_alias(self, ops_mocks: dict[str, Any]) -> None:
+        """The no-inputs message names the same alias-qualified ref the envelope reports."""
+        ops_mocks["render_inputs"].side_effect = NoInputsRequiredError("the renderer's own wording")
+
+        result = asyncio.run(build_inputs_for_pipe(pipe_code="dep->demo_domain.bundle_main"))
+
+        assert result["pipe_ref"] == "dep->demo_domain.bundle_main"
+        assert result["no_inputs_message"] == "Pipe 'dep->demo_domain.bundle_main' declares no inputs."
