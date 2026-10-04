@@ -29,16 +29,6 @@ class PipelexBackend(StrEnum):
                 return "Internal (software-only)"
 
 
-# The Pipelex-managed gateway backends the kit ships, in a stable order so a message built from them
-# reads the same every time.
-#
-# This is a *second*, narrower way of naming a managed gateway than `resolve_model_specs_section`, and
-# it exists for the callers that hold only a backend name and no configuration — an inference worker
-# asserting a provider behaviour that follows from running behind our gateway codebase, for instance.
-# Wherever the configuration is in hand, the declared section is the authority.
-MANAGED_GATEWAY_BACKEND_NAMES: tuple[str, ...] = (PipelexBackend.MANIFOLD,)
-
-
 def resolve_model_specs_section(*, backend_name: str, declared_section: str | None) -> str | None:
     """The remote-config section this backend's model specs come from, or `None` when it has none.
 

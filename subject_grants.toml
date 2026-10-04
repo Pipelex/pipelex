@@ -1708,14 +1708,6 @@ rationale = "Predicate on the error_message; single operand."
 param = "response"
 rationale = "Parses the response; single operand."
 
-["pipelex/cogt/inference/error_classification.py::_parse_retry_after_seconds"]
-param = "value"
-rationale = "Parses the value; single operand."
-
-["pipelex/cogt/inference/error_classification.py::_pipelex_service_error_code_from_body"]
-param = "body"
-rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
-
 ["pipelex/cogt/inference/error_classification.py::_provider_error_code_from_body"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."
@@ -1731,6 +1723,10 @@ rationale = "Extracts from the exc; single operand."
 ["pipelex/cogt/inference/error_classification.py::_stringify_for_scan"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."
+
+["pipelex/cogt/inference/error_classification.py::error_code_from_body_code_first"]
+param = "body"
+rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
 
 ["pipelex/cogt/inference/error_classification.py::extract_anthropic_metadata"]
 param = "exc"
@@ -1772,10 +1768,6 @@ rationale = "Extracts from the exc; single operand."
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
-["pipelex/cogt/inference/error_classification.py::extract_manifold_metadata"]
-param = "exc"
-rationale = "Extracts from the exc; single operand."
-
 ["pipelex/cogt/inference/error_classification.py::extract_mistral_metadata"]
 param = "exc"
 rationale = "Extracts from the exc; single operand."
@@ -1791,6 +1783,10 @@ rationale = "Extracts from the exc; single operand."
 ["pipelex/cogt/inference/error_classification.py::extract_underlying_sdk_exception"]
 param = "instructor_exc"
 rationale = "Extracts from the instructor_exc; single operand."
+
+["pipelex/cogt/inference/error_classification.py::parse_retry_after_seconds"]
+param = "value"
+rationale = "Parses the value; single operand."
 
 ["pipelex/cogt/inference/error_classify.py::_classify_statusless"]
 param = "metadata"
@@ -5011,6 +5007,10 @@ rationale = "Predicate on the sdk; single operand."
 ["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_responses"]
 param = "sdk"
 rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_error_metadata.py::extract_manifold_metadata"]
+param = "exc"
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory._make_gemini_image_config"]
 param = "taxonomy"

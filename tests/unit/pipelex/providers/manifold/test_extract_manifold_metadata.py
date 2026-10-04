@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import httpx
 
-from pipelex.cogt.inference.error_classification import extract_manifold_metadata
+from pipelex.providers.manifold.manifold_error_metadata import extract_manifold_metadata
 
 _ORIGIN = "https://manifold.example.com"
 

@@ -16,7 +16,7 @@ from enum import StrEnum
 # its auth runs (`src/pig/serviceTokenHeader.ts` there), which is what let the rename happen — it
 # had no runtime-only half. This is the one header the dialect sends about itself, on every
 # protocol: the OpenAI-substrate factories and the native client put it there directly, and the
-# shared Anthropic driver reads it from the backend's `auth_header` field, so the value in
+# Anthropic client reads it from the backend's `auth_header` field, so the value in
 # `backends.toml` must spell it exactly as this constant does.
 MANIFOLD_AUTH_HEADER = "x-pipelex-api-key"
 
@@ -29,13 +29,9 @@ MANIFOLD_AUTH_HEADER = "x-pipelex-api-key"
 # the vendor's vocabulary it does not have to.
 MANIFOLD_METADATA_HEADER = "x-pipelex-metadata"
 
-# The gateway's response headers are named in `cogt/inference/error_classification.py`, not here.
-# `MANIFOLD_TRACE_ID_HEADER` and `MANIFOLD_VENDOR_TRACE_ID_HEADER` are the two spellings it stamps
-# its trace id on, and `extract_manifold_metadata` — the native routes' distiller, which is in
-# `cogt`, and `cogt` may not import this package — is the only reader of those two names. The vendor
-# spelling itself has a second reader that does not go through them: `extract_gateway_metadata`
-# holds it as a literal, and that is the function the manifold *image* path distils its failures
-# through, because that path still travels on `portkey_ai`. This file names what the dialect *sends*.
+# The gateway's response headers, the two spellings of its trace id, are named in
+# `manifold_error_metadata`, beside the distiller that reads them. This file names what the dialect
+# *sends*.
 
 # The OpenAI and Portkey SDKs both expect their `base_url` to already carry the API version segment
 # (`AsyncOpenAI`'s default is `https://api.openai.com/v1`, `AsyncPortkey`'s is
@@ -58,10 +54,11 @@ MANIFOLD_SEARCH_ROUTE = "/pipelex/search"
 class ManifoldSdk(StrEnum):
     """The sdk values the manifold catalog section may name.
 
-    `anthropic` is deliberately absent: Claude reaches the manifold service over the *shared*
-    Anthropic SDK driver, which is not part of this package and outlives the Portkey retirement.
+    `manifold_anthropic` is the open Anthropic worker with this package's extras factory, which adds
+    the metadata header to every Claude call.
     """
 
+    ANTHROPIC = "manifold_anthropic"
     COMPLETIONS = "manifold_completions"
     RESPONSES = "manifold_responses"
     IMG_GEN = "manifold_img_gen"

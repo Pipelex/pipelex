@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:717ab382b52b2fa43c750bd30036428fb9d363cd0a5f8e86faffb4ebc0d86f3f"
+digest = "sha256:35e4a1027244f3cc4546249c0a3b4d3937ceb5a10a20b74c536b2cc72439ea6a"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T14:31:48Z"
-rationale = "real-catch: runtime_hub.py's docstring dropped builder from the interpreter packages it may not name, since pipelex.builder no longer exists. docs/contribute/hub-layering.md named it in the same list and in its verification snippet's INTERPRETER set, which the closure test compares against INTERPRETER_PACKAGES, and listed builder/runner_code among the interpreter callers that supply get_concept_library(); all three now leave it out."
+reviewed_at = "2026-10-04T18:44:31Z"
+rationale = "real-catch: runtime_hub.py gained get_optional_service_error_vocabulary and its setter, the plugins' service error codes frozen at boot; hub-layering.md's plugin-registries row and its sentence on what RuntimeBoot.setup installs on the RuntimeHub now name it."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:485fefa16424ad368e80a5008beab7bd5bf86305"
+"pipelex/runtime_hub.py" = "blob:05f84b9604b9f904e7df96d222b8856123ce9e91"

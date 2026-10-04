@@ -1,18 +1,22 @@
-"""The gateway's unresolvable-reference refusals, from the wire code to the rendered advice.
+"""The Manifold service's unresolvable-reference refusals, from the wire code to the rendered advice.
 
 A request may name a file rather than carry it — a ``pipelex-storage://`` key the
-Pipelex inference gateway resolves for the caller, or a document URL it fetches on
+Pipelex Manifold service resolves for the caller, or a document URL it fetches on
 their behalf. When it cannot turn that reference into bytes it refuses the request
 itself, with codes of its own: ``pig-09`` on the LLM routes, where its ``pig-0N``
 family has one fail-closed slot for "cannot resolve" and the message carries the
 difference, and a named ``pipelex_*`` contract code on the native
 ``/v1/pipelex/*`` routes for each distinct cause.
 
-Without a class for them the Classify step falls through to the generic status
-ladder — every one of these arrives on 400 — so a caller who mistyped a storage
+These codes are the service's wire contract, so the Manifold plugin owns them: each
+is a ``GatewayUnresolvedReference`` member in ``manifold_error_codes``, contributed
+as one entry of the service error vocabulary that ``classify_inference_error``
+consults ahead of the status ladder (the package's ``conftest.py`` hands the
+classifier that vocabulary). Without that entry the Classify step falls through to
+the generic status ladder — every one of these arrives on 400 — so a caller who mistyped a storage
 key, pointed at an object this deployment cannot read, or aimed a URL at a host the
 SSRF guard refuses reads "the provider rejected the request — review the prompt,
-parameters, and inputs". These tests pin the whole chain: the code is recognized,
+parameters, and inputs". These tests pin the whole chain: the code is in the vocabulary,
 it survives every Extract hop that can carry it, it classifies as a caller error
 that is never retried, and the Render step says which reference failed and what to
 do about it.
@@ -33,7 +37,7 @@ request limits.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anthropic
 import httpx
@@ -43,19 +47,25 @@ from portkey_ai import Portkey
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import (
-    _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE,  # pyright: ignore[reportPrivateUsage]
-    GatewayRequestLimit,
-    GatewayUnresolvedReference,
     ProviderErrorMetadata,
     UserActionKind,
     extract_anthropic_metadata,
     extract_gateway_metadata,
-    extract_manifold_metadata,
     extract_openai_metadata,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_classify import ClassificationResult, classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.providers.manifold.manifold_error_codes import (
+    _GATEWAY_REQUEST_LIMIT_BY_CODE,  # pyright: ignore[reportPrivateUsage]
+    _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE,  # pyright: ignore[reportPrivateUsage]
+    GatewayRequestLimit,
+    GatewayUnresolvedReference,
+)
+from pipelex.providers.manifold.manifold_error_metadata import extract_manifold_metadata
+
+if TYPE_CHECKING:
+    from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
 
 _ORIGIN = "https://manifold.example.com"
 
@@ -166,6 +176,21 @@ def _envelope(code: str | None, *, status_code: int = 400, provider: ProviderNam
     )
 
 
+def _unresolved_reference(code: str | None) -> GatewayUnresolvedReference | None:
+    """The family member a wire code names, if it names one."""
+    return _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE.get(code) if code is not None else None
+
+
+def _request_limit(code: str | None) -> GatewayRequestLimit | None:
+    """The neighbouring family's member a wire code names, if it names one."""
+    return _GATEWAY_REQUEST_LIMIT_BY_CODE.get(code) if code is not None else None
+
+
+def _classified_code(result: ClassificationResult) -> str | None:
+    """The wire code of the vocabulary entry the classifier matched, if it matched one."""
+    return result.service_error_code.code if result.service_error_code is not None else None
+
+
 def _rendered_detail(metadata: ProviderErrorMetadata, *, family: InferenceErrorFamily = InferenceErrorFamily.LLM) -> str:
     rendered = render_inference_error(
         metadata=metadata,
@@ -179,11 +204,14 @@ def _rendered_detail(metadata: ProviderErrorMetadata, *, family: InferenceErrorF
 
 
 class TestTheCodeIsRecognized:
-    """``gateway_unresolved_reference`` reads the gateway's own code namespace off the envelope."""
+    """Each code is in the Manifold vocabulary, under the family member that names its remedy."""
 
     @pytest.mark.parametrize(("code", "expected"), _EVERY_CODE_AND_MEMBER)
-    def test_each_code_maps_to_its_member(self, code: str, expected: GatewayUnresolvedReference) -> None:
-        assert _envelope(code).gateway_unresolved_reference == expected
+    def test_each_code_maps_to_its_member(
+        self, code: str, expected: GatewayUnresolvedReference, manifold_service_error_vocabulary: ServiceErrorVocabulary
+    ) -> None:
+        assert _unresolved_reference(code) == expected
+        assert manifold_service_error_vocabulary.lookup(code=code) is not None
 
     @pytest.mark.parametrize("member", list(GatewayUnresolvedReference))
     def test_every_member_is_reachable_from_a_wire_code(self, member: GatewayUnresolvedReference) -> None:
@@ -205,14 +233,15 @@ class TestTheCodeIsRecognized:
     )
     def test_any_other_code_is_not_an_unresolved_reference(self, code: str | None) -> None:
         """The routing codes, the request-shape limits, and a vendor's own code are all other families."""
-        assert _envelope(code).gateway_unresolved_reference is None
+        assert _unresolved_reference(code) is None
+        assert _unresolved_reference(_classified_code(classify_inference_error(_envelope(code)))) is None
 
     @pytest.mark.parametrize("provider", list(ProviderName))
     def test_the_code_is_read_whichever_provider_reported_it(self, provider: ProviderName) -> None:
         """Claude reaches the gateway on the Anthropic driver, so the refusal is not always reported as GATEWAY."""
-        metadata = _envelope("pipelex_document_host_refused", provider=provider)
+        result = classify_inference_error(_envelope("pipelex_document_host_refused", provider=provider))
 
-        assert metadata.gateway_unresolved_reference == GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED
+        assert _unresolved_reference(_classified_code(result)) == GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED
 
 
 class TestTheCodeSurvivesEveryExtractHop:
@@ -224,7 +253,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_gateway_metadata(exc)
 
         assert metadata.provider_error_code == "pig-09"
-        assert metadata.gateway_unresolved_reference == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
+        assert _unresolved_reference(metadata.provider_error_code) == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
 
     def test_the_portkey_substrate_discards_the_payload_and_the_code_survives_anyway(self) -> None:
         """The reason the hop above is built through the SDK rather than by hand.
@@ -237,7 +266,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         exc = _as_the_portkey_sdk_raises_it(status_code=400, body=_UNRESOLVED_BODY)
 
         assert isinstance(getattr(exc, "body", None), str)
-        assert extract_gateway_metadata(exc).gateway_unresolved_reference == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
+        assert _unresolved_reference(extract_gateway_metadata(exc).provider_error_code) == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
 
     def test_the_native_envelope_survives_the_portkey_substrate_too(self) -> None:
         """A gateway extract reaches Azure Document Intelligence in the chat costume.
@@ -253,7 +282,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_gateway_metadata(exc)
 
         assert metadata.provider_error_code == "pipelex_document_host_refused"
-        assert metadata.gateway_unresolved_reference == GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED
+        assert _unresolved_reference(metadata.provider_error_code) == GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED
 
     @pytest.mark.parametrize(
         ("code", "expected"),
@@ -272,7 +301,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_manifold_metadata(exc)
 
         assert metadata.provider_error_code == code
-        assert metadata.gateway_unresolved_reference == expected
+        assert _unresolved_reference(metadata.provider_error_code) == expected
 
     def test_through_the_shared_anthropic_driver(self) -> None:
         """Claude travels on the vendor's own SDK, which recovers the code from the body it kept."""
@@ -283,7 +312,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_anthropic_metadata(exc)
 
         assert metadata.provider_error_code == "pig-09"
-        assert metadata.gateway_unresolved_reference == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
+        assert _unresolved_reference(metadata.provider_error_code) == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
 
     def test_through_the_openai_substrate_that_carries_every_chat_call(self) -> None:
         """The hop a gateway or manifold LLM call actually takes.
@@ -297,7 +326,7 @@ class TestTheCodeSurvivesEveryExtractHop:
 
         metadata = extract_openai_metadata(exc)
 
-        assert metadata.gateway_unresolved_reference == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
+        assert _unresolved_reference(metadata.provider_error_code) == GatewayUnresolvedReference.REFERENCE_UNRESOLVED
 
 
 class TestClassification:
@@ -307,10 +336,11 @@ class TestClassification:
     def test_each_code_classifies_as_its_member_and_is_never_retried(self, code: str, expected: GatewayUnresolvedReference) -> None:
         result = classify_inference_error(_envelope(code))
 
-        assert result.gateway_unresolved_reference == expected
+        assert _unresolved_reference(_classified_code(result)) == expected
         assert result.category.is_retryable is False
         assert result.is_model_not_found is False
-        assert result.gateway_request_limit is None
+        assert _classified_code(result) == code
+        assert _request_limit(_classified_code(result)) is None
 
     @pytest.mark.parametrize("code", _CALLER_FIXABLE_CODES)
     def test_a_reference_the_caller_can_repair_asks_them_to_change_the_input(self, code: str) -> None:
@@ -323,7 +353,7 @@ class TestClassification:
         """No bucket configured is not something any input can avoid, so the caller is not asked to try."""
         result = classify_inference_error(_envelope("pipelex_storage_uri_unsupported"))
 
-        assert result.gateway_unresolved_reference == GatewayUnresolvedReference.STORAGE_NOT_SERVED
+        assert _unresolved_reference(_classified_code(result)) == GatewayUnresolvedReference.STORAGE_NOT_SERVED
         assert result.category == InferenceErrorCategory.CONFIGURATION
         assert result.user_action_kind == UserActionKind.CONTACT_SUPPORT
         assert result.category.is_retryable is False
@@ -332,7 +362,7 @@ class TestClassification:
         """Only the gateway's own codes name a reference; a bare 400 from a vendor does not."""
         result = classify_inference_error(_envelope("something-else"))
 
-        assert result.gateway_unresolved_reference is None
+        assert _classified_code(result) is None
         assert result.category == InferenceErrorCategory.CONTENT
         assert result.user_action_kind == UserActionKind.CHANGE_INPUT
 
@@ -420,18 +450,21 @@ class TestTheTwoGatewayFamiliesDoNotShadowEachOther:
 
     @pytest.mark.parametrize("code", _EVERY_CODE)
     def test_no_unresolved_reference_code_is_also_a_request_limit(self, code: str) -> None:
-        assert _envelope(code).gateway_request_limit is None
+        assert _request_limit(code) is None
 
     @pytest.mark.parametrize("code", ["pig-07", "pig-08", "pig-10", "pig-11", "pipelex_storage_object_too_large", "pipelex_document_too_large"])
     def test_no_request_limit_code_is_also_an_unresolved_reference(self, code: str) -> None:
-        assert _envelope(code, status_code=413).gateway_unresolved_reference is None
+        assert _unresolved_reference(code) is None
 
     def test_the_storage_codes_are_split_between_the_two_families_on_the_same_route(self) -> None:
         """Both arrive from ``/v1/pipelex/extract``, and each must reach its own family."""
         too_large = _envelope("pipelex_storage_object_too_large", status_code=413)
         unreadable = _envelope("pipelex_storage_unreadable")
 
-        assert classify_inference_error(too_large).gateway_request_limit == GatewayRequestLimit.OBJECT_TOO_LARGE
-        assert classify_inference_error(too_large).gateway_unresolved_reference is None
-        assert classify_inference_error(unreadable).gateway_unresolved_reference == GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE
-        assert classify_inference_error(unreadable).gateway_request_limit is None
+        too_large_code = _classified_code(classify_inference_error(too_large))
+        unreadable_code = _classified_code(classify_inference_error(unreadable))
+
+        assert _request_limit(too_large_code) == GatewayRequestLimit.OBJECT_TOO_LARGE
+        assert _unresolved_reference(too_large_code) is None
+        assert _unresolved_reference(unreadable_code) == GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE
+        assert _request_limit(unreadable_code) is None

@@ -21,6 +21,7 @@ _ANTHROPIC_LEVEL_MAP: dict[str, str] = {
 def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> AnthropicLLMWorker:
     """Create a minimal AnthropicLLMWorker with a mocked inference_model."""
     worker = object.__new__(AnthropicLLMWorker)
+    worker.extras_factory = None
     mock_model = mocker.MagicMock()
     mock_model.thinking_mode = thinking_mode
     mock_model.desc = "test-model"

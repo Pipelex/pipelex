@@ -1,24 +1,29 @@
-"""The gateway's request-shape refusals, from the wire code to the rendered advice.
+"""The Manifold service's request-shape refusals, from the wire code to the rendered advice.
 
-The Pipelex inference gateway bounds what a request may weigh and how deeply it may
+The Pipelex Manifold service bounds what a request may weigh and how deeply it may
 nest, and refuses anything over those bounds with codes of its own: ``pig-07`` (the
 body is over its byte cap, at 413), ``pig-08`` (the body's size cannot be read — a
 chunked body, or an unreadable ``Content-Length`` — at 411), ``pig-10`` (a
 ``pipelex-storage://`` object over its cap, at 413) and ``pig-11`` (the body nests
 deeper than the gateway's depth limit, at 400).
 
-Without a class for them the Classify step falls through to the generic status
-ladder, and a caller who sent something too large reads "the provider rejected the
-request" rather than "the request was too large". These tests pin the whole chain:
-the code is recognized, it survives every Extract hop that can carry it, it
-classifies as a caller/limit error that is never retried, and the Render step says
-which limit was hit.
+These codes are the service's wire contract, so the Manifold plugin owns them: each
+is a ``GatewayRequestLimit`` member in ``manifold_error_codes``, contributed as one
+entry of the service error vocabulary that ``classify_inference_error`` consults
+ahead of the status ladder. Without that entry the Classify step falls through to
+the generic ladder, and a caller who sent something too large reads "the provider
+rejected the request" rather than "the request was too large". These tests pin the
+whole chain: the code is in the vocabulary under the right member, it survives
+every Extract hop that can carry it, it classifies as a caller/limit error that is
+never retried, and the Render step says which limit was hit. The package's
+``conftest.py`` hands the classifier the Manifold vocabulary.
 
 **The code is the discriminator, not the provider.** A request reaches the gateway
 through several SDKs — the Portkey substrate, plain ``httpx`` on the native routes,
 and the shared Anthropic driver that Claude travels on — so the refusal arrives
 under three different ``ProviderName`` values. ``pig-`` and ``pipelex_`` are both
-the gateway's own code namespaces, which is why recognition keys on the code alone.
+the service's own code namespaces, which is why the vocabulary matches on the code
+alone.
 
 **And one failure can wear two codes.** The gateway renders a refusal in the
 vocabulary of the route it arrived on, so "this file is over its cap" is ``pig-10``
@@ -31,7 +36,7 @@ to classify alike.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anthropic
 import httpx
@@ -41,17 +46,25 @@ from portkey_ai import Portkey
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import (
-    GatewayRequestLimit,
     ProviderErrorMetadata,
     UserActionKind,
     extract_anthropic_metadata,
     extract_gateway_metadata,
-    extract_manifold_metadata,
     extract_openai_metadata,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_classify import ClassificationResult, classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.providers.manifold.manifold_error_codes import (
+    _GATEWAY_REQUEST_LIMIT_BY_CODE,  # pyright: ignore[reportPrivateUsage]
+    GatewayRequestLimit,
+)
+from pipelex.providers.manifold.manifold_error_metadata import extract_manifold_metadata
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
+    from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
 
 _ORIGIN = "https://manifold.example.com"
 
@@ -131,8 +144,18 @@ def _envelope(code: str | None, *, status_code: int, provider: ProviderName = Pr
     )
 
 
+def _request_limit(code: str | None) -> GatewayRequestLimit | None:
+    """The family member a wire code names, if it names one."""
+    return _GATEWAY_REQUEST_LIMIT_BY_CODE.get(code) if code is not None else None
+
+
+def _classified_limit(result: ClassificationResult) -> GatewayRequestLimit | None:
+    """The family member the classifier matched the refusal to, read off the vocabulary entry it carries."""
+    return _request_limit(result.service_error_code.code) if result.service_error_code is not None else None
+
+
 class TestTheCodeIsRecognized:
-    """``gateway_request_limit`` reads the gateway's own code namespace off the envelope."""
+    """Each code is in the Manifold vocabulary, under the family member that names its limit."""
 
     @pytest.mark.parametrize(
         ("code", "expected"),
@@ -143,18 +166,24 @@ class TestTheCodeIsRecognized:
             ("pig-11", GatewayRequestLimit.BODY_TOO_DEEP),
         ],
     )
-    def test_each_limit_code_maps_to_its_kind(self, code: str, expected: GatewayRequestLimit) -> None:
-        assert _envelope(code, status_code=413).gateway_request_limit == expected
+    def test_each_limit_code_maps_to_its_kind(
+        self, code: str, expected: GatewayRequestLimit, manifold_service_error_vocabulary: ServiceErrorVocabulary
+    ) -> None:
+        assert _request_limit(code) == expected
+        assert manifold_service_error_vocabulary.lookup(code=code) is not None
 
     @pytest.mark.parametrize("code", [None, "pig-01", "pig-09", "invalid_request_error", "PIG-07", ""])
     def test_any_other_code_is_not_a_request_limit(self, code: str | None) -> None:
         """The gateway's routing and storage-resolution refusals are a different family, and so is a vendor's code."""
-        assert _envelope(code, status_code=400).gateway_request_limit is None
+        assert _request_limit(code) is None
+        assert _classified_limit(classify_inference_error(_envelope(code, status_code=400))) is None
 
     @pytest.mark.parametrize("provider", list(ProviderName))
     def test_the_code_is_read_whichever_provider_reported_it(self, provider: ProviderName) -> None:
         """Claude reaches the gateway on the Anthropic driver, so the refusal is not always reported as GATEWAY."""
-        assert _envelope("pig-07", status_code=413, provider=provider).gateway_request_limit == GatewayRequestLimit.BODY_TOO_LARGE
+        result = classify_inference_error(_envelope("pig-07", status_code=413, provider=provider))
+
+        assert _classified_limit(result) == GatewayRequestLimit.BODY_TOO_LARGE
 
 
 class TestTheCodeSurvivesEveryExtractHop:
@@ -166,7 +195,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_gateway_metadata(exc)
 
         assert metadata.provider_error_code == "pig-07"
-        assert metadata.gateway_request_limit == GatewayRequestLimit.BODY_TOO_LARGE
+        assert _request_limit(metadata.provider_error_code) == GatewayRequestLimit.BODY_TOO_LARGE
 
     def test_the_portkey_substrate_discards_the_payload_and_the_code_survives_anyway(self) -> None:
         """The reason the hop above is built through the SDK rather than by hand.
@@ -179,7 +208,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         exc = _as_the_portkey_sdk_raises_it(status_code=413, body=_BODY_TOO_LARGE_BODY)
 
         assert isinstance(getattr(exc, "body", None), str)
-        assert extract_gateway_metadata(exc).gateway_request_limit == GatewayRequestLimit.BODY_TOO_LARGE
+        assert _request_limit(extract_gateway_metadata(exc).provider_error_code) == GatewayRequestLimit.BODY_TOO_LARGE
 
     def test_the_length_rule_arrives_on_the_substrate_too(self) -> None:
         """``pig-08`` is raised by the same middleware as ``pig-07``, ahead of authentication."""
@@ -188,7 +217,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_gateway_metadata(exc)
 
         assert metadata.provider_error_code == "pig-08"
-        assert metadata.gateway_request_limit == GatewayRequestLimit.BODY_LENGTH_REQUIRED
+        assert _request_limit(metadata.provider_error_code) == GatewayRequestLimit.BODY_LENGTH_REQUIRED
 
     def test_through_plain_httpx_on_the_native_routes(self) -> None:
         request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
@@ -198,7 +227,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_manifold_metadata(exc)
 
         assert metadata.provider_error_code == "pig-11"
-        assert metadata.gateway_request_limit == GatewayRequestLimit.BODY_TOO_DEEP
+        assert _request_limit(metadata.provider_error_code) == GatewayRequestLimit.BODY_TOO_DEEP
 
     def test_through_the_shared_anthropic_driver(self) -> None:
         request = httpx.Request("POST", f"{_ORIGIN}/v1/messages")
@@ -208,7 +237,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_anthropic_metadata(exc)
 
         assert metadata.provider_error_code == "pig-10"
-        assert metadata.gateway_request_limit == GatewayRequestLimit.OBJECT_TOO_LARGE
+        assert _request_limit(metadata.provider_error_code) == GatewayRequestLimit.OBJECT_TOO_LARGE
 
     @pytest.mark.parametrize(
         ("body", "expected"),
@@ -218,7 +247,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         ],
     )
     def test_through_the_openai_substrate_that_carries_every_chat_call(self, body: dict[str, Any], expected: GatewayRequestLimit) -> None:
-        """The hop a gateway or manifold LLM call actually takes, and the last one without a test.
+        """The hop a gateway or manifold LLM call actually takes.
 
         Both plugins build an ``OpenAICompletionsLLMWorker`` over a client pointed
         at the service, so a chat-route refusal is distilled by
@@ -232,7 +261,7 @@ class TestTheCodeSurvivesEveryExtractHop:
 
         metadata = extract_openai_metadata(exc)
 
-        assert metadata.gateway_request_limit == expected
+        assert _request_limit(metadata.provider_error_code) == expected
 
 
 class TestClassification:
@@ -263,7 +292,7 @@ class TestClassification:
     ) -> None:
         result = classify_inference_error(_envelope(code, status_code=status_code))
 
-        assert result.gateway_request_limit == expected_limit
+        assert _classified_limit(result) == expected_limit
         assert result.category == expected_category
         assert result.user_action_kind == expected_action
         assert result.category.is_retryable is False
@@ -273,8 +302,17 @@ class TestClassification:
         """Only the gateway's own code names a limit; a bare 413 from a vendor is not one."""
         result = classify_inference_error(_envelope(None, status_code=413))
 
-        assert result.gateway_request_limit is None
+        assert _classified_limit(result) is None
         assert result.category == InferenceErrorCategory.CONFIGURATION
+
+    def test_without_the_manifold_vocabulary_the_code_is_left_to_the_status_ladder(self, mocker: MockerFixture) -> None:
+        """The codes classify only because the plugin contributes them: a runtime without it reads the bare status."""
+        mocker.patch("pipelex.cogt.inference.error_classify.get_optional_service_error_vocabulary", return_value=None)
+
+        result = classify_inference_error(_envelope("pig-07", status_code=413))
+
+        assert result.service_error_code is None
+        assert result.user_action_kind == UserActionKind.CHANGE_INPUT
 
     def test_the_411_would_otherwise_read_as_a_configuration_error_with_input_advice(self) -> None:
         """What the fall-through gave before: the generic 4xx bucket, telling the caller to revise the prompt."""
@@ -367,7 +405,7 @@ class TestTheSameLimitOnTheNativeRoutes:
         result = classify_inference_error(metadata)
 
         assert metadata.provider_error_code == code
-        assert result.gateway_request_limit == GatewayRequestLimit.OBJECT_TOO_LARGE
+        assert _classified_limit(result) == GatewayRequestLimit.OBJECT_TOO_LARGE
         assert result.category == InferenceErrorCategory.CONTENT
         assert result.category.is_retryable is False
 
@@ -391,7 +429,7 @@ class TestTheSameLimitOnTheNativeRoutes:
         assert details[0] == details[1]
 
     def test_the_native_envelope_survives_the_portkey_substrate_too(self) -> None:
-        """Where the two fixes on this branch actually meet, on one real call.
+        """Where the response fallback and the code-first precedence meet, on one real call.
 
         A gateway extract or search reaches Azure Document Intelligence and Linkup
         through the chat costume, so the refusal those providers raise is rendered
@@ -417,7 +455,7 @@ class TestTheSameLimitOnTheNativeRoutes:
         result = classify_inference_error(metadata)
 
         assert metadata.provider_error_code == "pipelex_document_too_large"
-        assert result.gateway_request_limit == GatewayRequestLimit.OBJECT_TOO_LARGE
+        assert _classified_limit(result) == GatewayRequestLimit.OBJECT_TOO_LARGE
         assert result.category.is_retryable is False
 
     def test_the_generic_type_does_not_shadow_the_contract_code(self) -> None:
@@ -436,4 +474,4 @@ class TestTheSameLimitOnTheNativeRoutes:
         metadata = extract_manifold_metadata(exc)
 
         assert metadata.provider_error_code == "pipelex_document_host_refused"
-        assert metadata.gateway_request_limit is None
+        assert _request_limit(metadata.provider_error_code) is None
