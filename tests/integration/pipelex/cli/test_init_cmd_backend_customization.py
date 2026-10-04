@@ -4,6 +4,8 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import pytest
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
@@ -13,6 +15,12 @@ from pipelex.cli.commands.init.ui.backends_ui import RECOMMENDED_INIT_BACKEND
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 from tests.helpers.init_cmd_helpers import get_backend_indices_helper
+
+
+@pytest.fixture(autouse=True)
+def no_extension_suggestion(mocker: MockerFixture) -> None:
+    """Keep the IDE extension suggestion from consuming a queued answer and installing into the real editor."""
+    mocker.patch("pipelex.cli.commands.init.backends.suggest_extension_install_if_needed")
 
 
 class TestBackendCustomization:
