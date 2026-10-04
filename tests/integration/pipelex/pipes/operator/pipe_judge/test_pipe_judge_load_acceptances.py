@@ -32,3 +32,7 @@ class TestPipeJudgeLoadAcceptances:
         # Its model's spec is not on this boot, so whether it reads files is checked when the step runs, as on a keyless boot.
         bundle = PipeJudgeLoadTestData.bundle(inputs='{ photo = "Image" }', step_fields=f'model = "{unserved_judgment_waterfall}"')
         await validate_bundle(mthds_contents=[bundle])
+
+    async def test_a_dotted_input_is_admitted_as_material(self) -> None:
+        # MTHDS allows a dotted input name anywhere: the judge presents the value at its path under that full name.
+        await validate_bundle(mthds_contents=[PipeJudgeLoadTestData.bundle(inputs='{ "invoice.total" = "Number" }', step_fields=_MODEL)])

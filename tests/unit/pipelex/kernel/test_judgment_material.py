@@ -4,6 +4,7 @@ import datetime
 from typing import Any
 
 import pytest
+from pydantic import Field
 
 from pipelex.cogt.document.prompt_document import PromptDocumentUri
 from pipelex.cogt.image.prompt_image import PromptImageUri
@@ -36,6 +37,15 @@ class _ReportWithNestedContents(StructuredContent):
 
     payload: StuffContent
     extras: list[StuffContent]
+
+
+class _Invoice(StructuredContent):
+    """A structure a dotted input reaches into."""
+
+    total: float
+    note: str | None = None
+    scan: ImageContent | None = None
+    lines: list[TextContent] = Field(default_factory=list[TextContent])
 
 
 def _memory(contents: dict[str, StuffContent]) -> WorkingMemory:
@@ -144,3 +154,28 @@ class TestJudgmentMaterial:
         report = _ReportWithNestedContents(payload=TextContent(text="The roof is on fire"), extras=[NumberContent(number=3)])
         state, _, _ = build_judgment_material(memory=_memory({"report": report}), input_names=["report"])
         assert state == {"report": {"payload": {"text": "The roof is on fire"}, "extras": [{"number": 3}]}}
+
+    def test_a_dotted_input_is_the_value_at_its_path_keyed_by_its_full_name(self) -> None:
+        invoice = _Invoice(total=1250.0, note="rush", lines=[TextContent(text="roof"), TextContent(text="gutter")])
+        memory = _memory({"invoice": invoice})
+
+        state, images, documents = build_judgment_material(memory=memory, input_names=["invoice.total", "invoice.note", "invoice.lines"])
+
+        assert state == {"invoice.total": 1250.0, "invoice.note": "rush", "invoice.lines": ["roof", "gutter"]}
+        assert images == {}
+        assert documents == {}
+
+    def test_a_dotted_input_reaching_a_file_goes_to_the_file_channel(self) -> None:
+        invoice = _Invoice(total=1.0, scan=ImageContent(url="pipelex-storage://s/scan.png", mime_type="image/png"))
+
+        state, images, _ = build_judgment_material(memory=_memory({"invoice": invoice}), input_names=["invoice.scan"])
+
+        assert state == {}
+        assert images == {"invoice.scan": [PromptImageUri(uri="pipelex-storage://s/scan.png", mime_type="image/png")]}
+
+    def test_a_dotted_input_whose_field_or_root_holds_nothing_is_left_out(self) -> None:
+        memory = _memory({"message": TextContent(text="help"), "invoice": _Invoice(total=1.0)})
+
+        state, _, _ = build_judgment_material(memory=memory, input_names=["message", "invoice.note", "estimate.total"])
+
+        assert state == {"message": "help"}

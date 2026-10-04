@@ -17,7 +17,6 @@ class PipeJudgeBlueprintTestCases:
         ("both_spellings", _judge(prompt="Is it urgent?"), "sets `question`, or `prompt` as its synonym, but not both"),
         ("empty_question", _judge(question=""), "`question` cannot be empty"),
         ("blank_question", _judge(question="  \n "), "`question` cannot be empty"),
-        ("dotted_input", _judge(inputs={"invoice.total": "Number"}), "input 'invoice.total' cannot name a field"),
         ("options_and_levels", _judge(output="Choice", options={"a": "", "b": ""}, levels=["low", "high"]), "not both"),
         (
             "criteria_beside_options",
@@ -42,4 +41,5 @@ class PipeJudgeBlueprintTestCases:
         ("unreferenced_input", _judge(inputs={"message": "Text", "history": "Text"}, question="Is $message urgent?"), JudgmentKind.YES_NO),
         ("empty_string_option_description", _judge(output="Choice", options={"billing": "", "technical": "Bugs"}), JudgmentKind.CHOICE),
         ("rating", _judge(output="Rating", levels=["cosmetic", "a workaround exists", "blocking"]), JudgmentKind.RATING),
+        ("dotted_input", _judge(inputs={"invoice.total": "Number"}), JudgmentKind.YES_NO),
     ]

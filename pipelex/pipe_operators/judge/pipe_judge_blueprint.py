@@ -131,15 +131,6 @@ class PipeJudgeBlueprint(PipeBlueprint):
     def validate_inputs(self):
         template_category = TemplateCategory.BASIC
         declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
-        # Every input is sent to the model whole, keyed by its name, so a dotted name has no value to send.
-        for input_name in sorted(declared_inputs):
-            if "." in input_name:
-                root_name = get_root_from_dotted_path(input_name)
-                msg = (
-                    f"A PipeJudge sends each of its inputs whole, keyed by its name, so input '{input_name}' cannot name a field: "
-                    f"declare '{root_name}' instead."
-                )
-                raise ValueError(msg)
         try:
             preprocessed_template = preprocess_template(self.question, declared_inputs=declared_inputs)
         except TemplateSigilSyntaxError as exc:
