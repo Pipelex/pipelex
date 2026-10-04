@@ -348,6 +348,7 @@ plugins:
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
         - under-the-hood/writing-an-inference-plugin.md: "Writing an Inference Plugin"
+        - under-the-hood/service-error-codes.md: "Service Error Codes"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
         - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
@@ -600,6 +601,7 @@ nav:
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
       - Writing an Inference Plugin: under-the-hood/writing-an-inference-plugin.md
+      - Service Error Codes: under-the-hood/service-error-codes.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
       - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md

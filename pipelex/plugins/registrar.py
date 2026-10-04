@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import ErrorReport
-from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR_CODES
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
+from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR_CODES
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
 from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
@@ -389,9 +389,7 @@ class PluginRegistrar:
             if code in RUNTIME_CLASSIFIED_ERROR_CODES:
                 raise ReservedServiceErrorCodeError(code=code, plugin=self._active.name)
             if code in self.service_error_codes:
-                raise DuplicateServiceErrorCodeError(
-                    code=code, first_plugin=self._service_error_code_sources[code], second_plugin=self._active.name
-                )
+                raise DuplicateServiceErrorCodeError(code=code, first_plugin=self._service_error_code_sources[code], second_plugin=self._active.name)
             self.service_error_codes[code] = service_error_code
             self._service_error_code_sources[code] = self._active.name
             contributed.append(code)

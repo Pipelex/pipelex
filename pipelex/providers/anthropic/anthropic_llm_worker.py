@@ -35,6 +35,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
+from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
 from pipelex.providers.anthropic.anthropic_exceptions import (
     AnthropicWorkerConfigurationError,
 )
@@ -42,7 +43,6 @@ from pipelex.providers.anthropic.anthropic_factory import (
     AnthropicFactory,
     AnthropicSdkVariant,
 )
-from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar

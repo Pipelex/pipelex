@@ -47,7 +47,6 @@ from kajson.kajson_manager import KajsonManager
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexSetupError
-from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
@@ -65,6 +64,7 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
+from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )

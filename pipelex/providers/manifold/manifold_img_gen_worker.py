@@ -46,8 +46,8 @@ from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.providers.manifold.manifold_metadata import make_manifold_metadata_headers
+from pipelex.providers.manifold.manifold_response_errors import describe_response_validation_error
 from pipelex.providers.manifold.manifold_schemas import ManifoldImgGenAzureGptImage
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -186,7 +186,8 @@ class ManifoldImgGenWorker(ImgGenWorkerAbstract):
         try:
             azure_gpt_image = ManifoldImgGenAzureGptImage.model_validate(response_dict)
         except ValidationError as exc:
-            msg = f"Could not parse the image generation response for model '{self.inference_model.name}': {format_pydantic_validation_error(exc)}"
+            problems = describe_response_validation_error(exc=exc)
+            msg = f"Could not parse the image generation response for model '{self.inference_model.name}': {problems}"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,

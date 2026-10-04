@@ -36,9 +36,9 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.providers.manifold.manifold_constants import MANIFOLD_EXTRACT_ROUTE
 from pipelex.providers.manifold.manifold_exceptions import ManifoldExtractResponseError
 from pipelex.providers.manifold.manifold_native_client import ManifoldNativeClient
+from pipelex.providers.manifold.manifold_response_errors import describe_response_validation_error
 from pipelex.providers.manifold.manifold_schemas import ManifoldExtractInput, ManifoldExtractParams, ManifoldExtractRequest
 from pipelex.runtime_hub import get_storage_provider
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ class ManifoldExtractWorker(ExtractWorkerAbstract):
         try:
             return ExtractOutput.model_validate(response_body)
         except ValidationError as exc:
-            msg = f"Could not parse the extraction response for model '{self.inference_model.name}': {format_pydantic_validation_error(exc)}"
+            msg = f"Could not parse the extraction response for model '{self.inference_model.name}': {describe_response_validation_error(exc=exc)}"
             raise ManifoldExtractResponseError(msg) from exc
 
     async def _make_request(self, *, extract_job: ExtractJob) -> ManifoldExtractRequest:

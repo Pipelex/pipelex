@@ -101,13 +101,13 @@ own page. Classes are grouped by subsystem.
 - [`LinkupError`](linkup-error.md) — Linkup
 - [`LinkupSearchEmptyResultError`](linkup-search-empty-result-error.md) — Linkup search empty result
 - [`LinkupSearchResponseError`](linkup-search-response-error.md) — Linkup search response
-- [`ManifoldCredentialsError`](manifold-credentials-error.md) — Manifold credentials
-- [`ManifoldEndpointError`](manifold-endpoint-error.md) — Manifold endpoint
-- [`ManifoldError`](manifold-error.md) — Manifold
-- [`ManifoldExtractResponseError`](manifold-extract-response-error.md) — Manifold extract response
-- [`ManifoldFactoryError`](manifold-factory-error.md) — Manifold factory
-- [`ManifoldSearchEmptyResultError`](manifold-search-empty-result-error.md) — Manifold search empty result
-- [`ManifoldSearchResponseError`](manifold-search-response-error.md) — Manifold search response
+- [`ManifoldCredentialsError`](manifold-credentials-error.md) — Inference backend credentials missing
+- [`ManifoldEndpointError`](manifold-endpoint-error.md) — Inference backend endpoint missing
+- [`ManifoldError`](manifold-error.md) — Inference backend error
+- [`ManifoldExtractResponseError`](manifold-extract-response-error.md) — Extract response unreadable
+- [`ManifoldFactoryError`](manifold-factory-error.md) — Inference client setup error
+- [`ManifoldSearchEmptyResultError`](manifold-search-empty-result-error.md) — Search returned no result
+- [`ManifoldSearchResponseError`](manifold-search-response-error.md) — Search response unreadable
 - [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
 - [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
 - [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
@@ -136,6 +136,7 @@ own page. Classes are grouped by subsystem.
 - [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator
 - [`DuplicatePipeFuncExecutorError`](duplicate-pipe-func-executor-error.md) — Duplicate pipe func executor
 - [`DuplicateSecretsProviderError`](duplicate-secrets-provider-error.md) — Duplicate secrets provider
+- [`DuplicateServiceErrorCodeError`](duplicate-service-error-code-error.md) — Duplicate service error code
 - [`DuplicateStorageProviderError`](duplicate-storage-provider-error.md) — Duplicate storage provider
 - [`HubSlotAlreadyClaimedError`](hub-slot-already-claimed-error.md) — Hub slot already claimed
 - [`InferenceBackendNotFoundError`](inference-backend-not-found-error.md) — Inference backend not found
@@ -143,6 +144,7 @@ own page. Classes are grouped by subsystem.
 - [`PluginDeclaredInMultipleGroupsError`](plugin-declared-in-multiple-groups-error.md) — Plugin declared in multiple groups
 - [`PluginError`](plugin-error.md) — Plugin error
 - [`PluginLayerViolationError`](plugin-layer-violation-error.md) — Plugin layer violation
+- [`ReservedServiceErrorCodeError`](reserved-service-error-code-error.md) — Reserved service error code
 - [`RetiredPluginEntryPointGroupError`](retired-plugin-entry-point-group-error.md) — Retired plugin entry point group
 - [`UnknownBootOrchestratorError`](unknown-boot-orchestrator-error.md) — Unknown boot orchestrator
 - [`UnknownLogSinkError`](unknown-log-sink-error.md) — Unknown log sink
