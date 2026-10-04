@@ -8,7 +8,7 @@ here, beside the client that raises them.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, error_code_from_body_code_first, parse_retry_after_seconds
 from pipelex.cogt.inference.provider_name import ProviderName
@@ -51,6 +51,12 @@ def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
     answers that carried none — under ``MANIFOLD_TRACE_ID_HEADER`` before the inherited vendor
     spelling, which holds the same value and is only still read because the gateway still emits it.
 
+    **The message is the service's own when its body carries one.** ``str(exc)`` on an
+    ``httpx.HTTPStatusError`` is httpx's generic sentence (``Client error '401 Unauthorized' for url
+    …``), which says nothing about why the service refused, so the body's ``error.message`` is read
+    first, then its top-level ``message``; ``str(exc)`` stays the fallback for a body without
+    either, for a body that is not JSON and for an ``httpx.RequestError``, which has no body at all.
+
     **It reports ``ProviderName.GATEWAY``**, and that is a decision rather than an oversight: the
     service is a gateway, it phrases quota exhaustion and rate limiting the way the gateway
     substrate does, and every ``match`` on ``ProviderName`` would need a second arm with the same
@@ -82,10 +88,32 @@ def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.GATEWAY,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=_message_from_body(body=body) or str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
         provider_error_code=provider_error_code,
         body=body,
     )
+
+
+def _message_from_body(*, body: Any) -> str | None:
+    """The service's own explanation of a failure, read from its JSON body, if it gave one.
+
+    The nested ``error.message`` comes first, since it is the shape both the gateway and the native
+    routes' own refusals render; the top-level ``message`` the gateway also stamps is the fallback.
+    Only a non-empty string counts, so a ``null`` or a blank message falls through to the next.
+    """
+    if not isinstance(body, dict):
+        return None
+    body_dict = cast("dict[str, Any]", body)
+    sections: list[dict[str, Any]] = []
+    error_section = body_dict.get("error")
+    if isinstance(error_section, dict):
+        sections.append(cast("dict[str, Any]", error_section))
+    sections.append(body_dict)
+    for section in sections:
+        candidate = section.get("message")
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate
+    return None
