@@ -261,6 +261,13 @@ class InputShaper:
                             provided_description=cls._describe_value(value),
                             expected_shape=expected_shape,
                         ) from exc
+                    if cls._is_scalar_at_a_verdict_input(value=value, declared_concept=declared_concept, concept_provider=concept_provider):
+                        raise StructureValidationError.make_for_scalar_at_a_verdict_input(
+                            variable_name=variable_name,
+                            declared_concept_ref=declared_concept.concept_ref,
+                            provided_description=cls._describe_value(value),
+                            expected_shape=expected_shape,
+                        ) from exc
                     raise StructureValidationError.make_for_unreadable_bare_value(
                         variable_name=variable_name,
                         declared_concept_ref=declared_concept.concept_ref,
@@ -1058,6 +1065,27 @@ class InputShaper:
             except ValidationError:
                 return False
         return True
+
+    @classmethod
+    def _is_scalar_at_a_verdict_input(cls, *, value: Any, declared_concept: Concept, concept_provider: ConceptProviderAbstract) -> bool:
+        """Whether a bare value the fallback has no reading for is a scalar, or a list of scalars, at an input of a verdict native.
+
+        A caller sends a `Choice`'s key or a `Rating`'s level alone by mistake, which no container native
+        invites, so only an input whose concept is or refines a verdict native answers. An object is
+        never a scalar: whether it is the verdict's content unwrapped is `_is_content_of_declared_concept`'s
+        question. `Dynamic` is compatible with every concept, so it never answers.
+        """
+        if NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code):
+            return False
+        if isinstance(value, dict):
+            return False
+        if isinstance(value, list) and any(isinstance(item, dict) for item in cast("list[Any]", value)):
+            return False
+        for verdict_native in (NativeConceptCode.CHOICE, NativeConceptCode.RATING):
+            wanted_concept = concept_provider.get_native_concept(native_concept=verdict_native)
+            if concept_provider.is_compatible(tested_concept=declared_concept, wanted_concept=wanted_concept, strict=True):
+                return True
+        return False
 
     @classmethod
     def _declaration_suggested_for(cls, *, value: Any) -> str | None:

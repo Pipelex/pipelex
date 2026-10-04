@@ -139,9 +139,10 @@ class StructureValidationError(InputShapingError):
     does not build into the declared content class. It also covers the bare values an input reading
     values by their own shape refuses (R8): one it has no reading for, such as a list of plain objects
     at a ``Dynamic`` input, where the fix is usually the input's declaration; one it reads as a concept
-    the input does not accept, such as a string at a ``Choice`` input; and the content of the declared
+    the input does not accept, such as a string at a ``Choice`` input; the content of the declared
     concept sent without the envelope that names it, such as ``{"choice": "billing"}`` at a ``Choice``
-    input. The last two are fixed in the value, sent in the expected shape.
+    input; and a scalar at an input of a verdict native, such as a bare level at a ``Rating`` input.
+    The last three are fixed in the value, sent in the expected shape.
     """
 
     @classmethod
@@ -211,6 +212,34 @@ class StructureValidationError(InputShapingError):
             f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
             f"which is the content of a '{declared_concept_ref}' without the envelope that names its concept, "
             f"and an input of this concept takes its value in that envelope.\nExpected shape:\n{expected_shape}"
+        )
+        user_action = UserAction(
+            kind=UserActionKind.CHANGE_INPUT,
+            detail=f"Send input '{variable_name}' in the expected shape, which names its concept and spells out its content.",
+        )
+        return cls(message, variable_name=variable_name, user_action=user_action)
+
+    @classmethod
+    def make_for_scalar_at_a_verdict_input(
+        cls,
+        *,
+        variable_name: str,
+        declared_concept_ref: str,
+        provided_description: str,
+        expected_shape: str,
+    ) -> "StructureValidationError":
+        """The refusal for a scalar, or a list of scalars, at an input of a verdict native.
+
+        A `Choice` or a `Rating` input takes its value in the `{"concept", "content"}` envelope, and a
+        caller naturally sends its key or its level alone, as a `Number` or a `YesNo` input would take
+        it. A verdict is more than its key or its level, so the value has no reading, and a declaration
+        that reads it, such as `Anything`, would discard the verdict the method branches on: the advice
+        is the expected shape.
+        """
+        message = (
+            f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
+            f"and an input of this concept takes its value in the envelope that names its concept, with its content spelled out."
+            f"\nExpected shape:\n{expected_shape}"
         )
         user_action = UserAction(
             kind=UserActionKind.CHANGE_INPUT,
