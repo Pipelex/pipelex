@@ -139,8 +139,8 @@ Digest this brief: $brief
 """
 
 # A valid single-pipe bundle that declares NO main_pipe — validates fine (D2: no main-pipe
-# precondition on /validate) and simply yields no graph. On the per-pipe `/build/*` projections it is
-# also the closure that cannot default its pipe selector: an omitted `pipe_ref` is a 422 there.
+# precondition on /validate) and simply yields no graph. On `/pipe-io` it is also the closure that
+# cannot default its pipe selector: an omitted `pipe_ref` is a 422 there.
 NO_MAIN_PIPE_MTHDS = """\
 domain = "nomain"
 
@@ -166,23 +166,10 @@ output = "Text"
 prompt = "@text"
 """
 
-# A pipe that declares no inputs at all. Its inputs template is empty — a valid verdict, not an error
-# (the engine renderers raise NoInputsRequiredError; the CLI exits 0 on it).
-NO_INPUTS_MTHDS = """\
-domain = "noinputs"
-main_pipe = "greet"
-
-[pipe.greet]
-type = "PipeLLM"
-description = "Greet nobody in particular"
-output = "Text"
-prompt = "Say hello"
-"""
-
 # A pipe whose BARE code collides with VALID_MTHDS's `echo`, in a different domain, and whose output
 # carries the opposite multiplicity (a list). Submitted alongside VALID_MTHDS it catches any lookup
-# that matches a pipe by bare code alone: `/build/runner` reads the requested pipe's output
-# multiplicity out of the blueprints, and a bare-code scan would return whichever `echo` came first.
+# that matches a pipe by bare code alone: a bare `echo` must be refused as ambiguous, never resolved
+# to whichever `echo` came first.
 COLLIDING_ECHO_LIST_MTHDS = """\
 domain = "twin"
 

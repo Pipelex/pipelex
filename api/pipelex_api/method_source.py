@@ -13,10 +13,10 @@ manifest-identity package location, the bounds, and the structures check all liv
   `mthds_sources`, so diagnostics carry true per-file labels), and only the non-`.mthds`
   files are materialized into a temporary `library_dirs` entry — exactly the split the
   method-bundle transport uses, so a fetched package runs the same proven path.
-- The tooling routes (`/resolve`, `/codegen`, `/build/*`) use
+- The tooling routes (`/resolve`, `/codegen`, `/pipe-io`) use
   :func:`fetch_method_mthds_files`: only the `.mthds` files, as `files[]` items, paired with
-  the manifest's `main_pipe` so the per-pipe projections default their selector exactly as a
-  run does. No Python ever loads there, so the execution-locus gate does not apply.
+  the manifest's `main_pipe` so the per-pipe route defaults its selector exactly as a run
+  does. No Python ever loads there, so the execution-locus gate does not apply.
 
 The security gate (packaging invariant 7 — execution locus decides): `.mthds` content is
 data, always acceptable. On a deployment that is NOT sandbox-hosted, a fetched package

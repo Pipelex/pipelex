@@ -283,7 +283,7 @@ _CALLER_ANALYTICS_GROUPS_DESCRIPTION = (
 class CallerAnalyticsGroupsMixin(BaseModel):
     """The optional `analytics_groups` of a request whose work is done for a caller without being a run.
 
-    `/validate` and `/build/runner` dry-run the submitted pipes, and the runtime attributes that
+    `/validate` dry-runs the submitted pipes, and the runtime attributes that
     telemetry to the caller it is handed (`pipelex.system.caller_identity.CallerIdentity`). The user
     comes from the trusted auth layer, as on a run; the groups come from the body, as on a run, and are
     refused at the wire with the runtime's own rules.
@@ -569,7 +569,7 @@ class MthdsFilesRequest(BaseModel):
 
 
 class MthdsPipeRequest(MthdsFilesRequest):
-    """Shared base for the per-pipe `/build/*` projections: the closure selector plus a pipe selector.
+    """The base of a per-pipe route's request (`/pipe-io`): the closure selector plus a pipe selector.
 
     The pipe selector is the **qualified** ref `domain.pipe_code`, mirroring `pipelex codegen inputs
     --pipe`. It is optional, and an omitted selector defaults with the run routes' precedence: on a
@@ -596,8 +596,8 @@ ALLOW_SIGNATURES_DESCRIPTION = (
     "When true, the validation sweep tolerates unimplemented pipe signatures instead of rejecting the "
     "bundle (signatures dry-run trivially by minting a mock). Defaults to false (strict)."
 )
-"""Shared by the two routes that still run the dry-run sweep (`/validate`, `/build/runner`) — the flag only
-parameterizes that sweep, so the static `/build/{inputs,output}` projections do not accept it."""
+"""Used by `/validate`, the one route that runs the dry-run sweep: the flag only parameterizes that sweep,
+so the static crate routes do not accept it."""
 
 
 class MthdsContentsRequest(BaseModel):
@@ -606,7 +606,7 @@ class MthdsContentsRequest(BaseModel):
     This is the flat-list envelope. `/validate` uses it through this class (its `ValidateRequest`
     subclass adds a parallel `mthds_sources` for per-file source labels), and the run routes
     `/execute` and `/start` carry the same `mthds_contents` field independently on `RunRequest`.
-    The newer Pipelex-API extension routes (`/resolve`, `/codegen`, `/build/*`) use
+    The newer Pipelex-API extension routes (`/resolve`, `/codegen`, `/pipe-io`) use
     `MthdsFilesRequest` instead (`files[]` pairing each content with its `source`, XOR a
     `method_ref`), which folds the source label into each entry. `/validate` keeps the flat-list
     shape deliberately: it is an MTHDS Protocol route, so changing its inline envelope is a

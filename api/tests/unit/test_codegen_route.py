@@ -94,7 +94,7 @@ class TestCodegenRoute:
         [
             {"kind": "does_not_exist"},
             {"target": "not-a-target"},
-            {"kind": "inputs"},  # served by /build/inputs, deliberately not by this route
+            {"kind": "inputs"},  # an editable scaffold, projected client-side from /pipe-io's input form
             {"pipe_ref": "smoke.echo"},  # types is concept-set-wide; a pipe selector is a shape error
         ],
         ids=["unknown-kind", "unknown-target", "unserved-kind", "pipe-ref-on-types"],

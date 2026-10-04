@@ -1,6 +1,6 @@
 # Generating the Projection Fixture Corpus
 
-The MTHDS build routes no longer render a pipe's fill-in inputs template on the server. Each client SDK projects it from the input-form descriptor it already has — once in TypeScript (`mthds`) and once in Python (`mthds-python`) — and the two projections must agree **exactly**, TOML comment lines included, or the JS/Python asymmetry the change set out to remove is simply rebuilt one layer up.
+No server route renders a pipe's fill-in inputs template. Each client SDK projects it from the input-form descriptor it already has — once in TypeScript (`mthds`) and once in Python (`mthds-python`) — and the two projections must agree **exactly**, TOML comment lines included, or the JS/Python asymmetry the change set out to remove is simply rebuilt one layer up.
 
 `pipelex-dev generate-projection-corpus` writes the fixture corpus that makes that agreement checkable. It is the **sole producer** of the capture committed byte-identically in `mthds-js/tests/fixtures/protocol/` and `mthds-python/tests/fixtures/protocol/`; `trace-input-semantics` stays what its own page says it is, a debugging tracer.
 

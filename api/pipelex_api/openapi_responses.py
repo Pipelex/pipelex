@@ -82,7 +82,7 @@ class ProblemDocument(BaseModel):
         description=(
             "Structured per-error diagnostics, carried by a `ValidateBundleError`. Each item may carry a `suggested_fix`. "
             "Retained under `ERROR_DISCLOSURE=strict` — it describes the caller's own bundle, not server internals. "
-            "On `/validate`, `/resolve`, `/codegen` and `/build/*` an invalid bundle is a **200** verdict instead, so the "
+            "On `/validate`, `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead, so the "
             "items ride the response body there rather than a problem document."
         ),
     )

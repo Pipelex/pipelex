@@ -4,7 +4,7 @@ Return a method's I/O artifacts — its pipe I/O contracts, its input form and i
 
 **Endpoint:** `POST /v1/pipe-io`
 
-The route resolves the closure through the same static core as [`POST /v1/resolve`](codegen.md#resolve), selects a pipe the way the [per-pipe build routes](pipe-builder.md) do, and derives the three artifacts with the builder that [`POST /v1/validate`](pipe-validate.md) and every run already call. It runs **no dry-run sweep**, so a call costs one load and one derivation, where `/v1/validate` mock-runs every pipe of the method. A caller that shows a method, prepares its inputs or generates types for it reads this route; a caller that needs the dry-run verdict or the dry-run graph stays on `/v1/validate`, whose `views` still attach both forms beside the verdict.
+The route resolves the closure through the same static core as [`POST /v1/resolve`](codegen.md#resolve), selects a pipe with the [selection chain](#pipe-selection) below, and derives the three artifacts with the builder that [`POST /v1/validate`](pipe-validate.md) and every run already call. It runs **no dry-run sweep**, so a call costs one load and one derivation, where `/v1/validate` mock-runs every pipe of the method. A caller that shows a method, prepares its inputs or generates types for it reads this route; a caller that needs the dry-run verdict or the dry-run graph stays on `/v1/validate`, whose `views` still attach both forms beside the verdict.
 
 It is a **Pipelex API extension**, not an MTHDS Protocol route: it is not tagged `x-mthds-protocol` in the [OpenAPI artifact](openapi/pipelex-api.openapi.yaml). The artifacts it carries are the standard's, under their neutral names — see the MTHDS specification's pages on [pipe I/O contracts, the input-form descriptor and the output-form descriptor](https://mthds.ai).
 
@@ -31,7 +31,7 @@ There is no `views` field, because the valid arm always carries all three artifa
 
 ## Pipe selection
 
-The selection chain is the one the build routes share: the request's `pipe_ref`; else a fetched package's manifest `main_pipe`; else the closure's own `main_pipe` declaration, when exactly one domain declares one. The chain stops at the first link that is present, so a manifest `main_pipe` the closure does not declare, or declares in several domains, is a failed selection rather than a fall-through to the closure's declarations.
+The selection chain takes the request's `pipe_ref`; else a fetched package's manifest `main_pipe`; else the closure's own `main_pipe` declaration, when exactly one domain declares one. The chain stops at the first link that is present, so a manifest `main_pipe` the closure does not declare, or declares in several domains, is a failed selection rather than a fall-through to the closure's declarations.
 
 The closure is resolved first, so an invalid closure answers its invalid verdict whatever `pipe_ref` names. For a valid closure these selections are refused with an input `422` `problem+json`. Its `error_type` is the pipelex entry-lookup class that names the failure, never the `ValidationError` of a malformed request, so a client tells a selection refusal from a request-shape one by that field:
 

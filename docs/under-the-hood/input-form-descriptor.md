@@ -77,4 +77,4 @@ Inapplicable slots are absent, never JSON `null`: the report's valid arm is dump
 
 ## What clients project from it
 
-The descriptor is what a client SDK renders a pipe's fill-in inputs template from — the hosted build routes no longer render one server-side. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.
+The descriptor is what a client SDK renders a pipe's fill-in inputs template from — no server route renders one. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.

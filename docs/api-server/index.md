@@ -20,7 +20,7 @@ MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
 ```
 
 - **MTHDS Protocol** — five routes: `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those five — the flag is how a conformance suite or a third-party runner extracts the portable subset.
-- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), build tooling (`/build/*`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
+- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
 - **Pipelex hosted API** (`api.pipelex.com/v1`) — everything here, same shapes, plus durable runs, the method catalog, and account management.
 
 All routes are served under the `/v1` base path (clients compose `{base}/v1/{endpoint}`).
@@ -32,7 +32,7 @@ The API currently allows you to:
 1. **Run** any Pipelex pipeline with flexible inputs (sync or async)
 2. **Validate** any Pipelex pipeline to ensure correctness
 3. **Resolve** a library closure into its normalized crate, and **codegen** typed artifacts from it (TypeScript/Zod, Pydantic, Pipelex structures)
-4. **Build** pipeline components — generate input schemas, output representations, runner code, concepts, and pipe specs
+4. **Describe** a method's inputs and output — its pipe I/O contracts, input form and output form, from which a client projects an inputs template
 5. **Lint and format** single `.mthds` files for editor workflows
 6. **List** available model presets and configurations
 
@@ -180,20 +180,9 @@ Lint and format single `.mthds` files without loading or executing a pipeline.
 
 [Learn more →](mthds-tools.md)
 
-### Pipe Builder
-Generate input templates, output representations, and runner code for one pipe of a library closure. All three take the same closure selector as `/v1/resolve` and `/v1/codegen` (inline `files[]` XOR `method_ref`), plus an optional qualified `pipe_ref` defaulting to the fetched package manifest's `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`.
+### Models
+List the models this runner can route to.
 
-- `POST /v1/build/inputs` — Generate an example inputs template for a pipe (JSON or TOML)
-- `POST /v1/build/output` — Generate an output representation (schema, JSON, or Python)
-- `POST /v1/build/runner` — Generate Python runner code for a pipe
-
-[Learn more →](pipe-builder.md)
-
-### Agent
-Tools for AI agents building pipelines programmatically.
-
-- `POST /v1/build/concept` — Convert a JSON concept spec to TOML
-- `POST /v1/build/pipe-spec` — Convert a JSON pipe spec to TOML
 - `GET /v1/models` — The protocol model deck this runner routes to (flat `models` list, plus category-keyed `aliases`/`waterfalls` routing extensions); optional single `?type=` category filter
 
 ### Uploader (removed)

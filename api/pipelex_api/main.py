@@ -150,7 +150,7 @@ fastapi_app = PipelexFastAPI(
         f"This server implements the [MTHDS Protocol](https://mthds.ai) v{PROTOCOL_VERSION} "
         "(`POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version` — "
         "marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve and codegen "
-        "(`/resolve`, `/codegen`), build tooling (`/build/*`), and editor tooling (`/lint`, `/format`). "
+        "(`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), and editor tooling (`/lint`, `/format`). "
         "Contract layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API. "
         "All endpoints are served under the `/v1` base path; "
         "every error is an RFC 7807 `application/problem+json` problem document, documented per "

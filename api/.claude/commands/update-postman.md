@@ -91,9 +91,9 @@ Compare the Postman baseline (step 1) against the code (step 3):
 Produce a clear **change plan** and show it to the user before proceeding:
 ```
 Changes to apply:
-  + ADD: POST /v1/new-endpoint (folder: Build)
-  ~ UPDATE: POST /v1/build/pipe-spec — request body changed (added "model" field)
-  - REMOVE: POST /v1/build/pipe — endpoint deleted
+  + ADD: POST /v1/new-endpoint (folder: Validate)
+  ~ UPDATE: POST /v1/validate — request body changed (added "render" field)
+  - REMOVE: POST /v1/old-endpoint — endpoint deleted
   = UNCHANGED: 28 requests
 ```
 
@@ -146,11 +146,6 @@ For **unchanged endpoints**, do NOT touch them.
 |---|---|
 | Pipeline Execute/Start | 1 per pipe type, 1 pipe_code only, 1 error |
 | Validate | 1 valid, 1 missing main_pipe error |
-| Build Inputs | 1 happy path, 1 pipe not found error |
-| Build Output | 1 per format (`schema`, `json`, `python`) |
-| Build Runner | 1 happy path, 1 error |
-| Build Concept | structured fields, refines, concept_ref, 1 error |
-| Build Pipe Spec | 1 per pipe type, 1 invalid type error |
 | Models | no filter, filter by `llm`, filter by `extract`, multi-type |
 | Presigned Post URLs | single file, multiple files |
 | Version | version (protocol handshake) |
@@ -169,13 +164,11 @@ with open('/tmp/postman_current.json') as f:
 col = data['collection']
 
 # Navigate to the right folder
-# Example: find Agent > Build Pipe Spec
+# Example: find the Validate folder
 for folder in col['item']:
-    if folder['name'] == 'Agent':
-        for sub in folder['item']:
-            if sub['name'] == 'Build Pipe Spec':
-                target = sub
-                break
+    if folder['name'] == 'Validate':
+        target = folder
+        break
 
 # Build the new request item
 new_item = {
@@ -188,16 +181,16 @@ new_item = {
             "raw": json.dumps({...}, indent="\t")
         },
         "url": {
-            "raw": "{{base_url}}/v1/build/pipe-spec",
+            "raw": "{{base_url}}/v1/validate",
             "host": ["{{base_url}}"],
-            "path": ["v1", "build", "pipe-spec"]
+            "path": ["v1", "validate"]
         },
         "description": "..."
     },
     "response": [
         {
             "name": "200 OK",
-            "originalRequest": {"method": "POST", "url": {"raw": "{{base_url}}/v1/build/pipe-spec", "host": ["{{base_url}}"], "path": ["v1", "build", "pipe-spec"]}},
+            "originalRequest": {"method": "POST", "url": {"raw": "{{base_url}}/v1/validate", "host": ["{{base_url}}"], "path": ["v1", "validate"]}},
             "status": "OK",
             "code": 200,
             "body": json.dumps({...})
@@ -237,8 +230,7 @@ Key patterns:
 - `Version` → version (protocol handshake)
 - `Pipeline` → `Execute (sync)`, `Start (async)`
 - `Validate` → with valid/invalid sub-examples
-- `Build` → `Build Inputs`, `Build Output`, `Build Runner`
-- `Agent` → `Build Concept`, `Build Pipe Spec`, `Models`
+- `Agent` → `Models`
 - `Uploader` → `Presigned Post URLs`
 
 ### 9. Push to Postman

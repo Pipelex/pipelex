@@ -58,7 +58,7 @@ class TestValidateDefaultPipeRef:
 
     def test_several_declared_main_pipes_report_the_run_default_not_null(self):
         # The field states the RUN default (`select_primary_blueprint`: first blueprint declaring
-        # `main_pipe`), NOT the build routes' stricter rule that 422s on several. `/execute` and
+        # `main_pipe`), NOT `/pipe-io`'s stricter rule that 422s on several. `/execute` and
         # `/start` run this closure happily, so reporting null would make a consumer refuse to
         # prepare a method the server would run.
         client = _build_client()

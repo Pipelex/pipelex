@@ -32,8 +32,8 @@ class CodegenRouteKind(StrEnum):
     Membership follows the **trust chain**: a kind is served here exactly when its artifacts are
     stamped and locked, so a client can write them verbatim and pass the offline `codegen check` —
     the promise this route's valid arm makes by carrying a `lock`. Input templates are user-editable
-    scaffolds, never stamped or locked, so they cannot make that promise; they ride
-    `POST /build/inputs` instead and `inputs` is therefore not a kind here. Future per-pipe kinds
+    scaffolds, never stamped or locked, so they cannot make that promise: a client projects one from
+    the input form `POST /pipe-io` serves, and `inputs` is therefore not a kind here. Future per-pipe kinds
     (`docs`, `tools`, `tests`) do emit tracked artifacts, so they join this enum and select their
     pipe via `pipe_ref`. An unknown kind is a request-shape 422 listing the served set.
     """
