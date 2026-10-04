@@ -111,12 +111,12 @@ class _UnknownModelCase(NamedTuple):
 _UNKNOWN_MODEL_CASES: list[_UnknownModelCase] = [
     _UnknownModelCase(
         case_id="llm_handle",
-        bundle=_llm_bundle(model_line='model       = "gpt-5.1"'),
+        bundle=_llm_bundle(model_line='model       = "gpt-5.6-lunna"'),
         pipe_code="write_tide_note",
         field_name="model",
-        model_reference="gpt-5.1",
+        model_reference="gpt-5.6-lunna",
         model_type="llm",
-        model_sentence="Model handle 'gpt-5.1' was not found in the model deck",
+        model_sentence="Model handle 'gpt-5.6-lunna' was not found in the model deck",
     ),
     _UnknownModelCase(
         case_id="llm_alias",
@@ -352,7 +352,7 @@ class TestValidateBundleLoadRefusals:
                 read_scope=None,
                 user_id="test-user",
                 execution_config=execution_config,
-                mthds_contents=[_llm_bundle(model_line='model       = "gpt-5.1"')],
+                mthds_contents=[_llm_bundle(model_line='model       = "gpt-5.6-lunna"')],
                 pipe_code="write_tide_note",
                 pipe_run_mode=PipeRunMode.DRY,
             )
@@ -368,6 +368,6 @@ class TestValidateBundleLoadRefusals:
         assert strict_payload["error_type"] == "ValidateBundleError"
         assert strict_payload["error_domain"] == "input"
         assert "Pipe 'write_tide_note'" in strict_payload["message"]
-        assert "Model handle 'gpt-5.1' was not found in the model deck" in strict_payload["message"]
+        assert "Model handle 'gpt-5.6-lunna' was not found in the model deck" in strict_payload["message"]
         (strict_item,) = strict_payload["validation_errors"]
         assert strict_item["error_type"] == "unknown_model"

@@ -16,9 +16,6 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_ag
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.system.pipelex_service.exceptions import (
-    GatewayApiKeyMissingError,
-    GatewayDoNotTrackConflictError,
-    GatewayTermsNotAcceptedError,
     RemoteConfigValidationError,
 )
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
@@ -55,9 +52,6 @@ class TestMakePipelexForAgentCli:
         ("exc_class", "exc_args", "expected_error_type"),
         [
             (TelemetryConfigValidationError, ("telemetry config bad",), "TelemetryConfigValidationError"),
-            (GatewayTermsNotAcceptedError, (), "GatewayTermsNotAcceptedError"),
-            (GatewayApiKeyMissingError, (), "GatewayApiKeyMissingError"),
-            (GatewayDoNotTrackConflictError, ("DO_NOT_TRACK",), "GatewayDoNotTrackConflictError"),
             (RemoteConfigValidationError, ("bad remote config",), "RemoteConfigValidationError"),
         ],
     )

@@ -3,7 +3,7 @@ from importlib.resources.abc import Traversable
 
 # Git-ignored config files that should not be synced between .pipelex and kit/configs.
 # These are personal override files that differ per developer/environment:
-# - pipelex_service.toml: Contains terms_accepted (False for new users, True for devs)
+# - pipelex_service.toml: Contains the onboarding state of this machine (False for new users, True for devs)
 # - pipelex_override.toml: Personal config overrides
 # - telemetry_override.toml: Personal telemetry settings
 # - inference/backends_override.toml, inference/routing_profiles_override.toml: personal
@@ -24,8 +24,6 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
         "backends_override.toml",
         "routing_profiles_override.toml",
         "telemetry.project.toml",
-        "pipelex_gateway_models.md",  # Auto-generated from remote config
-        "pipelex_gateway_models_plain.md",  # Auto-generated from remote config
         # Custom deck files differ intentionally: kit templates have waterfalls
         # commented out, while .pipelex/ has them active for tests
         "x_custom_llm_deck.toml",

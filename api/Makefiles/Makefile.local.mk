@@ -59,7 +59,7 @@ docker-build:
 	docker build --platform linux/amd64 -f $(CURDIR)/Dockerfile -t $(LOCAL_IMAGE) $(WORKSPACE_ROOT)
 
 # Run the API on http://localhost:8081, foreground. Reads all env from .env.
-# Required: PIPELEX_GATEWAY_API_KEY (only if you use the default routing profile).
+# Required: OPENAI_API_KEY (only if you keep the bundled backends).
 # Optional: AUTH_MODE, API_KEY, JWT_SECRET_KEY (see .env.example).
 docker-run: docker-build
 	@docker rm -f $(CONTAINER_NAME) 2>/dev/null || true
@@ -71,7 +71,7 @@ docker-run: docker-build
 
 # Pull and run the PUBLISHED image from Docker Hub — no local checkout/build needed.
 # Same env contract as docker-run (reads all env from .env).
-# Required: PIPELEX_GATEWAY_API_KEY (only if you use the default routing profile).
+# Required: OPENAI_API_KEY (only if you keep the bundled backends).
 # Optional: AUTH_MODE, API_KEY, JWT_SECRET_KEY (see .env.example).
 # Override the published tag with HUB_TAG, e.g. make docker-run-hub HUB_TAG=0.5.0
 docker-run-hub:
@@ -87,7 +87,7 @@ docker-run-hub:
 # Boot an image and check that it serves: `/health` answers, and `/v1/version` reports this
 # repository's version for both the server and the pipelex it runs, which is the lockstep the release
 # promises. Pull-request CI runs it on the image `docker-build` made, and `deploy-docker-hub` runs it
-# on the image it is about to push. The gateway key is a placeholder: boot requires one, and neither
+# on the image it is about to push. The OpenAI key is a placeholder: boot requires one, and neither
 # route reaches a provider. SMOKE_IMAGE=<tag> names another image.
 SMOKE_IMAGE     ?= $(LOCAL_IMAGE)
 SMOKE_CONTAINER ?= pipelex-api-smoke
@@ -99,7 +99,7 @@ docker-smoke:
 	@docker rm -f $(SMOKE_CONTAINER) >/dev/null 2>&1 || true
 	@docker run --detach --platform linux/amd64 --name $(SMOKE_CONTAINER) \
 		-p 127.0.0.1:$(SMOKE_PORT):8081 \
-		-e PIPELEX_GATEWAY_API_KEY=smoke-test-placeholder \
+		-e OPENAI_API_KEY=smoke-test-placeholder \
 		$(SMOKE_IMAGE) >/dev/null
 	@healthy=""; \
 	for attempt in $$(seq 1 $(SMOKE_TIMEOUT)); do \

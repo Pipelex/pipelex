@@ -181,12 +181,12 @@ JSON commands return the result object directly. They are not wrapped in a `stat
   "success": true,
   "target_dir": "/path/to/.pipelex",
   "warnings": [
-    { "type": "RemoteConfigStale", "message": "Using a cached gateway config; run `pipelex init` while online to refresh." }
+    { "type": "RemoteConfigStale", "message": "The Pipelex-managed gateway backends are running off a cached remote config (snapshot: 2026-10-01T09:30:00+00:00). Run `pipelex init` while online to refresh." }
   ]
 }
 ```
 
-`RemoteConfigStale` is emitted when the gateway is enabled but the remote config service is unreachable and Pipelex falls back to its on-disk cache (offline mode).
+`RemoteConfigStale` is emitted when a Pipelex-managed gateway backend is enabled but the remote config service is unreachable and Pipelex falls back to its on-disk cache (offline mode).
 
 Do not confuse this setup-warning shape with the `warnings` array on the `validate` envelope — validate warnings are advisory lint items that reuse the validation-error item shape (see "Advisory warnings on validate" above).
 

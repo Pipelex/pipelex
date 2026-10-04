@@ -39,10 +39,6 @@ This section covers all Pipelex capabilities, organized by area.
 
 <div class="grid cards" markdown>
 
--   **[Pipelex Gateway & Model Access](gateway.md)**
-
-    Unified access to 60+ AI models through a single API key, or bring your own keys for direct provider access. Open-source model support via Hugging Face, Scaleway, and Groq.
-
 -   **[LLM Integration](llm-integration.md)**
 
     Text generation, structured outputs, vision language models, templating styles, system prompt inheritance, and model presets.

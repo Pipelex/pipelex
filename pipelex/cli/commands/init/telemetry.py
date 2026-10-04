@@ -41,6 +41,3 @@ def setup_telemetry(*, console: Console, telemetry_config_path: Path, for_projec
         console.print("[dim]  • \\[posthog] - Send traces to your own PostHog project[/dim]")
         console.print("[dim]  • \\[langfuse] - Enable Langfuse LLM observability[/dim]")
         console.print("[dim]  • \\[\\[otlp]] - Add custom OpenTelemetry exporters[/dim]")
-    console.print()
-    console.print("[dim]💡 Note: If you use Pipelex Gateway, separate telemetry is sent to Pipelex[/dim]")
-    console.print("[dim]servers regardless of these settings.[/dim]")

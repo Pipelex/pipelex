@@ -44,7 +44,7 @@ The configuration lives in `.pipelex-dev/test_profiles.toml`:
 ################################################################################
 
 [collections.backends]
-all = ["pipelex_gateway", "anthropic", "openai", "google", ...]
+all = ["anthropic", "openai", "google", ...]
 
 [collections.llm]
 anthropic = ["claude-3-haiku", "claude-4-opus", "claude-4.5-sonnet", ...]
@@ -65,7 +65,7 @@ from_image = ["docling-extract-text", "mistral-ocr", "deepseek-ocr", ...]
 
 [profiles.dev]
 description = "Quick dev testing with fast and cheap models"
-backends = ["pipelex_gateway", "internal"]
+backends = ["anthropic", "openai", "google", "mistral", "linkup", "internal"]
 llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf"]
@@ -122,7 +122,7 @@ Quick development testing with fast, cheap models from key providers.
 
 ```toml
 [profiles.dev]
-backends = ["pipelex_gateway", "internal"]
+backends = ["anthropic", "openai", "google", "mistral", "linkup", "internal"]
 llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf"]
@@ -211,9 +211,9 @@ This file contains:
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 LLM_COMBOS: list[ModelCombo] = [
-    ModelCombo("claude-4.5-haiku", "pipelex_gateway"),
-    ModelCombo("gemini-2.5-flash-lite", "pipelex_gateway"),
-    ModelCombo("gpt-4o-mini", "pipelex_gateway"),
+    ModelCombo("claude-4.5-haiku", "anthropic"),
+    ModelCombo("gemini-2.5-flash-lite", "google"),
+    ModelCombo("gpt-4o-mini", "openai"),
 ]
 
 IMG_GEN_COMBOS: list[ModelCombo] = [...]
@@ -300,7 +300,7 @@ This is useful for:
 # Add a personal profile
 [profiles.my_local]
 description = "My local testing profile"
-backends = ["pipelex_gateway"]
+backends = ["pipelex_manifold"]
 llm_models = ["claude-4.5-sonnet", "gpt-4o"]
 img_gen_models = []
 extract_models = []

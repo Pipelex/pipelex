@@ -9,8 +9,8 @@ every variant through the same loader the runtime uses and holds it to the shipp
   the kit's backend files, because handle retirement is how a parked deck actually goes stale.
 
 The second check is scoped to the handles only the variant names. A handle the shipped deck names
-too is already exercised at boot, and some of those are gateway-served with no backend section of
-their own, so holding them to a backend declaration would fail on a deck that is perfectly live.
+too is not held to them here: some are served only through Pipelex Manifold, with no backend section
+of their own, and the shipped deck's default aliases have their own guard in `test_shipped_deck_defaults.py`.
 """
 
 from collections.abc import Mapping
@@ -209,8 +209,8 @@ class TestDeckVariants:
     def test_handle_collection_reads_waterfall_entries(self):
         """A handle a deck names only inside a waterfall must still reach the retirement check above.
 
-        No deck declares a waterfall today, so nothing else in this module would notice the
-        collector skipping them, and the guard would go quietly blind the moment one does.
+        Nothing else in this module would notice the collector skipping them, and the guard would
+        go quietly blind to every handle a variant names only inside a waterfall.
         """
         blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
         probe_handle = "handle-named-only-by-a-waterfall"

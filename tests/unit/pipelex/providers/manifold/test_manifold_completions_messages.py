@@ -1,18 +1,8 @@
-"""`ManifoldCompletionsFactory.make_simple_messages` — the override that is a copy on purpose.
+"""`ManifoldCompletionsFactory.make_simple_messages` — the override for a Pipelex-operated gateway.
 
 Documents travel to a Pipelex-operated gateway as a `ChatCompletionContentPartImageParam` holding a
 data URL, not as the OpenAI file part the base class sends: the gateway translates that part into
 whatever document format the provider it picked actually wants, and it cannot translate a file part.
-The Portkey-path factory makes the same move for the same reason — it is the same gateway codebase
-on the other end — and the manifold factory carries its **own copy** rather than subclassing it, so
-that retiring the Portkey package stays a deletion.
-
-**The last test here is the one that makes that duplication safe.** A copy that silently drifts from
-its original is worse than either sharing or diverging deliberately, and nothing in the package
-would notice: the two factories are never used in the same process. Comparing their output is the
-only place the equality is stated. It imports from `providers/gateway/` — which the *package* must
-not do — and that is correct for a test whose whole subject is the relationship between the two; it
-is deleted along with the path it compares against.
 """
 
 from __future__ import annotations
@@ -142,37 +132,3 @@ class TestManifoldCompletionsMessages:
 
         with pytest.raises(TypeError, match=expected_match):
             await factory.make_simple_messages(llm_job=llm_job)
-
-
-@pytest.mark.asyncio(loop_scope="class")
-class TestManifoldCompletionsMessagesMatchTheGatewayPath:
-    """The copy has not drifted from the original it was taken from.
-
-    Delete this class when the Portkey path is deleted; until then it is the only statement anywhere
-    that the two overrides agree, and they must, because they talk to the same gateway codebase.
-    """
-
-    async def test_both_factories_build_the_same_messages_for_the_same_prompt(self, mocker: MockerFixture) -> None:
-        from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory  # ruff: ignore[import-outside-top-level]
-
-        gateway_namespace = "pipelex.providers.gateway.gateway_completions_factory"
-        prepped_images = [PreparedFileBase64(base64_data="QUJD", file_type=_PNG_FILE_TYPE)]
-        prepped_documents = [PreparedFileBase64(base64_data="UERG", file_type=_PDF_FILE_TYPE)]
-        for namespace in (_FACTORY_NAMESPACE, gateway_namespace):
-            mocker.patch(f"{namespace}.prep_prompt_images", new_callable=mocker.AsyncMock, return_value=prepped_images)
-            mocker.patch(f"{namespace}.prep_prompt_documents", new_callable=mocker.AsyncMock, return_value=prepped_documents)
-
-        def _job() -> Any:
-            return _make_llm_job(
-                mocker,
-                system_text="You are concise.",
-                user_text="Read these.",
-                has_images=True,
-                has_documents=True,
-                image_detail=PromptImageDetail.HIGH,
-            )
-
-        manifold_messages = await ManifoldCompletionsFactory(is_http_url_enabled=False).make_simple_messages(llm_job=_job())
-        gateway_messages = await GatewayCompletionsFactory(is_http_url_enabled=False).make_simple_messages(llm_job=_job())
-
-        assert manifold_messages == gateway_messages

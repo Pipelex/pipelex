@@ -13,7 +13,7 @@ pipelex init [FOCUS]
 pipelex init --local [FOCUS]
 ```
 
-By default, `pipelex init` writes to the global config directory at `~/.pipelex/`. Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials and Gateway service terms always remain in the global `~/.pipelex/` directory regardless of `--local`.
+By default, `pipelex init` writes to the global config directory at `~/.pipelex/`. Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials always remain in the global `~/.pipelex/` directory regardless of `--local`.
 
 !!! note "Config updates not yet supported"
     The `pipelex init` command always performs a full reset of the configuration. Incremental config updates will be supported in a future release.
@@ -22,7 +22,6 @@ By default, `pipelex init` writes to the global config directory at `~/.pipelex/
 
 - `FOCUS` - What to initialize (optional):
     - `all` (default) - Initialize everything
-    - `agreement` - Review or accept Pipelex Gateway terms
     - `config` - Only configuration files
     - `credentials` - Prompt for missing credentials only
     - `inference` - Only inference backend setup
@@ -49,9 +48,6 @@ pipelex init inference
 
 # Reconfigure telemetry settings
 pipelex init telemetry
-
-# Review the Pipelex service terms
-pipelex init agreement
 ```
 
 ## What Gets Initialized
@@ -78,7 +74,7 @@ This command creates or resets a Pipelex config directory with:
 When you run `pipelex init`, Pipelex can guide you through:
 
 1. **Config reset** - Recreate the selected config files
-2. **Backend selection** - Choose which AI providers to enable
+2. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default language-model and image-generation tier of the shipped model deck
 3. **Credential prompts** - Fill in missing keys when relevant
 4. **Routing configuration** - Set up how models are routed to backends
 5. **Telemetry setup** - Configure observability and analytics
@@ -101,8 +97,7 @@ pipelex-agent init [--config/-c JSON] [--global/-g]
 ```json
 {
   "backends": ["openai", "anthropic"],
-  "primary_backend": "openai",
-  "accept_gateway_terms": true
+  "primary_backend": "openai"
 }
 ```
 
@@ -110,9 +105,8 @@ All fields are optional:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`, `pipelex_manifold`). Omit to keep template defaults. |
-| `primary_backend` | `str` | Required only when 2+ backends are selected and `pipelex_gateway` is not among them. |
-| `accept_gateway_terms` | `bool` | Required when any Pipelex-managed gateway backend (`pipelex_gateway`, `pipelex_manifold`) is in backends. The terms are the Pipelex service's, so one acceptance covers every managed backend. |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`, `pipelex_manifold`). Omit to keep the template's enabled backends and its routing profile, which sends each model to the first of them that serves it. |
+| `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's backends to it first. |
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 
@@ -122,8 +116,8 @@ Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a
 # Initialize with OpenAI backend (project-level)
 pipelex-agent init --config '{"backends": ["openai"]}'
 
-# Initialize globally with gateway
-pipelex-agent init -g --config '{"backends": ["pipelex_gateway"], "accept_gateway_terms": true}'
+# Initialize globally with OpenAI, whose one key serves every default language-model and image-generation tier of the model deck
+pipelex-agent init -g --config '{"backends": ["openai"]}'
 ```
 
 ## Related Configuration

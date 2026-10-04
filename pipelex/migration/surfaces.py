@@ -37,8 +37,8 @@ from pipelex.system.configuration.config_surface import (
     TELEMETRY_CONFIG_SURFACE_ID,
 )
 from pipelex.system.configuration.configs import PipelexConfig
-from pipelex.system.pipelex_service.pipelex_service_agreement import PIPELEX_SERVICE_CONFIG_FILE_NAME
 from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
+from pipelex.system.pipelex_service.pipelex_service_onboarding import PIPELEX_SERVICE_CONFIG_FILE_NAME
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -132,7 +132,7 @@ class Surface(BaseModel):
 
     Empty for a surface that lives directly in `~/.pipelex/` or `.pipelex/`. A surface that owns a
     subdirectory owns it *one level deep and to the exclusion of every other surface*, which is
-    what makes `inference/backends/pipelex_gateway.toml` safe: its name matches the main
+    what makes `inference/backends/pipelex_manifold.toml` safe: its name matches the main
     configuration's tier glob exactly, and only the directory it sits in says it is not a
     `pipelex.toml` tier file."""
 
@@ -473,7 +473,7 @@ class SurfaceRegistry(BaseModel):
 
         Both halves are load-bearing and each answers a real collision. Without the *name* rule,
         `pipelex_service.toml` is both the base file of one surface and a match for another's
-        `pipelex_*.toml`. Without the *directory* rule, `inference/backends/pipelex_gateway.toml`
+        `pipelex_*.toml`. Without the *directory* rule, `inference/backends/pipelex_manifold.toml`
         is a `pipelex_*.toml` match too — and it is an inference backend definition, so the main
         configuration's ledger would be replayed over it and rewrite it.
 

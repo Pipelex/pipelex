@@ -84,7 +84,7 @@ class TestUpdateCmd:
         self._seed_kit_backends(
             mocker,
             kit_backends_dir,
-            {"internal.toml": "internal-with-reportlab", "openai.toml": "openai-kit", "pipelex_gateway_models.md": "models-kit"},
+            {"internal.toml": "internal-with-reportlab", "openai.toml": "openai-kit", "models_reference.md": "models-kit"},
         )
         self._seed_installed(backends_dir, {"internal.toml": "internal-before-reportlab", "openai.toml": "openai-user", "my_backend.toml": "mine"})
         self._patch_resolve_backends_dir(mocker, backends_dir)
@@ -257,7 +257,7 @@ class TestUpdateCmd:
 
         assert (backends_dir / "openai.toml").read_text(encoding="utf-8") == "openai-user"
         assert (backends_dir / "my_backend.toml").read_text(encoding="utf-8") == "mine"
-        assert not (backends_dir / "pipelex_gateway_models.md").exists()
+        assert not (backends_dir / "models_reference.md").exists()
         assert sorted(path.name for path in backends_dir.glob("*.bak.*")) == [next(backends_dir.glob("internal.toml.bak.*")).name]
 
     def test_a_refreshed_internal_toml_is_up_to_date_afterwards(self, kit_and_backends: tuple[Path, Path]) -> None:

@@ -59,12 +59,13 @@ def _xlsx_plugin_declarations() -> PluginModelDeclarations:
 class TestPluginModelMerge:
     @pytest.fixture
     def inference_dir(self, tmp_path: Path) -> Path:
-        """The kit's inference tree, routed to the internal backend so a lenient setup needs no credential and no gateway."""
+        """The kit's inference tree, routed to the internal backend so a lenient setup needs no credential."""
         inference_dir = tmp_path / INFERENCE_DIR_NAME
         shutil.copytree(Path(str(get_kit_configs_dir())) / INFERENCE_DIR_NAME, inference_dir)
         routing_profiles_path = inference_dir / "routing_profiles.toml"
         routing_profiles = routing_profiles_path.read_text(encoding="utf-8")
-        routing_profiles_path.write_text(routing_profiles.replace('active = "all_pipelex_gateway"', 'active = "all_internal"', 1), encoding="utf-8")
+        assert 'active = "all_enabled_backends"' in routing_profiles
+        routing_profiles_path.write_text(routing_profiles.replace('active = "all_enabled_backends"', 'active = "all_internal"', 1), encoding="utf-8")
         return inference_dir
 
     @staticmethod

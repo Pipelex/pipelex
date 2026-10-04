@@ -8,15 +8,11 @@ from pipelex.cogt.model_backends.backend_credentials import (
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
-GATEWAY_PITCH = (
-    "\n💡 Tip: Get a free Pipelex Gateway API key!\n"
-    "   With Pipelex Gateway, you get unified access to multiple AI providers\n"
-    "   (OpenAI, Anthropic, Google, Mistral, etc.) with a single API key.\n"
-    "   Check the project's 'README.md' for details on obtaining your key.\n"
-    "\n🔑 Or bring your own keys:\n"
+BYOK_HINT = (
+    "\n🔑 Bring your own keys:\n"
     "   Set your own provider keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY,\n"
-    "   MISTRAL_API_KEY, AZURE_API_KEY, etc.) and enable the corresponding backends\n"
-    "   in '.pipelex/inference/backends.toml'.\n"
+    "   MISTRAL_API_KEY, AZURE_API_KEY, OPENROUTER_API_KEY, etc.) and enable the corresponding\n"
+    "   backends in '.pipelex/inference/backends.toml'.\n"
 )
 
 
@@ -65,7 +61,7 @@ class TestBackendCredentials:
             "   Add the variable to your environment or .env file:\n"
             "   - 'OPENAI_API_KEY'=<your_api_key>\n"
             "\n2. Disable this backend\n"
-            "   Add 'enabled = false' under '\\[openai]' in '.pipelex/inference/backends.toml'\n" + GATEWAY_PITCH
+            "   Add 'enabled = false' under '\\[openai]' in '.pipelex/inference/backends.toml'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
 
@@ -84,7 +80,7 @@ class TestBackendCredentials:
             "1. Provide the missing secret\n"
             "   Make sure 'ANTHROPIC_API_KEY' is available from your secrets provider.\n"
             "\n2. Disable this backend\n"
-            "   Add 'enabled = false' under '\\[anthropic]' in '.pipelex/inference/backends.toml'\n" + GATEWAY_PITCH
+            "   Add 'enabled = false' under '\\[anthropic]' in '.pipelex/inference/backends.toml'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
         assert ".env file" not in error_msg
@@ -106,7 +102,7 @@ class TestBackendCredentials:
             "   - 'OPENAI_API_KEY'=<your_api_key>\n"
             "\n2. Disable unused backends\n"
             "   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
-            "   - Add 'enabled = false' under '\\[openai]'\n" + GATEWAY_PITCH
+            "   - Add 'enabled = false' under '\\[openai]'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
 
@@ -181,6 +177,6 @@ class TestBackendCredentials:
             "\n2. Disable unused backends\n"
             "   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
             "   - Add 'enabled = false' under '\\[anthropic]'\n"
-            "   - Add 'enabled = false' under '\\[bedrock]'\n" + GATEWAY_PITCH
+            "   - Add 'enabled = false' under '\\[bedrock]'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg

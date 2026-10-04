@@ -258,10 +258,10 @@ display_name = "Hello (plugin example)"
 enabled = true
 ```
 
-Finally, `routing_profiles.toml` routes the model to that backend. The file already has a table for the profile its `active` key names, here the default `[profiles.all_pipelex_gateway]`, so add one line inside that table rather than a second copy of it, which TOML refuses:
+Finally, `routing_profiles.toml` routes the model to that backend. The file already has an optional-routes table for the profile its `active` key names, here the default `[profiles.all_enabled_backends.optional_routes]`, so add one line inside that table rather than a second copy of it, which TOML refuses:
 
 ```toml
-optional_routes = { "hello-1" = "hello" }
+"hello-1" = "hello"
 ```
 
 An optional route applies only while its backend is enabled, so turning the `hello` backend off leaves the profile valid. If you would rather not edit the tracked `backends.toml` and `routing_profiles.toml`, the same entries can go in the personal override files beside them, each under its table's header, as [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides) explains.

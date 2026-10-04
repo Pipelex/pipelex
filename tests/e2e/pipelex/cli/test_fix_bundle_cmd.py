@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.e2e.agent_cli.conftest import REPO_ROOT, set_gateway_enabled
+from tests.e2e.agent_cli.conftest import REPO_ROOT, set_manifold_enabled
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -80,7 +80,7 @@ class TestFixBundleHumanE2E:
         offline_subprocess_env: dict[str, str],
     ) -> None:
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
         bundle_path = hermetic_home / "bundle.mthds"
         bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
 
@@ -97,7 +97,7 @@ class TestFixBundleHumanE2E:
         offline_subprocess_env: dict[str, str],
     ) -> None:
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
         bundle_path = hermetic_home / "bundle.mthds"
         bundle_path.write_text(_UNFIXABLE_MTHDS, encoding="utf-8")
 

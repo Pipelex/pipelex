@@ -4,18 +4,19 @@ This page covers how to configure the **Docker image** — the env vars it needs
 
 For the syntax and meaning of Pipelex config itself (storage backends, tracing, inference routing, model decks, …), see the official Pipelex documentation: **https://docs.pipelex.com**. This page does not duplicate that.
 
-> **The official `pipelex/pipelex-api` image is generic and orchestrator-agnostic.** It runs every pipeline **in-process** (no distributed orchestrator), with no S3, no remote tracing, and the Pipelex Gateway as the only enabled inference backend. Anything environment-specific is meant to be supplied by you, on top of the image, via a mounted `.pipelex/` override file. Distributed execution (Temporal, Mistral Workflows, …) is **not** built in — it is added by installing exactly one orchestrator plugin on top of this base to produce a deployment *flavor* (see "Execution mode" below).
+> **The official `pipelex/pipelex-api` image is generic and orchestrator-agnostic.** It runs every pipeline **in-process** (no distributed orchestrator), with no S3, no remote tracing, and `openai` as the only enabled model provider. Anything environment-specific is meant to be supplied by you, on top of the image, via a mounted `.pipelex/` override file. Distributed execution (Temporal, Mistral Workflows, …) is **not** built in — it is added by installing exactly one orchestrator plugin on top of this base to produce a deployment *flavor* (see "Execution mode" below).
 
 ## Environment variables
 
 The API reads its settings from environment variables. With Docker, the easiest way is a `.env` file:
 
 ```bash
-# Pipelex Gateway API key — used to call LLMs through Pipelex's inference layer.
-# Required only if you keep the default routing profile. If you reconfigure
-# Pipelex to call providers directly (OpenAI, Anthropic, Bedrock, …), you'll
+# OpenAI API key — the image enables the openai backend, which serves every
+# default language-model and image-generation tier of its model deck.
+# Required only if you keep the bundled backends. If you enable other providers
+# (Anthropic, Bedrock, OpenRouter, …) in a mounted backends override, you'll
 # need those providers' own env vars instead — see https://docs.pipelex.com.
-PIPELEX_GATEWAY_API_KEY=your-pipelex-gateway-key
+OPENAI_API_KEY=your-openai-api-key
 
 # Authentication for the API itself (optional — defaults to AUTH_MODE=none)
 AUTH_MODE=none                 # one of: none | api_key | jwt
@@ -66,7 +67,7 @@ You have three idiomatic options. Pick whichever fits your workflow — they all
 
 ```bash
 # .env
-PIPELEX_GATEWAY_API_KEY=your-pipelex-gateway-key
+OPENAI_API_KEY=your-openai-api-key
 MAX_REQUEST_BODY_MIB=200
 AUTH_MODE=api_key
 API_KEY=your-strong-secret
@@ -80,7 +81,7 @@ docker run --name pipelex-api -p 8081:8081 --env-file .env pipelex/pipelex-api:l
 
 ```bash
 docker run --name pipelex-api -p 8081:8081 \
-  -e PIPELEX_GATEWAY_API_KEY=your-pipelex-gateway-key \
+  -e OPENAI_API_KEY=your-openai-api-key \
   -e MAX_REQUEST_BODY_MIB=200 \
   pipelex/pipelex-api:latest
 ```
@@ -116,7 +117,7 @@ The Pipelex runtime loads `.toml` config files in a layered, deep-merged order. 
 
 In the official Docker image, the server's `.pipelex/` directory (`api/.pipelex/` in the pipelex repository) is copied to `/root/.pipelex` at build time, and the image holds no project-level `.pipelex/`. That means **`/root/.pipelex/` is the single config dir the runtime reads from**, and any file you mount there participates in the layering above. To override anything, you only need to provide the keys you want to change — the layering does the rest.
 
-**The inference tree the image ships is the defaults of the `pipelex` it runs.** The image is released together with `pipelex`, under the same version, and every file under `inference/backends/`, the routing profiles and the numbered model deck files are that release's defaults, unchanged, so the models an own-key backend offers are the ones that `pipelex` lists: read `api/.pipelex/inference/backends/<backend>.toml` in the pipelex repository at the image's tag to see them. Only two things are this image's own choice: the `enabled` switches in `inference/backends.toml`, which leave the Pipelex Gateway and the software-only `internal` backend on and every own-key backend off, and the `x_custom_*` deck overrides. A copy of `inference/backends.toml` you mount yourself therefore keeps the backend list of the release you took it from, so take it again when you move to a newer image.
+**The inference tree the image ships is the defaults of the `pipelex` it runs.** The image is released together with `pipelex`, under the same version, and every file under `inference/backends/`, the routing profiles and the numbered model deck files are that release's defaults, unchanged, so the models an own-key backend offers are the ones that `pipelex` lists: read `api/.pipelex/inference/backends/<backend>.toml` in the pipelex repository at the image's tag to see them. Only two things are this image's own choice: the `enabled` switches in `inference/backends.toml`, which leave `openai` and the software-only `internal` backend on and every other backend off, and the `x_custom_*` deck overrides. A copy of `inference/backends.toml` you mount yourself therefore keeps the backend list of the release you took it from, so take it again when you move to a newer image. The numbered deck points its default language-model and image-generation tiers at models that only `openai` and `azure_openai` serve, so a deployment that runs on another provider also repoints those aliases in an `x_custom_llm_deck.toml` override of its own.
 
 For the schema and meaning of every key in these files, see https://docs.pipelex.com.
 
@@ -233,7 +234,7 @@ docker run --name pipelex-api -p 8081:8081 \
 `.env`:
 
 ```bash
-PIPELEX_GATEWAY_API_KEY=your-pipelex-gateway-key
+OPENAI_API_KEY=your-openai-api-key
 ```
 
 `docker-compose.yml`:

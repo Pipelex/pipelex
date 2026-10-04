@@ -241,9 +241,8 @@ class GatewayRoutingRefusal(StrEnum):
     change, the code is not. All but one are the gateway's ``pig-`` codes, at HTTP
     400. ``MODEL_NOT_ALLOWED`` is keyed on the code of the Portkey substrate the
     gateway is built on, which answers it at HTTP 412 from the middleware the
-    gateway vendors; Portkey's cloud answers it the same way, for the integrations
-    ``pipelex_gateway`` reaches by default and for a caller's own workspace behind
-    the ``portkey`` backend alike.
+    gateway vendors; Portkey's cloud answers it the same way for a caller's own
+    workspace behind the ``portkey`` backend.
     """
 
     #: ``pig-01`` at HTTP 400 — the request body names one that no integration
@@ -306,9 +305,8 @@ class GatewayRoutingRefusal(StrEnum):
 # **``model_not_allowed_error`` is the one code outside that namespace**, and it is
 # matched on the code alone for a reason of its own: it is the code of Portkey, the
 # substrate the gateway is built on, and no model vendor uses it. Portkey's cloud
-# emits it for the integrations ``pipelex_gateway`` reaches and for a caller's own
-# workspace behind the ``portkey`` backend alike, and so does the middleware the
-# manifold vendors from it. The refusal means the same thing and calls for the same
+# emits it for a caller's own workspace behind the ``portkey`` backend, and so does
+# the middleware the manifold vendors from it. The refusal means the same thing and calls for the same
 # move whichever of them raised it, so only the advice has to hold for both. Both
 # raise sites answer 412, so checking the status too would add nothing. It arrives with
 # the code in ``type`` and ``code`` null, and every Extract hop recovers it from
@@ -330,10 +328,8 @@ class GatewayRoutingRefusal(StrEnum):
 #   the manifold clients against the four steering headers by name, while the
 #   gateway refuses on an *allow*-list — so a ``portkey_ai`` release that starts
 #   sending some other ``x-portkey-*`` header turns every request into a
-#   ``pig-03`` with that test still green. And ``gateway_img_gen_worker.py`` does
-#   send ``x-portkey-config`` on every image call, which Portkey's cloud reads and
-#   a Pipelex-operated gateway refuses: harmless while ``pipelex_gateway`` keeps
-#   its default endpoint, and a client bug the day that backend names one of ours.
+#   ``pig-03`` with that test still green. The manifold image path still travels
+#   on ``portkey_ai``, which is the one client that could start doing so.
 # - ``pig-04`` ("this gateway does not serve ``<method> <path>``") is the proxy
 #   policy refusing a path only the catch-all could answer, and it is a 404, so the
 #   ladder already reads it as model-not-found — wrong in kind, but unreachable

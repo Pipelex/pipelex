@@ -2,8 +2,8 @@
 
 These tests pin the helper's behaviour:
 
-- When the gateway is enabled and terms are accepted, a successful online fetch persists
-  the raw payload to ``~/.pipelex/cache/remote_config.json`` (priming).
+- When a managed gateway backend is enabled, a successful online fetch persists the raw payload
+  to ``~/.pipelex/cache/remote_config.json`` (priming).
 - When offline at init time, priming logs a yellow warning and continues — the cache stays
   empty, the user has been told, init does not crash.
 - When no managed gateway backend is enabled in ``backends.toml``, priming is a no-op (BYOK setups
@@ -14,7 +14,6 @@ These tests pin the helper's behaviour:
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path  # ruff: ignore[typing-only-standard-library-import] — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
@@ -23,16 +22,9 @@ import pytest
 from rich.console import Console
 
 from pipelex.cli.commands.init.command import prime_remote_config_cache
-from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.system.configuration.config_loader import ConfigLoader
-from pipelex.system.pipelex_service.pipelex_service_agreement import (
-    PipelexServiceAgreement,
-    PipelexServiceOnboarding,
-)
-from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
 from pipelex.system.pipelex_service.remote_config_cache import (
-    CACHE_SCHEMA_VERSION,
-    CachedRemoteConfig,
     RemoteConfigCache,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -43,7 +35,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 INIT_COMMAND_MODULE = "pipelex.cli.commands.init.command"
-GATEWAY_ONLY_SECTIONS = {PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION}
+MANIFOLD_ONLY_SECTIONS = {PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION}
 
 # Capture the unpatched classmethod at module import — the session conftest replaces
 # ``fetch_remote_config`` with a cache shim that bypasses ``httpx``. We need the real
@@ -51,43 +43,23 @@ GATEWAY_ONLY_SECTIONS = {PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECT
 _ORIGINAL_FETCH_REMOTE_CONFIG = RemoteConfigFetcher.fetch_remote_config
 
 
-def _accepted_service_config() -> PipelexServiceConfig:
-    return PipelexServiceConfig(
-        agreement=PipelexServiceAgreement(terms_accepted=True),
-        onboarding=PipelexServiceOnboarding(inference_setup_completed=True),
-    )
-
-
 def _fake_remote_payload() -> dict[str, object]:
     """Minimal valid payload for ``RemoteConfig.model_validate``."""
     return {
-        "posthog": {
-            "project_api_key": "test-key",
-            "endpoint": "https://example.invalid",
-            "is_geoip_enabled": False,
-            "is_debug_enabled": False,
-        },
-        "backend_model_specs": {},
+        MANIFOLD_MODEL_SPECS_SECTION: {},
         "aws_region": "us-east-1",
     }
 
 
-def _store_malformed_cache(remote_config_payload: dict[str, object]) -> None:
-    """Drop-in for ``RemoteConfigCache.store`` that writes a structurally valid cache *wrapper*
-    whose inner ``raw_config`` does NOT validate as a ``RemoteConfig``.
+def _store_unreadable_cache(remote_config_payload: dict[str, object]) -> None:
+    """Drop-in for ``RemoteConfigCache.store`` that writes a cache file ``RemoteConfigCache.load()`` cannot read back.
 
-    Reproduces the case where ``RemoteConfigCache.load()`` succeeds (the wrapper is fine) but the
-    cached payload is unusable for offline runs.
+    Reproduces a write that lands on disk without raising yet leaves nothing an offline run can use.
     """
-    del remote_config_payload  # intentionally discarded — we write a deliberately broken payload
-    cached = CachedRemoteConfig(
-        schema_version=CACHE_SCHEMA_VERSION,
-        cached_at=datetime.now(tz=UTC),
-        raw_config={},
-    )
+    del remote_config_payload  # intentionally discarded — we write a deliberately broken file
     cache_path = RemoteConfigCache.cache_path()
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(cached.model_dump_json(), encoding="utf-8")
+    cache_path.write_text("{not json", encoding="utf-8")
 
 
 def _make_httpx_response(payload: dict[str, object]) -> httpx.Response:
@@ -130,12 +102,8 @@ def _layered_or_pinned(layered_backends: Path) -> Callable[..., list[Path]]:
 class TestCachePriming:
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_primes_cache_when_online(self, mocker: MockerFixture) -> None:
-        """Gateway enabled + terms accepted + online → cache file written under the global dir."""
-        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=GATEWAY_ONLY_SECTIONS)
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
+        """Managed gateway enabled + online → cache file written under the global dir."""
+        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=MANIFOLD_ONLY_SECTIONS)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -154,12 +122,8 @@ class TestCachePriming:
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_warns_when_offline(self, mocker: MockerFixture) -> None:
-        """Gateway enabled + terms accepted + offline + no cache → warn, do not crash, no cache file."""
-        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=GATEWAY_ONLY_SECTIONS)
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
+        """Managed gateway enabled + offline + no cache → warn, do not crash, no cache file."""
+        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=MANIFOLD_ONLY_SECTIONS)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -179,7 +143,7 @@ class TestCachePriming:
         assert "yellow" in printed.lower(), f"priming offline must print a yellow warning; got: {printed!r}"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
-    def test_init_skips_priming_when_gateway_disabled(self, mocker: MockerFixture) -> None:
+    def test_init_skips_priming_when_no_managed_gateway_is_enabled(self, mocker: MockerFixture) -> None:
         """No managed gateway backend enabled → priming is a no-op (no fetch, no cache write)."""
         mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value={})
         fetch_spy = mocker.spy(RemoteConfigFetcher, "fetch_remote_config")
@@ -188,9 +152,9 @@ class TestCachePriming:
         console = mocker.create_autospec(Console, instance=True)
         prime_remote_config_cache(console=console)
 
-        assert fetch_spy.call_count == 0, "priming must not invoke the fetcher when gateway is disabled"
-        assert httpx_get_mock.call_count == 0, "priming must not hit the network when gateway is disabled"
-        assert not RemoteConfigCache.cache_path().exists(), "no cache should be written when gateway is disabled"
+        assert fetch_spy.call_count == 0, "priming must not invoke the fetcher when no managed gateway is enabled"
+        assert httpx_get_mock.call_count == 0, "priming must not hit the network when no managed gateway is enabled"
+        assert not RemoteConfigCache.cache_path().exists(), "no cache should be written when no managed gateway is enabled"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_warns_when_offline_with_stale_cache_present(self, mocker: MockerFixture) -> None:
@@ -206,11 +170,7 @@ class TestCachePriming:
         cache_path = RemoteConfigCache.cache_path()
         stale_on_disk_before = json.loads(cache_path.read_text(encoding="utf-8"))
 
-        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=GATEWAY_ONLY_SECTIONS)
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
+        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=MANIFOLD_ONLY_SECTIONS)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -235,31 +195,32 @@ class TestCachePriming:
         resolves to first.
 
         Setup:
-        - layered ``backends.toml`` (default ``config_manager.backends_file_paths()``) has gateway DISABLED.
-        - target_config_dir's ``backends.toml`` has gateway ENABLED.
+        - layered ``backends.toml`` (default ``config_manager.backends_file_paths()``) has the manifold DISABLED.
+        - target_config_dir's ``backends.toml`` has the manifold ENABLED.
 
-        Expected: priming runs (gateway enabled at the target). Without the fix, the helper
+        Expected: priming runs (managed gateway enabled at the target). Without the fix, the helper
         would consult the layered file and skip priming entirely.
         """
-        # Layered config says gateway is disabled — without the fix, this is what gets read.
+        # Layered config says the manifold is disabled — without the fix, this is what gets read.
         layered_dir = tmp_path / "layered_dir"
         layered_backends = layered_dir / "inference" / "backends.toml"
         layered_backends.parent.mkdir(parents=True, exist_ok=True)
-        layered_backends.write_text("[pipelex_gateway]\nenabled = false\n", encoding="utf-8")
+        layered_backends.write_text(
+            f"[pipelex_manifold]\nenabled = false\nmodel_specs_section = {MANIFOLD_MODEL_SPECS_SECTION!r}\n",
+            encoding="utf-8",
+        )
         mocker.patch.object(ConfigLoader, "backends_file_paths", side_effect=_layered_or_pinned(layered_backends))
 
-        # Target init dir says gateway IS enabled. The priming helper must read THIS file.
+        # Target init dir says the manifold IS enabled. The priming helper must read THIS file.
         target_dir = tmp_path / "target_dir"
         target_backends = target_dir / "inference" / "backends.toml"
         target_backends.parent.mkdir(parents=True, exist_ok=True)
-        target_backends.write_text("[pipelex_gateway]\nenabled = true\n", encoding="utf-8")
-
-        # Terms-accepted check still consults the global pipelex_service.toml — keep that mocked
-        # as before. Make the fetcher succeed so we can assert the cache is actually written.
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
+        target_backends.write_text(
+            f"[pipelex_manifold]\nenabled = true\nmodel_specs_section = {MANIFOLD_MODEL_SPECS_SECTION!r}\n",
+            encoding="utf-8",
         )
+
+        # Make the fetcher succeed so we can assert the cache is actually written.
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -272,29 +233,35 @@ class TestCachePriming:
         prime_remote_config_cache(console=console, target_config_dir=target_dir)
 
         assert RemoteConfigCache.cache_path().exists(), (
-            "priming must run (and write the cache) when the TARGET backends.toml has gateway "
+            "priming must run (and write the cache) when the TARGET backends.toml has the manifold "
             "enabled, even if the layered backends.toml says otherwise"
         )
 
     @pytest.mark.usefixtures("isolated_cache_dir")
-    def test_priming_skips_when_target_dir_says_gateway_disabled(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """Inverse of the above: target says gateway disabled, layered says enabled → skip.
+    def test_priming_skips_when_target_dir_says_manifold_disabled(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Inverse of the above: target says the manifold is disabled, layered says enabled → skip.
 
         Without the fix, the helper would see the layered "enabled" file, try to fetch, and
         write a cache the user did not opt in to. We assert no fetch attempt and no cache file.
         """
-        # Layered says gateway enabled — without the fix, this is what gets read.
+        # Layered says the manifold is enabled — without the fix, this is what gets read.
         layered_dir = tmp_path / "layered_dir"
         layered_backends = layered_dir / "inference" / "backends.toml"
         layered_backends.parent.mkdir(parents=True, exist_ok=True)
-        layered_backends.write_text("[pipelex_gateway]\nenabled = true\n", encoding="utf-8")
+        layered_backends.write_text(
+            f"[pipelex_manifold]\nenabled = true\nmodel_specs_section = {MANIFOLD_MODEL_SPECS_SECTION!r}\n",
+            encoding="utf-8",
+        )
         mocker.patch.object(ConfigLoader, "backends_file_paths", side_effect=_layered_or_pinned(layered_backends))
 
-        # Target says gateway disabled — priming should respect that and become a no-op.
+        # Target says the manifold is disabled — priming should respect that and become a no-op.
         target_dir = tmp_path / "target_dir"
         target_backends = target_dir / "inference" / "backends.toml"
         target_backends.parent.mkdir(parents=True, exist_ok=True)
-        target_backends.write_text("[pipelex_gateway]\nenabled = false\n", encoding="utf-8")
+        target_backends.write_text(
+            f"[pipelex_manifold]\nenabled = false\nmodel_specs_section = {MANIFOLD_MODEL_SPECS_SECTION!r}\n",
+            encoding="utf-8",
+        )
 
         fetch_spy = mocker.spy(RemoteConfigFetcher, "fetch_remote_config")
         httpx_get_mock = mocker.patch("httpx.get", side_effect=httpx.ConnectError("should not be called"))
@@ -302,30 +269,25 @@ class TestCachePriming:
         console = mocker.create_autospec(Console, instance=True)
         prime_remote_config_cache(console=console, target_config_dir=target_dir)
 
-        assert fetch_spy.call_count == 0, "target dir disables the gateway — priming must NOT consult the layered backends.toml"
+        assert fetch_spy.call_count == 0, "target dir disables the manifold — priming must NOT consult the layered backends.toml"
         assert httpx_get_mock.call_count == 0
         assert not RemoteConfigCache.cache_path().exists()
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_priming_runs_for_a_manifold_only_installation(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """Priming asks the boot's question — is *any* managed gateway backend enabled — not the
-        Portkey-cloud one's. The published configuration is one artifact carrying every managed
-        backend's section, so a manifold-only installation has exactly as much to cache as a
-        gateway one, and skipping it left the first offline dry-run after init with no fallback.
+        """Priming asks the boot's question — is *any* managed gateway backend enabled. The published
+        configuration is one artifact carrying every managed backend's section, so a manifold-only
+        installation has exactly as much to cache as any other, and skipping it would leave the first
+        offline dry-run after init with no fallback.
         """
         target_dir = tmp_path / "target_dir"
         target_backends = target_dir / "inference" / "backends.toml"
         target_backends.parent.mkdir(parents=True, exist_ok=True)
         target_backends.write_text(
-            f"[{PipelexBackend.GATEWAY}]\nenabled = false\n\n"
             f"[{PipelexBackend.MANIFOLD}]\nenabled = true\nmodel_specs_section = {MANIFOLD_MODEL_SPECS_SECTION!r}\n",
             encoding="utf-8",
         )
 
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -348,11 +310,7 @@ class TestCachePriming:
         while no usable cache exists, so ``pipelex-agent init`` would emit ``cache_primed: true``
         and a later offline run would hit ``RemoteConfigUnavailableError``.
         """
-        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=GATEWAY_ONLY_SECTIONS)
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
+        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=MANIFOLD_ONLY_SECTIONS)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -371,20 +329,14 @@ class TestCachePriming:
         assert "yellow" in printed.lower(), f"a failed cache write must surface a yellow warning; got: {printed!r}"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
-    def test_init_warns_when_cached_payload_is_malformed(self, mocker: MockerFixture) -> None:
-        """Online fetch succeeds and a cache file is written, but its inner ``raw_config`` is not
-        a valid ``RemoteConfig`` → priming reports failure, not success.
+    def test_init_warns_when_the_written_cache_does_not_read_back(self, mocker: MockerFixture) -> None:
+        """Online fetch succeeds and a cache file is written, but it does not read back → priming
+        reports failure, not success.
 
-        ``RemoteConfigCache.load()`` validates only the cache *wrapper*, so a malformed inner
-        payload would still pass an ``is None`` check. Priming must re-validate the payload as a
-        ``RemoteConfig``, otherwise ``pipelex-agent init`` would emit ``cache_primed: true`` while
-        a later offline run hits ``RemoteConfigUnavailableError``.
+        Priming reads the cache back rather than trusting the write, otherwise ``pipelex-agent init``
+        would emit ``cache_primed: true`` while a later offline run hits ``RemoteConfigUnavailableError``.
         """
-        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=GATEWAY_ONLY_SECTIONS)
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
+        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=MANIFOLD_ONLY_SECTIONS)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -392,13 +344,13 @@ class TestCachePriming:
         )
         mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _ORIGINAL_FETCH_REMOTE_CONFIG)
         mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
-        mocker.patch.object(RemoteConfigCache, "store", side_effect=_store_malformed_cache)
+        mocker.patch.object(RemoteConfigCache, "store", side_effect=_store_unreadable_cache)
 
         console = mocker.create_autospec(Console, instance=True)
         prime_remote_config_cache(console=console)  # must NOT raise
 
         printed = " ".join(str(call_args) for call_args in console.print.call_args_list)
-        assert "yellow" in printed.lower(), f"a malformed cached payload must surface a yellow warning; got: {printed!r}"
+        assert "yellow" in printed.lower(), f"a cache that does not read back must surface a yellow warning; got: {printed!r}"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_does_not_double_prime(self, mocker: MockerFixture) -> None:
@@ -411,11 +363,7 @@ class TestCachePriming:
         stale_on_disk = json.loads(cache_path.read_text(encoding="utf-8"))
         assert stale_on_disk["raw_config"]["aws_region"] == "eu-west-1"
 
-        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=GATEWAY_ONLY_SECTIONS)
-        mocker.patch(
-            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_accepted_service_config(),
-        )
+        mocker.patch(f"{INIT_COMMAND_MODULE}.enabled_managed_gateway_sections", return_value=MANIFOLD_ONLY_SECTIONS)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,

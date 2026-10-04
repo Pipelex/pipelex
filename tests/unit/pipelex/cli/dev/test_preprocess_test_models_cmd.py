@@ -27,7 +27,7 @@ class TestPreprocessTestModelsCmd:
         mocker.patch.object(
             preprocess_test_models_cmd,
             "enabled_managed_gateway_sections",
-            return_value={"pipelex_gateway": "backend_model_specs"},
+            return_value={"pipelex_manifold": "manifold_model_specs"},
         )
         mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", side_effect=gateway_error)
 
@@ -54,13 +54,13 @@ class TestPreprocessTestModelsCmd:
             preprocess_test_models_cmd,
             "enabled_managed_gateway_sections",
             return_value={
-                "pipelex_gateway": "backend_model_specs",
+                "pipelex_other": "other_model_specs",
                 "pipelex_manifold": "manifold_model_specs",
                 "absent_gateway": "no_such_section",
             },
         )
         sections = {
-            "backend_model_specs": {"defaults": {"model_type": "llm"}, "on-the-cloud": {}},
+            "other_model_specs": {"defaults": {"model_type": "llm"}, "on-the-cloud": {}},
             "manifold_model_specs": {"defaults": {"model_type": "llm"}, "in-our-vpc": {"model_type": "search"}},
         }
         config = mocker.Mock()
@@ -69,7 +69,7 @@ class TestPreprocessTestModelsCmd:
 
         result = _fetch_managed_gateway_models()
 
-        assert set(result) == {"pipelex_gateway", "pipelex_manifold"}
-        assert result["pipelex_gateway"]["llm"] == ["on-the-cloud"]
+        assert set(result) == {"pipelex_other", "pipelex_manifold"}
+        assert result["pipelex_other"]["llm"] == ["on-the-cloud"]
         assert result["pipelex_manifold"]["llm"] == []
         assert result["pipelex_manifold"]["search"] == ["in-our-vpc"]

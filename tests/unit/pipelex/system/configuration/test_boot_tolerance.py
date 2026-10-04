@@ -652,19 +652,19 @@ class TestTheServiceConfigLoader:
             migration_dir=synthetic_migration_dir,
             surface_id=PIPELEX_SERVICE_CONFIG_SURFACE_ID,
             base_file="pipelex_service.toml",
-            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = []\nkey = "terms"\nnew_key = "agreement"\n',
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = []\nkey = "setup"\nnew_key = "onboarding"\n',
         )
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         stale = config_dir / "pipelex_service.toml"
-        stale.write_text("[terms]\nterms_accepted = true\n", encoding="utf-8")
+        stale.write_text("[setup]\ninference_setup_completed = true\n", encoding="utf-8")
         warning = mocker.patch("pipelex.system.pipelex_service.pipelex_service_config.log.warning")
 
         config = load_pipelex_service_config_if_exists(config_dir=config_dir)
 
         assert config is not None
-        assert config.agreement.terms_accepted is True
-        assert stale.read_bytes() == b"[terms]\nterms_accepted = true\n", "a tolerated boot writes nothing"
+        assert config.onboarding.inference_setup_completed is True
+        assert stale.read_bytes() == b"[setup]\ninference_setup_completed = true\n", "a tolerated boot writes nothing"
         assert "pipelex migrate" in warning.call_args.args[0]
 
     @pytest.mark.usefixtures("synthetic_migration_dir")

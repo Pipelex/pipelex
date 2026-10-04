@@ -8,8 +8,6 @@ from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_en
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
-from pipelex.tools.misc.pretty import plain_markup_text
-from pipelex.tools.misc.rich_extra import is_rich_installed
 from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 
@@ -24,7 +22,6 @@ ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
     "PIPELEX_API_KEY",
     "PIPELEX_API_BASE_URL",
     "PIPELEX_INFERENCE_API_KEY",
-    "PIPELEX_GATEWAY_API_KEY",
     "OPENAI_API_KEY",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
@@ -66,6 +63,17 @@ def _set_test_run_mode() -> None:
         runtime_manager.set_run_mode(run_mode=RunMode.UNIT_TEST)
 
 
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure() -> None:
+    """Set the test run mode before collection starts.
+
+    First among the configure hooks, rather than in a fixture, because a boot at
+    test-module import, during collection or in a later pytest hook happens
+    before any fixture runs and would otherwise see the normal run mode.
+    """
+    _set_test_run_mode()
+
+
 def pytest_addoption(parser: Parser):
     parser.addoption(
         "--pipe-run-mode",
@@ -78,8 +86,7 @@ def pytest_addoption(parser: Parser):
         "--disable-inference",
         action="store_true",
         default=False,
-        help="Disable inference for this test session. Uses mock content generator, "
-        "skips gateway terms check, and auto-skips tests marked with @pytest.mark.inference.",
+        help="Disable inference for this test session. Uses mock content generator and auto-skips tests marked with @pytest.mark.inference.",
     )
     parser.addoption(
         "--class-registry",
@@ -88,83 +95,6 @@ def pytest_addoption(parser: Parser):
         help="Class registry mode: 'both' runs tests in shared and isolated modes (default), "
         "'shared' leaks dynamic classes to global, 'isolated' scopes them to the library registry",
     )
-
-
-#: What a session stopped for the terms agreement says. Written as Rich markup once: the Rich panel renders it,
-#: and the Rich-free path prints the text it renders to, so the message arrives either way.
-_TERMS_REQUIRED_MARKUP = (
-    "[bold yellow]Pipelex Service Terms Agreement Required[/bold yellow]\n\n"
-    "Tests cannot run because Pipelex Gateway is enabled but terms haven't been accepted.\n\n"
-    "[bold]To fix this, choose one option:[/bold]\n\n"
-    "  [cyan]1.[/cyan] Run [green]pipelex init agreement[/green] to accept terms (quick, no config reset)\n\n"
-    "  [cyan]2.[/cyan] Run [green]pipelex init config[/green] to fully reset and configure backends\n\n"
-    "  [cyan]3.[/cyan] Disable gateway in [blue].pipelex/inference/backends.toml[/blue]:\n"
-    "     [dim]Set pipelex_gateway.enabled = false[/dim]\n"
-)
-
-_TERMS_REQUIRED_TITLE = "⚠️  Setup Required"
-
-
-def _print_terms_required() -> None:
-    """Say why the session is stopping, framed by Rich where the extra is installed and plainly where it is not.
-
-    Rich is the ``cli`` extra and this plugin loads in every session of every project that registers it, so the
-    message a stopped session depends on is never allowed to depend on it.
-    """
-    if not is_rich_installed():
-        print_to_stderr("")
-        print_to_stderr(_TERMS_REQUIRED_TITLE)
-        print_to_stderr(plain_markup_text(markup=_TERMS_REQUIRED_MARKUP) or _TERMS_REQUIRED_MARKUP)
-        return
-    from rich.console import Console
-    from rich.panel import Panel
-
-    console = Console()
-    console.print()
-    console.print(Panel(_TERMS_REQUIRED_MARKUP, title=_TERMS_REQUIRED_TITLE, border_style="yellow"))
-
-
-@pytest.hookimpl(tryfirst=True)
-def pytest_configure(config: Config) -> None:
-    """Set the test run mode, then check prerequisites before test collection starts.
-
-    The run mode is set here, first among the configure hooks, rather than in a fixture, because
-    it is what keeps the Pipelex Gateway telemetry stream off in a test run: a boot at test-module
-    import, during collection or in a later pytest hook happens before any fixture runs, and would
-    otherwise see the normal run mode and send the stream.
-
-    Then validates that Pipelex Gateway terms are accepted when gateway is enabled.
-    This runs early to provide clear feedback before wasting time on test collection.
-    """
-    _set_test_run_mode()
-
-    # Skip check when inference is disabled via CLI option
-    if config.getoption("--disable-inference", default=False):
-        return
-
-    # Skip check in CI environments (IntegrationMode.CI doesn't require terms)
-    if is_env_var_set(key="GITHUB_ACTIONS") or is_env_var_set(key="CI"):
-        return
-
-    # Skip check in Codex Cloud (terms acceptance handled differently)
-    if is_env_var_truthy(key=CODEX_CLOUD_ENV_VAR_KEY):
-        return
-
-    # Import here to avoid circular imports during pytest startup
-    from pipelex.system.configuration.config_loader import config_manager  # ruff: ignore[import-outside-top-level]
-    from pipelex.system.pipelex_service.pipelex_service_config import (  # ruff: ignore[import-outside-top-level]
-        is_pipelex_gateway_enabled,
-        load_pipelex_service_config_if_exists,
-    )
-
-    if not is_pipelex_gateway_enabled():
-        return
-
-    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-
-    if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
-        _print_terms_required()
-        pytest.exit("Service terms not accepted - run 'pipelex init agreement' first", returncode=1)
 
 
 @pytest.fixture(scope="session")

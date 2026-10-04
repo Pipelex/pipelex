@@ -20,9 +20,8 @@ def generate_error_pages_cmd(*, output: Path | None = None, quiet: bool = False)
     dev CLI commands and to surface config / setup errors loudly), then calls
     :func:`generate_error_pages`. Inference is never invoked here — the command only
     introspects ``PipelexError`` subclasses and writes markdown — so the bootstrap
-    must skip the inference-setup / gateway-terms checks; otherwise CI environments
-    with no configured backend (e.g. the docs deploy job) hit
-    ``InferenceSetupRequiredError``. The underlying discovery rglobs every
+    skips the inference setup, which a CI environment with no configured backend
+    (e.g. the docs deploy job) could not complete. The underlying discovery rglobs every
     ``exceptions.py`` / ``*_exceptions.py`` via :func:`iter_pipelex_error_subclasses`
     — no manual import or class-list update is needed when a new error class lands.
     Pages already carrying ``<!-- pipelex:authored -->`` are preserved so hand-edited

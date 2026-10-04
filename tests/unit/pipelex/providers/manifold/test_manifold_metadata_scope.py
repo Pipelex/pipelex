@@ -19,7 +19,6 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, LLMJ
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
-from pipelex.providers.gateway.gateway_factory import GatewayFactory
 from pipelex.providers.manifold.manifold_constants import MANIFOLD_METADATA_HEADER
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory
@@ -93,9 +92,8 @@ class TestManifoldMetadataScope:
             OpenAICompletionsFactory(is_http_url_enabled=False),
             OpenAIResponsesFactory(is_http_url_enabled=False),
             PortkeyFactory,
-            GatewayFactory,
         ],
-        ids=["openai-completions", "openai-responses", "portkey", "gateway"],
+        ids=["openai-completions", "openai-responses", "portkey"],
     )
     async def test_other_backends_extras_carry_no_metadata_header(self, mocker: MockerFixture, factory: Any) -> None:
         model = _model(mocker, backend_name="openai")
@@ -106,7 +104,7 @@ class TestManifoldMetadataScope:
         assert MANIFOLD_METADATA_HEADER not in extra_headers
         assert "x-portkey-metadata" not in extra_headers
 
-    @pytest.mark.parametrize("backend_name", ["anthropic", "bedrock", "pipelex_gateway"])
+    @pytest.mark.parametrize("backend_name", ["anthropic", "bedrock"])
     async def test_direct_claude_sends_no_headers_on_the_text_call(self, mocker: MockerFixture, backend_name: str) -> None:
         sdk_client = AsyncAnthropic(api_key="test-key")
         stream = mocker.MagicMock(side_effect=_RequestCapturedError)

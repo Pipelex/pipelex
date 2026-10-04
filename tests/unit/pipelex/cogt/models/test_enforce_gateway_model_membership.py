@@ -5,7 +5,7 @@ services live that question only makes sense per service. Two failure shapes are
 pins down, because the single-gateway implementation had no way to tell them apart:
 
 - a **union** across the sections would accept a handle routed to the manifold service purely
-  because the Portkey-cloud section happens to serve it — a boot that then fails at the first call;
+  because another managed section happens to serve it — a boot that then fails at the first call;
 - the same check run twice, once per section, over the *whole* deck would demand that every deck
   handle appear in **both** sections, which no mixed routing profile can satisfy.
 
@@ -42,10 +42,12 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 
 BYOK_BACKEND = "xai"
-ENABLED_BACKENDS = [PipelexBackend.GATEWAY, PipelexBackend.MANIFOLD, BYOK_BACKEND, PipelexBackend.INTERNAL]
+# A second managed service beside the manifold, standing in for the next one the kit could ship.
+OTHER_BACKEND = "pipelex_other"
+ENABLED_BACKENDS = [OTHER_BACKEND, PipelexBackend.MANIFOLD, BYOK_BACKEND, PipelexBackend.INTERNAL]
 
 # The handles the fixture deck advertises. Everything not matched by a route lands on the profile's
-# default backend, which is the Portkey-cloud service here.
+# default backend, which is the other managed service here.
 GATEWAY_HANDLE = "gpt-5"
 MANIFOLD_HANDLE = "claude-4-sonnet"
 BYOK_HANDLE = "grok-3"
@@ -56,7 +58,7 @@ SEARCH_HANDLE = "web-search"
 
 def _specs(*model_names: str) -> BackendModelSpecs:
     """A spec map carrying exactly these model names, plus the `defaults` table the check ignores."""
-    specs: dict[str, object] = {"defaults": {"model_type": "llm", "sdk": "gateway_completions"}}
+    specs: dict[str, object] = {"defaults": {"model_type": "llm", "sdk": "manifold_completions"}}
     for model_name in model_names:
         specs[model_name] = {"model_id": model_name}
     return specs  # pyright: ignore[reportReturnType]
@@ -71,7 +73,7 @@ def _resolved(name: str, *, backend_name: str) -> InferenceModelSpec:
     return InferenceModelSpec(
         backend_name=backend_name,
         name=name,
-        sdk="gateway_completions",
+        sdk="manifold_completions",
         model_type=ModelType.LLM,
         model_id=name,
         costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
@@ -140,8 +142,8 @@ def _make_manager(
     )
     manager._routing_profile = RoutingProfile(  # pyright: ignore[reportPrivateUsage]  # ruff: ignore[private-member-access]
         name="mixed",
-        description="Portkey's cloud by default, Claude through the manifold service, grok direct",
-        default=PipelexBackend.GATEWAY,
+        description="The other managed service by default, Claude through the manifold service, grok direct",
+        default=OTHER_BACKEND,
         routes={"claude-*": PipelexBackend.MANIFOLD, "grok-*": BYOK_BACKEND},
     )
     return manager
@@ -156,7 +158,7 @@ def _enforce(
 ) -> None:
     manager._enforce_gateway_model_membership(  # pyright: ignore[reportPrivateUsage]  # ruff: ignore[private-member-access]
         managed_gateway_configs={
-            PipelexBackend.GATEWAY: GatewayConfig(model_specs=gateway_specs, aws_region="eu-west-3"),
+            OTHER_BACKEND: GatewayConfig(model_specs=gateway_specs),
             PipelexBackend.MANIFOLD: GatewayConfig(model_specs=manifold_specs),
         },
         gateway_config_source=source,
@@ -181,7 +183,7 @@ class TestEnforceGatewayModelMembership:
     def test_a_handle_absent_from_the_service_it_is_routed_to_raises_naming_that_service(self) -> None:
         """The case that must still fail loudly — and the one a union across the sections would miss.
 
-        `claude-4-sonnet` is served by the Portkey-cloud section here, and the profile routes it to
+        `claude-4-sonnet` is served by the other managed section here, and the profile routes it to
         the manifold service, which does not carry it. Every call would fail; the boot says so.
         """
         manager = _make_manager(llm_presets={"cheap": LLMSetting(model=MANIFOLD_HANDLE, temperature=0.5)})
@@ -257,13 +259,13 @@ class TestAWaterfallSpansBackends:
         """The primary is absent from the service it routes to, and the fallback resolves elsewhere.
 
         `claude-4-sonnet` routes to the manifold service, which carries nothing; `gpt-5` routes to
-        the Portkey-cloud one and is already resolved in the deck. At runtime the waterfall walks
+        the other managed one and is already resolved in the deck. At runtime the waterfall walks
         past the first and uses the second, so the boot has nothing to refuse.
         """
         manager = _make_manager(
             llm_presets={"premium": LLMSetting(model="~premium", temperature=0.5)},
             llm_waterfalls={"premium": [MANIFOLD_HANDLE, GATEWAY_HANDLE]},
-            inference_models={GATEWAY_HANDLE: _resolved(GATEWAY_HANDLE, backend_name=PipelexBackend.GATEWAY)},
+            inference_models={GATEWAY_HANDLE: _resolved(GATEWAY_HANDLE, backend_name=OTHER_BACKEND)},
         )
 
         _enforce(

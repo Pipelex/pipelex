@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.e2e.agent_cli.conftest import PIPELEX_AGENT_BIN, set_gateway_enabled
+from tests.e2e.agent_cli.conftest import PIPELEX_AGENT_BIN, set_manifold_enabled
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -71,7 +71,7 @@ def _run_fix_bundle(bundle_path: Path, *, env: dict[str, str], cwd: Path) -> sub
 class TestFixBundleE2E:
     def test_fixable_bundle_outputs_clean_json_and_writes_file(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
         bundle_path = hermetic_home / "bundle.mthds"
         bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
 
@@ -87,7 +87,7 @@ class TestFixBundleE2E:
 
     def test_unfixable_bundle_outputs_json_error_and_exit_one(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         pipelex_dir = hermetic_home / ".pipelex"
-        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
+        set_manifold_enabled(pipelex_dir / "inference" / "backends.toml", enabled=False)
         bundle_path = hermetic_home / "bundle.mthds"
         bundle_path.write_text(_UNFIXABLE_MTHDS, encoding="utf-8")
 

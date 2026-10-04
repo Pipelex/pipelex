@@ -1,4 +1,3 @@
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -53,16 +52,12 @@ class BackendCredentialsErrorMsgFactory:
                 rf"   Add 'enabled = false' under '\[{backend_name}]' in '.pipelex/inference/backends.toml'" + "\n"
             )
 
-        # Add pitch for Pipelex Gateway and BYOK (Bring Your Own Keys)
+        # Point at the BYOK (Bring Your Own Keys) setup
         error_msg += (
-            f"\n💡 Tip: Get a free {PipelexBackend.GATEWAY.display_name} API key!\n"
-            f"   With {PipelexBackend.GATEWAY.display_name}, you get unified access to multiple AI providers\n"
-            "   (OpenAI, Anthropic, Google, Mistral, etc.) with a single API key.\n"
-            "   Check the project's 'README.md' for details on obtaining your key.\n"
-            "\n🔑 Or bring your own keys:\n"
+            "\n🔑 Bring your own keys:\n"
             "   Set your own provider keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY,\n"
-            "   MISTRAL_API_KEY, AZURE_API_KEY, etc.) and enable the corresponding backends\n"
-            "   in '.pipelex/inference/backends.toml'.\n"
+            "   MISTRAL_API_KEY, AZURE_API_KEY, OPENROUTER_API_KEY, etc.) and enable the corresponding\n"
+            "   backends in '.pipelex/inference/backends.toml'.\n"
         )
 
         return error_msg
@@ -136,16 +131,12 @@ class BackendCredentialsErrorMsgFactory:
             for backend_name in backend_names:
                 error_msg += rf"   - Add 'enabled = false' under '\[{backend_name}]'" + "\n"
 
-        # Add pitch for Pipelex Gateway and BYOK (Bring Your Own Keys)
+        # Point at the BYOK (Bring Your Own Keys) setup
         error_msg += (
-            f"\n💡 Tip: Get a free {PipelexBackend.GATEWAY.display_name} API key!\n"
-            f"   With {PipelexBackend.GATEWAY.display_name}, you get unified access to multiple AI providers\n"
-            "   (OpenAI, Anthropic, Google, Mistral, etc.) with a single API key.\n"
-            "   Check the project's 'README.md' for details on obtaining your key.\n"
-            "\n🔑 Or bring your own keys:\n"
+            "\n🔑 Bring your own keys:\n"
             "   Set your own provider keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY,\n"
-            "   MISTRAL_API_KEY, AZURE_API_KEY, etc.) and enable the corresponding backends\n"
-            "   in '.pipelex/inference/backends.toml'.\n"
+            "   MISTRAL_API_KEY, AZURE_API_KEY, OPENROUTER_API_KEY, etc.) and enable the corresponding\n"
+            "   backends in '.pipelex/inference/backends.toml'.\n"
         )
 
         return error_msg

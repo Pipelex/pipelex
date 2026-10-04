@@ -1,49 +1,34 @@
-import pytest
-from pydantic import ValidationError
+from typing import Any
 
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 
 
 class TestRemoteConfig:
-    """Tests for GatewayRemoteConfig model."""
+    """Tests for the RemoteConfig model."""
 
-    def test_remote_config_valid(self) -> None:
-        """Test creating a valid GatewayRemoteConfig."""
-        payload = {
-            "backend_model_specs": {
-                "defaults": {"sdk": "gateway_completions"},
+    def test_remote_config_carries_its_sections_as_extras(self) -> None:
+        """The artifact declares no field of its own: every section arrives through `extra="allow"`."""
+        payload: dict[str, Any] = {
+            MANIFOLD_MODEL_SPECS_SECTION: {
+                "defaults": {"sdk": "manifold_completions"},
                 "gpt-4o": {"model_id": "gpt-4o-2024-11-20"},
             },
-            "posthog": {
-                "project_api_key": "test-project-api-key",
-                "endpoint": "https://test-endpoint.com",
-                "is_geoip_enabled": True,
-                "is_debug_enabled": False,
-            },
             "aws_region": "us-east-1",
         }
         config = RemoteConfig.model_validate(payload)
-        assert "defaults" in config.backend_model_specs
-        assert "gpt-4o" in config.backend_model_specs
-        assert config.aws_region == "us-east-1"
+        section = config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION)
+        assert section is not None
+        assert "defaults" in section
+        assert "gpt-4o" in section
 
-    def test_remote_config_missing_backend_fails(self) -> None:
-        """Test that missing backend key raises validation error."""
-        payload = {"other_key": "value"}
-        with pytest.raises(ValidationError):
-            RemoteConfig.model_validate(payload)
-
-    def test_remote_config_empty_backend(self) -> None:
-        """Test GatewayRemoteConfig with empty backend dict."""
-        payload = {
-            "backend_model_specs": {},
-            "posthog": {
-                "project_api_key": "test-project-api-key",
-                "endpoint": "https://test-endpoint.com",
-                "is_geoip_enabled": True,
-                "is_debug_enabled": False,
-            },
-            "aws_region": "us-east-1",
-        }
+    def test_remote_config_tolerates_keys_it_does_not_read(self) -> None:
+        """The artifact is shared with other consumers, so a key the runtime never asks for is not a refusal."""
+        payload: dict[str, Any] = {"other_key": "value"}
         config = RemoteConfig.model_validate(payload)
-        assert config.backend_model_specs == {}
+        assert config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) is None
+
+    def test_remote_config_empty_section(self) -> None:
+        payload: dict[str, Any] = {MANIFOLD_MODEL_SPECS_SECTION: {}}
+        config = RemoteConfig.model_validate(payload)
+        assert config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {}

@@ -43,15 +43,15 @@ It is the source-available reference implementation of the **[MTHDS Protocol](ht
 
 **Official Docker image available at:** [`pipelex/pipelex-api`](https://hub.docker.com/r/pipelex/pipelex-api)
 
-The published image is **generic and configuration-light**: Temporal is off, no S3, no remote tracing. It boots with a single required env var (`PIPELEX_GATEWAY_API_KEY`), and you bring your own [Pipelex configuration](https://docs.pipelex.com/latest/api-server/configuration/) on top to enable storage, tracing, Temporal, or anything else.
+The published image is **generic and configuration-light**: Temporal is off, no S3, no remote tracing. It boots with a single required env var (`OPENAI_API_KEY`), and you bring your own [Pipelex configuration](https://docs.pipelex.com/latest/api-server/configuration/) on top to enable storage, tracing, Temporal, or anything else.
 
 ### 1. Run with Docker
 
-The only required env var is `PIPELEX_GATEWAY_API_KEY`. Get a free key (with free credits) at https://app.pipelex.com, then run:
+The only required env var is `OPENAI_API_KEY`: the image enables the `openai` backend, which serves every default language-model and image-generation tier of its model deck. To run on another provider instead, mount a backends override, as the [Configuration page](https://docs.pipelex.com/latest/api-server/configuration/) shows. Then run:
 
 ```bash
 docker run --name pipelex-api -p 8081:8081 \
-  -e PIPELEX_GATEWAY_API_KEY=your-pipelex-gateway-api-key \
+  -e OPENAI_API_KEY=your-openai-api-key \
   pipelex/pipelex-api:latest
 ```
 

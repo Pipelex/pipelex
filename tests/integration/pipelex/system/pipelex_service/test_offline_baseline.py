@@ -2,9 +2,10 @@
 
 These tests describe the behaviour that must NOT regress:
 
-- BYOK setups (gateway disabled) must complete offline without any remote-config fetch.
-- Gateway-enabled setups with no network AND no cache must raise
+- BYOK setups (no managed gateway enabled) must complete offline without any remote-config fetch.
+- Managed-gateway setups with no network AND no cache must raise
   ``RemoteConfigUnavailableError`` (the user-facing offline-mode error introduced in Phase 2).
+- A live boot on a managed gateway needs no ``pipelex_service.toml``, in any integration mode.
 """
 
 from __future__ import annotations
@@ -16,15 +17,10 @@ import httpx
 import pytest
 
 from pipelex import log
-from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, PipelexBackend
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
-from pipelex.system.pipelex_service.pipelex_service_agreement import (
-    PipelexServiceAgreement,
-    PipelexServiceOnboarding,
-)
-from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode
 
@@ -54,9 +50,9 @@ class TestOfflineBaseline:
         self,
         mocker: MockerFixture,
     ) -> None:
-        """Gateway disabled: setup must succeed with no network and never hit remote config.
+        """No managed gateway enabled: setup must succeed with no network and never hit remote config.
 
-        Even with ``needs_model_specs=True``, when the gateway is disabled the fetch is
+        Even with ``needs_model_specs=True``, when no managed gateway is enabled the fetch is
         unreachable and the BYOK setup should complete normally.
         """
         Pipelex.teardown_if_needed()
@@ -80,15 +76,15 @@ class TestOfflineBaseline:
         finally:
             Pipelex.teardown_if_needed()
 
-        assert fetch_spy.call_count == 0, "fetch_remote_config must not be invoked when gateway is disabled"
-        assert httpx_get_mock.call_count == 0, "httpx.get must not be invoked when gateway is disabled"
+        assert fetch_spy.call_count == 0, "fetch_remote_config must not be invoked when no managed gateway is enabled"
+        assert httpx_get_mock.call_count == 0, "httpx.get must not be invoked when no managed gateway is enabled"
 
-    def test_gateway_offline_without_cache_raises_remote_config_unavailable_error(
+    def test_managed_gateway_offline_without_cache_raises_remote_config_unavailable_error(
         self,
         mocker: MockerFixture,
         tmp_path: Path,
     ) -> None:
-        """Gateway enabled + offline + no primed cache → ``RemoteConfigUnavailableError``.
+        """Managed gateway enabled + offline + no primed cache → ``RemoteConfigUnavailableError``.
 
         Phase 2 introduced a cache fallback so the fetcher only raises when both the network
         and the local cache are unusable. We redirect ``~/.pipelex`` to a tmp path so any
@@ -105,17 +101,9 @@ class TestOfflineBaseline:
             return_value=tmp_path / ".pipelex",
         )
 
-        service_config = PipelexServiceConfig(
-            agreement=PipelexServiceAgreement(terms_accepted=True),
-            onboarding=PipelexServiceOnboarding(inference_setup_completed=True),
-        )
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=service_config,
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
@@ -143,3 +131,46 @@ class TestOfflineBaseline:
             # "LogConfig is already set". Reset it manually here so other test modules can
             # still spin up a fresh Pipelex instance.
             log.reset()
+
+    @pytest.mark.parametrize("integration_mode", [IntegrationMode.FASTAPI, IntegrationMode.CLI, IntegrationMode.PYTEST])
+    def test_live_boot_on_a_managed_gateway_needs_no_service_file(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+        integration_mode: IntegrationMode,
+    ) -> None:
+        """A live boot with a managed gateway enabled and no ``pipelex_service.toml`` goes straight to the fetch.
+
+        No first-run check stands in front of the remote config: a server, a worker booting through the
+        CLI helper or a test suite boots from its config files alone. The fetch is the first thing the
+        boot does for the managed gateway, so reaching its offline refusal proves nothing stopped earlier.
+        """
+        Pipelex.teardown_if_needed()
+
+        # An empty global directory holds no pipelex_service.toml and no primed cache.
+        mocker.patch.object(
+            ConfigLoader,
+            "global_config_dir",
+            new_callable=mocker.PropertyMock,
+            return_value=tmp_path / ".pipelex",
+        )
+        mocker.patch(
+            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
+            return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
+        )
+        mocker.patch(
+            "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
+            new_callable=mocker.PropertyMock,
+            return_value=False,
+        )
+        mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _ORIGINAL_FETCH_REMOTE_CONFIG)
+        mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
+        mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
+
+        try:
+            with pytest.raises(RemoteConfigUnavailableError):
+                Pipelex.make(integration_mode=integration_mode, needs_inference=True)
+        finally:
+            Pipelex.teardown_if_needed()
+            log.reset()
+        assert not (tmp_path / ".pipelex" / "pipelex_service.toml").exists()

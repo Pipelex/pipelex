@@ -308,7 +308,7 @@ class TestDeckManifest:
         """The kit's other backend files and a user's own are never the update's: only internal.toml is hashed, on either side."""
         kit_backends_dir = tmp_path / "kit-backends"
         kit_backends_dir.mkdir()
-        for filename in ("internal.toml", "openai.toml", "pipelex_gateway_models.md"):
+        for filename in ("internal.toml", "openai.toml", "models_reference.md"):
             (kit_backends_dir / filename).write_text(f"kit {filename}", encoding="utf-8")
         mocker.patch.object(deck_manifest, "kit_backends_dir", return_value=kit_backends_dir)
         backends_dir = tmp_path / "backends"

@@ -70,11 +70,11 @@ class TestRoutingProfileOptionalRoutes:
         """`jev-*` sends every versioned judgment model to its backend while that backend is enabled."""
         routing_profile = RoutingProfile(
             name="test_profile",
-            default="pipelex_gateway",
+            default="pipelex_manifold",
             optional_routes={"jev-*": "typesafe"},
         )
 
-        result = routing_profile.get_backend_match_for_model(enabled_backends=["pipelex_gateway", "typesafe"], model_name="jev-1.13.0")
+        result = routing_profile.get_backend_match_for_model(enabled_backends=["pipelex_manifold", "typesafe"], model_name="jev-1.13.0")
 
         assert result is not None
         assert result.backend_name == "typesafe"
@@ -90,12 +90,12 @@ class TestRoutingProfileOptionalRoutes:
         """
         routing_profile = RoutingProfile(
             name="test_profile",
-            default="pipelex_gateway",
+            default="pipelex_manifold",
             routes={"gpt-*": "openai"},
             optional_routes={"jev-*": "typesafe"},
         )
 
-        routing_profile.get_backend_match_for_model(enabled_backends=["pipelex_gateway", "openai", "typesafe"], model_name="jev-1.13.0")
+        routing_profile.get_backend_match_for_model(enabled_backends=["pipelex_manifold", "openai", "typesafe"], model_name="jev-1.13.0")
 
         assert routing_profile.routes == {"gpt-*": "openai"}
         assert routing_profile.optional_routes == {"jev-*": "typesafe"}

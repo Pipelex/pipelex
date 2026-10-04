@@ -109,10 +109,9 @@ def _fetch_managed_gateway_models() -> dict[str, dict[str, list[str]]]:
     """Fetch model handles for every enabled managed gateway backend, grouped by model type.
 
     A *managed gateway backend* is one that declares a `model_specs_section`, and there can be more
-    than one of them — the Portkey-cloud `pipelex_gateway` and `pipelex_manifold` today. Which
-    section a backend reads is its own declaration, so this asks `enabled_managed_gateway_sections`
-    rather than naming any backend here: hardcoding one name is exactly what kept this command
-    blind to the second gateway.
+    than one of them — `pipelex_manifold` today. Which section a backend reads is its own
+    declaration, so this asks `enabled_managed_gateway_sections` rather than naming any backend
+    here: hardcoding one name is exactly what would keep this command blind to the next one.
 
     Returns:
         Dictionary mapping backend name to its {model_type: [model handles]}. Empty when no managed

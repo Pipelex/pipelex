@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
-from pydantic import ValidationError
 
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
@@ -44,13 +44,7 @@ _ORIGINAL_FETCH_REMOTE_CONFIG = RemoteConfigFetcher.fetch_remote_config
 
 def _valid_remote_config_payload() -> dict[str, Any]:
     return {
-        "posthog": {
-            "project_api_key": "test-key",
-            "endpoint": "https://posthog.example.com",
-            "is_geoip_enabled": False,
-            "is_debug_enabled": False,
-        },
-        "backend_model_specs": {"defaults": {"sdk": "gateway_completions"}},
+        MANIFOLD_MODEL_SPECS_SECTION: {"defaults": {"sdk": "manifold_completions"}},
         "aws_region": "eu-west-3",
     }
 
@@ -111,7 +105,7 @@ class TestRemoteConfigFetcher:
         assert isinstance(result, RemoteConfigResult)
         assert result.source == RemoteConfigSource.FRESH
         assert result.cached_at is None
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
 
         cached = RemoteConfigCache.load()
         assert cached is not None, "successful fetch must persist the raw payload to the cache"
@@ -137,7 +131,7 @@ class TestRemoteConfigFetcher:
 
         assert result.source == RemoteConfigSource.CACHED
         assert result.cached_at == stored_snapshot.cached_at, "result must forward the cache's snapshot timestamp, not a freshly-computed one"
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_network_failure_without_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
@@ -151,30 +145,6 @@ class TestRemoteConfigFetcher:
 
         assert expected_cache_path in str(exc_info.value), "error message must name the cache path so users can prime it"
         assert "pipelex init" in str(exc_info.value), "error message must point at the remediation command"
-
-    @pytest.mark.usefixtures("isolated_cache_dir")
-    def test_network_failure_with_invalid_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
-        """A cache with a valid wrapper but a stale/malformed ``raw_config`` must be treated
-        as unusable. ``RemoteConfigCache.load()`` only validates the wrapper, so the offline
-        path must catch the inner ``RemoteConfig`` validation failure and raise
-        ``RemoteConfigUnavailableError`` with the normal remediation message — never let a
-        raw Pydantic ``ValidationError`` escape.
-        """
-        # store() does not validate raw_config against RemoteConfig, so this writes a
-        # cache whose wrapper is valid but whose payload cannot parse as RemoteConfig.
-        RemoteConfigCache.store({"bogus": "payload"})
-
-        mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
-        mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
-
-        with pytest.raises(RemoteConfigUnavailableError) as exc_info:
-            RemoteConfigFetcher.fetch_remote_config()
-
-        assert "pipelex init" in str(exc_info.value), "invalid cache must surface the normal offline remediation, not a raw ValidationError"
-        assert isinstance(exc_info.value.__cause__, ValidationError), (
-            "the unavailable error must chain from the inner RemoteConfig ValidationError, "
-            "proving the malformed-cache branch (not the missing-cache branch) was exercised"
-        )
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_http_error_with_cache_returns_cached(self, mocker: MockerFixture) -> None:
@@ -199,7 +169,7 @@ class TestRemoteConfigFetcher:
 
         assert result.source == RemoteConfigSource.CACHED
         assert result.cached_at == stored_snapshot.cached_at
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_http_error_without_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
@@ -217,7 +187,7 @@ class TestRemoteConfigFetcher:
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_validation_error_does_not_fall_back(self, mocker: MockerFixture) -> None:
         """Server-side schema break must surface — we control the server, so a stale cache
-        would be the wrong answer here.
+        would be the wrong answer here. The artifact must be a JSON object; any object parses.
         """
         # Cache is populated and otherwise usable; we want to assert it's NOT consulted.
         RemoteConfigCache.store(_valid_remote_config_payload())
@@ -225,7 +195,7 @@ class TestRemoteConfigFetcher:
         bad_response = httpx.Response(
             status_code=200,
             request=httpx.Request("GET", "https://example.com/remote_config.json"),
-            content=b'{"posthog": "not-an-object"}',
+            content=b'["not-an-object"]',
         )
         mocker.patch("httpx.get", return_value=bad_response)
 
@@ -328,7 +298,7 @@ class TestRemoteConfigFetcher:
         result = RemoteConfigFetcher.fetch_remote_config()
 
         assert result.source == RemoteConfigSource.FRESH
-        assert result.config.aws_region == "eu-west-3"
+        assert result.config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION) == {"defaults": {"sdk": "manifold_completions"}}
         captured = capsys.readouterr()
         assert "failed to persist remote config cache" in captured.err, (
             f"cache-write failure must surface as a warning on stderr; got stderr={captured.err!r}"

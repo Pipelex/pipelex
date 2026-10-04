@@ -55,7 +55,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
         image_format: ImageFormat | None = None
-        # Both Pipelex-managed gateways, not just the Portkey-cloud one: the manifold service relays
+        # Every Pipelex-managed gateway: the manifold service relays
         # the same models through the same gateway codebase, so it normalises a completions image
         # response the same way — a URL to a PNG, with no format to read off the bytes.
         if self.inference_model.backend_name in MANAGED_GATEWAY_BACKEND_NAMES:
@@ -123,7 +123,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                             )
                         base64_str, base64_extracted_mime_type = extracted
         elif (content := openai_message.content) and content.startswith("http"):
-            # OpenAI response message is a URL, this happens with blackboxai and pipelex_gateway which have a fixed output format.
+            # OpenAI response message is a URL, this happens with blackboxai and the Pipelex-managed gateways which have a fixed output format.
             # Otherwise we won't know what format the image is in.
             if image_format is None:
                 msg = (

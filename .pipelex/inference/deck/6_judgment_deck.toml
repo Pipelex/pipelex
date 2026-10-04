@@ -26,7 +26,7 @@
 #
 # There is deliberately no `choice_default` here, and that is what tells you no judgment model is
 # served out of the box: a judgment backend is one you bring, so a pipe names the model it judges
-# with until the Pipelex Gateway serves the family. Set one here once you have a backend configured.
+# with. Set one here once you have a backend configured.
 
 [judgment]
 

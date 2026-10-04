@@ -11,7 +11,7 @@ ALLOWED_OVERRIDE_KEYS = frozenset({"sdk", "structure_method"})
 
 
 class GatewayConfigMerger:
-    """Merges remote gateway configuration with local overrides.
+    """Merges a managed gateway's served model specs with the local overrides of its backend file.
 
     Only allows overriding specific keys (sdk, structure_method).
     Logs warnings when overrides are applied or when disallowed keys are found.
@@ -27,8 +27,8 @@ class GatewayConfigMerger:
         """Merge remote config with local overrides.
 
         Args:
-            gateway_model_specs: Model specs from Pipelex Gateway.
-            local_overrides: Local overrides from local pipelex_gateway.toml.
+            gateway_model_specs: Model specs served for the managed gateway backend.
+            local_overrides: Local overrides from the backend's own file (e.g. `pipelex_manifold.toml`).
 
         Returns:
             Merged configuration with allowed overrides applied.

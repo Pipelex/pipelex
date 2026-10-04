@@ -32,7 +32,7 @@ Get **free credits** for testing and development with a single API key for LLMs,
 
 3. Run `pipelex init` and accept the Gateway terms of service when prompted.
 
-That's it! Your pipelines can now access any supported LLM. See [Gateway Available Models](../setup/gateway-models.md) for the full list.
+That's it! Your pipelines can now access any supported LLM. See [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) for the backends and models available.
 
 !!! info "Terms of Service & Telemetry"
     When using Pipelex Gateway, you'll be prompted to accept our terms of service. By using the Gateway, identified telemetry is automatically enabled (tied to your hashed API key) to help us monitor service quality and enforce fair usage.

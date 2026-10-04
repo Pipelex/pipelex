@@ -1,7 +1,7 @@
 """An image worker refuses a model spec it cannot use as a configuration fault, not as the caller's input.
 
-A spec with no `rules`, a rule value this release does not know, or one missing the `model_choice` or
-`endpoint_path` its worker needs, is the backend configuration's fault: the job fails before any provider call with an `ImgGenParameterError`
+A spec with no `rules`, a rule value this release does not know, or one missing the `model_choice` its
+worker needs, is the backend configuration's fault: the job fails before any provider call with an `ImgGenParameterError`
 in the `CONFIGURATION` category, which the error model renders as a 500 rather than the 422 that
 tells a caller to change what they sent.
 """
@@ -24,7 +24,6 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.providers.azure_rest.azure_img_gen_worker import AzureImgGenWorker
 from pipelex.providers.fal.fal_img_gen_worker import FalImgGenWorker
-from pipelex.providers.gateway.gateway_img_gen_worker import GatewayImgGenWorker
 from pipelex.providers.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker
 from pipelex.providers.manifold.manifold_img_gen_worker import ManifoldImgGenWorker
 from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker
@@ -68,11 +67,6 @@ def _make_worker(mocker: MockerFixture, *, worker_kind: str, rules: ImgGenModelR
             return OpenAIImgGenWorker(
                 sdk_instance=mocker.MagicMock(spec=AsyncOpenAI), inference_model=_model(backend_name="openai", sdk="openai_img_gen", rules=rules)
             )
-        case "gateway":
-            return GatewayImgGenWorker(
-                sdk_instance=mocker.MagicMock(spec=AsyncPortkey),
-                inference_model=_model(backend_name="pipelex_gateway", sdk="gateway_img_gen", rules=rules),
-            )
         case "manifold":
             return ManifoldImgGenWorker(
                 sdk_instance=mocker.MagicMock(spec=AsyncPortkey),
@@ -107,14 +101,12 @@ class TestImgGenWorkerConfigFaults:
         ("worker_kind", "rules", "error_match"),
         [
             ("openai", None, "does not have rules configured"),
-            ("gateway", None, "does not have rules configured"),
             ("manifold", None, "does not have rules configured"),
             ("fal", None, "does not have rules configured"),
             ("huggingface", None, "does not have rules configured"),
             ("azure", None, "does not have rules configured"),
             ("fal", PROMPT_ONLY_RULES, "must include a 'model_choice' entry"),
             ("huggingface", PROMPT_ONLY_RULES, "must include a 'model_choice' entry"),
-            ("gateway", PROMPT_ONLY_RULES, "does not have an endpoint_path configured"),
             ("openai", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
             ("manifold", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
             ("azure", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),

@@ -42,11 +42,11 @@ Deploy the Pipelex API anywhere that runs Docker (your laptop, ECS, Cloud Run, K
 
 ### 1. Run with Docker
 
-The only required env var is `PIPELEX_GATEWAY_API_KEY`. Get a free key (with free credits) at https://app.pipelex.com — it's the default path to LLMs and gives you access to every supported model with a single credential. (If you'd rather call providers like OpenAI, Anthropic, Bedrock, or Vertex directly, you reconfigure that on the Pipelex side, not here — see https://docs.pipelex.com.)
+The only required env var is `OPENAI_API_KEY`. The image enables the `openai` backend, which serves every default language-model and image-generation tier of its model deck. To call another provider instead, such as Anthropic, Bedrock, Vertex or OpenRouter, mount your own backends override, as the [Configuration](configuration.md) page shows.
 
 ```bash
 docker run --name pipelex-api -p 8081:8081 \
-  -e PIPELEX_GATEWAY_API_KEY=your-pipelex-gateway-api-key \
+  -e OPENAI_API_KEY=your-openai-api-key \
   pipelex/pipelex-api:latest
 ```
 
