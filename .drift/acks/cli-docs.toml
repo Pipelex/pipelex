@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:b69a13045cdf08548add542c15aaf72ff885eac0d7a73b3d90f687d6b410ae49"
+digest = "sha256:9ad68869227011d788deb2ece011967491b852cc3b49789247b21d4e1f242cca"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T14:15:35Z"
-rationale = "real-catch: pipelex-agent concept, pipelex-agent pipe and pipelex build runner are deleted. docs/tools/cli/ drops them: the build index and the CLI index's build row, a removal notice at build/runner.md, the related links of build inputs, output and structures, the agent-cli flat-command table and the inputs TOML note, and the run-by-address paragraph on build runner method. pipelex/cli/agent_cli/CLAUDE.md drops both commands from the layout, the command table and the always-JSON list. The other triggers only move imports to pipelex.pipeline.default_file_names and pipelex.cogt.models.model_listing, or drop the runner's error context, with no surface change."
+reviewed_at = "2026-10-04T14:57:21Z"
+rationale = "clean-pass: the only trigger change drops, from the emit_inputs_result docstring, its comparison with the deleted concept and pipe raw-TOML commands, with no surface change. Reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md: the review pass on this branch found what the previous ack missed, the Output Contract's raw-TOML bullet in docs/tools/cli/agent-cli.md and three passages of the agent-CLI guide still naming the deleted concept and pipe commands and the builder's validate ops, and this change removes them."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -26,7 +26,7 @@ rationale = "real-catch: pipelex-agent concept, pipelex-agent pipe and pipelex b
 "pipelex/cli/agent_cli/commands/fmt_cmd.py" = "blob:97d6fb6c328e0b718b1293bd6b73cba03edcb7dc"
 "pipelex/cli/agent_cli/commands/init_cmd.py" = "blob:f10c15f5f1c220cb5f9509336258eaa2d2a11967"
 "pipelex/cli/agent_cli/commands/inputs/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/agent_cli/commands/inputs/_inputs_core.py" = "blob:7dab39c6dc80755b53279ec284df45246f231836"
+"pipelex/cli/agent_cli/commands/inputs/_inputs_core.py" = "blob:4161029643f3a302de54fa637d2676521e10d873"
 "pipelex/cli/agent_cli/commands/inputs/app.py" = "blob:7e19284687b334c684fb03381a8d9d20af1aa152"
 "pipelex/cli/agent_cli/commands/inputs/bundle_cmd.py" = "blob:e42c08315b879df91ba4a22074ba697311830ae2"
 "pipelex/cli/agent_cli/commands/inputs/method_cmd.py" = "blob:56fc7edc47ec9513d4e289010c42405df351544e"
