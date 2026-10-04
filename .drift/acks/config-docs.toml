@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:2cc6d84b6be2696cb69b1851972b73334808a210e1d1115234ae3b7ef888c2bf"
+digest = "sha256:308ed837087ad1f5a71409cc3c53f78681fb8a5bb009e57fe0b8877999460add"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T18:45:10Z"
-rationale = "clean-pass: the trigger is config_surface.py losing the pipelex-service-config surface id with the retired pipelex_service.toml; docs/configuration carries no pipelex_service or remote-config mention after this branch's sweep, migration-ledger.md drops the surface row and explains the retired-name rule, the ledger checks pass with the service ledger and goldens deleted, and configs.py and config_cogt.py carry no field for either"
+reviewed_at = "2026-10-04T21:04:16Z"
+rationale = "clean-pass: merging dev into this branch combines dev's comment change on the deferred engine import in config_surface.py with this branch's removal of the pipelex-service-config surface id; docs/configuration, configs.py and config_cogt.py carry no pipelex_service or remote-config mention, and the ledgers directory holds no service ledger"
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -16,7 +16,7 @@ rationale = "clean-pass: the trigger is config_surface.py losing the pipelex-ser
 "pipelex/system/configuration/config_loader.py" = "blob:b1940ff11d9be7f9b8e113ec564d041ec53bb0ce"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
-"pipelex/system/configuration/config_surface.py" = "blob:2d5ab4580486ec1d74ab32a2eac34a4016b2defa"
+"pipelex/system/configuration/config_surface.py" = "blob:dc6c877564254aa97ce0b20fd29118def31c957c"
 "pipelex/system/configuration/configs.py" = "blob:3cb65cf9c3d34aef0baf92b62d8bd63e5c69d4eb"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:068a785d97a2d52ee43e82e723cd944b8b6601bc"

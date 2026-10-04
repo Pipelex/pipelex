@@ -23,7 +23,7 @@ import tempfile
 from pathlib import Path
 from typing import NamedTuple
 
-from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
+from pipelex.fix_ops.exceptions import FixTransactionError, FixWriteConflictError
 
 
 class FileSnapshot(NamedTuple):

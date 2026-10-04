@@ -1692,14 +1692,6 @@ rationale = "Predicate on the error_message; single operand."
 param = "response"
 rationale = "Parses the response; single operand."
 
-["pipelex/cogt/inference/error_classification.py::_parse_retry_after_seconds"]
-param = "value"
-rationale = "Parses the value; single operand."
-
-["pipelex/cogt/inference/error_classification.py::_pipelex_service_error_code_from_body"]
-param = "body"
-rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
-
 ["pipelex/cogt/inference/error_classification.py::_provider_error_code_from_body"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."
@@ -1715,6 +1707,10 @@ rationale = "Extracts from the exc; single operand."
 ["pipelex/cogt/inference/error_classification.py::_stringify_for_scan"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."
+
+["pipelex/cogt/inference/error_classification.py::error_code_from_body_code_first"]
+param = "body"
+rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
 
 ["pipelex/cogt/inference/error_classification.py::extract_anthropic_metadata"]
 param = "exc"
@@ -1756,10 +1752,6 @@ rationale = "Extracts from the exc; single operand."
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
-["pipelex/cogt/inference/error_classification.py::extract_manifold_metadata"]
-param = "exc"
-rationale = "Extracts from the exc; single operand."
-
 ["pipelex/cogt/inference/error_classification.py::extract_mistral_metadata"]
 param = "exc"
 rationale = "Extracts from the exc; single operand."
@@ -1775,6 +1767,10 @@ rationale = "Extracts from the exc; single operand."
 ["pipelex/cogt/inference/error_classification.py::extract_underlying_sdk_exception"]
 param = "instructor_exc"
 rationale = "Extracts from the instructor_exc; single operand."
+
+["pipelex/cogt/inference/error_classification.py::parse_retry_after_seconds"]
+param = "value"
+rationale = "Parses the value; single operand."
 
 ["pipelex/cogt/inference/error_classify.py::_classify_statusless"]
 param = "metadata"
@@ -3104,6 +3100,46 @@ rationale = "Verb-object: renders the page for the error class; single operand."
 param = "by_subsystem"
 rationale = "Verb-object: renders the index from the subsystem grouping; single operand."
 
+["pipelex/fix_ops/applier.py::_as_tomlkit_value"]
+param = "value"
+rationale = "Single-operand conversion of the value."
+
+["pipelex/fix_ops/applier.py::_render_syntax_diagnostic"]
+param = "diagnostic"
+rationale = "Verb-object: renders the diagnostic; single operand."
+
+["pipelex/fix_ops/applier.py::serialize_and_format"]
+param = "toml_doc"
+rationale = "Single-operand serialization of the TOML document."
+
+["pipelex/fix_ops/file_transaction.py::_cleanup_staged_updates"]
+param = "staged_updates"
+rationale = "Verb-object: cleans up the staged updates; single operand."
+
+["pipelex/fix_ops/file_transaction.py::_commit_staged_updates"]
+param = "staged_updates"
+rationale = "Verb-object: commits the staged updates; single operand."
+
+["pipelex/fix_ops/file_transaction.py::_rollback_committed_updates"]
+param = "committed_updates"
+rationale = "Verb-object: rolls back the committed updates; single operand."
+
+["pipelex/fix_ops/file_transaction.py::assert_snapshot_unchanged"]
+param = "snapshot"
+rationale = "Validator: the snapshot is the single operand checked."
+
+["pipelex/fix_ops/file_transaction.py::commit_file_updates"]
+param = "updates"
+rationale = "Verb-object: commits the updates; single operand."
+
+["pipelex/fix_ops/file_transaction.py::read_file_snapshot"]
+param = "path"
+rationale = "Factory from source: reads the snapshot of the file at path."
+
+["pipelex/fix_ops/file_transaction.py::stage_file_update"]
+param = "update"
+rationale = "Verb-object: stages the update; single operand."
+
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.from_graphspec"]
 param = "graph"
 rationale = "Factory from source: builds the analysis from the graph spec; single operand."
@@ -4428,46 +4464,6 @@ rationale = "Predicate on the fix; is_single_file is context."
 param = "target_path"
 rationale = "Predicate on the target path; scope params stay keyword."
 
-["pipelex/pipeline/fixes/applier.py::_as_tomlkit_value"]
-param = "value"
-rationale = "Single-operand conversion of the value."
-
-["pipelex/pipeline/fixes/applier.py::_render_syntax_diagnostic"]
-param = "diagnostic"
-rationale = "Verb-object: renders the diagnostic; single operand."
-
-["pipelex/pipeline/fixes/applier.py::serialize_and_format"]
-param = "toml_doc"
-rationale = "Single-operand serialization of the TOML document."
-
-["pipelex/pipeline/fixes/file_transaction.py::_cleanup_staged_updates"]
-param = "staged_updates"
-rationale = "Verb-object: cleans up the staged updates; single operand."
-
-["pipelex/pipeline/fixes/file_transaction.py::_commit_staged_updates"]
-param = "staged_updates"
-rationale = "Verb-object: commits the staged updates; single operand."
-
-["pipelex/pipeline/fixes/file_transaction.py::_rollback_committed_updates"]
-param = "committed_updates"
-rationale = "Verb-object: rolls back the committed updates; single operand."
-
-["pipelex/pipeline/fixes/file_transaction.py::assert_snapshot_unchanged"]
-param = "snapshot"
-rationale = "Validator: the snapshot is the single operand checked."
-
-["pipelex/pipeline/fixes/file_transaction.py::commit_file_updates"]
-param = "updates"
-rationale = "Verb-object: commits the updates; single operand."
-
-["pipelex/pipeline/fixes/file_transaction.py::read_file_snapshot"]
-param = "path"
-rationale = "Factory from source: reads the snapshot of the file at path."
-
-["pipelex/pipeline/fixes/file_transaction.py::stage_file_update"]
-param = "update"
-rationale = "Verb-object: stages the update; single operand."
-
 ["pipelex/pipeline/fixes/fix_loop.py::_absolute_source_path"]
 param = "path"
 rationale = "Single-operand conversion of the path."
@@ -4975,6 +4971,10 @@ rationale = "Predicate on the sdk; single operand."
 ["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_responses"]
 param = "sdk"
 rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_error_metadata.py::extract_manifold_metadata"]
+param = "exc"
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory._make_gemini_image_config"]
 param = "taxonomy"

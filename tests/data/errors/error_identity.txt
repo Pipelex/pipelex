@@ -79,6 +79,7 @@ DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/la
 DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
 DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
 DuplicateSecretsProviderError | Duplicate secrets provider | https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/
+DuplicateServiceErrorCodeError | Duplicate service error code | https://docs.pipelex.com/latest/errors/duplicate-service-error-code-error/
 DuplicateStorageProviderError | Duplicate storage provider | https://docs.pipelex.com/latest/errors/duplicate-storage-provider-error/
 EntryPipeAmbiguousError | Entry pipe ambiguous | https://docs.pipelex.com/latest/errors/entry-pipe-ambiguous-error/
 EntryPipeNotFoundError | Entry pipe not found | https://docs.pipelex.com/latest/errors/entry-pipe-not-found-error/
@@ -161,13 +162,13 @@ LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/la
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
 LogSinkHeaderValueError | Log sink header value holds a line break | https://docs.pipelex.com/latest/errors/log-sink-header-value-error/
 LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
-ManifoldCredentialsError | Manifold credentials | https://docs.pipelex.com/latest/errors/manifold-credentials-error/
-ManifoldEndpointError | Manifold endpoint | https://docs.pipelex.com/latest/errors/manifold-endpoint-error/
-ManifoldError | Manifold | https://docs.pipelex.com/latest/errors/manifold-error/
-ManifoldExtractResponseError | Manifold extract response | https://docs.pipelex.com/latest/errors/manifold-extract-response-error/
-ManifoldFactoryError | Manifold factory | https://docs.pipelex.com/latest/errors/manifold-factory-error/
-ManifoldSearchEmptyResultError | Manifold search empty result | https://docs.pipelex.com/latest/errors/manifold-search-empty-result-error/
-ManifoldSearchResponseError | Manifold search response | https://docs.pipelex.com/latest/errors/manifold-search-response-error/
+ManifoldCredentialsError | Inference backend credentials missing | https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/
+ManifoldEndpointError | Inference backend endpoint missing | https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/
+ManifoldError | Inference backend error | https://docs.pipelex.com/latest/errors/cogt-error/
+ManifoldExtractResponseError | Extract response unreadable | https://docs.pipelex.com/latest/errors/extract-job-failure-error/
+ManifoldFactoryError | Inference client setup error | https://docs.pipelex.com/latest/errors/cogt-error/
+ManifoldSearchEmptyResultError | Search returned no result | https://docs.pipelex.com/latest/errors/search-job-failure-error/
+ManifoldSearchResponseError | Search response unreadable | https://docs.pipelex.com/latest/errors/search-job-failure-error/
 MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/latest/errors/method-dependency-fetch-error/
 MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
 MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
@@ -283,6 +284,7 @@ PyPdfium2RendererError | Py pdfium 2 renderer | https://docs.pipelex.com/latest/
 ReadinessCheckError | Readiness check | https://docs.pipelex.com/latest/errors/readiness-check-error/
 RemoteFileFetchError | Remote file could not be fetched | https://docs.pipelex.com/latest/errors/remote-file-fetch-error/
 ReportingManagerError | Reporting manager | https://docs.pipelex.com/latest/errors/reporting-manager-error/
+ReservedServiceErrorCodeError | Reserved service error code | https://docs.pipelex.com/latest/errors/reserved-service-error-code-error/
 RetiredPluginEntryPointGroupError | Retired plugin entry point group | https://docs.pipelex.com/latest/errors/retired-plugin-entry-point-group-error/
 RoutingProfileBlueprintValueError | Routing profile blueprint value | https://docs.pipelex.com/latest/errors/routing-profile-blueprint-value-error/
 RoutingProfileDisabledBackendError | Routing profile disabled backend | https://docs.pipelex.com/latest/errors/routing-profile-disabled-backend-error/

@@ -98,6 +98,11 @@ own page. Classes are grouped by subsystem.
 - [`CodegenLockError`](codegen-lock-error.md) — Codegen lock error
 - [`CodegenStampError`](codegen-stamp-error.md) — Codegen stamp error
 
+## Fix ops
+
+- [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
+- [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
+
 ## Methods
 
 - [`MethodDependencyFetchError`](method-dependency-fetch-error.md) — Method dependency fetch

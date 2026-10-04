@@ -1,30 +1,34 @@
-"""The gateway's routing refusals, from the wire code to the rendered advice.
+"""The Manifold service's routing refusals, from the wire code to the rendered advice.
 
-Before a request can reach a provider the Pipelex inference gateway has to decide
+Before a request can reach a provider the Pipelex Manifold service has to decide
 *which* provider: it reads the model out of the request, looks it up in its own
 routing table, and hands the call to the integration that serves it. When that
 resolution fails it refuses the request itself, with codes of its own — ``pig-01``
 when it serves no such model, ``pig-02`` when the model's integration is switched
 off for want of a credential, ``pig-05`` when a native-protocol path names a model
 another provider serves, and ``pig-06`` when a model reaches a route its provider
-does not serve. One more comes from the Portkey substrate the gateway is built on
-rather than from the ``pig-`` namespace: ``model_not_allowed_error``, which its
-middleware answers when an integration serves the model but does not allow it for
-this caller, because the model is off the integration's allow-list or archived.
+does not serve.
 
-Every ``pig-`` code answers HTTP 400, so without a class for them the Classify step
-falls through to the status ladder's 400 arm and a caller who named a model the
-deployment does not serve is told *"The provider rejected the request — review the
-prompt, parameters, and inputs."* — and receives an ``LLMCompletionError`` rather
-than the ``LLMModelNotFoundError`` that case has always produced when the model
-deck itself cannot find a model. ``model_not_allowed_error`` answers 412, which the
-ladder's generic 4xx arm already read as a configuration problem, but with the
-same advice to review the prompt. These tests pin the whole chain: the code is
-recognized, it survives every Extract hop that can carry it, it classifies as a
-configuration problem that is never retried, the Render step says which routing
-decision failed and who has to change what, and both consequences of the category
-that outlive this module are pinned too — the HTTP status the family now answers,
-and the advice surviving the pipe layer's re-raise.
+These codes are the service's wire contract, so the Manifold plugin owns them: each
+is a ``GatewayRoutingRefusal`` member in ``manifold_error_codes``, contributed as one
+entry of the service error vocabulary that ``classify_inference_error`` consults
+ahead of the status ladder (the package's ``conftest.py`` hands the classifier that
+vocabulary). Every ``pig-`` code answers HTTP 400, so without its entry the
+Classify step falls through to the status ladder's 400 arm and a caller who named a
+model the deployment does not serve is told *"The provider rejected the request —
+review the prompt, parameters, and inputs."* — and receives an
+``LLMCompletionError`` rather than the ``LLMModelNotFoundError`` that case produces
+when the model deck itself cannot find a model. These tests pin the whole chain:
+the code is in the vocabulary under the right member, it survives every Extract hop
+that can carry it, it classifies as a configuration problem that is never retried,
+the Render step says which routing decision failed and who has to change what, and
+both consequences of the category that outlive this module are pinned too — the
+HTTP status the family answers, and the advice surviving the pipe layer's re-raise.
+
+``model_not_allowed_error``, the Portkey substrate's answer for a model an
+integration serves but does not allow for this caller, is not one of the service's
+codes and not in its vocabulary: the runtime reads it in core, and
+``tests/unit/pipelex/cogt/inference/test_model_not_allowed.py`` pins it.
 
 **Every member is its own wire code here**, unlike the two families beside it.
 That is not an accident of the code space: grouping is by remedy in all three
@@ -34,30 +38,24 @@ families, and each of these names a different thing that has to change.
 selects the family's ``*ModelNotFoundError`` class, which ``pipe_operator.py``
 re-raises as a ``PipeOperatorModelAvailabilityError`` carrying the model handle.
 ``pig-01`` is literally "this deployment does not know that model", seen from the
-gateway. For ``pig-05`` and ``pig-06`` the model exists and *is* served — it just
+service. For ``pig-05`` and ``pig-06`` the model exists and *is* served — it just
 cannot do what was asked, or was asked over the wrong protocol — so claiming it
-was not found would be false. The same holds for ``model_not_allowed_error``: the
-model exists and an integration serves it, only not for this caller.
-
-**``model_not_allowed_error`` is the one member whose advice names the model.**
-The rest defer every specific to the gateway's own message, but that message names
-only the backend's wire id, which the method's author never wrote. So the advice
-names the model handle the deck resolved the pipe's model to.
+was not found would be false.
 
 **``pig-02`` is the family's ``CONTACT_SUPPORT`` arm.** A switched-off integration
-is the gateway operator's fact: nothing about the request causes it, none of the
+is the service operator's fact: nothing about the request causes it, none of the
 caller's own credentials are at fault, and sending them shopping for another model
 would hide an unset variable. The same call ``STORAGE_NOT_SERVED`` and
 ``BODY_LENGTH_REQUIRED`` get in the two families beside this one.
 
 **``pig-03`` and ``pig-04`` are deliberately outside the family**, and that scope
 decision is pinned below rather than left to a comment. Neither is produced today
-by a client talking to a Pipelex-operated gateway: ``pig-03`` refuses client-side
+by a client talking to a Pipelex-operated service: ``pig-03`` refuses client-side
 routing forms that
 ``tests/unit/pipelex/providers/manifold/test_manifold_clients.py`` pins the
-manifold clients against by name, and ``pig-04`` refuses a path the gateway does
+manifold clients against by name, and ``pig-04`` refuses a path the service does
 not mount at all. Two limits on the first half, recorded beside the map rather
-than implied here: that test names four headers while the gateway refuses on an
+than implied here: that test names four headers while the service refuses on an
 allow-list, and the gateway img-gen worker does send ``x-portkey-config``, which
 Portkey's cloud reads and one of our gateways would refuse.
 
@@ -65,7 +63,7 @@ Portkey's cloud reads and one of our gateways would refuse.
 Extract hop is pinned for it. It is raised only on a native Google protocol path
 (``/v1/<v1|v1alpha|v1beta>/models/<model>:generateContent`` or its
 ``streamGenerateContent`` twin), and no worker speaks that protocol to
-the gateway: both the gateway and manifold plugins build their LLM workers on the
+the service: both the gateway and manifold plugins build their LLM workers on the
 OpenAI substrate, and ``ManifoldNativeClient`` serves only the ``/v1/pipelex/*``
 extract and search routes. The map entry costs nothing and is right the day a
 native Google path is wired — but the Google Extract hop would not carry the code
@@ -87,25 +85,32 @@ from portkey_ai import Portkey
 from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import (
-    _GATEWAY_ROUTING_REFUSAL_BY_CODE,  # pyright: ignore[reportPrivateUsage]
-    GatewayRoutingRefusal,
+    MODEL_NOT_ALLOWED_ERROR_CODE,
     ProviderErrorMetadata,
     UserActionKind,
     extract_anthropic_metadata,
     extract_gateway_metadata,
     extract_google_metadata,
-    extract_manifold_metadata,
     extract_openai_metadata,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_classify import ClassificationResult, classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.providers.manifold.manifold_error_codes import (
+    _GATEWAY_REQUEST_LIMIT_BY_CODE,  # pyright: ignore[reportPrivateUsage]
+    _GATEWAY_ROUTING_REFUSAL_BY_CODE,  # pyright: ignore[reportPrivateUsage]
+    _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE,  # pyright: ignore[reportPrivateUsage]
+    MANIFOLD_SERVICE_ERROR_CODES,
+    GatewayRoutingRefusal,
+)
+from pipelex.providers.manifold.manifold_error_metadata import extract_manifold_metadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from pytest_mock import MockerFixture
+
+    from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
 
 _ORIGIN = "https://manifold.example.com"
 
@@ -117,15 +122,10 @@ _EVERY_CODE_AND_MEMBER: list[tuple[str, GatewayRoutingRefusal]] = [
     ("pig-02", GatewayRoutingRefusal.DISABLED_INTEGRATION),
     ("pig-05", GatewayRoutingRefusal.WRONG_PROTOCOL),
     ("pig-06", GatewayRoutingRefusal.UNSERVED_CAPABILITY),
-    ("model_not_allowed_error", GatewayRoutingRefusal.MODEL_NOT_ALLOWED),
 ]
 
 # The same codes as a flat list, for the cases that only need the wire code.
 _EVERY_CODE: list[str] = [pair[0] for pair in _EVERY_CODE_AND_MEMBER]
-
-# The members the gateway renders in its own fail-closed envelope, the ``pig-`` ones.
-_FAIL_CLOSED_CODES_AND_MEMBERS: list[tuple[str, GatewayRoutingRefusal]] = [pair for pair in _EVERY_CODE_AND_MEMBER if pair[0].startswith("pig-")]
-_FAIL_CLOSED_CODES: list[str] = [pair[0] for pair in _FAIL_CLOSED_CODES_AND_MEMBERS]
 
 # Every member whose remedy is picking a different model, i.e. all of them but the
 # one that means an operator never enabled the integration.
@@ -153,23 +153,6 @@ def _fail_closed_refusal_body(message: str, code: str) -> dict[str, Any]:
 
 
 _UNKNOWN_MODEL_BODY = _fail_closed_refusal_body("No model found for the request", "pig-01")
-
-# The backend's id for the model, which is all the gateway's own message names, and
-# the handle the deck resolved the method's model to, which is the deck's own name for it.
-_MODEL_NOT_ALLOWED_WIRE_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-_MODEL_NOT_ALLOWED_HANDLE = "claude-4.5-sonnet"
-
-# The body the Portkey middleware answers with, at HTTP 412, verbatim as a run on the
-# hosted API received it. Unlike the fail-closed envelope, the code sits in ``type``
-# and ``code`` is null.
-_MODEL_NOT_ALLOWED_BODY: dict[str, Any] = {
-    "error": {
-        "message": f"Model {_MODEL_NOT_ALLOWED_WIRE_ID} is not allowed for this integration",
-        "type": "model_not_allowed_error",
-        "param": None,
-        "code": None,
-    }
-}
 
 
 def _as_the_portkey_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -> BaseException:
@@ -209,30 +192,6 @@ def _as_the_openai_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -> B
     return client._make_status_error_from_response(response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
 
-def _as_the_anthropic_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -> BaseException:
-    """Build the exception through the Anthropic SDK's own factory, the hop Claude travels on.
-
-    For a status it has no subclass for, 412 among them, the factory returns a plain
-    ``APIStatusError``, which a hand-built ``BadRequestError`` would not show.
-    """
-    request = httpx.Request("POST", f"{_ORIGIN}/v1/messages")
-    response = httpx.Response(
-        status_code=status_code,
-        request=request,
-        content=json.dumps(body).encode(),
-        headers={"content-type": "application/json"},
-    )
-    client = anthropic.AsyncAnthropic(api_key="unused-in-this-test", base_url=_ORIGIN)
-    return client._make_status_error_from_response(response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-
-
-def _as_plain_httpx_raises_it(*, status_code: int, body: dict[str, Any]) -> BaseException:
-    """The manifold's native ``/v1/pipelex/*`` routes, which the runtime calls over plain ``httpx``."""
-    request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
-    response = httpx.Response(status_code=status_code, request=request, json=body)
-    return httpx.HTTPStatusError(f"Client error '{status_code}'", request=request, response=response)
-
-
 def _envelope(code: str | None, *, status_code: int = 400, provider: ProviderName = ProviderName.GATEWAY) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=provider,
@@ -241,6 +200,21 @@ def _envelope(code: str | None, *, status_code: int = 400, provider: ProviderNam
         status_code=status_code,
         provider_error_code=code,
     )
+
+
+def _routing_refusal(code: str | None) -> GatewayRoutingRefusal | None:
+    """The family member a wire code names, if it names one."""
+    return _GATEWAY_ROUTING_REFUSAL_BY_CODE.get(code) if code is not None else None
+
+
+def _in_another_family(code: str | None) -> bool:
+    """Whether a wire code names a request-shape limit or an unresolvable reference."""
+    return code in _GATEWAY_REQUEST_LIMIT_BY_CODE or code in _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE
+
+
+def _classified_code(result: ClassificationResult) -> str | None:
+    """The wire code of the vocabulary entry the classifier matched, if it matched one."""
+    return result.service_error_code.code if result.service_error_code is not None else None
 
 
 def _rendered_error(
@@ -253,7 +227,7 @@ def _rendered_error(
         metadata=metadata,
         classification=classify_inference_error(metadata),
         family=family,
-        model_desc=f"{model_handle} → Model[{_MODEL_NOT_ALLOWED_WIRE_ID}]",
+        model_desc=f"{model_handle} → Model[some-wire-id]",
         model_handle=model_handle,
     )
 
@@ -270,11 +244,14 @@ def _rendered_detail(
 
 
 class TestTheCodeIsRecognized:
-    """``gateway_routing_refusal`` reads the gateway's own code namespace off the envelope."""
+    """Each code is in the Manifold vocabulary, under the family member that names the routing decision."""
 
     @pytest.mark.parametrize(("code", "expected"), _EVERY_CODE_AND_MEMBER)
-    def test_each_code_maps_to_its_member(self, code: str, expected: GatewayRoutingRefusal) -> None:
-        assert _envelope(code).gateway_routing_refusal == expected
+    def test_each_code_maps_to_its_member(
+        self, code: str, expected: GatewayRoutingRefusal, manifold_service_error_vocabulary: ServiceErrorVocabulary
+    ) -> None:
+        assert _routing_refusal(code) == expected
+        assert manifold_service_error_vocabulary.lookup(code=code) is not None
 
     @pytest.mark.parametrize("member", list(GatewayRoutingRefusal))
     def test_every_member_is_reachable_from_a_wire_code(self, member: GatewayRoutingRefusal) -> None:
@@ -303,22 +280,27 @@ class TestTheCodeIsRecognized:
             "model_not_found",
             "model_not_allowed",
             "MODEL_NOT_ALLOWED_ERROR",
+            MODEL_NOT_ALLOWED_ERROR_CODE,
             "",
         ],
     )
     def test_any_other_code_is_not_a_routing_refusal(self, code: str | None) -> None:
-        """The request-shape limits, the unresolvable references, and a vendor's own code are all other families."""
-        assert _envelope(code).gateway_routing_refusal is None
+        """The request-shape limits, the unresolvable references, the substrate's own refusal and a vendor's code are all other families."""
+        assert _routing_refusal(code) is None
+        assert _routing_refusal(_classified_code(classify_inference_error(_envelope(code)))) is None
+
+    def test_the_substrates_model_not_allowed_refusal_is_not_the_services_to_contribute(
+        self, manifold_service_error_vocabulary: ServiceErrorVocabulary
+    ) -> None:
+        """Core reads ``model_not_allowed_error`` itself, so the Manifold vocabulary must not claim it too."""
+        assert manifold_service_error_vocabulary.lookup(code=MODEL_NOT_ALLOWED_ERROR_CODE) is None
 
     @pytest.mark.parametrize("provider", list(ProviderName))
-    @pytest.mark.parametrize(
-        ("code", "expected"), [("pig-01", GatewayRoutingRefusal.UNKNOWN_MODEL), ("model_not_allowed_error", GatewayRoutingRefusal.MODEL_NOT_ALLOWED)]
-    )
-    def test_the_code_is_read_whichever_provider_reported_it(self, provider: ProviderName, code: str, expected: GatewayRoutingRefusal) -> None:
-        """Claude reaches the gateway on the Anthropic driver, so the refusal is not always reported as GATEWAY."""
-        metadata = _envelope(code, provider=provider)
+    def test_the_code_is_read_whichever_provider_reported_it(self, provider: ProviderName) -> None:
+        """Claude reaches the service on the Anthropic driver, so the refusal is not always reported as GATEWAY."""
+        result = classify_inference_error(_envelope("pig-01", provider=provider))
 
-        assert metadata.gateway_routing_refusal == expected
+        assert _routing_refusal(_classified_code(result)) == GatewayRoutingRefusal.UNKNOWN_MODEL
 
 
 class TestTheCodeSurvivesEveryExtractHop:
@@ -330,7 +312,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_gateway_metadata(exc)
 
         assert metadata.provider_error_code == "pig-01"
-        assert metadata.gateway_routing_refusal == GatewayRoutingRefusal.UNKNOWN_MODEL
+        assert _routing_refusal(metadata.provider_error_code) == GatewayRoutingRefusal.UNKNOWN_MODEL
 
     def test_the_portkey_substrate_discards_the_payload_and_the_code_survives_anyway(self) -> None:
         """The reason the hop above is built through the SDK rather than by hand.
@@ -343,9 +325,9 @@ class TestTheCodeSurvivesEveryExtractHop:
         exc = _as_the_portkey_sdk_raises_it(status_code=400, body=_UNKNOWN_MODEL_BODY)
 
         assert isinstance(getattr(exc, "body", None), str)
-        assert extract_gateway_metadata(exc).gateway_routing_refusal == GatewayRoutingRefusal.UNKNOWN_MODEL
+        assert _routing_refusal(extract_gateway_metadata(exc).provider_error_code) == GatewayRoutingRefusal.UNKNOWN_MODEL
 
-    @pytest.mark.parametrize(("code", "expected"), _FAIL_CLOSED_CODES_AND_MEMBERS)
+    @pytest.mark.parametrize(("code", "expected"), _EVERY_CODE_AND_MEMBER)
     def test_through_the_openai_substrate_that_carries_every_chat_call(self, code: str, expected: GatewayRoutingRefusal) -> None:
         """The hop a gateway or manifold LLM call actually takes.
 
@@ -356,7 +338,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         """
         exc = _as_the_openai_sdk_raises_it(status_code=400, body=_fail_closed_refusal_body("refused", code))
 
-        assert extract_openai_metadata(exc).gateway_routing_refusal == expected
+        assert _routing_refusal(extract_openai_metadata(exc).provider_error_code) == expected
 
     def test_through_plain_httpx_on_the_native_routes(self) -> None:
         """Where ``pig-06`` is actually raised: ``/v1/pipelex/extract`` and its siblings.
@@ -372,7 +354,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_manifold_metadata(exc)
 
         assert metadata.provider_error_code == "pig-06"
-        assert metadata.gateway_routing_refusal == GatewayRoutingRefusal.UNSERVED_CAPABILITY
+        assert _routing_refusal(metadata.provider_error_code) == GatewayRoutingRefusal.UNSERVED_CAPABILITY
 
     def test_through_the_shared_anthropic_driver(self) -> None:
         """Claude travels on the vendor's own SDK, which recovers the code from the body it kept."""
@@ -383,36 +365,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_anthropic_metadata(exc)
 
         assert metadata.provider_error_code == "pig-01"
-        assert metadata.gateway_routing_refusal == GatewayRoutingRefusal.UNKNOWN_MODEL
-
-    @pytest.mark.parametrize(
-        ("raise_it", "extract"),
-        [
-            pytest.param(_as_the_openai_sdk_raises_it, extract_openai_metadata, id="openai-substrate"),
-            pytest.param(_as_the_anthropic_sdk_raises_it, extract_anthropic_metadata, id="anthropic-driver"),
-            pytest.param(_as_the_portkey_sdk_raises_it, extract_gateway_metadata, id="portkey-substrate"),
-            pytest.param(_as_plain_httpx_raises_it, extract_manifold_metadata, id="native-routes-httpx"),
-        ],
-    )
-    def test_the_model_not_allowed_refusal_through_every_hop(
-        self,
-        raise_it: Callable[..., BaseException],
-        extract: Callable[[BaseException], ProviderErrorMetadata],
-    ) -> None:
-        """The substrate's own envelope, at 412, through each SDK's own factory.
-
-        Its code sits in ``type`` with ``code`` null, the inverse of the fail-closed
-        envelope. The two vendor-facing hops read ``type`` first; the two
-        Pipelex-service hops read ``code`` first and fall back to ``type``, which is
-        the fallback this case exercises.
-        """
-        exc = raise_it(status_code=412, body=_MODEL_NOT_ALLOWED_BODY)
-
-        metadata = extract(exc)
-
-        assert metadata.status_code == 412
-        assert metadata.provider_error_code == "model_not_allowed_error"
-        assert metadata.gateway_routing_refusal == GatewayRoutingRefusal.MODEL_NOT_ALLOWED
+        assert _routing_refusal(metadata.provider_error_code) == GatewayRoutingRefusal.UNKNOWN_MODEL
 
     def test_the_google_hop_would_not_carry_a_gateway_code_and_nothing_reaches_it_today(self) -> None:
         """``pig-05``'s hop, pinned as the trap it is rather than as a passing path.
@@ -442,7 +395,7 @@ class TestTheCodeSurvivesEveryExtractHop:
         metadata = extract_google_metadata(_GoogleApiError(details=_fail_closed_refusal_body("wrong protocol", "pig-05")))
 
         assert metadata.provider_error_code == "failure"
-        assert metadata.gateway_routing_refusal is None
+        assert _classified_code(classify_inference_error(metadata)) is None
 
 
 class TestClassification:
@@ -452,11 +405,10 @@ class TestClassification:
     def test_each_code_classifies_as_its_member_and_is_never_retried(self, code: str, expected: GatewayRoutingRefusal) -> None:
         result = classify_inference_error(_envelope(code))
 
-        assert result.gateway_routing_refusal == expected
+        assert _classified_code(result) == code
+        assert _routing_refusal(_classified_code(result)) == expected
         assert result.category == InferenceErrorCategory.CONFIGURATION
         assert result.category.is_retryable is False
-        assert result.gateway_request_limit is None
-        assert result.gateway_unresolved_reference is None
 
     @pytest.mark.parametrize("code", _CHANGE_MODEL_CODES)
     def test_a_refusal_the_caller_can_route_around_asks_them_to_change_the_model(self, code: str) -> None:
@@ -468,7 +420,7 @@ class TestClassification:
         """The credential is the gateway operator's and unset; the caller's own key is fine."""
         result = classify_inference_error(_envelope("pig-02"))
 
-        assert result.gateway_routing_refusal == GatewayRoutingRefusal.DISABLED_INTEGRATION
+        assert _routing_refusal(_classified_code(result)) == GatewayRoutingRefusal.DISABLED_INTEGRATION
         assert result.user_action_kind == UserActionKind.CONTACT_SUPPORT
         assert result.is_model_not_found is False
 
@@ -483,33 +435,22 @@ class TestClassification:
 
         assert result.is_model_not_found is (code == "pig-01")
 
-    def test_a_model_not_allowed_refusal_asks_for_another_model_and_is_not_a_missing_model(self) -> None:
-        """The model exists and an integration serves it, only not for this caller.
-
-        So ``CHANGE_MODEL`` is what the caller can do, and the flag stays unset for
-        the reason it does on ``pig-05`` and ``pig-06``: "not found" would be false.
-        """
-        result = classify_inference_error(_envelope("model_not_allowed_error", status_code=412))
-
-        assert result.gateway_routing_refusal == GatewayRoutingRefusal.MODEL_NOT_ALLOWED
-        assert result.category == InferenceErrorCategory.CONFIGURATION
-        assert result.category.is_retryable is False
-        assert result.user_action_kind == UserActionKind.CHANGE_MODEL
-        assert result.is_model_not_found is False
-
-    def test_a_412_without_a_recognized_code_still_takes_the_status_ladder(self) -> None:
-        """The contrast: the ladder's generic 4xx arm, which is what the refusal used to read as."""
-        result = classify_inference_error(_envelope("something-else", status_code=412))
-
-        assert result.gateway_routing_refusal is None
-        assert result.category == InferenceErrorCategory.CONFIGURATION
-        assert result.user_action_kind == UserActionKind.CHANGE_INPUT
-
     def test_a_plain_400_without_a_recognized_code_still_takes_the_status_ladder(self) -> None:
         """Only the gateway's own codes name a routing decision; a bare 400 from a vendor does not."""
         result = classify_inference_error(_envelope("something-else"))
 
-        assert result.gateway_routing_refusal is None
+        assert result.service_error_code is None
+        assert result.category == InferenceErrorCategory.CONTENT
+        assert result.user_action_kind == UserActionKind.CHANGE_INPUT
+
+    def test_without_the_manifold_vocabulary_an_unserved_model_is_a_plain_400(self, mocker: MockerFixture) -> None:
+        """The family classifies only because the plugin contributes it: a runtime without it reads the bare status."""
+        mocker.patch("pipelex.cogt.inference.error_classify.get_optional_service_error_vocabulary", return_value=None)
+
+        result = classify_inference_error(_envelope("pig-01"))
+
+        assert result.service_error_code is None
+        assert result.is_model_not_found is False
         assert result.category == InferenceErrorCategory.CONTENT
         assert result.user_action_kind == UserActionKind.CHANGE_INPUT
 
@@ -560,32 +501,6 @@ class TestEndToEnd:
         assert rendered.user_action is not None
         assert "not found" not in rendered.user_action.detail
 
-    def test_a_model_not_allowed_refusal_reaches_the_caller_as_a_change_model_naming_the_handle(self) -> None:
-        """The refusal a run on the hosted API received, through the hop an LLM call on the gateway takes.
-
-        It used to read "review the prompt, parameters, and inputs". It now asks for
-        another model, names it by its handle, and stays the family's
-        failure class, since the model was found.
-        """
-        exc = _as_the_openai_sdk_raises_it(status_code=412, body=_MODEL_NOT_ALLOWED_BODY)
-        metadata = extract_openai_metadata(exc)
-
-        rendered = render_inference_error(
-            metadata=metadata,
-            classification=classify_inference_error(metadata),
-            family=InferenceErrorFamily.LLM,
-            model_desc=f"{_MODEL_NOT_ALLOWED_HANDLE} → Model[{_MODEL_NOT_ALLOWED_WIRE_ID}]",
-            model_handle=_MODEL_NOT_ALLOWED_HANDLE,
-        )
-
-        assert isinstance(rendered, LLMCompletionError)
-        assert not isinstance(rendered, LLMModelNotFoundError)
-        assert rendered.error_category == InferenceErrorCategory.CONFIGURATION
-        assert rendered.user_action is not None
-        assert rendered.user_action.kind == UserActionKind.CHANGE_MODEL
-        assert f"'{_MODEL_NOT_ALLOWED_HANDLE}'" in rendered.user_action.detail
-        assert rendered.user_action.detail != _GENERIC_ADVICE
-
 
 class TestRenderedAdvice:
     """Each member gets advice naming what has to change, not a generic rejection line."""
@@ -615,47 +530,14 @@ class TestRenderedAdvice:
             ("pig-02", "has not enabled"),
             ("pig-05", "not over the protocol"),
             ("pig-06", "does not serve that capability"),
-            ("model_not_allowed_error", "does not allow the model"),
         ],
     )
     def test_the_detail_names_the_remedy(self, code: str, expected_phrase: str) -> None:
         assert expected_phrase in _rendered_detail(_envelope(code))
 
-    def test_the_model_not_allowed_advice_names_the_handle_and_not_the_wire_id(self) -> None:
-        """The gateway's message names only the backend's id, which the method's author never wrote."""
-        detail = _rendered_detail(_envelope("model_not_allowed_error", status_code=412), model_handle=_MODEL_NOT_ALLOWED_HANDLE)
-
-        assert f"'{_MODEL_NOT_ALLOWED_HANDLE}'" in detail
-        assert _MODEL_NOT_ALLOWED_WIRE_ID not in detail
-        assert "pick another model" in detail
-        assert "prompt" not in detail
-
-    def test_the_model_not_allowed_advice_offers_the_default_only_when_the_pipe_named_the_model(self) -> None:
-        """The Render step cannot tell a model the pipe named from the deck's default.
-
-        When the default is the refused model, an unconditional "leave the pipe's
-        model unset" would tell the caller to do what they already did.
-        """
-        detail = _rendered_detail(_envelope("model_not_allowed_error", status_code=412), model_handle=_MODEL_NOT_ALLOWED_HANDLE)
-
-        assert "if the pipe named this one, leaving its model unset uses the default" in detail
-
-    def test_the_model_not_allowed_advice_says_who_settles_a_deck_disagreement_on_either_gateway(self) -> None:
-        """The same code comes from the Pipelex gateway and from a user's own Portkey workspace.
-
-        Nothing on the wire tells them apart, so advice that only said "contact
-        support" would send the owner of a Portkey workspace to Pipelex for a
-        setting in their own dashboard.
-        """
-        detail = _rendered_detail(_envelope("model_not_allowed_error", status_code=412), model_handle=_MODEL_NOT_ALLOWED_HANDLE)
-
-        assert "model deck" in detail
-        assert "on the Pipelex gateway, contact support" in detail
-        assert "on a Portkey workspace of your own, allow the model in the integration that serves it" in detail
-
-    @pytest.mark.parametrize("code", [code for code in _EVERY_CODE if code != "model_not_allowed_error"])
-    def test_every_other_member_leaves_the_handle_to_the_message(self, code: str) -> None:
-        """Only the member whose gateway message names no handle the author wrote names one itself."""
+    @pytest.mark.parametrize("code", _EVERY_CODE)
+    def test_every_member_leaves_the_handle_to_the_message(self, code: str) -> None:
+        """The service's own message states every specific, so the advice names no handle of its own."""
         assert "some-distinctive-handle" not in _rendered_detail(_envelope(code), model_handle="some-distinctive-handle")
 
     def test_the_unserved_model_and_the_wrong_protocol_are_told_apart(self) -> None:
@@ -709,16 +591,13 @@ class TestTheScopeDecisionIsPinned:
     def test_the_unmapped_routing_codes_are_not_routing_refusals(self, code: str, status_code: int) -> None:
         metadata = _envelope(code, status_code=status_code)
 
-        assert metadata.gateway_routing_refusal is None
-        assert classify_inference_error(metadata).gateway_routing_refusal is None
+        assert _routing_refusal(code) is None
+        assert _classified_code(classify_inference_error(metadata)) is None
 
     def test_the_unmapped_routing_codes_belong_to_no_gateway_family_at_all(self) -> None:
         """Not quietly picked up by one of the neighbouring maps either."""
-        for code, status_code in (("pig-03", 400), ("pig-04", 404)):
-            metadata = _envelope(code, status_code=status_code)
-
-            assert metadata.gateway_request_limit is None
-            assert metadata.gateway_unresolved_reference is None
+        for code in ("pig-03", "pig-04"):
+            assert not _in_another_family(code)
 
 
 class TestTheThreeGatewayFamiliesDoNotShadowEachOther:
@@ -731,22 +610,14 @@ class TestTheThreeGatewayFamiliesDoNotShadowEachOther:
 
     @pytest.mark.parametrize("code", _EVERY_CODE)
     def test_no_routing_code_belongs_to_another_family(self, code: str) -> None:
-        metadata = _envelope(code)
-
-        assert metadata.gateway_request_limit is None
-        assert metadata.gateway_unresolved_reference is None
+        assert not _in_another_family(code)
 
     @pytest.mark.parametrize("code", _REQUEST_LIMIT_CODES + _UNRESOLVED_REFERENCE_CODES)
     def test_no_other_familys_code_is_a_routing_refusal(self, code: str) -> None:
-        assert _envelope(code, status_code=413).gateway_routing_refusal is None
+        assert _routing_refusal(code) is None
 
     def test_the_three_maps_are_disjoint_as_sets(self) -> None:
         """The direction the per-code cases cannot see: a code added to two maps at once."""
-        from pipelex.cogt.inference.error_classification import (  # ruff: ignore[import-outside-top-level]
-            _GATEWAY_REQUEST_LIMIT_BY_CODE,  # pyright: ignore[reportPrivateUsage]
-            _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE,  # pyright: ignore[reportPrivateUsage]
-        )
-
         limits = set(_GATEWAY_REQUEST_LIMIT_BY_CODE)
         references = set(_GATEWAY_UNRESOLVED_REFERENCE_BY_CODE)
         routing = set(_GATEWAY_ROUTING_REFUSAL_BY_CODE)
@@ -754,6 +625,19 @@ class TestTheThreeGatewayFamiliesDoNotShadowEachOther:
         assert limits & references == set()
         assert limits & routing == set()
         assert references & routing == set()
+
+    def test_the_vocabulary_contributes_every_mapped_code_once(self) -> None:
+        """The contribution is the three maps and nothing else, one entry per code.
+
+        The registrar refuses a code claimed twice at boot; this states the same
+        property of the contribution itself, without a boot.
+        """
+        contributed = [entry.code for entry in MANIFOLD_SERVICE_ERROR_CODES]
+
+        assert len(contributed) == len(set(contributed))
+        assert set(contributed) == set(_GATEWAY_REQUEST_LIMIT_BY_CODE) | set(_GATEWAY_UNRESOLVED_REFERENCE_BY_CODE) | set(
+            _GATEWAY_ROUTING_REFUSAL_BY_CODE
+        )
 
 
 class TestWhatTheFamilyAnswersOverHTTP:
@@ -769,26 +653,12 @@ class TestWhatTheFamilyAnswersOverHTTP:
     process and about nothing else.
     """
 
-    @pytest.mark.parametrize("code", _FAIL_CLOSED_CODES)
+    @pytest.mark.parametrize("code", _EVERY_CODE)
     def test_every_member_answers_500_rather_than_the_422_it_used_to(self, code: str) -> None:
         report = _rendered_error(_envelope(code)).to_error_report()
 
         assert report.error_domain == ErrorDomain.CONFIG
         assert report.http_status == 500
-
-    def test_the_model_not_allowed_refusal_answers_500_as_it_did_before(self) -> None:
-        """At its real status the member's answer does not move: only its advice does.
-
-        The ladder's generic 4xx arm already read a 412 as ``CONFIGURATION``, so the
-        family changes this refusal's ``user_action`` and nothing about its status.
-        """
-        report = _rendered_error(_envelope("model_not_allowed_error", status_code=412)).to_error_report()
-        unrecognized_report = _rendered_error(_envelope("something-else", status_code=412)).to_error_report()
-
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.http_status == 500
-        assert unrecognized_report.error_domain == ErrorDomain.CONFIG
-        assert unrecognized_report.http_status == 500
 
     def test_an_unrecognized_400_still_answers_422(self) -> None:
         """The contrast that makes the case above a change rather than a constant."""
@@ -810,8 +680,7 @@ class TestTheAdviceSurvivesThePipeBoundary:
     nothing else in this module crosses that boundary to see it.
 
     Every other member keeps the family's failure class, which the pipe operator
-    lets through for the pipe router to locate. The last case pins that route, for
-    the member a run on the hosted API reached.
+    lets through for the pipe router to locate.
     """
 
     def _re_raised_as_the_pipe_operator_does(self, cause: LLMModelNotFoundError) -> PipeOperatorModelAvailabilityError:
@@ -845,33 +714,3 @@ class TestTheAdviceSurvivesThePipeBoundary:
         assert report.user_action_detail() == _rendered_detail(_envelope("pig-01"))
         assert report.error_domain == ErrorDomain.CONFIG
         assert report.http_status == 500
-
-    def test_the_model_not_allowed_advice_reaches_the_caller_through_the_located_failure(self) -> None:
-        """The failure class is not re-raised by the pipe operator, so the router's location is the boundary.
-
-        ``PipeRouterError`` reports the root fault located at the failing pipe, with
-        the classification its cause chain carries. When nothing on the chain
-        carried a user action, that report fell back to "the message gives the
-        cause", which is what a run on the hosted API read before this member.
-        """
-        rendered = _rendered_error(_envelope("model_not_allowed_error", status_code=412), model_handle=_MODEL_NOT_ALLOWED_HANDLE)
-        located = PipeRouterError.make_located(
-            failure=rendered,
-            run_mode=PipeRunMode.LIVE,
-            pipe_code="score_lead",
-            output_name=None,
-            pipe_stack=["score_lead"],
-        )
-        located.__cause__ = rendered
-
-        report = located.to_error_report()
-
-        assert report.error_type == "LLMCompletionError"
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.error_category == InferenceErrorCategory.CONFIGURATION
-        assert report.retryable is False
-        assert report.user_action is not None
-        assert report.user_action.kind == UserActionKind.CHANGE_MODEL
-        assert report.user_action_detail() == _rendered_detail(
-            _envelope("model_not_allowed_error", status_code=412), model_handle=_MODEL_NOT_ALLOWED_HANDLE
-        )

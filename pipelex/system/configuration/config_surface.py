@@ -152,11 +152,11 @@ def replay_surface_files_in_memory(*, surface_id: str, paths: Sequence[Path]) ->
     are where it is loud; on a machine in the field the user has a configuration error in front of
     them, and replacing it with ours would cost them the only message that names what to fix.
     """
-    # Imported here rather than at module level, and the reason is architectural: the engine's
-    # applier lives under `pipelex.pipeline`, an interpreter package, while this module sits in
-    # `runtime_hub`'s import closure — the kernel layer, which loads zero interpreter modules.
-    # Deferring it also makes the contract's "the healthy path is untouched" literal: a boot whose
-    # configuration validates never even imports the migration engine.
+    # Imported here rather than at module level so that the contract's "the healthy path is
+    # untouched" is literal: a boot whose configuration validates never even imports the migration
+    # engine. The engine is kernel-layer, like this module, so the deferral is not what keeps the
+    # boot clean of interpreter modules — `test_runtime_boot_closure.py` boots over a stale file to
+    # prove that.
     from pipelex.migration.engine import replay_ledger_over_text  # ruff: ignore[import-outside-top-level]
 
     try:

@@ -25,8 +25,6 @@ own page. Classes are grouped by subsystem.
 
 ## Pipeline execution
 
-- [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
-- [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
 - [`PipeIOContractError`](pipe-io-contract-error.md) — Pipe IO contract
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow

@@ -1,17 +1,17 @@
 ---
-title: "Manifold factory"
+title: "Inference client setup error"
 description: "Reference for the `ManifoldFactoryError` Pipelex error class."
 ---
 
 <!-- pipelex:generated -->
 
-# Manifold factory
+# Inference client setup error
 
 | Field | Value |
 |---|---|
 | `error_type` | `ManifoldFactoryError` |
-| `title` | Manifold factory |
-| `type_uri` | `https://docs.pipelex.com/latest/errors/manifold-factory-error/` |
+| `title` | Inference client setup error |
+| `type_uri` | `https://docs.pipelex.com/latest/errors/cogt-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.providers.manifold.manifold_exceptions` |
 | Parent class | [`ManifoldError`](manifold-error.md) |

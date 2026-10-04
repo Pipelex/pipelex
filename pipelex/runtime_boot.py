@@ -63,6 +63,7 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
+from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
@@ -560,6 +561,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # they are looked up at run time by the interpreter.
         self.runtime_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
         self.runtime_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
+        self.runtime_hub.set_service_error_vocabulary(service_error_vocabulary=ServiceErrorVocabulary(plugin_registrar.service_error_codes))
         self.runtime_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
         self.runtime_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
         storage_provider_registry = StorageProviderRegistry(plugin_registrar.storage_providers)

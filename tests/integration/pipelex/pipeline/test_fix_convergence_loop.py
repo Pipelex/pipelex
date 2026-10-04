@@ -13,7 +13,8 @@ import pytest
 import tomlkit
 from pytest_mock import MockerFixture
 
-from pipelex.pipeline.exceptions import FixWriteConflictError, ValidateBundleError
+from pipelex.fix_ops.exceptions import FixWriteConflictError
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes import fix_loop
 from pipelex.pipeline.fixes.fix_loop import fix_bundle_file
 

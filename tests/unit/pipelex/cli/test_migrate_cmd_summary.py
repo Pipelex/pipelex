@@ -20,10 +20,10 @@ from rich.console import Console
 
 from pipelex.cli.commands import migrate_cmd as migrate_cmd_module
 from pipelex.cli.commands.migrate_cmd import migrate_cmd
+from pipelex.fix_ops.exceptions import FixTransactionError, FixWriteConflictError
+from pipelex.fix_ops.file_transaction import PendingFileUpdate, commit_file_updates
 from pipelex.migration.goldens import pre_history_document_path
 from pipelex.migration.ledger import packaged_migration_dir
-from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
-from pipelex.pipeline.fixes.file_transaction import PendingFileUpdate, commit_file_updates
 from pipelex.system.configuration.config_surface import TELEMETRY_CONFIG_SURFACE_ID
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_OVERRIDE_FILE_NAME
 
