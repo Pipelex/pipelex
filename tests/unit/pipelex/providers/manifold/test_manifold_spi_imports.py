@@ -62,7 +62,9 @@ class TestManifoldReachesCoreOnlyThroughTheSpi:
     def test_every_core_import_is_published(self) -> None:
         published = _published_symbols()
 
-        unpublished = sorted(f"{file}: from {module} import {symbol}" for file, module, symbol in _core_imports() if (module, symbol) not in published)
+        unpublished = sorted(
+            f"{file}: from {module} import {symbol}" for file, module, symbol in _core_imports() if (module, symbol) not in published
+        )
 
         assert not unpublished, "Imports outside the Inference SPI table; publish them there or copy them into the package:\n" + "\n".join(
             unpublished

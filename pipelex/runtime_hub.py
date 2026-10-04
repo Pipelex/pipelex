@@ -295,7 +295,7 @@ class RuntimeHub:
     def set_secrets_provider_registry(self, secrets_provider_registry: "SecretsProviderRegistry"):
         self._secrets_provider_registry = secrets_provider_registry
 
-    def set_service_error_vocabulary(self, service_error_vocabulary: "ServiceErrorVocabulary"):
+    def set_service_error_vocabulary(self, *, service_error_vocabulary: "ServiceErrorVocabulary"):
         self._service_error_vocabulary = service_error_vocabulary
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):

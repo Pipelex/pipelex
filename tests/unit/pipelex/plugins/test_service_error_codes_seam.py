@@ -11,8 +11,8 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import MODEL_NOT_ALLOWED_ERROR_CODE, UserActionKind
 from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorCode
 from pipelex.plugins.contract import PLUGIN_API_VERSION
-from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.plugins.exceptions import DuplicateServiceErrorCodeError, ReservedServiceErrorCodeError
+from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.runtime_hub import get_optional_service_error_vocabulary
 

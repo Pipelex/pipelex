@@ -24,12 +24,14 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.registrar import PluginRegistrar
-from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
+from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS
 from pipelex.providers.manifold.manifold_anthropic_extras import ManifoldAnthropicExtrasFactory
 from pipelex.providers.manifold.manifold_plugin import ManifoldPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pytest_mock import MockerFixture
 
 _EXPECTED_KEYS = {
@@ -41,6 +43,11 @@ _EXPECTED_KEYS = {
     (InferenceFamily.EXTRACT, "manifold_extract"),
     (InferenceFamily.SEARCH, "manifold_search"),
 }
+
+
+def _build_now(*, handle: object, build: Callable[[], object]) -> object:
+    del handle
+    return build()
 
 
 def _registrar(mocker: MockerFixture) -> PluginRegistrar:
@@ -73,7 +80,7 @@ class TestManifoldPluginRegistrations:
         model.get_instructor_mode.return_value = None
         backend = InferenceBackend(name="pipelex_manifold", endpoint="https://manifold.example.com", api_key="token")
         sdk_clients = mocker.MagicMock()
-        sdk_clients.get_or_create.side_effect = lambda handle, build: build()  # noqa: ARG005
+        sdk_clients.get_or_create.side_effect = _build_now
         mocker.patch.object(ModelHandle, "make_for_inference_model", return_value=mocker.MagicMock(sdk="manifold_anthropic"))
 
         worker = make_worker(inference_model=model, backend=backend, sdk_clients=sdk_clients, reporting_delegate=None)
