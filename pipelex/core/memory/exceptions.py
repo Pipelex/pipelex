@@ -231,10 +231,11 @@ class StructureValidationError(InputShapingError):
         """The refusal for a scalar, or a list of scalars, at an input of a verdict native.
 
         A `Choice` or a `Rating` input takes its value in the `{"concept", "content"}` envelope, and a
-        caller naturally sends its key or its level alone, as a `Number` or a `YesNo` input would take
-        it. A verdict is more than its key or its level, so the value has no reading, and a declaration
-        that reads it, such as `Anything`, would discard the verdict the method branches on: the advice
-        is the expected shape.
+        caller naturally sends a rating's level alone, as a `Number` input would take it. A number or a
+        boolean has no reading there, since a verdict is more than its level, and a declaration that
+        reads it, such as `Anything`, would discard the verdict the method branches on: the advice is the
+        expected shape. A string, such as a choice's key, never reaches this refusal: it reads as a
+        `Text`, which `make_for_bare_value_of_another_concept` refuses.
         """
         message = (
             f"Input '{variable_name}' could not be built as '{declared_concept_ref}': you provided {provided_description}, "
