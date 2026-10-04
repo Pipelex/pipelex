@@ -74,7 +74,6 @@ own page. Classes are grouped by subsystem.
 - [`FatalError`](fatal-error.md) — Fatal error
 - [`FuncRegistryError`](func-registry-error.md) — Func registry
 - [`GatewayConfigMergeError`](gateway-config-merge-error.md) — Gateway config merge
-- [`InferenceSetupRequiredError`](inference-setup-required-error.md) — Inference setup required
 - [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`LangfuseCredentialsError`](langfuse-credentials-error.md) — Langfuse credentials
 - [`MissingDependencyError`](missing-dependency-error.md) — Missing dependency

@@ -25,7 +25,6 @@ from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
-from pipelex.system.pipelex_service.pipelex_service_onboarding import update_inference_setup_completed
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
@@ -318,12 +317,6 @@ def execute_initialization(
             selected_backend_keys = get_selected_backend_keys(backends_toml_path)
             if selected_backend_keys:
                 customize_routing_profile(selected_backend_keys, target_config_dir=target_config_dir)
-
-        # Choosing the backends is this machine's inference setup, as `pipelex-agent init` records it
-        # too: without the flag, the boot's first-run check refuses every live run once a
-        # Pipelex-managed backend is enabled. It lives in the global pipelex_service.toml whichever
-        # directory this init targets.
-        update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
 
     # Step 2.5: Prompt for missing credentials
     if check_credentials:

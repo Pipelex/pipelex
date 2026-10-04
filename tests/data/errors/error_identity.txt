@@ -124,7 +124,6 @@ InferenceBackendLibraryNotFoundError | Inference backend library not found | htt
 InferenceBackendLibraryValidationError | Inference backend library validation | https://docs.pipelex.com/latest/errors/inference-backend-library-validation-error/
 InferenceBackendNotFoundError | Inference backend not found | https://docs.pipelex.com/latest/errors/inference-backend-not-found-error/
 InferenceModelSpecError | Inference model spec | https://docs.pipelex.com/latest/errors/inference-model-spec-error/
-InferenceSetupRequiredError | Inference setup required | https://docs.pipelex.com/latest/errors/inference-setup-required-error/
 InputShapingError | Input shaping | https://docs.pipelex.com/latest/errors/input-shaping-error/
 InputStuffSpecNotFoundError | Input stuff spec not found | https://docs.pipelex.com/latest/errors/input-stuff-spec-not-found-error/
 InputStuffSpecsError | Input stuff specs | https://docs.pipelex.com/latest/errors/input-stuff-specs-error/

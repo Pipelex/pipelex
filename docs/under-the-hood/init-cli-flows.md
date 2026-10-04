@@ -53,10 +53,9 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 | `routing_profiles.toml` | Inference step | Project or global | `.pipelex/inference/routing_profiles.toml` |
 | `telemetry.toml` | Telemetry step | Project or global | `.pipelex/telemetry.toml` |
 | `.env` | Credentials step | **Always global** | `~/.pipelex/.env` (mode 0600) |
-| `pipelex_service.toml` | Onboarding state | **Always global** | `~/.pipelex/pipelex_service.toml` |
 
 !!! info "Project vs global"
-    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exceptions are `.env` (credentials) and `pipelex_service.toml`, which are **always** written to and read from `~/.pipelex/`.
+    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from `~/.pipelex/`.
 
 ---
 
@@ -96,9 +95,8 @@ flowchart TD
     COPY_INF --> CUST_BE[customize_backends_config<br/>Interactive backend selection]
     CUST_BE --> CHK_RT{check_routing?}
     CHK_RT -- "No (auto-route)" --> CUST_RT[customize_routing_profile<br/>Auto-routing based on selection]
-    CUST_RT --> ONBOARD["Mark inference setup completed<br/>(written to ~/.pipelex/)"]
-    CHK_RT -- "Yes (focus=routing)" --> ONBOARD
-    ONBOARD --> S25
+    CUST_RT --> S25
+    CHK_RT -- "Yes (focus=routing)" --> S25
 
     S2 -- No --> S25
 
@@ -255,7 +253,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 | `inference/deck/*.toml` | Inference step | Model deck definitions |
 | `inference/routing_profiles.toml` | Inference step | Routing profile definitions |
 | `telemetry.toml` | Telemetry step | Telemetry export configuration |
-| `pipelex_service.toml` | Onboarding step | Inference setup state |
+| `pipelex_service.toml` | `pipelex-agent init` | The inference setup state that `pipelex-agent init` records |
 
 ### Skip Lists
 

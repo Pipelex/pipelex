@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:c86f83f429f13abe72ea9db43f1410bca2c5774c6c5ffea91f8b98d4b5518842"
+digest = "sha256:9def7a7729aac507aaf746de8fe79a8ea65c22d5c3d54a99347122a3d92c0357"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-04T14:04:23Z"
-rationale = "clean-pass: against dev, the only trigger change is one phrase of the boot-contract test's module docstring, which now calls the gate an offline boot skips the first-run gate since the Gateway terms gate is gone; the test's calls are unchanged, and docs/under-the-hood/pipelex-kernel.md names no gateway, terms or telemetry stream, so nothing on the page moved."
+reviewed_at = "2026-10-04T16:18:57Z"
+rationale = "clean-pass: the boot-contract test's docstring now says an offline boot skips the remote config fetch rather than the removed first-run gate; its calls are unchanged, and docs/under-the-hood/pipelex-kernel.md names no first-run check, onboarding flag or inference setup state, so nothing on the page moved."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -27,4 +27,4 @@ rationale = "clean-pass: against dev, the only trigger change is one phrase of t
 "pipelex/kernel/search_ops.py" = "blob:f9c1dc09dd3beaf1a54ac8e3774db1d510cbdaa3"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
 "pipelex/kernel/templating_style_ops.py" = "blob:395473806d600dfc4f124c07f2afebb951fc086b"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:2b0555013806732c6a771474379205a954f64937"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:39543269189511ac813fa99242b04d5c528ebfa2"

@@ -265,7 +265,7 @@ class Pipelex(RuntimeBoot):
             needs_inference: When False, forces every run THIS process initiates to DRY mode
                 (applied at runtime_hub.resolve_run_mode_for_boot, which every run-params factory
                 calls: operators dispatch normally and the cogt leaf mocks) and loads backends leniently
-                (skipping those with missing credentials). This skips the first-run check and model
+                (skipping those with missing credentials). This skips the remote config fetch and model
                 deck validation. Useful for commands like validate/show that don't call inference
                 APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
                 not constrain work this process executes as a Temporal worker.

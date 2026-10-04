@@ -204,12 +204,6 @@ def set_manifold_enabled(backends_path: Path, *, enabled: bool) -> None:
     backends_path.write_text("".join(lines), encoding="utf-8")
 
 
-def write_pipelex_service_config(pipelex_dir: Path, *, inference_setup_completed: bool) -> None:
-    """Overwrite ``pipelex_service.toml`` so the subprocess skips the first-run gate."""
-    content = f"[onboarding]\ninference_setup_completed = {str(inference_setup_completed).lower()}\n"
-    (pipelex_dir / "pipelex_service.toml").write_text(content, encoding="utf-8")
-
-
 def write_active_routing_profile(routing_profiles_path: Path, active_profile: str) -> None:
     """Rewrite the ``active = "..."`` line in routing_profiles.toml in place."""
     original_text = routing_profiles_path.read_text(encoding="utf-8")
@@ -249,7 +243,6 @@ def hermetic_home(tmp_path: Path) -> Path:
     """
     pipelex_dir = tmp_path / ".pipelex"
     _copy_kit_configs_into(pipelex_dir)
-    write_pipelex_service_config(pipelex_dir, inference_setup_completed=True)
     return tmp_path
 
 
@@ -269,8 +262,7 @@ def offline_subprocess_env(hermetic_home: Path) -> dict[str, str]:
         "HOME": str(hermetic_home),
         "PATH": "/usr/bin:/bin:/usr/local/bin",
         "PIPELEX_REMOTE_CONFIG_URL": UNREACHABLE_REMOTE_CONFIG_URL,
-        # Force CI test mode so vertexai is skipped and the first-run gate doesn't fire
-        # for code paths that still consult the integration mode.
+        # Force CI test mode so vertexai is skipped.
         "RUN_MODE": "ci_test",
         # Dummy credentials — the test never makes a real provider call (dry-run only) and
         # ``lenient=True`` (set by ``--dry-run``) skips backends whose env vars are missing

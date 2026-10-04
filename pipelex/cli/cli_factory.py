@@ -5,7 +5,6 @@ from pathlib import Path
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_gateway_unknown_model_error,
-    handle_inference_setup_required_error,
     handle_model_deck_preset_error,
     handle_remote_config_unavailable_error,
     handle_remote_config_validation_error,
@@ -14,7 +13,6 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.pipelex import Pipelex
 from pipelex.system.pipelex_service.exceptions import (
-    InferenceSetupRequiredError,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
@@ -56,8 +54,6 @@ def make_pipelex_for_cli(
             boot_orchestrator=boot_orchestrator,
             needs_model_specs=needs_model_specs,
         )
-    except InferenceSetupRequiredError as exc:
-        handle_inference_setup_required_error(exc)
     except TelemetryConfigValidationError as exc:
         handle_telemetry_config_validation_error(exc)
     except RemoteConfigUnavailableError as exc:

@@ -656,10 +656,6 @@ rationale = "Noun-named derivation: the header text for the category; single ope
 param = "exc"
 rationale = "Error handler: the exc is the single operand handled."
 
-["pipelex/cli/error_handlers.py::handle_inference_setup_required_error"]
-param = "exc"
-rationale = "Error handler: the exc is the single operand handled."
-
 ["pipelex/cli/error_handlers.py::handle_model_availability_error"]
 param = "exc"
 rationale = "Error handler: the exc is the single operand handled."

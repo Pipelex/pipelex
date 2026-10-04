@@ -52,7 +52,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:${PATH}"
 
-# ─── Pipelex global config (terms acceptance, backends) ────────────────────────
+# ─── Pipelex global config (backends, routing, telemetry) ──────────────────────
 # The server's bundled config becomes ~/.pipelex (the global config dir), and no project-level
 # .pipelex exists in the image, so users mounting overrides into /root/.pipelex aren't shadowed.
 # See docs/api-server/configuration.md at the repository root.

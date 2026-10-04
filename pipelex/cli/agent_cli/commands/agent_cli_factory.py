@@ -8,15 +8,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-import typer
-
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, record_setup_warning
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.pipelex_service.exceptions import (
-    InferenceSetupRequiredError,
     RemoteConfigStaleWarning,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
@@ -172,10 +169,6 @@ def make_pipelex_for_agent_cli(
     exceptions but routes them through ``agent_error()`` so the output
     is always machine-parseable JSON on stderr.
 
-    One intentional exception: ``InferenceSetupRequiredError`` prints
-    human-readable markdown to stdout and exits 0, so the calling agent
-    can display setup guidance directly.
-
     Stdout / stderr contract: every ``pipelex-agent`` invocation reserves stdout
     exclusively for the structured success envelope (JSON via ``--format json``, or
     markdown via ``--format markdown``) emitted by ``agent_success`` /
@@ -203,8 +196,7 @@ def make_pipelex_for_agent_cli(
         Initialized Pipelex instance.
 
     Raises:
-        typer.Exit: If initialization fails (after printing JSON error to stderr),
-            or if inference setup is required (after printing markdown to stdout).
+        typer.Exit: If initialization fails (after printing JSON error to stderr).
     """
     # Process-global logging cutoff, BEFORE Pipelex.make can trigger any third-party
     # log line (anthropic/httpx/botocore credential probes, telemetry setup, etc.).
@@ -224,17 +216,6 @@ def make_pipelex_for_agent_cli(
         for item in caught:
             if issubclass(item.category, RemoteConfigStaleWarning):
                 record_setup_warning({"type": "RemoteConfigStale", "message": str(item.message)})
-    except InferenceSetupRequiredError:
-        print(
-            "# First-time inference setup required\n"
-            "\n"
-            "This looks like your first time running a method with live inference.\n"
-            "You need to configure an inference backend before running.\n"
-            "\n"
-            "Use `/mthds-runner-setup` for guided setup, "
-            "or run `pipelex-agent init` with appropriate backend configuration."
-        )
-        raise typer.Exit(0) from None
     except TelemetryConfigValidationError as exc:
         agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
     except RemoteConfigUnavailableError as exc:

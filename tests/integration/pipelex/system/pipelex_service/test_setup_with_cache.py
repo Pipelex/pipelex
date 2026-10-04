@@ -27,8 +27,6 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigStaleWarning,
     RemoteConfigUnavailableError,
 )
-from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
-from pipelex.system.pipelex_service.pipelex_service_onboarding import PipelexServiceOnboarding
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode
@@ -44,10 +42,6 @@ RUNTIME_BOOT_MODULE = "pipelex.runtime_boot"
 # ``fetch_remote_config`` with a cached shim. We need the real fetch path to exercise the
 # httpx mock for the cache-fallback flow.
 _ORIGINAL_FETCH_REMOTE_CONFIG = RemoteConfigFetcher.fetch_remote_config
-
-
-def _onboarded_service_config() -> PipelexServiceConfig:
-    return PipelexServiceConfig(onboarding=PipelexServiceOnboarding(inference_setup_completed=True))
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -95,10 +89,6 @@ class TestSetupWithCache:
             return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
         )
         mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_onboarded_service_config(),
-        )
-        mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
             return_value=False,
@@ -137,10 +127,6 @@ class TestSetupWithCache:
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
             return_value={PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION},
-        )
-        mocker.patch(
-            f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
-            return_value=_onboarded_service_config(),
         )
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",

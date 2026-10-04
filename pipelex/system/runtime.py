@@ -19,26 +19,6 @@ class IntegrationMode(StrEnum):
     PYTEST = "pytest"
     PYTHON = "python"
 
-    @property
-    def requires_inference_setup(self) -> bool:
-        match self:
-            case IntegrationMode.CI:
-                return False
-            case IntegrationMode.CLI:
-                return True
-            case IntegrationMode.DOCKER:
-                return True
-            case IntegrationMode.FASTAPI:
-                return True
-            case IntegrationMode.MCP:
-                return True
-            case IntegrationMode.N8N:
-                return True
-            case IntegrationMode.PYTEST:
-                return True
-            case IntegrationMode.PYTHON:
-                return True
-
 
 class RunMode(StrEnum):
     NORMAL = "normal"

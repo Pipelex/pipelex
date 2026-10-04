@@ -9,7 +9,6 @@ import typer
 
 from pipelex.cli.error_handlers import (
     ErrorContext,
-    handle_inference_setup_required_error,
     handle_model_availability_error,
     handle_model_choice_error,
     handle_model_deck_preset_error,
@@ -21,7 +20,6 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.pipelex_service.exceptions import InferenceSetupRequiredError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -99,13 +97,3 @@ class TestErrorHandlers:
 
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
-
-    def test_handle_inference_setup_required_error_exits(self, mocker: MockerFixture) -> None:
-        """handle_inference_setup_required_error should exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
-        exc = InferenceSetupRequiredError()
-
-        with pytest.raises(typer.Exit) as exc_info:
-            handle_inference_setup_required_error(exc)
-
-        assert exc_info.value.exit_code == 1

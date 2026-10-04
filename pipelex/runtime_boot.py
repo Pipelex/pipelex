@@ -96,15 +96,9 @@ from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_ma
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.config_surface import INFERENCE_BACKEND_CONFIG_SURFACE_ID, PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
-from pipelex.system.pipelex_service.exceptions import (
-    InferenceSetupRequiredError,
-    RemoteConfigStaleWarning,
-)
+from pipelex.system.pipelex_service.exceptions import RemoteConfigStaleWarning
 from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
-from pipelex.system.pipelex_service.pipelex_service_config import (
-    enabled_managed_gateway_sections,
-    load_pipelex_service_config_if_exists,
-)
+from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.registries.class_registry_access import class_registry_scoping
 from pipelex.system.registries.func_registry import FuncRegistry, func_registry
@@ -411,14 +405,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # ``pipelex-agent models`` without ``--backend``.
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
-                # The first-run check only matters for actual inference usage, not for read-only
-                # operations like fetching model specs for validation, and it is skipped for CI mode —
-                # automated pipelines have no onboarding to complete. It fires when inference has
-                # never been set up on this machine, so the agent skill can guide the user through it.
-                if needs_inference and integration_mode.requires_inference_setup:
-                    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-                    if pipelex_service_config is None or not pipelex_service_config.onboarding.inference_setup_completed:
-                        raise InferenceSetupRequiredError
                 # Fetch remote configuration (may fall back to on-disk cache when offline).
                 remote_config_result = RemoteConfigFetcher.fetch_remote_config()
                 remote_config = remote_config_result.config

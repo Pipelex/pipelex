@@ -17,7 +17,6 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, suggested_fix_label, validation_item_title
 from pipelex.runtime_hub import get_console
 from pipelex.system.pipelex_service.exceptions import (
-    InferenceSetupRequiredError,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
@@ -396,32 +395,6 @@ def handle_validate_bundle_error(
         )
         console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
-def handle_inference_setup_required_error(exc: InferenceSetupRequiredError) -> NoReturn:
-    """Handle and display InferenceSetupRequiredError with first-run guidance.
-
-    This error occurs on first run when no inference backend has been configured yet.
-
-    Args:
-        exc: The inference setup required error exception
-    """
-    console = get_console()
-    print_traceback_if_requested(console=console)
-    console.print("\n[bold yellow]⚠ First-time inference setup required[/bold yellow]\n")
-
-    console.print(
-        "This looks like your first time running a method with live inference.\nYou need to configure an inference backend before running.\n"
-    )
-
-    console.print("[bold green]💡 To get started:[/bold green]")
-    console.print("  • Run [cyan]pipelex init config[/cyan] for interactive setup")
-    console.print("  • Or run [cyan]pipelex-agent init[/cyan] with backend configuration")
-    console.print()
-
-    console.print(f"[dim]For more information: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc
 
