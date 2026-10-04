@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_machinery.rendering.input_renderer import build_concept_comments, render_inputs
@@ -36,7 +37,9 @@ async def build_inputs_for_pipe(
         explicit: When True, emit the ceremonial envelope form; when False (default), the light shape.
 
     Returns:
-        Dictionary with inputs suitable for JSON serialization.
+        Dictionary with ``success``, the resolved ``pipe_ref``, the ``inputs`` template and the
+        internal ``concept_comments``. A pipe that declares no inputs answers with empty ``inputs``
+        and an internal ``no_inputs_message`` saying so.
 
     Raises:
         ValidateBundleError: If bundle validation fails.
@@ -79,7 +82,19 @@ async def build_inputs_for_pipe(
         raise ValueError(msg)
 
     the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
-    inputs_json_str = render_inputs(the_pipe, indent=2, explicit=explicit)
+    # The envelope names the pipe that was resolved, always domain-qualified, never the selector
+    # the caller typed: a bare code and an omitted one both answer with the same `pipe_ref`.
+    try:
+        inputs_json_str = render_inputs(the_pipe, indent=2, explicit=explicit)
+    except NoInputsRequiredError as exc:
+        # A pipe that declares no inputs is an answer, not a failure: its template is empty.
+        return {
+            "success": True,
+            "pipe_ref": the_pipe.pipe_ref,
+            "inputs": {},
+            "concept_comments": {},
+            "no_inputs_message": str(exc),
+        }
     inputs_dict = json.loads(inputs_json_str)
 
     # concept_comments is internal plumbing for the light-TOML emitter (stripped before the JSON
@@ -87,7 +102,7 @@ async def build_inputs_for_pipe(
     # the human `build inputs --format toml` does.
     return {
         "success": True,
-        "pipe_code": pipe_code,
+        "pipe_ref": the_pipe.pipe_ref,
         "inputs": inputs_dict,
         "concept_comments": build_concept_comments(the_pipe.inputs),
     }

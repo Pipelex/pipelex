@@ -38,7 +38,7 @@ def build_inputs_template(the_pipe: PipeAbstract, *, explicit: bool = False) -> 
         NoInputsRequiredError: If the pipe has no inputs
     """
     if not the_pipe.inputs.root:
-        msg = f"No inputs required for pipe '{the_pipe.code}'."
+        msg = f"Pipe '{the_pipe.pipe_ref}' declares no inputs."
         raise NoInputsRequiredError(msg)
 
     envelope_template = the_pipe.inputs.build_inputs_template(concept_provider=get_concept_library())
