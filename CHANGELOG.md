@@ -17,7 +17,7 @@
 
 ### Fixed
 
-- **A Manifold failure on the extract and search routes reports the service's own message**: `extract_manifold_metadata` takes the message from the response body's `error.message`, or else its top-level `message`, so a refused key now reads `Portkey Error: Invalid API Key. Error Code: 03` rather than httpx's `Client error '401 Unauthorized' for url …`; a body carrying neither, a body that is not JSON and a network failure keep the exception's own text.
+- **A Manifold failure on the extract and search routes reports the service's own message**: `extract_manifold_metadata` takes the message from the response body's `error.message`, or else its top-level `message`, so a refused key now reads `Portkey Error: Invalid API Key. Error Code: 03` rather than httpx's `Client error '401 Unauthorized' for url …`; a body carrying neither, a body that is not JSON and a network failure keep the exception's own text. Because the quota check reads that message, a 429 on those routes whose body names a quota, such as `Monthly quota exceeded`, now classifies as quota exhaustion, to be fixed in billing, rather than as a transient rate limit to retry.
 - **A kernel-only boot over a stale configuration file stays kernel-only (Breaking)**: the boot-tolerance replay no longer loads interpreter modules into a `RuntimeBoot` process, because the fix-op applier, the file transaction and their errors moved from `pipelex.pipeline` to the new kernel-layer `pipelex.fix_ops` package; import `FixWriteConflictError` and `FixTransactionError` from `pipelex.fix_ops.exceptions`, and the applier and transaction from `pipelex.fix_ops.applier` and `pipelex.fix_ops.file_transaction`.
 
 ### Removed

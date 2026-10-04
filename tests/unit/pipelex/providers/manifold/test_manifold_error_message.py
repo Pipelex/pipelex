@@ -21,13 +21,13 @@ _HTTPX_SENTENCE = f"Client error '401 Unauthorized' for url '{_URL}'"
 _GATEWAY_MESSAGE = "Portkey Error: Invalid API Key. Error Code: 03"
 
 
-def _status_error(*, json_body: Any | None = None, text_body: str | None = None) -> httpx.HTTPStatusError:
+def _status_error(*, json_body: Any | None = None, text_body: str | None = None, status_code: int = 401) -> httpx.HTTPStatusError:
     """A native-route refusal as the manifold client raises it: `raise_for_status()` on a plain httpx response."""
     request = httpx.Request("POST", _URL)
     if json_body is not None:
-        response = httpx.Response(status_code=401, request=request, json=json_body)
+        response = httpx.Response(status_code=status_code, request=request, json=json_body)
     else:
-        response = httpx.Response(status_code=401, request=request, text=text_body or "")
+        response = httpx.Response(status_code=status_code, request=request, text=text_body or "")
     return httpx.HTTPStatusError(_HTTPX_SENTENCE, request=request, response=response)
 
 
@@ -85,3 +85,25 @@ class TestTheMessageTheManifoldPathReports:
 
         assert metadata.message == "connection refused"
         assert metadata.status_code is None
+
+
+class TestTheQuotaReadingOfANativeRoute429:
+    """The quota check reads `metadata.message`, so on the native routes it now sees the service's words.
+
+    Before, it saw httpx's sentence, which never names a quota, so every 429 there read as a
+    transient rate limit to retry, even one the service explained as an exhausted quota.
+    """
+
+    def test_a_429_whose_body_names_a_quota_is_quota_exhaustion(self) -> None:
+        body = {"error": {"message": "Monthly quota exceeded for this workspace"}}
+
+        metadata = extract_manifold_metadata(_status_error(json_body=body, status_code=429))
+
+        assert metadata.is_quota_exhaustion
+
+    def test_a_429_whose_body_names_no_quota_stays_a_rate_limit(self) -> None:
+        body = {"error": {"message": "Too many requests, slow down"}}
+
+        metadata = extract_manifold_metadata(_status_error(json_body=body, status_code=429))
+
+        assert not metadata.is_quota_exhaustion
