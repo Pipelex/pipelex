@@ -19,10 +19,10 @@ is the backend that supports grouping. So whatever is put here is a live group
 key in those projects and a span attribute on every OpenTelemetry export, and the
 bounds below are shaped by that consumer.
 
-The inference gateway is the other reader. Every call the Pipelex Manifold
+The Pipelex service is the other reader. Every call the hosted
 dialect makes carries the mapping, whole, in its `x-pipelex-metadata` header,
-beside the runtime's own ids for the run and the step, so the gateway can
-attribute the call's spend and log it (`pipelex.providers.manifold.manifold_metadata`).
+beside the runtime's own ids for the run and the step, so the service can
+attribute the call's spend and log it (`pipelex.providers.pipelex_hosted.pipelex_hosted_metadata`).
 The runtime's ids win when an extras key collides with one of them — every one of
 their names (`user_id`, `pipeline_run_id`, `pipe_run_id`, `pipe_code`,
 `content_generation_job_id`) fits the key charset below — because this mapping is

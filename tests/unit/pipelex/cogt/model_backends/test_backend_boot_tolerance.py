@@ -266,7 +266,7 @@ class TestThePreviousReleaseKit:
     As that release left it, its `backends.toml` enables the Pipelex Gateway over a comment-only file and
     its active routing profile sends every model there: that is refused, naming the backend, rather than
     booted with every model silently missing from the deck. Once the user disables that table and picks
-    another profile, as the changelog says, the rest loads: the disabled Manifold table, which carries a key
+    another profile, as the changelog says, the rest loads: the disabled table of the hosted backend under its former name, which carries a key
     the backend blueprint does not define, is skipped before its variables are substituted or its file is
     read, and only the active routing profile is validated against the enabled backends.
     """

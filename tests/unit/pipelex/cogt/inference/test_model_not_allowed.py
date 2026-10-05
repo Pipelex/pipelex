@@ -50,7 +50,7 @@ from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.pipe_run.exceptions import PipeRouterError
-from pipelex.providers.manifold.manifold_error_metadata import extract_manifold_metadata
+from pipelex.providers.pipelex_hosted.pipelex_hosted_error_metadata import extract_pipelex_hosted_metadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
@@ -121,7 +121,7 @@ def _as_the_anthropic_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -
 
 
 def _as_plain_httpx_raises_it(*, status_code: int, body: dict[str, Any]) -> BaseException:
-    """The Manifold service's native ``/v1/pipelex/*`` routes, which the runtime calls over plain ``httpx``."""
+    """The Pipelex service's native ``/v1/pipelex/*`` routes, which the runtime calls over plain ``httpx``."""
     request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
     response = httpx.Response(status_code=status_code, request=request, json=body)
     return httpx.HTTPStatusError(f"Client error '{status_code}'", request=request, response=response)
@@ -185,7 +185,7 @@ class TestTheCodeSurvivesEveryExtractHop:
             pytest.param(_as_the_openai_sdk_raises_it, extract_openai_metadata, id="openai-substrate"),
             pytest.param(_as_the_anthropic_sdk_raises_it, extract_anthropic_metadata, id="anthropic-driver"),
             pytest.param(_as_the_portkey_sdk_raises_it, extract_gateway_metadata, id="portkey-substrate"),
-            pytest.param(_as_plain_httpx_raises_it, extract_manifold_metadata, id="native-routes-httpx"),
+            pytest.param(_as_plain_httpx_raises_it, extract_pipelex_hosted_metadata, id="native-routes-httpx"),
         ],
     )
     def test_the_refusal_through_every_hop(
