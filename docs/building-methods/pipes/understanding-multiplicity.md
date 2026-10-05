@@ -268,6 +268,8 @@ steps = [
 ]
 ```
 
+When the list is held in a field of a bigger value, such as the scans of an `InvoiceBatch`, `batch_over` takes the dotted path, `batch_over = "invoice_batch.scans"`: the sequence binds the list at that path, then batches over it (see [Batching over a field](pipe-controllers/PipeSequence.md#batching-over-a-field)).
+
 ### Use Case 2: Generate Fixed Alternatives for Testing
 
 Create exactly 3 subject line variations for A/B testing:
