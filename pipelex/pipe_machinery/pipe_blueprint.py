@@ -355,9 +355,6 @@ class PipeBlueprint(ABC, BaseModel):
     @final
     def generic_validate_inputs(self):
         if self.inputs:
-            # One check for every pipe, operator, controller or signature alike: an input name is a plain
-            # snake_case name, never a dotted path into a field (`invalid_input_name`).
-            validate_input_names(input_names=list(self.inputs))
             for input_name, slot_value in self.inputs.items():
                 # One grammar, two spellings: the expanded slot form's `concept` value is validated
                 # with the same ref+multiplicity+presence grammar as the plain string form.
@@ -406,6 +403,12 @@ class PipeBlueprint(ABC, BaseModel):
                 except ConceptStringError as exc:
                     msg = f"Invalid concept string or code '{concept_ref_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
                     raise ValueError(msg) from exc
+
+            # One check for every pipe, operator, controller or signature alike: an input name is a plain
+            # snake_case name, never a dotted path into a field (`invalid_input_name`). It runs once every spec
+            # is known to be valid, because whether deleting a redundant dotted key is safe depends on the
+            # markers the specs carry.
+            validate_input_names(input_specs={input_name: slot_concept_spec(slot_value) for input_name, slot_value in self.inputs.items()})
 
         self.validate_inputs()
 

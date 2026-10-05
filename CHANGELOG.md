@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`pipelex fix bundle` deletes a dotted input key beside its root**: the new safe rule `delete-redundant-dotted-input` removes a key such as `"page.page_view" = "Image"` from a pipe's `inputs` when the same table declares its root `page`, which already supplies every field a template reads through it. A lone dotted key gets no automatic fix, since nothing states its root's concept, and its refusal names the two remedies instead.
+- **`pipelex fix bundle` deletes a dotted input key beside its root**: the new rule `delete-redundant-dotted-input` removes a key such as `"page.page_view" = "Image"` from a pipe's `inputs` when the same table declares its root `page`, which already supplies every field a template reads through it. The fix is safe, and applied, only when the root keeps the presence marker and multiplicity the table gave it: a key that set them otherwise, such as `"data.text" = "Text!"` declared after `data = "Text?"`, gets an unsafe fix that `pipelex fix bundle` never applies, and both the fix and the refusal name the marker to move onto the root. A lone dotted key gets no automatic fix, since nothing states its root's concept, and its refusal names the two remedies instead.
 
 ### Changed
 

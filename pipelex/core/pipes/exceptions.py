@@ -185,6 +185,7 @@ class PipeValidationError(ValueError):
         file_path: str | None = None,
         explanation: str | None = None,
         redundant_input_name: str | None = None,
+        dropped_input_marker: str | None = None,
     ):
         self.error_type = error_type
         self.domain_code = domain_code
@@ -208,6 +209,11 @@ class PipeValidationError(ValueError):
         # input-name check when that holds — the semantic fact the fix planner translates into
         # deleting the key, since the declared root already supplies every field a template reads.
         self.redundant_input_name = redundant_input_name
+        # Set beside `redundant_input_name` only when deleting that key would change its root's contract: the
+        # marker the key declares (`!`, `[]`, or the empty string for a plain single value), which, as the last
+        # declaration under its root, set the root's presence and multiplicity. The fix planner then offers the
+        # deletion as unsafe, naming that marker.
+        self.dropped_input_marker = dropped_input_marker
         self.file_path = file_path
         self.explanation = explanation
         super().__init__(message)
@@ -230,6 +236,8 @@ class PipeValidationError(ValueError):
             msg += f" • declared_inputs='{self.declared_inputs}'"
         if self.redundant_input_name:
             msg += f" • redundant_input_name='{self.redundant_input_name}'"
+        if self.dropped_input_marker is not None:
+            msg += f" • dropped_input_marker='{self.dropped_input_marker}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
         if self.explanation:

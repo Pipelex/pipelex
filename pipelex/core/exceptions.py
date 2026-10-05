@@ -71,6 +71,12 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # name or a malformed one leaves it unset, because its repair is the author's to choose.
     redundant_input_name: str | None = None
 
+    # Set beside ``redundant_input_name`` only when deleting that key would change its root's contract: the marker
+    # the key declares, as MTHDS writes it after the concept (``!``, ``[]``, or the empty string for a plain single
+    # value). As the last declaration under its root, the key set the root's presence and multiplicity, so the
+    # planner offers the deletion as unsafe and names the marker. Unset, the deletion is safe.
+    dropped_input_marker: str | None = None
+
 
 class PipesAndConceptValidationErrorData(BaseModel):
     """Structured validation error data for Pipe/Concept validation errors.

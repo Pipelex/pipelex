@@ -8,9 +8,13 @@ structurally. ``DELETE_KEY`` on ``["concept"]`` covers every authoring form (tab
 all normalize to a ``concept.<Code>`` key).
 """
 
+import pytest
+
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error
-from pipelex.suggested_fix import DeleteKeyOp, FixSafety, RenameTableKeyOp, SetKeyOp
+from pipelex.suggested_fix import DeleteKeyOp, FixSafety, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -50,6 +54,7 @@ def _invalid_input_name_error_data(
     variable_name: str,
     redundant_input_name: str | None,
     pipe_code: str | None = "describe_page",
+    dropped_input_marker: str | None = None,
 ) -> PipelexBundleBlueprintValidationErrorData:
     return PipelexBundleBlueprintValidationErrorData(
         error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
@@ -58,8 +63,38 @@ def _invalid_input_name_error_data(
         pipe_code=pipe_code,
         variable_names=[variable_name],
         redundant_input_name=redundant_input_name,
+        dropped_input_marker=dropped_input_marker,
         message=f"Input '{variable_name}' is not a plain input name.",
     )
+
+
+_REDUNDANT_INPUT_BUNDLE_HEADER = """domain = "dotted_safety"
+description = "Inputs declared once by their root and again by a dotted path into it"
+
+[concept]
+Item = "An item of an order"
+
+[pipe.read_input]
+type = "PipeLLM"
+description = "Reads a field of its input"
+output = "Text"
+"""
+
+
+def _fix_planned_from_inputs(input_specs: list[tuple[str, str]]) -> SuggestedFix:
+    """The fix planned for a bundle whose one pipe declares these inputs, in this order, through the parser and its categorizer."""
+    inputs_line = ", ".join(f'"{input_name}" = "{input_spec}"' for input_name, input_spec in input_specs)
+    dotted_name = next(input_name for input_name, _ in input_specs if "." in input_name)
+    mthds_content = f'{_REDUNDANT_INPUT_BUNDLE_HEADER}inputs = {{ {inputs_line} }}\nprompt = "Read ${dotted_name}"\n'
+    with pytest.raises(MthdsParserError) as exc_info:
+        MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="main.mthds")
+    errors = exc_info.value.validation_errors
+    assert len(errors) == 1, f"Expected exactly one error, got {[(error.error_type, error.message) for error in errors]}"
+    assert errors[0].error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+    fix = plan_fix_for_blueprint_validation_error(errors[0])
+    assert fix is not None
+    assert fix.fix_code == "delete-redundant-dotted-input"
+    return fix
 
 
 class TestBlueprintFixPlanner:
@@ -163,3 +198,128 @@ class TestBlueprintFixPlanner:
         """Without the pipe the key lives in there is no table to delete it from."""
         error_data = _invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name="page.page_view", pipe_code=None)
         assert plan_fix_for_blueprint_validation_error(error_data) is None
+
+    def test_redundant_dotted_input_dropping_a_marker_yields_an_unsafe_delete_naming_it(self) -> None:
+        """A deletion that would drop the key's marker from the root's contract is offered, but as UNSAFE, naming the marker and where to move it."""
+        fix = plan_fix_for_blueprint_validation_error(
+            _invalid_input_name_error_data(variable_name="data.text", redundant_input_name="data.text", dropped_input_marker="!")
+        )
+        assert fix is not None
+        assert fix.fix_code == "delete-redundant-dotted-input"
+        assert fix.safety == FixSafety.UNSAFE
+        assert fix.ops == [DeleteKeyOp(table_path=["pipe", "describe_page", "inputs"], key="data.text")]
+        assert "drops its marker `!`" in fix.description
+        assert "move `!` onto 'data' if the root must carry it" in fix.description
+
+    def test_redundant_dotted_input_dropping_its_plain_form_yields_an_unsafe_delete(self) -> None:
+        """A key with no marker under a root that carries one is the same contract change seen from the other side: UNSAFE, naming the plain form."""
+        fix = plan_fix_for_blueprint_validation_error(
+            _invalid_input_name_error_data(variable_name="data.text", redundant_input_name="data.text", dropped_input_marker="")
+        )
+        assert fix is not None
+        assert fix.safety == FixSafety.UNSAFE
+        assert "drops its plain single form" in fix.description
+        assert "declare 'data' without a marker if the root must be a plain single value" in fix.description
+
+    @pytest.mark.parametrize(
+        ("input_specs", "expected_safety", "deleted_key", "description_fragment"),
+        [
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text!")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its marker `!`, which 'data' does not carry: move `!` onto 'data' if the root must carry it",
+                id="key-forcing-an-optional-root-declared-after-it",
+            ),
+            pytest.param(
+                [("data.text", "Text!"), ("data", "Text?")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="key-forcing-an-optional-root-declared-before-it",
+            ),
+            pytest.param(
+                [("data", "Text!"), ("data.text", "Text!")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="equal-markers",
+            ),
+            pytest.param(
+                [("items", "Item"), ("items.x", "Text[]")],
+                FixSafety.UNSAFE,
+                "items.x",
+                "drops its marker `[]`, which 'items' does not carry: move `[]` onto 'items' if the root must carry it",
+                id="list-key-declared-after-its-single-root",
+            ),
+            pytest.param(
+                [("items.x", "Text[]"), ("items", "Item")],
+                FixSafety.SAFE,
+                "items.x",
+                None,
+                id="list-key-declared-before-its-single-root",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its plain single form",
+                id="plain-key-declared-after-its-optional-root",
+            ),
+            pytest.param(
+                [("page", "Page"), ("page.page_view", "Image")],
+                FixSafety.SAFE,
+                "page.page_view",
+                None,
+                id="differing-concept-root-first",
+            ),
+            pytest.param(
+                [("page.page_view", "Image"), ("page", "Page")],
+                FixSafety.SAFE,
+                "page.page_view",
+                None,
+                id="differing-concept-root-last",
+            ),
+            pytest.param(
+                [("data", "Text"), ("data.text", "Text[1]")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="count-of-one-is-the-single-form",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text!"), ("data.page", "Text?")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="key-followed-by-another-under-its-root",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text!"), ("page", "Page"), ("page.page_view", "Image")],
+                FixSafety.SAFE,
+                "page.page_view",
+                None,
+                id="safe-deletion-reported-before-an-unsafe-one",
+            ),
+        ],
+    )
+    def test_redundant_dotted_input_is_safe_to_delete_only_when_the_roots_contract_holds(
+        self,
+        input_specs: list[tuple[str, str]],
+        expected_safety: FixSafety,
+        deleted_key: str,
+        description_fragment: str | None,
+    ) -> None:
+        """Deleting a dotted key beside its root is SAFE only when the root keeps the presence marker and multiplicity it had.
+
+        Before dotted names were refused, every declaration under a root was folded onto that root in declaration order, so
+        the last one set the root's presence marker and multiplicity. The concepts never decide: a field's concept differs
+        from its root's by nature. With several keys under one root the table is read in order, and a SAFE deletion is
+        reported before an UNSAFE one so the fix loop makes progress first.
+        """
+        fix = _fix_planned_from_inputs(input_specs)
+
+        assert fix.safety == expected_safety
+        assert fix.ops == [DeleteKeyOp(table_path=["pipe", "read_input", "inputs"], key=deleted_key)]
+        if description_fragment is not None:
+            assert description_fragment in fix.description

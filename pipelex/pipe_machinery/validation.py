@@ -1,7 +1,8 @@
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping
 
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -125,15 +126,42 @@ def _binding_step(*, dotted_path: str) -> str:
     return f'`{{ from = "{dotted_path}", result = "{plain_name}" }}`'
 
 
-def _dotted_input_message(*, input_name: str, is_root_declared: bool) -> str:
-    """The refusal of a dotted input name, naming both remedies: read the field through the root, or bind it."""
+def dropped_input_marker_warning(*, input_name: str, dropped_input_marker: str) -> str:
+    """The warning that deleting a redundant dotted input drops the marker it declares, and where to move that marker.
+
+    Shared by the refusal's message and the fix planner's description, so a person reading either gets the same
+    warning. ``dropped_input_marker`` is written as MTHDS writes it after the concept, the empty string standing for
+    a plain single value, which carries no marker.
+    """
+    root_name = get_root_from_dotted_path(input_name)
+    if dropped_input_marker:
+        return (
+            f"Deleting '{input_name}' drops its marker `{dropped_input_marker}`, which '{root_name}' does not carry: "
+            f"move `{dropped_input_marker}` onto '{root_name}' if the root must carry it"
+        )
+    return (
+        f"Deleting '{input_name}' drops its plain single form, written with no marker, where '{root_name}' carries one: "
+        f"declare '{root_name}' without a marker if the root must be a plain single value"
+    )
+
+
+def _dotted_input_message(*, input_name: str, is_root_declared: bool, dropped_input_marker: str | None = None) -> str:
+    """The refusal of a dotted input name, naming both remedies: read the field through the root, or bind it.
+
+    When the root is declared and deleting the key would drop the marker it declares, the message warns of it
+    as the fix does, so a person reading the message does not delete the key blind.
+    """
     root_name = get_root_from_dotted_path(input_name)
     preamble = f"Input '{input_name}' is not a plain input name: an input names one whole value, so its name cannot reach into a field with a dot."
     binding_remedy = f"have the calling sequence bind the field to a plain name with a binding step ({_binding_step(dotted_path=input_name)})"
     if is_root_declared:
+        marker_warning = ""
+        if dropped_input_marker is not None:
+            marker_warning = f" {dropped_input_marker_warning(input_name=input_name, dropped_input_marker=dropped_input_marker)}."
         return (
             f"{preamble} '{root_name}' is already declared, so delete this key and read the field through '{root_name}' in the template "
-            f"(`${input_name}`). To hand the field to this pipe under a name of its own instead, {binding_remedy} and declare that name."
+            f"(`${input_name}`).{marker_warning} To hand the field to this pipe under a name of its own instead, {binding_remedy} and declare "
+            "that name."
         )
     return (
         f"{preamble} Either declare '{root_name}' with its whole concept and read the field through it in the template (`${input_name}`), "
@@ -141,30 +169,81 @@ def _dotted_input_message(*, input_name: str, is_root_declared: bool) -> str:
     )
 
 
-def validate_input_names(*, input_names: Sequence[str]) -> None:
+def _input_marker(*, input_spec: str) -> str:
+    """The marker an input declaration carries, as MTHDS writes it after the concept: its multiplicity suffix, then its presence symbol.
+
+    ``Text!`` carries ``!`` and ``Text[]`` carries ``[]``. A plain single value carries the empty string, and a count
+    of one is the single form, so ``Text[1]!`` carries ``!`` as ``Text!`` does.
+    """
+    parsed_spec = parse_concept_with_multiplicity(input_spec)
+    return format_concept_with_multiplicity("", multiplicity=parsed_spec.multiplicity, presence=parsed_spec.presence)
+
+
+def _dropped_input_marker(*, dotted_name: str, input_specs: Mapping[str, str]) -> str | None:
+    """The marker deleting a redundant dotted input would drop from its root's contract, or ``None`` when deleting it keeps that contract.
+
+    Before dotted names were refused, every declaration under a root, the root's own and each well-formed dotted
+    key's, was folded onto the root in declaration order, so the last one set the root's presence marker and
+    multiplicity. Deleting a key keeps that contract unless the key is the last declaration under its root and
+    carries another marker than the declaration before it, which would take over. The key's own marker is then
+    returned, for the fix and the message to name. Concepts are never compared: a field's concept differs from its
+    root's by nature, and typing the input by its root's whole concept is what refusing the dotted name is for.
+
+    When this is reported, the declaration before the key is the root itself, since a key followed by another under
+    the same root is always safe to delete and is reported first.
+    """
+    root_name = get_root_from_dotted_path(dotted_name)
+    names_under_root = [
+        input_name
+        for input_name in input_specs
+        if input_name == root_name or (_is_dotted_field_path(name=input_name) and get_root_from_dotted_path(input_name) == root_name)
+    ]
+    if names_under_root[-1] != dotted_name:
+        return None
+    dotted_marker = _input_marker(input_spec=input_specs[dotted_name])
+    if _input_marker(input_spec=input_specs[names_under_root[-2]]) == dotted_marker:
+        return None
+    return dotted_marker
+
+
+def validate_input_names(*, input_specs: Mapping[str, str]) -> None:
     """Refuse an `inputs` table holding a name that is not a plain input name.
 
     An input names one whole value, of the concept its slot declares, so its name is a plain snake_case
     identifier and never a dotted path into a field. One name is reported, chosen so the fix loop can
-    make progress: the first dotted name whose root the same table declares, which is redundant and
-    which the fix planner deletes, else the first name that is not plain, in declaration order.
+    make progress: the first dotted name whose root the same table declares and whose deletion keeps the
+    root's presence marker and multiplicity, which the fix planner deletes safely, else the first dotted
+    name whose root the same table declares, else the first name that is not plain, in declaration order.
+
+    Args:
+        input_specs: Each input name, in declaration order, mapped to its concept spec with its markers
+            (``Text?``, ``Item[]``). The specs are already valid, as the blueprint checks them first.
 
     Raises:
         PipeValidationError: ``INVALID_INPUT_NAME`` naming the input, with ``redundant_input_name`` set
-            when the name is dotted and its root is declared beside it.
+            when the name is dotted and its root is declared beside it, and ``dropped_input_marker`` set
+            besides when deleting it would drop the marker it declares from the root's contract.
     """
-    invalid_names = [input_name for input_name in input_names if not is_valid_input_name(input_name)]
+    invalid_names = [input_name for input_name in input_specs if not is_valid_input_name(input_name)]
     if not invalid_names:
         return
-    declared_names = set(input_names)
-    for invalid_name in invalid_names:
-        if _is_dotted_field_path(name=invalid_name) and get_root_from_dotted_path(invalid_name) in declared_names:
-            raise PipeValidationError(
-                message=_dotted_input_message(input_name=invalid_name, is_root_declared=True),
-                error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
-                variable_names=[invalid_name],
-                redundant_input_name=invalid_name,
-            )
+    redundant_names = [
+        invalid_name
+        for invalid_name in invalid_names
+        if _is_dotted_field_path(name=invalid_name) and get_root_from_dotted_path(invalid_name) in input_specs
+    ]
+    if redundant_names:
+        dropped_markers = {
+            redundant_name: _dropped_input_marker(dotted_name=redundant_name, input_specs=input_specs) for redundant_name in redundant_names
+        }
+        reported_name = next((redundant_name for redundant_name in redundant_names if dropped_markers[redundant_name] is None), redundant_names[0])
+        raise PipeValidationError(
+            message=_dotted_input_message(input_name=reported_name, is_root_declared=True, dropped_input_marker=dropped_markers[reported_name]),
+            error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
+            variable_names=[reported_name],
+            redundant_input_name=reported_name,
+            dropped_input_marker=dropped_markers[reported_name],
+        )
     first_invalid_name = invalid_names[0]
     if _is_dotted_field_path(name=first_invalid_name):
         msg = _dotted_input_message(input_name=first_invalid_name, is_root_declared=False)

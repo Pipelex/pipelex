@@ -6,6 +6,7 @@ of the validation report — CLI, API, MCP — sees fixes with zero extra plumbi
 """
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.pipe_machinery.validation import dropped_input_marker_warning
 from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixOp, FixSafety, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
@@ -19,7 +20,9 @@ DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE = "delete-redundant-dotted-input"
 # SAFE rule constant above must be added here; the CLI rejects codes outside this set loudly (a typo'd
 # filter selects *behavior*, so lenient-ignore is wrong). An UNSAFE rule stays out: the loop never applies
 # it, so accepting it in `--select` would promise a fix the command then silently skips. `rename-model`
-# is the one such rule today.
+# is the one such rule today. A rule that is SAFE on some errors and UNSAFE on others, such as
+# `delete-redundant-dotted-input`, stays in: `--select` picks its SAFE fixes, and its UNSAFE ones are
+# skipped like any other.
 KNOWN_FIX_CODES: frozenset[str] = frozenset(
     {
         MATCH_SEQUENCE_OUTPUT_FIX_CODE,
@@ -193,19 +196,31 @@ def _plan_delete_redundant_dotted_input(*, error_data: PipelexBundleBlueprintVal
     ``redundant_input_name`` becomes a ``delete_key`` of that key in the pipe's ``inputs`` table.
 
     The enrichment is set only when the same table declares the dotted name's root, which already
-    supplies every field a template reads through it, so deleting the key changes nothing a run does: the
-    fix is ``SAFE``. A lone dotted name, whose root's concept nothing states, and a malformed name carry
-    no enrichment and are suppressed here structurally; their message names the remedies for the author.
+    supplies every field a template reads through it. The fix is ``SAFE`` when deleting the key also
+    keeps the root's presence marker and multiplicity as the table's last declaration under the root set
+    them. When it would not, ``dropped_input_marker`` names the marker the key declares, and the fix is
+    ``UNSAFE``: deleting the key would change what a run requires, so ``pipelex fix bundle`` never
+    applies it, and its description says to move the marker onto the root if the root must carry it. A
+    lone dotted name, whose root's concept nothing states, and a malformed name carry no enrichment and
+    are suppressed here structurally; their message names the remedies for the author.
     """
     if error_data.redundant_input_name is None or error_data.pipe_code is None:
         return None
+    description = (
+        f"Delete the dotted input '{error_data.redundant_input_name}' of pipe '{error_data.pipe_code}': its root is declared "
+        "beside it, and a template reads the field through the root"
+    )
+    safety = FixSafety.SAFE
+    if error_data.dropped_input_marker is not None:
+        marker_warning = dropped_input_marker_warning(
+            input_name=error_data.redundant_input_name, dropped_input_marker=error_data.dropped_input_marker
+        )
+        description = f"{description}. {marker_warning}"
+        safety = FixSafety.UNSAFE
     return SuggestedFix(
         fix_code=DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE,
-        description=(
-            f"Delete the dotted input '{error_data.redundant_input_name}' of pipe '{error_data.pipe_code}': its root is declared "
-            "beside it, and a template reads the field through the root"
-        ),
-        safety=FixSafety.SAFE,
+        description=description,
+        safety=safety,
         source=error_data.source,
         ops=[
             DeleteKeyOp(

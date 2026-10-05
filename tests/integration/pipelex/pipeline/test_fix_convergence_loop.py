@@ -434,6 +434,22 @@ Describe this catalog page:
 \"\"\"
 """
 
+_MARKER_DROPPING_DOTTED_INPUT_MTHDS = """domain = "dottedfix_marker"
+main_pipe = "summarize_draft"
+
+# Wrong on purpose: a dotted input key beside its declared root, declared after it with another presence
+# marker. The key forces the root the author declared optional, so deleting it would change the contract.
+[pipe.summarize_draft]
+type = "PipeLLM"
+description = "Summarize the text of a draft."
+inputs = { draft = "Text?", "draft.text" = "Text!" }
+output = "Text"
+prompt = \"\"\"
+Summarize this draft:
+$draft.text
+\"\"\"
+"""
+
 _LONE_DOTTED_INPUT_MTHDS = """domain = "dottedfix_lone"
 main_pipe = "describe_page"
 
@@ -987,3 +1003,28 @@ class TestFixConvergenceLoop:
         assert remaining.message is not None
         assert "declare 'page' with its whole concept" in remaining.message
         assert '{ from = "page.page_view", result = "page_view" }' in remaining.message
+
+    async def test_marker_dropping_dotted_input_is_offered_but_never_applied(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A dotted input whose deletion would drop its marker from the root gets an UNSAFE fix, which the loop leaves to the author."""
+        load_empty_library()
+        bundle_path = tmp_path / "marker_dropping_dotted.mthds"
+        bundle_path.write_text(_MARKER_DROPPING_DOTTED_INPUT_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is False
+        assert result.iterations == 0
+        assert result.fixes_applied == []
+        assert bundle_path.read_text(encoding="utf-8") == _MARKER_DROPPING_DOTTED_INPUT_MTHDS
+        assert [item.error_type for item in result.remaining_errors] == ["invalid_input_name"]
+        remaining = result.remaining_errors[0]
+        assert remaining.suggested_fix is not None
+        assert remaining.suggested_fix.fix_code == "delete-redundant-dotted-input"
+        assert not remaining.suggested_fix.safety.is_safe
+        assert "move `!` onto 'draft' if the root must carry it" in remaining.suggested_fix.description
+        assert remaining.message is not None
+        assert "Deleting 'draft.text' drops its marker `!`" in remaining.message
