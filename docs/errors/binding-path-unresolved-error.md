@@ -7,7 +7,7 @@ description: "Reference for the `BindingPathUnresolvedError` Pipelex error class
 
 # Binding path unresolved
 
-A binding step's `from` path that the declared structures cannot walk.
+A binding step's `from` path that cannot be walked before the run: the declared structures do not hold it, or the concept of its root is not known.
 
 | Field | Value |
 |---|---|

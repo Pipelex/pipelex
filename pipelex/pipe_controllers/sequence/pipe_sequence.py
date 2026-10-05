@@ -120,6 +120,7 @@ class PipeSequence(PipeController):
         return {
             name: MemoryWrite(
                 stuff_spec=slot.stuff_spec,
+                disagreement=slot.disagreement,
                 absence=taint_analysis.final_slot_taints.get(name),
                 is_always_written=name in typed_flow.always_written_names,
             )
@@ -259,34 +260,41 @@ class PipeSequence(PipeController):
             if not isinstance(step, SubPipe):
                 continue
             binding_slots = typed_flow.binding_slots_by_pipe_step.get(step_index)
-            if not binding_slots:
-                continue
-            step_pipe = get_optional_pipe(pipe_code=step.pipe_code)
-            if step_pipe is None:
-                continue
-            step_needs = step_pipe.needed_inputs()
-            batch_item_name: str | None = None
-            if step.batch_params is not None:
-                batch_item_name = step.batch_params.input_item_stuff_name
-                list_slot = binding_slots.get(step.batch_params.input_list_stuff_name)
-                item_need = step_needs.root.get(batch_item_name)
-                if list_slot is not None and list_slot.stuff_spec is not None and item_need is not None:
-                    self._check_binding_consumer(
-                        step_index=step_index,
-                        step_pipe_code=step_pipe.code,
-                        variable_name=step.batch_params.input_list_stuff_name,
-                        slot=list_slot,
-                        needed_spec=StuffSpec(concept=item_need.concept, multiplicity=True),
-                    )
-            for input_name, needed_spec in step_needs.items:
-                if input_name == batch_item_name:
-                    continue
-                slot = binding_slots.get(input_name)
-                if slot is None or slot.stuff_spec is None:
-                    continue
+            if binding_slots:
+                self._check_step_reading_bindings(step_index=step_index, step=step, binding_slots=binding_slots)
+
+    def _check_step_reading_bindings(self, *, step_index: int, step: SubPipe, binding_slots: dict[str, FlowSlot]) -> None:
+        """Refuse a pipe step reading, among the bindings' results it can see, one whose spec its pipe does not need.
+
+        Raises:
+            PipeValidationError: ``INPUT_STUFF_SPEC_MISMATCH`` naming the step and the binding.
+        """
+        step_pipe = get_optional_pipe(pipe_code=step.pipe_code)
+        if step_pipe is None:
+            return
+        step_needs = step_pipe.needed_inputs()
+        batch_item_name: str | None = None
+        if step.batch_params is not None:
+            batch_item_name = step.batch_params.input_item_stuff_name
+            list_slot = binding_slots.get(step.batch_params.input_list_stuff_name)
+            item_need = step_needs.root.get(batch_item_name)
+            if list_slot is not None and list_slot.stuff_spec is not None and item_need is not None:
                 self._check_binding_consumer(
-                    step_index=step_index, step_pipe_code=step_pipe.code, variable_name=input_name, slot=slot, needed_spec=needed_spec
+                    step_index=step_index,
+                    step_pipe_code=step_pipe.code,
+                    variable_name=step.batch_params.input_list_stuff_name,
+                    slot=list_slot,
+                    needed_spec=StuffSpec(concept=item_need.concept, multiplicity=True),
                 )
+        for input_name, needed_spec in step_needs.items:
+            if input_name == batch_item_name:
+                continue
+            slot = binding_slots.get(input_name)
+            if slot is None or slot.stuff_spec is None:
+                continue
+            self._check_binding_consumer(
+                step_index=step_index, step_pipe_code=step_pipe.code, variable_name=input_name, slot=slot, needed_spec=needed_spec
+            )
 
     def final_binding_spec(self) -> StuffSpec | None:
         """The spec the binding step ending the sequence binds, `None` when the last step runs a pipe or the flow cannot type the binding's root.
@@ -404,7 +412,8 @@ class PipeSequence(PipeController):
             typed_flow = self.build_typed_flow()
             binding_spec = typed_flow.binding_specs.get(len(self.sequential_sub_pipes) - 1)
             if binding_spec is None:
-                # A root the flow cannot type: nothing says what the binding derives, so only its absence is checked.
+                # A root a pipe that does not resolve stored: nothing says what the binding derives, so only its absence is
+                # checked here, and the run checks the binding it derives against the output (`_refuse_runtime_output_mismatch`).
                 self._refuse_escaping_absence(taint_analysis=self._analyze_taint(visited_pipes=None, typed_flow=typed_flow))
                 return
             last_step_concept = binding_spec.concept
@@ -740,6 +749,8 @@ class PipeSequence(PipeController):
     ) -> PipeOutput:
         evolving_memory = working_memory
         typed_flow: SequenceTypedFlow | None = None
+        # By step index, each binding the run derived from the value its root held, the flow having no spec for that root.
+        runtime_bindings: dict[int, DerivedBinding] = {}
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
             is_last_step = sub_pipe_index == len(self.sequential_sub_pipes) - 1
@@ -750,12 +761,17 @@ class PipeSequence(PipeController):
                     binding_step=sub_pipe,
                     step_index=sub_pipe_index,
                     typed_flow=typed_flow,
+                    runtime_bindings=runtime_bindings,
                     working_memory=evolving_memory,
                     job_metadata=job_metadata,
                     pipe_run_params=pipe_run_params,
                     is_last_step=is_last_step,
                 )
                 continue
+            if runtime_bindings and typed_flow is not None:
+                self._refuse_runtime_consumer_mismatch(
+                    step_index=sub_pipe_index, step=sub_pipe, typed_flow=typed_flow, runtime_bindings=runtime_bindings
+                )
             # Only the last step should apply the final_stuff_code
             if is_last_step:
                 sub_pipe_run_params = pipe_run_params.model_copy()
@@ -786,6 +802,7 @@ class PipeSequence(PipeController):
         binding_step: BindingStep,
         step_index: int,
         typed_flow: SequenceTypedFlow,
+        runtime_bindings: dict[int, DerivedBinding],
         working_memory: WorkingMemory,
         job_metadata: JobMetadata,
         pipe_run_params: PipeRunParams,
@@ -793,15 +810,21 @@ class PipeSequence(PipeController):
     ) -> None:
         """Bind one value into the working memory, as a node of the execution graph producing the stuff it binds.
 
-        A binding whose root the flow cannot type, a name the outcomes of a condition store under different concepts, is
-        derived from the value the run holds under it, or skipped when the root holds a recorded absence.
+        A binding whose root the flow cannot type, a value a pipe that did not resolve at validation stored, is derived from
+        the value the run holds under it, recorded in `runtime_bindings`, and checked against the sequence's output when it
+        ends the sequence; it is skipped when the root holds a recorded absence.
 
         Raises:
-            BindingStepRunError: When the path cannot be walked from the concept of the value the root holds.
+            BindingStepRunError: When the path cannot be walked from the concept of the value the root holds, or when the
+                binding derived from it ends the sequence and contradicts its declared output.
         """
         derived_binding = self._derived_binding(
             binding_step=binding_step, step_index=step_index, typed_flow=typed_flow, working_memory=working_memory
         )
+        if derived_binding is not None and step_index not in typed_flow.binding_specs:
+            runtime_bindings[step_index] = derived_binding
+            if is_last_step:
+                self._refuse_runtime_output_mismatch(binding_step=binding_step, derived_binding=derived_binding)
         node_id = binding_step.trace_start(job_metadata=job_metadata, working_memory=working_memory, domain_code=self.domain_code)
         outcome: BindingOutcome | None = None
         try:
@@ -857,8 +880,61 @@ class PipeSequence(PipeController):
             )
         except PipeValidationError as exc:
             msg = (
-                f"{exc} The sequence's flow could not type '{binding_step.root_name}', which the outcomes of a condition "
-                f"store under different concepts, so the binding was derived from the '{root_stuff.concept.concept_ref}' it holds."
+                f"{exc} The sequence's flow could not type '{binding_step.root_name}', which a pipe that did not resolve at "
+                f"validation stores, so the binding was derived from the '{root_stuff.concept.concept_ref}' it holds."
+            )
+            raise BindingStepRunError(msg) from exc
+
+    def _refuse_runtime_output_mismatch(self, *, binding_step: BindingStep, derived_binding: DerivedBinding) -> None:
+        """Refuse a binding ending the sequence, derived when it ran, that contradicts the sequence's declared output, as
+        validation refuses one it derives: its concept, its multiplicity, and a result that may be absent behind a plain output.
+
+        Raises:
+            BindingStepRunError: Naming the binding, what it binds and the declared output.
+        """
+        bound_spec = derived_binding.stuff_spec
+        is_concept_ok = get_concept_library().is_compatible(tested_concept=bound_spec.concept, wanted_concept=self.output.concept)
+        is_multiplicity_ok = is_multiplicity_compatible(source_multiplicity=bound_spec.multiplicity, target_multiplicity=self.output.multiplicity)
+        is_presence_ok = not derived_binding.derivation.may_find_nothing or self.output.presence.is_optional
+        if is_concept_ok and is_multiplicity_ok and is_presence_ok:
+            return
+        bound_ref = StuffSpec(
+            concept=bound_spec.concept,
+            multiplicity=bound_spec.multiplicity,
+            presence=PresenceMarker.OPTIONAL if derived_binding.derivation.may_find_nothing else PresenceMarker.PLAIN,
+        ).to_bundle_representation(relative_to_domain=self.domain_code)
+        declared_ref = self.output.to_bundle_representation(relative_to_domain=self.domain_code)
+        msg = (
+            f"In pipe '{self.code}', the binding step {binding_step.as_written} ends the sequence, whose output is declared "
+            f"'{declared_ref}', but it binds '{bound_ref}'. A pipe that did not resolve at validation stored '{binding_step.root_name}', "
+            "so the binding was derived when it ran, from the value it found. Declare the sequence's output as what the binding binds, "
+            "or bind a path that reaches the declared output."
+        )
+        raise BindingStepRunError(msg)
+
+    def _refuse_runtime_consumer_mismatch(
+        self, *, step_index: int, step: SubPipe, typed_flow: SequenceTypedFlow, runtime_bindings: dict[int, DerivedBinding]
+    ) -> None:
+        """Refuse a pipe step reading the result of a binding derived when it ran as a spec its pipe does not need, as
+        validation refuses one reading a binding it derives.
+
+        Raises:
+            BindingStepRunError: Naming the step, the binding and both specs.
+        """
+        runtime_slots: dict[str, FlowSlot] = {}
+        for name, slot in typed_flow.binding_slots_by_pipe_step.get(step_index, {}).items():
+            if slot.binding_step_index is None or slot.binding_step_index not in runtime_bindings:
+                continue
+            runtime_spec = runtime_bindings[slot.binding_step_index].stuff_spec
+            runtime_slots[name] = FlowSlot(stuff_spec=runtime_spec, binding_step_index=slot.binding_step_index)
+        if not runtime_slots:
+            return
+        try:
+            self._check_step_reading_bindings(step_index=step_index, step=step, binding_slots=runtime_slots)
+        except PipeValidationError as exc:
+            msg = (
+                f"{exc} The binding was derived when it ran, from the value its root held, since a pipe that did not resolve at "
+                "validation stored the root."
             )
             raise BindingStepRunError(msg) from exc
 

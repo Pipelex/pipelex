@@ -11,6 +11,8 @@ of the memory, so they store nothing beyond their result.
 the absence-taint pass is in `pipelex.pipe_controllers.absence_taint`.
 """
 
+from typing import NamedTuple
+
 from pydantic import BaseModel, ConfigDict
 from pydantic.dataclasses import dataclass
 
@@ -32,14 +34,46 @@ class SlotTaint:
         return description
 
 
+class StoredSpec(BaseModel):
+    """One of the values a name may hold once a step returns, and what stores it, as a message names it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # What stores the value, written to precede "as 'X'", e.g. "outcome 'stash_parcel' of pipe 'stash_by_mode'".
+    stored_by: str
+    stuff_spec: StuffSpec
+
+
+class SpecDisagreement(BaseModel):
+    """Why a name has no spec before the run although every value it may hold has one: the values have different specs.
+
+    That is a condition whose outcomes store the name under different specs, or one whose outcomes store a value of another
+    spec than the one an outcome storing nothing leaves. Unlike a value a pipe that does not resolve stores, which nothing
+    can type before the run, the disagreement is seen at validation, so a binding reading the name is refused there.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    stored_specs: tuple[StoredSpec, ...]
+
+    def describe(self, *, relative_to_domain: str) -> str:
+        """Each value and what stores it, e.g. "outcome 'stash_crate' of pipe 'stash_by_mode' as 'Crate'; outcome ... as 'Parcel'"."""
+        return "; ".join(
+            f"{stored_spec.stored_by} as '{stored_spec.stuff_spec.to_bundle_representation(relative_to_domain=relative_to_domain)}'"
+            for stored_spec in self.stored_specs
+        )
+
+
 class MemoryWrite(BaseModel):
     """What a pipe stores under one name of the memory it runs on, besides its result."""
 
     model_config = ConfigDict(frozen=True)
 
-    # The spec of the value stored, `None` when it cannot be typed: a pipe that does not resolve stored it, or the outcomes
-    # of a condition store it under different specs.
+    # The spec of the value stored, `None` when it cannot be typed: a pipe that does not resolve stored it, or the values the
+    # name may hold have different specs, which `disagreement` then says.
     stuff_spec: StuffSpec | None
+    # Set only when `stuff_spec` is `None` because the values the name may hold have different specs.
+    disagreement: SpecDisagreement | None = None
     # Why the name may hold an absence once the pipe returns, `None` when it always holds a value; a list never holds one.
     absence: SlotTaint | None = None
     # Whether every run of the pipe that returns stores the name. A run that does not, a condition's outcome that stores
@@ -55,29 +89,58 @@ def is_same_value_spec(*, first_spec: StuffSpec | None, second_spec: StuffSpec |
     return first_spec.concept == second_spec.concept and first_spec.multiplicity == second_spec.multiplicity
 
 
-def merge_alternative_writes(*, alternatives: list[dict[str, MemoryWrite]]) -> dict[str, MemoryWrite]:
+class AlternativeWrites(NamedTuple):
+    """What one alternative stores, and how a message names it, e.g. "outcome 'stash_parcel' of pipe 'stash_by_mode'"."""
+
+    label: str
+    writes: dict[str, MemoryWrite]
+
+
+def merge_alternative_writes(*, alternatives: list[AlternativeWrites]) -> dict[str, MemoryWrite]:
     """What a pipe stores when exactly one of several alternatives runs, as a condition runs one of its outcomes.
 
     A name is always written only if every alternative always writes it. It may hold an absence if any alternative may leave
     one. It keeps a spec only if every alternative storing it stores the same value spec; an alternative that does not store
     it leaves the caller's value, which the caller merges with what the name held before (`is_always_written` is then false).
+    A name left untyped records why when it is seen before the run (`SpecDisagreement`): the alternatives typing it store it
+    under different specs, or one of them stores it with a disagreement of its own. Otherwise an alternative that could not
+    type it, a pipe that does not resolve having stored it, leaves it untyped with no disagreement.
     """
     merged_writes: dict[str, MemoryWrite] = {}
-    for alternative_writes in alternatives:
-        for written_name in alternative_writes:
+    for alternative in alternatives:
+        for written_name in alternative.writes:
             if written_name in merged_writes:
                 continue
-            name_writes = [other_writes.get(written_name) for other_writes in alternatives]
-            stored_writes = [name_write for name_write in name_writes if name_write is not None]
+            name_writes = [other.writes.get(written_name) for other in alternatives]
+            labeled_writes = [(other.label, other.writes[written_name]) for other in alternatives if written_name in other.writes]
+            stored_writes = [name_write for _, name_write in labeled_writes]
             first_spec = stored_writes[0].stuff_spec
             is_typed = all(is_same_value_spec(first_spec=first_spec, second_spec=name_write.stuff_spec) for name_write in stored_writes)
             absences = [name_write.absence for name_write in stored_writes if name_write.absence is not None]
             merged_writes[written_name] = MemoryWrite(
                 stuff_spec=first_spec if is_typed else None,
+                disagreement=None if is_typed else _alternatives_disagreement(labeled_writes=labeled_writes),
                 absence=absences[0] if absences else None,
                 is_always_written=all(name_write is not None and name_write.is_always_written for name_write in name_writes),
             )
     return merged_writes
+
+
+def _alternatives_disagreement(*, labeled_writes: list[tuple[str, MemoryWrite]]) -> SpecDisagreement | None:
+    """Why the alternatives storing a name leave it untyped, when it is seen before the run: the specs they store disagree, or
+    one of them stores the name with a disagreement of its own. `None` when an alternative could not type the name at all.
+    """
+    typed_specs: list[StoredSpec] = []
+    for label, name_write in labeled_writes:
+        if name_write.stuff_spec is not None:
+            typed_specs.append(StoredSpec(stored_by=label, stuff_spec=name_write.stuff_spec))
+    first_typed_spec = typed_specs[0].stuff_spec if typed_specs else None
+    if any(not is_same_value_spec(first_spec=first_typed_spec, second_spec=typed_spec.stuff_spec) for typed_spec in typed_specs):
+        return SpecDisagreement(stored_specs=tuple(typed_specs))
+    for _, name_write in labeled_writes:
+        if name_write.disagreement is not None:
+            return name_write.disagreement
+    return None
 
 
 def taint_after_write(*, prior_taint: SlotTaint | None, memory_write: MemoryWrite) -> SlotTaint | None:

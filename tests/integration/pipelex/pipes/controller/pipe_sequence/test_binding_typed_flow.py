@@ -22,6 +22,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.test_extras.mthds_corpus.resources import entries_root
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.integration.pipelex.pipes.controller.pipe_sequence.unresolved_pipes import hide_pipe_from_sequence_analyses
 
 if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
@@ -322,6 +323,52 @@ steps = [
 """
 
 
+# A parcel the depot weighs, whose producer the tests hide from the sequence's analyses (`hide_pipe_from_sequence_analyses`), as
+# a pipe that does not resolve at validation: the flow cannot type `parcel`, so a binding reading it is derived when it runs.
+_UNRESOLVED_PRODUCER_HEADER = """domain = "depot_carriers"
+description = "Reading a parcel a pipe that does not resolve at validation weighs"
+main_pipe = "read_parcel"
+
+[concept.Parcel]
+description = "A parcel received at the depot"
+
+[concept.Parcel.structure]
+weight = { type = "number", description = "The weight, in kilograms", required = true }
+carrier = { type = "text", description = "The carrier who brought it", required = true }
+
+[pipe.weigh_parcel]
+type = "PipeCompose"
+description = "Writes out a parcel of a given weight"
+inputs = { amount = "Number" }
+output = "Parcel"
+
+[pipe.weigh_parcel.construct]
+weight = { from = "amount.number" }
+carrier = "Depot Express"
+
+[pipe.write_note]
+type = "PipeCompose"
+description = "Writes a note on what was weighed"
+inputs = { weight = "Number" }
+output = "Text"
+template = "Weighed $weight kilograms"
+"""
+
+
+def _unresolved_producer_bundle(*, output: str, steps: list[str]) -> str:
+    """The bundle with a sequence weighing a parcel, then running `steps` over it."""
+    return (
+        f"{_UNRESOLVED_PRODUCER_HEADER}\n"
+        "[pipe.read_parcel]\n"
+        'type = "PipeSequence"\n'
+        'description = "Weighs a parcel, then reads it"\n'
+        'inputs = { amount = "Number" }\n'
+        f'output = "{output}"\n'
+        "steps = [\n"
+        '  { pipe = "weigh_parcel", result = "parcel" },\n' + "".join(f"  {step},\n" for step in steps) + "]\n"
+    )
+
+
 def _called_binding_bundle(*, called_pipe: str, step_count: str, output: str) -> str:
     """The bundle with a sequence calling one of those ending with a binding, asking it for a count of outputs."""
     return (
@@ -479,18 +526,13 @@ class TestBindingTypedFlow:
             pytest.param(
                 {'crate = "swap_for_crate"': 'crate = "swap_for_parcel"'}, "crate", "depot_swaps.Parcel", id="a-condition-whose-outcomes-agree"
             ),
-            pytest.param({}, "parcel", None, id="a-condition-whose-outcomes-disagree-running-one"),
-            pytest.param({}, "crate", None, id="a-condition-whose-outcomes-disagree-running-the-other"),
         ],
     )
     async def test_a_name_a_nested_controller_stores_types_the_binding_reading_it(
-        self, load_empty_library: Callable[[], str], replacements: dict[str, str], mode: str | None, typed_record_ref: str | None
+        self, load_empty_library: Callable[[], str], replacements: dict[str, str], mode: str | None, typed_record_ref: str
     ) -> None:
         """A nested sequence, or a condition's outcome, runs on the caller's memory, so what it stores is stored by the step
         running it, and the caller needs no input of that name.
-
-        When the outcomes of a condition store a name under different concepts, the flow cannot type it, and the run derives the
-        binding from the value it holds.
         """
         mthds_content = _NESTED_WRITES_BUNDLE
         for old_text, new_text in replacements.items():
@@ -501,13 +543,9 @@ class TestBindingTypedFlow:
         flow = sequence.build_typed_flow()
 
         record_spec = flow.final_slots["record"].stuff_spec
-        if typed_record_ref is None:
-            assert record_spec is None
-            assert 1 not in flow.binding_derivations
-        else:
-            assert record_spec is not None
-            assert record_spec.concept.concept_ref == typed_record_ref
-            assert flow.binding_specs[1].concept.concept_ref == "native.Number"
+        assert record_spec is not None
+        assert record_spec.concept.concept_ref == typed_record_ref
+        assert flow.binding_specs[1].concept.concept_ref == "native.Number"
 
         inputs: PipelineInputs = {"amount": {"concept": "native.Number", "content": {"number": 7.5}}}
         if mode is not None:
@@ -517,32 +555,55 @@ class TestBindingTypedFlow:
         assert response.pipe_output.main_stuff.concept.concept_ref == "native.Number"
         assert response.pipe_output.main_stuff_as_number.number == 7.5
 
-    @pytest.mark.asyncio(loop_scope="class")
-    async def test_a_value_a_continue_outcome_leaves_in_place_is_bound_by_the_concept_it_holds(self, load_empty_library: Callable[[], str]) -> None:
-        """A `continue` outcome stores nothing, so the name holds either the caller's value or the other outcome's: the flow
-        cannot type it, and the run refuses a path the value it holds has no field for.
+    @pytest.mark.parametrize(
+        ("replacements", "stored_specs"),
+        [
+            pytest.param(
+                {},
+                "outcome 'swap_for_crate' of pipe 'swap_record' as 'Crate'; outcome 'swap_for_parcel' of pipe 'swap_record' as 'Parcel'",
+                id="outcomes-storing-different-concepts",
+            ),
+            pytest.param(
+                {
+                    # A `continue` outcome stores nothing, so the condition may hold nothing and leaves the caller's record in place.
+                    'crate = "swap_for_crate"': 'crate = "continue"',
+                    'output = "Text"\nexpression': 'output = "Text?"\nexpression',
+                    'what replaced it"\ninputs = { amount = "Number", mode = "Text" }': (
+                        'what replaced it"\ninputs = { record = "Invoice", amount = "Number", mode = "Text" }'
+                    ),
+                },
+                (
+                    "the value it held before step 1 (pipe 'swap_record'), which the step leaves when it stores nothing, as 'Invoice'; "
+                    "step 1 (pipe 'swap_record'), when it stores a value, as 'Parcel'"
+                ),
+                id="an-outcome-storing-another-concept-than-the-one-continue-leaves",
+            ),
+        ],
+    )
+    def test_a_root_stored_under_different_concepts_is_refused_before_the_run(
+        self, load_empty_library: Callable[[], str], replacements: dict[str, str], stored_specs: str
+    ) -> None:
+        """Regression: the flow could not type a root the outcomes of a condition store under different concepts, so its binding
+        was derived when it ran and the sequence could return a concept other than the one it declares. The binding is refused
+        before the run, naming each outcome and what it stores.
         """
-        # A condition with a `continue` outcome may hold nothing, so its output is declared optional, and it may leave the record
-        # as the caller had it, so the caller provides one.
-        mthds_content = _NESTED_WRITES_BUNDLE.replace('crate = "swap_for_crate"', 'crate = "continue"')
-        mthds_content = mthds_content.replace('output = "Text"\nexpression', 'output = "Text?"\nexpression')
-        mthds_content = mthds_content.replace(
-            'what replaced it"\ninputs = { amount = "Number", mode = "Text" }',
-            'what replaced it"\ninputs = { record = "Invoice", amount = "Number", mode = "Text" }',
+        mthds_content = _NESTED_WRITES_BUNDLE
+        for old_text, new_text in replacements.items():
+            assert old_text in mthds_content
+            mthds_content = mthds_content.replace(old_text, new_text)
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_swapped_weight")
+
+        assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+        assert exc_info.value.pipe_code == "read_swapped_weight"
+        message = str(exc_info.value)
+        assert 'the binding step { from = "record.weight", result = "weight" } cannot be derived' in message
+        assert (
+            "the concept of 'record' is not known before the run, because the outcomes that may store it store it under different concepts" in message
         )
-        sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_swapped_weight")
-        assert sequence.build_typed_flow().final_slots["record"].stuff_spec is None
-        inputs: PipelineInputs = {
-            "record": {"concept": "depot_swaps.Invoice", "content": {"total": 120}},
-            "amount": {"concept": "native.Number", "content": {"number": 7.5}},
-            "mode": "crate",
-        }
-
-        with pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[mthds_content], inputs=inputs)
-
-        assert "'record' holds a 'depot_swaps.Invoice', which has no field 'weight'" in str(exc_info.value)
-        assert "so the binding was derived from the 'depot_swaps.Invoice' it holds" in str(exc_info.value)
+        assert stored_specs in message
+        assert "Store 'record' under one concept in every outcome, or bind inside each outcome" in message
 
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(
@@ -671,3 +732,81 @@ class TestBindingTypedFlow:
         message = str(exc_info.value)
         assert "Pipe 'read_written_total' failed" in message
         assert "Binding 'invoice.total' was derived as a single value, but its root 'invoice' holds a list of 2 items" in message
+
+    @pytest.mark.asyncio(loop_scope="class")
+    @pytest.mark.parametrize(
+        ("output", "steps", "expected_output"),
+        [
+            pytest.param("Number", ['{ from = "parcel.weight", result = "weight" }'], 7.5, id="a-final-binding"),
+            pytest.param(
+                "Text",
+                ['{ from = "parcel.weight", result = "weight" }', '{ pipe = "write_note", result = "note" }'],
+                "Weighed 7.5 kilograms",
+                id="a-binding-read-by-a-later-step",
+            ),
+        ],
+    )
+    async def test_a_root_a_pipe_unresolved_at_validation_stores_is_bound_when_it_runs(
+        self, load_empty_library: Callable[[], str], mocker: MockerFixture, output: str, steps: list[str], expected_output: float | str
+    ) -> None:
+        """A pipe that does not resolve at validation is assumed to deliver, so the binding reading what it stores is derived
+        when it runs, from the value it finds, and runs when that value fits what reads it.
+        """
+        hide_pipe_from_sequence_analyses(mocker=mocker, pipe_code="weigh_parcel")
+        mthds_content = _unresolved_producer_bundle(output=output, steps=steps)
+        sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_parcel")
+        assert 1 not in sequence.build_typed_flow().binding_specs
+
+        response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(
+            mthds_contents=[mthds_content], inputs={"amount": {"concept": "native.Number", "content": {"number": 7.5}}}
+        )
+
+        if isinstance(expected_output, str):
+            assert response.pipe_output.main_stuff_as_str == expected_output
+        else:
+            assert response.pipe_output.main_stuff_as_number.number == expected_output
+
+    @pytest.mark.asyncio(loop_scope="class")
+    @pytest.mark.parametrize(
+        ("output", "steps", "message_fragments"),
+        [
+            pytest.param(
+                "Number",
+                ['{ from = "parcel.carrier", result = "weight" }'],
+                ["ends the sequence, whose output is declared 'Number', but it binds 'Text'"],
+                id="a-final-binding-of-another-concept",
+            ),
+            pytest.param(
+                "Number",
+                ['{ from = "parcel", result = "weight" }'],
+                ["ends the sequence, whose output is declared 'Number', but it binds 'Parcel'"],
+                id="a-final-bare-name-of-another-concept",
+            ),
+            pytest.param(
+                "Text",
+                ['{ from = "parcel.carrier", result = "weight" }', '{ pipe = "write_note", result = "note" }'],
+                ["step 3 (pipe 'write_note') reads 'weight' as 'Number', but the binding step", "binds it as 'Text'"],
+                id="a-binding-read-by-a-later-step-as-another-concept",
+            ),
+        ],
+    )
+    async def test_a_binding_derived_when_it_runs_that_contradicts_what_reads_it_is_a_run_error(
+        self, load_empty_library: Callable[[], str], mocker: MockerFixture, output: str, steps: list[str], message_fragments: list[str]
+    ) -> None:
+        """Regression: a binding the flow could not type was derived when it ran and its result went unchecked, so the sequence
+        returned a `Text` where it declares a `Number`. The run now checks it against the sequence's output, or against the input
+        of the step reading it, as validation checks a binding it derives.
+        """
+        hide_pipe_from_sequence_analyses(mocker=mocker, pipe_code="weigh_parcel")
+        mthds_content = _unresolved_producer_bundle(output=output, steps=steps)
+        _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_parcel")
+
+        with pytest.raises(PipelexError) as exc_info:
+            await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(
+                mthds_contents=[mthds_content], inputs={"amount": {"concept": "native.Number", "content": {"number": 7.5}}}
+            )
+
+        message = str(exc_info.value)
+        for fragment in message_fragments:
+            assert fragment in message, f"'{fragment}' not in: {message}"
+        assert "pipe that did not resolve at validation stored" in message

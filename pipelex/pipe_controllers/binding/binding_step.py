@@ -126,7 +126,7 @@ class BindingStep(BaseModel):
     def skip_untyped_root(self, *, working_memory: WorkingMemory, calling_pipe_code: str, run_mode: PipeRunMode) -> BindingOutcome:
         """Skip the binding because its root is absent, when nothing tells what the root would have held.
 
-        That is a root the sequence's flow cannot type, one the outcomes of a condition store under different concepts.
+        That is a root the sequence's flow cannot type, one a pipe that did not resolve at validation stored.
         Whether the path crosses a list is unknown without the root's concept, so the result is recorded as a single
         skipped absence, chained to the root's record, as `_lift` records a single result.
 

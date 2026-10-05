@@ -2,6 +2,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.pipes.exceptions import PipeValidationError
@@ -11,6 +12,7 @@ from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.integration.pipelex.pipes.controller.pipe_sequence.unresolved_pipes import hide_pipe_from_sequence_analyses
 
 if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
@@ -149,8 +151,10 @@ branches = [
 
 _READ_WEIGHT_STEP = '{ from = "record.weight", result = "weight" }'
 
-# The calling sequence of the bundles below: a document it may be given, swapped for a parcel or left as it is by a condition
-# whose outcomes the flow cannot type it through, then a binding of its total and a plain reader of that total.
+# The calling sequence of the bundles below: a document it may be given, swapped for a parcel or left as it is by a condition,
+# then a binding of its total and a plain reader of that total. The outcome storing the parcel stores the `Parcel` its pipe
+# writes, which disagrees with the `Invoice` the caller may give, unless the tests hide that pipe from the sequence's analyses,
+# as a pipe that does not resolve at validation (`hide_pipe_from_sequence_analyses`): the flow then cannot type the document.
 _UNTYPED_ROOT_PIPES = """
 [pipe.stash_doc_parcel]
 type = "PipeSequence"
@@ -237,8 +241,8 @@ class NestedShape(NamedTuple):
     stash_step: str
     inputs: str
     needed_inputs: set[str]
-    # The concept the flow types `record` as when the binding of its weight reads it, `None` when the flow cannot type it.
-    record_concept_ref: str | None
+    # The concept the flow types `record` as when the binding of its weight reads it.
+    record_concept_ref: str
     # Whether `record`, and so the binding of its weight, may hold an absence.
     is_maybe_absent: bool
     # Each run: its inputs beside the amount, and the weight it reads, `None` for an absent output.
@@ -284,17 +288,6 @@ _NESTED_SHAPES = [
             replacements=(('crate = "stash_crate"', 'crate = "stash_parcel"'),),
         ),
         id="a-condition-whose-outcomes-agree",
-    ),
-    pytest.param(
-        NestedShape(
-            stash_step='{ pipe = "stash_by_mode", result = "stash_note" }',
-            inputs='amount = "Number", mode = "Text"',
-            needed_inputs={"amount", "mode"},
-            record_concept_ref=None,
-            is_maybe_absent=False,
-            runs=[({"mode": "parcel"}, 7.5), ({"mode": "crate"}, 7.5)],
-        ),
-        id="a-condition-whose-outcomes-disagree",
     ),
     pytest.param(
         NestedShape(
@@ -379,13 +372,9 @@ class TestBindingNestedWrites:
         assert set(sequence.needed_inputs().root) == shape.needed_inputs
         typed_flow = sequence.build_typed_flow()
         record_spec = typed_flow.final_slots["record"].stuff_spec
-        if shape.record_concept_ref is None:
-            assert record_spec is None
-            assert 1 not in typed_flow.binding_specs
-        else:
-            assert record_spec is not None
-            assert record_spec.concept.concept_ref == shape.record_concept_ref
-            assert typed_flow.binding_specs[1].concept.concept_ref == "native.Number"
+        assert record_spec is not None
+        assert record_spec.concept.concept_ref == shape.record_concept_ref
+        assert typed_flow.binding_specs[1].concept.concept_ref == "native.Number"
         assert (sequence.analyze_taint().output_taint is not None) is shape.is_maybe_absent
 
         for extra_inputs, expected_weight in shape.runs:
@@ -487,11 +476,41 @@ class TestBindingNestedWrites:
         assert outcome.upstream.variable_name == "record"
         assert await _run(mthds_content=mthds_content, inputs={"amount": {"concept": "native.Number", "content": {"number": 7.5}}}) == 7.5
 
-    @pytest.mark.asyncio(loop_scope="class")
-    async def test_an_untyped_root_keeps_its_absence(self, load_empty_library: Callable[[], str]) -> None:
-        """Regression: a root the flow cannot type still carries its own absence to the binding's result, so a plain reader of
-        the result is listed as liftable and the sequence's output is declared `?`, as the run skips both when the root is absent.
+    def test_a_name_the_outcomes_store_under_different_concepts_is_refused(self, load_empty_library: Callable[[], str]) -> None:
+        """Regression: the outcomes of a condition store `record` as a parcel or as a crate, so its concept is not known before
+        the run, and the binding of its weight is refused there rather than derived when it runs.
         """
+        mthds_content = _bundle(
+            stash_step='{ pipe = "stash_by_mode", result = "stash_note" }', inputs='amount = "Number", mode = "Text"', output="Number"
+        )
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_sequence(mthds_content=mthds_content, library_id=load_empty_library())
+
+        assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+        assert exc_info.value.pipe_code == "read_stashed_weight"
+        assert "outcome 'stash_crate' of pipe 'stash_by_mode' as 'Crate'; outcome 'stash_parcel' of pipe 'stash_by_mode' as 'Parcel'" in str(
+            exc_info.value
+        )
+
+    def test_a_document_swapped_for_another_concept_is_refused(self, load_empty_library: Callable[[], str]) -> None:
+        """The condition may leave the `Invoice` the caller gives or store a `Parcel`, so the binding of the document's total
+        is refused before the run, whatever its output says about absence.
+        """
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_sequence(mthds_content=_untyped_root_bundle(output="Text?", ends_with_the_binding=False), library_id=load_empty_library())
+
+        assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+        assert "the concept of 'doc' is not known before the run" in str(exc_info.value)
+        assert "which the step leaves when it stores nothing, as 'Invoice?'" in str(exc_info.value)
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_an_untyped_root_keeps_its_absence(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
+        """Regression: a root the flow cannot type, a pipe that does not resolve at validation having stored it, still carries
+        its own absence to the binding's result, so a plain reader of the result is listed as liftable and the sequence's output
+        is declared `?`, as the run skips both when the root is absent.
+        """
+        hide_pipe_from_sequence_analyses(mocker=mocker, pipe_code="weigh_parcel")
         with pytest.raises(PipeValidationError) as exc_info:
             _load_sequence(mthds_content=_untyped_root_bundle(output="Text", ends_with_the_binding=False), library_id=load_empty_library())
         assert exc_info.value.error_type == PipeValidationErrorType.OPTIONAL_NOT_HANDLED
@@ -510,8 +529,9 @@ class TestBindingNestedWrites:
         )
         assert isinstance(response.pipe_output.working_memory.resolve_main_stuff(), AbsenceRecord)
 
-    def test_an_untyped_root_ending_the_sequence_keeps_its_absence(self, load_empty_library: Callable[[], str]) -> None:
+    def test_an_untyped_root_ending_the_sequence_keeps_its_absence(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
         """Regression: a binding ending the sequence, whose root the flow cannot type, is still refused behind a plain output."""
+        hide_pipe_from_sequence_analyses(mocker=mocker, pipe_code="weigh_parcel")
         with pytest.raises(PipeValidationError) as exc_info:
             _load_sequence(mthds_content=_untyped_root_bundle(output="Number", ends_with_the_binding=True), library_id=load_empty_library())
 

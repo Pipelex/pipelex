@@ -9,6 +9,12 @@ always stores replaces what was there, so a binding's root is typed by the lates
 name a step stores on some runs only, as a condition whose `continue` outcome stores nothing, keeps its spec
 when the value stored has the same one, and is untyped otherwise.
 
+A binding's root is untyped in two ways. The values it may hold have different specs, as the outcomes of a
+condition storing it under different concepts: that is seen before the run (`SpecDisagreement`), so the
+binding is refused as `binding_path_unresolved`. Or a pipe that does not resolve at validation, a dependency
+not loaded yet, stored it: nothing can type it before the run, so the binding is assumed to deliver and the
+run derives it from the value it holds, checking it there against what reads it.
+
 `step_memory_writes` is the one place a step's stores beside its result are computed: the sequence's needed
 inputs and its absence-taint walk read them from it too, so the three analyses agree on every name.
 
@@ -33,7 +39,7 @@ from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivatio
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_machinery.memory_writes import MemoryWrite, is_same_value_spec
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, SpecDisagreement, StoredSpec, is_same_value_spec
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -47,9 +53,11 @@ class FlowSlot(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     # `None` when the flow cannot type the value: a pipe that does not resolve (an unloaded dependency) stored it, or the
-    # outcomes of a condition store it under different specs.
+    # values it may hold have different specs, which `disagreement` then says.
     stuff_spec: StuffSpec | None
     binding_step_index: int | None = None
+    # Set only when `stuff_spec` is `None` because the values the name may hold have different specs, seen before the run.
+    disagreement: SpecDisagreement | None = None
 
 
 class SequenceTypedFlow(BaseModel):
@@ -151,15 +159,44 @@ def step_memory_writes(*, step: SubPipe, step_pipe: PipeAbstract, visited_pipes:
     return step_pipe.memory_writes(visited_pipes=visited_pipes)
 
 
-def slot_after_write(*, prior_slot: FlowSlot | None, memory_write: MemoryWrite) -> FlowSlot:
+def slot_after_write(*, prior_slot: FlowSlot | None, memory_write: MemoryWrite, step_label: str) -> FlowSlot:
     """What a name holds once a step stored it: the stored spec, or, when the step may leave the name as it was, the spec
     the stored value and the value already there agree on, untyped when they do not.
+
+    A name left untyped records why when the two specs are known and differ, or when either side carries a disagreement
+    already; a side nothing could type, a pipe that does not resolve having stored it, leaves it untyped with no disagreement.
+    `step_label` names the step for that record, e.g. "step 2 (pipe 'swap_record')".
     """
     if memory_write.is_always_written or prior_slot is None:
-        return FlowSlot(stuff_spec=memory_write.stuff_spec)
+        return FlowSlot(stuff_spec=memory_write.stuff_spec, disagreement=memory_write.disagreement)
     if is_same_value_spec(first_spec=prior_slot.stuff_spec, second_spec=memory_write.stuff_spec):
         return prior_slot
-    return FlowSlot(stuff_spec=None)
+    disagreement: SpecDisagreement | None
+    if prior_slot.stuff_spec is not None and memory_write.stuff_spec is not None:
+        disagreement = SpecDisagreement(
+            stored_specs=(
+                StoredSpec(
+                    stored_by=f"the value it held before {step_label}, which the step leaves when it stores nothing,",
+                    stuff_spec=prior_slot.stuff_spec,
+                ),
+                StoredSpec(stored_by=f"{step_label}, when it stores a value,", stuff_spec=memory_write.stuff_spec),
+            )
+        )
+    else:
+        disagreement = prior_slot.disagreement or memory_write.disagreement
+    return FlowSlot(stuff_spec=None, disagreement=disagreement)
+
+
+def untyped_root_error(*, sequence_code: str, domain_code: str, binding_step: BindingStep, disagreement: SpecDisagreement) -> PipeValidationError:
+    """The refusal of a binding whose root's values have different specs, so that its concept is not known before the run."""
+    root_name = binding_step.root_name
+    msg = (
+        f"Cannot bind '{binding_step.from_path}': the concept of '{root_name}' is not known before the run, because the outcomes that may "
+        f"store it store it under different concepts: {disagreement.describe(relative_to_domain=domain_code)}. Store '{root_name}' under "
+        "one concept in every outcome, or bind inside each outcome, where its concept is known."
+    )
+    exc = BindingPathUnresolvedError(msg, path=binding_step.from_path, failed_segment=root_name, available_fields=[])
+    return binding_path_unresolved_error(sequence_code=sequence_code, domain_code=domain_code, binding_step=binding_step, exc=exc)
 
 
 def build_sequence_typed_flow(
@@ -182,7 +219,7 @@ def build_sequence_typed_flow(
 
     Raises:
         PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked from its root's concept,
-            or when the concept it derives is not in the library.
+            when the concept it derives is not in the library, or when the values its root may hold have different specs.
     """
     slots: dict[str, FlowSlot] = {name: FlowSlot(stuff_spec=stuff_spec) for name, stuff_spec in declared_inputs.root.items()}
     written_names: set[str] = set()
@@ -197,10 +234,12 @@ def build_sequence_typed_flow(
             written_names.add(step.output_name)
             always_written_names.add(step.output_name)
             root_slot = slots.get(step.root_name)
+            if root_slot is not None and root_slot.disagreement is not None:
+                raise untyped_root_error(sequence_code=sequence_code, domain_code=domain_code, binding_step=step, disagreement=root_slot.disagreement)
             if root_slot is None or root_slot.stuff_spec is None:
-                # A root nothing types: an undeclared one, refused as a missing input of the sequence; the result of a pipe
-                # that does not resolve, assumed to deliver as the rest of the sequence's checks assume; or a name the
-                # outcomes of a condition store under different specs, which the run derives from the value it holds.
+                # A root nothing types: an undeclared one, refused as a missing input of the sequence; or a value a pipe that
+                # does not resolve stored, assumed to deliver as the rest of the sequence's checks assume, which the run
+                # derives from the value it holds and checks against what reads it.
                 slots[step.output_name] = FlowSlot(stuff_spec=None, binding_step_index=step_index)
                 continue
             derived_binding = derive_binding_spec(
@@ -221,11 +260,12 @@ def build_sequence_typed_flow(
             continue
         step_writes = step_memory_writes(step=step, step_pipe=step_pipe, visited_pipes=visited_pipes)
         memory_writes_by_pipe_step[step_index] = step_writes
+        step_label = f"step {step_index + 1} (pipe '{step_pipe.code}')"
         for written_name, memory_write in step_writes.items():
             written_names.add(written_name)
             if memory_write.is_always_written:
                 always_written_names.add(written_name)
-            slots[written_name] = slot_after_write(prior_slot=slots.get(written_name), memory_write=memory_write)
+            slots[written_name] = slot_after_write(prior_slot=slots.get(written_name), memory_write=memory_write, step_label=step_label)
         if step.output_name:
             written_names.add(step.output_name)
             always_written_names.add(step.output_name)
