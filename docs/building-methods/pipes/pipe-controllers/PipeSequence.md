@@ -43,7 +43,7 @@ A pipe step is a table with the following keys:
 | `nb_output` | integer | Request a fixed number of outputs from this step's pipe. Cannot be combined with `multiple_output`. | No       |
 | `multiple_output` | boolean | Request a variable number of outputs from this step's pipe (the model decides how many). Cannot be combined with `nb_output`. | No       |
 | `batch_over` | string | The list in the working memory to batch this step over, running the pipe once per item: a name, or a dotted path to a list held in a field, such as `catalog.pages`, which is a binding followed by a batch (see [Batching over a field](#batching-over-a-field)). Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
-| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). | No       |
+| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). Like `result` and `batch_over`, it never starts with `_bound_`, a prefix reserved for the bound list of a dotted `batch_over`. | No       |
 
 #### Binding steps
 
@@ -173,7 +173,7 @@ So a dotted `batch_over` shares everything a binding does:
 -   A path outside the path grammar, such as `catalog..pages`, is refused with `binding_step_invalid`, which the schema catches too.
 -   In the execution graph, the binding is a node of kind `binding`, fed by the root's producer, and it feeds the batch.
 
-The private name starts with an underscore, `_bound_catalog_pages` for `catalog.pages`, so no template or input can read it: it shows only in the working memory the run leaves and in the graph. Only a sequence's steps bind, so a [`PipeParallel`](PipeParallel.md) branch carries a plain `batch_over` only, and a dotted one there is refused with `binding_step_invalid`: bind the list in a step before the `PipeParallel`, and batch the branch over the bound name.
+The private name starts with an underscore, `_bound_catalog_pages` for `catalog.pages`, so no template or input can read it: it shows only in the working memory the run leaves and in the graph. The `_bound_` prefix is reserved for these names. A nested `PipeSequence` binds in the working memory of the sequence calling it, so a name of the caller taking the prefix could be overwritten by the list a sequence it calls binds: a pipe step's `result`, `batch_as` or plain `batch_over`, on a sequence step or a `PipeParallel` branch, and a [`PipeBatch`](PipeBatch.md)'s `input_item_name` that starts with `_bound_` are refused with `invalid_input_name`, which the schema catches too, and the message asks for another name. Only a sequence's steps bind, so a [`PipeParallel`](PipeParallel.md) branch carries a plain `batch_over` only, and a dotted one there is refused with `binding_step_invalid`: bind the list in a step before the `PipeParallel`, and batch the branch over the bound name.
 
 ### Example
 
