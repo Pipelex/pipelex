@@ -1,11 +1,10 @@
 # An input name is a plain name, on every pipe: anything else is refused as ``invalid_input_name``.
 #
-# Catalogue rows I2 to I5 of the path-binding design (``wip/path-binding/design.md``, D1), pinned through the
-# parser, the entry point a ``.mthds`` file goes through: a dotted input key on every operator, controller and
-# signature is refused by the one shared check (I3), a dotted key beside its declared root carries the
-# enrichment the fix planner deletes it with (I2), other malformed names are refused the same way (I4), and so
-# is a dotted PipeBatch ``input_list_name`` (I5). Each refused bundle is paired with the same bundle without the
-# fault, which parses, so the refusal is shown to come from the name and nothing else.
+# These cases are pinned through the parser, the entry point a ``.mthds`` file goes through: a dotted input key
+# on every operator, controller and signature is refused by the one shared check, a dotted key beside its
+# declared root carries the enrichment the fix planner deletes it with, other malformed names are refused the
+# same way, and so is a dotted PipeBatch ``input_list_name``. Each refused bundle is paired with the same bundle
+# without the fault, which parses, so the refusal is shown to come from the name and nothing else.
 
 import pytest
 
@@ -62,7 +61,7 @@ class TestInputNameRefusal:
 
     @pytest.mark.parametrize("table_id", _ALL_TABLE_IDS)
     def test_a_dotted_input_key_is_refused_on_every_pipe_kind(self, table_id: str) -> None:
-        """I3: a dotted key is refused by the one shared check, whichever operator, controller or signature declares it."""
+        """A dotted key is refused by the one shared check, whichever operator, controller or signature declares it."""
         error = _the_one_error(_bundle(pipe_table=_pipe_table(table_id), added_input='"invoice.total" = "Number"'))
 
         assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
@@ -70,7 +69,7 @@ class TestInputNameRefusal:
         assert error.variable_names == ["invoice.total"]
 
     def test_a_lone_dotted_input_names_both_remedies_and_carries_no_fix_enrichment(self) -> None:
-        """I1 through the parser: the root is not declared, so nothing says its concept and the key is the author's to repair."""
+        """A lone dotted key, through the parser: the root is not declared, so nothing says its concept and the key is the author's to repair."""
         lone_table = _PIPE_TABLES[PipeType.PIPE_LLM].replace('inputs = { invoice = "Invoice" }', 'inputs = { "invoice.total" = "Number" }')
         lone_table = lone_table.replace("Summarize $invoice", "Summarize $invoice.total")
 
@@ -83,7 +82,7 @@ class TestInputNameRefusal:
         assert '{ from = "invoice.total", result = "total" }' in error.message
 
     def test_a_dotted_input_beside_its_root_carries_the_fix_enrichment(self) -> None:
-        """I2: the root is declared in the same table, so the key is redundant and the error says which key to delete."""
+        """The root is declared in the same table, so the key is redundant and the error says which key to delete."""
         error = _the_one_error(_bundle(pipe_table=_PIPE_TABLES[PipeType.PIPE_LLM], added_input='"invoice.total" = "Number"'))
 
         assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
@@ -102,7 +101,7 @@ class TestInputNameRefusal:
 
     @pytest.mark.parametrize("malformed_name", ["InvoiceTotal", "2nd_total", "invoice-total", "_total", "invoice..total", "Invoice.total"])
     def test_a_malformed_input_name_is_refused(self, malformed_name: str) -> None:
-        """I4: any name that is not a plain snake_case identifier is refused the same way, and is never deletable."""
+        """Any name that is not a plain snake_case identifier is refused the same way, and is never deletable."""
         error = _the_one_error(_bundle(pipe_table=_PIPE_TABLES[PipeType.PIPE_LLM], added_input=f'"{malformed_name}" = "Number"'))
 
         assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
@@ -111,7 +110,7 @@ class TestInputNameRefusal:
         assert "[a-z][a-z0-9_]*" in error.message
 
     def test_a_dotted_batch_list_name_is_refused(self) -> None:
-        """I5: `input_list_name` is a plain input name, so a path into a field of a declared input is refused."""
+        """`input_list_name` is a plain input name, so a path into a field of a declared input is refused."""
         batch_table = InputNameRefusalTestData.BATCH_OVER_A_FIELD_TABLE
         error = _the_one_error(_bundle(pipe_table=batch_table))
 
@@ -121,7 +120,7 @@ class TestInputNameRefusal:
         assert '{ from = "catalog.pages", result = "pages" }' in error.message
 
     def test_a_dotted_batch_list_declared_as_an_input_is_refused(self) -> None:
-        """I5, the other spelling: the list declared under its dotted name is refused by the shared input-name check."""
+        """The other spelling of a dotted batch list: the list declared under its dotted name is refused by the shared input-name check."""
         batch_table = _PIPE_TABLES[PipeType.PIPE_BATCH].replace('inputs = { invoices = "Invoice[]" }', 'inputs = { "ledger.invoices" = "Invoice[]" }')
         batch_table = batch_table.replace('input_list_name = "invoices"', 'input_list_name = "ledger.invoices"')
 

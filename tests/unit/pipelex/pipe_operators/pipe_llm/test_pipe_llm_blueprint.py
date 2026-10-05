@@ -132,7 +132,7 @@ class TestPipeLLMBlueprint:
         assert "Reference them in the prompt or system_prompt" in str(error)
 
     def test_validate_inputs_correct_reading_fields_through_the_root(self):
-        """R1: every template form reads a field through the root it names, with only the root declared."""
+        """Every template form reads a field through the root it names, with only the root declared."""
         blueprint = PipeLLMBlueprint(
             description="lorem ipsum",
             inputs={"page": "Page"},
@@ -142,7 +142,7 @@ class TestPipeLLMBlueprint:
         assert blueprint.input_names == ["page"]
 
     def test_validate_inputs_refuses_a_lone_dotted_input_name(self):
-        """I1: an input name is a plain name, so a dotted one is refused before the prompt is read, naming both remedies."""
+        """An input name is a plain name, so a dotted one is refused before the prompt is read, naming both remedies."""
         error = refused_input_error(
             blueprint_class=PipeLLMBlueprint,
             blueprint_kwargs={
@@ -157,7 +157,7 @@ class TestPipeLLMBlueprint:
         assert error.redundant_input_name is None
 
     def test_validate_inputs_refuses_a_dotted_input_name_beside_its_root(self):
-        """I2: the root declared beside the dotted key makes the key redundant, which the error names for the fix planner."""
+        """The root declared beside the dotted key makes the key redundant, which the error names for the fix planner."""
         error = refused_input_error(
             blueprint_class=PipeLLMBlueprint,
             blueprint_kwargs={

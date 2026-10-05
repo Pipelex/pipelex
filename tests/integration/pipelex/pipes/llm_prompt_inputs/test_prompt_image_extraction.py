@@ -322,7 +322,7 @@ class TestPromptImageExtraction:
         pretty_print(llm_prompt.user_text, title="with_images | tag - images extracted AND wrapped in tags")
 
     async def test_direct_nested_image_via_dotted_path(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """R2: `@page.page_view`, read through the root `page = "Page"`, is attached as an image and produces an [Image N] token.
+        """`@page.page_view`, read through the root `page = "Page"`, is attached as an image and produces an [Image N] token.
 
         This tests the case where:
         - inputs declare only the root, `page = "Page"`: an input name is a plain name, never a path into a field
@@ -754,7 +754,7 @@ class TestPromptImageExtraction:
         pretty_print(llm_prompt.user_text, title="$page.page_view - should show [Image 1]")
 
     async def test_dotted_path_to_a_scalar_through_the_root_renders_its_value(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """R1: `{{ page.page_view.url }}` reads a text field through the root `page = "Page"`, so it renders as text and attaches no image."""
+        """`{{ page.page_view.url }}` reads a text field through the root `page = "Page"`, so it renders as text and attaches no image."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         pipe_llm_blueprint = PipeLLMBlueprint(

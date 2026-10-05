@@ -30,7 +30,7 @@ page = "Page"
 class TestFixApplierRedundantDottedInput:
     @pytest.mark.parametrize("source", [_INLINE_SOURCE, _BLOCK_SOURCE], ids=["inline-table", "block-table"])
     def test_delete_drops_the_quoted_dotted_key_and_keeps_its_root(self, source: str) -> None:
-        """R4 at the applier: the `delete-redundant-dotted-input` op removes the quoted key as one flat key, never a nested path."""
+        """At the applier, the `delete-redundant-dotted-input` op removes the quoted key as one flat key, never a nested path."""
         toml_doc = tomlkit.loads(source)
 
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[DeleteKeyOp(table_path=_INPUTS_TABLE_PATH, key="page.page_view")])

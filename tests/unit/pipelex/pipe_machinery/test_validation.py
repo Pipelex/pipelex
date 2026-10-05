@@ -44,7 +44,7 @@ class TestInputNameValidation:
         validate_input_names(input_specs={})
 
     def test_a_lone_dotted_name_names_both_remedies(self):
-        """I1: the root is not declared, so the message offers declaring it or binding the field, and no key is deletable."""
+        """The root is not declared, so the message offers declaring it or binding the field, and no key is deletable."""
         with pytest.raises(PipeValidationError) as exc_info:
             validate_input_names(input_specs={"invoice.total": "Number"})
 
@@ -58,7 +58,7 @@ class TestInputNameValidation:
         assert 'binding step (`{ from = "invoice.total", result = "total" }`)' in message
 
     def test_a_dotted_name_beside_its_root_is_redundant(self):
-        """I2: the root is declared in the same table, so the key is named as deletable, and the message still names the binding step."""
+        """The root is declared in the same table, so the key is named as deletable, and the message still names the binding step."""
         with pytest.raises(PipeValidationError) as exc_info:
             validate_input_names(input_specs={"page": "Page", "page.page_view": "Image"})
 
@@ -136,7 +136,7 @@ class TestInputNameValidation:
 
     @pytest.mark.parametrize("malformed_name", ["InvoiceTotal", "2nd_total", "invoice-total", "Invoice.total", "invoice..total"])
     def test_a_malformed_name_is_refused_with_the_grammar(self, malformed_name: str):
-        """I4: a name that is not snake_case is refused with the grammar it breaks, even beside a declared root."""
+        """A name that is not snake_case is refused with the grammar it breaks, even beside a declared root."""
         with pytest.raises(PipeValidationError) as exc_info:
             validate_input_names(input_specs={"invoice": "Invoice", malformed_name: "Number"})
 
@@ -151,7 +151,7 @@ class TestInputNameValidation:
         check_input_list_name(input_list_name="pages")
 
     def test_a_dotted_list_name_is_refused(self):
-        """I5: a PipeBatch's list is one of its own inputs, so a dotted list name is refused, naming the binding step."""
+        """A PipeBatch's list is one of its own inputs, so a dotted list name is refused, naming the binding step."""
         with pytest.raises(PipeValidationError) as exc_info:
             check_input_list_name(input_list_name="catalog.pages")
 

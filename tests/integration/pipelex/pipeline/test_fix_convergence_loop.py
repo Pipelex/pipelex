@@ -967,7 +967,7 @@ class TestFixConvergenceLoop:
         tmp_path: Path,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """R4: a dotted input whose root is declared beside it is deleted, and the bundle then validates."""
+        """A dotted input whose root is declared beside it is deleted, and the bundle then validates."""
         load_empty_library()
         bundle_path = tmp_path / "redundant_dotted.mthds"
         bundle_path.write_text(_REDUNDANT_DOTTED_INPUT_MTHDS, encoding="utf-8")
@@ -987,7 +987,7 @@ class TestFixConvergenceLoop:
         tmp_path: Path,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """R4: a lone dotted input has no safe fix, so the file is untouched and the error names both remedies."""
+        """A lone dotted input has no safe fix, so the file is untouched and the error names both remedies."""
         load_empty_library()
         bundle_path = tmp_path / "lone_dotted.mthds"
         bundle_path.write_text(_LONE_DOTTED_INPUT_MTHDS, encoding="utf-8")

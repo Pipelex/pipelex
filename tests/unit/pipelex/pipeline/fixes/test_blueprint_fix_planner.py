@@ -171,7 +171,7 @@ class TestBlueprintFixPlanner:
         assert fix.source == "sibling.mthds"
 
     def test_redundant_dotted_input_yields_a_safe_delete_of_the_key(self) -> None:
-        """R4: a dotted input whose root the same table declares is deleted from that pipe's `inputs`, safely."""
+        """A dotted input whose root the same table declares is deleted from that pipe's `inputs`, safely."""
         fix = plan_fix_for_blueprint_validation_error(
             _invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name="page.page_view")
         )
@@ -183,7 +183,7 @@ class TestBlueprintFixPlanner:
         assert "page.page_view" in fix.description
 
     def test_lone_dotted_input_yields_none(self) -> None:
-        """R4: a lone dotted input carries no enrichment, since nothing says its root's concept: the author repairs it."""
+        """A lone dotted input carries no enrichment, since nothing says its root's concept: the author repairs it."""
         assert (
             plan_fix_for_blueprint_validation_error(_invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name=None)) is None
         )
