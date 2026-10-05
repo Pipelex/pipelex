@@ -196,39 +196,88 @@ steps = [{ pipe = "extract_pdf", batch_over = "transcripts", batch_as = "transcr
         assert "transcript" not in consumers
 
     @pytest.mark.parametrize(
-        ("inputs", "batch_over", "expected_summary"),
+        ("root_name", "root_concept", "steps", "expected_summary"),
         [
             pytest.param(
-                '{ case = "Case" }', "case.transcripts", [("extract_pdf", "case.transcripts[]", False)], id="one-list-field-of-a-single-root"
+                "case",
+                "Case",
+                ['{ pipe = "extract_pdf", batch_over = "case.transcripts", batch_as = "transcript", result = "pages" }'],
+                [("extract_pdf", "case.transcripts[]", False)],
+                id="one-list-field-of-a-single-root",
             ),
-            pytest.param('{ cases = "Case[]" }', "cases.transcripts", [], id="lists-gathered-across-items"),
+            pytest.param(
+                "cases",
+                "Case[]",
+                ['{ pipe = "extract_pdf", batch_over = "cases.transcripts", batch_as = "transcript", result = "pages" }'],
+                [("extract_pdf", "cases[].transcripts[]", False)],
+                id="a-list-field-of-every-item-of-a-list-root",
+            ),
+            pytest.param(
+                "cases",
+                "Case[]",
+                [
+                    '{ from = "cases.transcripts", result = "case_transcripts" }',
+                    '{ pipe = "extract_pdf", batch_over = "case_transcripts", batch_as = "transcript", result = "pages" }',
+                ],
+                [("extract_pdf", "cases[].transcripts[]", False)],
+                id="an-explicit-binding-then-a-batch",
+            ),
+            pytest.param(
+                "case",
+                "Case",
+                ['{ pipe = "extract_pdf", batch_over = "case.folders.transcripts", batch_as = "transcript", result = "pages" }'],
+                [("extract_pdf", "case.folders[].transcripts[]", False)],
+                id="a-list-field-of-every-item-of-a-list-field",
+            ),
+            pytest.param(
+                "cases",
+                "Case[]",
+                ['{ pipe = "extract_pdf", batch_over = "cases.attachment", batch_as = "transcript", result = "pages" }'],
+                [],
+                id="a-single-field-gathered-across-items",
+            ),
         ],
     )
-    def test_a_dotted_batch_over_maps_the_field_list_to_its_item_slot(
-        self, load_empty_library: Callable[[], str], inputs: str, batch_over: str, expected_summary: list[tuple[str, str, bool]]
+    def test_a_bound_list_maps_its_items_to_where_they_come_from(
+        self,
+        load_empty_library: Callable[[], str],
+        root_name: str,
+        root_concept: str,
+        steps: list[str],
+        expected_summary: list[tuple[str, str, bool]],
     ):
-        """A dotted `batch_over` binds its path, then batches over the bound list: a list one field of a single root holds is
-        the value at that field's path, while a list gathered across items stands for no one path and is not followed.
+        """A dotted `batch_over` binds its path, then batches over the bound list, as an explicit binding then a batch does.
+
+        A list whose last field is itself a list holds the items of that field, wherever the path crossed a list before it, so
+        the batch maps its item to every item of that field. A list gathered from a single field of every item has no path the
+        walk can give its items, so it is not followed.
         """
         pipes = f"""
+[concept.Folder]
+description = "A folder of a case file"
+
+[concept.Folder.structure]
+transcripts = {{ type = "list", item_type = "concept", item_concept_ref = "native.Document", description = "Its transcripts", required = true }}
+
 [concept.Case]
 description = "A case file"
 
 [concept.Case.structure]
 transcripts = {{ type = "list", item_type = "concept", item_concept_ref = "native.Document", description = "Its transcripts", required = true }}
+attachment = {{ type = "concept", concept_ref = "native.Document", description = "Its attachment", required = true }}
+folders = {{ type = "list", item_type = "concept", item_concept_ref = "Folder", description = "Its folders", required = true }}
 
 [pipe.main]
 type = "PipeSequence"
-description = "Extract every transcript of the case"
-inputs = {inputs}
+description = "Extract every transcript of the case files"
+inputs = {{ {root_name} = "{root_concept}" }}
 output = "Page[]"
-steps = [{{ pipe = "extract_pdf", batch_over = "{batch_over}", batch_as = "transcript", result = "pages" }}]
+steps = [{", ".join(steps)}]
 """
-        consumers = _consumers(load_empty_library=load_empty_library, domain="fic_dotted_batch_step", pipes=pipes)
+        consumers = _consumers(load_empty_library=load_empty_library, domain="fic_bound_list", pipes=pipes)
 
-        root_name = inputs.split(" ")[1]
         assert _summary(consumers.get(root_name, [])) == expected_summary
-        assert "transcript" not in consumers
+        assert set(consumers) <= {root_name}
 
     def test_a_standalone_pipe_batch_maps_the_list_slot_to_its_item_slot(self, load_empty_library: Callable[[], str]):
         pipes = """

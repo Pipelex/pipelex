@@ -64,6 +64,41 @@ output = "Page[]"
 model = "docling-extract-text"
 """
 
+_CASES_HEADER = """
+domain = "consumer_check_cases"
+description = "Extract the transcripts of every case file"
+
+[concept.Case]
+description = "A case file"
+
+[concept.Case.structure]
+transcripts = { type = "list", item_type = "concept", item_concept_ref = "native.Document", description = "Its transcripts", required = true }
+
+[pipe.extract_transcript]
+type = "PipeExtract"
+description = "Extract one transcript"
+inputs = { transcript = "Document" }
+output = "Page[]"
+model = "pypdfium2-extract-pdf"
+
+[pipe.extract_case_transcripts]
+type = "PipeSequence"
+description = "Extract every transcript of every case"
+inputs = { cases = "Case[]" }
+output = "Page[]"
+"""
+
+_CASES_DOTTED_MTHDS = (
+    _CASES_HEADER + 'steps = [{ pipe = "extract_transcript", batch_over = "cases.transcripts", batch_as = "transcript", result = "pages" }]\n'
+)
+
+_CASES_EXPLICIT_MTHDS = (
+    _CASES_HEADER + "steps = [\n"
+    '    { from = "cases.transcripts", result = "case_transcripts" },\n'
+    '    { pipe = "extract_transcript", batch_over = "case_transcripts", batch_as = "transcript", result = "pages" },\n'
+    "]\n"
+)
+
 _CONDITIONAL_MTHDS = """
 domain = "consumer_check_conditional"
 description = "Extract a transcript in one mode only"
@@ -167,6 +202,46 @@ class TestPipelineRunSetupConsumerCheck:
 
         assert "transcripts[1]" in str(exc_info.value)
         assert "transcripts[0]" not in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "mthds_content",
+        [
+            pytest.param(_CASES_DOTTED_MTHDS, id="a-dotted-batch-over"),
+            pytest.param(_CASES_EXPLICIT_MTHDS, id="an-explicit-binding-then-a-batch"),
+        ],
+    )
+    async def test_a_word_transcript_of_one_case_among_pdf_transcripts_is_refused_before_the_run(self, mthds_content: str):
+        """The transcripts of every case are bound into one list, then batched: the walk follows each item back to its case."""
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
+        pdf_url = _data_url(mime_type="application/pdf", raw_bytes=PDF_BYTES)
+        docx_url = _data_url(mime_type="application/octet-stream", raw_bytes=DOCX_BYTES)
+
+        with pytest.raises(PipelineInputFormatUnsupportedError) as exc_info:
+            await pipeline_run_setup(
+                storage_scope="test/scope",
+                read_scope=None,
+                user_id="test-user",
+                execution_config=execution_config,
+                mthds_contents=[mthds_content],
+                pipe_code="extract_case_transcripts",
+                inputs={
+                    "cases": {
+                        "concept": "consumer_check_cases.Case",
+                        "content": [
+                            {"transcripts": [{"url": pdf_url}]},
+                            {"transcripts": [{"url": docx_url}, {"url": pdf_url}]},
+                        ],
+                    }
+                },
+            )
+
+        message = str(exc_info.value)
+        assert (
+            "Input 'cases[1].transcripts[0]' is a Word document (.docx): pipe 'extract_transcript' extracts it "
+            "with model 'pypdfium2-extract-pdf', which reads PDF." in message
+        )
+        assert "cases[0].transcripts[0]" not in message
+        assert "cases[1].transcripts[1]" not in message
 
     async def test_pdf_transcripts_pass_setup(self):
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)

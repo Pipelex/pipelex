@@ -203,18 +203,39 @@ class BindingDerivation(BaseModel):
     def is_plural(self) -> bool:
         return is_multiple_multiplicity(multiplicity=self.multiplicity)
 
-    @property
-    def is_value_at_one_path(self) -> bool:
-        """Whether what the binding binds is the value at one path of its root, rather than values gathered across items.
+    def provenance_path(self, *, item_segment: str) -> tuple[str, ...] | None:
+        """Where, below its root, the value the binding binds comes from, `item_segment` standing for any item of a list crossed.
 
-        A single value is, a bare name is its root's own value, and a list is when it is one list field of a single root,
-        no list being crossed before that field: a list root, or a list crossed along the way, gathers across items.
+        A list sits at its own path and its items at that path followed by the item segment, so what the binding binds has
+        such a path when it is the value at one path of its root, or the items of a list field reached across items:
+
+        - a single value, or one list field of a single root, is at its fields' path: `invoice.lines` is `("lines",)`;
+        - a bare name is its root's own value, a list included: `()`;
+        - a list gathered across items whose last field is itself a list holds the items of that field, wherever they sit:
+          the item segment follows a list root, and every field before the last that crosses a list, so `cases.transcripts`
+          over a list root is `("[]", "transcripts")` and `case.folders.transcripts` is `("folders", "[]", "transcripts")`.
+
+        A list gathered from a field that is not itself a list, `cases.attachment` over a list root, holds values that are
+        items of no list at one path, so it has no such path: `None`.
+
+        Args:
+            item_segment: The segment the caller's paths use for any item of a list.
+
+        Returns:
+            The segments below the root, or `None` for a list gathered from a field that is not a list.
         """
-        if not self.is_plural or self.is_bare_name:
-            return True
-        if is_multiple_multiplicity(multiplicity=self.root_multiplicity):
-            return False
-        return not any(segment.crosses_list for segment in self.segments[:-1])
+        if self.is_bare_name:
+            return ()
+        *leading_segments, last_segment = self.segments
+        if self.is_plural and not last_segment.crosses_list:
+            return None
+        provenance: list[str] = [item_segment] if is_multiple_multiplicity(multiplicity=self.root_multiplicity) else []
+        for segment in leading_segments:
+            provenance.append(segment.name)
+            if segment.crosses_list:
+                provenance.append(item_segment)
+        provenance.append(last_segment.name)
+        return tuple(provenance)
 
 
 def _quoted(*, names: list[str]) -> str:
