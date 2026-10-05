@@ -5,8 +5,11 @@ import pytest
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
@@ -235,6 +238,27 @@ steps = [
 """
 
 
+_ANYTHING_FIELD_BUNDLE = """domain = "depot_crates"
+description = "Reading what a crate holds, whatever it is"
+main_pipe = "read_contents"
+
+[concept.Crate]
+description = "A crate that may hold anything"
+
+[concept.Crate.structure]
+contents = { type = "concept", concept_ref = "native.Anything", description = "What the crate holds", required = true }
+
+[pipe.read_contents]
+type = "PipeSequence"
+description = "Binds what a crate holds"
+inputs = { crate = "Crate" }
+output = "Anything"
+steps = [
+  { from = "crate.contents", result = "contents" },
+]
+"""
+
+
 def _load_sequence(*, mthds_content: str, library_id: str, pipe_code: str) -> PipeSequence:
     blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="flow.mthds")
     pipes = get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
@@ -420,6 +444,24 @@ class TestBindingTypedFlow:
 
         assert "'record' holds a 'depot_swaps.Invoice', which has no field 'weight'" in str(exc_info.value)
         assert "so the binding was derived from the 'depot_swaps.Invoice' it holds" in str(exc_info.value)
+
+    @pytest.mark.asyncio(loop_scope="class")
+    @pytest.mark.parametrize(
+        ("contents", "expected_content"),
+        [
+            pytest.param("a spare part", TextContent(text="a spare part"), id="a-string"),
+            pytest.param(12, NumberContent(number=12), id="a-number"),
+            pytest.param({"order_ref": "PO-118"}, JSONContent(json_obj={"order_ref": "PO-118"}), id="an-object"),
+        ],
+    )
+    async def test_a_binding_ending_on_an_anything_field_runs(self, contents: object, expected_content: StuffContent) -> None:
+        """The path may end on a field holding `native.Anything`, and the run stores its value as an `Anything` input is shaped."""
+        inputs: PipelineInputs = {"crate": {"concept": "depot_crates.Crate", "content": {"contents": contents}}}
+
+        response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[_ANYTHING_FIELD_BUNDLE], inputs=inputs)
+
+        assert response.pipe_output.main_stuff.concept.concept_ref == "native.Anything"
+        assert response.pipe_output.main_stuff.content == expected_content
 
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(

@@ -64,6 +64,13 @@ CONCEPTS: dict[str, ConceptBlueprint | str] = {
         structure={"parcels": make_field(field_type=FieldType.LIST, item_type="concept", item_concept_ref="Parcel", required=True)},
     ),
     "billing.Parcel": ConceptBlueprint(description="A parcel", structure={"weight": make_field(field_type=FieldType.NUMBER, required=True)}),
+    "billing.Crate": ConceptBlueprint(
+        description="A crate holding anything",
+        structure={
+            "contents": make_field(field_type=FieldType.CONCEPT, concept_ref="native.Anything", required=True),
+            "extras": make_field(field_type=FieldType.LIST, item_type="concept", item_concept_ref="native.Anything", required=True),
+        },
+    ),
 }
 
 
@@ -116,6 +123,13 @@ class ParcelRecord(StructuredContent):
 
 class ShipmentRecord(StructuredContent):
     parcels: list[ParcelRecord]
+
+
+class CrateRecord(StructuredContent):
+    """A `native.Anything` field is generated as `Any`, so it holds a raw value of any type."""
+
+    contents: Any
+    extras: list[Any]
 
 
 INVOICE_ISSUED_AT = datetime.datetime(2026, 3, 14, 9, 30, tzinfo=datetime.UTC)

@@ -9,11 +9,13 @@ root's stuff. It is null-aware and list-aware, as the standard says:
 
 The value reached is a deep copy, never an alias of the root: a concept's content is copied whole, every field
 included, and a plain value is stored as the native concept its field derives (`str` as `TextContent`, a number
-as `NumberContent`, and so on), since the structure classes hold raw Python scalars.
+as `NumberContent`, and so on), since the structure classes hold raw Python scalars. A field holding
+`native.Anything` holds a raw value of any type, stored as the native its type maps to, as an `Anything` input is.
 """
 
 import copy
 import datetime
+import math
 from typing import Any, NamedTuple, cast
 
 from pipelex.core.stuffs.date_content import DateContent
@@ -129,7 +131,36 @@ def _store_value(*, value: Any, leaf_kind: BindingValueKind, path: str) -> Stuff
         case BindingValueKind.JSON:
             if isinstance(value, dict):
                 return JSONContent(json_obj=copy.deepcopy(cast("dict[str, Any]", value)))
+        case BindingValueKind.ANYTHING:
+            if (natural_content := _natural_content(value=value)) is not None:
+                return natural_content
         case BindingValueKind.UNDERIVABLE:
             pass
     msg = f"Binding '{path}' reached a '{type(value).__name__}', which cannot be stored as {leaf_kind.leaf_description}'s value."
     raise BindingStepRunError(msg)
+
+
+def _natural_content(*, value: Any) -> StuffContent | None:
+    """The content a value of any type is stored as, keyed on its type as an `Anything` input is shaped, `None` when it has none.
+
+    A content is copied whole; a boolean is a yes-no, a finite number a number, a time a time, a date or a datetime a date,
+    a string a text and a dict a JSON object. A list, which a single value never is, and any other object have no content.
+    """
+    if isinstance(value, StuffContent):
+        return copy.deepcopy(value)
+    # `bool` before numbers, which it subclasses, and `datetime` before `date`, likewise.
+    if isinstance(value, bool):
+        return YesNoContent(yes_no=value)
+    if isinstance(value, (int, float)):
+        return NumberContent(number=value) if math.isfinite(value) else None
+    if isinstance(value, datetime.time):
+        return TimeContent(time=value)
+    if isinstance(value, datetime.datetime):
+        return DateContent(date=value.date(), time=value.timetz())
+    if isinstance(value, datetime.date):
+        return DateContent(date=value)
+    if isinstance(value, str):
+        return TextContent(text=value)
+    if isinstance(value, dict):
+        return JSONContent(json_obj=copy.deepcopy(cast("dict[str, Any]", value)))
+    return None

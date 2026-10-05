@@ -43,6 +43,9 @@ class BindingValueKind(StrEnum):
     DATETIME = "datetime"
     TIME = "time"
     JSON = "json"
+    # A field holding `native.Anything`, whose generated class types it `Any`: any raw value, stored as the native its
+    # type maps to, as an `Anything` input is shaped. A leaf like a plain value, since `Anything` has no structure.
+    ANYTHING = "anything"
     # A list with no `item_type`, or a field whose concept cannot be derived: no concept exists for its value.
     UNDERIVABLE = "underivable"
 
@@ -62,6 +65,8 @@ class BindingValueKind(StrEnum):
                 return NativeConceptCode.TIME
             case BindingValueKind.JSON:
                 return NativeConceptCode.JSON
+            case BindingValueKind.ANYTHING:
+                return NativeConceptCode.ANYTHING
             case BindingValueKind.CONCEPT | BindingValueKind.UNDERIVABLE:
                 return None
 
@@ -83,6 +88,8 @@ class BindingValueKind(StrEnum):
                 return "a time field"
             case BindingValueKind.JSON:
                 return "a dict field"
+            case BindingValueKind.ANYTHING:
+                return "a field holding any value"
             case BindingValueKind.CONCEPT:
                 return "a concept field"
             case BindingValueKind.UNDERIVABLE:
@@ -305,7 +312,9 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
                     msg = f"Cannot bind '{path}': the concept field '{reached_path}' names no concept."
                     raise BindingPathUnresolvedError(msg, path=path, failed_segment=segment_name, available_fields=[])
                 derived_concept_ref = walkable_field.concept_ref
-                leaf_kind = BindingValueKind.CONCEPT
+                # A field holding `native.Anything` holds a raw value of any type, generated as `Any`, never a content.
+                holds_anything = walkable_field.concept_ref == NativeConceptCode.ANYTHING.concept_ref
+                leaf_kind = BindingValueKind.ANYTHING if holds_anything else BindingValueKind.CONCEPT
                 current_leaf_field = None
                 if is_last_segment:
                     current_concept = None
@@ -319,6 +328,7 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
                 | BindingValueKind.DATETIME
                 | BindingValueKind.TIME
                 | BindingValueKind.JSON
+                | BindingValueKind.ANYTHING
             ):
                 native_code = walkable_field.value_kind.leaf_native_concept_code
                 if native_code is None:

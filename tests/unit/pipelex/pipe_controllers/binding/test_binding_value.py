@@ -20,6 +20,7 @@ from tests.unit.pipelex.pipe_controllers.binding.test_data import (
     INVOICE,
     INVOICE_ISSUED_AT,
     RESOLVER,
+    CrateRecord,
     InvoiceLineRecord,
     ParcelRecord,
     ShipmentRecord,
@@ -203,6 +204,49 @@ class TestBindContent:
         assert bound.source_prompt == "A catalog page, photographed flat"
         assert bound.source_negative_prompt == "No glare"
         assert bound is not view
+
+    @pytest.mark.parametrize(
+        ("contents", "expected_content"),
+        [
+            pytest.param("a spare part", TextContent(text="a spare part"), id="a-string-is-text"),
+            pytest.param(42, NumberContent(number=42), id="a-number-is-a-number"),
+            pytest.param(True, YesNoContent(yes_no=True), id="a-boolean-is-yes-no"),
+            pytest.param(datetime.date(2026, 3, 14), DateContent(date=datetime.date(2026, 3, 14)), id="a-date-is-a-date"),
+            pytest.param(datetime.time(17, 0), TimeContent(time=datetime.time(17, 0)), id="a-time-is-a-time"),
+            pytest.param({"order_ref": "PO-118"}, JSONContent(json_obj={"order_ref": "PO-118"}), id="an-object-is-json"),
+            pytest.param(TextContent(text="already content"), TextContent(text="already content"), id="a-content-is-copied-whole"),
+        ],
+    )
+    def test_a_value_an_anything_field_holds_is_stored_as_its_natural_content(self, contents: object, expected_content: StuffContent) -> None:
+        """A field holding `native.Anything` holds a raw value, stored as the native its type maps to, as an `Anything` input is."""
+        derivation = _derive("crate.contents", root=make_root("billing.Crate"))
+
+        bound = bind_content(root_content=CrateRecord(contents=contents, extras=[]), derivation=derivation)
+
+        assert derivation.concept_ref == "native.Anything"
+        assert bound == expected_content
+        assert bound is not contents
+
+    def test_a_list_of_anything_binds_each_item_as_its_natural_content(self) -> None:
+        derivation = _derive("crate.extras", root=make_root("billing.Crate"))
+
+        bound = bind_content(root_content=CrateRecord(contents=None, extras=["a strap", 3]), derivation=derivation)
+
+        assert _list_items(bound) == [TextContent(text="a strap"), NumberContent(number=3)]
+
+    @pytest.mark.parametrize(
+        "contents",
+        [
+            pytest.param(["a strap"], id="a-list"),
+            pytest.param(float("nan"), id="a-number-that-is-not-finite"),
+            pytest.param(object(), id="an-arbitrary-object"),
+        ],
+    )
+    def test_a_value_an_anything_field_holds_with_no_natural_content_is_a_run_error(self, contents: object) -> None:
+        derivation = _derive("crate.contents", root=make_root("billing.Crate"))
+
+        with pytest.raises(BindingStepRunError, match="cannot be stored as a field holding any value's value"):
+            bind_content(root_content=CrateRecord(contents=contents, extras=[]), derivation=derivation)
 
     def test_a_value_contradicting_its_declared_structure_is_a_run_error(self) -> None:
         """The structure says `supplier` holds a Supplier; content lacking the field is a broken contract, not an absence."""
