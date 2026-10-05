@@ -1,4 +1,4 @@
-domain      = "delivery_rounds"
+domain      = "round_notes"
 description = "Passing on the notes left for the morning and evening delivery rounds"
 main_pipe   = "pass_on_notes"
 

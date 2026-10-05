@@ -15,7 +15,13 @@ from pipelex.core.pipes.variable_multiplicity import (
     presence_from_symbol,
     presence_symbol,
 )
-from pipelex.tools.misc.string_utils import FIELD_PATH_PATTERN, SNAKE_CASE_PATTERN, get_root_from_dotted_path, is_snake_case
+from pipelex.tools.misc.string_utils import (
+    FIELD_PATH_PATTERN,
+    SNAKE_CASE_IDENTIFIER_REGEX,
+    SNAKE_CASE_PATTERN,
+    get_root_from_dotted_path,
+    is_snake_case,
+)
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # The grammar of an input name, the standard's `[a-z][a-z0-9_]*`: a plain snake_case identifier, which
@@ -133,11 +139,12 @@ def _quoted_names(*, names: list[str]) -> str:
 
 def is_valid_input_name(input_name: str) -> bool:
     """Whether a name is a plain input name: a snake_case identifier matching ``INPUT_NAME_PATTERN``, never dotted."""
-    return re.fullmatch(INPUT_NAME_PATTERN, input_name) is not None
+    return is_snake_case(input_name)
 
 
 _PLAIN_NAME_RULE = (
-    "an input name is a plain snake_case identifier, matching `[a-z][a-z0-9_]*`: a lowercase letter, then lowercase letters, digits and underscores"
+    f"an input name is a plain snake_case identifier, matching `{SNAKE_CASE_IDENTIFIER_REGEX}`: a lowercase letter, then lowercase letters, "
+    "digits and underscores"
 )
 
 

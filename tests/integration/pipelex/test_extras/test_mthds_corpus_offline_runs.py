@@ -54,7 +54,6 @@ def _content_dump(content: StuffContent) -> dict[str, Any]:
     return content.model_dump(mode="json")
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestMthdsCorpusOfflineRuns:
     def test_every_offline_entry_has_expectations(self) -> None:
         offline_names = {entry.name for entry in _OFFLINE_ENTRIES}
@@ -62,6 +61,7 @@ class TestMthdsCorpusOfflineRuns:
             "Every offline-tier entry needs its expectations in OfflineRunExpectations.BY_ENTRY, and nothing else may be listed there"
         )
 
+    @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize("entry", _OFFLINE_ENTRIES, ids=_entry_id)
     async def test_offline_entry_runs_and_leaves_the_expected_values(self, entry: CorpusEntry) -> None:
         assert entry.inputs_path is not None, f"Offline entry '{entry.name}' has no inputs.json to run with"

@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_machinery.validation import BINDING_PATH_PATTERN, BINDING_RESULT_PATTERN
-from pipelex.tools.misc.string_utils import is_field_path, is_snake_case
+from pipelex.tools.misc.string_utils import FIELD_PATH_SEGMENT_REGEX, SNAKE_CASE_IDENTIFIER_REGEX, is_field_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # The key a binding step is recognized by, as MTHDS writes it, and the field it parses into: `from` is a
@@ -18,9 +18,9 @@ PIPE_STEP_ONLY_FIELDS: tuple[str, ...] = ("pipe", "nb_output", "multiple_output"
 
 _PATH_GRAMMAR = (
     "a name in working memory followed by zero or more field names, separated by single dots, each a letter followed by letters, "
-    "digits and underscores (`[A-Za-z][A-Za-z0-9_]*`), with no subscript, expression, whitespace or underscore-led segment"
+    f"digits and underscores (`{FIELD_PATH_SEGMENT_REGEX}`), with no subscript, expression, whitespace or underscore-led segment"
 )
-_RESULT_GRAMMAR = "a plain input name, a snake_case identifier matching `[a-z][a-z0-9_]*`"
+_RESULT_GRAMMAR = f"a plain input name, a snake_case identifier matching `{SNAKE_CASE_IDENTIFIER_REGEX}`"
 
 
 def is_binding_step_dict(*, raw_step: Mapping[str, Any]) -> bool:
