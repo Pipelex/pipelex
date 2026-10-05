@@ -436,11 +436,13 @@ def validate_input_names(*, input_specs: Mapping[str, str]) -> None:
     raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[first_invalid_name])
 
 
-def check_input_list_name(*, input_list_name: str) -> None:
+def check_input_list_name(*, input_list_name: str, branch_pipe_code: str, input_item_name: str) -> None:
     """Refuse a PipeBatch's `input_list_name` that is not a plain input name.
 
     It names one of the batch's own inputs, so it follows the input-name grammar: a list held in a field
-    of a larger value is declared by the batch under a plain name, and handed to it by the calling sequence.
+    of a larger value is declared by the batch under a plain name, and handed to it by the calling sequence,
+    which binds the field to that name, or runs the branch pipe in a step whose dotted `batch_over` binds the
+    list and batches over it, in place of the PipeBatch.
 
     Raises:
         PipeValidationError: ``INVALID_INPUT_NAME`` naming the list.
@@ -453,7 +455,9 @@ def check_input_list_name(*, input_list_name: str) -> None:
             f"`input_list_name` '{input_list_name}' is not a plain input name: a PipeBatch maps over a list it declares as an input "
             f'of its own, under a plain name. Declare the list itself (`{plain_name} = "<Concept>[]"`, with '
             f'`input_list_name = "{plain_name}"`), and have the calling sequence bind the field to that name with a binding step '
-            f"({_binding_step(dotted_path=input_list_name)})."
+            f"({_binding_step(dotted_path=input_list_name)}), or have the calling sequence run '{branch_pipe_code}' in a step that "
+            f'batches over the field itself, which binds the list and batches over it, in place of the PipeBatch (`{{ pipe = "{branch_pipe_code}", '
+            f'batch_over = "{input_list_name}", batch_as = "{input_item_name}" }}`).'
         )
     else:
         msg = f"`input_list_name` '{input_list_name}' is not a valid input name: {_PLAIN_NAME_RULE}."

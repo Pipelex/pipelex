@@ -25,7 +25,7 @@ class PipeBatchBlueprint(PipeBlueprint):
     def validate_inputs(self):
         # The list is one of the batch's own inputs, so its name is a plain input name: a list held in a
         # field is declared under a plain name and handed to the batch by the calling sequence.
-        check_input_list_name(input_list_name=self.input_list_name)
+        check_input_list_name(input_list_name=self.input_list_name, branch_pipe_code=self.branch_pipe_code, input_item_name=self.input_item_name)
         # The PipeBatch will iterate over a list and pass each item to the branch pipe,
         # so we must have the list's name as part of the batch inputs
         # and conversely, we must not have the item's name as part of the batch inputs
