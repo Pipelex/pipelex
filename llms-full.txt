@@ -2208,7 +2208,7 @@ Pipelex uses a layered TOML configuration system that lets you define sensible d
 ## Configuration Levels
 
 1. **Package defaults** — Built into Pipelex (`pipelex.toml` in the package)
-2. **Global tier** — `~/.pipelex/` for user-wide settings: the base `pipelex.toml`, then its override sequence
+2. **Global tier** — `~/.pipelex/` for user-wide settings, or the directory the `PIPELEX_HOME` environment variable names (see [the home configuration directory](../configuration/index.md#the-home-configuration-directory-pipelex_home)): the base `pipelex.toml`, then its override sequence
 3. **Project tier** — `{project_root}/.pipelex/` for project-specific settings: the base `pipelex.toml`, then the same override sequence
 
 Within each tier, the base `pipelex.toml` is followed by an override sequence, merged in order (later wins per key):
@@ -9776,7 +9776,7 @@ pipelex init [FOCUS]
 pipelex init --local [FOCUS]
 ```
 
-By default, `pipelex init` writes to the global config directory at `~/.pipelex/`. Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials always remain in the global `~/.pipelex/` directory regardless of `--local`.
+By default, `pipelex init` writes to the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home)). Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials always remain in the home configuration directory regardless of `--local`.
 
 !!! note "Config updates not yet supported"
     The `pipelex init` command always performs a full reset of the configuration. Incremental config updates will be supported in a future release.
@@ -9850,7 +9850,7 @@ pipelex-agent init [--config/-c JSON] [--global/-g]
 **Target directory:**
 
 - **Default:** project-level `.pipelex/` at the detected project root (looks for `.git`, `pyproject.toml`, etc.). Errors out if no project root is found.
-- **`--global`/`-g`:** forces `~/.pipelex/`.
+- **`--global`/`-g`:** forces the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`).
 
 **Config JSON schema:**
 
@@ -9924,7 +9924,7 @@ Pipelex manages two areas of an install, each tracked by its own small JSON mani
 - the model deck, `~/.pipelex/inference/deck/` (or `.pipelex/inference/deck/` for a project-local install);
 - the backends directory, `~/.pipelex/inference/backends/` (or `.pipelex/inference/backends/`), where only `internal.toml` is managed.
 
-Each area is found the way the runtime finds it: a project's `.pipelex/` directory wins when it has one, and the global `~/.pipelex/` one is used otherwise, so the command refreshes the files your runs actually read. A manifest stores the kit version that produced the install and a SHA-256 of each managed file at install time.
+Each area is found the way the runtime finds it: a project's `.pipelex/` directory wins when it has one, and the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home)) is used otherwise, so the command refreshes the files your runs actually read. A manifest stores the kit version that produced the install and a SHA-256 of each managed file at install time.
 
 On `update`, Pipelex compares three states for each area — what the kit ships, what is on disk, what the manifest recorded — and produces a per-file plan:
 
@@ -10013,7 +10013,7 @@ pipelex migrate --yes      # apply without asking
 
 Two directories, and only those:
 
-- the global `~/.pipelex/`
+- the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home))
 - the project `.pipelex/`, when the current directory is inside a project that has one
 
 Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers — and at the inference backend definitions in `inference/backends/`.
@@ -11639,17 +11639,32 @@ Pipelex uses a TOML-based configuration system with **shipped defaults** plus **
 You can create the configuration files by running:
 
 ```bash
-pipelex init config          # creates the global config at ~/.pipelex/
+pipelex init config          # creates the global config at ~/.pipelex/ (or in PIPELEX_HOME)
 pipelex init config --local  # creates the project config at {project_root}/.pipelex/
 ```
 
 !!! important "Configuration Setup Notes"
-    1. By default `pipelex init config` targets the **global** `~/.pipelex/` directory; pass `--local` to create the project-level `.pipelex/` instead.
+    1. By default `pipelex init config` targets the **global** `~/.pipelex/` directory, or the one `PIPELEX_HOME` names (see [below](#the-home-configuration-directory-pipelex_home)); pass `--local` to create the project-level `.pipelex/` instead.
     2. `pipelex init config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
     3. Running `pipelex init config` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before running this command.
-    4. Credentials (`~/.pipelex/.env`) and the onboarding state file always remain in the global `~/.pipelex/` directory regardless of `--local` — only config, inference, and telemetry files are written to the project `.pipelex/`.
+    4. Credentials (the `.env` in `~/.pipelex/`) always remain in the global directory regardless of `--local` — only config, inference, and telemetry files are written to the project `.pipelex/`.
 
 For a complete list of all possible configuration options, refer to the configuration group documentation below.
+
+## The home configuration directory: `PIPELEX_HOME`
+
+The global layer lives in `~/.pipelex/` unless the `PIPELEX_HOME` environment variable names another directory. The variable names the directory itself, the equivalent of `~/.pipelex`, not its parent, so it can be any directory whatever its name:
+
+```bash
+export PIPELEX_HOME=/path/to/ci/pipelex-home
+```
+
+Everything that reads or writes the global layer follows it: its `pipelex.toml` and override files, the inference files and their personal overrides, the credentials in its `.env`, the telemetry configuration, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate`, and the agent CLI's `--global` flag. The first boot fills the directory from the kit's templates when it does not exist or is empty, as it does for `~/.pipelex/`, so a fresh `mktemp -d` or an empty volume mount works as it is; a directory with anything in it is left alone. A `~` is expanded, a relative path resolves against the working directory at the moment Pipelex is imported, and an empty value counts as unset.
+
+It is meant for any process that should not share the machine's settings: a test run or a CI job that commits a configuration of its own, a container, or a checkout that must not read the developer's personal backends. A project's own `.pipelex/` keeps winning over it, exactly as it wins over `~/.pipelex/`.
+
+!!! warning "Set it before Pipelex is imported"
+    The home directory's `.env` is loaded when Pipelex is first imported, so `PIPELEX_HOME` has to be in the process environment by then: set it in the shell, the make target, the CI job or the container image. Set later, from a test fixture or from code that runs after something has imported Pipelex, it moves the configuration files but not the credentials already loaded from the old `.env`. A `.env` file cannot set it either: the home `.env` is found through it, so Pipelex discards a `PIPELEX_HOME` line in the home `.env` or the project's `.env`, and the process keeps the value it was started with.
 
 ## Where to edit configuration in a project
 
@@ -11693,7 +11708,7 @@ Pipelex uses a sophisticated configuration override system that loads and merges
 The exact loading sequence is (later wins, per leaf key):
 
 1. Base configuration from the installed Pipelex package (`pipelex.toml`)
-2. Global base configuration (`~/.pipelex/pipelex.toml`)
+2. Global base configuration (`~/.pipelex/pipelex.toml`, or `pipelex.toml` in the directory `PIPELEX_HOME` names)
 3. Global override sequence, from `~/.pipelex/`: `pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml`, `pipelex_temporary_override.toml`
 4. Your project's base configuration (`{project_root}/.pipelex/pipelex.toml`)
 5. Project override sequence, from the project's `.pipelex/`: the same five files as step 3
@@ -13491,7 +13506,7 @@ Both files are optional and git-ignored: `pipelex init` writes the rule into `.p
 Where a file lives decides its reach. The base file resolves as before — the project's copy if it has one, otherwise the global one — and the overrides merge over it in this order:
 
 1. the base `backends.toml` / `routing_profiles.toml`
-2. `~/.pipelex/inference/<file>_override.toml` — the global override, applied in every project on the machine
+2. `~/.pipelex/inference/<file>_override.toml` — the global override, applied in every project on the machine (under the directory `PIPELEX_HOME` names, when it is set: see [the home configuration directory](../index.md#the-home-configuration-directory-pipelex_home))
 3. `{project}/.pipelex/inference/<file>_override.toml` — the project override, which wins
 
 The global override reaches a project that carries its own tracked base, which is the point: one edit under `~/.pipelex/inference/` and every project follows. Deleting the override files restores the shipped default.
@@ -18956,10 +18971,10 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 | `deck/*.toml` | Inference step | Project or global | `.pipelex/inference/deck/` |
 | `routing_profiles.toml` | Inference step | Project or global | `.pipelex/inference/routing_profiles.toml` |
 | `telemetry.toml` | Telemetry step | Project or global | `.pipelex/telemetry.toml` |
-| `.env` | Credentials step | **Always global** | `~/.pipelex/.env` (mode 0600) |
+| `.env` | Credentials step | **Always global** | `~/.pipelex/.env`, or `.env` under `PIPELEX_HOME` (mode 0600) |
 
 !!! info "Project vs global"
-    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from `~/.pipelex/`.
+    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from the global directory. Wherever this page says `~/.pipelex/`, the `PIPELEX_HOME` environment variable relocates it ([Configuration](../configuration/index.md#the-home-configuration-directory-pipelex_home)).
 
 ---
 
@@ -19190,7 +19205,7 @@ The `ConfigLoader` (singleton: `config_manager`) resolves where configuration fi
 
 | Property | Path | When it exists |
 |----------|------|----------------|
-| `global_config_dir` | `~/.pipelex/` | Always (created on first use) |
+| `global_config_dir` | `~/.pipelex/`, or `PIPELEX_HOME` | Always (created on first use) |
 | `project_config_dir` | `{project_root}/.pipelex/` | Only if the directory exists on disk |
 | `pipelex_config_dir` | Project if exists, else global | Always (backward-compat alias) |
 
@@ -19223,7 +19238,7 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ### Global Config Bootstrap
 
-`ensure_global_config_exists()` creates `~/.pipelex/` with kit template files on first use (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
+`ensure_global_config_exists()` creates the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`) with kit template files on first use, and fills it the same way when it exists but is empty (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
 
 ### Config Loading Chain
 
@@ -19249,7 +19264,7 @@ This means a project-level file **wins** over the global one, but only if it act
 | Flag | Target |
 |------|--------|
 | Default (no flag) | `{project_root}/.pipelex/` — project root detected via `find_project_root()` |
-| `--global` / `-g` | `~/.pipelex/` |
+| `--global` / `-g` | `~/.pipelex/`, or `PIPELEX_HOME` |
 
 If no project root is found and `--global` is not set, the command fails with an error.
 
@@ -22361,7 +22376,7 @@ For the user-facing configuration guide, see [Configuration Overview](../configu
 Pipelex configuration is merged in layers:
 
 - **Shipped defaults**: maintained by the Pipelex project and used as the baseline by the installed package.
-- **Global config** (`~/.pipelex/`): machine-wide settings for a developer, applied to every project on the machine.
+- **Global config** (`~/.pipelex/`, or the directory `PIPELEX_HOME` names): machine-wide settings for a developer, applied to every project on the machine. One resolver, `get_pipelex_home_dir()` in `pipelex/system/environment.py`, locates it; `ConfigLoader.global_config_dir` and the import-time `.env` load both ask it, and a unit test refuses any other join of `Path.home()` with `.pipelex`.
 - **Project config** (`{project_root}/.pipelex/`): per-project settings, edited by teams using Pipelex.
 - **Override files** at each level (`pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml`, `pipelex_temporary_override.toml`): optional, typically gitignored, used for personal or ephemeral tweaks.
 
