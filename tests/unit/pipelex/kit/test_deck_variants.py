@@ -9,7 +9,7 @@ every variant through the same loader the runtime uses and holds it to the shipp
   the kit's backend files, because handle retirement is how a parked deck actually goes stale.
 
 The second check is scoped to the handles only the variant names. A handle the shipped deck names
-too is not held to them here: some are served only through Pipelex Manifold, with no backend section
+too is not held to them here: some are served only through Pipelex, with no backend section
 of their own, and the shipped deck's default aliases have their own guard in `test_shipped_deck_defaults.py`.
 """
 

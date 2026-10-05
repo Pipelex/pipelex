@@ -162,13 +162,6 @@ LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/la
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
 LogSinkHeaderValueError | Log sink header value holds a line break | https://docs.pipelex.com/latest/errors/log-sink-header-value-error/
 LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
-ManifoldCredentialsError | Inference backend credentials missing | https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/
-ManifoldEndpointError | Inference backend endpoint missing | https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/
-ManifoldError | Inference backend error | https://docs.pipelex.com/latest/errors/cogt-error/
-ManifoldExtractResponseError | Extract response unreadable | https://docs.pipelex.com/latest/errors/extract-job-failure-error/
-ManifoldFactoryError | Inference client setup error | https://docs.pipelex.com/latest/errors/cogt-error/
-ManifoldSearchEmptyResultError | Search returned no result | https://docs.pipelex.com/latest/errors/search-job-failure-error/
-ManifoldSearchResponseError | Search response unreadable | https://docs.pipelex.com/latest/errors/search-job-failure-error/
 MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/latest/errors/method-dependency-fetch-error/
 MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
 MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
@@ -256,6 +249,13 @@ PipelexBridgeDispatchError | Pipelex bridge dispatch | https://docs.pipelex.com/
 PipelexCLIError | Pipelex CLI | https://docs.pipelex.com/latest/errors/pipelex-cli-error/
 PipelexConfigError | Pipelex config | https://docs.pipelex.com/latest/errors/pipelex-config-error/
 PipelexError | Pipelex error | https://docs.pipelex.com/latest/errors/pipelex-error/
+PipelexHostedCredentialsError | Inference backend credentials missing | https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/
+PipelexHostedEndpointError | Inference backend endpoint missing | https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/
+PipelexHostedError | Inference backend error | https://docs.pipelex.com/latest/errors/cogt-error/
+PipelexHostedExtractResponseError | Extract response unreadable | https://docs.pipelex.com/latest/errors/extract-job-failure-error/
+PipelexHostedFactoryError | Inference client setup error | https://docs.pipelex.com/latest/errors/cogt-error/
+PipelexHostedSearchEmptyResultError | Search returned no result | https://docs.pipelex.com/latest/errors/search-job-failure-error/
+PipelexHostedSearchResponseError | Search response unreadable | https://docs.pipelex.com/latest/errors/search-job-failure-error/
 PipelexRuntimeBridgeError | Pipelex runtime bridge | https://docs.pipelex.com/latest/errors/pipelex-runtime-bridge-error/
 PipelexSetupError | Pipelex setup | https://docs.pipelex.com/latest/errors/pipelex-setup-error/
 PipelexUnexpectedError | Unexpected internal error | https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/

@@ -11,7 +11,7 @@ id = "inference-backend"
 title = "Inference backend model definitions"
 subdirectory = "inference/backends"
 tier_glob = "*.toml"
-current_schema_version = 3
+current_schema_version = 4
 min_supported_schema_version = 0
 
 [[migration]]
@@ -84,3 +84,34 @@ kind = "remap_value"
 table_path = ["*"]
 key = "sdk"
 mapping = { bedrock_aioboto3 = "bedrock_aioboto" }
+
+# Unsafe for the reason `@3` is: `sdk` is a free string, so the old handles still validate and the boot never
+# reaches the ledger. The entry exists so that `pipelex migrate` names each file still carrying one of them.
+[[migration]]
+id = "inference-backend@4"
+to_schema_version = 4
+introduced_in = "0.73.0"
+breaking = true
+safety = "unsafe"
+title = "Rename the hosted backend's manifold_* SDK handles to pipelex_hosted_*, by hand"
+description = """
+The SDK handles of the Pipelex-run hosted backend are renamed from `manifold_anthropic`, \
+`manifold_completions`, `manifold_responses`, `manifold_img_gen`, `manifold_extract` and \
+`manifold_search` to `pipelex_hosted_anthropic`, `pipelex_hosted_completions`, \
+`pipelex_hosted_responses`, `pipelex_hosted_img_gen`, `pipelex_hosted_extract` and \
+`pipelex_hosted_search`. A backend file that still names an old handle keeps loading, but every call to \
+a model it defines fails, because no plugin registers that SDK any more.
+"""
+guidance = """
+Replace each `manifold_*` value of `sdk` with its `pipelex_hosted_*` counterpart wherever the file sets \
+it: in `[defaults]` and in any model table that overrides it. The backend itself is renamed too, from \
+`pipelex_manifold` to `pipelex_hosted`, so rename this file to `pipelex_hosted.toml`, and rename the \
+`[pipelex_manifold]` table of `backends.toml` and any routing profile naming it; those two files are not \
+migration surfaces, so no tool rewrites them.
+"""
+
+[[migration.ops]] # `["*"]` is every root table of the file: `[defaults]` and each model alike
+kind = "remap_value"
+table_path = ["*"]
+key = "sdk"
+mapping = { manifold_anthropic = "pipelex_hosted_anthropic", manifold_completions = "pipelex_hosted_completions", manifold_responses = "pipelex_hosted_responses", manifold_img_gen = "pipelex_hosted_img_gen", manifold_extract = "pipelex_hosted_extract", manifold_search = "pipelex_hosted_search" }
