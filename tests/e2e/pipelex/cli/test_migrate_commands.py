@@ -1145,9 +1145,9 @@ class TestAStaleTelemetryFileIsMigratedNotReset:
         assert "pipelex init telemetry" not in printed
 
 
-# A backend file whose name matches the main configuration's `pipelex_*.toml` glob, as the hosted backend's does.
-LEGACY_PREFIXED_BACKEND_FILE_NAME = "pipelex_hosted.toml"
-LEGACY_PREFIXED_BACKEND_FILE_CONTENT = "# Per-model overrides for the Pipelex backend.\n"
+# A backend file earlier kits shipped, whose name matches the main configuration's `pipelex_*.toml` glob.
+LEGACY_PREFIXED_BACKEND_FILE_NAME = "pipelex_manifold.toml"
+LEGACY_PREFIXED_BACKEND_FILE_CONTENT = "# Per-model overrides for the Pipelex Manifold backend.\n"
 
 
 class TestAStaleBackendDirectory:
@@ -1155,8 +1155,8 @@ class TestAStaleBackendDirectory:
 
     Everything else in this module is planted on a file that sits *directly* in a configuration
     directory. These files do not: they are the reason the walk learned to enter a subdirectory at
-    all, and the reason a file is claimed by `(directory, name)` rather than by name — a backend
-    file such as the hosted backend's `pipelex_hosted.toml` lives in there, which the main configuration's `pipelex_*.toml` glob
+    all, and the reason a file is claimed by `(directory, name)` rather than by name — earlier kits
+    shipped a `pipelex_manifold.toml` in there, which the main configuration's `pipelex_*.toml` glob
     would otherwise have claimed. It is planted here for that reason, untouched, and the assertions say so.
 
     What a boot *says* is not asserted here and cannot be: the probe is `pipelex-agent`, which cuts
@@ -1168,8 +1168,8 @@ class TestAStaleBackendDirectory:
         """Everything in and beside the directory that no migration may rewrite.
 
         Excluded by name rather than by extension, and the difference is the whole point of this
-        class: a backend file such as the hosted backend's `pipelex_hosted.toml` lives in this directory,
-        so it is planted here as a deployment leaves it. The main configuration's
+        class: earlier kits shipped `pipelex_manifold.toml` in this directory, and machines set up with
+        them still carry it, so it is planted here as they left it. The main configuration's
         `pipelex_*.toml` glob would claim it by name alone, so it is the one file a walk that forgot
         about directories would rewrite. An extension filter dropped it — and every other `.toml` in
         here — out of the snapshot, leaving the class's own claim unasserted. Only the files the
