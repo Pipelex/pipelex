@@ -378,6 +378,8 @@ class TestMthdsSchemaGeneration:
             pytest.param({"pipe": "sub_pipe", "from": "invoice.total", "result": "total"}, False, id="pipe-and-from"),
             pytest.param({"from": "invoice.lines", "result": "lines", "batch_over": "lines"}, False, id="binding-with-batch-over"),
             pytest.param({"from": "invoice.total", "result": "total", "note": "x"}, False, id="binding-with-a-stray-field"),
+            pytest.param({"from_path": "invoice.total", "result": "total"}, False, id="binding-spelled-from-path"),
+            pytest.param({"from": "invoice.total", "from_path": "invoice.total", "result": "total"}, False, id="binding-with-from-path-beside-from"),
             pytest.param({"result": "total"}, False, id="neither-pipe-nor-from"),
         ],
     )

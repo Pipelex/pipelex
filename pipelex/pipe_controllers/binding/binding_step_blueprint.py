@@ -8,10 +8,10 @@ from pipelex.pipe_machinery.validation import BINDING_PATH_PATTERN, BINDING_RESU
 from pipelex.tools.misc.string_utils import FIELD_PATH_SEGMENT_REGEX, SNAKE_CASE_IDENTIFIER_REGEX, is_field_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
-# The key a binding step is recognized by, as MTHDS writes it, and the field it parses into: `from` is a
-# Python keyword, so the blueprint field is `from_path`, as PipeCompose's construct spells it.
+# The key a binding step is recognized by, as MTHDS writes it. `from` is a Python keyword, so the blueprint field is
+# `from_path`, as PipeCompose's construct spells it, but that name is Python's only: MTHDS spells the key `from`, and a
+# step spelling it `from_path` is refused, as the schema refuses it.
 BINDING_FROM_KEY = "from"
-BINDING_FROM_FIELD = "from_path"
 
 # The fields of a pipe step that a binding step never carries, `result` aside, which both shapes share.
 PIPE_STEP_ONLY_FIELDS: tuple[str, ...] = ("pipe", "nb_output", "multiple_output", "batch_over", "batch_as")
@@ -24,8 +24,8 @@ _RESULT_GRAMMAR = f"a plain input name, a snake_case identifier matching `{SNAKE
 
 
 def is_binding_step_dict(*, raw_step: Mapping[str, Any]) -> bool:
-    """Whether a step, as written, is a binding step: it carries `from` (or `from_path`, its Python spelling)."""
-    return BINDING_FROM_KEY in raw_step or BINDING_FROM_FIELD in raw_step
+    """Whether a step, as written, is a binding step: it carries `from`."""
+    return BINDING_FROM_KEY in raw_step
 
 
 def check_binding_step_shape(*, raw_step: Mapping[str, Any], step_label: str) -> None:
@@ -40,7 +40,7 @@ def check_binding_step_shape(*, raw_step: Mapping[str, Any], step_label: str) ->
     """
     if not is_binding_step_dict(raw_step=raw_step):
         return
-    from_path = raw_step.get(BINDING_FROM_KEY, raw_step.get(BINDING_FROM_FIELD))
+    from_path = raw_step.get(BINDING_FROM_KEY)
     if "pipe" in raw_step:
         msg = (
             f"{step_label} carries both `pipe` and `from`: a step either runs a pipe or binds a value, never both. "
@@ -68,7 +68,8 @@ class BindingStepBlueprint(BaseModel):
     lives in a PipeSequence's `steps` only, and carries exactly these two fields.
     """
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # No `populate_by_name`: the path is read under `from` alone, so a `from_path` key is refused as an extra field.
+    model_config = ConfigDict(extra="forbid")
 
     from_path: str = Field(
         validation_alias=BINDING_FROM_KEY,

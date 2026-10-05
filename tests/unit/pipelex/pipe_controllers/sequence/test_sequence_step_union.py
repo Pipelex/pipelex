@@ -103,6 +103,22 @@ class TestSequenceStepUnion:
         assert errors[0].pipe_code == "acknowledge_invoice"
         assert message_fragment in errors[0].message
 
+    @pytest.mark.parametrize(
+        "step_toml",
+        [
+            pytest.param('{ from_path = "invoice.total", result = "total_amount" }', id="from-path-alone"),
+            pytest.param('{ from = "invoice.total", from_path = "invoice.total", result = "total_amount" }', id="from-path-beside-from"),
+        ],
+    )
+    def test_a_step_spelling_its_path_from_path_is_refused(self, step_toml: str) -> None:
+        """`from_path` is the Python name of the field, not MTHDS: the parser refuses it, as the schema does."""
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_sequence_bundle(steps_toml=f"    {step_toml},"), mthds_source="main.mthds")
+
+        assert "from_path" in str(exc_info.value)
+        with pytest.raises(ValidationError):
+            BindingStepBlueprint.model_validate({"from_path": "invoice.total", "result": "total_amount"})
+
     def test_i10_a_binding_step_in_a_parallel_branch_is_refused(self) -> None:
         mthds_content = f"""{_BUNDLE_HEADER}steps = [{{ pipe = "acknowledge_in_parallel", result = "receipt" }}]
 

@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.pipe_controllers.binding.binding_step_blueprint import is_binding_step_dict, raw_step_mapping
+from pipelex.pipe_controllers.binding.binding_step_blueprint import BINDING_FROM_KEY, is_binding_step_dict, raw_step_mapping
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -39,7 +39,7 @@ class PipeParallelBlueprint(PipeBlueprint):
         for branch_index, branch in enumerate(branch_list):
             raw_branch = raw_step_mapping(raw_step=branch)
             if raw_branch is not None and is_binding_step_dict(raw_step=raw_branch):
-                from_path = raw_branch.get("from", raw_branch.get("from_path"))
+                from_path = raw_branch.get(BINDING_FROM_KEY)
                 msg = (
                     f"Branch {branch_index + 1} of the parallel is a binding step (it carries `from`), but a PipeParallel branch is always "
                     f"a pipe step: bind the value in a step of the calling PipeSequence, before the PipeParallel step "
