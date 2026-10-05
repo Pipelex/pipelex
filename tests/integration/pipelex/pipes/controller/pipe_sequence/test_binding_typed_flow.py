@@ -1,17 +1,24 @@
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.test_extras.mthds_corpus.resources import entries_root
 from pipelex.validation_error_types import PipeValidationErrorType
+
+if TYPE_CHECKING:
+    from mthds.protocol.pipeline_inputs import PipelineInputs
 
 _REBOUND_ROOT_BUNDLE = """domain = "depot_records"
 description = "A record name holding an invoice, then a parcel"
@@ -105,6 +112,37 @@ steps = [
 """
 
 
+_BATCHED_STEP_BUNDLE = """domain = "depot_batches"
+description = "Weighing a batch of parcels, then reading their weights"
+main_pipe = "read_weights"
+
+[concept.Parcel]
+description = "A parcel received at the depot"
+
+[concept.Parcel.structure]
+weight = { type = "number", description = "The weight, in kilograms", required = true }
+
+[pipe.weigh_parcel]
+type = "PipeCompose"
+description = "Writes out a parcel of a given weight"
+inputs = { amount = "Number" }
+output = "Parcel"
+
+[pipe.weigh_parcel.construct]
+weight = { from = "amount.number" }
+
+[pipe.read_weights]
+type = "PipeSequence"
+description = "Weighs a parcel for each amount, then binds their weights"
+inputs = { amounts = "Number[]" }
+output = "Number[]"
+steps = [
+  { pipe = "weigh_parcel", result = "parcels", batch_over = "amounts", batch_as = "amount" },
+  { from = "parcels.weight", result = "weights" },
+]
+"""
+
+
 def _load_sequence(*, mthds_content: str, library_id: str, pipe_code: str) -> PipeSequence:
     blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="flow.mthds")
     pipes = get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
@@ -185,6 +223,34 @@ class TestBindingTypedFlow:
 
         assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
         assert f"'{root_name}' holds a 'depot_notices.{concept_code}', which is declared with neither a structure nor refines" in str(exc_info.value)
+
+    @pytest.mark.asyncio(loop_scope="class")
+    @pytest.mark.parametrize(
+        "step_count",
+        [
+            pytest.param("", id="a-plain-batch"),
+            pytest.param(", nb_output = 1", id="a-batch-asking-for-one-output"),
+            pytest.param(", nb_output = 3", id="a-batch-asking-for-three-outputs"),
+            pytest.param(", multiple_output = true", id="a-batch-asking-for-multiple-outputs"),
+        ],
+    )
+    async def test_a_batched_step_stores_a_list_whatever_count_it_asks_for(self, load_empty_library: Callable[[], str], step_count: str) -> None:
+        """A batched step stores the list of its branches' results, so a binding over it is plural, as the run binds it."""
+        mthds_content = _BATCHED_STEP_BUNDLE.replace('batch_as = "amount" }', f'batch_as = "amount"{step_count} }}')
+        sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_weights")
+
+        flow = sequence.build_typed_flow()
+
+        assert flow.binding_derivations[1].multiplicity is True
+        assert flow.binding_specs[1].concept.concept_ref == "native.Number"
+        assert flow.binding_specs[1].multiplicity is True
+        assert flow.final_slots["parcels"].stuff_spec is not None
+        assert flow.final_slots["parcels"].stuff_spec.multiplicity is True
+
+        inputs: PipelineInputs = {"amounts": {"concept": "native.Number", "content": [{"number": 2.5}, {"number": 4}]}}
+        response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[mthds_content], inputs=inputs)
+
+        assert [item.number for item in response.pipe_output.main_stuff_as_items(item_type=NumberContent)] == [2.5, 4]
 
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(

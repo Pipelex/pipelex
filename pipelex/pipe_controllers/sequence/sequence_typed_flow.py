@@ -16,7 +16,6 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 from pipelex.interpreter_hub import get_concept_library, get_optional_pipe
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
@@ -26,8 +25,6 @@ from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
-from pipelex.pipe_run.pipe_run_params import output_multiplicity_to_apply
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # A step of a PipeSequence, as the runtime holds it: a pipe step or a binding step.
@@ -68,23 +65,6 @@ def resolve_library_concept(*, concept_library: ConceptLibraryAbstract, concept_
         if len(candidate_keys) != 1:
             return None
         return concept_library.get_required_concept(concept_ref=candidate_keys[0])
-
-
-def pipe_step_output_spec(*, sub_pipe: SubPipe, step_pipe: PipeAbstract) -> StuffSpec:
-    """The spec a pipe step stores under its `result`, resolved the way the run path resolves it."""
-    multiplicity_resolution = output_multiplicity_to_apply(
-        base_multiplicity=step_pipe.output.multiplicity,
-        override_multiplicity=sub_pipe.output_multiplicity,
-    )
-    multiplicity: VariableMultiplicity | None
-    if not multiplicity_resolution.is_multiple_outputs_enabled:
-        multiplicity = None
-    elif multiplicity_resolution.specific_output_count is not None:
-        multiplicity = multiplicity_resolution.specific_output_count
-    else:
-        multiplicity = True
-    presence = step_pipe.output.presence if multiplicity is None else PresenceMarker.PLAIN
-    return StuffSpec(concept=step_pipe.output.concept, multiplicity=multiplicity, presence=presence)
 
 
 def binding_path_unresolved_error(
@@ -170,10 +150,10 @@ def build_sequence_typed_flow(
                 if not branch.output_name:
                     continue
                 branch_pipe = get_optional_pipe(pipe_code=branch.pipe_code)
-                branch_spec = pipe_step_output_spec(sub_pipe=branch, step_pipe=branch_pipe) if branch_pipe is not None else None
+                branch_spec = branch.result_spec(step_pipe=branch_pipe) if branch_pipe is not None else None
                 slots[branch.output_name] = FlowSlot(stuff_spec=branch_spec)
         if step.output_name:
-            slots[step.output_name] = FlowSlot(stuff_spec=pipe_step_output_spec(sub_pipe=step, step_pipe=step_pipe))
+            slots[step.output_name] = FlowSlot(stuff_spec=step.result_spec(step_pipe=step_pipe))
 
     return SequenceTypedFlow(
         binding_derivations=binding_derivations,
