@@ -64,10 +64,11 @@ api_key = "sk-not-a-real-key-either"
 # the current kit no longer carries: a missing per-backend file is fatal for an enabled backend.
 PREVIOUS_RELEASE_KIT_DIR = Path("tests/data/inference/previous_release_kit")
 
-# The disabled table in the previous kit: its variables are never set here, so a load that substituted
-# them before checking `enabled` would fail the strict case.
-PREVIOUS_RELEASE_DISABLED_BACKEND = "pipelex_manifold"
-PREVIOUS_RELEASE_DISABLED_BACKEND_VARS = ("PIPELEX_MANIFOLD_ENDPOINT", "PIPELEX_MANIFOLD_API_KEY")
+# The disabled table in the previous kit, a backend the current kit no longer carries, under a neutral
+# name: its variables are never set here, so a load that substituted them before checking `enabled`
+# would fail the strict case, and its keys the blueprint does not define must not be validated either.
+PREVIOUS_RELEASE_DISABLED_BACKEND = "retired_preview"
+PREVIOUS_RELEASE_DISABLED_BACKEND_VARS = ("RETIRED_PREVIEW_ENDPOINT", "RETIRED_PREVIEW_API_KEY")
 
 # The enabled table in the previous kit whose per-backend file declares no model, and the line enabling it.
 PREVIOUS_RELEASE_EMPTY_ENABLED_BACKEND = "pipelex_gateway"
@@ -266,7 +267,7 @@ class TestThePreviousReleaseKit:
     As that release left it, its `backends.toml` enables the Pipelex Gateway over a comment-only file and
     its active routing profile sends every model there: that is refused, naming the backend, rather than
     booted with every model silently missing from the deck. Once the user disables that table and picks
-    another profile, as the changelog says, the rest loads: the disabled table of the hosted backend, which carries a key
+    another profile, as the changelog says, the rest loads: the disabled table of a backend the current kit no longer carries, which carries a key
     the backend blueprint does not define, is skipped before its variables are substituted or its file is
     read, and only the active routing profile is validated against the enabled backends.
     """
