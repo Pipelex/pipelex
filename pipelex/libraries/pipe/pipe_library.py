@@ -1,7 +1,7 @@
 from itertools import groupby
 from typing import Self
 
-from pydantic import RootModel
+from pydantic import PrivateAttr, RootModel
 from typing_extensions import override
 
 from pipelex import pretty_print
@@ -15,6 +15,13 @@ PipeLibraryRoot = dict[str, PipeAbstract]
 
 
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
+    # The aliased keys (`alias->domain.code`) of dependency pipes their package does not export: loaded because a
+    # public pipe of the package calls them, and visible to that package's pipes only.
+    _private_dependency_keys: set[str] = PrivateAttr(default_factory=set)
+    # The aliased keys of dependency pipes their package declares but neither exports nor calls from a public pipe:
+    # never built, and recorded only so a reference to one is refused as unexported rather than as missing.
+    _withheld_dependency_keys: set[str] = PrivateAttr(default_factory=set)
+
     @override
     def setup(self):
         pass
@@ -22,6 +29,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     @override
     def teardown(self):
         self.root = {}
+        self._private_dependency_keys = set()
+        self._withheld_dependency_keys = set()
 
     @override
     def reset(self):
@@ -105,7 +114,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
         It deliberately does **not** consult `[exports]`. Package visibility governs what one method
         may reference from inside another; a pipe someone names by hand at an entry point is not an
-        in-body reference, so the rule does not apply to it.
+        in-body reference, so the rule does not apply to it. A dependency's private pipe that a public
+        one calls is loaded, so it is reachable here by its aliased key.
 
         Aliased dependency entries are excluded from the search. Without that, installing an
         unrelated package could make a host pipe's bare code ambiguous — reintroducing, through this
@@ -154,18 +164,44 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             raise EntryPipeNotFoundError(msg)
         return the_pipe
 
-    def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract) -> None:
+    def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract, is_exported: bool) -> None:
         """Add a pipe from a dependency package with an aliased key.
 
         Args:
             alias: The dependency alias
             pipe: The pipe to add
+            is_exported: Whether the package makes the pipe public. A private one is there because a public pipe
+                of the package calls it, and validation refuses a reference to it from outside the package.
         """
         key = f"{alias}->{pipe.pipe_ref}"
         if key in self.root:
             msg = f"Dependency pipe '{key}' already exists in the library"
             raise PipeLibraryError(msg)
         self.root[key] = pipe
+        if not is_exported:
+            self._private_dependency_keys.add(key)
+
+    def is_private_dependency_pipe(self, *, pipe_key: str) -> bool:
+        """Whether `pipe_key`, an aliased key `alias->domain.code`, holds a dependency pipe its package does not export."""
+        return pipe_key in self._private_dependency_keys
+
+    def add_withheld_dependency_pipes(self, *, alias: str, pipe_refs: set[str]) -> None:
+        """Record the `domain.code` of the pipes a dependency declares but does not load, being private and unreached."""
+        self._withheld_dependency_keys.update(f"{alias}->{pipe_ref}" for pipe_ref in pipe_refs)
+
+    def is_withheld_dependency_pipe(self, *, pipe_code: str) -> bool:
+        """Whether a cross-package reference names a pipe its package declares but withholds, as private and unreached.
+
+        The reference may name the pipe as `alias->domain.code` or as `alias->code`, as `get_optional_pipe` accepts.
+        """
+        if pipe_code in self._withheld_dependency_keys:
+            return True
+        if not QualifiedRef.has_cross_package_prefix(pipe_code):
+            return False
+        alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
+        if "." in remainder:
+            return False
+        return any(key.startswith(f"{alias}->") and key.endswith(f".{remainder}") for key in self._withheld_dependency_keys)
 
     @override
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
@@ -196,6 +232,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         for pipe_ref in pipe_refs:
             if pipe_ref in self.root:
                 del self.root[pipe_ref]
+            self._private_dependency_keys.discard(pipe_ref)
 
     @override
     def pretty_list_pipes(self) -> None:

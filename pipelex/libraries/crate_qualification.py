@@ -23,6 +23,13 @@ Two kinds of ref are deliberately left alone: cross-package (`alias->…`) refs,
 is the packaging project's design work, and `SpecialOutcome` values (`fail` / `continue`), which are
 condition outcomes rather than pipe refs.
 
+**A dependency package's own pipe refs carry its alias.** The dependency loader passes `package_alias`,
+and every pipe ref the package wrote without an alias then becomes `alias->domain.code`, the key the
+consumer's library holds that pipe under (`PipeLibrary.add_dependency_pipe`). Every reader of a sub-pipe
+ref — validation, the pre-run walks, execution — looks it up in the consumer's library, so stored as a
+plain `domain.code` it would find nothing, or the consumer's own pipe of the same `domain.code`. Concept
+refs are not aliased: a dependency's concepts are bound when its pipes are built, under `domain.Code`.
+
 The pass is idempotent: an already-qualified ref is returned unchanged, so running it twice over the
 same crate is the same as running it once. It does not mutate the crate it is given.
 
@@ -64,8 +71,13 @@ class QualifiedCrateContent(NamedTuple):
     pipes: dict[str, PipeBlueprintUnion]
 
 
-def qualify_crate(crate: LibraryCrate) -> QualifiedCrateContent:
+def qualify_crate(crate: LibraryCrate, *, package_alias: str | None = None) -> QualifiedCrateContent:
     """Qualify every in-body reference of a merged, key-qualified crate.
+
+    Args:
+        crate: The merged, key-qualified crate.
+        package_alias: The alias a dependency package is loaded under, when the crate is that package's:
+            every pipe ref it wrote without an alias is then stored as `alias->domain.code`.
 
     Raises:
         CrateNormalizationError: A crate key is not domain-qualified — the pass was handed something
@@ -76,7 +88,8 @@ def qualify_crate(crate: LibraryCrate) -> QualifiedCrateContent:
     }
 
     pipes: dict[str, PipeBlueprintUnion] = {
-        pipe_ref: _qualify_pipe_blueprint(blueprint, owner_domain=_domain_of(pipe_ref)) for pipe_ref, blueprint in crate.pipes.items()
+        pipe_ref: _qualify_pipe_blueprint(blueprint, owner_domain=_domain_of(pipe_ref), package_alias=package_alias)
+        for pipe_ref, blueprint in crate.pipes.items()
     }
 
     return QualifiedCrateContent(concepts=concepts, pipes=pipes)
@@ -147,7 +160,7 @@ def _qualify_slot_value(slot_value: "str | InputSlotBlueprint", *, domain: str) 
     return slot_value.model_copy(update={"concept": _qualify_io_ref(slot_value.concept, domain=domain)})
 
 
-def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str) -> PipeBlueprintUnion:
+def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str, package_alias: str | None) -> PipeBlueprintUnion:
     updates: dict[str, object] = {}
     if blueprint.inputs:
         updates["inputs"] = {name: _qualify_slot_value(value, domain=owner_domain) for name, value in blueprint.inputs.items()}
@@ -155,7 +168,7 @@ def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str)
         updates["output"] = _qualify_io_ref(blueprint.output, domain=owner_domain)
 
     def qualify(*, pipe_ref: str) -> str:
-        return _qualify_pipe_ref(pipe_ref, owner_domain=owner_domain)
+        return _qualify_pipe_ref(pipe_ref, owner_domain=owner_domain, package_alias=package_alias)
 
     def qualify_outcome(*, outcome: str) -> str:
         """A condition outcome may be a `SpecialOutcome` instead of a pipe ref.
@@ -167,7 +180,7 @@ def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str)
         """
         if outcome in SpecialOutcome.value_list():
             return outcome
-        return _qualify_pipe_ref(outcome, owner_domain=owner_domain)
+        return _qualify_pipe_ref(outcome, owner_domain=owner_domain, package_alias=package_alias)
 
     match blueprint:
         case PipeSequenceBlueprint():
@@ -210,7 +223,7 @@ def _render_ref_with_markers(concept_ref: str, *, parsed: MultiplicityParseResul
     return f"{concept_ref}{suffix}{presence_symbol(presence=parsed.presence)}"
 
 
-def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str) -> str:
+def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str, package_alias: str | None) -> str:
     """Qualify one in-body pipe ref to the domain of the pipe that wrote it.
 
     The exact twin of `_qualify_concept_ref`, and unconditional: a bare code is the owner domain's,
@@ -220,9 +233,13 @@ def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str) -> str:
     A ref that names nothing is not this function's problem. It cannot be: the pass sees one load
     batch, and a batch may reference a pipe a prior batch put in the same domain. Dependency
     validation sees the whole live library and reports the miss there, naming the qualified ref.
+
+    Under `package_alias` the qualified ref is prefixed with the alias, since that is the key the
+    consumer's library holds a dependency's pipe under.
     """
     if QualifiedRef.has_cross_package_prefix(pipe_ref):
-        return pipe_ref  # cross-package deferred
-    if "." in pipe_ref:
-        return pipe_ref
-    return f"{owner_domain}.{pipe_ref}"
+        return pipe_ref  # cross-package deferred; an aliased ref is also what makes the pass idempotent under `package_alias`
+    qualified = pipe_ref if "." in pipe_ref else f"{owner_domain}.{pipe_ref}"
+    if package_alias is None:
+        return qualified
+    return f"{package_alias}->{qualified}"

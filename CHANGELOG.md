@@ -6,6 +6,16 @@
 
 - **The hosted backend's errors and messages no longer carry a codename (Breaking)**: its error classes are renamed from `Manifold*` to `PipelexHosted*`, such as `PipelexHostedError` and `PipelexHostedCredentialsError`, with their reference pages, while each keeps the `type` and `title` of its generic family. Its messages speak of "the Pipelex service", and the two that refuse a missing endpoint or key name the backend's `endpoint` and `api_key` settings rather than an environment variable. Its provider package moves to `pipelex.providers.pipelex_hosted`, `extract_manifold_metadata` is now `extract_pipelex_hosted_metadata`, and the enum member `PipelexBackend.MANIFOLD` is now `PipelexBackend.PIPELEX_HOSTED`, with its value `pipelex_manifold` unchanged.
 
+### Added
+
+- **A reference to a package's private pipe is refused as unexported**: a consumer naming a pipe that a loaded dependency package declares but does not export is refused at load with the new `PipeValidationErrorType` value `unexported_pipe_dependency`, whose item names the referring pipe in `pipe_code` and the reference in `missing_pipe_code`.
+
+### Fixed
+
+- **A dependency package's pipes call their own sub-pipes**: a sequence, parallel, condition or batch inside an installed package now reaches the package's own pipe, stored as `alias->domain.code`, where it used to look the plain `domain.code` up in the consumer's library. A package whose controllers call its own pipes, such as `github.com/Pipelex/methods/documents` from 0.1.3, no longer fails to load with `PipeNotFoundError`, and a consumer pipe of the same domain and code is no longer run in the package's place.
+- **An exported pipe can call its package's private pipes (Breaking)**: a package with `[exports]` loads every pipe its exported pipes and `main_pipe`s reach, not the exported ones alone, and a private pipe nothing public reaches is not built. Exports are read by domain, so exporting `x` from one domain no longer exports a pipe named `x` in another, and `PipeLibrary.add_dependency_pipe` takes `is_exported`.
+- **A missing pipe of a loaded package is refused at load**: a reference to a pipe a loaded dependency package does not have is refused as `unresolved_pipe_dependency`, naming the package, where it was skipped and reported as an extraneous input with a wrong suggested fix.
+
 ## [v0.73.0] - 2026-10-05
 
 ### Added
