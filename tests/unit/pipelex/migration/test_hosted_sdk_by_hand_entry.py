@@ -38,7 +38,16 @@ outputs = ["image"]
 costs = { input = 5.0, output = 40.0 }
 """
 
-FORMER_HANDLE_BY_CURRENT = {sdk: f"manifold_{sdk.value.removeprefix('pipelex_hosted_')}" for sdk in PipelexHostedSdk}
+# The handles the entry renames, closed at the set that shipped: a hosted sdk added later never had a
+# former spelling, so it belongs in no pair here.
+RENAMED_HANDLES = (
+    ("manifold_anthropic", "pipelex_hosted_anthropic"),
+    ("manifold_completions", "pipelex_hosted_completions"),
+    ("manifold_responses", "pipelex_hosted_responses"),
+    ("manifold_img_gen", "pipelex_hosted_img_gen"),
+    ("manifold_extract", "pipelex_hosted_extract"),
+    ("manifold_search", "pipelex_hosted_search"),
+)
 
 
 def _ledger() -> MigrationLedger:
@@ -66,11 +75,16 @@ class TestTheHostedSdkByHandEntry:
         assert migrated["claude-4.5-sonnet"]["sdk"] == PipelexHostedSdk.ANTHROPIC
         assert migrated["gpt-image-1"]["sdk"] == PipelexHostedSdk.IMG_GEN
 
-    @pytest.mark.parametrize("current", list(PipelexHostedSdk))
-    def test_the_mapping_covers_every_registered_handle(self, current: PipelexHostedSdk) -> None:
+    @pytest.mark.parametrize(("former", "current"), RENAMED_HANDLES)
+    def test_every_former_handle_maps_to_its_current_one(self, former: str, current: str) -> None:
         entry = next(entry for entry in _ledger().migration if entry.id == ENTRY_ID)
-        stale = f'[defaults]\nsdk = "{FORMER_HANDLE_BY_CURRENT[current]}"\n'
+        stale = f'[defaults]\nsdk = "{former}"\n'
 
         migrated: dict[str, Any] = load_toml_from_content(apply_ops_over_text(text=stale, ops=entry.ops).text)
 
         assert migrated["defaults"]["sdk"] == current
+
+    @pytest.mark.parametrize(("former", "current"), RENAMED_HANDLES)
+    def test_every_target_is_a_handle_the_plugin_registers(self, former: str, current: str) -> None:
+        assert former not in set(PipelexHostedSdk)
+        assert current in set(PipelexHostedSdk)

@@ -1,7 +1,7 @@
 """What the hosted plugin claims, stated in one place.
 
-These sdk names are a contract with a file in another repository: the catalog's `sdk` column
-(`pipelex_hosted_models.toml`) has to name exactly these strings, and a mismatch is not a startup error —
+These sdk names are a contract with a file in another repository: the `sdk` column of the hosted
+plane's model catalog has to name exactly these strings, and a mismatch is not a startup error —
 it is an `InferenceBackendNotFoundError` at the first request against that model, which is to say in
 production, for one model, on whatever day someone first uses it. The claim is cheap to pin and
 expensive to discover.
