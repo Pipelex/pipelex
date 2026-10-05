@@ -102,7 +102,7 @@ class TestSequenceStepUnion:
         assert errors[0].pipe_code == "acknowledge_invoice"
         assert message_fragment in errors[0].message
 
-    def test_I10_a_binding_step_in_a_parallel_branch_is_refused(self) -> None:
+    def test_i10_a_binding_step_in_a_parallel_branch_is_refused(self) -> None:
         mthds_content = f"""{_BUNDLE_HEADER}steps = [{{ pipe = "acknowledge_in_parallel", result = "receipt" }}]
 
 [pipe.acknowledge_in_parallel]

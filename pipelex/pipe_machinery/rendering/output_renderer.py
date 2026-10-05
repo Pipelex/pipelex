@@ -5,6 +5,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.interpreter_hub import get_concept_library, get_required_pipe
+from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
 
@@ -81,6 +82,22 @@ def _collect_possible_outputs(
                 return []
 
             last_sub_pipe = sequential_sub_pipes[-1]
+            if isinstance(last_sub_pipe, BindingStep):
+                # A binding ending the sequence outputs the spec it derives, rendered like a pipe's output.
+                binding_spec = the_pipe.build_typed_flow().binding_specs.get(len(sequential_sub_pipes) - 1)
+                if binding_spec is None:
+                    return []
+                binding_concept_provider = get_concept_library()
+                try:
+                    binding_output_dict = binding_spec.render_stuff_spec(concept_provider=binding_concept_provider, output_format=output_format)
+                except (PipelexError, ValueError):
+                    return []
+                return [
+                    {
+                        "concept_ref": binding_spec.concept.concept_ref,
+                        "content": binding_output_dict.get("content", binding_output_dict),
+                    }
+                ]
             last_pipe_code: str = getattr(last_sub_pipe, "pipe_code", "")
             if not last_pipe_code:
                 return []

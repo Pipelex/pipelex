@@ -91,7 +91,7 @@ def _build_sequence(*, output_ref: str, steps: list[SubPipeBlueprint], inputs: d
             description="Taint-pass test sequence",
             inputs=inputs,
             output=output_ref,
-            steps=steps,
+            steps=list(steps),
         ),
     )
     get_pipe_library().add_new_pipe(pipe=sequence)

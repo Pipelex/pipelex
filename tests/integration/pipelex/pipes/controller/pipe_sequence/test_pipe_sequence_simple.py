@@ -72,9 +72,9 @@ class TestPipeSequenceSimple:
         assert pipe_sequence.domain_code == "test_integration"
         assert pipe_sequence.code == "simple_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
-        assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "test_integration4.capitalize_text"
+        assert pipe_sequence.pipe_steps[0].pipe_code == "test_integration4.capitalize_text"
         assert pipe_sequence.sequential_sub_pipes[0].output_name == "capitalized_text"
-        assert pipe_sequence.sequential_sub_pipes[1].pipe_code == "test_integration4.add_prefix"
+        assert pipe_sequence.pipe_steps[1].pipe_code == "test_integration4.add_prefix"
         assert pipe_sequence.sequential_sub_pipes[1].output_name == "final_text"
 
         # Verify the working memory has the correct structure

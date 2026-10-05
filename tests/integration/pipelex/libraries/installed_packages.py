@@ -49,7 +49,7 @@ def sole_step_target(*, library: Library, pipe_key: str) -> str:
     pipe = library.pipe_library.get_required_pipe(pipe_code=pipe_key)
     assert isinstance(pipe, PipeSequence)
     assert len(pipe.sequential_sub_pipes) == 1
-    return pipe.sequential_sub_pipes[0].pipe_code
+    return pipe.pipe_steps[0].pipe_code
 
 
 def refusal_types(exc: LibraryLoadingError) -> list[PipeValidationErrorType | None]:

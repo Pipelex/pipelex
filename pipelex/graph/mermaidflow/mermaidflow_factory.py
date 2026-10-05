@@ -365,6 +365,9 @@ class MermaidflowFactory:
             case NodeKind.ERROR:
                 # Rectangle with failed class
                 node_str = f'{mermaid_id}["{label}"]:::failed'
+            case NodeKind.BINDING:
+                # Parallelogram for a binding step, which reshapes a value rather than running a pipe
+                node_str = f'{mermaid_id}[/"{label}"/]'
             case NodeKind.CONTROLLER | NodeKind.PIPE_CALL | NodeKind.OPERATOR:
                 # Rectangle for operators/pipes
                 if node.status == NodeStatus.FAILED:

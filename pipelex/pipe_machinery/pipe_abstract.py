@@ -328,6 +328,13 @@ class PipeAbstract(ABC, BaseModel):
             for var_name, declared_stuff_spec in self.inputs.root.items()
         }
 
+    def refuse_undeclared_needed_input(self, *, variable_name: str) -> None:
+        """Raise a pipe's own refusal of a needed input it does not declare, before the generic one; nothing by default.
+
+        A controller whose need is better named than "required variable" overrides it: a PipeSequence asks, for a
+        binding step's root, for the concept whose structure holds the path the binding walks.
+        """
+
     @final
     def generic_validate_inputs_with_library(self):
         # First validate required variables are in the inputs: a variable path reads the input its root names
@@ -354,6 +361,7 @@ class PipeAbstract(ABC, BaseModel):
             var_name = named_stuff_spec.variable_name
 
             if var_name not in self.inputs.variables:
+                self.refuse_undeclared_needed_input(variable_name=var_name)
                 msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs.format_for_display()}"
                 raise PipeValidationError(
                     message=msg,

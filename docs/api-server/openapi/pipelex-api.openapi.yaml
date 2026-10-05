@@ -1175,9 +1175,10 @@ components:
       - not_provided
       title: AbsenceKind
       description: "How a slot came to hold no value.\n\n- DECLARED_ABSENT: a producer with an optional (`?`) output declared\
-        \ it produced nothing\n  (e.g. a PipeCondition `continue` outcome, or — phase 2 — an LLM maybe-wrapper).\n- SKIPPED:\
-        \ the producing pipe was lifted (skipped) because one of its plain inputs was absent.\n- NOT_PROVIDED: the caller\
-        \ omitted an optional method input from the pipeline inputs."
+        \ it produced nothing\n  (e.g. a PipeCondition `continue` outcome, or — phase 2 — an LLM maybe-wrapper), or a binding\n\
+        \  step's path reached a field holding nothing.\n- SKIPPED: the producing pipe was lifted (skipped) because one of\
+        \ its plain inputs was absent,\n  or a binding step was, because its root was.\n- NOT_PROVIDED: the caller omitted\
+        \ an optional method input from the pipeline inputs."
     AbsenceRecord:
       properties:
         variable_name:
@@ -1236,6 +1237,32 @@ components:
       - opaque
       - auto
       title: Background
+    BindingStepBlueprint:
+      properties:
+        from:
+          type: string
+          pattern: ^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$
+          title: From
+          description: 'The path to bind: a name in working memory followed by zero or more field names, separated by dots.'
+        result:
+          type: string
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Result
+          description: 'The name under which the bound value is stored in working memory: a plain input name.'
+      additionalProperties: false
+      type: object
+      required:
+      - from
+      - result
+      title: BindingStepBlueprint
+      description: 'A PipeSequence step that binds the value at a path in working memory to a new name.
+
+
+        `{ from = "invoice.total", result = "total_amount" }` stores a deep copy of the value at `invoice.total`
+
+        under `total_amount`, as the concept the path derives through the declared structures. A binding step
+
+        lives in a PipeSequence''s `steps` only, and carries exactly these two fields.'
     BooleanField:
       properties:
         title:
@@ -3609,6 +3636,7 @@ components:
       - output
       - artifact
       - error
+      - binding
       title: NodeKind
       description: Types of nodes in the execution graph.
     NodeSpec:
@@ -5384,7 +5412,9 @@ components:
           title: Output
         steps:
           items:
-            $ref: '#/components/schemas/SubPipeBlueprint'
+            oneOf:
+            - $ref: '#/components/schemas/SubPipeBlueprint'
+            - $ref: '#/components/schemas/BindingStepBlueprint'
           type: array
           title: Steps
       additionalProperties: false
@@ -5511,6 +5541,8 @@ components:
       - unknown_pipe_type
       - missing_pipe_type
       - batch_item_name_collision
+      - binding_step_invalid
+      - binding_path_unresolved
       - optional_marker_invalid
       - optional_not_handled
       - optional_output_required
