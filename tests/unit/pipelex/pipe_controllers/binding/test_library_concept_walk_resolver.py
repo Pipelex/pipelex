@@ -1,5 +1,5 @@
 import datetime
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic import Field
@@ -82,7 +82,7 @@ def _make_concept_library(
     mocker: MockerFixture, *, concepts_by_key: dict[str, Concept], classes: dict[str, type[StuffContent]] | None = None
 ) -> ConceptLibraryAbstract:
     """A library holding each concept under its key, `alias->domain.Code` for a dependency's, looked up as the real one is."""
-    concept_library = mocker.MagicMock(spec=ConceptLibraryAbstract)
+    concept_library: Any = mocker.MagicMock(spec=ConceptLibraryAbstract)
     known_classes = classes if classes is not None else _CLASSES
 
     def get_required_concept(concept_ref: str) -> Concept:
@@ -107,7 +107,7 @@ def _make_concept_library(
     concept_library.list_concept_keys_for_ref.side_effect = list_concept_keys_for_ref
     concept_library.get_structure_class.side_effect = get_structure_class
     concept_library.list_concepts.return_value = list(concepts_by_key.values())
-    return concept_library
+    return cast("ConceptLibraryAbstract", concept_library)
 
 
 @pytest.fixture
