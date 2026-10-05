@@ -430,6 +430,43 @@ class TestMthdsSchemaGeneration:
         assert validator.is_valid(sequence_table) is is_valid_on_a_step, f"sequence step batch_over {batch_over!r}"
         assert validator.is_valid(parallel_table) is is_valid_on_a_branch, f"parallel branch batch_over {batch_over!r}"
 
+    @pytest.mark.parametrize(
+        ("name", "should_validate"),
+        [
+            pytest.param("catalog_pages", True, id="a-plain-name"),
+            pytest.param("bound_pages", True, id="the-prefix-without-its-underscore"),
+            pytest.param("_draft", True, id="another-underscore-led-name"),
+            pytest.param("_bound_catalog_pages", False, id="the-reserved-prefix"),
+            pytest.param("_bound_", False, id="the-reserved-prefix-alone"),
+        ],
+    )
+    @pytest.mark.parametrize("field_name", ["result", "batch_as", "batch_over"])
+    def test_a_step_and_a_branch_refuse_the_reserved_prefix(self, schema: dict[str, Any], field_name: str, name: str, should_validate: bool) -> None:
+        """A pipe step's `result`, `batch_as` and plain `batch_over` never take `_bound_`, the runtime's prefix for a dotted `batch_over`'s list.
+
+        The runtime refuses them as `invalid_input_name` when the bundle is parsed, and the schema refuses them first, through a
+        Draft-4 `not` on the string arm, on a PipeSequence step and on a PipeParallel branch alike.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        pipe_step: dict[str, Any] = {"pipe": "describe_page", "batch_over": "pages", "batch_as": "page", "result": "descriptions", field_name: name}
+        sequence_table = {**_minimal_pipe_table("PipeSequence"), "steps": [pipe_step]}
+        parallel_table = {**_minimal_pipe_table("PipeParallel"), "branches": [pipe_step]}
+        assert validator.is_valid(sequence_table) is should_validate, f"sequence step {field_name} {name!r}"
+        assert validator.is_valid(parallel_table) is should_validate, f"parallel branch {field_name} {name!r}"
+
+    @pytest.mark.parametrize(
+        ("input_item_name", "should_validate"),
+        [
+            pytest.param("item", True, id="a-plain-name"),
+            pytest.param("_draft_item", True, id="another-underscore-led-name"),
+            pytest.param("_bound_item", False, id="the-reserved-prefix"),
+        ],
+    )
+    def test_batch_input_item_name_refuses_the_reserved_prefix(self, schema: dict[str, Any], input_item_name: str, should_validate: bool) -> None:
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeBatch"), "input_item_name": input_item_name}
+        assert validator.is_valid(table) is should_validate
+
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
         """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.
 

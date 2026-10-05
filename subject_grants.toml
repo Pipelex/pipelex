@@ -3584,6 +3584,10 @@ rationale = "Verb-object: mutates the schema object's required list; field_names
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
+["pipelex/language/mthds_schema_generator.py::_reserve_private_binding_names"]
+param = "schema"
+rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
+
 ["pipelex/language/mthds_schema_generator.py::_walk_schema"]
 param = "node"
 rationale = "Verb-object: walks the schema node tree; the visitor stays keyword."
