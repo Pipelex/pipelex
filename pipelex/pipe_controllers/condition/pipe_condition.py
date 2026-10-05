@@ -12,6 +12,7 @@ from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
@@ -63,6 +64,39 @@ class PipeCondition(PipeController):
 
         # Exclude internal variables starting with `_`
         return {var for var in required_variables if not var.startswith("_")}
+
+    @override
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, StuffSpec | None]:
+        """What the outcome it runs stores besides its result: the chosen outcome runs on the caller's memory.
+
+        A name keeps a spec only when every outcome that can run stores it under that same spec. An outcome storing it under
+        another spec, or not storing it, which leaves the caller's value in place, leaves it untyped. A `continue` outcome
+        stores nothing, a `fail` outcome stops the run, and an outcome pipe that does not resolve is left out, as a sequence
+        assumes an unresolved pipe delivers. The alias the condition may add is left out too: the working memory refuses an
+        alias over a name it already holds, so it never replaces a value the flow types.
+        """
+        if visited_pipes is None:
+            visited_pipes = set()
+        if self.visit_key in visited_pipes:
+            return {}
+        visited_pipes_with_current = visited_pipes | {self.visit_key}
+        outcome_writes: list[dict[str, StuffSpec | None]] = []
+        for outcome_pipe_code in sorted(self.pipe_dependencies()):
+            outcome_pipe = get_optional_pipe(pipe_code=outcome_pipe_code)
+            if outcome_pipe is not None:
+                outcome_writes.append(outcome_pipe.memory_writes(visited_pipes=visited_pipes_with_current))
+        if any(SpecialOutcome.is_continue(outcome) for outcome in [*self.outcome_map.values(), self.default_outcome]):
+            outcome_writes.append({})
+        merged_writes: dict[str, StuffSpec | None] = {}
+        for writes in outcome_writes:
+            for written_name in writes:
+                if written_name in merged_writes:
+                    continue
+                written_specs = [other_writes.get(written_name) for other_writes in outcome_writes]
+                first_spec = written_specs[0]
+                is_typed = first_spec is not None and all(written_spec == first_spec for written_spec in written_specs)
+                merged_writes[written_name] = first_spec if is_typed else None
+        return merged_writes
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:

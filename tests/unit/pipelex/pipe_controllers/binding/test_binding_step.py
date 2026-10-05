@@ -216,6 +216,29 @@ class TestBindingStep:
                 run_mode=PipeRunMode.LIVE,
             )
 
+    def test_an_absent_root_the_flow_cannot_type_skips_the_binding_as_a_single_result(self) -> None:
+        """Without the root's concept, whether the path crosses a list is unknown, so the skip is a single absence."""
+        working_memory, root_absence = _memory_with_absent_invoice()
+        step = BindingStep(from_path="invoice.lines", output_name="lines")
+
+        outcome = step.skip_untyped_root(working_memory=working_memory, calling_pipe_code=_SEQUENCE_CODE, run_mode=PipeRunMode.LIVE)
+
+        assert outcome.stuff is None
+        assert outcome.absence == AbsenceRecord(
+            variable_name="lines",
+            kind=AbsenceKind.SKIPPED,
+            reason="skipped because input 'invoice' is absent",
+            upstream=root_absence,
+        )
+        assert working_memory.get_optional_absence("lines") == outcome.absence
+        assert working_memory.get_optional_stuff("lines") is None
+
+    def test_a_root_the_flow_cannot_type_and_nothing_records_is_a_run_error(self) -> None:
+        step = BindingStep(from_path="invoice.lines", output_name="lines")
+
+        with pytest.raises(PipeRunInputsError, match="reads 'invoice', which is not in working memory"):
+            step.skip_untyped_root(working_memory=WorkingMemory(), calling_pipe_code=_SEQUENCE_CODE, run_mode=PipeRunMode.LIVE)
+
     def test_the_step_is_written_back_as_mthds_writes_it(self) -> None:
         step = BindingStep(from_path="invoice.supplier.address.city", output_name="city")
 

@@ -621,6 +621,18 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, StuffSpec | None]:  # ruff: ignore[unused-method-argument] (the overrides recurse)
+        """What the pipe stores in the working memory it runs on, besides its own result, which its caller names.
+
+        Each name maps to the spec of the value it holds once the pipe returns, `None` where that cannot be typed. An
+        operator stores only its result, so it stores nothing more. A controller that runs its steps or its outcome on
+        its caller's memory, rather than on copies, overrides this, so its caller's typed flow sees what it replaced.
+
+        Args:
+            visited_pipes: The `visit_key` of each pipe currently being processed, to prevent infinite recursion.
+        """
+        return {}
+
     def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
         indent_level = len(pipe_run_params.pipe_stack) - 1
         indent = "   " * indent_level

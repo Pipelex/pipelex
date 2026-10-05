@@ -18,6 +18,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -77,6 +78,21 @@ class PipeParallel(PipeController):
     @override
     def required_variables(self) -> set[str]:
         return set()
+
+    @override
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, StuffSpec | None]:
+        """Each branch's result, when the parallel adds each output: its branches run on copies of the memory, and only
+        the results it adds come back to it.
+        """
+        if not self.add_each_output:
+            return {}
+        branch_writes: dict[str, StuffSpec | None] = {}
+        for branch in self.parallel_sub_pipes:
+            if not branch.output_name:
+                continue
+            branch_pipe = get_optional_pipe(pipe_code=branch.pipe_code)
+            branch_writes[branch.output_name] = branch.result_spec(step_pipe=branch_pipe) if branch_pipe is not None else None
+        return branch_writes
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:

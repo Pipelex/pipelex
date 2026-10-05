@@ -94,24 +94,11 @@ class BindingStep(BaseModel):
         """
         root_stuff = working_memory.get_optional_stuff(self.root_name)
         if root_stuff is None:
-            root_absence = working_memory.get_optional_absence(self.root_name)
-            if root_absence is None:
-                msg = (
-                    f"The binding step {self.as_written} of pipe '{calling_pipe_code}' reads '{self.root_name}', which is not in working "
-                    f"memory and has no recorded absence. Valid keys are: {working_memory.list_keys()}"
-                )
-                raise PipeRunInputsError(
-                    message=msg,
-                    run_mode=run_mode,
-                    pipe_code=calling_pipe_code,
-                    variable_name=self.root_name,
-                    concept_code=None,
-                )
             return self._lift(
                 working_memory=working_memory,
                 derivation=derivation,
                 result_concept=result_concept,
-                root_absence=root_absence,
+                root_absence=self._required_root_absence(working_memory=working_memory, calling_pipe_code=calling_pipe_code, run_mode=run_mode),
                 stuff_code=stuff_code,
             )
 
@@ -136,6 +123,50 @@ class BindingStep(BaseModel):
         log.verbose(f"Bound '{self.from_path}' to '{self.output_name}': {concept.concept_ref}")
         return BindingOutcome(stuff=bound_stuff)
 
+    def skip_untyped_root(self, *, working_memory: WorkingMemory, calling_pipe_code: str, run_mode: PipeRunMode) -> BindingOutcome:
+        """Skip the binding because its root is absent, when nothing tells what the root would have held.
+
+        That is a root the sequence's flow cannot type, one the outcomes of a condition store under different concepts.
+        Whether the path crosses a list is unknown without the root's concept, so the result is recorded as a single
+        skipped absence, chained to the root's record, as `_lift` records a single result.
+
+        Raises:
+            PipeRunInputsError: When the root holds neither a value nor a recorded absence.
+        """
+        root_absence = self._required_root_absence(working_memory=working_memory, calling_pipe_code=calling_pipe_code, run_mode=run_mode)
+        record = self._skipped_record(root_absence=root_absence)
+        working_memory.record_new_main_absence(record)
+        return BindingOutcome(absence=record)
+
+    def _required_root_absence(self, *, working_memory: WorkingMemory, calling_pipe_code: str, run_mode: PipeRunMode) -> AbsenceRecord:
+        """The absence recorded for a root that holds no value.
+
+        Raises:
+            PipeRunInputsError: When the root has no recorded absence either.
+        """
+        root_absence = working_memory.get_optional_absence(self.root_name)
+        if root_absence is None:
+            msg = (
+                f"The binding step {self.as_written} of pipe '{calling_pipe_code}' reads '{self.root_name}', which is not in working "
+                f"memory and has no recorded absence. Valid keys are: {working_memory.list_keys()}"
+            )
+            raise PipeRunInputsError(
+                message=msg,
+                run_mode=run_mode,
+                pipe_code=calling_pipe_code,
+                variable_name=self.root_name,
+                concept_code=None,
+            )
+        return root_absence
+
+    def _skipped_record(self, *, root_absence: AbsenceRecord) -> AbsenceRecord:
+        return AbsenceRecord(
+            variable_name=self.output_name,
+            kind=AbsenceKind.SKIPPED,
+            reason=f"skipped because input '{self.root_name}' is absent",
+            upstream=root_absence,
+        )
+
     def _lift(
         self,
         *,
@@ -151,12 +182,7 @@ class BindingStep(BaseModel):
         list, since a plural slot is never absent, with the skip kept as a note for observability. The empty list
         takes the stuff code the run fixes, when it fixes one, as a bound value would.
         """
-        record = AbsenceRecord(
-            variable_name=self.output_name,
-            kind=AbsenceKind.SKIPPED,
-            reason=f"skipped because input '{self.root_name}' is absent",
-            upstream=root_absence,
-        )
+        record = self._skipped_record(root_absence=root_absence)
         if derivation.is_plural:
             empty_list_stuff = StuffFactory.make_stuff(
                 concept=result_concept,

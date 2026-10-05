@@ -14,6 +14,8 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity, is_multiple_multiplicity, is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
@@ -30,10 +32,12 @@ from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
+    DerivedBinding,
     FlowSlot,
     SequenceStep,
     SequenceTypedFlow,
     build_sequence_typed_flow,
+    derive_binding_spec,
 )
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
@@ -78,12 +82,31 @@ class PipeSequence(PipeController):
         Raises:
             PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked.
         """
+        return self._build_typed_flow(visited_pipes=set())
+
+    def _build_typed_flow(self, *, visited_pipes: set[str]) -> SequenceTypedFlow:
         return build_sequence_typed_flow(
             steps=self.sequential_sub_pipes,
             declared_inputs=self.inputs,
             sequence_code=self.code,
             domain_code=self.domain_code,
+            visited_pipes=visited_pipes | {self.visit_key},
         )
+
+    @override
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, StuffSpec | None]:
+        """What the steps store, as the flow stands after the last one: a sequence runs its steps on its caller's memory.
+
+        Raises:
+            PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked, as validating the
+                sequence itself reports.
+        """
+        if visited_pipes is None:
+            visited_pipes = set()
+        if self.visit_key in visited_pipes:
+            return {}
+        typed_flow = self._build_typed_flow(visited_pipes=visited_pipes)
+        return {name: slot.stuff_spec for name, slot in typed_flow.written_slots.items()}
 
     def _binding_root_names(self) -> set[str]:
         """The roots of the binding steps that no earlier step stores, which the sequence must hold as inputs."""
@@ -647,35 +670,74 @@ class PipeSequence(PipeController):
     ) -> None:
         """Bind one value into the working memory, as a node of the execution graph producing the stuff it binds.
 
+        A binding whose root the flow cannot type, a name the outcomes of a condition store under different concepts, is
+        derived from the value the run holds under it, or skipped when the root holds a recorded absence.
+
         Raises:
-            BindingStepRunError: When the flow cannot derive the binding, which validation rules out.
+            BindingStepRunError: When the path cannot be walked from the concept of the value the root holds.
         """
-        derivation = typed_flow.binding_derivations.get(step_index)
-        binding_spec = typed_flow.binding_specs.get(step_index)
-        if derivation is None or binding_spec is None:
-            msg = (
-                f"In pipe '{self.code}', the binding step {binding_step.as_written} cannot run: the concept of its root "
-                f"'{binding_step.root_name}' is unknown to the sequence, so nothing can be derived for it."
-            )
-            raise BindingStepRunError(msg)
+        derived_binding = self._derived_binding(
+            binding_step=binding_step, step_index=step_index, typed_flow=typed_flow, working_memory=working_memory
+        )
         node_id = binding_step.trace_start(job_metadata=job_metadata, working_memory=working_memory, domain_code=self.domain_code)
         outcome: BindingOutcome | None = None
         try:
-            outcome = binding_step.bind(
-                working_memory=working_memory,
-                derivation=derivation,
-                result_concept=binding_spec.concept,
-                calling_pipe_code=self.code,
-                run_mode=pipe_run_params.run_mode,
-                stuff_code=pipe_run_params.final_stuff_code if is_last_step else None,
+            step_outcome = (
+                binding_step.skip_untyped_root(working_memory=working_memory, calling_pipe_code=self.code, run_mode=pipe_run_params.run_mode)
+                if derived_binding is None
+                else binding_step.bind(
+                    working_memory=working_memory,
+                    derivation=derived_binding.derivation,
+                    result_concept=derived_binding.stuff_spec.concept,
+                    calling_pipe_code=self.code,
+                    run_mode=pipe_run_params.run_mode,
+                    stuff_code=pipe_run_params.final_stuff_code if is_last_step else None,
+                )
             )
+            outcome = step_outcome
+            binding_step.trace_end(job_metadata=job_metadata, node_id=node_id, outcome=step_outcome)
         finally:
             # The node is closed on the way out whatever stopped the binding, a content failing its own validation or a
-            # cancellation included, so no binding node is left running. `bind` returned nothing only if it raised, and
+            # cancellation included, so no binding node is left running. The step returned nothing only if it raised, and
             # the error it raised is the one propagating.
             if outcome is None:
                 binding_step.trace_error(job_metadata=job_metadata, node_id=node_id, error=sys.exc_info()[1])
-        binding_step.trace_end(job_metadata=job_metadata, node_id=node_id, outcome=outcome)
+
+    def _derived_binding(
+        self, *, binding_step: BindingStep, step_index: int, typed_flow: SequenceTypedFlow, working_memory: WorkingMemory
+    ) -> DerivedBinding | None:
+        """What the binding binds: from the flow, or from the value the run holds when the flow cannot type the root, `None`
+        when the root holds no value either.
+        """
+        derivation = typed_flow.binding_derivations.get(step_index)
+        binding_spec = typed_flow.binding_specs.get(step_index)
+        if derivation is not None and binding_spec is not None:
+            return DerivedBinding(derivation=derivation, stuff_spec=binding_spec)
+        root_stuff = working_memory.get_optional_stuff(binding_step.root_name)
+        if root_stuff is None:
+            return None
+        return self._derive_from_held_value(binding_step=binding_step, root_stuff=root_stuff)
+
+    def _derive_from_held_value(self, *, binding_step: BindingStep, root_stuff: Stuff) -> DerivedBinding:
+        """Derive a binding whose root the flow cannot type from the concept and the shape of the value the root holds.
+
+        Raises:
+            BindingStepRunError: When the path cannot be walked from that concept.
+        """
+        root_multiplicity: VariableMultiplicity | None = True if isinstance(root_stuff.content, ListContent) else None
+        try:
+            return derive_binding_spec(
+                binding_step=binding_step,
+                root_spec=StuffSpec(concept=root_stuff.concept, multiplicity=root_multiplicity),
+                sequence_code=self.code,
+                domain_code=self.domain_code,
+            )
+        except PipeValidationError as exc:
+            msg = (
+                f"{exc} The sequence's flow could not type '{binding_step.root_name}', which the outcomes of a condition "
+                f"store under different concepts, so the binding was derived from the '{root_stuff.concept.concept_ref}' it holds."
+            )
+            raise BindingStepRunError(msg) from exc
 
     @override
     async def _dry_run_controller_pipe(

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -143,6 +144,97 @@ steps = [
 """
 
 
+_NESTED_WRITES_BUNDLE = """domain = "depot_swaps"
+description = "Swapping a record for a parcel or a crate inside a nested controller, then reading its weight"
+main_pipe = "read_swapped_weight"
+
+[concept.Invoice]
+description = "An invoice received at the depot"
+
+[concept.Invoice.structure]
+total = { type = "number", description = "The amount due, in euros", required = true }
+
+[concept.Parcel]
+description = "A parcel received at the depot"
+
+[concept.Parcel.structure]
+weight = { type = "number", description = "The weight, in kilograms", required = true }
+
+[concept.Crate]
+description = "A crate received at the depot"
+
+[concept.Crate.structure]
+weight = { type = "number", description = "The weight, in kilograms", required = true }
+
+[pipe.weigh_parcel]
+type = "PipeCompose"
+description = "Writes out a parcel of a given weight"
+inputs = { amount = "Number" }
+output = "Parcel"
+
+[pipe.weigh_parcel.construct]
+weight = { from = "amount.number" }
+
+[pipe.weigh_crate]
+type = "PipeCompose"
+description = "Writes out a crate of a given weight"
+inputs = { amount = "Number" }
+output = "Crate"
+
+[pipe.weigh_crate.construct]
+weight = { from = "amount.number" }
+
+[pipe.write_note]
+type = "PipeCompose"
+description = "Writes a note on what was weighed"
+inputs = { amount = "Number" }
+output = "Text"
+template = "Weighed $amount kilograms"
+
+[pipe.swap_for_parcel]
+type = "PipeSequence"
+description = "Stores a parcel under the record's name, then writes a note"
+inputs = { amount = "Number" }
+output = "Text"
+steps = [
+  { pipe = "weigh_parcel", result = "record" },
+  { pipe = "write_note", result = "note" },
+]
+
+[pipe.swap_for_crate]
+type = "PipeSequence"
+description = "Stores a crate under the record's name, then writes a note"
+inputs = { amount = "Number" }
+output = "Text"
+steps = [
+  { pipe = "weigh_crate", result = "record" },
+  { pipe = "write_note", result = "note" },
+]
+
+[pipe.swap_record]
+type = "PipeCondition"
+description = "Swaps the record for a parcel or a crate, as the mode says"
+inputs = { amount = "Number", mode = "Text" }
+output = "Text"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.swap_record.outcomes]
+parcel = "swap_for_parcel"
+crate = "swap_for_crate"
+
+[pipe.read_swapped_weight]
+type = "PipeSequence"
+description = "Swaps the record, then binds the weight of what replaced it"
+inputs = { record = "Invoice", amount = "Number", mode = "Text" }
+output = "Number"
+steps = [
+  { pipe = "swap_record", result = "note" },
+  { from = "record.weight", result = "weight" },
+]
+"""
+
+
 def _load_sequence(*, mthds_content: str, library_id: str, pipe_code: str) -> PipeSequence:
     blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="flow.mthds")
     pipes = get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
@@ -251,6 +343,83 @@ class TestBindingTypedFlow:
         response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[mthds_content], inputs=inputs)
 
         assert [item.number for item in response.pipe_output.main_stuff_as_items(item_type=NumberContent)] == [2.5, 4]
+
+    @pytest.mark.asyncio(loop_scope="class")
+    @pytest.mark.parametrize(
+        ("replacements", "mode", "typed_record_ref"),
+        [
+            pytest.param(
+                {
+                    '{ pipe = "swap_record", result = "note" }': '{ pipe = "swap_for_parcel", result = "note" }',
+                    'inputs = { record = "Invoice", amount = "Number", mode = "Text" }': 'inputs = { record = "Invoice", amount = "Number" }',
+                },
+                None,
+                "depot_swaps.Parcel",
+                id="a-nested-sequence",
+            ),
+            pytest.param(
+                {'crate = "swap_for_crate"': 'crate = "swap_for_parcel"'}, "crate", "depot_swaps.Parcel", id="a-condition-whose-outcomes-agree"
+            ),
+            pytest.param({}, "parcel", None, id="a-condition-whose-outcomes-disagree-running-one"),
+            pytest.param({}, "crate", None, id="a-condition-whose-outcomes-disagree-running-the-other"),
+        ],
+    )
+    async def test_a_name_a_nested_controller_stores_types_the_binding_reading_it(
+        self, load_empty_library: Callable[[], str], replacements: dict[str, str], mode: str | None, typed_record_ref: str | None
+    ) -> None:
+        """A nested sequence, or a condition's outcome, runs on the caller's memory, so what it stores replaces the caller's value.
+
+        When the outcomes of a condition store a name under different concepts, the flow cannot type it, and the run derives the
+        binding from the value it holds.
+        """
+        mthds_content = _NESTED_WRITES_BUNDLE
+        for old_text, new_text in replacements.items():
+            mthds_content = mthds_content.replace(old_text, new_text)
+        sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_swapped_weight")
+
+        flow = sequence.build_typed_flow()
+
+        record_spec = flow.final_slots["record"].stuff_spec
+        if typed_record_ref is None:
+            assert record_spec is None
+            assert 1 not in flow.binding_derivations
+        else:
+            assert record_spec is not None
+            assert record_spec.concept.concept_ref == typed_record_ref
+            assert flow.binding_specs[1].concept.concept_ref == "native.Number"
+
+        inputs: PipelineInputs = {
+            "record": {"concept": "depot_swaps.Invoice", "content": {"total": 120}},
+            "amount": {"concept": "native.Number", "content": {"number": 7.5}},
+        }
+        if mode is not None:
+            inputs["mode"] = mode
+        response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[mthds_content], inputs=inputs)
+
+        assert response.pipe_output.main_stuff.concept.concept_ref == "native.Number"
+        assert response.pipe_output.main_stuff_as_number.number == 7.5
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_value_a_continue_outcome_leaves_in_place_is_bound_by_the_concept_it_holds(self, load_empty_library: Callable[[], str]) -> None:
+        """A `continue` outcome stores nothing, so the name holds either the caller's value or the other outcome's: the flow
+        cannot type it, and the run refuses a path the value it holds has no field for.
+        """
+        # A condition with a `continue` outcome may hold nothing, so its output is declared optional.
+        mthds_content = _NESTED_WRITES_BUNDLE.replace('crate = "swap_for_crate"', 'crate = "continue"')
+        mthds_content = mthds_content.replace('output = "Text"\nexpression', 'output = "Text?"\nexpression')
+        sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_swapped_weight")
+        assert sequence.build_typed_flow().final_slots["record"].stuff_spec is None
+        inputs: PipelineInputs = {
+            "record": {"concept": "depot_swaps.Invoice", "content": {"total": 120}},
+            "amount": {"concept": "native.Number", "content": {"number": 7.5}},
+            "mode": "crate",
+        }
+
+        with pytest.raises(PipelexError) as exc_info:
+            await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[mthds_content], inputs=inputs)
+
+        assert "'record' holds a 'depot_swaps.Invoice', which has no field 'weight'" in str(exc_info.value)
+        assert "so the binding was derived from the 'depot_swaps.Invoice' it holds" in str(exc_info.value)
 
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(
