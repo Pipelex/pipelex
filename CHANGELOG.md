@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **The hosted backend's errors and messages no longer carry a codename (Breaking)**: its error classes are renamed from `Manifold*` to `PipelexHosted*`, such as `PipelexHostedError` and `PipelexHostedCredentialsError`, with their reference pages, while each keeps the `type` and `title` of its generic family. Its messages speak of "the Pipelex service", and the two that refuse a missing endpoint or key name the backend's `endpoint` and `api_key` settings rather than an environment variable. Its provider package moves to `pipelex.providers.pipelex_hosted`, `extract_manifold_metadata` is now `extract_pipelex_hosted_metadata`, and the enum member `PipelexBackend.MANIFOLD` is now `PipelexBackend.PIPELEX_HOSTED`, with its value `pipelex_manifold` unchanged.
+- **The hosted-only inference provider plugin is no longer shipped (Breaking)**: its built-in plugin, its sdk tokens, its error classes and their reference pages, and the `PipelexBackend` member naming its backend are removed, leaving `PipelexBackend.INTERNAL` alone. A project config that still declares the hosted backend disabled, or a routing profile that names it but is not active, keeps booting; a model spec naming one of its sdk tokens now fails when its worker is built, unless a plugin of your own registers that token.
 
 ### Added
 

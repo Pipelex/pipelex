@@ -13,7 +13,6 @@ from pipelex.providers.log_sinks.log_sink_plugin import LogSinkPlugin
 from pipelex.providers.mistral.mistral_plugin import MistralPlugin
 from pipelex.providers.openai.openai_plugin import OpenAIPlugin
 from pipelex.providers.openrouter.openrouter_plugin import OpenRouterPlugin
-from pipelex.providers.pipelex_hosted.pipelex_hosted_plugin import PipelexHostedPlugin
 from pipelex.providers.portkey.portkey_plugin import PortkeyPlugin
 from pipelex.providers.pypdfium2.pypdfium2_plugin import Pypdfium2Plugin
 from pipelex.providers.reportlab.reportlab_plugin import ReportlabDocGenPlugin
@@ -40,7 +39,6 @@ KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
     StoragePlugin(),
     SecretsPlugin(),
     OpenAIPlugin(),
-    PipelexHostedPlugin(),
     PortkeyPlugin(),
     AnthropicPlugin(),
     MistralPlugin(),

@@ -9,10 +9,10 @@ from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 BACKENDS_TOML_TEMPLATE = """
-[pipelex_manifold]
-display_name = "Pipelex"
+[retired_preview]
+display_name = "Retired preview"
 enabled = {enabled}
-model_specs_section = "manifold_model_specs"
+model_specs_section = "retired_preview_model_specs"
 api_key = "sk-not-a-real-key"
 """
 
@@ -23,7 +23,7 @@ class TestBackendRetiredModelSpecsSection:
     def _load(self, *, tmp_path: Path, enabled: bool, lenient: bool = False) -> InferenceBackendLibrary:
         backends_dir = tmp_path / "backends"
         backends_dir.mkdir()
-        (backends_dir / "pipelex_manifold.toml").write_text(COMMENT_ONLY_BACKEND_TOML)
+        (backends_dir / "retired_preview.toml").write_text(COMMENT_ONLY_BACKEND_TOML)
         base_path = tmp_path / "backends.toml"
         base_path.write_text(BACKENDS_TOML_TEMPLATE.format(enabled=str(enabled).lower()))
         library = InferenceBackendLibrary.make_empty()
@@ -41,9 +41,9 @@ class TestBackendRetiredModelSpecsSection:
             self._load(tmp_path=tmp_path, enabled=True, lenient=lenient)
 
         message = str(refused.value)
-        assert "pipelex_manifold" in message
+        assert "retired_preview" in message
         assert "model_specs_section" in message
-        assert "backends/pipelex_manifold.toml" in message
+        assert "backends/retired_preview.toml" in message
 
     def test_a_disabled_backend_naming_it_is_skipped(self, tmp_path: Path) -> None:
         library = self._load(tmp_path=tmp_path, enabled=False)

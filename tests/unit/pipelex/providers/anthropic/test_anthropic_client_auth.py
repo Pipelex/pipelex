@@ -2,14 +2,12 @@
 
 The anthropic SDK carries its key in `x-api-key`. That is right for Anthropic itself and for the
 Anthropic-compatible vendors, and wrong for a backend that fronts the protocol behind a gateway
-which authenticates on a header of its own — the Pipelex service reads `x-pipelex-api-key`
-(or an `Authorization` bearer) and never looks at `x-api-key`, so a key left in the SDK's own slot
-reaches it as an anonymous request. A backend says which header carries its key with the
+which authenticates on a header of its own and never looks at `x-api-key`, so a key left in the
+SDK's own slot reaches it as an anonymous request. A backend says which header carries its key with the
 `auth_header` extra-config field; these tests pin both paths and the refusal.
 
-This lives in `providers/anthropic/` rather than in the hosted package deliberately: the driver is
-shared with the plain BYOK Anthropic backend and outlives the Portkey retirement. The gate is the
-backend's own declaration, so a BYOK backend takes the unchanged path.
+The driver is shared with the plain BYOK Anthropic backend, and the gate is the backend's own
+declaration, so a BYOK backend takes the unchanged path.
 
 **The `base_url` here is the origin with no `/v1`, and that is the whole endpoint rule in one
 assertion.** `AsyncAnthropic` defaults to `https://api.anthropic.com` and appends `/v1/messages`
@@ -32,8 +30,8 @@ from pipelex.providers.anthropic.anthropic_factory import AnthropicFactory
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-_PIPELEX_HOSTED_AUTH_HEADER = "x-pipelex-api-key"
-_PIPELEX_HOSTED_ORIGIN = "https://pipelex_hosted.example.com"
+_GATEWAY_AUTH_HEADER = "x-gateway-api-key"
+_GATEWAY_ORIGIN = "https://gateway.example.com"
 
 
 def _model_handle() -> ModelHandle:
@@ -62,30 +60,30 @@ class TestAnthropicClientAuth:
         _patch_config(mocker)
         mock_client = mocker.patch("pipelex.providers.anthropic.anthropic_factory.AsyncAnthropic")
         backend = InferenceBackend(
-            name="pipelex_manifold",
-            endpoint=_PIPELEX_HOSTED_ORIGIN,
-            api_key="hosted-service-token",
-            extra_config={"auth_header": _PIPELEX_HOSTED_AUTH_HEADER},
+            name="my_gateway",
+            endpoint=_GATEWAY_ORIGIN,
+            api_key="gateway-token",
+            extra_config={"auth_header": _GATEWAY_AUTH_HEADER},
         )
 
         AnthropicFactory.make_anthropic_client(model_handle=_model_handle(), backend=backend)
 
         kwargs = mock_client.call_args.kwargs
-        assert kwargs["default_headers"] == {_PIPELEX_HOSTED_AUTH_HEADER: "hosted-service-token"}
+        assert kwargs["default_headers"] == {_GATEWAY_AUTH_HEADER: "gateway-token"}
         # The SDK refuses an empty api_key, so the slot holds a placeholder rather than the token.
-        assert kwargs["api_key"] != "hosted-service-token"
+        assert kwargs["api_key"] != "gateway-token"
         assert kwargs["api_key"]
         # The origin, not the origin plus `/v1`: this SDK appends its own `/v1/messages`.
-        assert kwargs["base_url"] == _PIPELEX_HOSTED_ORIGIN
+        assert kwargs["base_url"] == _GATEWAY_ORIGIN
 
     def test_auth_header_without_a_key_is_refused(self, mocker: MockerFixture) -> None:
         _patch_config(mocker)
         mocker.patch("pipelex.providers.anthropic.anthropic_factory.AsyncAnthropic")
         backend = InferenceBackend(
-            name="pipelex_manifold",
-            endpoint=_PIPELEX_HOSTED_ORIGIN,
+            name="my_gateway",
+            endpoint=_GATEWAY_ORIGIN,
             api_key=None,
-            extra_config={"auth_header": _PIPELEX_HOSTED_AUTH_HEADER},
+            extra_config={"auth_header": _GATEWAY_AUTH_HEADER},
         )
 
         with pytest.raises(AnthropicFactoryError, match="auth_header"):

@@ -15,13 +15,13 @@ display_name = "⭐ Pipelex Gateway"
 enabled = true                         # Enable after accepting terms via `pipelex init config`
 api_key = "${PIPELEX_GATEWAY_API_KEY}"
 
-# Pipelex Manifold is a closed private beta: leave it off unless you have been invited.
-[pipelex_manifold]
-display_name = "Pipelex Manifold (private beta)"
+# A private beta: leave it off unless you have been invited.
+[retired_preview]
+display_name = "Retired preview (private beta)"
 enabled = false
-endpoint = "${PIPELEX_MANIFOLD_ENDPOINT}"
-api_key = "${PIPELEX_MANIFOLD_API_KEY}"
-model_specs_section = "manifold_model_specs"
+endpoint = "${RETIRED_PREVIEW_ENDPOINT}"
+api_key = "${RETIRED_PREVIEW_API_KEY}"
+model_specs_section = "retired_preview_model_specs"
 auth_header = "x-pipelex-api-key"
 
 [anthropic]

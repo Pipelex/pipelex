@@ -33,16 +33,16 @@ default = "pipelex_gateway"
 [profiles.all_pipelex_gateway.optional_routes]
 "jev-*" = "typesafe"
 
-# The same model names, served by the Pipelex-operated inference service instead. Switching between
+# The same model names, served by the preview backend instead. Switching between
 # this profile and the one above needs no other edit: a model's wire id and sdk are per-backend, so
 # decks, aliases and presets keep naming the same handles.
-[profiles.all_pipelex_manifold]
-description = "Use Pipelex Manifold (private beta) for all its supported models"
-default = "pipelex_manifold"
+[profiles.all_retired_preview]
+description = "Use the retired preview backend (private beta) for all its supported models"
+default = "retired_preview"
 
 # Judgment models are brought by you rather than served by Pipelex, so they go to their own backend
 # whenever it is enabled. An optional route is inert while its backend is disabled.
-[profiles.all_pipelex_manifold.optional_routes]
+[profiles.all_retired_preview.optional_routes]
 "jev-*" = "typesafe"
 
 [profiles.all_anthropic]
