@@ -24,12 +24,21 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _make_backend(name: str, enabled: bool, endpoint: str | None = None, model_count: int = 0) -> SimpleNamespace:
+def _make_backend(
+    name: str,
+    enabled: bool,
+    endpoint: str | None = None,
+    model_count: int = 0,
+    unresolved_credentials: dict[str, list[str]] | None = None,
+) -> SimpleNamespace:
+    unresolved = unresolved_credentials or {}
     return SimpleNamespace(
         name=name,
         enabled=enabled,
         endpoint=endpoint,
         model_specs={f"model_{model_index}": object() for model_index in range(model_count)},
+        unresolved_credentials=unresolved,
+        unresolved_credential_vars=sorted({var_name for var_names in unresolved.values() for var_name in var_names}),
     )
 
 
@@ -146,6 +155,36 @@ class TestShowCmd:
         telemetry.track_event.assert_called_once()
         _, call_kwargs = telemetry.track_event.call_args
         assert call_kwargs["properties"] == {"nb_backends": 2}
+
+    @pytest.mark.usefixtures("telemetry")
+    def test_do_show_backends_lists_a_backend_whose_credentials_this_boot_did_not_resolve(self, mocker: MockerFixture, console: Console) -> None:
+        """The command boots keyless, which keeps every backend: one whose key is unset is listed with its variables."""
+        backends = [
+            _make_backend(
+                "azure_openai",
+                enabled=True,
+                model_count=3,
+                unresolved_credentials={"endpoint": ["AZURE_API_BASE"], "api_key": ["AZURE_API_KEY"]},
+            ),
+            _make_backend("groq", enabled=True, endpoint="https://api.groq.com", model_count=1, unresolved_credentials={"api_key": ["GROQ_API_KEY"]}),
+            _make_backend("ollama", enabled=True, endpoint="http://localhost:11434", model_count=1),
+        ]
+        self._mock_backend_setup(mocker, backends=backends, routing_profile=_make_routing_profile())
+
+        do_show_backends(show_all=False)
+
+        output = console.export_text()
+        rows = {line.split()[1]: line for line in output.splitlines() if line.startswith("│") and len(line.split()) > 1}
+        assert "Credential variables" in output
+        assert "not resolved" in rows["azure_openai"]
+        assert "AZURE_API_BASE" in rows["azure_openai"]
+        assert "AZURE_API_KEY" in rows["azure_openai"]
+        assert "https://api.groq.com" in rows["groq"]
+        assert "not resolved" not in rows["groq"]
+        assert "GROQ_API_KEY" in rows["groq"]
+        assert "http://localhost:11434" in rows["ollama"]
+        assert "none" in rows["ollama"]
+        assert "does not resolve credentials" in output
 
     @pytest.mark.usefixtures("telemetry")
     def test_do_show_backends_show_all_includes_status_column(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
