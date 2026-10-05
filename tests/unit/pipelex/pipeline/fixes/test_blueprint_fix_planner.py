@@ -45,6 +45,23 @@ def _strip_namespace_error_data(
     )
 
 
+def _invalid_input_name_error_data(
+    *,
+    variable_name: str,
+    redundant_input_name: str | None,
+    pipe_code: str | None = "describe_page",
+) -> PipelexBundleBlueprintValidationErrorData:
+    return PipelexBundleBlueprintValidationErrorData(
+        error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
+        domain_code="catalog_review",
+        source="main.mthds",
+        pipe_code=pipe_code,
+        variable_names=[variable_name],
+        redundant_input_name=redundant_input_name,
+        message=f"Input '{variable_name}' is not a plain input name.",
+    )
+
+
 class TestBlueprintFixPlanner:
     def test_native_redeclaration_yields_strip_fix(self) -> None:
         """An enriched native-redeclaration error yields a SAFE delete_key of the concept."""
@@ -117,3 +134,32 @@ class TestBlueprintFixPlanner:
         fix = plan_fix_for_blueprint_validation_error(error_data)
         assert fix is not None
         assert fix.source == "sibling.mthds"
+
+    def test_redundant_dotted_input_yields_a_safe_delete_of_the_key(self) -> None:
+        """R4: a dotted input whose root the same table declares is deleted from that pipe's `inputs`, safely."""
+        fix = plan_fix_for_blueprint_validation_error(
+            _invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name="page.page_view")
+        )
+        assert fix is not None
+        assert fix.fix_code == "delete-redundant-dotted-input"
+        assert fix.safety == FixSafety.SAFE
+        assert fix.source == "main.mthds"
+        assert fix.ops == [DeleteKeyOp(table_path=["pipe", "describe_page", "inputs"], key="page.page_view")]
+        assert "page.page_view" in fix.description
+
+    def test_lone_dotted_input_yields_none(self) -> None:
+        """R4: a lone dotted input carries no enrichment, since nothing says its root's concept: the author repairs it."""
+        assert (
+            plan_fix_for_blueprint_validation_error(_invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name=None)) is None
+        )
+
+    def test_malformed_input_name_yields_none(self) -> None:
+        """A malformed name is never deleted: its repair is a rename only the author can choose."""
+        assert (
+            plan_fix_for_blueprint_validation_error(_invalid_input_name_error_data(variable_name="InvoiceTotal", redundant_input_name=None)) is None
+        )
+
+    def test_redundant_dotted_input_without_its_pipe_yields_none(self) -> None:
+        """Without the pipe the key lives in there is no table to delete it from."""
+        error_data = _invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name="page.page_view", pipe_code=None)
+        assert plan_fix_for_blueprint_validation_error(error_data) is None

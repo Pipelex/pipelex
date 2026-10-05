@@ -13,6 +13,7 @@ SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
 STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE = "strip-native-concept-redecl"
 STRIP_NAMESPACE_FIX_CODE = "strip-namespace"
 RENAME_MODEL_FIX_CODE = "rename-model"
+DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE = "delete-redundant-dotted-input"
 
 # The codes `pipelex fix bundle --select/--ignore` accept: every SAFE rule the fix loop can apply. A new
 # SAFE rule constant above must be added here; the CLI rejects codes outside this set loudly (a typo'd
@@ -25,6 +26,7 @@ KNOWN_FIX_CODES: frozenset[str] = frozenset(
         SYNC_CONTROLLER_INPUTS_FIX_CODE,
         STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE,
         STRIP_NAMESPACE_FIX_CODE,
+        DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE,
     }
 )
 
@@ -181,7 +183,37 @@ def plan_fix_for_blueprint_validation_error(error_data: PipelexBundleBlueprintVa
         return _plan_strip_native_concept_redecl(error_data)
     if error_data.error_type.is_invalid_pipe_code_syntax:
         return _plan_strip_namespace(error_data)
+    if error_data.error_type.is_invalid_input_name:
+        return _plan_delete_redundant_dotted_input(error_data=error_data)
     return None
+
+
+def _plan_delete_redundant_dotted_input(*, error_data: PipelexBundleBlueprintValidationErrorData) -> SuggestedFix | None:
+    """``delete-redundant-dotted-input``: an ``invalid_input_name`` carrying the enriched
+    ``redundant_input_name`` becomes a ``delete_key`` of that key in the pipe's ``inputs`` table.
+
+    The enrichment is set only when the same table declares the dotted name's root, which already
+    supplies every field a template reads through it, so deleting the key changes nothing a run does: the
+    fix is ``SAFE``. A lone dotted name, whose root's concept nothing states, and a malformed name carry
+    no enrichment and are suppressed here structurally; their message names the remedies for the author.
+    """
+    if error_data.redundant_input_name is None or error_data.pipe_code is None:
+        return None
+    return SuggestedFix(
+        fix_code=DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE,
+        description=(
+            f"Delete the dotted input '{error_data.redundant_input_name}' of pipe '{error_data.pipe_code}': its root is declared "
+            "beside it, and a template reads the field through the root"
+        ),
+        safety=FixSafety.SAFE,
+        source=error_data.source,
+        ops=[
+            DeleteKeyOp(
+                table_path=["pipe", error_data.pipe_code, "inputs"],
+                key=error_data.redundant_input_name,
+            ),
+        ],
+    )
 
 
 def _plan_strip_native_concept_redecl(error_data: PipelexBundleBlueprintValidationErrorData) -> SuggestedFix | None:
