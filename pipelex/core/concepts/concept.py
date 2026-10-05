@@ -47,6 +47,15 @@ class Concept(ConceptAbstract):
     which concept a field holds when several concepts share one class. Excluded from serialization, like
     every definition field the concept's ref stands for on the wire.
     """
+    is_described_only: bool = Field(default=False, exclude=True)
+    """Whether the concept is declared with a description alone, neither a `structure` nor `refines`.
+
+    That is `Note = "A note"`, or a `[concept.Note]` table holding only a description. The runtime gives such a
+    concept a text placeholder for a structure class, and the table spelling refines `native.Text` besides, but the
+    standard gives it no structure to walk, so the walk deriving a binding step's concept refuses to enter it
+    whichever way it was written. A description-only concept whose code names a registered Python class takes that
+    class as its structure, and is not described only. Excluded from serialization, like `declared_structure`.
+    """
 
     @field_validator("code")
     @classmethod

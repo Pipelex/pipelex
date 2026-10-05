@@ -20,7 +20,7 @@ from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMul
 from pipelex.interpreter_hub import get_concept_library, get_optional_pipe
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
-from pipelex.pipe_controllers.binding.binding_concept_resolvers import LibraryConceptWalkResolver
+from pipelex.pipe_controllers.binding.binding_concept_resolvers import LibraryConceptWalkResolver, library_concept_key
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation, BindingRoot, derive_binding
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
@@ -130,9 +130,12 @@ def build_sequence_typed_flow(
                 continue
             root_spec = root_slot.stuff_spec
             try:
+                # The root is walked from the key the library holds its concept under, which for a dependency package's
+                # concept names the package, so the package's own definitions are read and never a host's of the same spelling.
+                root_concept_key = library_concept_key(concept_library=concept_library, concept=root_spec.concept)
                 derivation = derive_binding(
                     path=step.from_path,
-                    root=BindingRoot(concept_ref=root_spec.concept.concept_ref, multiplicity=root_spec.multiplicity),
+                    root=BindingRoot(concept_ref=root_concept_key, multiplicity=root_spec.multiplicity),
                     resolver=resolver,
                 )
             except BindingPathUnresolvedError as exc:

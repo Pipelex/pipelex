@@ -116,6 +116,7 @@ class TestCases:
                 description="A concept from same domain",
                 structure_class_name="my_domain__DomainConcept",
                 refines="native.Text",
+                is_described_only=True,
             ),
         ),
         # Test case 9: Blueprint with dict structure (same domain)

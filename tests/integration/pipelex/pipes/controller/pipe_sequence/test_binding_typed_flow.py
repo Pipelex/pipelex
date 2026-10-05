@@ -3,11 +3,13 @@ from collections.abc import Callable
 import pytest
 
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.test_extras.mthds_corpus.resources import entries_root
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -59,6 +61,50 @@ steps = [
 """
 
 
+class DepotSlipRecord(StructuredContent):
+    """A depot slip whose carrier note is required yet may be `None`, as a Python class can declare it."""
+
+    reference: str
+    carrier_note: str | None
+
+
+_NULLABLE_FIELD_BUNDLE = """domain = "depot_slips"
+description = "Reading the carrier's note off a depot slip"
+
+[concept.DepotSlip]
+description = "A slip handed over at the depot"
+structure = "DepotSlipRecord"
+
+[pipe.read_note]
+type = "PipeSequence"
+description = "Binds the carrier's note of a slip"
+inputs = { slip = "DepotSlip" }
+output = "Text"
+steps = [
+  { from = "slip.carrier_note", result = "note" },
+]
+"""
+
+_DESCRIPTION_ONLY_BUNDLE = """domain = "depot_notices"
+description = "Notices and bulletins posted at the depot"
+
+[concept]
+Notice = "A notice posted at the depot"
+
+[concept.Bulletin]
+description = "A bulletin posted at the depot"
+
+[pipe.read_notice]
+type = "PipeSequence"
+description = "Binds the text inside a notice"
+inputs = { notice = "Notice" }
+output = "Text"
+steps = [
+  { from = "notice.text", result = "notice_text" },
+]
+"""
+
+
 def _load_sequence(*, mthds_content: str, library_id: str, pipe_code: str) -> PipeSequence:
     blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="flow.mthds")
     pipes = get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
@@ -95,6 +141,50 @@ class TestBindingTypedFlow:
         assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
         assert exc_info.value.pipe_code == "read_records"
         assert "holds a 'depot_records.Parcel', which has no field 'total'. Its fields are: 'weight', 'labels'." in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("output", "is_refused"),
+        [
+            pytest.param("Text", True, id="a-plain-output-is-refused"),
+            pytest.param("Text?", False, id="an-optional-output-validates"),
+        ],
+    )
+    def test_a_required_field_that_admits_none_may_leave_the_binding_absent(
+        self, load_empty_library: Callable[[], str], output: str, is_refused: bool
+    ) -> None:
+        """A Python class can require a field and still let it hold `None`, so a sequence ending on it must declare its output `?`."""
+        library_id = load_empty_library()
+        # Registered in the library just opened, whose class registry the concept's `structure` is resolved through.
+        get_class_registry().register_class(DepotSlipRecord)
+        mthds_content = _NULLABLE_FIELD_BUNDLE.replace('output = "Text"', f'output = "{output}"')
+        if not is_refused:
+            sequence = _load_sequence(mthds_content=mthds_content, library_id=library_id, pipe_code="read_note")
+            assert sequence.build_typed_flow().binding_derivations[0].may_find_nothing is True
+            return
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_sequence(mthds_content=mthds_content, library_id=library_id, pipe_code="read_note")
+
+        assert exc_info.value.error_type == PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+        assert "'slip.carrier_note'" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("root_name", "concept_code"),
+        [
+            pytest.param("notice", "Notice", id="declared-as-a-string"),
+            pytest.param("bulletin", "Bulletin", id="declared-as-a-table-with-a-description"),
+        ],
+    )
+    def test_a_description_only_concept_is_never_entered(self, load_empty_library: Callable[[], str], root_name: str, concept_code: str) -> None:
+        """Both spellings of a concept declared with a description alone are refused the same way, as having no structure."""
+        mthds_content = _DESCRIPTION_ONLY_BUNDLE.replace('inputs = { notice = "Notice" }', f'inputs = {{ {root_name} = "{concept_code}" }}').replace(
+            '{ from = "notice.text", result = "notice_text" }', f'{{ from = "{root_name}.text", result = "notice_text" }}'
+        )
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_notice")
+
+        assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+        assert f"'{root_name}' holds a 'depot_notices.{concept_code}', which is declared with neither a structure nor refines" in str(exc_info.value)
 
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(
