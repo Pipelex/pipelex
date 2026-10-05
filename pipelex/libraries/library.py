@@ -281,10 +281,17 @@ class Library(BaseModel):
                     error_type=PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY,
                     message=_describe_unexported_pipe_dependency(referring_pipe_key=pipe_key, private_ref=sub_pipe_code, package_alias=ref_alias),
                 )
-            msg = (
-                f"Pipe '{pipe_key}' references '{sub_pipe_code}', which does not exist. "
-                f"The package loaded as '{ref_alias}' has no pipe '{remainder}'."
-            )
+            unbuilt_reason = self.pipe_library.unbuilt_dependency_pipe_reason(pipe_code=sub_pipe_code)
+            if unbuilt_reason is not None:
+                msg = (
+                    f"Pipe '{pipe_key}' references '{sub_pipe_code}', which the package loaded as '{ref_alias}' declares "
+                    f"but could not build: {unbuilt_reason}"
+                )
+            else:
+                msg = (
+                    f"Pipe '{pipe_key}' references '{sub_pipe_code}', which does not exist. "
+                    f"The package loaded as '{ref_alias}' has no pipe '{remainder}'."
+                )
             raise _pipe_dependency_refusal(
                 pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
             )

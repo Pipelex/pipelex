@@ -84,8 +84,10 @@ A reference written inside a package always reaches that package's pipe. If the 
 
 When a consumer references a loaded package, two mistakes are refused when the consumer loads, rather than surfacing later as an unrelated error:
 
-- **A pipe the package does not have** is refused as an unresolved pipe dependency (`unresolved_pipe_dependency`), naming the reference and the package.
+- **A pipe the package does not have** is refused as an unresolved pipe dependency (`unresolved_pipe_dependency`), naming the reference and the package. The same refusal names the error when the package declares the pipe but it failed to build.
 - **A pipe the package does not export** is refused as an unexported pipe dependency (`unexported_pipe_dependency`). The pipe exists, so the remedy is to call one of the package's exported pipes, or to export this one in the package's manifest.
+
+A reference by bare code, `alias->code`, ignores the package's private pipes when it also matches an exported one, so a private helper sharing an exported pipe's code in another domain does not make the reference ambiguous.
 
 Naming a private pipe by hand, as the pipe to run at the command line or in an API request, is not a reference from inside a method, so `[exports]` does not apply to it: a loaded private pipe can be run that way by its `alias->domain.code`.
 

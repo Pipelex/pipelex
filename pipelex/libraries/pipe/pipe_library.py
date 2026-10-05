@@ -21,6 +21,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     # The aliased keys of dependency pipes their package declares but neither exports nor calls from a public pipe:
     # never built, and recorded only so a reference to one is refused as unexported rather than as missing.
     _withheld_dependency_keys: set[str] = PrivateAttr(default_factory=set)
+    # The aliased keys of dependency pipes the package meant to load but that failed to build, with the reason, so a
+    # reference to one is refused naming that failure rather than as a pipe the package does not have.
+    _unbuilt_dependency_reasons: dict[str, str] = PrivateAttr(default_factory=dict)
 
     @override
     def setup(self):
@@ -31,6 +34,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         self.root = {}
         self._private_dependency_keys = set()
         self._withheld_dependency_keys = set()
+        self._unbuilt_dependency_reasons = {}
 
     @override
     def reset(self):
@@ -90,9 +94,14 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             pipe = self.root.get(aliased_key)
             if pipe is not None:
                 return pipe
-            # Bare code remainder — search aliased entries matching the bare code
+            # Bare code remainder — search aliased entries matching the bare code. A package's private pipes only
+            # break a tie: they are invisible to a consumer, so one exported match among several is the one meant,
+            # and a lone private match is returned for validation to refuse as unexported.
             if "." not in remainder:
-                matches = [val for key, val in self.root.items() if key.startswith(f"{alias}->") and val.code == remainder]
+                matched = {key: val for key, val in self.root.items() if key.startswith(f"{alias}->") and val.code == remainder}
+                matches = list(matched.values())
+                if len(matches) > 1:
+                    matches = [val for key, val in matched.items() if key not in self._private_dependency_keys] or matches
                 if len(matches) == 1:
                     return matches[0]
                 if len(matches) > 1:
@@ -194,14 +203,33 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
         The reference may name the pipe as `alias->domain.code` or as `alias->code`, as `get_optional_pipe` accepts.
         """
-        if pipe_code in self._withheld_dependency_keys:
-            return True
+        return bool(self._dependency_keys_named_by(pipe_code=pipe_code, keys=self._withheld_dependency_keys))
+
+    def add_unbuilt_dependency_pipe(self, *, alias: str, pipe_ref: str, reason: str) -> None:
+        """Record a dependency pipe, by its `domain.code`, that failed to build, and why."""
+        self._unbuilt_dependency_reasons[f"{alias}->{pipe_ref}"] = reason
+
+    def unbuilt_dependency_pipe_reason(self, *, pipe_code: str) -> str | None:
+        """Why the dependency pipe a cross-package reference names failed to build, or `None` when it did not fail.
+
+        The reference may name the pipe as `alias->domain.code` or as `alias->code`, as `get_optional_pipe` accepts.
+        """
+        keys = self._dependency_keys_named_by(pipe_code=pipe_code, keys=set(self._unbuilt_dependency_reasons))
+        if len(keys) != 1:
+            return None
+        return self._unbuilt_dependency_reasons[keys[0]]
+
+    @classmethod
+    def _dependency_keys_named_by(cls, *, pipe_code: str, keys: set[str]) -> list[str]:
+        """The aliased keys among `keys` that a cross-package reference names, by its full key or by its bare code."""
+        if pipe_code in keys:
+            return [pipe_code]
         if not QualifiedRef.has_cross_package_prefix(pipe_code):
-            return False
+            return []
         alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
         if "." in remainder:
-            return False
-        return any(key.startswith(f"{alias}->") and key.endswith(f".{remainder}") for key in self._withheld_dependency_keys)
+            return []
+        return sorted(key for key in keys if key.startswith(f"{alias}->") and key.endswith(f".{remainder}"))
 
     @override
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:

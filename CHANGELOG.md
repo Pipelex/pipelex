@@ -16,6 +16,8 @@
 - **An exported pipe can call its package's private pipes (Breaking)**: a package with `[exports]` loads every pipe its exported pipes and `main_pipe`s reach, not the exported ones alone, and a private pipe nothing public reaches is not built. Exports are read by domain, so exporting `x` from one domain no longer exports a pipe named `x` in another, and `PipeLibrary.add_dependency_pipe` takes `is_exported`.
 - **A missing pipe of a loaded package is refused at load**: a reference to a pipe a loaded dependency package does not have is refused as `unresolved_pipe_dependency`, naming the package, where it was skipped and reported as an extraneous input with a wrong suggested fix.
 - **A pipe wrapping another package's pipe of the same domain and code reports its inputs**: the recursion guards of the needed-inputs, signature and file-input walks tell two pipes of the same `domain.code` apart by object rather than by `pipe_ref`. A consumer pipe calling a dependency's pipe of its own domain and code, or one package's pipe calling another's, was taken for an already-visited pipe and reported no inputs, so a correct bundle was refused with an extraneous-input error.
+- **A bare reference into a package ignores its private pipes when an exported one matches**: a consumer's `alias->code` that matches an exported pipe and a private pipe of the same code in another domain resolves to the exported one, where it was refused as ambiguous.
+- **A dependency pipe that fails to build is refused naming why**: a reference to a pipe the package declares but could not build, such as a `PipeFunc` naming an unregistered function, is refused with that build error, where it was reported as a pipe the package does not have.
 
 ## [v0.73.0] - 2026-10-05
 

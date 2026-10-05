@@ -21,6 +21,7 @@ from tests.integration.pipelex.libraries.installed_packages import (
     install_package,
     install_probe,
     isolate_installed_methods,
+    refusal_types,
     sole_step_target,
     write_consumer,
 )
@@ -172,3 +173,21 @@ class TestDependencyPipeScope:
             library_manager.teardown(library_id=library_id)
 
         assert needed_input_names == {"data"}
+
+    def test_a_dependency_pipe_that_fails_to_build_is_refused_naming_why(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The package declares `helper`, so a reference to it is not to a pipe the package lacks: the refusal says it failed to build."""
+        isolate_installed_methods(mocker=mocker, root=tmp_path)
+        install_probe(root=tmp_path, bundle=ProbePackageTestData.DEP_BUNDLE_WITH_AN_UNBUILDABLE_HELPER)
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with pytest.raises(LibraryLoadingError) as exc_info:
+                library_manager.load_libraries(library_id=library_id, library_file_paths=consumer_files)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert refusal_types(exc_info.value) == [PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY]
+        assert "could not build" in str(exc_info.value)
+        assert "no_such_function_anywhere" in str(exc_info.value)
+        assert "has no pipe" not in str(exc_info.value)

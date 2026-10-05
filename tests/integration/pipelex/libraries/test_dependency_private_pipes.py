@@ -172,3 +172,26 @@ class TestDependencyPrivatePipes:
             library_manager.teardown(library_id=library_id)
 
         assert child_pipe_refs == {"probe_dep.entry", "probe_dep.helper"}
+
+    def test_a_private_pipe_sharing_an_exported_pipe_s_code_does_not_make_a_bare_reference_ambiguous(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """`dom_a.x` is exported and calls the private `dom_b.x`: a consumer's `alias->x` means the exported one."""
+        isolate_installed_methods(mocker=mocker, root=tmp_path)
+        install_package(
+            root=tmp_path,
+            method_name=TwoDomainPackageTestData.METHOD_NAME,
+            manifest=TwoDomainPackageTestData.MANIFEST,
+            bundles={"dom_a.mthds": TwoDomainPackageTestData.BUNDLE_A, "dom_b.mthds": TwoDomainPackageTestData.BUNDLE_B},
+        )
+        bare_ref = f"{TwoDomainPackageTestData.DEP_ALIAS}->x"
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.consumer_calling(pipe_ref=bare_ref)})
+        library_manager = get_library_manager()
+        library_id, library = library_manager.open_library()
+        try:
+            library_manager.load_libraries(library_id=library_id, library_file_paths=consumer_files)
+            resolved = library.pipe_library.get_required_pipe(pipe_code=bare_ref)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert resolved.pipe_ref == "dom_a.x"

@@ -1297,6 +1297,8 @@ class LibraryManager(LibraryManagerAbstract):
 
         # What a consumer may reference: `None` when the package declares no exports, so every pipe is public.
         public_pipe_refs = _public_dependency_pipe_refs(resolved_dep=resolved_dep, blueprints=dep_blueprints)
+        # The `domain.code` of each pipe meant to load that failed to build, with why, for a reference to it to name.
+        unbuilt_pipe_reasons: dict[str, str] = {}
 
         # Temporarily register dep concepts in main library for pipe construction
         # (PipeFactory resolves concepts through the hub's current library)
@@ -1368,6 +1370,7 @@ class LibraryManager(LibraryManagerAbstract):
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
                     log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+                    unbuilt_pipe_reasons[pipe_ref] = "; ".join(str(error["msg"]) for error in exc.errors()) or str(exc)
         finally:
             # Remove temporary concept entries from main library
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)
@@ -1383,6 +1386,8 @@ class LibraryManager(LibraryManagerAbstract):
             is_exported = public_pipe_refs is None or pipe.pipe_ref in public_pipe_refs
             library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe, is_exported=is_exported)
         library.pipe_library.add_withheld_dependency_pipes(alias=alias, pipe_refs=set(qualified_dep_pipes) - loaded_pipe_refs)
+        for pipe_ref, reason in unbuilt_pipe_reasons.items():
+            library.pipe_library.add_unbuilt_dependency_pipe(alias=alias, pipe_ref=pipe_ref, reason=reason)
 
         log.verbose(f"Loaded dependency '{alias}': {len(dep_concepts)} concepts, pipes from {len(dep_blueprints)} bundles")
 
