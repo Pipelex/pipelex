@@ -145,8 +145,9 @@ def reachable_dependency_pipe_refs(
     The pipes are the package's qualified blueprints, whose in-package refs carry `package_alias`. A public pipe's
     private helpers, a build-time elaboration's synthetic helpers among them, travel with it; a private pipe nothing
     public reaches is left out. A ref to another package, or to a pipe the package does not declare, is not followed:
-    validation reports the latter. A ref written `alias->code`, with no domain, is followed to every pipe of that code,
-    since lookup resolves it by code within the package and reports the ambiguity when more than one matches.
+    validation reports the latter. A ref written `alias->code`, with no domain, is followed as lookup resolves it, by code
+    within the package: to the public pipes of that code when there are some among several, else to every pipe of it,
+    lookup reporting the ambiguity when more than one remains.
     """
     reachable: set[str] = set()
     pending = [pipe_ref for pipe_ref in public_pipe_refs if pipe_ref in qualified_pipes]
@@ -165,7 +166,10 @@ def reachable_dependency_pipe_refs(
                 if in_package_ref in qualified_pipes:
                     pending.append(in_package_ref)
             else:
-                pending.extend(candidate for candidate in qualified_pipes if candidate.rsplit(".", 1)[-1] == in_package_ref)
+                candidates = [candidate for candidate in qualified_pipes if candidate.rsplit(".", 1)[-1] == in_package_ref]
+                # Lookup lets private pipes only break a tie (`PipeLibrary.get_optional_pipe`), so one public match is the one reached.
+                public_candidates = [candidate for candidate in candidates if candidate in public_pipe_refs]
+                pending.extend(public_candidates if len(candidates) > 1 and public_candidates else candidates)
     return reachable
 
 

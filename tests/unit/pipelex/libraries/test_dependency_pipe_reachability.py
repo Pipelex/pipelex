@@ -92,3 +92,15 @@ class TestDependencyPipeReachability:
         reachable = reachable_dependency_pipe_refs(public_pipe_refs={"alpha.entry", "alpha.not_declared"}, qualified_pipes=pipes, package_alias=ALIAS)
 
         assert reachable == {"alpha.entry"}
+
+    def test_a_ref_without_its_domain_follows_only_the_exported_match_when_there_is_one(self):
+        """Lookup resolves `alias->x` to the exported `alpha.x`, so the private `beta.x` is never reached, nor built."""
+        pipes: dict[str, PipeBlueprintUnion] = {
+            "alpha.entry": _sequence(f"{ALIAS}->x"),
+            "alpha.x": _leaf(description="exported x"),
+            "beta.x": _sequence(f"{ALIAS}->beta.missing"),
+        }
+
+        reachable = reachable_dependency_pipe_refs(public_pipe_refs={"alpha.entry", "alpha.x"}, qualified_pipes=pipes, package_alias=ALIAS)
+
+        assert reachable == {"alpha.entry", "alpha.x"}
