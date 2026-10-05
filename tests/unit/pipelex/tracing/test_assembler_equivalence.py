@@ -17,6 +17,7 @@ import pytest
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeKind, NodeSpec
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
@@ -60,25 +61,27 @@ def _normalize_node(node: NodeSpec) -> dict[str, Any]:
         "error_type": node.error.error_type if node.error else None,
         "error_message": node.error.message if node.error else None,
         "metrics": node.metrics,
-        # Multiplicity rides along so both builders are held to carry each io item's marker.
+        # Concept and multiplicity ride along so both builders are held to carry each io item's typing.
         "inputs": sorted(
-            [(spec.name, spec.digest, spec.multiplicity) for spec in node.node_io.inputs],
-            key=lambda triple: (triple[0] or "", triple[1] or ""),
+            [(spec.name, spec.digest, spec.concept, spec.multiplicity) for spec in node.node_io.inputs],
+            key=lambda item: (item[0] or "", item[1] or ""),
         ),
         "outputs": sorted(
-            [(spec.name, spec.digest, spec.multiplicity) for spec in node.node_io.outputs],
-            key=lambda triple: (triple[0] or "", triple[1] or ""),
+            [(spec.name, spec.digest, spec.concept, spec.multiplicity) for spec in node.node_io.outputs],
+            key=lambda item: (item[0] or "", item[1] or ""),
         ),
     }
 
 
-def _normalize_edge(edge: EdgeSpec) -> tuple[str, str, EdgeKind, str | None]:
+def _normalize_edge(edge: EdgeSpec) -> tuple[str, str, EdgeKind, str | None, str | None, str | None]:
     """Extract structurally comparable fields from an EdgeSpec."""
     return (
         _normalize_id(edge.source),
         _normalize_id(edge.target),
         edge.kind,
         edge.label,
+        edge.source_stuff_digest,
+        edge.target_stuff_digest,
     )
 
 
@@ -525,6 +528,107 @@ def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceCont
     )
 
 
+def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) -> None:
+    """Dry-run condition whose two outcomes write different concepts into the slot a consumer reads.
+
+    `write_questions` is a batch whose aggregate edge names its output list; `write_rejection` runs
+    last, so its stuff is the condition's output and the one `assemble` reads.
+    """
+    started_at = _T0
+
+    seq_id, seq_ctx = tracer.on_pipe_start(
+        trace_context=context,
+        pipe_code="screen",
+        pipe_type="PipeSequence",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at,
+    )
+    cond_id, cond_ctx = tracer.on_pipe_start(
+        trace_context=seq_ctx,
+        pipe_code="route",
+        pipe_type="PipeCondition",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at + timedelta(seconds=1),
+        input_specs=[IOSpec(name="verdict", concept="Text", digest="digest_verdict")],
+    )
+
+    batch_id, batch_ctx = tracer.on_pipe_start(
+        trace_context=cond_ctx,
+        pipe_code="write_questions",
+        pipe_type="PipeBatch",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at + timedelta(seconds=2),
+    )
+    item_id, _ = tracer.on_pipe_start(
+        trace_context=batch_ctx,
+        pipe_code="write_question",
+        pipe_type="PipeLLM",
+        node_kind=NodeKind.OPERATOR,
+        started_at=started_at + timedelta(seconds=3),
+    )
+    tracer.on_pipe_end_success(
+        node_id=item_id,
+        ended_at=started_at + timedelta(seconds=4),
+        output_spec=IOSpec(name="follow_up", concept="Question", digest="digest_question_0"),
+    )
+    tracer.register_batch_aggregation(
+        output_list_stuff_code="digest_questions",
+        item_stuff_code="digest_question_0",
+        item_index=0,
+        batch_controller_node_id=batch_id,
+    )
+    tracer.on_pipe_end_success(
+        node_id=batch_id,
+        ended_at=started_at + timedelta(seconds=5),
+        output_spec=IOSpec(name="follow_up", concept="Question", multiplicity=True, digest="digest_questions"),
+    )
+
+    rejection_id, _ = tracer.on_pipe_start(
+        trace_context=cond_ctx,
+        pipe_code="write_rejection",
+        pipe_type="PipeLLM",
+        node_kind=NodeKind.OPERATOR,
+        started_at=started_at + timedelta(seconds=6),
+    )
+    tracer.on_pipe_end_success(
+        node_id=rejection_id,
+        ended_at=started_at + timedelta(seconds=7),
+        output_spec=IOSpec(name="follow_up", concept="Rejection", digest="digest_rejection"),
+    )
+    tracer.register_condition_output_merge(
+        merge=ConditionOutputMerge(
+            condition_node_id=cond_id,
+            shared_digest="digest_rejection",
+            merged_digests=["digest_questions"],
+            shared_typing=ConditionOutputTyping(concept="Anything"),
+        ),
+    )
+    tracer.on_pipe_end_success(
+        node_id=cond_id,
+        ended_at=started_at + timedelta(seconds=8),
+        output_spec=IOSpec(name="follow_up", concept="Rejection", digest="digest_rejection"),
+    )
+
+    assemble_id, _ = tracer.on_pipe_start(
+        trace_context=seq_ctx,
+        pipe_code="assemble",
+        pipe_type="PipeLLM",
+        node_kind=NodeKind.OPERATOR,
+        started_at=started_at + timedelta(seconds=9),
+        input_specs=[IOSpec(name="follow_up", concept="Anything", digest="digest_rejection")],
+    )
+    tracer.on_pipe_end_success(
+        node_id=assemble_id,
+        ended_at=started_at + timedelta(seconds=10),
+        output_spec=IOSpec(name="result", concept="Text", digest="digest_result"),
+    )
+    tracer.on_pipe_end_success(
+        node_id=seq_id,
+        ended_at=started_at + timedelta(seconds=11),
+        output_spec=IOSpec(name="result", concept="Text", digest="digest_result"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -542,6 +646,7 @@ class TestAssemblerEquivalence:
             pytest.param(_scenario_partial_failure, id="partial_failure"),
             pytest.param(_scenario_pass_through, id="pass_through"),
             pytest.param(_scenario_condition_selected_outcome, id="condition_selected_outcome"),
+            pytest.param(_scenario_dry_condition_merge, id="dry_condition_merge"),
         ],
     )
     def test_equivalence(self, scenario_fn: ScenarioFn) -> None:
@@ -562,6 +667,17 @@ class TestAssemblerEquivalence:
             assert multiplicity_by_digest["digest_output_list"] is True
             assert multiplicity_by_digest["digest_item_0"] is None
             assert multiplicity_by_digest["digest_result_0"] is None
+
+    def test_condition_merge_survives_both_builders(self) -> None:
+        """Agreement alone would pass if both builders dropped the merge, so pin the merged shape too."""
+        direct_spec, assembled_spec = _run_both_paths(_scenario_dry_condition_merge)
+        for spec in (direct_spec, assembled_spec):
+            outputs_by_code = {node.pipe_code: node.node_io.outputs for node in spec.nodes}
+            assert [(item.digest, item.concept) for item in outputs_by_code["route"]] == [("digest_rejection", "Anything")]
+            assert [(item.digest, item.concept) for item in outputs_by_code["write_questions"]] == [("digest_rejection", "Question")]
+            assert [(item.digest, item.concept) for item in outputs_by_code["write_rejection"]] == [("digest_rejection", "Rejection")]
+            aggregate_edges = [edge for edge in spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+            assert [(edge.source_stuff_digest, edge.target_stuff_digest) for edge in aggregate_edges] == [("digest_question_0", "digest_rejection")]
 
     def test_usage_is_the_one_intentional_divergence(self) -> None:
         """The two builders stay structurally equivalent, and diverge on `usage` on purpose.

@@ -3152,7 +3152,7 @@ rationale = "Query accessor keyed by the node it inspects; single operand."
 param = "digest"
 rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
-["pipelex/graph/graph_analysis.py::GraphAnalysis.get_producer"]
+["pipelex/graph/graph_analysis.py::GraphAnalysis.get_producers"]
 param = "digest"
 rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
@@ -6995,6 +6995,10 @@ rationale = "Dispatch handler: handles the event; single operand."
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_batch_item"]
 param = "event"
 rationale = "Dispatch handler: handles the event; single operand."
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_condition_output_merge"]
+param = "event"
+rationale = "An event handler of the assembler's pass one, called with the one event it folds in, like its sibling handlers."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_controller_output"]
 param = "event"

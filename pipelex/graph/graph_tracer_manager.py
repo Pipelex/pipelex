@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from pipelex import log
+from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
@@ -506,3 +507,20 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             branch_stuff_codes=branch_stuff_codes,
             parallel_controller_node_id=parallel_controller_node_id,
         )
+
+    def register_condition_output_merge(
+        self,
+        *,
+        lookup_key: str,
+        merge: ConditionOutputMerge,
+    ) -> None:
+        """Register that a dry-run condition's outcomes all produce the condition's output stuff.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            merge: The condition node, its output digest and the outcome digests merged onto it.
+        """
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+        tracer.register_condition_output_merge(merge=merge)

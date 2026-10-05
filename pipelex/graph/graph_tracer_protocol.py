@@ -3,6 +3,7 @@ from typing import Any, Protocol
 
 from typing_extensions import override
 
+from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.trace_context import TraceContext
@@ -260,6 +261,21 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def register_condition_output_merge(
+        self,
+        *,
+        merge: ConditionOutputMerge,
+    ) -> None:
+        """Register that a dry-run condition's outcomes all produce the condition's output stuff.
+
+        The merge is applied once the graph is built: every merged digest moves onto the shared
+        digest, so the condition's result is one stuff with a producer per outcome.
+
+        Args:
+            merge: The condition node, its output digest and the outcome digests merged onto it.
+        """
+        ...
+
     def register_execution_data(
         self,
         *,
@@ -424,5 +440,13 @@ class GraphTracerNoOp(GraphTracerProtocol):
         combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,
+    ) -> None:
+        pass
+
+    @override
+    def register_condition_output_merge(
+        self,
+        *,
+        merge: ConditionOutputMerge,
     ) -> None:
         pass
