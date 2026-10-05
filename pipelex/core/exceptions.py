@@ -74,8 +74,12 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # Set beside ``redundant_input_name`` only when deleting that key would change its root's contract: the marker
     # the key declares, as MTHDS writes it after the concept (``!``, ``[]``, or the empty string for a plain single
     # value). As the last declaration under its root, the key set the root's presence and multiplicity, so the
-    # planner offers the deletion as unsafe and names the marker. Unset, the deletion is safe.
+    # planner offers the deletion as unsafe. Unset, the deletion is safe.
     dropped_input_marker: str | None = None
+
+    # Set together with ``dropped_input_marker``: the marker the root declares, written the same way. The planner's
+    # warning compares the two markers' multiplicity and presence apart, and names only the part that differs.
+    root_input_marker: str | None = None
 
 
 class PipesAndConceptValidationErrorData(BaseModel):

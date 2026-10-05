@@ -1025,6 +1025,6 @@ class TestFixConvergenceLoop:
         assert remaining.suggested_fix is not None
         assert remaining.suggested_fix.fix_code == "delete-redundant-dotted-input"
         assert not remaining.suggested_fix.safety.is_safe
-        assert "move `!` onto 'draft' if the root must carry it" in remaining.suggested_fix.description
+        assert "replace `?` with `!` on 'draft' if the root must be forced" in remaining.suggested_fix.description
         assert remaining.message is not None
-        assert "Deleting 'draft.text' drops its marker `!`" in remaining.message
+        assert "Deleting 'draft.text' drops its forced presence (`!`), where 'draft' is optional (`?`)" in remaining.message

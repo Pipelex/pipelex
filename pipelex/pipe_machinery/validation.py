@@ -1,8 +1,20 @@
 import re
 from collections.abc import Mapping
+from typing import NamedTuple
 
-from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
+from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeVariableMultiplicityError
+from pipelex.core.pipes.variable_multiplicity import (
+    PresenceMarker,
+    VariableMultiplicity,
+    fixed_item_count,
+    format_concept_with_multiplicity,
+    is_multiple_multiplicity,
+    multiplicity_from_bracket_content,
+    parse_concept_with_multiplicity,
+    presence_from_symbol,
+    presence_symbol,
+)
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -11,6 +23,11 @@ from pipelex.validation_error_types import PipeValidationErrorType
 # `input_list_name`. The MTHDS JSON Schema generator writes this same pattern on both, so a structural
 # check refuses exactly what `validate_input_names` and `check_input_list_name` refuse.
 INPUT_NAME_PATTERN = r"^[a-z][a-z0-9_]*$"
+
+# The marker of an input declaration as `_input_marker` writes it after the concept: an optional multiplicity
+# suffix (`[]` or `[N]`), then an optional presence symbol (`?` or `!`). Group 1 is the bracket content, group 2
+# the presence symbol.
+_INPUT_MARKER_PATTERN = r"^(?:\[(\d*)\])?([?!])?$"
 
 
 def is_input_used_by_variables(input_name: str, *, variable_paths: set[str]) -> bool:
@@ -126,29 +143,159 @@ def _binding_step(*, dotted_path: str) -> str:
     return f'`{{ from = "{dotted_path}", result = "{plain_name}" }}`'
 
 
-def dropped_input_marker_warning(*, input_name: str, dropped_input_marker: str) -> str:
-    """The warning that deleting a redundant dotted input drops the marker it declares, and where to move that marker.
+class _InputMarkerChange(NamedTuple):
+    """What deleting a redundant dotted input would change in its root's contract, as the two markers it compares."""
 
-    Shared by the refusal's message and the fix planner's description, so a person reading either gets the same
-    warning. ``dropped_input_marker`` is written as MTHDS writes it after the concept, the empty string standing for
-    a plain single value, which carries no marker.
+    # The marker the key declares, which the deletion drops.
+    dropped_input_marker: str
+    # The marker of the declaration before the key, which takes over when the key is deleted: the root's own
+    # whenever the change is reported (see `_input_marker_change`).
+    root_input_marker: str
+
+
+class _InputMarkerParts(NamedTuple):
+    """An input marker split into the two parts the old fold let the last declaration under a root set."""
+
+    multiplicity: VariableMultiplicity | None
+    presence: PresenceMarker
+
+    @property
+    def multiplicity_suffix(self) -> str:
+        """The multiplicity part as MTHDS writes it: the empty string for a single value, else `[]` or `[N]`."""
+        return format_concept_with_multiplicity("", multiplicity=self.multiplicity)
+
+    @property
+    def presence_suffix(self) -> str:
+        """The presence part as MTHDS writes it: the empty string for plain, else `?` or `!`."""
+        return presence_symbol(presence=self.presence)
+
+
+def _parse_input_marker(*, input_marker: str) -> _InputMarkerParts:
+    """Split a marker written by `_input_marker` into its multiplicity and its presence.
+
+    Raises:
+        PipeVariableMultiplicityError: When the marker is not an optional multiplicity suffix followed by an
+            optional presence symbol.
     """
-    root_name = get_root_from_dotted_path(input_name)
-    if dropped_input_marker:
-        return (
-            f"Deleting '{input_name}' drops its marker `{dropped_input_marker}`, which '{root_name}' does not carry: "
-            f"move `{dropped_input_marker}` onto '{root_name}' if the root must carry it"
-        )
-    return (
-        f"Deleting '{input_name}' drops its plain single form, written with no marker, where '{root_name}' carries one: "
-        f"declare '{root_name}' without a marker if the root must be a plain single value"
+    marker_match = re.fullmatch(_INPUT_MARKER_PATTERN, input_marker)
+    if marker_match is None:
+        msg = f"Invalid input marker '{input_marker}': expected an optional multiplicity suffix (`[]` or `[N]`), then an optional `?` or `!`."
+        raise PipeVariableMultiplicityError(msg)
+    return _InputMarkerParts(
+        multiplicity=multiplicity_from_bracket_content(bracket_content=marker_match.group(1)),
+        presence=presence_from_symbol(symbol=marker_match.group(2)),
     )
 
 
-def _dotted_input_message(*, input_name: str, is_root_declared: bool, dropped_input_marker: str | None = None) -> str:
+def _with_symbol(*, phrase: str, symbol: str) -> str:
+    """A phrase followed by the symbol MTHDS writes for it, in backticks, unless the symbol is empty."""
+    if symbol:
+        return f"{phrase} (`{symbol}`)"
+    return phrase
+
+
+def _multiplicity_state(*, multiplicity: VariableMultiplicity | None) -> str:
+    """What a multiplicity makes a declaration, without its suffix: a single value, a list, or a list of N."""
+    if not is_multiple_multiplicity(multiplicity=multiplicity):
+        return "a single value"
+    item_count = fixed_item_count(multiplicity=multiplicity)
+    if item_count is None:
+        return "a list"
+    return f"a list of {item_count}"
+
+
+def _multiplicity_form(*, multiplicity: VariableMultiplicity | None) -> str:
+    """The name of a multiplicity as a form a key drops, without its suffix."""
+    if not is_multiple_multiplicity(multiplicity=multiplicity):
+        return "single-value form"
+    if fixed_item_count(multiplicity=multiplicity) is None:
+        return "list form"
+    return "fixed-count form"
+
+
+def _presence_name(*, presence: PresenceMarker) -> str:
+    """The name of a presence marker, as the docs on optionality give it."""
+    match presence:
+        case PresenceMarker.PLAIN:
+            return "plain"
+        case PresenceMarker.OPTIONAL:
+            return "optional"
+        case PresenceMarker.FORCE:
+            return "forced"
+
+
+def _marker_edit(*, root_name: str, root_part: str, key_part: str) -> str:
+    """The edit that makes the root carry the key's part where it carries its own, each written as MTHDS writes it."""
+    if not root_part:
+        return f"add `{key_part}` to '{root_name}'"
+    if not key_part:
+        return f"remove `{root_part}` from '{root_name}'"
+    return f"replace `{root_part}` with `{key_part}` on '{root_name}'"
+
+
+def dropped_input_marker_warning(*, input_name: str, dropped_input_marker: str, root_input_marker: str) -> str:
+    """The warning that deleting a redundant dotted input drops part of the marker it declares, and how to settle it on the root.
+
+    Shared by the refusal's message and the fix planner's description, so a person reading either gets the same
+    warning. Both markers are written as MTHDS writes them after the concept, the empty string standing for a plain
+    single value: ``dropped_input_marker`` is the key's, and ``root_input_marker`` its root's. Their multiplicity and
+    their presence are compared apart, and the warning names, and asks to change on the root, only the part that
+    differs, or both when both do, so it never asks to add to the root a part the root already carries.
+
+    Raises:
+        PipelexUnexpectedError: When the two markers are equal, since deleting the key then drops nothing and no
+            raise site reports it.
+    """
+    root_name = get_root_from_dotted_path(input_name)
+    key_parts = _parse_input_marker(input_marker=dropped_input_marker)
+    root_parts = _parse_input_marker(input_marker=root_input_marker)
+    is_multiplicity_dropped = key_parts.multiplicity_suffix != root_parts.multiplicity_suffix
+    is_presence_dropped = key_parts.presence != root_parts.presence
+
+    dropped_multiplicity = "its " + _with_symbol(phrase=_multiplicity_form(multiplicity=key_parts.multiplicity), symbol=key_parts.multiplicity_suffix)
+    root_multiplicity = _with_symbol(phrase=_multiplicity_state(multiplicity=root_parts.multiplicity), symbol=root_parts.multiplicity_suffix)
+    wanted_multiplicity = f"must be {_multiplicity_state(multiplicity=key_parts.multiplicity)}"
+    dropped_presence = "its " + _with_symbol(phrase=f"{_presence_name(presence=key_parts.presence)} presence", symbol=key_parts.presence_suffix)
+    root_presence = _with_symbol(phrase=_presence_name(presence=root_parts.presence), symbol=root_parts.presence_suffix)
+    wanted_presence: str
+    if key_parts.presence.is_plain:
+        wanted_presence = f"must not be {_presence_name(presence=root_parts.presence)}"
+    else:
+        wanted_presence = f"must be {_presence_name(presence=key_parts.presence)}"
+
+    dropped: str
+    held: str
+    edit: str
+    wanted: str
+    match (is_multiplicity_dropped, is_presence_dropped):
+        case (True, True):
+            dropped = f"{dropped_multiplicity} and {dropped_presence}"
+            held = f"{root_multiplicity} and {root_presence}"
+            edit = _marker_edit(root_name=root_name, root_part=root_input_marker, key_part=dropped_input_marker)
+            wanted = f"{wanted_multiplicity} and {wanted_presence}"
+        case (True, False):
+            dropped = dropped_multiplicity
+            held = root_multiplicity
+            edit = _marker_edit(root_name=root_name, root_part=root_parts.multiplicity_suffix, key_part=key_parts.multiplicity_suffix)
+            wanted = wanted_multiplicity
+        case (False, True):
+            dropped = dropped_presence
+            held = root_presence
+            edit = _marker_edit(root_name=root_name, root_part=root_parts.presence_suffix, key_part=key_parts.presence_suffix)
+            wanted = wanted_presence
+        case (False, False):
+            msg = (
+                f"No marker to warn of for '{input_name}': it declares the marker `{dropped_input_marker}` its root '{root_name}' declares, "
+                "so deleting it drops nothing."
+            )
+            raise PipelexUnexpectedError(msg)
+    return f"Deleting '{input_name}' drops {dropped}, where '{root_name}' is {held}: {edit} if the root {wanted}"
+
+
+def _dotted_input_message(*, input_name: str, is_root_declared: bool, marker_change: _InputMarkerChange | None = None) -> str:
     """The refusal of a dotted input name, naming both remedies: read the field through the root, or bind it.
 
-    When the root is declared and deleting the key would drop the marker it declares, the message warns of it
+    When the root is declared and deleting the key would change the root's contract, the message warns of it
     as the fix does, so a person reading the message does not delete the key blind.
     """
     root_name = get_root_from_dotted_path(input_name)
@@ -156,8 +303,13 @@ def _dotted_input_message(*, input_name: str, is_root_declared: bool, dropped_in
     binding_remedy = f"have the calling sequence bind the field to a plain name with a binding step ({_binding_step(dotted_path=input_name)})"
     if is_root_declared:
         marker_warning = ""
-        if dropped_input_marker is not None:
-            marker_warning = f" {dropped_input_marker_warning(input_name=input_name, dropped_input_marker=dropped_input_marker)}."
+        if marker_change is not None:
+            warning = dropped_input_marker_warning(
+                input_name=input_name,
+                dropped_input_marker=marker_change.dropped_input_marker,
+                root_input_marker=marker_change.root_input_marker,
+            )
+            marker_warning = f" {warning}."
         return (
             f"{preamble} '{root_name}' is already declared, so delete this key and read the field through '{root_name}' in the template "
             f"(`${input_name}`).{marker_warning} To hand the field to this pipe under a name of its own instead, {binding_remedy} and declare "
@@ -179,15 +331,16 @@ def _input_marker(*, input_spec: str) -> str:
     return format_concept_with_multiplicity("", multiplicity=parsed_spec.multiplicity, presence=parsed_spec.presence)
 
 
-def _dropped_input_marker(*, dotted_name: str, input_specs: Mapping[str, str]) -> str | None:
-    """The marker deleting a redundant dotted input would drop from its root's contract, or ``None`` when deleting it keeps that contract.
+def _input_marker_change(*, dotted_name: str, input_specs: Mapping[str, str]) -> _InputMarkerChange | None:
+    """The markers deleting a redundant dotted input would trade on its root's contract, or ``None`` when deleting it keeps that contract.
 
     Before dotted names were refused, every declaration under a root, the root's own and each well-formed dotted
     key's, was folded onto the root in declaration order, so the last one set the root's presence marker and
     multiplicity. Deleting a key keeps that contract unless the key is the last declaration under its root and
-    carries another marker than the declaration before it, which would take over. The key's own marker is then
-    returned, for the fix and the message to name. Concepts are never compared: a field's concept differs from its
-    root's by nature, and typing the input by its root's whole concept is what refusing the dotted name is for.
+    carries another marker than the declaration before it, which would take over. The key's own marker and that
+    declaration's are then returned, for the fix and the message to name the part that differs. Concepts are never
+    compared: a field's concept differs from its root's by nature, and typing the input by its root's whole concept
+    is what refusing the dotted name is for.
 
     When this is reported, the declaration before the key is the root itself, since a key followed by another under
     the same root is always safe to delete and is reported first.
@@ -201,9 +354,10 @@ def _dropped_input_marker(*, dotted_name: str, input_specs: Mapping[str, str]) -
     if names_under_root[-1] != dotted_name:
         return None
     dotted_marker = _input_marker(input_spec=input_specs[dotted_name])
-    if _input_marker(input_spec=input_specs[names_under_root[-2]]) == dotted_marker:
+    previous_marker = _input_marker(input_spec=input_specs[names_under_root[-2]])
+    if previous_marker == dotted_marker:
         return None
-    return dotted_marker
+    return _InputMarkerChange(dropped_input_marker=dotted_marker, root_input_marker=previous_marker)
 
 
 def validate_input_names(*, input_specs: Mapping[str, str]) -> None:
@@ -221,8 +375,9 @@ def validate_input_names(*, input_specs: Mapping[str, str]) -> None:
 
     Raises:
         PipeValidationError: ``INVALID_INPUT_NAME`` naming the input, with ``redundant_input_name`` set
-            when the name is dotted and its root is declared beside it, and ``dropped_input_marker`` set
-            besides when deleting it would drop the marker it declares from the root's contract.
+            when the name is dotted and its root is declared beside it, and ``dropped_input_marker`` and
+            ``root_input_marker`` set besides when deleting it would change the root's contract: the marker
+            the key declares, and the one its root declares.
     """
     invalid_names = [input_name for input_name in input_specs if not is_valid_input_name(input_name)]
     if not invalid_names:
@@ -233,16 +388,18 @@ def validate_input_names(*, input_specs: Mapping[str, str]) -> None:
         if _is_dotted_field_path(name=invalid_name) and get_root_from_dotted_path(invalid_name) in input_specs
     ]
     if redundant_names:
-        dropped_markers = {
-            redundant_name: _dropped_input_marker(dotted_name=redundant_name, input_specs=input_specs) for redundant_name in redundant_names
+        marker_changes = {
+            redundant_name: _input_marker_change(dotted_name=redundant_name, input_specs=input_specs) for redundant_name in redundant_names
         }
-        reported_name = next((redundant_name for redundant_name in redundant_names if dropped_markers[redundant_name] is None), redundant_names[0])
+        reported_name = next((redundant_name for redundant_name in redundant_names if marker_changes[redundant_name] is None), redundant_names[0])
+        marker_change = marker_changes[reported_name]
         raise PipeValidationError(
-            message=_dotted_input_message(input_name=reported_name, is_root_declared=True, dropped_input_marker=dropped_markers[reported_name]),
+            message=_dotted_input_message(input_name=reported_name, is_root_declared=True, marker_change=marker_change),
             error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
             variable_names=[reported_name],
             redundant_input_name=reported_name,
-            dropped_input_marker=dropped_markers[reported_name],
+            dropped_input_marker=marker_change.dropped_input_marker if marker_change is not None else None,
+            root_input_marker=marker_change.root_input_marker if marker_change is not None else None,
         )
     first_invalid_name = invalid_names[0]
     if _is_dotted_field_path(name=first_invalid_name):

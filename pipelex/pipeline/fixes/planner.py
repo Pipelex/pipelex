@@ -198,11 +198,14 @@ def _plan_delete_redundant_dotted_input(*, error_data: PipelexBundleBlueprintVal
     The enrichment is set only when the same table declares the dotted name's root, which already
     supplies every field a template reads through it. The fix is ``SAFE`` when deleting the key also
     keeps the root's presence marker and multiplicity as the table's last declaration under the root set
-    them. When it would not, ``dropped_input_marker`` names the marker the key declares, and the fix is
-    ``UNSAFE``: deleting the key would change what a run requires, so ``pipelex fix bundle`` never
-    applies it, and its description says to move the marker onto the root if the root must carry it. A
-    lone dotted name, whose root's concept nothing states, and a malformed name carry no enrichment and
-    are suppressed here structurally; their message names the remedies for the author.
+    them. When it would not, ``dropped_input_marker`` and ``root_input_marker`` carry the marker the key
+    declares and the one its root declares, and the fix is ``UNSAFE``: deleting the key would change what
+    a run requires, so ``pipelex fix bundle`` never applies it, and its description names the part that
+    differs, the multiplicity, the presence or both, and the edit that carries it onto the root. The two
+    markers are set together; a dropped marker without its root's is an incomplete enrichment and yields
+    no fix, never a ``SAFE`` one. A lone dotted name, whose root's concept nothing states, and a malformed
+    name carry no enrichment and are suppressed here structurally; their message names the remedies for
+    the author.
     """
     if error_data.redundant_input_name is None or error_data.pipe_code is None:
         return None
@@ -212,8 +215,12 @@ def _plan_delete_redundant_dotted_input(*, error_data: PipelexBundleBlueprintVal
     )
     safety = FixSafety.SAFE
     if error_data.dropped_input_marker is not None:
+        if error_data.root_input_marker is None:
+            return None
         marker_warning = dropped_input_marker_warning(
-            input_name=error_data.redundant_input_name, dropped_input_marker=error_data.dropped_input_marker
+            input_name=error_data.redundant_input_name,
+            dropped_input_marker=error_data.dropped_input_marker,
+            root_input_marker=error_data.root_input_marker,
         )
         description = f"{description}. {marker_warning}"
         safety = FixSafety.UNSAFE

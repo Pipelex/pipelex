@@ -55,6 +55,7 @@ def _invalid_input_name_error_data(
     redundant_input_name: str | None,
     pipe_code: str | None = "describe_page",
     dropped_input_marker: str | None = None,
+    root_input_marker: str | None = None,
 ) -> PipelexBundleBlueprintValidationErrorData:
     return PipelexBundleBlueprintValidationErrorData(
         error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
@@ -64,6 +65,7 @@ def _invalid_input_name_error_data(
         variable_names=[variable_name],
         redundant_input_name=redundant_input_name,
         dropped_input_marker=dropped_input_marker,
+        root_input_marker=root_input_marker,
         message=f"Input '{variable_name}' is not a plain input name.",
     )
 
@@ -199,27 +201,73 @@ class TestBlueprintFixPlanner:
         error_data = _invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name="page.page_view", pipe_code=None)
         assert plan_fix_for_blueprint_validation_error(error_data) is None
 
-    def test_redundant_dotted_input_dropping_a_marker_yields_an_unsafe_delete_naming_it(self) -> None:
-        """A deletion that would drop the key's marker from the root's contract is offered, but as UNSAFE, naming the marker and where to move it."""
+    @pytest.mark.parametrize(
+        ("dropped_input_marker", "root_input_marker", "expected_warning"),
+        [
+            pytest.param(
+                "[]",
+                "[]?",
+                "Deleting 'data.text' drops its plain presence, where 'data' is optional (`?`): "
+                "remove `?` from 'data' if the root must not be optional",
+                id="presence-only",
+            ),
+            pytest.param(
+                "[]",
+                "",
+                "Deleting 'data.text' drops its list form (`[]`), where 'data' is a single value: add `[]` to 'data' if the root must be a list",
+                id="multiplicity-only",
+            ),
+            pytest.param(
+                "[]!",
+                "?",
+                "Deleting 'data.text' drops its list form (`[]`) and its forced presence (`!`), where 'data' is a single value and optional (`?`): "
+                "replace `?` with `[]!` on 'data' if the root must be a list and must be forced",
+                id="multiplicity-and-presence",
+            ),
+            pytest.param(
+                "!",
+                "?",
+                "Deleting 'data.text' drops its forced presence (`!`), where 'data' is optional (`?`): "
+                "replace `?` with `!` on 'data' if the root must be forced",
+                id="forced-key-under-an-optional-root",
+            ),
+            pytest.param(
+                "",
+                "?",
+                "Deleting 'data.text' drops its plain presence, where 'data' is optional (`?`): "
+                "remove `?` from 'data' if the root must not be optional",
+                id="plain-key-under-an-optional-root",
+            ),
+        ],
+    )
+    def test_redundant_dotted_input_dropping_a_marker_yields_an_unsafe_delete_naming_only_what_differs(
+        self,
+        dropped_input_marker: str,
+        root_input_marker: str,
+        expected_warning: str,
+    ) -> None:
+        """A deletion that would change the root's contract is offered as UNSAFE, naming only what differs and how to settle it on the root."""
         fix = plan_fix_for_blueprint_validation_error(
-            _invalid_input_name_error_data(variable_name="data.text", redundant_input_name="data.text", dropped_input_marker="!")
+            _invalid_input_name_error_data(
+                variable_name="data.text",
+                redundant_input_name="data.text",
+                dropped_input_marker=dropped_input_marker,
+                root_input_marker=root_input_marker,
+            )
         )
         assert fix is not None
         assert fix.fix_code == "delete-redundant-dotted-input"
         assert fix.safety == FixSafety.UNSAFE
         assert fix.ops == [DeleteKeyOp(table_path=["pipe", "describe_page", "inputs"], key="data.text")]
-        assert "drops its marker `!`" in fix.description
-        assert "move `!` onto 'data' if the root must carry it" in fix.description
-
-    def test_redundant_dotted_input_dropping_its_plain_form_yields_an_unsafe_delete(self) -> None:
-        """A key with no marker under a root that carries one is the same contract change seen from the other side: UNSAFE, naming the plain form."""
-        fix = plan_fix_for_blueprint_validation_error(
-            _invalid_input_name_error_data(variable_name="data.text", redundant_input_name="data.text", dropped_input_marker="")
+        assert fix.description == (
+            "Delete the dotted input 'data.text' of pipe 'describe_page': its root is declared beside it, and a template reads the field "
+            f"through the root. {expected_warning}"
         )
-        assert fix is not None
-        assert fix.safety == FixSafety.UNSAFE
-        assert "drops its plain single form" in fix.description
-        assert "declare 'data' without a marker if the root must be a plain single value" in fix.description
+
+    def test_redundant_dotted_input_with_a_dropped_marker_but_no_root_marker_yields_none(self) -> None:
+        """The two markers are set together; without the root's, the warning cannot say what differs, so no fix is offered rather than a SAFE one."""
+        error_data = _invalid_input_name_error_data(variable_name="data.text", redundant_input_name="data.text", dropped_input_marker="!")
+        assert plan_fix_for_blueprint_validation_error(error_data) is None
 
     @pytest.mark.parametrize(
         ("input_specs", "expected_safety", "deleted_key", "description_fragment"),
@@ -228,7 +276,7 @@ class TestBlueprintFixPlanner:
                 [("data", "Text?"), ("data.text", "Text!")],
                 FixSafety.UNSAFE,
                 "data.text",
-                "drops its marker `!`, which 'data' does not carry: move `!` onto 'data' if the root must carry it",
+                "drops its forced presence (`!`), where 'data' is optional (`?`): replace `?` with `!` on 'data' if the root must be forced",
                 id="key-forcing-an-optional-root-declared-after-it",
             ),
             pytest.param(
@@ -249,7 +297,7 @@ class TestBlueprintFixPlanner:
                 [("items", "Item"), ("items.x", "Text[]")],
                 FixSafety.UNSAFE,
                 "items.x",
-                "drops its marker `[]`, which 'items' does not carry: move `[]` onto 'items' if the root must carry it",
+                "drops its list form (`[]`), where 'items' is a single value: add `[]` to 'items' if the root must be a list",
                 id="list-key-declared-after-its-single-root",
             ),
             pytest.param(
@@ -263,8 +311,23 @@ class TestBlueprintFixPlanner:
                 [("data", "Text?"), ("data.text", "Text")],
                 FixSafety.UNSAFE,
                 "data.text",
-                "drops its plain single form",
+                "drops its plain presence, where 'data' is optional (`?`): remove `?` from 'data' if the root must not be optional",
                 id="plain-key-declared-after-its-optional-root",
+            ),
+            pytest.param(
+                [("data", "Text"), ("data.text", "Text[]")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its list form (`[]`), where 'data' is a single value: add `[]` to 'data' if the root must be a list",
+                id="multiplicity-only-list-key-declared-after-its-single-root",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text[]")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its list form (`[]`) and its plain presence, where 'data' is a single value and optional (`?`): "
+                "replace `?` with `[]` on 'data' if the root must be a list and must not be optional",
+                id="list-key-declared-after-its-optional-single-root",
             ),
             pytest.param(
                 [("page", "Page"), ("page.page_view", "Image")],
