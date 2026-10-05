@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import field_validator
 from typing_extensions import override
@@ -26,13 +26,17 @@ class PipeParallelBlueprint(PipeBlueprint):
 
     @field_validator("branches", mode="before")
     @classmethod
-    def refuse_binding_branches(cls, branches: list[Any]) -> list[Any]:
+    def refuse_binding_branches(cls, branches: Any) -> Any:
         """Refuse a branch written as a binding step: a branch is always a pipe step.
 
         A binding orders a value before the steps that read it, and branches run concurrently, so a binding
         among them would only be a binding before the parallel, written in the wrong place.
         """
-        for branch_index, branch in enumerate(branches):
+        if not isinstance(branches, list):
+            # Not a list at all: pydantic's own `list_type` error names the field and what it holds.
+            return branches
+        branch_list = cast("list[Any]", branches)
+        for branch_index, branch in enumerate(branch_list):
             raw_branch = raw_step_mapping(raw_step=branch)
             if raw_branch is not None and is_binding_step_dict(raw_step=raw_branch):
                 from_path = raw_branch.get("from", raw_branch.get("from_path"))
@@ -42,7 +46,7 @@ class PipeParallelBlueprint(PipeBlueprint):
                     f'(`{{ from = "{from_path}", result = "<name>" }}`), and have the branch read that name.'
                 )
                 raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID)
-        return branches
+        return branch_list
 
     @override
     def validate_output(self):

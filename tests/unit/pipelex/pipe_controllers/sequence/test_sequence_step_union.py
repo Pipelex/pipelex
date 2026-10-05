@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -125,3 +126,32 @@ branches = [
 
     def test_a_parallel_branch_keeps_the_pipe_step_shape(self) -> None:
         assert PipeParallelBlueprint.model_fields["branches"].annotation == list[SubPipeBlueprint]
+
+    @pytest.mark.parametrize(
+        "steps",
+        [
+            pytest.param(5, id="a-number"),
+            pytest.param(None, id="null"),
+            pytest.param("write_receipt", id="a-string"),
+        ],
+    )
+    def test_steps_that_are_not_a_list_are_refused_as_a_list_type(self, steps: object) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            PipeSequenceBlueprint.model_validate({"description": "Acknowledges an invoice", "output": "Text", "steps": steps})
+
+        assert [error["type"] for error in exc_info.value.errors()] == ["list_type"]
+        assert exc_info.value.errors()[0]["loc"] == ("steps",)
+
+    @pytest.mark.parametrize(
+        "branches",
+        [
+            pytest.param(None, id="null"),
+            pytest.param(5, id="a-number"),
+        ],
+    )
+    def test_branches_that_are_not_a_list_are_refused_as_a_list_type(self, branches: object) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            PipeParallelBlueprint.model_validate({"description": "Writes receipts in parallel", "output": "Text", "branches": branches})
+
+        assert [error["type"] for error in exc_info.value.errors()] == ["list_type"]
+        assert exc_info.value.errors()[0]["loc"] == ("branches",)

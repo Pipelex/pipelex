@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import Discriminator, Tag, field_validator
 from typing_extensions import override
@@ -61,15 +61,19 @@ class PipeSequenceBlueprint(PipeBlueprint):
 
     @field_validator("steps", mode="before")
     @classmethod
-    def validate_steps(cls, steps: list[Any]) -> list[Any]:
-        if not steps:
+    def validate_steps(cls, steps: Any) -> Any:
+        if not isinstance(steps, list):
+            # Not a list at all: pydantic's own `list_type` error names the field and what it holds.
+            return steps
+        step_list = cast("list[Any]", steps)
+        if not step_list:
             msg = "PipeSequence must have at least 1 step"
             raise ValueError(msg)
-        for step_index, step in enumerate(steps):
+        for step_index, step in enumerate(step_list):
             raw_step = raw_step_mapping(raw_step=step)
             if raw_step is not None:
                 check_binding_step_shape(raw_step=raw_step, step_label=f"Step {step_index + 1} of the sequence")
-        return steps
+        return step_list
 
     @override
     def validate_inputs(self):
