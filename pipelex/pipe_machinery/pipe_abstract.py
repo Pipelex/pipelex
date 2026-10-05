@@ -26,6 +26,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.pipe_machinery.memory_writes import MemoryWrite
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
@@ -70,7 +71,8 @@ class CompanionSlot(NamedTuple):
     """
 
     slot_name: str
-    concept: Concept
+    # The concept of the empty list a plural slot resolves to; `None` for a slot whose spec is unknown, which is never plural.
+    concept: Concept | None
     is_plural: bool
     producing_pipe_code: str
 
@@ -621,12 +623,13 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
-    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, StuffSpec | None]:  # ruff: ignore[unused-method-argument] (the overrides recurse)
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, MemoryWrite]:  # ruff: ignore[unused-method-argument] (the overrides recurse)
         """What the pipe stores in the working memory it runs on, besides its own result, which its caller names.
 
-        Each name maps to the spec of the value it holds once the pipe returns, `None` where that cannot be typed. An
-        operator stores only its result, so it stores nothing more. A controller that runs its steps or its outcome on
-        its caller's memory, rather than on copies, overrides this, so its caller's typed flow sees what it replaced.
+        Each name maps to what it holds once the pipe returns: its spec, why it may hold an absence, and whether every run
+        stores it (`MemoryWrite`). An operator stores only its result, so it stores nothing more. A controller that runs its
+        steps or its outcome on its caller's memory, rather than on copies, overrides this, and its calling sequence's
+        typed flow, needed inputs and absence-taint walk all read what it stores from here.
 
         Args:
             visited_pipes: The `visit_key` of each pipe currently being processed, to prevent infinite recursion.
@@ -874,9 +877,26 @@ class PipeAbstract(ABC, BaseModel):
 
     def lifted_companion_slots(self) -> list[CompanionSlot]:
         """Extra slots this pipe would have written besides its main output, to resolve when it
-        is lifted. Default: none; an `add_each_output` PipeParallel reports its branch slots.
+        is lifted: every name its `memory_writes` always stores, so a name its caller's analyses
+        count as stored is never left holding neither a value nor an absence. A name only some
+        runs store is left as the caller had it, which those analyses already allow for. An
+        operator stores nothing more; an `add_each_output` PipeParallel reports its branch slots
+        with the branch pipe that produces each.
         """
-        return []
+        companion_slots: list[CompanionSlot] = []
+        for slot_name, memory_write in self.memory_writes().items():
+            if not memory_write.is_always_written:
+                continue
+            stuff_spec = memory_write.stuff_spec
+            companion_slots.append(
+                CompanionSlot(
+                    slot_name=slot_name,
+                    concept=stuff_spec.concept if stuff_spec is not None else None,
+                    is_plural=stuff_spec is not None and stuff_spec.is_multiple(),
+                    producing_pipe_code=self.code,
+                )
+            )
+        return companion_slots
 
     @classmethod
     def _make_skip_reason(cls, *, liftable: list[AbsentInput]) -> str:
@@ -939,7 +959,7 @@ class PipeAbstract(ABC, BaseModel):
                 producing_pipe=companion_slot.producing_pipe_code,
                 upstream=lifted_input.absence_record,
             )
-            if companion_slot.is_plural:
+            if companion_slot.is_plural and companion_slot.concept is not None:
                 empty_companion_stuff = Stuff(
                     concept=companion_slot.concept,
                     content=ListContent[StuffContent](items=[]),

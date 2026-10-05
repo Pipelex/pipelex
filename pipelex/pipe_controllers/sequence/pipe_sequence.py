@@ -21,14 +21,13 @@ from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
     LiftableStepInfo,
     SequenceTaintAnalysis,
-    SlotTaint,
+    TaintTriggerScan,
     is_plural_step_result,
     scan_taint_triggers,
 )
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation
 from pipelex.pipe_controllers.binding.binding_step import BindingOutcome, BindingStep
 from pipelex.pipe_controllers.binding.exceptions import BindingStepRunError
-from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
@@ -38,8 +37,10 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
     SequenceTypedFlow,
     build_sequence_typed_flow,
     derive_binding_spec,
+    step_memory_writes,
 )
 from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, taint_after_write
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -99,8 +100,11 @@ class PipeSequence(PipeController):
         )
 
     @override
-    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, StuffSpec | None]:
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, MemoryWrite]:
         """What the steps store, as the flow stands after the last one: a sequence runs its steps on its caller's memory.
+
+        Each name the steps store carries the spec the typed flow gives it, the absence the taint walk leaves on it, and
+        whether some step stores it on every run.
 
         Raises:
             PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked, as validating the
@@ -111,28 +115,115 @@ class PipeSequence(PipeController):
         if self.visit_key in visited_pipes:
             return {}
         typed_flow = self._build_typed_flow(visited_pipes=visited_pipes)
-        return {name: slot.stuff_spec for name, slot in typed_flow.written_slots.items()}
+        taint_analysis = self._analyze_taint(visited_pipes=visited_pipes | {self.visit_key}, typed_flow=typed_flow)
+        return {
+            name: MemoryWrite(
+                stuff_spec=slot.stuff_spec,
+                absence=taint_analysis.final_slot_taints.get(name),
+                is_always_written=name in typed_flow.always_written_names,
+            )
+            for name, slot in typed_flow.written_slots.items()
+        }
 
-    def _binding_root_names(self) -> set[str]:
-        """The roots of the binding steps that no earlier step stores, which the sequence must hold as inputs."""
-        root_names: set[str] = set()
-        stored_names: set[str] = set()
-        for step in self.sequential_sub_pipes:
-            if isinstance(step, BindingStep) and step.root_name not in stored_names:
-                root_names.add(step.root_name)
-            if step.output_name:
-                stored_names.add(step.output_name)
-        return root_names
+    def _walk_needed_inputs(self, *, visited_pipes: set[str]) -> tuple[InputStuffSpecs, set[str]]:
+        """The inputs the steps need from the sequence's caller, and, among them, the roots of binding steps.
+
+        A name is needed when a step reads it before any earlier step stores it on every run: a step stores its result, and
+        what its pipe always stores besides (`step_memory_writes`). A name only some runs of an earlier step store, as a
+        condition's outcomes that do not all store it, is still needed, since a run may leave it as the caller had it.
+        """
+        visited_pipes_with_current = visited_pipes | {self.visit_key}
+        needed_inputs = InputStuffSpecsFactory.make_empty()
+        binding_root_needs: set[str] = set()
+        generated_outputs: set[str] = set()
+
+        for sequential_sub_pipe in self.sequential_sub_pipes:
+            if isinstance(sequential_sub_pipe, BindingStep):
+                # A binding reads its root plainly. A root no earlier step always stores is a needed input of the sequence,
+                # typed as the sequence declares it, which is the concept the binding's walk validates its path against. An
+                # undeclared root is needed as `Anything`, a flexible need, and refused as a missing input.
+                root_name = sequential_sub_pipe.root_name
+                if root_name not in generated_outputs:
+                    binding_root_needs.add(root_name)
+                    if root_name not in needed_inputs.root:
+                        declared_root_spec = self.inputs.root.get(root_name)
+                        if declared_root_spec is not None:
+                            needed_inputs.add_stuff_spec(
+                                variable_name=root_name,
+                                concept=declared_root_spec.concept,
+                                multiplicity=declared_root_spec.multiplicity,
+                                presence=declared_root_spec.presence,
+                            )
+                        else:
+                            needed_inputs.add_stuff_spec(
+                                variable_name=root_name, concept=get_native_concept(native_concept=NativeConceptCode.ANYTHING)
+                            )
+                generated_outputs.add(sequential_sub_pipe.output_name)
+                continue
+            # Skip cross-package pipe refs that aren't loaded yet (dependency not resolved)
+            if QualifiedRef.has_cross_package_prefix(sequential_sub_pipe.pipe_code):
+                sub_pipe = get_optional_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+                if sub_pipe is None:
+                    continue
+            else:
+                sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+            # Use the centralized recursion detection
+            sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
+
+            if sequential_sub_pipe.batch_params:
+                input_list_root = get_root_from_dotted_path(sequential_sub_pipe.batch_params.input_list_stuff_name)
+                if input_list_root not in generated_outputs:
+                    try:
+                        stuff_spec = sub_pipe_needed_inputs.get_required_stuff_spec(
+                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
+                        )
+                    except InputStuffSpecNotFoundError as exc:
+                        msg = (
+                            f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
+                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs.format_for_display()}"
+                        )
+                        raise PipeSequenceValueError(msg) from exc
+                    is_dotted_path = "." in sequential_sub_pipe.batch_params.input_list_stuff_name
+                    needed_inputs.add_stuff_spec(
+                        variable_name=input_list_root,
+                        concept=stuff_spec.concept,
+                        multiplicity=True if not is_dotted_path else None,
+                    )
+                    for input_name, stuff_spec in sub_pipe_needed_inputs.items:
+                        if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
+                            needed_inputs.add_stuff_spec(
+                                variable_name=input_name,
+                                concept=stuff_spec.concept,
+                                multiplicity=stuff_spec.multiplicity,
+                                presence=stuff_spec.presence,
+                            )
+            else:
+                for input_name, stuff_spec in sub_pipe_needed_inputs.items:
+                    if input_name not in generated_outputs:
+                        needed_inputs.add_stuff_spec(
+                            variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                        )
+
+            # What the step stores on every run, besides its result, and its result.
+            step_writes = step_memory_writes(step=sequential_sub_pipe, step_pipe=sub_pipe, visited_pipes=visited_pipes_with_current)
+            generated_outputs.update(written_name for written_name, memory_write in step_writes.items() if memory_write.is_always_written)
+            if sequential_sub_pipe.output_name:
+                generated_outputs.add(sequential_sub_pipe.output_name)
+
+        return needed_inputs, binding_root_needs
 
     @override
     def refuse_undeclared_needed_input(self, *, variable_name: str) -> None:
-        """Refuse a binding's root that the sequence neither declares nor stores, asking for the concept its path walks."""
+        """Refuse a binding's root that the sequence neither declares nor always stores, asking for the concept its path walks."""
+        _, binding_root_needs = self._walk_needed_inputs(visited_pipes=set())
+        if variable_name not in binding_root_needs:
+            return
         for step in self.sequential_sub_pipes:
-            if isinstance(step, BindingStep) and step.root_name == variable_name and variable_name in self._binding_root_names():
+            if isinstance(step, BindingStep) and step.root_name == variable_name:
                 msg = (
                     f"In pipe '{self.code}', the binding step {step.as_written} reads '{variable_name}', which is neither an input of the "
-                    f"sequence nor stored by an earlier step. Declare '{variable_name}' in the sequence's `inputs`, with the concept whose "
-                    f"structure holds the path '{step.from_path}'."
+                    f"sequence nor always stored by an earlier step. Declare '{variable_name}' in the sequence's `inputs`, with the concept "
+                    f"whose structure holds the path '{step.from_path}'."
                 )
                 raise PipeValidationError(
                     message=msg,
@@ -236,7 +327,8 @@ class PipeSequence(PipeController):
             typed_flow = self.build_typed_flow()
             binding_spec = typed_flow.binding_specs.get(len(self.sequential_sub_pipes) - 1)
             if binding_spec is None:
-                # A root the flow cannot type, from a pipe that does not resolve: assume it delivers.
+                # A root the flow cannot type: nothing says what the binding derives, so only its absence is checked.
+                self._refuse_escaping_absence(taint_analysis=self._analyze_taint(visited_pipes=None, typed_flow=typed_flow))
                 return
             last_step_concept = binding_spec.concept
             last_step_label = f"the binding step {last_step.as_written}"
@@ -330,8 +422,12 @@ class PipeSequence(PipeController):
                 expected_output_ref=expected_output_ref,
             )
 
-        # The absence-taint boundary check (D6): a maybe-absent slot ending the sequence must be
-        # matched by an optional (`?`) declared output, or the taint silently escapes the boundary.
+        self._refuse_escaping_absence(taint_analysis=taint_analysis)
+
+    def _refuse_escaping_absence(self, *, taint_analysis: SequenceTaintAnalysis) -> None:
+        """The absence-taint boundary check (D6): a maybe-absent slot ending the sequence must be matched by an optional
+        (`?`) declared output, or the taint silently escapes the boundary.
+        """
         if taint_analysis.output_taint is not None and not self.output.presence.is_optional:
             msg = (
                 f"PipeSequence '{self.code}' output '{self.output.concept.concept_ref}' may resolve absent at run time, "
@@ -356,7 +452,19 @@ class PipeSequence(PipeController):
         outputs; it propagates through lifted steps (plain input fed a tainted slot), terminates
         at `?` (absorb) and `!` (assert) inputs, and never touches plural slots (D4). A step that
         rewrites a tainted slot with a guaranteed value clears it — the static mirror of the
-        runtime value-supersedes-record invariant.
+        runtime value-supersedes-record invariant. What a step stores besides its result, a nested
+        controller's names (`step_memory_writes`), carries its own absence the same way.
+        """
+        return self._analyze_taint(visited_pipes=None, typed_flow=None)
+
+    def _analyze_taint(self, *, visited_pipes: set[str] | None, typed_flow: SequenceTypedFlow | None) -> SequenceTaintAnalysis:
+        """The taint walk, over a typed flow already built when `typed_flow` is given, whose per-step stores it then reads
+        instead of computing them again.
+
+        With `visited_pipes`, the walk runs inside the recursion guard of `memory_writes`, which reads only the absences it
+        leaves on the slots: a step is then scanned for its consumptions only while some slot may be absent, since with none
+        it lifts on nothing, and only the `!` lint reads what it consumes. That keeps a caller's needed inputs, which read
+        `memory_writes` for every nested controller, from walking each nested controller's needs a second time.
         """
         slot_taints: dict[str, SlotTaint] = {}
         for input_name, stuff_spec in self.inputs.root.items():
@@ -369,7 +477,9 @@ class PipeSequence(PipeController):
         liftable_steps: list[LiftableStepInfo] = []
         force_consumptions: list[ForceConsumptionInfo] = []
         last_step_taint: SlotTaint | None = None
-        typed_flow = self.build_typed_flow() if self.has_binding_step else None
+        if typed_flow is None and self.has_binding_step:
+            typed_flow = self._build_typed_flow(visited_pipes=visited_pipes or set())
+        writes_visited_pipes = visited_pipes or {self.visit_key}
 
         for step_index, sequential_sub_pipe in enumerate(self.sequential_sub_pipes):
             if isinstance(sequential_sub_pipe, BindingStep):
@@ -394,7 +504,10 @@ class PipeSequence(PipeController):
                 continue
 
             # How does this step consume the currently tainted slots?
-            trigger_scan = scan_taint_triggers(sub_pipe, slot_taints=slot_taints)
+            if visited_pipes is not None and not slot_taints:
+                trigger_scan = TaintTriggerScan(trigger_names=(), trigger_taint=None)
+            else:
+                trigger_scan = scan_taint_triggers(sub_pipe, slot_taints=slot_taints, visited_pipes=visited_pipes)
             for asserting_name in trigger_scan.asserting_force_names:
                 force_consumptions.append(
                     ForceConsumptionInfo(within_pipe_ref=self.pipe_ref, pipe_ref=sub_pipe.pipe_ref, variable_name=asserting_name, is_asserting=True)
@@ -441,37 +554,37 @@ class PipeSequence(PipeController):
                         origin_slot_name=output_slot_name or sub_pipe.code,
                     )
 
-            # An add_each_output parallel also writes each branch's result slot into this flow.
-            if isinstance(sub_pipe, PipeParallel) and sub_pipe.add_each_output:
+            # What the step stores besides its result: a nested sequence's steps, a condition's outcome, or an
+            # add_each_output parallel's branches write into this flow, each name with its own absence.
+            if typed_flow is not None and step_index in typed_flow.memory_writes_by_pipe_step:
+                step_writes = typed_flow.memory_writes_by_pipe_step[step_index]
+            else:
+                step_writes = step_memory_writes(step=sequential_sub_pipe, step_pipe=sub_pipe, visited_pipes=writes_visited_pipes)
+            for written_name, memory_write in step_writes.items():
                 if step_lifted and trigger_taint is not None:
-                    # The whole parallel lifts: companion (branch) slots resolve exactly like the
-                    # runtime `_make_lifted_output` does — singular slots go absent, plural slots
-                    # become guaranteed empty lists (D4).
-                    for companion_slot in sub_pipe.lifted_companion_slots():
-                        if companion_slot.is_plural:
-                            slot_taints.pop(companion_slot.slot_name, None)
-                        else:
-                            slot_taints[companion_slot.slot_name] = SlotTaint(
-                                source=trigger_taint.source,
-                                origin_slot_name=trigger_taint.origin_slot_name,
-                                chain=(
-                                    *trigger_taint.chain,
-                                    (
-                                        f"pipe '{sub_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent"
-                                        f" → branch slot '{companion_slot.slot_name}'"
-                                    ),
-                                ),
-                            )
+                    # The whole step lifts: what it always stores resolves exactly like the runtime
+                    # `_make_lifted_output` resolves its companion slots — a singular slot goes absent,
+                    # a plural slot becomes a guaranteed empty list (D4) — and a name only some runs
+                    # store is left as it was.
+                    if not memory_write.is_always_written:
+                        continue
+                    if memory_write.stuff_spec is not None and memory_write.stuff_spec.is_multiple():
+                        slot_taints.pop(written_name, None)
+                    else:
+                        slot_taints[written_name] = SlotTaint(
+                            source=trigger_taint.source,
+                            origin_slot_name=trigger_taint.origin_slot_name,
+                            chain=(
+                                *trigger_taint.chain,
+                                f"pipe '{sub_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent → slot '{written_name}'",
+                            ),
+                        )
+                    continue
+                written_taint = taint_after_write(prior_taint=slot_taints.get(written_name), memory_write=memory_write)
+                if written_taint is None:
+                    slot_taints.pop(written_name, None)
                 else:
-                    branch_taints = sub_pipe.analyze_branch_taint().branch_taints
-                    for parallel_sub_pipe in sub_pipe.parallel_sub_pipes:
-                        if not parallel_sub_pipe.output_name:
-                            continue
-                        branch_taint = branch_taints.get(parallel_sub_pipe.output_name)
-                        if branch_taint is None:
-                            slot_taints.pop(parallel_sub_pipe.output_name, None)
-                        else:
-                            slot_taints[parallel_sub_pipe.output_name] = branch_taint
+                    slot_taints[written_name] = written_taint
 
             if output_slot_name:
                 if step_output_taint is None:
@@ -484,6 +597,7 @@ class PipeSequence(PipeController):
             liftable_steps=tuple(liftable_steps),
             output_taint=last_step_taint,
             force_consumptions=tuple(force_consumptions),
+            final_slot_taints=slot_taints,
         )
 
     @staticmethod
@@ -496,9 +610,11 @@ class PipeSequence(PipeController):
         """The presence of a binding's result: tainted by its root's taint, or by a path that may find nothing.
 
         A list result is never tainted, since a lifted binding over a list binds an empty list and a path reaching
-        nothing on an item drops it. A root the flow cannot type is assumed to deliver, as an unresolved pipe is.
+        nothing on an item drops it. A root the flow cannot type has no derivation, so whether its path may find nothing,
+        or crosses a list, is unknown: the run records a skipped absence when the root is absent (`skip_untyped_root`), so
+        the root's own taint is kept, and its path is otherwise assumed to deliver, as an unresolved pipe is.
         """
-        if derivation is None or derivation.is_plural:
+        if derivation is not None and derivation.is_plural:
             return None
         if root_taint is not None:
             return SlotTaint(
@@ -512,7 +628,7 @@ class PipeSequence(PipeController):
                     ),
                 ),
             )
-        if derivation.may_find_nothing:
+        if derivation is not None and derivation.may_find_nothing:
             return SlotTaint(
                 source=f"binding step {binding_step.as_written}, whose path may find nothing at '{derivation.first_optional_path}'",
                 origin_slot_name=binding_step.output_name,
@@ -528,84 +644,7 @@ class PipeSequence(PipeController):
         if self.visit_key in visited_pipes:
             return InputStuffSpecsFactory.make_empty()
 
-        # Add this pipe to visited set for recursive calls
-        visited_pipes_with_current = visited_pipes | {self.visit_key}
-
-        needed_inputs = InputStuffSpecsFactory.make_empty()
-        generated_outputs: set[str] = set()
-
-        for sequential_sub_pipe in self.sequential_sub_pipes:
-            if isinstance(sequential_sub_pipe, BindingStep):
-                # A binding reads its root plainly. A root no earlier step stored is a needed input of the sequence, typed
-                # as the sequence declares it, which is the concept the binding's walk validates its path against. An
-                # undeclared root is needed as `Anything`, a flexible need, and refused as a missing input.
-                root_name = sequential_sub_pipe.root_name
-                if root_name not in generated_outputs and root_name not in needed_inputs.root:
-                    declared_root_spec = self.inputs.root.get(root_name)
-                    if declared_root_spec is not None:
-                        needed_inputs.add_stuff_spec(
-                            variable_name=root_name,
-                            concept=declared_root_spec.concept,
-                            multiplicity=declared_root_spec.multiplicity,
-                            presence=declared_root_spec.presence,
-                        )
-                    else:
-                        needed_inputs.add_stuff_spec(variable_name=root_name, concept=get_native_concept(native_concept=NativeConceptCode.ANYTHING))
-                generated_outputs.add(sequential_sub_pipe.output_name)
-                continue
-            # Skip cross-package pipe refs that aren't loaded yet (dependency not resolved)
-            if QualifiedRef.has_cross_package_prefix(sequential_sub_pipe.pipe_code):
-                sub_pipe = get_optional_pipe(pipe_code=sequential_sub_pipe.pipe_code)
-                if sub_pipe is None:
-                    continue
-            else:
-                sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
-            # Use the centralized recursion detection
-            sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
-
-            if isinstance(sub_pipe, PipeParallel) and sub_pipe.add_each_output:
-                for sub_parallel_pipe in sub_pipe.parallel_sub_pipes:
-                    if (sub_pipe.add_each_output and sub_parallel_pipe.output_name) or sub_parallel_pipe.output_name:
-                        generated_outputs.add(sub_parallel_pipe.output_name)
-
-            if sequential_sub_pipe.batch_params:
-                input_list_root = get_root_from_dotted_path(sequential_sub_pipe.batch_params.input_list_stuff_name)
-                if input_list_root not in generated_outputs:
-                    try:
-                        stuff_spec = sub_pipe_needed_inputs.get_required_stuff_spec(
-                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
-                        )
-                    except InputStuffSpecNotFoundError as exc:
-                        msg = (
-                            f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
-                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs.format_for_display()}"
-                        )
-                        raise PipeSequenceValueError(msg) from exc
-                    is_dotted_path = "." in sequential_sub_pipe.batch_params.input_list_stuff_name
-                    needed_inputs.add_stuff_spec(
-                        variable_name=input_list_root,
-                        concept=stuff_spec.concept,
-                        multiplicity=True if not is_dotted_path else None,
-                    )
-                    for input_name, stuff_spec in sub_pipe_needed_inputs.items:
-                        if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
-                            needed_inputs.add_stuff_spec(
-                                variable_name=input_name,
-                                concept=stuff_spec.concept,
-                                multiplicity=stuff_spec.multiplicity,
-                                presence=stuff_spec.presence,
-                            )
-            else:
-                for input_name, stuff_spec in sub_pipe_needed_inputs.items:
-                    if input_name not in generated_outputs:
-                        needed_inputs.add_stuff_spec(
-                            variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
-                        )
-
-            # Add this step's output to generated outputs
-            if sequential_sub_pipe.output_name:
-                generated_outputs.add(sequential_sub_pipe.output_name)
-
+        needed_inputs, _ = self._walk_needed_inputs(visited_pipes=visited_pipes)
         return needed_inputs
 
     @override

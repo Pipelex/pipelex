@@ -14,32 +14,21 @@ batched step compacts absent branch results, so a list slot is always guaranteed
 The walk logic itself lives on the controllers (`PipeSequence.analyze_taint`,
 `PipeParallel.analyze_branch_taint`); this module holds the shared value objects and the
 presence-resolution helper so the pipeline layer (liftable-pipe inventory) can consume the
-same shapes without importing controller internals.
+same shapes without importing controller internals. `SlotTaint` itself lives in
+`pipelex.pipe_machinery.memory_writes`, beside the model of what a nested controller stores in
+its caller's memory, which carries it.
 """
 
+from dataclasses import field
 from typing import NamedTuple
 
 from pydantic.dataclasses import dataclass
 
 from pipelex.core.pipes.inputs.input_stuff_specs import NamedStuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
+from pipelex.pipe_machinery.memory_writes import SlotTaint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_run_params import output_multiplicity_to_apply
-
-
-@dataclass(frozen=True)
-class SlotTaint:
-    """A maybe-absent slot: where the absence originates and how it propagated here."""
-
-    source: str
-    origin_slot_name: str
-    chain: tuple[str, ...] = ()
-
-    def describe(self) -> str:
-        description = f"Absence origin: {self.source}."
-        if self.chain:
-            description += f" Propagation: {' → '.join(self.chain)}."
-        return description
 
 
 @dataclass(frozen=True)
@@ -75,6 +64,8 @@ class SequenceTaintAnalysis:
     liftable_steps: tuple[LiftableStepInfo, ...]
     output_taint: SlotTaint | None
     force_consumptions: tuple[ForceConsumptionInfo, ...] = ()
+    # The maybe-absent slots once the last step ran, which give the absence of what the sequence stores in its caller's memory.
+    final_slot_taints: dict[str, SlotTaint] = field(default_factory=dict[str, SlotTaint])
 
 
 @dataclass(frozen=True)
@@ -99,18 +90,22 @@ class TaintTriggerScan(NamedTuple):
     redundant_force_names: tuple[str, ...] = ()
 
 
-def scan_taint_triggers(pipe: PipeAbstract, *, slot_taints: dict[str, SlotTaint]) -> TaintTriggerScan:
+def scan_taint_triggers(pipe: PipeAbstract, *, slot_taints: dict[str, SlotTaint], visited_pipes: set[str] | None = None) -> TaintTriggerScan:
     """Apply the D3 trichotomy to a pipe's needed inputs against the given taint map.
 
     A tainted slot consumed PLAIN is a lift trigger; consumed `?` (absorb) or `!` (assert),
     the taint terminates at that consumption. `!` consumptions are also classified for the
     useless-`!` lint: asserting when the slot was tainted, redundant when it was guaranteed.
+
+    `visited_pipes` is handed to the pipe's `needed_inputs` when the scan runs inside a walk that
+    is itself guarded against recursion, as `memory_writes` is, so a pipe that reaches itself again
+    through its steps stops there.
     """
     trigger_names: list[str] = []
     trigger_taint: SlotTaint | None = None
     asserting_force_names: list[str] = []
     redundant_force_names: list[str] = []
-    for named_stuff_spec in pipe.needed_inputs().named_stuff_specs:
+    for named_stuff_spec in pipe.needed_inputs(visited_pipes=visited_pipes).named_stuff_specs:
         incoming_taint = slot_taints.get(named_stuff_spec.variable_name)
         match effective_consumption_presence(pipe=pipe, named_stuff_spec=named_stuff_spec):
             case PresenceMarker.PLAIN:

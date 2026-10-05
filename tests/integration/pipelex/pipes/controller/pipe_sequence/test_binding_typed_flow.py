@@ -231,7 +231,7 @@ crate = "swap_for_crate"
 [pipe.read_swapped_weight]
 type = "PipeSequence"
 description = "Swaps the record, then binds the weight of what replaced it"
-inputs = { record = "Invoice", amount = "Number", mode = "Text" }
+inputs = { amount = "Number", mode = "Text" }
 output = "Number"
 steps = [
   { pipe = "swap_record", result = "note" },
@@ -394,7 +394,7 @@ class TestBindingTypedFlow:
             pytest.param(
                 {
                     '{ pipe = "swap_record", result = "note" }': '{ pipe = "swap_for_parcel", result = "note" }',
-                    'inputs = { record = "Invoice", amount = "Number", mode = "Text" }': 'inputs = { record = "Invoice", amount = "Number" }',
+                    'what replaced it"\ninputs = { amount = "Number", mode = "Text" }': 'what replaced it"\ninputs = { amount = "Number" }',
                 },
                 None,
                 "depot_swaps.Parcel",
@@ -410,13 +410,15 @@ class TestBindingTypedFlow:
     async def test_a_name_a_nested_controller_stores_types_the_binding_reading_it(
         self, load_empty_library: Callable[[], str], replacements: dict[str, str], mode: str | None, typed_record_ref: str | None
     ) -> None:
-        """A nested sequence, or a condition's outcome, runs on the caller's memory, so what it stores replaces the caller's value.
+        """A nested sequence, or a condition's outcome, runs on the caller's memory, so what it stores is stored by the step
+        running it, and the caller needs no input of that name.
 
         When the outcomes of a condition store a name under different concepts, the flow cannot type it, and the run derives the
         binding from the value it holds.
         """
         mthds_content = _NESTED_WRITES_BUNDLE
         for old_text, new_text in replacements.items():
+            assert old_text in mthds_content
             mthds_content = mthds_content.replace(old_text, new_text)
         sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_swapped_weight")
 
@@ -431,10 +433,7 @@ class TestBindingTypedFlow:
             assert record_spec.concept.concept_ref == typed_record_ref
             assert flow.binding_specs[1].concept.concept_ref == "native.Number"
 
-        inputs: PipelineInputs = {
-            "record": {"concept": "depot_swaps.Invoice", "content": {"total": 120}},
-            "amount": {"concept": "native.Number", "content": {"number": 7.5}},
-        }
+        inputs: PipelineInputs = {"amount": {"concept": "native.Number", "content": {"number": 7.5}}}
         if mode is not None:
             inputs["mode"] = mode
         response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[mthds_content], inputs=inputs)
@@ -447,9 +446,14 @@ class TestBindingTypedFlow:
         """A `continue` outcome stores nothing, so the name holds either the caller's value or the other outcome's: the flow
         cannot type it, and the run refuses a path the value it holds has no field for.
         """
-        # A condition with a `continue` outcome may hold nothing, so its output is declared optional.
+        # A condition with a `continue` outcome may hold nothing, so its output is declared optional, and it may leave the record
+        # as the caller had it, so the caller provides one.
         mthds_content = _NESTED_WRITES_BUNDLE.replace('crate = "swap_for_crate"', 'crate = "continue"')
         mthds_content = mthds_content.replace('output = "Text"\nexpression', 'output = "Text?"\nexpression')
+        mthds_content = mthds_content.replace(
+            'what replaced it"\ninputs = { amount = "Number", mode = "Text" }',
+            'what replaced it"\ninputs = { record = "Invoice", amount = "Number", mode = "Text" }',
+        )
         sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_swapped_weight")
         assert sequence.build_typed_flow().final_slots["record"].stuff_spec is None
         inputs: PipelineInputs = {

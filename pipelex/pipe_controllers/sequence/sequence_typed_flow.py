@@ -3,9 +3,14 @@
 The flow is built in step order. The sequence's declared inputs seed it; a pipe step's `result` takes its
 pipe's output spec, made plural by `batch_over`, `nb_output` or `multiple_output`; a binding step contributes
 the spec it derives. A pipe step also contributes what its pipe stores on the memory it runs on besides its
-result (`PipeAbstract.memory_writes`): a nested sequence's steps and a condition's outcome run on the caller's
+result (`step_memory_writes`): a nested sequence's steps and a condition's outcome run on the caller's
 memory, and a PipeParallel with `add_each_output` stores each branch's result there. A name a later step
-stores replaces what was there, so a binding's root is typed by the latest value stored under it.
+always stores replaces what was there, so a binding's root is typed by the latest value stored under it; a
+name a step stores on some runs only, as a condition whose `continue` outcome stores nothing, keeps its spec
+when the value stored has the same one, and is untyped otherwise.
+
+`step_memory_writes` is the one place a step's stores beside its result are computed: the sequence's needed
+inputs and its absence-taint walk read them from it too, so the three analyses agree on every name.
 
 It is used in three places, and only these: a binding types its root from the flow, a step reading a
 binding's result is checked against the spec the binding derives, and a binding ending the sequence is
@@ -28,6 +33,8 @@ from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivatio
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, is_same_value_spec
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # A step of a PipeSequence, as the runtime holds it: a pipe step or a binding step.
@@ -60,6 +67,10 @@ class SequenceTypedFlow(BaseModel):
     final_slots: dict[str, FlowSlot]
     # The slots the steps stored, as they stand after the last step: what the sequence leaves in the memory it runs on.
     written_slots: dict[str, FlowSlot]
+    # The names some step stores on every run, among the written slots.
+    always_written_names: frozenset[str]
+    # By pipe-step index, what the step stores besides its result (`step_memory_writes`), for the walks that follow the flow.
+    memory_writes_by_pipe_step: dict[int, dict[str, MemoryWrite]]
 
 
 class DerivedBinding(NamedTuple):
@@ -128,6 +139,29 @@ def derive_binding_spec(*, binding_step: BindingStep, root_spec: StuffSpec, sequ
     return DerivedBinding(derivation=derivation, stuff_spec=StuffSpec(concept=result_concept, multiplicity=derivation.multiplicity))
 
 
+def step_memory_writes(*, step: SubPipe, step_pipe: PipeAbstract, visited_pipes: set[str]) -> dict[str, MemoryWrite]:
+    """What a pipe step stores in the sequence's memory besides its result, as the typed flow, the needed inputs and the
+    absence-taint walk of the sequence all read it.
+
+    The step's pipe stores its `memory_writes`, unless the step batches: a batched step runs its pipe on a copy of the
+    memory for each item, so only its result comes back.
+    """
+    if step.batch_params is not None:
+        return {}
+    return step_pipe.memory_writes(visited_pipes=visited_pipes)
+
+
+def slot_after_write(*, prior_slot: FlowSlot | None, memory_write: MemoryWrite) -> FlowSlot:
+    """What a name holds once a step stored it: the stored spec, or, when the step may leave the name as it was, the spec
+    the stored value and the value already there agree on, untyped when they do not.
+    """
+    if memory_write.is_always_written or prior_slot is None:
+        return FlowSlot(stuff_spec=memory_write.stuff_spec)
+    if is_same_value_spec(first_spec=prior_slot.stuff_spec, second_spec=memory_write.stuff_spec):
+        return prior_slot
+    return FlowSlot(stuff_spec=None)
+
+
 def build_sequence_typed_flow(
     *,
     steps: list[SequenceStep],
@@ -152,13 +186,16 @@ def build_sequence_typed_flow(
     """
     slots: dict[str, FlowSlot] = {name: FlowSlot(stuff_spec=stuff_spec) for name, stuff_spec in declared_inputs.root.items()}
     written_names: set[str] = set()
+    always_written_names: set[str] = set()
     binding_derivations: dict[int, BindingDerivation] = {}
     binding_specs: dict[int, StuffSpec] = {}
     binding_slots_by_pipe_step: dict[int, dict[str, FlowSlot]] = {}
+    memory_writes_by_pipe_step: dict[int, dict[str, MemoryWrite]] = {}
 
     for step_index, step in enumerate(steps):
         if isinstance(step, BindingStep):
             written_names.add(step.output_name)
+            always_written_names.add(step.output_name)
             root_slot = slots.get(step.root_name)
             if root_slot is None or root_slot.stuff_spec is None:
                 # A root nothing types: an undeclared one, refused as a missing input of the sequence; the result of a pipe
@@ -179,15 +216,19 @@ def build_sequence_typed_flow(
         if step_pipe is None:
             if step.output_name:
                 written_names.add(step.output_name)
+                always_written_names.add(step.output_name)
                 slots[step.output_name] = FlowSlot(stuff_spec=None)
             continue
-        if step.batch_params is None:
-            # A batched step runs its pipe on a copy of the memory for each item, so only its result comes back.
-            for written_name, written_spec in step_pipe.memory_writes(visited_pipes=visited_pipes).items():
-                written_names.add(written_name)
-                slots[written_name] = FlowSlot(stuff_spec=written_spec)
+        step_writes = step_memory_writes(step=step, step_pipe=step_pipe, visited_pipes=visited_pipes)
+        memory_writes_by_pipe_step[step_index] = step_writes
+        for written_name, memory_write in step_writes.items():
+            written_names.add(written_name)
+            if memory_write.is_always_written:
+                always_written_names.add(written_name)
+            slots[written_name] = slot_after_write(prior_slot=slots.get(written_name), memory_write=memory_write)
         if step.output_name:
             written_names.add(step.output_name)
+            always_written_names.add(step.output_name)
             slots[step.output_name] = FlowSlot(stuff_spec=step.result_spec(step_pipe=step_pipe))
 
     return SequenceTypedFlow(
@@ -196,4 +237,6 @@ def build_sequence_typed_flow(
         binding_slots_by_pipe_step=binding_slots_by_pipe_step,
         final_slots=slots,
         written_slots={name: slot for name, slot in slots.items() if name in written_names},
+        always_written_names=frozenset(always_written_names),
+        memory_writes_by_pipe_step=memory_writes_by_pipe_step,
     )
