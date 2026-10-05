@@ -1,0 +1,11 @@
+name = "feature_binding_step_batch_over_equivalence"
+description = "The lines of an order priced through a dotted batch_over and through a binding then a batch, both reading the customer's currency beside each line"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+  "controller.batch",
+]

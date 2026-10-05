@@ -1,0 +1,18 @@
+{
+  "order": {
+    "concept": "order_pricing.Order",
+    "content": {
+      "lines": [
+        {
+          "article": "Linen tea towel",
+          "amount": 12.5
+        },
+        {
+          "article": "Enamel mug",
+          "amount": 9
+        }
+      ]
+    }
+  },
+  "currency": "euros"
+}

@@ -1,7 +1,7 @@
 from typing import Any, ClassVar, NamedTuple
 
 from pipelex.core.memory.absence import AbsenceKind
-from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, PRIVATE_BINDING_NAME_PREFIX
 
 
 class Bound(NamedTuple):
@@ -123,6 +123,39 @@ class OfflineRunExpectations:
             "index_lines": Bound(
                 concept_ref="native.Text",
                 content={"items": [{"text": "Photograph: Garden chairs on a lawn"}, {"text": "Photograph: Two parasols"}]},
+            ),
+        },
+        # A dotted `batch_over` binds its path under a private name, then batches over it: the bound list is kept there.
+        "feature_binding_step_batch_over_catalog_pages": {
+            f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages": Bound(
+                concept_ref="nursery_catalog.CatalogPage", content={"items": [{"title": "Climbing roses"}, {"title": "Fruit trees"}]}
+            ),
+            "index_lines": Bound(concept_ref="native.Text", content={"items": [{"text": "Page: Climbing roses"}, {"text": "Page: Fruit trees"}]}),
+        },
+        "feature_binding_step_batch_over_catalogs": {
+            f"{PRIVATE_BINDING_NAME_PREFIX}catalogs_pages": Bound(
+                concept_ref="furniture_catalogs.CatalogPage",
+                content={"items": [{"title": "Garden chairs"}, {"title": "Parasols"}, {"title": "Bookcases"}]},
+            ),
+            "index_lines": Bound(
+                concept_ref="native.Text",
+                content={"items": [{"text": "Page: Garden chairs"}, {"text": "Page: Parasols"}, {"text": "Page: Bookcases"}]},
+            ),
+        },
+        "feature_binding_step_batch_over_equivalence": {
+            f"{PRIVATE_BINDING_NAME_PREFIX}order_lines": Bound(
+                concept_ref="order_pricing.OrderLine",
+                content={"items": [{"article": "Linen tea towel", "amount": 12.5}, {"article": "Enamel mug", "amount": 9.0}]},
+            ),
+            "lines": Bound(
+                concept_ref="order_pricing.OrderLine",
+                content={"items": [{"article": "Linen tea towel", "amount": 12.5}, {"article": "Enamel mug", "amount": 9.0}]},
+            ),
+            "priced_by_path": Bound(
+                concept_ref="native.Text", content={"items": [{"text": "Linen tea towel: 12.5 euros"}, {"text": "Enamel mug: 9.0 euros"}]}
+            ),
+            "priced_by_binding": Bound(
+                concept_ref="native.Text", content={"items": [{"text": "Linen tea towel: 12.5 euros"}, {"text": "Enamel mug: 9.0 euros"}]}
             ),
         },
         "feature_binding_step_parallel_root": {
