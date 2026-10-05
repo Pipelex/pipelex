@@ -5223,8 +5223,8 @@ The `[exports]` section controls which pipes are visible outside the package.
 
 ### Default Behavior
 
-- **Without `METHODS.toml`**: local bundles are still available to your project
-- **With `METHODS.toml`**: pipes are private by default — only pipes listed in `[exports]` (and each bundle's `main_pipe`) are visible from outside
+- **Without `METHODS.toml`, or with one that declares no `[exports]`**: every pipe of the package is visible from outside
+- **With an `[exports]` section**: pipes are private by default — only the pipes listed in `[exports]` (and each bundle's `main_pipe`) are visible from outside
 
 ### Declaring Exports
 
@@ -5238,7 +5238,26 @@ pipes = ["extract_clause", "analyze_contract"]
 pipes = ["compute_weighted_score"]
 ```
 
-This manifest exports two pipes from `legal.contracts` and one pipe from `scoring`.
+This manifest exports two pipes from `legal.contracts` and one pipe from `scoring`. Exports are read by domain: exporting `compute_weighted_score` from `scoring` does not export a pipe of the same name declared in another domain of the package.
+
+### Pipes Call Their Own Package
+
+Inside a package, a pipe calls the package's own pipes, private ones included. A sequence exported by the package can call a helper the manifest does not export, and that helper is loaded with it. A private pipe that no exported pipe calls is not loaded at all, so a problem in it never stops a consumer from loading the package.
+
+A reference written inside a package always reaches that package's pipe. If the consumer declares a pipe with the same domain and code, or another loaded package does, the package's own call is never redirected to it.
+
+### What a Consumer Is Refused
+
+When a consumer references a loaded package, two mistakes are refused when the consumer loads, rather than surfacing later as an unrelated error:
+
+- **A pipe the package does not have** is refused as an unresolved pipe dependency (`unresolved_pipe_dependency`), naming the reference and the package. The same refusal names the error when the package declares the pipe but it failed to build.
+- **A pipe the package does not export** is refused as an unexported pipe dependency (`unexported_pipe_dependency`). The pipe exists, so the remedy is to call one of the package's exported pipes, or to export this one in the package's manifest.
+
+These checks apply to the consumer's references and to a package's references to its own pipes. A package's reference to one of its own dependencies is not checked when the consumer loads, because a package's dependencies are not loaded with it.
+
+A reference by bare code, `alias->code`, ignores the package's private pipes when it also matches an exported one, so a private helper sharing an exported pipe's code in another domain does not make the reference ambiguous.
+
+Naming a private pipe by hand, as the pipe to run at the command line or in an API request, is not a reference from inside a method, so `[exports]` does not apply to it: a loaded private pipe can be run that way by its `alias->domain.code`.
 
 ## Cross-Package References
 
@@ -14813,11 +14832,7 @@ Anything that names no caller of its own keeps reporting under the `user_id` you
 
 The extras do not depend on that. A run that leaves `user_id` at its default still carries its `extras` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
 
-The extras also travel with the run's inference calls when they go through Pipelex Manifold. Every request the Manifold backend makes carries one `x-pipelex-metadata` header: a flat JSON object holding the run's extras as they are, plus the run's `user_id` and `pipeline_run_id` and the step's `pipe_run_id`, `pipe_code` and `content_generation_job_id` when it has them, so the service can attribute and log each call. If an extras key has the same name as one of those ids, the run's own value is the one sent, since the extras are yours to set and must not be able to restate whose run it is. No other backend receives this header: a provider you reach directly with your own key gets none of your labels.
-
-```text
-x-pipelex-metadata: {"org_id":"org_acme","user_id":"user_42","pipeline_run_id":"run_abc","pipe_run_id":"0123456789abcdef","pipe_code":"summarize_doc"}
-```
+The extras are also available to the inference workers, on the job metadata of every call. None of the backends Pipelex ships sends them anywhere: a provider you reach directly with your own key gets none of your labels. An inference backend plugin of your own may forward them to a service you operate, for instance so that it can attribute each call's spend, and if it does, the run's own ids should win over an extras key of the same name, since the extras are caller data and must not be able to restate whose run it is.
 
 ### Work that is not a run, and crashes
 
@@ -15702,7 +15717,7 @@ Practical consequences:
 
 - Within a single process, after `BundleElaborator.elaborate(...)`, the metadata is available everywhere the bundle goes.
 - Across any serialization boundary — kajson dump, library cache, Temporal payload, MTHDS export — the metadata is gone. Downstream consumers that need it today have to re-elaborate.
-- The dependency loader handles one specific consequence: when a manifest restricts exports, synthetic helpers of exported parents are still loaded, even though they are never named in the manifest. This is implemented inline in `LibraryManager._load_single_dependency`.
+- The dependency loader does not need the metadata: when a manifest restricts exports, the synthetic helpers of an exported parent are still loaded, though the manifest never names them, because the parent's steps call them. `LibraryManager._load_single_dependency` loads every pipe a package's public pipes reach through its own references, as private pipes of the package.
 
 When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step.
 
@@ -19294,7 +19309,7 @@ flowchart TD
 
 `check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
 
-`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose gateway model specs were not handed to the loader (the probe fetches nothing) or whose credentials do not resolve is skipped rather than reported: those are the Models row's and the Credentials row's findings. Without leniency the shipped defaults, which ship the manifold backend's override file, would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after the manifold in `backends.toml` would go unreported. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
+`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose credentials do not resolve is skipped rather than reported: that is the Credentials row's finding. Without leniency an enabled backend whose key is not set yet would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after that backend in `backends.toml` would go unreported. Leniency covers credentials and nothing else: a malformed file stays fatal, and so do the refusals of an enabled backend that declares no model or still carries `model_specs_section`. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
 ### Fix Targeting
 
