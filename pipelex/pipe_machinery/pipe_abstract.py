@@ -108,6 +108,16 @@ class PipeAbstract(ABC, BaseModel):
         return f"{self.domain_code}.{self.code}"
 
     @property
+    def visit_key(self) -> str:
+        """This pipe's entry in a recursion guard's visited set, unique to this pipe object.
+
+        Not `pipe_ref`: a consumer and a dependency package, or two dependency packages, may each declare a pipe
+        of the same `domain.code`, and a guard keyed by it would take one for the other and cut a walk short.
+        A library holds one object per pipe, so a cycle returns to the same object.
+        """
+        return f"{self.pipe_ref}@{id(self):x}"
+
+    @property
     def pipe_type(self) -> str:
         return self.__class__.__name__
 
@@ -596,7 +606,7 @@ class PipeAbstract(ABC, BaseModel):
         """Return the stuff specs that are needed for the pipe to run.
 
         Args:
-            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
+            visited_pipes: The `visit_key` of each pipe currently being processed, to prevent infinite recursion.
                           If None, starts recursion detection with an empty set.
 
         Returns:

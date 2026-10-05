@@ -52,7 +52,7 @@ from pipelex.methods.structures_check import ensure_no_structured_content_in_lib
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipelexBundleBlueprint, StepRole
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipeBlueprintUnion, PipelexBundleBlueprint, StepRole
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
@@ -117,6 +117,60 @@ def _dependency_bundle_source(*, package_address: str, package_root: Path, mthds
             if candidate_path.is_relative_to(candidate_root):
                 return f"{package_address}/{candidate_path.relative_to(candidate_root).as_posix()}"
     return f"{package_address}/{mthds_path.name}"
+
+
+def _public_dependency_pipe_refs(*, resolved_dep: ResolvedDependency, blueprints: list[PipelexBundleBlueprint]) -> set[str] | None:
+    """The `domain.code` of every pipe a dependency makes public, or `None` when it declares no exports and all are public.
+
+    A package's public pipes are the ones its manifest exports, read by domain so that exporting `a.x` does not
+    also export a `b.x` of another domain, and the `main_pipe` of each of its bundles.
+    """
+    if resolved_dep.exported_pipe_codes is None:
+        return None
+    public_pipe_refs: set[str] = set()
+    if resolved_dep.manifest is not None:
+        for domain_path, domain_exports in resolved_dep.manifest.exports.items():
+            public_pipe_refs.update(f"{domain_path}.{pipe_code}" for pipe_code in domain_exports.pipes)
+    for blueprint in blueprints:
+        if blueprint.main_pipe:
+            public_pipe_refs.add(f"{blueprint.domain}.{blueprint.main_pipe}")
+    return public_pipe_refs
+
+
+def reachable_dependency_pipe_refs(
+    *, public_pipe_refs: set[str], qualified_pipes: "Mapping[str, PipeBlueprintUnion]", package_alias: str
+) -> set[str]:
+    """The `domain.code` of every pipe of a dependency its public pipes reach through the package's own references.
+
+    The pipes are the package's qualified blueprints, whose in-package refs carry `package_alias`. A public pipe's
+    private helpers, a build-time elaboration's synthetic helpers among them, travel with it; a private pipe nothing
+    public reaches is left out. A ref to another package, or to a pipe the package does not declare, is not followed:
+    validation reports the latter. A ref written `alias->code`, with no domain, is followed as lookup resolves it, by code
+    within the package: to the public pipes of that code when there are some among several, else to every pipe of it,
+    lookup reporting the ambiguity when more than one remains.
+    """
+    reachable: set[str] = set()
+    pending = [pipe_ref for pipe_ref in public_pipe_refs if pipe_ref in qualified_pipes]
+    while pending:
+        pipe_ref = pending.pop()
+        if pipe_ref in reachable:
+            continue
+        reachable.add(pipe_ref)
+        for dependency_ref in qualified_pipes[pipe_ref].pipe_dependencies:
+            if not QualifiedRef.has_cross_package_prefix(dependency_ref):
+                continue
+            ref_alias, in_package_ref = QualifiedRef.split_cross_package_ref(dependency_ref)
+            if ref_alias != package_alias:
+                continue
+            if "." in in_package_ref:
+                if in_package_ref in qualified_pipes:
+                    pending.append(in_package_ref)
+            else:
+                candidates = [candidate for candidate in qualified_pipes if candidate.rsplit(".", 1)[-1] == in_package_ref]
+                # Lookup lets private pipes only break a tie (`PipeLibrary.get_optional_pipe`), so one public match is the one reached.
+                public_candidates = [candidate for candidate in candidates if candidate in public_pipe_refs]
+                pending.extend(public_candidates if len(candidates) > 1 and public_candidates else candidates)
+    return reachable
 
 
 def _dependency_entries_first(*, concepts_by_key: "Mapping[str, Concept]") -> list["Concept"]:
@@ -1245,41 +1299,10 @@ class LibraryManager(LibraryManagerAbstract):
             loaded_concepts=dep_concepts, visible_concepts=dep_concepts, concept_sources=crate.source_map, refuses_unresolved_structures=False
         )
 
-        # Collect main_pipes for auto-export
-        main_pipes: set[str] = set()
-        for blueprint in dep_blueprints:
-            if blueprint.main_pipe:
-                main_pipes.add(blueprint.main_pipe)
-
-        # Determine if we filter by exports or load all.
-        # exported_pipe_codes is None when no manifest exists (all pipes public),
-        # or a set (possibly empty) when a manifest defines exports.
-        if resolved_dep.exported_pipe_codes is None:
-            # No manifest: all pipes are public, no filtering
-            has_exports = False
-            all_exported: set[str] = set()
-        else:
-            # Manifest exists: filter to exported pipes + main_pipes
-            has_exports = True
-            all_exported = resolved_dep.exported_pipe_codes | main_pipes
-            # Synthetic helpers from build-time elaboration (e.g. `<code>__draft_text` and
-            # `<code>__structure` produced by `structuring_method = preliminary_text`) are
-            # private to their parent pipe and never listed in the manifest. When the parent
-            # is exported, its helpers must travel with it — otherwise the wrapping
-            # PipeSequence references unresolved pipe codes at runtime.
-            # Note: `parent_pipe_code` and `synthetic_code` are bare codes within a single
-            # bundle — `BundleElaborator` writes them that way today. If two bundles in the
-            # same dep ever ship the same bare pipe code, this lookup would conflate their
-            # helpers. The downstream factory would then fail on duplicate registration, so
-            # the failure mode is loud rather than silent.
-            synthetic_helpers: set[str] = set()
-            for blueprint in dep_blueprints:
-                if not blueprint.elaboration_metadata:
-                    continue
-                for synthetic_code, meta in blueprint.elaboration_metadata.items():
-                    if meta.parent_pipe_code in all_exported:
-                        synthetic_helpers.add(synthetic_code)
-            all_exported |= synthetic_helpers
+        # What a consumer may reference: `None` when the package declares no exports, so every pipe is public.
+        public_pipe_refs = _public_dependency_pipe_refs(resolved_dep=resolved_dep, blueprints=dep_blueprints)
+        # The `domain.code` of each pipe meant to load that failed to build, with why, for a reference to it to name.
+        unbuilt_pipe_reasons: dict[str, str] = {}
 
         # Temporarily register dep concepts in main library for pipe construction
         # (PipeFactory resolves concepts through the hub's current library)
@@ -1302,11 +1325,20 @@ class LibraryManager(LibraryManagerAbstract):
         # Load exported pipes (reconciled by the crate) into child library, ensuring temp concepts
         # are always cleaned up even if an unexpected exception occurs
         try:
-            # Same qualification the main load path applies: a dependency package's own in-body refs
-            # are its own domain's, and its child library is keyed by qualified pipe_ref. Inside the
+            # The main load path's qualification, plus this load's alias: a dependency package's own
+            # in-body refs are its own domain's, and each is stored as `alias->domain.code`, the key
+            # the consumer's library holds that pipe under, so every reader of the ref (validation,
+            # the pre-run walks, execution) reaches the package's pipe and never a consumer pipe of
+            # the same `domain.code`. The child library itself stays keyed by `domain.code`. Inside the
             # try: qualification can raise on malformed refs, and the temp concepts must still be
             # removed from the main library.
-            qualified_dep_pipes = qualify_crate(crate).pipes
+            qualified_dep_pipes = qualify_crate(crate, package_alias=alias).pipes
+            if public_pipe_refs is None:
+                loaded_pipe_refs = set(qualified_dep_pipes)
+            else:
+                loaded_pipe_refs = reachable_dependency_pipe_refs(
+                    public_pipe_refs=public_pipe_refs, qualified_pipes=qualified_dep_pipes, package_alias=alias
+                )
             for pipe_ref, pipe_blueprint in qualified_dep_pipes.items():
                 parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed_pipe.domain_path is None:
@@ -1314,8 +1346,8 @@ class LibraryManager(LibraryManagerAbstract):
                     raise PipeLibraryError(msg)
                 domain_code = parsed_pipe.domain_path
                 pipe_code = parsed_pipe.local_code
-                # If manifest has exports, only load exported pipes
-                if has_exports and pipe_code not in all_exported:
+                # A private pipe nothing public reaches is never built, so a broken one cannot refuse the consumer's load.
+                if pipe_ref not in loaded_pipe_refs:
                     continue
                 dependency_source = crate.source_map.get(pipe_ref)
                 # A pipe that reads a file beside its bundle (a PipeDocGen `template_file`) finds it from the
@@ -1342,6 +1374,7 @@ class LibraryManager(LibraryManagerAbstract):
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
                     log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+                    unbuilt_pipe_reasons[pipe_ref] = "; ".join(str(error["msg"]) for error in exc.errors()) or str(exc)
         finally:
             # Remove temporary concept entries from main library
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)
@@ -1354,7 +1387,11 @@ class LibraryManager(LibraryManagerAbstract):
             library.concept_library.add_dependency_concept(alias=alias, concept=concept)
 
         for pipe in child_library.pipe_library.get_pipes():
-            library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe)
+            is_exported = public_pipe_refs is None or pipe.pipe_ref in public_pipe_refs
+            library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe, is_exported=is_exported)
+        library.pipe_library.add_withheld_dependency_pipes(alias=alias, pipe_refs=set(qualified_dep_pipes) - loaded_pipe_refs)
+        for pipe_ref, reason in unbuilt_pipe_reasons.items():
+            library.pipe_library.add_unbuilt_dependency_pipe(alias=alias, pipe_ref=pipe_ref, reason=reason)
 
         log.verbose(f"Loaded dependency '{alias}': {len(dep_concepts)} concepts, pipes from {len(dep_blueprints)} bundles")
 

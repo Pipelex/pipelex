@@ -6,6 +6,19 @@
 
 - **The hosted backend's errors and messages no longer carry a codename (Breaking)**: its error classes are renamed from `Manifold*` to `PipelexHosted*`, such as `PipelexHostedError` and `PipelexHostedCredentialsError`, with their reference pages, while each keeps the `type` and `title` of its generic family. Its messages speak of "the Pipelex service", and the two that refuse a missing endpoint or key name the backend's `endpoint` and `api_key` settings rather than an environment variable. Its provider package moves to `pipelex.providers.pipelex_hosted`, `extract_manifold_metadata` is now `extract_pipelex_hosted_metadata`, and the enum member `PipelexBackend.MANIFOLD` is now `PipelexBackend.PIPELEX_HOSTED`, with its value `pipelex_manifold` unchanged.
 
+### Added
+
+- **A reference to a package's private pipe is refused as unexported**: a consumer naming a pipe that a loaded dependency package declares but does not export is refused at load with the new `PipeValidationErrorType` value `unexported_pipe_dependency`, whose item names the referring pipe in `pipe_code` and the reference in `missing_pipe_code`.
+
+### Fixed
+
+- **A dependency package's pipes call their own sub-pipes**: a sequence, parallel, condition or batch inside an installed package now reaches the package's own pipe, stored as `alias->domain.code`, where it used to look the plain `domain.code` up in the consumer's library. A package whose controllers call its own pipes, such as `github.com/Pipelex/methods/documents` from 0.1.3, no longer fails to load with `PipeNotFoundError`, and a consumer pipe of the same domain and code is no longer run in the package's place.
+- **An exported pipe can call its package's private pipes (Breaking)**: a package with `[exports]` loads every pipe its exported pipes and `main_pipe`s reach, not the exported ones alone, and a private pipe nothing public reaches is not built. Exports are read by domain, so exporting `x` from one domain no longer exports a pipe named `x` in another, and `PipeLibrary.add_dependency_pipe` takes `is_exported`.
+- **A missing pipe of a loaded package is refused at load**: a reference to a pipe a loaded dependency package does not have is refused as `unresolved_pipe_dependency`, naming the package, where it was skipped and reported as an extraneous input with a wrong suggested fix. A dependency's own reference to another package is not checked against the consumer's packages, since a dependency's dependencies are not loaded.
+- **A pipe wrapping another package's pipe of the same domain and code reports its inputs**: the recursion guards of the needed-inputs, signature and file-input walks tell two pipes of the same `domain.code` apart by object rather than by `pipe_ref`. A consumer pipe calling a dependency's pipe of its own domain and code, or one package's pipe calling another's, was taken for an already-visited pipe and reported no inputs, so a correct bundle was refused with an extraneous-input error.
+- **A bare reference into a package ignores its private pipes when an exported one matches**: a consumer's `alias->code` that matches an exported pipe and a private pipe of the same code in another domain resolves to the exported one, where it was refused as ambiguous.
+- **A dependency pipe that fails to build is refused naming why**: a reference to a pipe the package declares but could not build, such as a `PipeFunc` naming an unregistered function, is refused with that build error, where it was reported as a pipe the package does not have. A bare `alias->code` matching such a pipe is refused the same way, rather than resolved to another pipe of that code.
+
 ## [v0.73.0] - 2026-10-05
 
 ### Added

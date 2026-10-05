@@ -119,8 +119,8 @@ class TestPipeLibraryLookup:
         `__cause__`.
         """
         library = PipeLibrary.make_empty()
-        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
-        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="analytics"))
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"), is_exported=True)
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="analytics"), is_exported=True)
 
         with pytest.raises(EntryPipeAmbiguousError) as exc_info:
             library.get_optional_entry_pipe("lib->compute_score")
@@ -153,8 +153,8 @@ class TestPipeLibraryLookup:
         bundle — so the entry classification must not leak onto them.
         """
         library = PipeLibrary.make_empty()
-        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
-        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="analytics"))
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"), is_exported=True)
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="analytics"), is_exported=True)
 
         with pytest.raises(PipeLibraryError) as exc_info:
             library.get_optional_pipe("lib->compute_score")
@@ -179,7 +179,7 @@ class TestPipeLibraryLookup:
         library = PipeLibrary.make_empty()
         host_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         library.root["scoring.compute_score"] = host_pipe
-        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="vendor"))
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="vendor"), is_exported=True)
 
         assert library.get_optional_entry_pipe("compute_score") is host_pipe
 
@@ -227,7 +227,7 @@ class TestPipeLibraryLookup:
         """Cross-package ref with domain-qualified remainder resolves correctly."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        library.add_dependency_pipe(alias="lib", pipe=mock_pipe)
+        library.add_dependency_pipe(alias="lib", pipe=mock_pipe, is_exported=True)
         result = library.get_optional_pipe("lib->scoring.compute_score")
         assert result is mock_pipe
 
@@ -235,7 +235,7 @@ class TestPipeLibraryLookup:
         """Cross-package ref with wrong domain returns None."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        library.add_dependency_pipe(alias="lib", pipe=mock_pipe)
+        library.add_dependency_pipe(alias="lib", pipe=mock_pipe, is_exported=True)
         result = library.get_optional_pipe("lib->wrong_domain.compute_score")
         assert result is None
 
@@ -243,7 +243,7 @@ class TestPipeLibraryLookup:
         """Cross-package ref with bare code resolves when unambiguous."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        library.add_dependency_pipe(alias="lib", pipe=mock_pipe)
+        library.add_dependency_pipe(alias="lib", pipe=mock_pipe, is_exported=True)
         result = library.get_optional_pipe("lib->compute_score")
         assert result is mock_pipe
 
@@ -338,8 +338,8 @@ class TestPipeLibraryOwnPipes:
         own = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         library.add_new_pipe(own)
         # A dependency sharing the host's `domain.code`: keyed by alias, so it lands beside the host's.
-        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
-        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="other", domain_code="analytics"))
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"), is_exported=True)
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="other", domain_code="analytics"), is_exported=True)
 
         assert library.get_own_pipes() == [own]
         assert len(library.get_pipes()) == 3
