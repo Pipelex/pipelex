@@ -532,7 +532,8 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
     """Dry-run condition whose two outcomes write different concepts into the slot a consumer reads.
 
     `write_questions` is a batch whose aggregate edge names its output list; `write_rejection` runs
-    last, so its stuff is the condition's output and the one `assemble` reads.
+    last, so its stuff is the condition's output, the output of `follow_up_flow`, the sequence
+    ending on the condition, and the one `assemble` reads.
     """
     started_at = _T0
 
@@ -543,8 +544,15 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
         node_kind=NodeKind.CONTROLLER,
         started_at=started_at,
     )
-    cond_id, cond_ctx = tracer.on_pipe_start(
+    flow_id, flow_ctx = tracer.on_pipe_start(
         trace_context=seq_ctx,
+        pipe_code="follow_up_flow",
+        pipe_type="PipeSequence",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at + timedelta(milliseconds=500),
+    )
+    cond_id, cond_ctx = tracer.on_pipe_start(
+        trace_context=flow_ctx,
         pipe_code="route",
         pipe_type="PipeCondition",
         node_kind=NodeKind.CONTROLLER,
@@ -608,6 +616,11 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
         ended_at=started_at + timedelta(seconds=8),
         output_spec=IOSpec(name="follow_up", concept="Rejection", digest="digest_rejection"),
     )
+    tracer.on_pipe_end_success(
+        node_id=flow_id,
+        ended_at=started_at + timedelta(seconds=8, milliseconds=500),
+        output_spec=IOSpec(name="follow_up", concept="Rejection", digest="digest_rejection"),
+    )
 
     assemble_id, _ = tracer.on_pipe_start(
         trace_context=seq_ctx,
@@ -615,7 +628,7 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
         started_at=started_at + timedelta(seconds=9),
-        input_specs=[IOSpec(name="follow_up", concept="Anything", digest="digest_rejection")],
+        input_specs=[IOSpec(name="follow_up", concept="Rejection", digest="digest_rejection")],
     )
     tracer.on_pipe_end_success(
         node_id=assemble_id,
@@ -673,7 +686,10 @@ class TestAssemblerEquivalence:
         direct_spec, assembled_spec = _run_both_paths(_scenario_dry_condition_merge)
         for spec in (direct_spec, assembled_spec):
             outputs_by_code = {node.pipe_code: node.node_io.outputs for node in spec.nodes}
+            inputs_by_code = {node.pipe_code: node.node_io.inputs for node in spec.nodes}
+            assert [(item.digest, item.concept) for item in outputs_by_code["follow_up_flow"]] == [("digest_rejection", "Anything")]
             assert [(item.digest, item.concept) for item in outputs_by_code["route"]] == [("digest_rejection", "Anything")]
+            assert [(item.digest, item.concept) for item in inputs_by_code["assemble"]] == [("digest_rejection", "Anything")]
             assert [(item.digest, item.concept) for item in outputs_by_code["write_questions"]] == [("digest_rejection", "Question")]
             assert [(item.digest, item.concept) for item in outputs_by_code["write_rejection"]] == [("digest_rejection", "Rejection")]
             aggregate_edges = [edge for edge in spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]

@@ -32,3 +32,15 @@ def output_named(node: NodeSpec, name: str) -> IOSpec:
     matches = [output_spec for output_spec in node.node_io.outputs if output_spec.name == name]
     assert len(matches) == 1, f"expected one output '{name}' on '{node.pipe_code}', found {node.node_io.outputs}"
     return matches[0]
+
+
+def items_on(graph_spec: GraphSpec, digest: str) -> list[tuple[NodeSpec, IOSpec]]:
+    """Every io item naming `digest`, in node order, each node's outputs before its inputs."""
+    return [(node, io_spec) for node in graph_spec.nodes for io_spec in [*node.node_io.outputs, *node.node_io.inputs] if io_spec.digest == digest]
+
+
+def first_item_on(graph_spec: GraphSpec, digest: str) -> IOSpec:
+    """The item a reader taking a stuff's typing from its first mention reads, as mthds-ui's renderer does."""
+    items = items_on(graph_spec, digest)
+    assert items, f"no io item names the digest '{digest}'"
+    return items[0][1]

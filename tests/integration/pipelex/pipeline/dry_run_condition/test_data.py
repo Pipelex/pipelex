@@ -520,3 +520,121 @@ inputs = { follow_ups = "Anything[]" }
 output = "Text"
 prompt = "Assemble $follow_ups"
 """
+
+    # The main sequence ends on the condition, so the sequence's output is the condition's shared
+    # stuff, and the sequence comes before the condition in node order: a reader typing a stuff by
+    # its first item would see the sequence's item first.
+    WRAPPED_CONDITION_MTHDS: ClassVar[str] = """
+domain = "dry_condition_wrapped"
+description = "A sequence whose last step is a condition with differing outcomes"
+main_pipe = "screen_candidate"
+
+[concept.InterviewQuestion]
+description = "An interview question"
+refines = "Text"
+
+[concept.Email]
+description = "An email"
+refines = "Text"
+
+[pipe.screen_candidate]
+type = "PipeSequence"
+description = "Judge a CV, then write questions or a refusal"
+inputs = { cv = "Text" }
+output = "Anything"
+steps = [
+  { pipe = "judge", result = "verdict" },
+  { pipe = "route_on_match", result = "decision_output" },
+]
+
+[pipe.judge]
+type = "PipeLLM"
+description = "Judge the CV"
+inputs = { cv = "Text" }
+output = "Text"
+prompt = "Judge $cv"
+
+[pipe.route_on_match]
+type = "PipeCondition"
+description = "Write questions or a refusal on the verdict"
+inputs = { verdict = "Text", cv = "Text" }
+output = "Anything"
+expression = "verdict"
+outcomes = { fit = "generate_interview_questions", no_fit = "write_refusal_email" }
+default_outcome = "fail"
+
+[pipe.generate_interview_questions]
+type = "PipeLLM"
+description = "Write interview questions"
+inputs = { cv = "Text" }
+output = "InterviewQuestion[]"
+prompt = "Questions for $cv"
+
+[pipe.write_refusal_email]
+type = "PipeLLM"
+description = "Write a refusal"
+inputs = { cv = "Text" }
+output = "Email"
+prompt = "Refusal for $cv"
+"""
+
+    # A sequence step batched over a list runs a branch sequence per item, each ending on its own run
+    # of the condition, so each branch sequence's output is that run's shared stuff.
+    BATCH_BRANCH_SEQUENCE_MTHDS: ClassVar[str] = """
+domain = "dry_condition_batch_branch_sequence"
+description = "A batch whose branch is a sequence ending on a condition with differing outcomes"
+main_pipe = "screen_cvs"
+
+[concept.InterviewQuestion]
+description = "An interview question"
+refines = "Text"
+
+[pipe.screen_cvs]
+type = "PipeSequence"
+description = "Screen every CV"
+inputs = { cvs = "Text[]" }
+output = "Anything[]"
+steps = [
+  { pipe = "screen_single_cv", batch_over = "cvs", batch_as = "cv", result = "results" },
+]
+
+[pipe.screen_single_cv]
+type = "PipeSequence"
+description = "Judge one CV, then write questions or a refusal"
+inputs = { cv = "Text" }
+output = "Anything"
+steps = [
+  { pipe = "judge", result = "verdict" },
+  { pipe = "route_by_match", result = "output" },
+]
+
+[pipe.judge]
+type = "PipeLLM"
+description = "Judge the CV"
+inputs = { cv = "Text" }
+output = "Text"
+prompt = "Judge $cv"
+
+[pipe.route_by_match]
+type = "PipeCondition"
+description = "Write questions or a refusal on the verdict"
+inputs = { verdict = "Text", cv = "Text" }
+output = "Anything"
+expression = "verdict"
+outcomes = { yes = "generate_interview_questions", no = "write_refusal_email" }
+default_outcome = "fail"
+
+[pipe.generate_interview_questions]
+type = "PipeLLM"
+description = "Write interview questions"
+inputs = { cv = "Text" }
+output = "InterviewQuestion[]"
+prompt = "Questions for $cv"
+
+[pipe.write_refusal_email]
+type = "PipeLLM"
+description = "Write a refusal"
+inputs = { cv = "Text" }
+output = "Text"
+prompt = "Refusal for $cv"
+"""

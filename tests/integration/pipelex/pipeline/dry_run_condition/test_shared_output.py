@@ -19,7 +19,9 @@ from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.mermaid.mermaid_utils import sanitize_mermaid_id
 from tests.integration.pipelex.pipeline.dry_run_condition.graph_reading import (
+    first_item_on,
     input_named,
+    items_on,
     node_by_code,
     nodes_by_code,
     only_output,
@@ -136,6 +138,10 @@ class TestDryRunConditionSharedOutput:
         assert only_output(node_by_code(graph_spec, "score_cv")).concept == "Number"
 
         assert only_output(node_by_code(graph_spec, "outer")).concept == "Anything"
+        assert only_output(node_by_code(graph_spec, "inner")).concept == "Anything"
+        # `write_note` is the outer condition's outcome, beside `inner`, so it keeps what it writes.
+        assert only_output(node_by_code(graph_spec, "write_note")).concept == "Text"
+        assert only_output(node_by_code(graph_spec, "summarize_cv")).concept == "Text"
         analysis = GraphAnalysis.from_graphspec(graph_spec)
         assert analysis.shared_stuff_controllers == {shared_digest: node_by_code(graph_spec, "outer").node_id}
         assert analysis.stuff_registry[shared_digest].concept == "Anything"
@@ -176,3 +182,34 @@ class TestDryRunConditionSharedOutput:
         mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config=make_graph_config())
         declarations = _subgraphs_declaring(mermaid_code=mermaidflow.mermaid_code, mermaid_id=make_stuff_id(shared_digest))
         assert declarations == [f"sg_{sanitize_mermaid_id(route_node_id)}"]
+
+    async def test_a_sequence_ending_on_the_condition_carries_the_declaration(self) -> None:
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.WRAPPED_CONDITION_MTHDS])
+
+        shared_digest = _shared_digest(graph_spec, condition_code="route_on_match")
+        outcome_typings = {"generate_interview_questions": ("InterviewQuestion", True), "write_refusal_email": ("Email", None)}
+        typings_by_code = {node.pipe_code: (item.concept, item.multiplicity) for node, item in items_on(graph_spec, shared_digest)}
+        assert typings_by_code == {"screen_candidate": ("Anything", None), "route_on_match": ("Anything", None), **outcome_typings}
+
+        # The sequence comes first in node order, so a reader typing the stuff by its first item reads the declaration.
+        first_item = first_item_on(graph_spec, shared_digest)
+        assert (first_item.concept, first_item.multiplicity) == ("Anything", None)
+        assert node_by_code(graph_spec, "screen_candidate") is graph_spec.nodes[0]
+
+    async def test_a_batch_branch_sequence_ending_on_the_condition_carries_the_declaration(self) -> None:
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.BATCH_BRANCH_SEQUENCE_MTHDS])
+
+        condition_nodes = nodes_by_code(graph_spec, "route_by_match")
+        assert len(condition_nodes) > 1, "the batch runs its branch once per item"
+        outcome_typings = {"generate_interview_questions": ("InterviewQuestion", True), "write_refusal_email": ("Text", None)}
+        for condition_node in condition_nodes:
+            shared_digest = only_output(condition_node).digest
+            assert shared_digest is not None
+            typings_by_code = {node.pipe_code: (item.concept, item.multiplicity) for node, item in items_on(graph_spec, shared_digest)}
+            assert typings_by_code == {"screen_single_cv": ("Anything", None), "route_by_match": ("Anything", None), **outcome_typings}
+            first_item = first_item_on(graph_spec, shared_digest)
+            assert (first_item.concept, first_item.multiplicity) == ("Anything", None)
+
+        # The batch's aggregate is another stuff, typed by the batched step's own output.
+        main_output = only_output(node_by_code(graph_spec, "screen_cvs"))
+        assert main_output.digest not in {only_output(node).digest for node in condition_nodes}
