@@ -76,6 +76,11 @@ class PipeSequence(PipeController):
         """The steps that run a pipe, in order; a binding step runs none."""
         return [step for step in self.sequential_sub_pipes if isinstance(step, SubPipe)]
 
+    @property
+    def has_binding_step(self) -> bool:
+        """Whether a step binds a value: only binding steps read the typed flow, so a sequence without one never builds it."""
+        return any(isinstance(step, BindingStep) for step in self.sequential_sub_pipes)
+
     def build_typed_flow(self) -> SequenceTypedFlow:
         """The typed flow of the steps, deriving what each binding step binds.
 
@@ -140,6 +145,8 @@ class PipeSequence(PipeController):
     @override
     def validate_inputs_with_library(self):
         """Derive every binding step through the typed flow, then check the steps reading a binding's result against it."""
+        if not self.has_binding_step:
+            return
         typed_flow = self.build_typed_flow()
         for step_index, step in enumerate(self.sequential_sub_pipes):
             if not isinstance(step, SubPipe):
@@ -362,7 +369,7 @@ class PipeSequence(PipeController):
         liftable_steps: list[LiftableStepInfo] = []
         force_consumptions: list[ForceConsumptionInfo] = []
         last_step_taint: SlotTaint | None = None
-        typed_flow = self.build_typed_flow() if any(isinstance(step, BindingStep) for step in self.sequential_sub_pipes) else None
+        typed_flow = self.build_typed_flow() if self.has_binding_step else None
 
         for step_index, sequential_sub_pipe in enumerate(self.sequential_sub_pipes):
             if isinstance(sequential_sub_pipe, BindingStep):
