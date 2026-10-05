@@ -95,14 +95,17 @@ The concept of the result is derived before the method runs, from the declared s
 | A `time` field | `Time` |
 | A `dict` field | `JSON` |
 | A `list` field of `X`, or of a plain type | `X[]`, or the native the plain type derives, as a list |
+| A field holding `Anything` | `Anything`, its value stored as an `Anything` input is: a string as a `Text`, a number as a `Number`, an object as a `JSON`, and so on. A list, or a value of no such type, is refused when the step runs |
 
-The root is typed by the latest step that stored a value under its name, or by the sequence's `inputs` when no step did. A concept that refines another is walked through the structure it inherits, and a native concept through its pinned definition, so `page.page_view` binds an `Image`, every field of it kept, its `caption` included.
+The root is typed by the latest step that stored a value under its name, or by the sequence's `inputs` when no step did. A step stores its `result`, and a batched step stores the list of its branches' results, `X[]`, whatever `nb_output` it carries. A nested `PipeSequence` runs its steps on the caller's working memory and a `PipeCondition` runs its chosen outcome there, so a name either of them stores counts as stored by the step that calls it, as do the branch results of a `PipeParallel` with `add_each_output`. When the outcomes of a condition store a name under different concepts, nothing types it before the run: the binding is not checked, and the run derives it from the value the name holds.
+
+A concept that refines another is walked through the structure it inherits, and a native concept through its pinned definition, so `page.page_view` binds an `Image`, every field of it kept, its `caption` included. A root holding a dependency package's concept, the output of one of the package's pipes, is walked through the package's own definitions, never through a concept of the method spelled the same.
 
 A path is refused with `binding_path_unresolved` when the walk cannot follow it, and the message names the segment and the fields the concept does have:
 
 -   a segment naming no field of the concept reached;
 -   a segment after a plain field (`invoice.total.amount`), after a `dict` field, or after a list with no declared item type;
--   a segment into a concept with no structure to walk: a concept declared without a structure, `Dynamic`, `Anything`, `Composite`, a native holding its value in a single field (`Text`, `Number`, `Time`, `JSON`, `Markdown`), or a concept refining one of these. Bind the value itself instead, `from = "note"`.
+-   a segment into a concept with no structure to walk: a concept declared with neither a `structure` nor `refines`, whether as a string (`Notice = "A notice"`) or as a table with a description alone, unless its code names a registered Python class, whose fields are walked; `Dynamic`, `Anything`, `Composite`; a native holding its value in a single field (`Text`, `Number`, `Time`, `JSON`, `Markdown`); or a concept refining one of these. Bind the value itself instead, `from = "note"`.
 
 A path ending on a list with no declared item type is refused too, since nothing says what its items are.
 
@@ -117,7 +120,7 @@ A binding that finds nothing records an absence, under the optionality model (se
 -   when the path reaches a field holding nothing, the result is recorded as `DECLARED_ABSENT`, and the reason names the segment that held nothing;
 -   when the root itself is absent, the binding is skipped as a pipe with an absent plain input is, and the result is recorded as `SKIPPED`, chained to the root's own record.
 
-A single result can be absent when its path walks a field that is not `required` and has no default, so the static checks treat it as a maybe-absent value: a step reading it as a plain input may be lifted, and a sequence ending with it declares its output optional (`Text?`), or the validation refuses it with `optional_not_handled`.
+A single result can be absent when its path walks a field that is not `required` and has no default, or, on a concept whose structure is a Python class, a field whose annotation admits `None`, required or not, so the static checks treat it as a maybe-absent value: a step reading it as a plain input may be lifted, and a sequence ending with it declares its output optional (`Text?`), or the validation refuses it with `optional_not_handled`.
 
 ### A copy, with an identity of its own
 
