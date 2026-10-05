@@ -82,9 +82,14 @@ def reset_pipelex_config_fixture() -> Generator[None, None, None]:
     Pipelex.teardown_if_needed()
 
 
+@pytest.fixture
+def pipelex_home(tmp_path: Path) -> Path:
+    return tmp_path / "pipelex_home"
+
+
 @pytest.fixture(autouse=True)
-def empty_pipelex_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
-    monkeypatch.setenv(PIPELEX_HOME_ENV_KEY, str(tmp_path / "pipelex_home"))
+def empty_pipelex_home(pipelex_home: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    monkeypatch.setenv(PIPELEX_HOME_ENV_KEY, str(pipelex_home))
     Pipelex.teardown_if_needed()
     yield
     Pipelex.teardown_if_needed()
@@ -170,3 +175,13 @@ class TestKeylessBootModelMetadata:
         """R1: only the keyless boot changed; the boot that needs inference stays fail-fast."""
         with pytest.raises(PipelexSetupError, match="Could not get credentials for inference backend"):
             _boot(needs_inference=True, secrets_provider=RecordingSecretsProvider.make_empty())
+
+    @pytest.mark.parametrize("needs_inference", [True, False])
+    def test_a_routing_profile_naming_a_disabled_backend_is_refused_on_both_boots(self, pipelex_home: Path, needs_inference: bool) -> None:
+        """R3: once the keyless boot keeps every enabled backend, a profile it cannot route is a configuration error there too."""
+        override_path = pipelex_home / "inference" / "routing_profiles_override.toml"
+        override_path.parent.mkdir(parents=True)
+        override_path.write_text('active = "all_vertexai"\n')
+
+        with pytest.raises(PipelexSetupError, match="'vertexai'.*is not enabled"):
+            _boot(needs_inference=needs_inference, secrets_provider=RecordingSecretsProvider.make_credentialed())

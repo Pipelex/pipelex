@@ -337,7 +337,6 @@ class TestThePreviousReleaseKit:
         routing_profile = load_active_routing_profile(
             routing_profile_library_paths=[inference_dir / ROUTING_PROFILES_FILE_NAME],
             enabled_backends=enabled_backends,
-            lenient=credentials is CredentialResolution.SKIP,
         )
 
         assert routing_profile.default in enabled_backends

@@ -105,7 +105,6 @@ class ModelManager(ModelManagerAbstract):
         self._routing_profile = load_active_routing_profile(
             routing_profile_library_paths=routing_profile_library_paths or config_manager.routing_profiles_file_paths(),
             enabled_backends=enabled_backends,
-            lenient=not needs_inference,
         )
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=deck_dir_path or str(config_manager.model_decks_dir_path))
         deck_blueprint = load_model_deck_blueprint(
