@@ -8224,7 +8224,7 @@
     "tests/unit/pipelex/migration/test_migration_run.py::TestTheSchemaVersionFloor::test_a_file_declaring_exactly_the_floor_is_migrated": 0.005,
     "tests/unit/pipelex/migration/test_migration_run.py::TestTheSchemaVersionFloor::test_a_file_declaring_nothing_is_migrated": 0.0056,
     "tests/unit/pipelex/migration/test_migration_run.py::TestTheWalkIsNotRecursive::test_a_directory_no_surface_owns_is_never_entered": 0.0024,
-    "tests/unit/pipelex/migration/test_migration_run.py::TestTheWalkIsNotRecursive::test_the_real_gateway_backend_file_is_claimed_by_its_own_directorys_surface": 0.066,
+    "tests/unit/pipelex/migration/test_migration_run.py::TestTheWalkIsNotRecursive::test_a_legacy_gateway_backend_file_is_claimed_by_its_own_directorys_surface": 0.066,
     "tests/unit/pipelex/migration/test_migration_run.py::TestTheWalkIsNotRecursive::test_the_same_file_name_at_the_top_level_is_claimed_by_the_main_configuration": 0.0022,
     "tests/unit/pipelex/migration/test_migration_run.py::TestWhichDirectoriesAreWalked::test_a_global_directory_that_does_not_exist_is_skipped": 0.0027,
     "tests/unit/pipelex/migration/test_migration_run.py::TestWhichDirectoriesAreWalked::test_a_machine_with_no_project_directory_is_an_ordinary_machine": 0.0028,

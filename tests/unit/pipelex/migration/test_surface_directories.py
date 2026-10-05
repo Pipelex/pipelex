@@ -5,7 +5,8 @@ two globs over one file refused by name. This module covers the half a subdirect
 name in two directories is two different files, and only the surface that owns the directory it
 sits in may claim it.
 
-The specimen is real and it is the reason this exists at all:
+The specimen is a file earlier kits shipped, which machines set up with them still carry, and it is
+the reason this exists at all:
 `inference/backends/pipelex_gateway.toml` matches the `pipelex-config` tier glob `pipelex_*.toml`
 exactly. Before the walk reached subdirectories, depth alone kept it safe. Now that the walk goes
 there on purpose, the *directory* is what has to keep it safe — and if it ever stops doing so, the
