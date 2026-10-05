@@ -1,10 +1,6 @@
 # Changelog
 
-## [v0.74.1] - 2026-10-05
-
-### Added
-
-- **`PIPELEX_HOME` relocates the home configuration directory**: when set and not empty, it names the directory Pipelex uses in place of `~/.pipelex`, for the configuration layers, the inference files and their overrides, the credentials `.env`, the first-boot copy of the kit, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate` and the agent CLI's `--global`. It must be in the process environment before Pipelex is imported, a relative value is resolved against the working directory at import, and a `PIPELEX_HOME` line in a `.env` file is ignored. The first boot now fills the home directory from the kit when it exists but is empty, as it already did when it was missing, so an empty volume mount or a `mktemp -d` works as it is.
+## [Unreleased]
 
 ### Changed
 
@@ -12,7 +8,13 @@
 
 ### Fixed
 
-- **A dry-run condition's output is one stuff every outcome produces**: in the graph of a dry run, every outcome of a `PipeCondition` now carries the condition's output digest, so the step reading the condition's result is wired to all of them rather than to the outcome whose pipe code sorts last, and the condition's own item takes its declared output concept when the outcomes write or declare different ones. Each outcome but the last now runs on a copy of the memory the condition received, so an outcome reading the condition's slot reads the value from before the condition rather than a sibling's output, and the default outcome runs last, so the steps after the condition read its value.
+- **A dry-run condition's output is one stuff every outcome produces**: in the graph of a dry run, every outcome of a `PipeCondition` now carries the condition's output digest, so the step reading the condition's result is wired to all of them rather than to the outcome whose pipe code sorts last, and when the outcomes write or declare different outputs, the condition's declared output types that stuff on every node outside the outcomes: the condition, the controllers whose output it is, such as a sequence ending on the condition, and the steps reading it, while each outcome keeps the concept it writes. Each outcome but the last now runs on a copy of the memory the condition received, so an outcome reading the condition's slot reads the value from before the condition rather than a sibling's output, and the default outcome runs last, so the steps after the condition read its value.
+
+## [v0.74.1] - 2026-10-05
+
+### Added
+
+- **`PIPELEX_HOME` relocates the home configuration directory**: when set and not empty, it names the directory Pipelex uses in place of `~/.pipelex`, for the configuration layers, the inference files and their overrides, the credentials `.env`, the first-boot copy of the kit, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate` and the agent CLI's `--global`. It must be in the process environment before Pipelex is imported, a relative value is resolved against the working directory at import, and a `PIPELEX_HOME` line in a `.env` file is ignored. The first boot now fills the home directory from the kit when it exists but is empty, as it already did when it was missing, so an empty volume mount or a `mktemp -d` works as it is.
 
 ## [v0.74.0] - 2026-10-05
 

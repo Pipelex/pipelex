@@ -53,7 +53,8 @@ class TestApplyConditionOutputMerges:
                     node_id="assemble",
                     inputs=[
                         IOSpec(name="verdict", concept="Text", digest="d_verdict"),
-                        IOSpec(name="follow_up", concept="Anything", digest="d_rejection"),
+                        # A reader records the stuff it received, which in a dry run is the last outcome's.
+                        IOSpec(name="follow_up", concept="Rejection", digest="d_rejection"),
                     ],
                     outputs=[IOSpec(name="result", concept="Text", digest="d_result")],
                 ),
@@ -86,7 +87,7 @@ class TestApplyConditionOutputMerges:
         # Without a typing, the condition's own item is untouched.
         assert outputs["route"][0].concept == "Rejection"
 
-    def test_a_typing_retypes_the_condition_item_only(self) -> None:
+    def test_a_typing_retypes_the_condition_and_its_reader_not_the_outcomes(self) -> None:
         graph = self._report_shape()
         merge = ConditionOutputMerge(
             condition_node_id="route",
@@ -104,7 +105,10 @@ class TestApplyConditionOutputMerges:
         assert outputs["write_questions"][0].multiplicity is True
         assert outputs["write_rejection"][0].concept == "Rejection"
         assert _inputs_by_node(merged)["assemble"][1].concept == "Anything"
+        # Items on other stuffs are untouched.
+        assert _inputs_by_node(merged)["assemble"][0].concept == "Text"
         assert _inputs_by_node(merged)["route"][0].concept == "Text"
+        assert outputs["assemble"][0].concept == "Text"
 
     def test_a_typing_types_a_list(self) -> None:
         graph = self._report_shape()
@@ -152,34 +156,246 @@ class TestApplyConditionOutputMerges:
             "fallback": ["d_fallback"],
         }
 
-    def test_a_nested_typing_retypes_the_inner_condition_item(self) -> None:
-        """A typing names the item by the digest it had when recorded, which a later merge may move."""
+    def test_a_sequence_ending_on_the_condition_takes_the_typing(self) -> None:
+        """`screen` runs `judge` then `route`, so `screen`'s output is `route`'s, the last outcome's stuff."""
         graph = self._graph(
             nodes=[
+                _node(node_id="screen", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="decision", concept="Email", digest="d_email")]),
+                _node(node_id="judge", outputs=[IOSpec(name="verdict", concept="Text", digest="d_verdict")]),
+                _node(
+                    node_id="route",
+                    kind=NodeKind.CONTROLLER,
+                    inputs=[IOSpec(name="verdict", concept="Text", digest="d_verdict")],
+                    outputs=[IOSpec(name="decision", concept="Email", digest="d_email")],
+                ),
+                _node(node_id="write_questions", outputs=[IOSpec(name="decision", concept="Question", multiplicity=True, digest="d_questions")]),
+                _node(node_id="write_email", outputs=[IOSpec(name="decision", concept="Email", digest="d_email")]),
+            ],
+            edges=[
+                _contains(source="screen", target="judge"),
+                _contains(source="screen", target="route"),
+                _contains(source="route", target="write_questions"),
+                _contains(source="route", target="write_email"),
+            ],
+        )
+        merge = ConditionOutputMerge(
+            condition_node_id="route",
+            shared_digest="d_email",
+            merged_digests=["d_questions"],
+            shared_typing=ConditionOutputTyping(concept="Anything"),
+        )
+
+        merged = apply_condition_output_merges(graph=graph, merges=[merge])
+
+        outputs = _outputs_by_node(merged)
+        assert [(spec.digest, spec.concept, spec.multiplicity) for spec in outputs["screen"]] == [("d_email", "Anything", None)]
+        assert [(spec.digest, spec.concept, spec.multiplicity) for spec in outputs["route"]] == [("d_email", "Anything", None)]
+        assert [(spec.digest, spec.concept, spec.multiplicity) for spec in outputs["write_questions"]] == [("d_email", "Question", True)]
+        assert [(spec.digest, spec.concept, spec.multiplicity) for spec in outputs["write_email"]] == [("d_email", "Email", None)]
+        assert outputs["judge"][0].concept == "Text"
+
+    def test_each_batch_branch_sequence_takes_its_own_condition_typing(self) -> None:
+        """`screen_each` runs the sequence `screen_one` per item, each ending on its own run of `route`."""
+        nodes = [
+            _node(
+                node_id="screen_each", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="results", concept="Text", multiplicity=True, digest="d_list")]
+            )
+        ]
+        edges: list[EdgeSpec] = []
+        merges: list[ConditionOutputMerge] = []
+        for index in (0, 1):
+            branch_digest = f"d_branch_{index}"
+            nodes += [
+                _node(node_id=f"screen_one_{index}", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="output", concept="Text", digest=branch_digest)]),
+                _node(node_id=f"route_{index}", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="output", concept="Text", digest=branch_digest)]),
+                _node(
+                    node_id=f"write_questions_{index}",
+                    outputs=[IOSpec(name="output", concept="Question", multiplicity=True, digest=f"d_questions_{index}")],
+                ),
+                _node(node_id=f"write_refusal_{index}", outputs=[IOSpec(name="output", concept="Text", digest=branch_digest)]),
+            ]
+            edges += [
+                _contains(source="screen_each", target=f"screen_one_{index}"),
+                _contains(source=f"screen_one_{index}", target=f"route_{index}"),
+                _contains(source=f"route_{index}", target=f"write_questions_{index}"),
+                _contains(source=f"route_{index}", target=f"write_refusal_{index}"),
+                EdgeSpec(
+                    edge_id=f"aggregate_{index}",
+                    source=f"screen_one_{index}",
+                    target="screen_each",
+                    kind=EdgeKind.BATCH_AGGREGATE,
+                    source_stuff_digest=branch_digest,
+                    target_stuff_digest="d_list",
+                ),
+            ]
+            merges.append(
+                ConditionOutputMerge(
+                    condition_node_id=f"route_{index}",
+                    shared_digest=branch_digest,
+                    merged_digests=[f"d_questions_{index}"],
+                    shared_typing=ConditionOutputTyping(concept=f"Declared{index}"),
+                )
+            )
+
+        merged = apply_condition_output_merges(graph=self._graph(nodes=nodes, edges=edges), merges=merges)
+
+        outputs = _outputs_by_node(merged)
+        for index in (0, 1):
+            assert [(spec.digest, spec.concept) for spec in outputs[f"screen_one_{index}"]] == [(f"d_branch_{index}", f"Declared{index}")]
+            assert [(spec.digest, spec.concept) for spec in outputs[f"route_{index}"]] == [(f"d_branch_{index}", f"Declared{index}")]
+            assert [(spec.digest, spec.concept) for spec in outputs[f"write_questions_{index}"]] == [(f"d_branch_{index}", "Question")]
+            assert [(spec.digest, spec.concept) for spec in outputs[f"write_refusal_{index}"]] == [(f"d_branch_{index}", "Text")]
+        # The batch's aggregate is another stuff, which keeps its own typing.
+        assert [(spec.digest, spec.concept, spec.multiplicity) for spec in outputs["screen_each"]] == [("d_list", "Text", True)]
+
+    def test_an_outcome_sequence_keeps_the_outcome_typing(self) -> None:
+        """`questions_flow` is an outcome: it and its last step write the slot, inside the condition's outcomes."""
+        graph = self._graph(
+            nodes=[
+                _node(node_id="route", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="follow_up", concept="Rejection", digest="d_rejection")]),
+                _node(
+                    node_id="questions_flow",
+                    kind=NodeKind.CONTROLLER,
+                    outputs=[IOSpec(name="follow_up", concept="Question", multiplicity=True, digest="d_questions")],
+                ),
+                _node(node_id="draft_questions", outputs=[IOSpec(name="draft", concept="Text", digest="d_draft")]),
+                _node(
+                    node_id="finalize_questions",
+                    inputs=[IOSpec(name="draft", concept="Text", digest="d_draft")],
+                    outputs=[IOSpec(name="follow_up", concept="Question", multiplicity=True, digest="d_questions")],
+                ),
+                _node(node_id="write_rejection", outputs=[IOSpec(name="follow_up", concept="Rejection", digest="d_rejection")]),
+            ],
+            edges=[
+                _contains(source="route", target="questions_flow"),
+                _contains(source="questions_flow", target="draft_questions"),
+                _contains(source="questions_flow", target="finalize_questions"),
+                _contains(source="route", target="write_rejection"),
+            ],
+        )
+        merge = ConditionOutputMerge(
+            condition_node_id="route",
+            shared_digest="d_rejection",
+            merged_digests=["d_questions"],
+            shared_typing=ConditionOutputTyping(concept="Anything"),
+        )
+
+        merged = apply_condition_output_merges(graph=graph, merges=[merge])
+
+        outputs = _outputs_by_node(merged)
+        assert [(spec.digest, spec.concept, spec.multiplicity) for spec in outputs["questions_flow"]] == [("d_rejection", "Question", True)]
+        assert [(spec.digest, spec.concept, spec.multiplicity) for spec in outputs["finalize_questions"]] == [("d_rejection", "Question", True)]
+        assert outputs["route"][0].concept == "Anything"
+
+    def _nested_shape(self) -> GraphSpec:
+        """`screen` ends on `outer`, which runs `wrapper` then `fallback`; `wrapper` ends on `inner`, which runs `x` then `y`."""
+        return self._graph(
+            nodes=[
+                _node(node_id="screen", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="slot", concept="Text", digest="d_fallback")]),
                 _node(node_id="outer", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="slot", concept="Text", digest="d_fallback")]),
+                _node(node_id="wrapper", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="slot", concept="Email", digest="d_y")]),
                 _node(node_id="inner", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="slot", concept="Email", digest="d_y")]),
-                _node(node_id="x", outputs=[IOSpec(name="slot", concept="Question", digest="d_x")]),
+                _node(node_id="x", outputs=[IOSpec(name="slot", concept="Question", multiplicity=True, digest="d_x")]),
                 _node(node_id="y", outputs=[IOSpec(name="slot", concept="Email", digest="d_y")]),
                 _node(node_id="fallback", outputs=[IOSpec(name="slot", concept="Text", digest="d_fallback")]),
+                _node(node_id="assemble", inputs=[IOSpec(name="slot", concept="Text", digest="d_fallback")]),
             ],
-            edges=[],
+            edges=[
+                _contains(source="screen", target="outer"),
+                _contains(source="outer", target="wrapper"),
+                _contains(source="wrapper", target="inner"),
+                _contains(source="inner", target="x"),
+                _contains(source="inner", target="y"),
+                _contains(source="outer", target="fallback"),
+            ],
         )
-        merges = [
+
+    def _nested_merges(self, *, outer_typing: ConditionOutputTyping | None) -> list[ConditionOutputMerge]:
+        return [
             ConditionOutputMerge(
                 condition_node_id="inner",
                 shared_digest="d_y",
                 merged_digests=["d_x"],
-                shared_typing=ConditionOutputTyping(concept="Anything", multiplicity=None),
+                shared_typing=ConditionOutputTyping(concept="InnerDeclared"),
             ),
-            ConditionOutputMerge(condition_node_id="outer", shared_digest="d_fallback", merged_digests=["d_y"]),
+            ConditionOutputMerge(condition_node_id="outer", shared_digest="d_fallback", merged_digests=["d_y"], shared_typing=outer_typing),
+        ]
+
+    @pytest.mark.parametrize("inner_first", [True, False])
+    def test_nested_typings_split_at_the_outer_condition(self, *, inner_first: bool) -> None:
+        """What lies between the conditions carries the inner typing; the outer condition and beyond, the outer one."""
+        merges = self._nested_merges(outer_typing=ConditionOutputTyping(concept="OuterDeclared"))
+        if not inner_first:
+            merges.reverse()
+
+        merged = apply_condition_output_merges(graph=self._nested_shape(), merges=merges)
+
+        outputs = _outputs_by_node(merged)
+        assert {node_id: [(spec.digest, spec.concept) for spec in specs] for node_id, specs in outputs.items()} == {
+            "screen": [("d_fallback", "OuterDeclared")],
+            "outer": [("d_fallback", "OuterDeclared")],
+            "wrapper": [("d_fallback", "InnerDeclared")],
+            "inner": [("d_fallback", "InnerDeclared")],
+            "x": [("d_fallback", "Question")],
+            "y": [("d_fallback", "Email")],
+            # A sibling outcome of the inner condition is the outer condition's outcome, never the inner one's.
+            "fallback": [("d_fallback", "Text")],
+            "assemble": [],
+        }
+        assert [(spec.digest, spec.concept) for spec in _inputs_by_node(merged)["assemble"]] == [("d_fallback", "OuterDeclared")]
+
+    def test_an_untyped_outer_condition_lets_the_inner_typing_through(self) -> None:
+        merged = apply_condition_output_merges(graph=self._nested_shape(), merges=self._nested_merges(outer_typing=None))
+
+        concepts = {node_id: [spec.concept for spec in specs] for node_id, specs in _outputs_by_node(merged).items()}
+        assert concepts["screen"] == ["InnerDeclared"]
+        assert concepts["outer"] == ["InnerDeclared"]
+        assert concepts["wrapper"] == ["InnerDeclared"]
+        assert concepts["inner"] == ["InnerDeclared"]
+        assert concepts["fallback"] == ["Text"]
+        assert concepts["x"] == ["Question"]
+        assert concepts["y"] == ["Email"]
+        assert [spec.concept for spec in _inputs_by_node(merged)["assemble"]] == ["InnerDeclared"]
+
+    def test_sibling_typed_conditions_resolve_to_the_first_in_node_order(self) -> None:
+        """Two typed conditions as outcomes of an untyped one: everything outside them takes the first one's typing."""
+        graph = self._graph(
+            nodes=[
+                _node(node_id="outer", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="slot", concept="Text", digest="d_b")]),
+                _node(node_id="inner_a", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="slot", concept="Text", digest="d_a")]),
+                _node(node_id="a_1", outputs=[IOSpec(name="slot", concept="Number", digest="d_a1")]),
+                _node(node_id="a_2", outputs=[IOSpec(name="slot", concept="Text", digest="d_a")]),
+                _node(node_id="inner_b", kind=NodeKind.CONTROLLER, outputs=[IOSpec(name="slot", concept="Text", digest="d_b")]),
+                _node(node_id="b_1", outputs=[IOSpec(name="slot", concept="Number", digest="d_b1")]),
+                _node(node_id="b_2", outputs=[IOSpec(name="slot", concept="Text", digest="d_b")]),
+            ],
+            edges=[
+                _contains(source="outer", target="inner_a"),
+                _contains(source="inner_a", target="a_1"),
+                _contains(source="inner_a", target="a_2"),
+                _contains(source="outer", target="inner_b"),
+                _contains(source="inner_b", target="b_1"),
+                _contains(source="inner_b", target="b_2"),
+            ],
+        )
+        merges = [
+            ConditionOutputMerge(
+                condition_node_id="inner_b", shared_digest="d_b", merged_digests=["d_b1"], shared_typing=ConditionOutputTyping(concept="B")
+            ),
+            ConditionOutputMerge(
+                condition_node_id="inner_a", shared_digest="d_a", merged_digests=["d_a1"], shared_typing=ConditionOutputTyping(concept="A")
+            ),
+            ConditionOutputMerge(condition_node_id="outer", shared_digest="d_b", merged_digests=["d_a"]),
         ]
 
         merged = apply_condition_output_merges(graph=graph, merges=merges)
 
-        inner_output = _outputs_by_node(merged)["inner"][0]
-        assert inner_output.digest == "d_fallback"
-        assert inner_output.concept == "Anything"
-        assert _outputs_by_node(merged)["outer"][0].concept == "Text"
+        concepts = {node_id: [spec.concept for spec in specs] for node_id, specs in _outputs_by_node(merged).items()}
+        assert concepts["outer"] == ["A"]
+        assert concepts["inner_a"] == ["A"]
+        assert concepts["inner_b"] == ["B"]
+        assert concepts["a_1"] == ["Number"]
+        assert concepts["b_2"] == ["Text"]
 
     def test_stuff_to_stuff_edges_follow_the_merge(self) -> None:
         graph = self._graph(
