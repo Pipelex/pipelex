@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer
 
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_machinery.validation import BINDING_PATH_PATTERN, BINDING_RESULT_PATTERN
@@ -10,7 +10,7 @@ from pipelex.validation_error_types import PipeValidationErrorType
 
 # The key a binding step is recognized by, as MTHDS writes it. `from` is a Python keyword, so the blueprint field is
 # `from_path`, as PipeCompose's construct spells it, but that name is Python's only: MTHDS spells the key `from`, and a
-# step spelling it `from_path` is refused, as the schema refuses it.
+# step spelling it `from_path` is refused, as the schema refuses it, while every dump writes `from`.
 BINDING_FROM_KEY = "from"
 
 # The fields of a pipe step that a binding step never carries, `result` aside, which both shapes share.
@@ -99,6 +99,19 @@ class BindingStepBlueprint(BaseModel):
             )
             raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID, variable_names=[result])
         return result
+
+    @model_serializer(mode="wrap")
+    def serialize_under_from(self, handler: SerializerFunctionWrapHandler):
+        """Always write the path under `from`, the one key the parser reads back, whatever the caller asks.
+
+        A dump without `by_alias` would otherwise write `from_path`, which a crate would carry and hash, and which
+        a crate validated again refuses as an extra field. PipeCompose's construct writes `from` the same way.
+
+        The return is deliberately unannotated — see `ConceptBlueprint.serialize_without_absent_hints`:
+        an annotation here becomes the model's serialization JSON Schema and erases its shape.
+        """
+        dumped: dict[str, Any] = handler(self)
+        return {(BINDING_FROM_KEY if key == "from_path" else key): value for key, value in dumped.items()}
 
     @property
     def root_name(self) -> str:

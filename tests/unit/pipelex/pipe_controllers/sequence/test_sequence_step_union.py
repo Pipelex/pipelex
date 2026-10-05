@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -69,10 +71,35 @@ class TestSequenceStepUnion:
         assert sequence.pipe_dependencies == {"write_receipt"}
         assert sequence.ordered_pipe_dependencies == ["write_receipt"]
 
-    def test_a_binding_step_serializes_under_from(self) -> None:
+    @pytest.mark.parametrize(
+        "dump_kwargs",
+        [
+            pytest.param({}, id="default"),
+            pytest.param({"mode": "json"}, id="json-mode"),
+            pytest.param({"by_alias": True}, id="by-alias"),
+            pytest.param({"by_alias": False}, id="by-field-name"),
+            pytest.param({"mode": "json", "exclude_none": True}, id="crate-emission"),
+        ],
+    )
+    def test_a_binding_step_serializes_under_from_whatever_the_caller_asks(self, dump_kwargs: dict[str, Any]) -> None:
+        """`from_path` is Python's name only: every dump writes `from`, the one key the parser reads back."""
         binding_step = BindingStepBlueprint.model_validate({"from": "invoice.total", "result": "total_amount"})
 
-        assert binding_step.model_dump(by_alias=True) == {"from": "invoice.total", "result": "total_amount"}
+        dumped = binding_step.model_dump(**dump_kwargs)
+
+        assert dumped == {"from": "invoice.total", "result": "total_amount"}
+        assert BindingStepBlueprint.model_validate(dumped) == binding_step
+
+    def test_a_sequence_holding_a_binding_step_dumps_and_validates_again(self) -> None:
+        sequence = _parse_sequence(
+            steps_toml="""    { from = "invoice.total", result = "total_amount" },
+    { pipe = "write_receipt", result = "receipt" },""",
+        )
+
+        dumped = sequence.model_dump(mode="json")
+
+        assert dumped["steps"][0] == {"from": "invoice.total", "result": "total_amount"}
+        assert PipeSequenceBlueprint.model_validate(dumped) == sequence
 
     @pytest.mark.parametrize(
         ("step_toml", "message_fragment"),
