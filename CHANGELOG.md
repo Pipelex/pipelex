@@ -6,6 +6,14 @@
 
 - **`PIPELEX_HOME` relocates the home configuration directory**: when set and not empty, it names the directory Pipelex uses in place of `~/.pipelex`, for the configuration layers, the inference files and their overrides, the credentials `.env`, the first-boot copy of the kit, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate` and the agent CLI's `--global`. It must be in the process environment before Pipelex is imported, a relative value is resolved against the working directory at import, and a `PIPELEX_HOME` line in a `.env` file is ignored. The first boot now fills the home directory from the kit when it exists but is empty, as it already did when it was missing, so an empty volume mount or a `mktemp -d` works as it is.
 
+### Changed
+
+- **`GraphAnalysis.stuff_producers` lists every producer (Breaking)**: it maps a digest to a list of node ids, `get_producer` is replaced by `get_producers`, and the new `shared_stuff_controllers` names the controller a stuff with several producers belongs to. The Mermaid graph draws such a stuff once, inside that controller, with an edge from each producer.
+
+### Fixed
+
+- **A dry-run condition's output is one stuff every outcome produces**: in the graph of a dry run, every outcome of a `PipeCondition` now carries the condition's output digest, so the step reading the condition's result is wired to all of them rather than to the outcome whose pipe code sorts last, and the condition's own item takes its declared output concept when the outcomes write different ones. Each outcome but the last now runs on a copy of the memory the condition received, so an outcome reading the condition's slot reads the value from before the condition rather than a sibling's output, and the default outcome runs last, so the steps after the condition read its value.
+
 ## [v0.74.0] - 2026-10-05
 
 ### Added

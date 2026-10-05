@@ -5,6 +5,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex.graph.condition_output_merge import ConditionOutputMerge, apply_condition_output_merges
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import (
     EdgeKind,
@@ -28,6 +29,7 @@ from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
     BatchItemEvent,
+    ConditionOutputMergeEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -141,6 +143,9 @@ class GraphTracer(GraphTracerProtocol):
         # The branch_producer_node_id is snapshotted at registration time, before register_controller_output
         # overrides _stuff_producer_map to point branch stuff codes to the controller node
         self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+        # Dry-run conditions whose outcome outputs merge onto the condition's output digest,
+        # applied to the finished graph by the rewrite the event-replay assembler shares
+        self._condition_output_merges: list[ConditionOutputMerge] = []
         # Whether this run emits graph (node/edge) events and assembles a GraphSpec on teardown.
         # In costs-only mode this is False: the tracer still mints node ids for the in-memory graph
         # (so usage-event node_id correlation stays valid) but teardown skips the discarded spec build.
@@ -266,6 +271,7 @@ class GraphTracer(GraphTracerProtocol):
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
         self._parallel_combine_map = {}
+        self._condition_output_merges = []
         self._event_log = event_log
         self._workflow_id = workflow_id
         self._pipeline_run_id = pipeline_run_id
@@ -324,6 +330,7 @@ class GraphTracer(GraphTracerProtocol):
                 pipe_registry=dict(self._pipe_registry),
                 concept_registry=dict(self._concept_registry),
             )
+            graph = apply_condition_output_merges(graph=graph, merges=self._condition_output_merges)
 
         self._is_active = False
 
@@ -337,6 +344,7 @@ class GraphTracer(GraphTracerProtocol):
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
         self._parallel_combine_map = {}
+        self._condition_output_merges = []
         if self._event_log is not None:
             self._event_log.close()
         self._event_log = None
@@ -614,6 +622,34 @@ class GraphTracer(GraphTracerProtocol):
                     branch_stuff_codes=branch_stuff_codes,
                     parallel_controller_node_id=parallel_controller_node_id,
                     branch_producer_node_ids=branch_entries,
+                )
+            )
+
+    @override
+    def register_condition_output_merge(
+        self,
+        *,
+        merge: ConditionOutputMerge,
+    ) -> None:
+        """Register that a dry-run condition's outcomes all produce the condition's output stuff.
+
+        Args:
+            merge: The condition node, its output digest and the outcome digests merged onto it.
+        """
+        if not self._is_active:
+            return
+        self._condition_output_merges.append(merge)
+
+        # Emit ConditionOutputMergeEvent
+        if self._event_log is not None:
+            self._emit_event(
+                ConditionOutputMergeEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
+                    workflow_id=self._workflow_id,
+                    timestamp=datetime.now(UTC),
+                    sequence=self._next_event_sequence(),
+                    merge=merge,
                 )
             )
 

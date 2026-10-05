@@ -9,12 +9,14 @@ from pydantic import TypeAdapter
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.tracing.trace_events import (
     AnyTraceEvent,
     BatchAggregateEvent,
     BatchItemEvent,
+    ConditionOutputMergeEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -186,6 +188,18 @@ class TestTraceEvents:
             },
         ),
         (
+            "condition_output_merge",
+            TraceEventKind.CONDITION_OUTPUT_MERGE,
+            {
+                "merge": ConditionOutputMerge(
+                    condition_node_id=_Shared.PARENT_NODE_ID,
+                    shared_digest="shared_001",
+                    merged_digests=["outcome_a"],
+                    shared_typing=ConditionOutputTyping(concept="Anything", multiplicity=5),
+                ),
+            },
+        ),
+        (
             "execution_data",
             TraceEventKind.EXECUTION_DATA,
             {
@@ -213,6 +227,7 @@ class TestTraceEvents:
         TraceEventKind.BATCH_ITEM: BatchItemEvent,
         TraceEventKind.BATCH_AGGREGATE: BatchAggregateEvent,
         TraceEventKind.PARALLEL_COMBINE: ParallelCombineEvent,
+        TraceEventKind.CONDITION_OUTPUT_MERGE: ConditionOutputMergeEvent,
         TraceEventKind.EXECUTION_DATA: ExecutionDataEvent,
         TraceEventKind.USAGE_REPORT: UsageReportEvent,
     }

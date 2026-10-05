@@ -1,14 +1,15 @@
 """Regression test: a dry run of a ``PipeCondition`` must not depend on set iteration order.
 
 ``PipeCondition.pipe_dependencies()`` returns a ``set[str]``, and ``_dry_run_controller_pipe``
-dry-runs **every** branch into the same working memory under the same ``output_name`` — so the
-branch iterated last is the one whose stuff the caller sees as the condition's output. Iterating
-the raw set made that "last" a function of string-hash order, which varies per process: the same
-bundle dry-run in two processes produced two different graphs, and any consumer diffing graph
-specs (the mthds-ui fixture corpus, a static-vs-dry parity check) saw phantom changes.
+dry-runs **every** branch under the same ``output_name``, the last one into the condition's own
+working memory — so the branch run last is the one whose stuff the caller sees as the condition's
+output. Iterating the raw set made that "last" a function of string-hash order, which varies per
+process: the same bundle dry-run in two processes produced two different graphs, and any consumer
+diffing graph specs (the mthds-ui fixture corpus, a static-vs-dry parity check) saw phantom changes.
 
-The loop sorts now. This test pins the property that makes the sort load-bearing: forcing the
-dependency set to iterate in either order must produce the same graph.
+The order is a property of the method now: the branches run sorted, with the default outcome's
+pipe last. This test pins the property that makes that load-bearing: forcing the dependency set
+to iterate in either order must produce the same graph.
 """
 
 from collections.abc import Iterator
@@ -139,7 +140,7 @@ class TestDryRunConditionBranchOrder:
         reverse = await self._graph_output_names(mocker=mocker, reverse=True)
 
         assert forward == reverse
-        # Pin the value too, not just the agreement: the sorted loop ends on the branch whose
-        # pipe code sorts last, so the enclosing sequence's output is always beta's stuff.
-        # Without the sort these two runs disagree — alpha_result one way, beta_result the other.
-        assert forward["respond"] == ["beta_result"]
+        # Pin the value too, not just the agreement: the loop ends on the default outcome's pipe,
+        # so the enclosing sequence's output is always alpha's stuff, although alpha sorts first.
+        # Following set iteration order instead, these two runs disagree.
+        assert forward["respond"] == ["alpha_result"]

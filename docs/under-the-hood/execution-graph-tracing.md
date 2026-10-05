@@ -330,6 +330,16 @@ This paradigm enables:
 - Visualization of data lineage across the execution graph
 - Debugging by tracing which pipe produced unexpected output
 
+### A Dry-Run Condition's Output
+
+A stuff usually has one producer. The exception is the output of a `PipeCondition` in a dry run, which runs every outcome because it cannot know which one a live run would take. Every outcome writes the condition's one slot, so the graph draws that slot as one stuff with a producer per outcome, which is also the shape the static graph builder in mthds-ui draws for the same method.
+
+The condition runs every outcome but the last on a copy of the working memory and run params it received, as `PipeParallel` runs its branches, so no outcome reads what a sibling wrote. The last outcome is the default outcome's pipe when the default is a pipe, the others running before it in sorted order. It runs on the condition's own memory, so the steps after the condition read its stuff, which is the condition's output digest.
+
+Once every outcome has run, the condition registers a `ConditionOutputMerge` (`pipelex/graph/condition_output_merge.py`) through the tracer's `register_condition_output_merge`, which the event log carries as a `ConditionOutputMergeEvent`. It names the condition's node, its output digest and the digests the other outcomes minted for the slot. Only a stuff minted inside the condition is merged: an outcome that hands back a stuff it was given keeps its digest, and nothing is merged when the last outcome resolves its slot absent. Both graph builders apply every merge to the finished graph through `apply_condition_output_merges`, which moves each merged digest onto the condition's, transitively for a condition run as another condition's outcome, across every io item and every edge's stuff digests. The last step of an outcome sequence and the output list of an outcome batch therefore move with their outcome.
+
+Each outcome's io item keeps its own concept and multiplicity, so its node still says what that outcome writes. The condition's own output item types the shared stuff: when the merged outcomes write different concepts or multiplicities, the merge carries the condition's declared output concept and multiplicity, with the invocation's `nb_output` or `multiple_output` applied, and the rewrite retypes that item with it.
+
 ### Data Flow Edge Generation
 
 DATA edges are generated at teardown by correlating input/output digests:
@@ -366,7 +376,7 @@ is_root = analysis.is_root("node_123")
 
 # Data flow
 stuff_info = analysis.get_stuff_info(digest="abc123")
-producer = analysis.get_producer(digest="abc123")
+producers = analysis.get_producers(digest="abc123")
 consumers = analysis.get_consumers(digest="abc123")
 ```
 
@@ -378,8 +388,9 @@ consumers = analysis.get_consumers(digest="abc123")
 | `controller_node_ids` | Nodes with children |
 | `root_nodes` | Top-level nodes |
 | `stuff_registry` | Digest → StuffInfo |
-| `stuff_producers` | Digest → producer node ID |
+| `stuff_producers` | Digest → producer node IDs, more than one for a dry-run condition's output |
 | `stuff_consumers` | Digest → consumer node IDs |
+| `shared_stuff_controllers` | Digest → the deepest controller containing every producer, for a stuff with several producers; that controller's output item types the stuff in `stuff_registry` |
 
 ---
 
@@ -408,6 +419,7 @@ print(mermaidflow.mermaid_code)
 - Operators rendered as rectangles inside subgraphs
 - Stuff nodes (data items) rendered as stadium shapes
 - DATA edges connect producers → stuff → consumers
+- A stuff with several producers is rendered once, inside the deepest controller containing them all, with an edge from each producer
 
 In the standalone viewer (`mermaidflow.html`), clicking a stuff node opens its JSON content, and an image or PDF output also offers a preview rendered from the URL that JSON carries.
 
@@ -533,6 +545,7 @@ validate_graphspec(graph_spec)
 | `pipelex/system/trace_context.py` | Serializable tracing context — sits below `graph/` because it rides in every job's metadata |
 | `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `interpreter.pipeline_execution.graph.data_inclusion` |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
+| `pipelex/graph/condition_output_merge.py` | The merge record of a dry-run condition and the rewrite both graph builders apply |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |
 | `pipelex/graph/validation.py` | GraphSpec validation |

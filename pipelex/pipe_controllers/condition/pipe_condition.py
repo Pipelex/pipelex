@@ -12,13 +12,16 @@ from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -27,6 +30,7 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
+    from pipelex.graph.graphspec import IOMultiplicity
     from pipelex.libraries.library_crate import LibraryCrate
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
@@ -436,22 +440,33 @@ class PipeCondition(PipeController):
                 )
             )
 
-        # Here, it should launch the dry run of all the pipes in the outcomes map.
-        # pipe_dependencies() is a set, and every branch dry-runs into the SAME
-        # working memory under the SAME output_name — so the branch iterated last
-        # is the one whose stuff the caller sees as this condition's output. Left
-        # unsorted, that is string-hash order, which varies per process: the same
-        # bundle dry-run twice yields two different graphs. Sort so the last writer
-        # is a property of the method, not of PYTHONHASHSEED.
-        for pipe_code in sorted(self.pipe_dependencies()):
-            pipe = get_required_pipe(pipe_code=pipe_code)
-            await pipe.run_pipe(
+        # A dry run cannot know which outcome a live run takes, so every pipe outcome runs. Each
+        # outcome but the last runs on a copy of the memory and run params this condition received,
+        # as PipeParallel runs its branches: no outcome sees what a sibling wrote, and the memory
+        # this condition leaves is the one a live run choosing the last outcome would leave. The
+        # last outcome is the default outcome's pipe, so the steps after the condition read the
+        # value a live run falls back to when nothing matches, and the order is a property of the
+        # method rather than of set iteration order. The graph then shows the condition's result
+        # as one stuff that every outcome produces, which the merge registered below records.
+        received_stuff_codes = {stuff.stuff_code for stuff in working_memory.root.values()}
+        outcome_slots: list[Stuff | None] = []
+        outcome_pipe_codes = self._dry_run_outcome_order()
+        for outcome_index, pipe_code in enumerate(outcome_pipe_codes):
+            is_last_outcome = outcome_index == len(outcome_pipe_codes) - 1
+            outcome_output = await get_required_pipe(pipe_code=pipe_code).run_pipe(
                 job_metadata=job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
+                working_memory=working_memory if is_last_outcome else working_memory.make_deep_copy(),
+                pipe_run_params=pipe_run_params if is_last_outcome else pipe_run_params.make_deep_copy(),
                 output_name=output_name,
                 library_crate=library_crate,
             )
+            outcome_slots.append(outcome_output.working_memory.get_optional_main_stuff())
+        self._register_dry_run_output_merge(
+            job_metadata=job_metadata,
+            pipe_run_params=pipe_run_params,
+            received_stuff_codes=received_stuff_codes,
+            outcome_slots=outcome_slots,
+        )
         execution_data_dict: dict[str, Any] = {
             "evaluated_expression": "dry_run",
             "selected_outcome": "all_outcomes",
@@ -482,6 +497,75 @@ class PipeCondition(PipeController):
                 reason=f"dry run of PipeCondition '{self.code}': all outcomes are special, the declared output resolves absent",
             )
         return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
+
+    def _dry_run_outcome_order(self) -> list[str]:
+        """The pipe outcomes in the order a dry run runs them: sorted, with the default outcome's pipe last."""
+        pipe_codes = sorted(self.pipe_dependencies())
+        if self.default_outcome in pipe_codes:
+            pipe_codes.remove(self.default_outcome)
+            pipe_codes.append(self.default_outcome)
+        return pipe_codes
+
+    def _register_dry_run_output_merge(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        pipe_run_params: PipeRunParams,
+        received_stuff_codes: set[str],
+        outcome_slots: list[Stuff | None],
+    ) -> None:
+        """Record that every outcome's output is this condition's one output stuff, for the graph.
+
+        The shared stuff is the last outcome's, which the steps after the condition already read.
+        Only a stuff minted inside the condition is merged: an outcome handing back a stuff it was
+        given would otherwise drag that stuff's own producer into the condition's result. When the
+        merged outcomes write different concepts or multiplicities, the shared stuff is typed by
+        this condition's declared output, the one typing that covers them all.
+
+        Args:
+            job_metadata: The condition's job metadata, whose trace context names its graph node.
+            pipe_run_params: The condition's run params, carrying the invocation's output multiplicity.
+            received_stuff_codes: The stuff codes in the memory the condition received.
+            outcome_slots: The stuff each outcome wrote into its slot, in run order, or None where it resolved the slot absent.
+        """
+        trace_context = job_metadata.trace_context
+        if trace_context is None or not trace_context.emit_graph_events or trace_context.parent_node_id is None:
+            return
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None or not outcome_slots:
+            return
+        shared_slot = outcome_slots[-1]
+        if not isinstance(shared_slot, Stuff) or shared_slot.stuff_code in received_stuff_codes:
+            return
+        merged_slots = [
+            slot
+            for slot in outcome_slots[:-1]
+            if isinstance(slot, Stuff) and slot.stuff_code not in received_stuff_codes and slot.stuff_code != shared_slot.stuff_code
+        ]
+        if not merged_slots:
+            return
+
+        shared_typing: ConditionOutputTyping | None = None
+        if len({(slot.concept.code, slot.is_list) for slot in [*merged_slots, shared_slot]}) > 1:
+            multiplicity_resolution = output_multiplicity_to_apply(
+                base_multiplicity=self.output.multiplicity,
+                override_multiplicity=pipe_run_params.output_multiplicity,
+            )
+            declared_multiplicity: IOMultiplicity | None = None
+            if multiplicity_resolution.is_multiple_outputs_enabled:
+                output_count = multiplicity_resolution.specific_output_count
+                declared_multiplicity = output_count if output_count is not None and output_count > 1 else True
+            shared_typing = ConditionOutputTyping(concept=self.output.concept.code, multiplicity=declared_multiplicity)
+
+        tracer_manager.register_condition_output_merge(
+            lookup_key=trace_context.lookup_key,
+            merge=ConditionOutputMerge(
+                condition_node_id=trace_context.parent_node_id,
+                shared_digest=shared_slot.stuff_code,
+                merged_digests=sorted({slot.stuff_code for slot in merged_slots}),
+                shared_typing=shared_typing,
+            ),
+        )
 
     def _record_declared_absent_output(self, *, working_memory: WorkingMemory, output_name: str | None, reason: str) -> None:
         """Resolve this pipe's declared output as a declared-absent record (the `continue` arm)."""

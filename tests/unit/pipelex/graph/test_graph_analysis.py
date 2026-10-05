@@ -245,7 +245,7 @@ class TestGraphAnalysis:
         assert stuff_info.data == "input content"
 
     def test_stuff_producers_map(self) -> None:
-        """Test that stuff_producers maps digest to producer node_id."""
+        """Test that stuff_producers maps digest to its producer node_ids."""
         producer_node = {
             "node_id": "producer_1",
             "kind": NodeKind.OPERATOR,
@@ -259,7 +259,7 @@ class TestGraphAnalysis:
         graph = self._make_graph(nodes=[producer_node])
         analysis = GraphAnalysis.from_graphspec(graph)
 
-        assert analysis.stuff_producers.get("digest_abc") == "producer_1"
+        assert analysis.stuff_producers.get("digest_abc") == ["producer_1"]
 
     def test_stuff_consumers_map(self) -> None:
         """Test that stuff_consumers maps digest to list of consumer node_ids."""
@@ -334,9 +334,9 @@ class TestGraphAnalysis:
         analysis = GraphAnalysis.from_graphspec(graph)
 
         # Controller should not be in producers
-        assert analysis.stuff_producers.get("ctrl_out_digest") != "ctrl_1"
+        assert "ctrl_out_digest" not in analysis.stuff_producers
         # Child should be the producer
-        assert analysis.stuff_producers.get("child_digest") == "child_1"
+        assert analysis.stuff_producers.get("child_digest") == ["child_1"]
 
     def test_deterministic_analysis(self) -> None:
         """Test that same GraphSpec yields same analysis."""
@@ -470,8 +470,8 @@ class TestGraphAnalysis:
 
         assert analysis.get_stuff_info("nonexistent") is None
 
-    def test_get_producer_helper(self) -> None:
-        """Test the get_producer helper method."""
+    def test_get_producers_helper(self) -> None:
+        """Test the get_producers helper method."""
         producer_node = {
             "node_id": "producer_1",
             "kind": NodeKind.OPERATOR,
@@ -485,8 +485,8 @@ class TestGraphAnalysis:
         graph = self._make_graph(nodes=[producer_node])
         analysis = GraphAnalysis.from_graphspec(graph)
 
-        assert analysis.get_producer("digest_001") == "producer_1"
-        assert analysis.get_producer("nonexistent") is None
+        assert analysis.get_producers("digest_001") == ["producer_1"]
+        assert analysis.get_producers("nonexistent") == []
 
     def test_get_consumers_helper(self) -> None:
         """Test the get_consumers helper method."""
@@ -600,3 +600,60 @@ class TestGraphAnalysis:
         # Only outer_ctrl should be in root_nodes
         root_ids = {node.node_id for node in analysis.root_nodes}
         assert root_ids == {"ctrl_outer"}
+
+    def _merged_condition_graph(self) -> GraphSpec:
+        """A dry-run condition whose two outcomes both produce the stuff the next step reads."""
+        return self._make_graph(
+            nodes=[
+                {"node_id": "screen", "kind": NodeKind.CONTROLLER, "pipe_code": "screen", "status": NodeStatus.SUCCEEDED},
+                {
+                    "node_id": "route",
+                    "kind": NodeKind.CONTROLLER,
+                    "pipe_code": "route",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Anything", digest="d_shared")]),
+                },
+                {
+                    "node_id": "write_questions",
+                    "kind": NodeKind.OPERATOR,
+                    "pipe_code": "write_questions",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(outputs=[IOSpec(name="questions", concept="Question", multiplicity=True, digest="d_shared")]),
+                },
+                {
+                    "node_id": "write_rejection",
+                    "kind": NodeKind.OPERATOR,
+                    "pipe_code": "write_rejection",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Rejection", digest="d_shared")]),
+                },
+                {
+                    "node_id": "assemble",
+                    "kind": NodeKind.OPERATOR,
+                    "pipe_code": "assemble",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(inputs=[IOSpec(name="follow_up", concept="Anything", digest="d_shared")]),
+                },
+            ],
+            edges=[
+                {"edge_id": "c1", "source": "screen", "target": "route", "kind": EdgeKind.CONTAINS},
+                {"edge_id": "c2", "source": "screen", "target": "assemble", "kind": EdgeKind.CONTAINS},
+                {"edge_id": "c3", "source": "route", "target": "write_questions", "kind": EdgeKind.CONTAINS},
+                {"edge_id": "c4", "source": "route", "target": "write_rejection", "kind": EdgeKind.CONTAINS},
+            ],
+        )
+
+    def test_a_stuff_lists_every_producer(self) -> None:
+        analysis = GraphAnalysis.from_graphspec(self._merged_condition_graph())
+
+        assert analysis.get_producers("d_shared") == ["write_questions", "write_rejection"]
+        assert analysis.get_consumers("d_shared") == ["assemble"]
+
+    def test_a_stuff_with_several_producers_belongs_to_their_deepest_common_controller(self) -> None:
+        analysis = GraphAnalysis.from_graphspec(self._merged_condition_graph())
+
+        assert analysis.shared_stuff_controllers == {"d_shared": "route"}
+        # The controller's own item types the stuff, since only its declaration covers every producer.
+        stuff_info = analysis.get_stuff_info("d_shared")
+        assert stuff_info is not None
+        assert (stuff_info.name, stuff_info.concept, stuff_info.multiplicity) == ("follow_up", "Anything", None)

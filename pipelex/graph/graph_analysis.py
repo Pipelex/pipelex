@@ -80,13 +80,23 @@ class GraphAnalysis(BaseModel):
         default_factory=dict,
         description="Map of digest to StuffInfo for all stuffs in the graph",
     )
-    stuff_producers: dict[str, str] = Field(
+    stuff_producers: dict[str, list[str]] = Field(
         default_factory=dict,
-        description="Map of digest to producer node_id",
+        description=(
+            "Map of digest to its producer node_ids, in node order. A stuff has several producers when a dry-run "
+            "condition's outcomes all write the condition's one output stuff."
+        ),
     )
     stuff_consumers: dict[str, list[str]] = Field(
         default_factory=dict,
         description="Map of digest to list of consumer node_ids",
+    )
+    shared_stuff_controllers: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Map of digest to the deepest controller containing every producer, for a stuff with several producers. "
+            "A renderer places the stuff inside that controller, whose own output item types it."
+        ),
     )
 
     @classmethod
@@ -128,7 +138,7 @@ class GraphAnalysis(BaseModel):
 
         # Build stuff registry and producer/consumer maps
         stuff_registry: dict[str, StuffInfo] = {}
-        stuff_producers: dict[str, str] = {}
+        stuff_producers: dict[str, list[str]] = defaultdict(list)
         stuff_consumers: dict[str, list[str]] = defaultdict(list)
 
         for node in graph.nodes:
@@ -145,7 +155,8 @@ class GraphAnalysis(BaseModel):
                         multiplicity=output_spec.multiplicity,
                         data=output_spec.data,
                     )
-                    stuff_producers[output_spec.digest] = node.node_id
+                    if node.node_id not in stuff_producers[output_spec.digest]:
+                        stuff_producers[output_spec.digest].append(node.node_id)
 
             # Collect inputs (this node consumes these stuffs)
             for input_spec in node.node_io.inputs:
@@ -160,8 +171,31 @@ class GraphAnalysis(BaseModel):
                         )
                     stuff_consumers[input_spec.digest].append(node.node_id)
 
-        # Convert defaultdict to regular dict for Pydantic
+        # Convert defaultdicts to regular dicts for Pydantic
+        stuff_producers = dict(stuff_producers)
         stuff_consumers = dict(stuff_consumers)
+
+        # A stuff with several producers belongs to the deepest controller containing them all: the
+        # condition whose outcomes write it. That controller's own output item types the stuff, since
+        # only its declaration covers every producer when the outcomes write different concepts.
+        parent_by_node: dict[str, str] = {child_id: parent_id for parent_id, child_ids in containment_tree.items() for child_id in child_ids}
+        shared_stuff_controllers: dict[str, str] = {}
+        for digest, producer_node_ids in stuff_producers.items():
+            if len(producer_node_ids) < 2:
+                continue
+            common_controller_id = cls._deepest_common_controller(node_ids=producer_node_ids, parent_by_node=parent_by_node)
+            if common_controller_id is None:
+                continue
+            shared_stuff_controllers[digest] = common_controller_id
+            for output_spec in nodes_by_id[common_controller_id].node_io.outputs:
+                if output_spec.digest == digest:
+                    stuff_registry[digest] = StuffInfo(
+                        name=output_spec.name,
+                        concept=output_spec.concept,
+                        multiplicity=output_spec.multiplicity,
+                        data=output_spec.data,
+                    )
+                    break
 
         return cls(
             nodes_by_id=nodes_by_id,
@@ -172,7 +206,27 @@ class GraphAnalysis(BaseModel):
             stuff_registry=stuff_registry,
             stuff_producers=stuff_producers,
             stuff_consumers=stuff_consumers,
+            shared_stuff_controllers=shared_stuff_controllers,
         )
+
+    @classmethod
+    def _deepest_common_controller(cls, *, node_ids: list[str], parent_by_node: dict[str, str]) -> str | None:
+        """The deepest controller containing every node of `node_ids`, or None when they share no ancestor."""
+        other_ancestor_sets = [set(cls._ancestors_of(node_id=node_id, parent_by_node=parent_by_node)) for node_id in node_ids[1:]]
+        for candidate in cls._ancestors_of(node_id=node_ids[0], parent_by_node=parent_by_node):
+            if all(candidate in ancestor_set for ancestor_set in other_ancestor_sets):
+                return candidate
+        return None
+
+    @classmethod
+    def _ancestors_of(cls, *, node_id: str, parent_by_node: dict[str, str]) -> list[str]:
+        """The controllers containing `node_id`, from its parent up to its root."""
+        ancestors: list[str] = []
+        current = parent_by_node.get(node_id)
+        while current is not None and current not in ancestors:
+            ancestors.append(current)
+            current = parent_by_node.get(current)
+        return ancestors
 
     def get_children(self, node_id: str) -> list[str]:
         """Get the child node IDs for a given parent node.
@@ -218,16 +272,16 @@ class GraphAnalysis(BaseModel):
         """
         return self.stuff_registry.get(digest)
 
-    def get_producer(self, digest: str) -> str | None:
-        """Get the producer node ID for a stuff.
+    def get_producers(self, digest: str) -> list[str]:
+        """Get the producer node IDs for a stuff.
 
         Args:
             digest: The stuff digest.
 
         Returns:
-            Producer node ID if found, None otherwise.
+            List of producer node IDs in node order, or empty list if no producer is known.
         """
-        return self.stuff_producers.get(digest)
+        return self.stuff_producers.get(digest, [])
 
     def get_consumers(self, digest: str) -> list[str]:
         """Get the consumer node IDs for a stuff.
