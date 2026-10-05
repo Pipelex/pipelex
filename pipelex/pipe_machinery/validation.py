@@ -17,6 +17,7 @@ from pipelex.core.pipes.variable_multiplicity import (
 )
 from pipelex.tools.misc.string_utils import (
     FIELD_PATH_PATTERN,
+    FIELD_PATH_SEGMENT_REGEX,
     SNAKE_CASE_IDENTIFIER_REGEX,
     SNAKE_CASE_PATTERN,
     get_root_from_dotted_path,
@@ -39,6 +40,15 @@ BINDING_RESULT_PATTERN = INPUT_NAME_PATTERN
 # single dots, each segment a letter followed by letters, digits and underscores. Subscripts, expressions,
 # whitespace and underscore-led segments are outside it.
 BINDING_PATH_PATTERN = FIELD_PATH_PATTERN
+
+# The grammar of a PipeSequence pipe step's `batch_over`: a name with no dot, which names the list as a step or the
+# sequence's inputs store it, or a dotted path following the binding path grammar, which the sequence binds before
+# batching over the bound list. A dotted `batch_over` outside the path grammar is `binding_step_invalid`.
+SEQUENCE_STEP_BATCH_OVER_PATTERN = rf"^(?:[^.]*|{FIELD_PATH_SEGMENT_REGEX}(?:\.{FIELD_PATH_SEGMENT_REGEX})+)$"
+
+# The grammar of a PipeParallel branch's `batch_over`: a name with no dot. A dotted `batch_over` binds, and only a
+# sequence's steps bind, so a branch carrying one is `binding_step_invalid`.
+PARALLEL_BRANCH_BATCH_OVER_PATTERN = r"^[^.]*$"
 
 # The marker of an input declaration as `_input_marker` writes it after the concept: an optional multiplicity
 # suffix (`[]` or `[N]`), then an optional presence symbol (`?` or `!`). Group 1 is the bracket content, group 2

@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Any, cast, get_args
 
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_machinery.validation import INPUT_NAME_PATTERN
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.validation import INPUT_NAME_PATTERN, PARALLEL_BRANCH_BATCH_OVER_PATTERN, SEQUENCE_STEP_BATCH_OVER_PATTERN
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -37,6 +39,10 @@ _PIPE_DEFINITION_NAMES: frozenset[str] = frozenset(member.__name__ for member in
 # is rejected (extra property under the arm's `additionalProperties: false`).
 _SIGNATURE_DEFINITION_NAME = PipeSignatureBlueprint.__name__
 
+# The definition a PipeParallel branch takes: `SubPipeBlueprint`'s, with a `batch_over` that is never dotted
+# (`_constrain_batch_over`). No Python class carries the name, since steps and branches share one blueprint.
+_PARALLEL_BRANCH_DEFINITION_NAME = "ParallelBranchBlueprint"
+
 
 def generate_mthds_schema() -> dict[str, Any]:
     """Generate a Taplo-compatible JSON Schema for .mthds files.
@@ -59,6 +65,7 @@ def generate_mthds_schema() -> dict[str, Any]:
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
     schema = _constrain_input_names(schema)
+    schema = _constrain_batch_over(schema)
 
     return _add_taplo_metadata(schema)
 
@@ -289,6 +296,56 @@ def _constrain_input_names(schema: dict[str, Any]) -> dict[str, Any]:
         input_list_name_schema["pattern"] = INPUT_NAME_PATTERN
 
     return schema
+
+
+def _constrain_batch_over(schema: dict[str, Any]) -> dict[str, Any]:
+    """Give `batch_over` its grammar: a dotted path on a PipeSequence step, and a name with no dot on a PipeParallel branch.
+
+    A dotted `batch_over` binds the list at its path before batching over it, so on a sequence's pipe step it follows the
+    binding path grammar, and a PipeParallel branch, which never binds, carries none: the runtime refuses both faults as
+    `binding_step_invalid`, which this makes the schema refuse first. Both steps and branches parse into `SubPipeBlueprint`,
+    so the branch takes a copy of its definition, `ParallelBranchBlueprint`, carrying the stricter `pattern`. Each is a
+    `pattern` on the string arm of the field, which a Draft-4 validator such as plxt's applies.
+    """
+    schema = copy.deepcopy(schema)
+    definitions = schema.get("definitions", {})
+    pipe_step_schema = definitions.get(SubPipeBlueprint.__name__)
+    branches_schema = definitions.get(PipeParallelBlueprint.__name__, {}).get("properties", {}).get("branches")
+    if pipe_step_schema is None or branches_schema is None:
+        return schema
+
+    branch_schema = copy.deepcopy(pipe_step_schema)
+    branch_schema["title"] = _PARALLEL_BRANCH_DEFINITION_NAME
+    _set_batch_over_grammar(
+        step_schema=pipe_step_schema,
+        pattern=SEQUENCE_STEP_BATCH_OVER_PATTERN,
+        description=(
+            "The list in working memory to batch this step over, running the pipe once per item. A dotted path such as "
+            "`catalog.pages` is a binding followed by a batch: the path is bound under a private name, by the rules of a binding "
+            "step's `from`, and the step batches over the bound list, which must be a list."
+        ),
+    )
+    _set_batch_over_grammar(
+        step_schema=branch_schema,
+        pattern=PARALLEL_BRANCH_BATCH_OVER_PATTERN,
+        description=(
+            "The list in working memory to batch this branch over, running the pipe once per item. A name with no dot: a branch "
+            "never binds, so a list held in a field is bound by the calling sequence before the PipeParallel step."
+        ),
+    )
+    definitions[_PARALLEL_BRANCH_DEFINITION_NAME] = branch_schema
+    branches_schema["items"] = {"$ref": f"#/definitions/{_PARALLEL_BRANCH_DEFINITION_NAME}"}
+    return schema
+
+
+def _set_batch_over_grammar(*, step_schema: dict[str, Any], pattern: str, description: str) -> None:
+    batch_over_schema = step_schema.get("properties", {}).get("batch_over")
+    if batch_over_schema is None:
+        return
+    batch_over_schema["description"] = description
+    for arm in batch_over_schema.get("anyOf", [batch_over_schema]):
+        if arm.get("type") == "string":
+            arm["pattern"] = pattern
 
 
 def _build_construct_field_schema() -> dict[str, Any]:

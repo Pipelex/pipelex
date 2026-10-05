@@ -395,7 +395,40 @@ class TestMthdsSchemaGeneration:
         table = {**_minimal_pipe_table("PipeParallel"), "branches": [{"from": "invoice.total", "result": "total"}]}
         assert validator.is_valid(table) is False
         branch_items = schema["definitions"]["PipeParallelBlueprint"]["properties"]["branches"]["items"]
-        assert branch_items == {"$ref": "#/definitions/SubPipeBlueprint"}
+        assert branch_items == {"$ref": "#/definitions/ParallelBranchBlueprint"}
+        branch_schema = dict(schema["definitions"]["ParallelBranchBlueprint"])
+        pipe_step_schema = dict(schema["definitions"]["SubPipeBlueprint"])
+        for step_schema in (branch_schema, pipe_step_schema):
+            step_schema.pop("title")
+            step_schema["properties"] = {name: field for name, field in step_schema["properties"].items() if name != "batch_over"}
+        assert branch_schema == pipe_step_schema
+
+    @pytest.mark.parametrize(
+        ("batch_over", "is_valid_on_a_step", "is_valid_on_a_branch"),
+        [
+            pytest.param("pages", True, True, id="a-plain-name"),
+            pytest.param("PagesOfTheCatalog", True, True, id="a-name-a-pipe-step-may-store-under"),
+            pytest.param("catalog.pages", True, False, id="a-dotted-path"),
+            pytest.param("catalogs.pages.page_view", True, False, id="a-deep-dotted-path"),
+            pytest.param("catalog..pages", False, False, id="an-empty-segment"),
+            pytest.param("catalog.pages[0]", False, False, id="a-subscript"),
+            pytest.param("catalog._pages", False, False, id="an-underscore-led-segment"),
+            pytest.param(".pages", False, False, id="a-leading-dot"),
+        ],
+    )
+    def test_batch_over_is_a_path_on_a_sequence_step_and_a_plain_name_on_a_parallel_branch(
+        self, schema: dict[str, Any], batch_over: str, is_valid_on_a_step: bool, is_valid_on_a_branch: bool
+    ) -> None:
+        """A dotted `batch_over` binds before it batches: it follows the path grammar on a sequence step, and a branch never binds.
+
+        Both refusals are `binding_step_invalid`, which the runtime raises when the bundle is parsed and the schema refuses first.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        pipe_step = {"pipe": "describe_page", "batch_over": batch_over, "batch_as": "page", "result": "descriptions"}
+        sequence_table = {**_minimal_pipe_table("PipeSequence"), "steps": [pipe_step]}
+        parallel_table = {**_minimal_pipe_table("PipeParallel"), "branches": [pipe_step]}
+        assert validator.is_valid(sequence_table) is is_valid_on_a_step, f"sequence step batch_over {batch_over!r}"
+        assert validator.is_valid(parallel_table) is is_valid_on_a_branch, f"parallel branch batch_over {batch_over!r}"
 
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
         """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.

@@ -16,7 +16,8 @@ BINDING_FROM_KEY = "from"
 # The fields of a pipe step that a binding step never carries, `result` aside, which both shapes share.
 PIPE_STEP_ONLY_FIELDS: tuple[str, ...] = ("pipe", "nb_output", "multiple_output", "batch_over", "batch_as")
 
-_PATH_GRAMMAR = (
+# How a message states the path grammar, after "a path is": the grammar of a binding step's `from` and of a dotted `batch_over`.
+PATH_GRAMMAR_DESCRIPTION = (
     "a name in working memory followed by zero or more field names, separated by single dots, each a letter followed by letters, "
     f"digits and underscores (`{FIELD_PATH_SEGMENT_REGEX}`), with no subscript, expression, whitespace or underscore-led segment"
 )
@@ -52,7 +53,8 @@ def check_binding_step_shape(*, raw_step: Mapping[str, Any], step_label: str) ->
         quoted_fields = ", ".join(f"`{field_name}`" for field_name in pipe_step_fields)
         msg = (
             f"{step_label} is a binding step (it carries `from`), which carries only `from` and `result`, so it cannot carry {quoted_fields}. "
-            "To batch over a bound list, bind it first, then batch over the bound name in the next pipe step."
+            f'To batch over the list at `{from_path}`, write it as a pipe step\'s `batch_over = "{from_path}"`, which binds it and batches over '
+            "the bound list, or bind it first, then batch over the bound name in the next pipe step."
         )
         raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID)
     if "result" not in raw_step:
@@ -86,7 +88,7 @@ class BindingStepBlueprint(BaseModel):
     @classmethod
     def validate_from_path(cls, from_path: str) -> str:
         if not is_field_path(path=from_path):
-            msg = f"The binding step's `from` '{from_path}' is not a path: a path is {_PATH_GRAMMAR}."
+            msg = f"The binding step's `from` '{from_path}' is not a path: a path is {PATH_GRAMMAR_DESCRIPTION}."
             raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID, variable_names=[from_path])
         return from_path
 

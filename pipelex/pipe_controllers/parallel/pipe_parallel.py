@@ -41,7 +41,6 @@ from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint
 from pipelex.pipe_machinery.pipe_abstract import CompanionSlot
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
-from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -129,9 +128,9 @@ class PipeParallel(PipeController):
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
                     raise PipeValidationError(message=msg) from exc
-                input_list_root = get_root_from_dotted_path(sub_pipe.batch_params.input_list_stuff_name)
+                # A branch batches over a plain name only: a dotted `batch_over` is refused on a branch, since it binds.
                 needed_inputs.add_stuff_spec(
-                    variable_name=input_list_root,
+                    variable_name=sub_pipe.batch_params.input_list_stuff_name,
                     concept=stuff_spec.concept,
                     multiplicity=True,
                 )

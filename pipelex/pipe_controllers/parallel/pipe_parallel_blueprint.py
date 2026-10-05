@@ -7,7 +7,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.binding.binding_step_blueprint import BINDING_FROM_KEY, is_binding_step_dict, raw_step_mapping
-from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint, is_dotted_batch_over
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -27,25 +27,41 @@ class PipeParallelBlueprint(PipeBlueprint):
     @field_validator("branches", mode="before")
     @classmethod
     def refuse_binding_branches(cls, branches: Any) -> Any:
-        """Refuse a branch written as a binding step: a branch is always a pipe step.
+        """Refuse a branch that binds: a branch written as a binding step, or a branch whose `batch_over` is a dotted path.
 
         A binding orders a value before the steps that read it, and branches run concurrently, so a binding
-        among them would only be a binding before the parallel, written in the wrong place.
+        among them would only be a binding before the parallel, written in the wrong place. A dotted
+        `batch_over` is a binding followed by a batch, so a branch carries only a plain one.
         """
         if not isinstance(branches, list):
             # Not a list at all: pydantic's own `list_type` error names the field and what it holds.
             return branches
         branch_list = cast("list[Any]", branches)
         for branch_index, branch in enumerate(branch_list):
-            raw_branch = raw_step_mapping(raw_step=branch)
-            if raw_branch is not None and is_binding_step_dict(raw_step=raw_branch):
-                from_path = raw_branch.get(BINDING_FROM_KEY)
+            batch_over: Any
+            if isinstance(branch, SubPipeBlueprint):
+                batch_over = branch.batch_over
+            else:
+                raw_branch = raw_step_mapping(raw_step=branch)
+                if raw_branch is None:
+                    continue
+                if is_binding_step_dict(raw_step=raw_branch):
+                    from_path = raw_branch.get(BINDING_FROM_KEY)
+                    msg = (
+                        f"Branch {branch_index + 1} of the parallel is a binding step (it carries `from`), but a PipeParallel branch is always "
+                        f"a pipe step: bind the value in a step of the calling PipeSequence, before the PipeParallel step "
+                        f'(`{{ from = "{from_path}", result = "<name>" }}`), and have the branch read that name.'
+                    )
+                    raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID)
+                batch_over = raw_branch.get("batch_over")
+            if isinstance(batch_over, str) and is_dotted_batch_over(batch_over=batch_over):
                 msg = (
-                    f"Branch {branch_index + 1} of the parallel is a binding step (it carries `from`), but a PipeParallel branch is always "
-                    f"a pipe step: bind the value in a step of the calling PipeSequence, before the PipeParallel step "
-                    f'(`{{ from = "{from_path}", result = "<name>" }}`), and have the branch read that name.'
+                    f"Branch {branch_index + 1} of the parallel batches over the dotted path '{batch_over}', but a dotted `batch_over` binds "
+                    "the list at its path before batching over it, and a PipeParallel branch never binds: bind the list in a step of the "
+                    f'calling PipeSequence, before the PipeParallel step (`{{ from = "{batch_over}", result = "<name>" }}`), and have the '
+                    'branch batch over that name (`batch_over = "<name>"`).'
                 )
-                raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID)
+                raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID, variable_names=[batch_over])
         return branch_list
 
     @override

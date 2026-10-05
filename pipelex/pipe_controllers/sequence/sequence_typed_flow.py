@@ -88,6 +88,16 @@ class DerivedBinding(NamedTuple):
     stuff_spec: StuffSpec
 
 
+def authored_step_number(*, steps: list[SequenceStep], step_index: int) -> int:
+    """The number of a step, counting from 1, as its author wrote the sequence.
+
+    The binding a sequence writes for a dotted `batch_over` is no step of the author's: it shares the number of the pipe
+    step it was written for, which follows it.
+    """
+    rewritten_before = sum(1 for step in steps[:step_index] if isinstance(step, BindingStep) and step.is_dotted_batch_over)
+    return step_index + 1 - rewritten_before
+
+
 def resolve_library_concept(*, concept_library: ConceptLibraryAbstract, concept_ref: str) -> Concept | None:
     """The library's concept for a ref, looked up directly, then among a dependency's aliased keys when one alone matches."""
     try:
@@ -102,7 +112,7 @@ def resolve_library_concept(*, concept_library: ConceptLibraryAbstract, concept_
 def binding_path_unresolved_error(
     *, sequence_code: str, domain_code: str, binding_step: BindingStep, exc: BindingPathUnresolvedError
 ) -> PipeValidationError:
-    msg = f"In pipe '{sequence_code}', the binding step {binding_step.as_written} cannot be derived. {exc}"
+    msg = f"In pipe '{sequence_code}', the {binding_step.label} cannot be derived. {exc}"
     return PipeValidationError(
         message=msg,
         error_type=PipeValidationErrorType.BINDING_PATH_UNRESOLVED,
@@ -260,7 +270,7 @@ def build_sequence_typed_flow(
             continue
         step_writes = step_memory_writes(step=step, step_pipe=step_pipe, visited_pipes=visited_pipes)
         memory_writes_by_pipe_step[step_index] = step_writes
-        step_label = f"step {step_index + 1} (pipe '{step_pipe.code}')"
+        step_label = f"step {authored_step_number(steps=steps, step_index=step_index)} (pipe '{step_pipe.code}')"
         for written_name, memory_write in step_writes.items():
             written_names.add(written_name)
             if memory_write.is_always_written:

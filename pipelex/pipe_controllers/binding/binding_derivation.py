@@ -188,6 +188,8 @@ class BindingDerivation(BaseModel):
     # How the runtime stores the value it reaches: a concept's content is copied whole, a plain value wrapped.
     leaf_kind: BindingValueKind
     segments: tuple[BindingSegment, ...] = ()
+    # The multiplicity of the root the path starts from, as the sequence knows it at the binding step.
+    root_multiplicity: VariableMultiplicity | None = None
 
     @property
     def root_name(self) -> str:
@@ -200,6 +202,19 @@ class BindingDerivation(BaseModel):
     @property
     def is_plural(self) -> bool:
         return is_multiple_multiplicity(multiplicity=self.multiplicity)
+
+    @property
+    def is_value_at_one_path(self) -> bool:
+        """Whether what the binding binds is the value at one path of its root, rather than values gathered across items.
+
+        A single value is, a bare name is its root's own value, and a list is when it is one list field of a single root,
+        no list being crossed before that field: a list root, or a list crossed along the way, gathers across items.
+        """
+        if not self.is_plural or self.is_bare_name:
+            return True
+        if is_multiple_multiplicity(multiplicity=self.root_multiplicity):
+            return False
+        return not any(segment.crosses_list for segment in self.segments[:-1])
 
 
 def _quoted(*, names: list[str]) -> str:
@@ -236,6 +251,7 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
             multiplicity=root.multiplicity,
             may_find_nothing=False,
             leaf_kind=BindingValueKind.CONCEPT,
+            root_multiplicity=root.multiplicity,
         )
 
     crosses_any_list = is_multiple_multiplicity(multiplicity=root.multiplicity)
@@ -349,4 +365,5 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
         first_optional_path=first_optional_path if not crosses_any_list else None,
         leaf_kind=leaf_kind,
         segments=tuple(segments),
+        root_multiplicity=root.multiplicity,
     )

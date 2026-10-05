@@ -195,6 +195,41 @@ steps = [{ pipe = "extract_pdf", batch_over = "transcripts", batch_as = "transcr
         assert _summary(consumers["transcripts"]) == [("extract_pdf", "transcripts[]", False)]
         assert "transcript" not in consumers
 
+    @pytest.mark.parametrize(
+        ("inputs", "batch_over", "expected_summary"),
+        [
+            pytest.param(
+                '{ case = "Case" }', "case.transcripts", [("extract_pdf", "case.transcripts[]", False)], id="one-list-field-of-a-single-root"
+            ),
+            pytest.param('{ cases = "Case[]" }', "cases.transcripts", [], id="lists-gathered-across-items"),
+        ],
+    )
+    def test_a_dotted_batch_over_maps_the_field_list_to_its_item_slot(
+        self, load_empty_library: Callable[[], str], inputs: str, batch_over: str, expected_summary: list[tuple[str, str, bool]]
+    ):
+        """A dotted `batch_over` binds its path, then batches over the bound list: a list one field of a single root holds is
+        the value at that field's path, while a list gathered across items stands for no one path and is not followed.
+        """
+        pipes = f"""
+[concept.Case]
+description = "A case file"
+
+[concept.Case.structure]
+transcripts = {{ type = "list", item_type = "concept", item_concept_ref = "native.Document", description = "Its transcripts", required = true }}
+
+[pipe.main]
+type = "PipeSequence"
+description = "Extract every transcript of the case"
+inputs = {inputs}
+output = "Page[]"
+steps = [{{ pipe = "extract_pdf", batch_over = "{batch_over}", batch_as = "transcript", result = "pages" }}]
+"""
+        consumers = _consumers(load_empty_library=load_empty_library, domain="fic_dotted_batch_step", pipes=pipes)
+
+        root_name = inputs.split(" ")[1]
+        assert _summary(consumers.get(root_name, [])) == expected_summary
+        assert "transcript" not in consumers
+
     def test_a_standalone_pipe_batch_maps_the_list_slot_to_its_item_slot(self, load_empty_library: Callable[[], str]):
         pipes = """
 [pipe.main]
