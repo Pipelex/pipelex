@@ -94,7 +94,8 @@ class GraphAnalysis(BaseModel):
     shared_stuff_controllers: dict[str, str] = Field(
         default_factory=dict,
         description=(
-            "Map of digest to the deepest controller containing every producer, for a stuff with several producers. "
+            "Map of digest to the deepest controller containing every writer, for a stuff with several writers: its "
+            "producers, and the parallel or batch controllers whose branches combine or whose items aggregate into it. "
             "A renderer places the stuff inside that controller, whose own output item types it."
         ),
     )
@@ -175,15 +176,23 @@ class GraphAnalysis(BaseModel):
         stuff_producers = dict(stuff_producers)
         stuff_consumers = dict(stuff_consumers)
 
-        # A stuff with several producers belongs to the deepest controller containing them all: the
-        # condition whose outcomes write it. That controller's own output item types the stuff, since
-        # only its declaration covers every producer when the outcomes write different concepts.
+        # A stuff with several writers belongs to the deepest controller containing them all: the
+        # condition whose outcomes write it. A writer is a producer, or a parallel or batch controller
+        # whose combined or aggregated output it is, since such an outcome writes the stuff as a
+        # controller. That controller's own output item types the stuff, since only its declaration
+        # covers every writer when the outcomes write different concepts.
+        stuff_writers: dict[str, list[str]] = {digest: list(producer_node_ids) for digest, producer_node_ids in stuff_producers.items()}
+        for edge in graph.edges:
+            if (edge.kind.is_parallel_combine or edge.kind.is_batch_aggregate) and edge.target_stuff_digest:
+                writer_node_ids = stuff_writers.setdefault(edge.target_stuff_digest, [])
+                if edge.target not in writer_node_ids:
+                    writer_node_ids.append(edge.target)
         parent_by_node: dict[str, str] = {child_id: parent_id for parent_id, child_ids in containment_tree.items() for child_id in child_ids}
         shared_stuff_controllers: dict[str, str] = {}
-        for digest, producer_node_ids in stuff_producers.items():
-            if len(producer_node_ids) < 2:
+        for digest, writer_node_ids in stuff_writers.items():
+            if len(writer_node_ids) < 2:
                 continue
-            common_controller_id = cls._deepest_common_controller(node_ids=producer_node_ids, parent_by_node=parent_by_node)
+            common_controller_id = cls._deepest_common_controller(node_ids=writer_node_ids, parent_by_node=parent_by_node)
             if common_controller_id is None:
                 continue
             shared_stuff_controllers[digest] = common_controller_id

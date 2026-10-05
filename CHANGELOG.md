@@ -8,11 +8,11 @@
 
 ### Changed
 
-- **`GraphAnalysis.stuff_producers` lists every producer (Breaking)**: it maps a digest to a list of node ids, `get_producer` is replaced by `get_producers`, and the new `shared_stuff_controllers` names the controller a stuff with several producers belongs to. The Mermaid graph draws such a stuff once, inside that controller, with an edge from each producer.
+- **`GraphAnalysis.stuff_producers` lists every producer (Breaking)**: it maps a digest to a list of node ids, `get_producer` is replaced by `get_producers`, and the new `shared_stuff_controllers` names the controller a stuff with several writers belongs to, a parallel or batch controller combining or aggregating into the stuff counting as one of them. The Mermaid graph draws such a stuff once, inside that controller, with an edge from each producer.
 
 ### Fixed
 
-- **A dry-run condition's output is one stuff every outcome produces**: in the graph of a dry run, every outcome of a `PipeCondition` now carries the condition's output digest, so the step reading the condition's result is wired to all of them rather than to the outcome whose pipe code sorts last, and the condition's own item takes its declared output concept when the outcomes write different ones. Each outcome but the last now runs on a copy of the memory the condition received, so an outcome reading the condition's slot reads the value from before the condition rather than a sibling's output, and the default outcome runs last, so the steps after the condition read its value.
+- **A dry-run condition's output is one stuff every outcome produces**: in the graph of a dry run, every outcome of a `PipeCondition` now carries the condition's output digest, so the step reading the condition's result is wired to all of them rather than to the outcome whose pipe code sorts last, and the condition's own item takes its declared output concept when the outcomes write or declare different ones. Each outcome but the last now runs on a copy of the memory the condition received, so an outcome reading the condition's slot reads the value from before the condition rather than a sibling's output, and the default outcome runs last, so the steps after the condition read its value.
 
 ## [v0.74.0] - 2026-10-05
 

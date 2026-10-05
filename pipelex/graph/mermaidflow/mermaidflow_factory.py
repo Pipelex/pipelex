@@ -140,8 +140,12 @@ class MermaidflowFactory:
                     for output_spec in controller_node.node_io.outputs:
                         if output_spec.digest and output_spec.digest in digest_map:
                             digest_map[output_spec.digest] = (output_spec.name, output_spec.concept_label)
-            # A stuff with several producers (a dry-run condition's one output stuff, which every outcome
-            # writes) is rendered once, inside the deepest controller containing all its producers.
+            # A stuff with several writers (a dry-run condition's one output stuff, which every outcome
+            # writes) is rendered once, inside the deepest controller containing all its writers, and
+            # never inside a parallel outcome that combines into it.
+            for digest_map in controller_output_stuffs.values():
+                for digest in analysis.shared_stuff_controllers:
+                    digest_map.pop(digest, None)
             for digest, controller_id in analysis.shared_stuff_controllers.items():
                 if digest in stuff_registry:
                     controller_output_stuffs.setdefault(controller_id, {})[digest] = stuff_registry[digest]

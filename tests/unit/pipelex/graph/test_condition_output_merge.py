@@ -106,19 +106,19 @@ class TestApplyConditionOutputMerges:
         assert _inputs_by_node(merged)["assemble"][1].concept == "Anything"
         assert _inputs_by_node(merged)["route"][0].concept == "Text"
 
-    def test_a_typing_keeps_a_fixed_count(self) -> None:
+    def test_a_typing_types_a_list(self) -> None:
         graph = self._report_shape()
         merge = ConditionOutputMerge(
             condition_node_id="route",
             shared_digest="d_rejection",
             merged_digests=["d_questions"],
-            shared_typing=ConditionOutputTyping(concept="Question", multiplicity=5),
+            shared_typing=ConditionOutputTyping(concept="Question", multiplicity=True),
         )
 
         merged = apply_condition_output_merges(graph=graph, merges=[merge])
 
         route_output = _outputs_by_node(merged)["route"][0]
-        assert route_output.concept_label == "Question[5]"
+        assert route_output.concept_label == "Question[]"
 
     @pytest.mark.parametrize("inner_first", [True, False])
     def test_a_nested_condition_lands_on_the_outer_digest(self, *, inner_first: bool) -> None:

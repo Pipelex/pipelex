@@ -195,7 +195,7 @@ class TestTraceEvents:
                     condition_node_id=_Shared.PARENT_NODE_ID,
                     shared_digest="shared_001",
                     merged_digests=["outcome_a"],
-                    shared_typing=ConditionOutputTyping(concept="Anything", multiplicity=5),
+                    shared_typing=ConditionOutputTyping(concept="Anything", multiplicity=True),
                 ),
             },
         ),

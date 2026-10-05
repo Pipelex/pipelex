@@ -338,7 +338,9 @@ The condition runs every outcome but the last on a copy of the working memory an
 
 Once every outcome has run, the condition registers a `ConditionOutputMerge` (`pipelex/graph/condition_output_merge.py`) through the tracer's `register_condition_output_merge`, which the event log carries as a `ConditionOutputMergeEvent`. It names the condition's node, its output digest and the digests the other outcomes minted for the slot. Only a stuff minted inside the condition is merged: an outcome that hands back a stuff it was given keeps its digest, and nothing is merged when the last outcome resolves its slot absent. Both graph builders apply every merge to the finished graph through `apply_condition_output_merges`, which moves each merged digest onto the condition's, transitively for a condition run as another condition's outcome, across every io item and every edge's stuff digests. The last step of an outcome sequence and the output list of an outcome batch therefore move with their outcome.
 
-Each outcome's io item keeps its own concept and multiplicity, so its node still says what that outcome writes. The condition's own output item types the shared stuff: when the merged outcomes write different concepts or multiplicities, the merge carries the condition's declared output concept and multiplicity, with the invocation's `nb_output` or `multiple_output` applied, and the rewrite retypes that item with it.
+Each outcome's io item keeps its own concept and multiplicity, so its node still says what that outcome writes. The condition's own output item types the shared stuff: when the merged outcomes write different concepts or multiplicities, or declare different ones, the merge carries the condition's declared output concept, a list when the declaration or the invocation's `nb_output` or `multiple_output` makes it one, and the rewrite retypes that item with it. The declarations count because an outcome's stuff can stand for several: an outcome that is itself a condition hands back only its last outcome's stuff, while its declaration covers every one of them. A list is recorded as `True`, never as an item count, as on every other io item.
+
+An outcome that is a `PipeParallel` or a `PipeBatch` writes the shared stuff as a controller, combining its branches or aggregating its items into it, so it is no producer of the stuff. `GraphAnalysis` still counts it as one of the stuff's writers, so the stuff belongs to the condition all the same.
 
 ### Data Flow Edge Generation
 
@@ -390,7 +392,7 @@ consumers = analysis.get_consumers(digest="abc123")
 | `stuff_registry` | Digest → StuffInfo |
 | `stuff_producers` | Digest → producer node IDs, more than one for a dry-run condition's output |
 | `stuff_consumers` | Digest → consumer node IDs |
-| `shared_stuff_controllers` | Digest → the deepest controller containing every producer, for a stuff with several producers; that controller's output item types the stuff in `stuff_registry` |
+| `shared_stuff_controllers` | Digest → the deepest controller containing every writer, for a stuff with several writers: its producers, and the parallel or batch controllers combining or aggregating into it. That controller's output item types the stuff in `stuff_registry` |
 
 ---
 
@@ -419,7 +421,7 @@ print(mermaidflow.mermaid_code)
 - Operators rendered as rectangles inside subgraphs
 - Stuff nodes (data items) rendered as stadium shapes
 - DATA edges connect producers → stuff → consumers
-- A stuff with several producers is rendered once, inside the deepest controller containing them all, with an edge from each producer
+- A stuff with several writers is rendered once, inside the deepest controller containing them all, never inside a parallel outcome combining into it, with an edge from each producer
 
 In the standalone viewer (`mermaidflow.html`), clicking a stuff node opens its JSON content, and an image or PDF output also offers a preview rendered from the URL that JSON carries.
 

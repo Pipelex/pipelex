@@ -657,3 +657,84 @@ class TestGraphAnalysis:
         stuff_info = analysis.get_stuff_info("d_shared")
         assert stuff_info is not None
         assert (stuff_info.name, stuff_info.concept, stuff_info.multiplicity) == ("follow_up", "Anything", None)
+
+    def _parallel_outcome_graph(self, *, with_fallback: bool) -> GraphSpec:
+        """A dry-run condition whose parallel outcome combines its branches into the stuff its fallback produces."""
+        nodes: list[dict[str, Any]] = [
+            {
+                "node_id": "route",
+                "kind": NodeKind.CONTROLLER,
+                "pipe_code": "route",
+                "status": NodeStatus.SUCCEEDED,
+                "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Anything", digest="d_shared")]),
+            },
+            {
+                "node_id": "write_both",
+                "kind": NodeKind.CONTROLLER,
+                "pipe_code": "write_both",
+                "status": NodeStatus.SUCCEEDED,
+                "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Composite", digest="d_shared")]),
+            },
+            {
+                "node_id": "write_questions",
+                "kind": NodeKind.OPERATOR,
+                "pipe_code": "write_questions",
+                "status": NodeStatus.SUCCEEDED,
+                "node_io": NodeIOSpec(outputs=[IOSpec(name="questions", concept="Text", digest="d_questions")]),
+            },
+            {
+                "node_id": "write_notes",
+                "kind": NodeKind.OPERATOR,
+                "pipe_code": "write_notes",
+                "status": NodeStatus.SUCCEEDED,
+                "node_io": NodeIOSpec(outputs=[IOSpec(name="notes", concept="Text", digest="d_notes")]),
+            },
+        ]
+        edges: list[dict[str, Any]] = [
+            {"edge_id": "c1", "source": "route", "target": "write_both", "kind": EdgeKind.CONTAINS},
+            {"edge_id": "c2", "source": "write_both", "target": "write_questions", "kind": EdgeKind.CONTAINS},
+            {"edge_id": "c3", "source": "write_both", "target": "write_notes", "kind": EdgeKind.CONTAINS},
+            {
+                "edge_id": "p1",
+                "source": "write_questions",
+                "target": "write_both",
+                "kind": EdgeKind.PARALLEL_COMBINE,
+                "source_stuff_digest": "d_questions",
+                "target_stuff_digest": "d_shared",
+            },
+            {
+                "edge_id": "p2",
+                "source": "write_notes",
+                "target": "write_both",
+                "kind": EdgeKind.PARALLEL_COMBINE,
+                "source_stuff_digest": "d_notes",
+                "target_stuff_digest": "d_shared",
+            },
+        ]
+        if with_fallback:
+            nodes.append(
+                {
+                    "node_id": "write_rejection",
+                    "kind": NodeKind.OPERATOR,
+                    "pipe_code": "write_rejection",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Text", digest="d_shared")]),
+                }
+            )
+            edges.append({"edge_id": "c4", "source": "route", "target": "write_rejection", "kind": EdgeKind.CONTAINS})
+        return self._make_graph(nodes=nodes, edges=edges)
+
+    def test_a_parallel_outcome_writes_the_shared_stuff_as_a_controller(self) -> None:
+        analysis = GraphAnalysis.from_graphspec(self._parallel_outcome_graph(with_fallback=True))
+
+        # The parallel combines into the stuff without producing it, and still makes it shared.
+        assert analysis.get_producers("d_shared") == ["write_rejection"]
+        assert analysis.shared_stuff_controllers == {"d_shared": "route"}
+        stuff_info = analysis.get_stuff_info("d_shared")
+        assert stuff_info is not None
+        assert stuff_info.concept == "Anything"
+
+    def test_a_parallel_alone_does_not_share_its_combined_stuff(self) -> None:
+        analysis = GraphAnalysis.from_graphspec(self._parallel_outcome_graph(with_fallback=False))
+
+        assert analysis.shared_stuff_controllers == {}

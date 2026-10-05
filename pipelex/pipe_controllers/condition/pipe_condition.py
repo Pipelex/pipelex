@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
 from pipelex import log
@@ -30,10 +31,35 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
-    from pipelex.graph.graphspec import IOMultiplicity
     from pipelex.libraries.library_crate import LibraryCrate
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
+
+
+class DryRunOutcomeSlot(BaseModel):
+    """What one outcome of a dry-run condition left in the condition's slot, beside what it declares.
+
+    Attributes:
+        declared_concept: The concept code the outcome pipe declares as its output.
+        declared_list: Whether the outcome pipe declares a list output.
+        stuff: The stuff the outcome wrote into the slot, or None where it resolved the slot absent.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    declared_concept: str
+    declared_list: bool
+    stuff: Stuff | None
+
+    @property
+    def declared_typing(self) -> tuple[str, bool]:
+        return (self.declared_concept, self.declared_list)
+
+    @property
+    def written_typing(self) -> tuple[str, bool] | None:
+        if self.stuff is None:
+            return None
+        return (self.stuff.concept.code, self.stuff.is_list)
 
 
 class PipeCondition(PipeController):
@@ -449,18 +475,25 @@ class PipeCondition(PipeController):
         # method rather than of set iteration order. The graph then shows the condition's result
         # as one stuff that every outcome produces, which the merge registered below records.
         received_stuff_codes = {stuff.stuff_code for stuff in working_memory.root.values()}
-        outcome_slots: list[Stuff | None] = []
+        outcome_slots: list[DryRunOutcomeSlot] = []
         outcome_pipe_codes = self._dry_run_outcome_order()
         for outcome_index, pipe_code in enumerate(outcome_pipe_codes):
             is_last_outcome = outcome_index == len(outcome_pipe_codes) - 1
-            outcome_output = await get_required_pipe(pipe_code=pipe_code).run_pipe(
+            outcome_pipe = get_required_pipe(pipe_code=pipe_code)
+            outcome_output = await outcome_pipe.run_pipe(
                 job_metadata=job_metadata,
                 working_memory=working_memory if is_last_outcome else working_memory.make_deep_copy(),
                 pipe_run_params=pipe_run_params if is_last_outcome else pipe_run_params.make_deep_copy(),
                 output_name=output_name,
                 library_crate=library_crate,
             )
-            outcome_slots.append(outcome_output.working_memory.get_optional_main_stuff())
+            outcome_slots.append(
+                DryRunOutcomeSlot(
+                    declared_concept=outcome_pipe.output.concept.code,
+                    declared_list=bool(outcome_pipe.output.multiplicity),
+                    stuff=outcome_output.working_memory.get_optional_main_stuff(),
+                )
+            )
         self._register_dry_run_output_merge(
             job_metadata=job_metadata,
             pipe_run_params=pipe_run_params,
@@ -512,21 +545,23 @@ class PipeCondition(PipeController):
         job_metadata: JobMetadata,
         pipe_run_params: PipeRunParams,
         received_stuff_codes: set[str],
-        outcome_slots: list[Stuff | None],
+        outcome_slots: list[DryRunOutcomeSlot],
     ) -> None:
         """Record that every outcome's output is this condition's one output stuff, for the graph.
 
         The shared stuff is the last outcome's, which the steps after the condition already read.
         Only a stuff minted inside the condition is merged: an outcome handing back a stuff it was
         given would otherwise drag that stuff's own producer into the condition's result. When the
-        merged outcomes write different concepts or multiplicities, the shared stuff is typed by
-        this condition's declared output, the one typing that covers them all.
+        merged outcomes write or declare different concepts or multiplicities, the shared stuff is
+        typed by this condition's declared output, the one typing that covers them all. The
+        declarations count because an outcome's stuff can stand for several: a nested condition
+        hands back only its last outcome's stuff, while its declaration covers all of them.
 
         Args:
             job_metadata: The condition's job metadata, whose trace context names its graph node.
             pipe_run_params: The condition's run params, carrying the invocation's output multiplicity.
             received_stuff_codes: The stuff codes in the memory the condition received.
-            outcome_slots: The stuff each outcome wrote into its slot, in run order, or None where it resolved the slot absent.
+            outcome_slots: What each outcome left in the slot and what it declares, in run order.
         """
         trace_context = job_metadata.trace_context
         if trace_context is None or not trace_context.emit_graph_events or trace_context.parent_node_id is None:
@@ -535,34 +570,34 @@ class PipeCondition(PipeController):
         if tracer_manager is None or not outcome_slots:
             return
         shared_slot = outcome_slots[-1]
-        if not isinstance(shared_slot, Stuff) or shared_slot.stuff_code in received_stuff_codes:
+        shared_stuff = shared_slot.stuff
+        if shared_stuff is None or shared_stuff.stuff_code in received_stuff_codes:
             return
-        merged_slots = [
-            slot
-            for slot in outcome_slots[:-1]
-            if isinstance(slot, Stuff) and slot.stuff_code not in received_stuff_codes and slot.stuff_code != shared_slot.stuff_code
-        ]
-        if not merged_slots:
+        merged_stuffs: dict[str, DryRunOutcomeSlot] = {}
+        for slot in outcome_slots[:-1]:
+            if slot.stuff is not None and slot.stuff.stuff_code not in received_stuff_codes and slot.stuff.stuff_code != shared_stuff.stuff_code:
+                merged_stuffs[slot.stuff.stuff_code] = slot
+        if not merged_stuffs:
             return
 
+        merging_slots = [*merged_stuffs.values(), shared_slot]
         shared_typing: ConditionOutputTyping | None = None
-        if len({(slot.concept.code, slot.is_list) for slot in [*merged_slots, shared_slot]}) > 1:
+        if len({slot.written_typing for slot in merging_slots}) > 1 or len({slot.declared_typing for slot in merging_slots}) > 1:
             multiplicity_resolution = output_multiplicity_to_apply(
                 base_multiplicity=self.output.multiplicity,
                 override_multiplicity=pipe_run_params.output_multiplicity,
             )
-            declared_multiplicity: IOMultiplicity | None = None
-            if multiplicity_resolution.is_multiple_outputs_enabled:
-                output_count = multiplicity_resolution.specific_output_count
-                declared_multiplicity = output_count if output_count is not None and output_count > 1 else True
-            shared_typing = ConditionOutputTyping(concept=self.output.concept.code, multiplicity=declared_multiplicity)
+            shared_typing = ConditionOutputTyping(
+                concept=self.output.concept.code,
+                multiplicity=True if multiplicity_resolution.is_multiple_outputs_enabled else None,
+            )
 
         tracer_manager.register_condition_output_merge(
             lookup_key=trace_context.lookup_key,
             merge=ConditionOutputMerge(
                 condition_node_id=trace_context.parent_node_id,
-                shared_digest=shared_slot.stuff_code,
-                merged_digests=sorted({slot.stuff_code for slot in merged_slots}),
+                shared_digest=shared_stuff.stuff_code,
+                merged_digests=sorted(merged_stuffs),
                 shared_typing=shared_typing,
             ),
         )

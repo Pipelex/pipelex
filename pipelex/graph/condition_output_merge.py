@@ -13,16 +13,21 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.graph.graphspec import EdgeSpec, GraphSpec, IOMultiplicity, IOSpec, NodeSpec
+from pipelex.graph.graphspec import EdgeSpec, GraphSpec, IOSpec, NodeSpec
 
 
 class ConditionOutputTyping(BaseModel):
-    """The typing of a condition's shared output stuff, when its outcomes do not agree on one."""
+    """The typing of a condition's shared output stuff, when its outcomes do not agree on one.
+
+    Its multiplicity is `True` for a list and never an item count, as every io item records it
+    (`stuff_io_multiplicity`), so the shared stuff reads the same on the condition and on the
+    steps that read it.
+    """
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
     concept: str
-    multiplicity: IOMultiplicity | None = None
+    multiplicity: bool | None = None
 
 
 class ConditionOutputMerge(BaseModel):
@@ -32,9 +37,9 @@ class ConditionOutputMerge(BaseModel):
         condition_node_id: The condition's graph node.
         shared_digest: The condition's output digest, which is the last outcome's stuff.
         merged_digests: The digests the other outcomes minted for the same slot.
-        shared_typing: The typing of the condition's own output item, set when the outcomes write
-            different concepts or multiplicities, so that the shared stuff carries the declaration
-            that covers every outcome rather than whichever outcome ran last.
+        shared_typing: The typing of the condition's own output item, set when the outcomes write or
+            declare different concepts or multiplicities, so that the shared stuff carries the
+            declaration that covers every outcome rather than whichever outcome ran last.
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
