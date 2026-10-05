@@ -54,7 +54,8 @@ PIPELEX_HOSTED_SEARCH_ROUTE = "/pipelex/search"
 class PipelexHostedSdk(StrEnum):
     """The sdk values the hosted model catalog section may name.
 
-    `manifold_anthropic` is the open Anthropic worker with this package's extras factory, which adds
+    The values are the spellings the hosted plane's catalog uses, so they keep them although the
+    member names do not. `manifold_anthropic` is the open Anthropic worker with this package's extras factory, which adds
     the metadata header to every Claude call.
     """
 

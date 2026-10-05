@@ -201,6 +201,7 @@ def _make_pipelex_hosted_search_worker(
 class PipelexHostedPlugin:
     """Built-in driver for the Pipelex service, serving all inference families."""
 
+    # The plugin name the hosted plane's config selects, so it keeps that spelling
     name = "manifold"
     targets_api = PLUGIN_API_VERSION
 
