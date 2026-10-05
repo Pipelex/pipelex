@@ -291,9 +291,9 @@ class Pipelex(RuntimeBoot):
                 to this directory (package defaults + this directory) instead of following
                 project/global layering. Note the limit: it scopes *that load* and nothing else. The
                 inference files — backends, routing profiles and the model deck — still resolve through
-                the layered paths, and the onboarding state is read from the global
-                config dir outright. So this does not fully isolate a boot from the surrounding
-                project.
+                the layered paths, and the credentials `.env` is the home directory's. So this does
+                not fully isolate a boot from the surrounding project; `PIPELEX_HOME` is how a
+                process keeps the machine's home configuration out.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.

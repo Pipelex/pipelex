@@ -47,6 +47,9 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
 # Two backends, both with a literal key: what is under test is the *shape* of the per-backend files,
 # and a `${VAR}` here would make every case below depend on the machine's environment instead.
 BACKENDS_TOML = """

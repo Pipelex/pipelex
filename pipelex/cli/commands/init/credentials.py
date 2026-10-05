@@ -15,7 +15,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
 def get_global_env_path() -> Path:
-    """Return the path to the global credentials file (~/.pipelex/.env)."""
+    """Return the path to the credentials file in the home configuration directory (`~/.pipelex/.env`, or under `PIPELEX_HOME`)."""
     return config_manager.global_config_dir / ".env"
 
 

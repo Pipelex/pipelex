@@ -10,6 +10,7 @@ from pipelex.system.configuration.config_surface import (
     stale_configuration_warning,
     strip_reserved_meta,
 )
+from pipelex.system.environment import get_pipelex_home_dir
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
@@ -107,8 +108,12 @@ class ConfigLoader:
 
     @property
     def global_config_dir(self) -> Path:
-        """Get the global config directory at ~/.pipelex."""
-        return Path.home() / CONFIG_DIR_NAME
+        """The home configuration directory: ``~/.pipelex``, or the directory ``PIPELEX_HOME`` names.
+
+        Every reader of the home layer goes through this property, so the variable moves all of
+        them together; ``get_pipelex_home_dir`` is the resolver behind it.
+        """
+        return get_pipelex_home_dir()
 
     @property
     def project_root(self) -> Path | None:

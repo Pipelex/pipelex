@@ -6,16 +6,56 @@ from dotenv import load_dotenv
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
-# Load global credentials first (~/.pipelex/.env)
-_global_env_path = Path.home() / ".pipelex" / ".env"
-if _global_env_path.is_file():
-    load_dotenv(dotenv_path=str(_global_env_path), override=True)
-
-# Load project-level .env second (overrides global)
-load_dotenv(dotenv_path=".env", override=True)
+# Environment variable relocating the home configuration directory, which is ~/.pipelex otherwise
+PIPELEX_HOME_ENV_KEY = "PIPELEX_HOME"
 
 # Environment variable for specifying library directories (PATH-style, colon-separated on Unix, semicolon on Windows)
 PIPELEXPATH_ENV_KEY = "PIPELEXPATH"
+
+
+def get_pipelex_home_dir() -> Path:
+    """The home configuration directory: `PIPELEX_HOME` when it is set and not empty, else `~/.pipelex`.
+
+    This is the one place that locates it. The `.env` loaded below asks, and so does
+    `ConfigLoader.global_config_dir`, through which every other reader goes, so the variable moves
+    the configuration layers, the inference files and their overrides, the first-boot copy of the
+    kit, `pipelex init` and `pipelex doctor` with `--global`, and `pipelex migrate` together.
+
+    The variable names the directory itself, the equivalent of `~/.pipelex`, not its parent. `~` is
+    expanded and a relative value resolves against the working directory.
+    """
+    configured_home = os.environ.get(PIPELEX_HOME_ENV_KEY)
+    if not configured_home:
+        return Path.home() / ".pipelex"
+    return Path(configured_home).expanduser().resolve()
+
+
+def _load_dotenv_files() -> None:
+    """Load the home `.env`, then the project's `.env` from the working directory, which wins.
+
+    `PIPELEX_HOME` is read from the process environment only. The home `.env` is found through it,
+    so a `.env` that set it would leave the process reading its configuration from one directory and
+    its credentials from another: whatever either file says about it is discarded. A relative value
+    is pinned to the absolute path it resolves to at import, so that a later change of directory, or
+    a subprocess started from elsewhere, finds the same home directory as this load did.
+    """
+    configured_home = os.environ.get(PIPELEX_HOME_ENV_KEY)
+    home_dir = get_pipelex_home_dir()
+    if configured_home and not Path(configured_home).is_absolute():
+        configured_home = str(home_dir)
+
+    home_env_path = home_dir / ".env"
+    if home_env_path.is_file():
+        load_dotenv(dotenv_path=str(home_env_path), override=True)
+    load_dotenv(dotenv_path=".env", override=True)
+
+    if configured_home is None:
+        os.environ.pop(PIPELEX_HOME_ENV_KEY, None)
+    else:
+        os.environ[PIPELEX_HOME_ENV_KEY] = configured_home
+
+
+_load_dotenv_files()
 
 
 def get_required_env(key: str) -> str:

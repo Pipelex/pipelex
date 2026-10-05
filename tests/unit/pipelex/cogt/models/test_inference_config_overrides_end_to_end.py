@@ -23,6 +23,9 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
 # Ollama needs no credential, so whether it loads depends on the override alone.
 OLLAMA_OFF_OVERRIDE = "[ollama]\nenabled = false\n"
 ANTHROPIC_PROFILE_OVERRIDE = 'active = "all_anthropic"\n'

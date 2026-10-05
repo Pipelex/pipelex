@@ -52,10 +52,10 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 | `deck/*.toml` | Inference step | Project or global | `.pipelex/inference/deck/` |
 | `routing_profiles.toml` | Inference step | Project or global | `.pipelex/inference/routing_profiles.toml` |
 | `telemetry.toml` | Telemetry step | Project or global | `.pipelex/telemetry.toml` |
-| `.env` | Credentials step | **Always global** | `~/.pipelex/.env` (mode 0600) |
+| `.env` | Credentials step | **Always global** | `~/.pipelex/.env`, or `.env` under `PIPELEX_HOME` (mode 0600) |
 
 !!! info "Project vs global"
-    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from `~/.pipelex/`.
+    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from the global directory. Wherever this page says `~/.pipelex/`, the `PIPELEX_HOME` environment variable relocates it ([Configuration](../configuration/index.md#the-home-configuration-directory-pipelex_home)).
 
 ---
 
@@ -286,7 +286,7 @@ The `ConfigLoader` (singleton: `config_manager`) resolves where configuration fi
 
 | Property | Path | When it exists |
 |----------|------|----------------|
-| `global_config_dir` | `~/.pipelex/` | Always (created on first use) |
+| `global_config_dir` | `~/.pipelex/`, or `PIPELEX_HOME` | Always (created on first use) |
 | `project_config_dir` | `{project_root}/.pipelex/` | Only if the directory exists on disk |
 | `pipelex_config_dir` | Project if exists, else global | Always (backward-compat alias) |
 
@@ -345,7 +345,7 @@ This means a project-level file **wins** over the global one, but only if it act
 | Flag | Target |
 |------|--------|
 | Default (no flag) | `{project_root}/.pipelex/` — project root detected via `find_project_root()` |
-| `--global` / `-g` | `~/.pipelex/` |
+| `--global` / `-g` | `~/.pipelex/`, or `PIPELEX_HOME` |
 
 If no project root is found and `--global` is not set, the command fails with an error.
 

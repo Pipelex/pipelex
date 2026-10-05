@@ -48,6 +48,9 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
 RETIRED_KEY = "prompting_target"
 """What `#1104` removed, and what the ledger entry explains."""
 

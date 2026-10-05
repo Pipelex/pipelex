@@ -197,7 +197,7 @@ def agent_doctor_cmd(
         typer.Option(
             "--global",
             "-g",
-            help="Force checking the global ~/.pipelex/ directory.",
+            help="Force checking the home configuration directory (~/.pipelex/, or PIPELEX_HOME).",
         ),
     ] = False,
     output_format: Annotated[
@@ -217,8 +217,8 @@ def agent_doctor_cmd(
 
     Default output is markdown; use --format json for structured JSON.
 
-    Target directory: auto-detects project .pipelex/ if present, else ~/.pipelex/.
-    Use --global/-g to force checking the global ~/.pipelex/ directory.
+    Target directory: auto-detects project .pipelex/ if present, else the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
+    Use --global/-g to force checking it.
     """
     # The doctor configures logging and installs a sink for its own report; once the report is out,
     # it releases them, so an ``otlp`` sink's exporter and the hook it registered at exit go with the
