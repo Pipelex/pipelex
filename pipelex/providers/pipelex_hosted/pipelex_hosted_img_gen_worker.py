@@ -15,7 +15,7 @@ design page's claim that the hosted plugin does not depend on `portkey_ai` is fa
 the lift is written into the design rather than only into a plan.
 
 **The response shapes this worker parses are only the ones the hosted model catalog names.** Every
-`pipelex_hosted_img_gen` entry is an Azure GPT Image model, and the gateway's own configuration serves
+`manifold_img_gen` entry is an Azure GPT Image model, and the gateway's own configuration serves
 them from one integration. The Portkey path's worker also carries a Black Forest Labs Flux 2 Pro
 branch and a FAL queue-polling branch; neither has a model on this path, so neither is carried here.
 A response that matches nothing is refused with what it actually contained, and restoring a branch

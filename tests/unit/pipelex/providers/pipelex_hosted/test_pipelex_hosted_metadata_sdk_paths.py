@@ -4,7 +4,7 @@ The header differs per job, so it cannot be a client default: each path adds it 
 each is pinned here where the request leaves the runtime — the kwargs handed to the SDK call, or the
 headers handed to `httpx` on the native routes. The paths are the OpenAI-substrate chat completions
 (text, and image generation over completions) and responses, the vendor-SDK image path, the native
-extract and search routes, and Claude over the Anthropic worker the package registers as `pipelex_hosted_anthropic`.
+extract and search routes, and Claude over the Anthropic worker the package registers as `manifold_anthropic`.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def _model(mocker: MockerFixture, *, backend_name: str = PipelexBackend.PIPELEX_
 
 
 def _native_client() -> PipelexHostedNativeClient:
-    return PipelexHostedNativeClient(backend=InferenceBackend(name="pipelex_hosted", endpoint=_ORIGIN, api_key="token"))
+    return PipelexHostedNativeClient(backend=InferenceBackend(name="pipelex_manifold", endpoint=_ORIGIN, api_key="token"))
 
 
 def _patch_httpx_post(mocker: MockerFixture, *, json_body: dict[str, Any]) -> Any:

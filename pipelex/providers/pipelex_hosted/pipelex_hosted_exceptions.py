@@ -34,7 +34,7 @@ class PipelexHostedCredentialsError(PipelexHostedError):
 class PipelexHostedEndpointError(PipelexHostedError):
     """The backend declares no usable endpoint for the Pipelex service.
 
-    Its own error rather than a credentials one, because the remedy is a different variable and
+    Its own error rather than a credentials one, because the remedy is a different setting and
     because there is deliberately no default to fall back on: an empty-resolving endpoint that
     silently became a vendor's public URL would carry our service token to the wrong company.
     """

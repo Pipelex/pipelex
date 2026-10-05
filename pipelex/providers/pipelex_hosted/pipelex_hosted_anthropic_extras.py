@@ -1,7 +1,7 @@
 """The per-request extras of a Claude call through the Pipelex service.
 
 Claude reaches the service over the open Anthropic worker, registered here under the package's own
-`pipelex_hosted_anthropic` sdk token with this factory: the worker asks it, per request, what joins the
+`manifold_anthropic` sdk token with this factory: the worker asks it, per request, what joins the
 call, and the answer is the `x-pipelex-metadata` header naming the run and the step (see
 `pipelex_hosted_metadata`). Every other Anthropic path builds the worker without a factory and sends
 nothing of the kind.

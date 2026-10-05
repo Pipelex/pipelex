@@ -47,28 +47,28 @@ class PipelexHostedExtrasBySpecTestData:
     GEMINI_IMAGE_CASES: ClassVar[list[tuple[str, dict[str, Any], AspectRatio, SizeTier | ImageSize | None, dict[str, str]]]] = [
         (
             "nano-banana",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_completions", "rules": {"aspect_ratio": "gemini_2_5"}},
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"aspect_ratio": "gemini_2_5"}},
             AspectRatio.LANDSCAPE_16_9,
             None,
             {"aspect_ratio": "16:9"},
         ),
         (
             "nano-banana-pro",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_completions", "rules": {"aspect_ratio": "gemini_3_pro"}},
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"aspect_ratio": "gemini_3_pro"}},
             AspectRatio.PORTRAIT_9_16,
             SizeTier.TWO_K,
             {"aspect_ratio": "9:16", "image_size": "2K"},
         ),
         (
             "nano-banana-2",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_completions", "rules": {"aspect_ratio": "gemini_3_flash"}},
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"aspect_ratio": "gemini_3_flash"}},
             AspectRatio.LANDSCAPE_4_1,
             SizeTier.FOUR_K,
             {"aspect_ratio": "4:1", "image_size": "4K"},
         ),
         (
             "nano-banana-2-lite",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_completions", "rules": {"aspect_ratio": "gemini_3_flash_lite"}},
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"aspect_ratio": "gemini_3_flash_lite"}},
             AspectRatio.SQUARE,
             SizeTier.ONE_K,
             {"aspect_ratio": "1:1", "image_size": "1K"},
@@ -77,7 +77,7 @@ class PipelexHostedExtrasBySpecTestData:
             "nano-banana",
             {
                 "model_type": "img_gen",
-                "sdk": "pipelex_hosted_completions",
+                "sdk": "manifold_completions",
                 "model_id": "gemini-2.5-flash-image",
                 "rules": {"aspect_ratio": "gemini_2_5"},
             },
@@ -92,12 +92,12 @@ class PipelexHostedExtrasBySpecTestData:
         (
             "gpt_image_legacy",
             "gpt-image-1",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_img_gen", "rules": {"model_choice": "model_name", "aspect_ratio": "gpt_image_legacy"}},
+            {"model_type": "img_gen", "sdk": "manifold_img_gen", "rules": {"model_choice": "model_name", "aspect_ratio": "gpt_image_legacy"}},
         ),
         (
             "gpt_image_2",
             "gpt-image-2",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_img_gen", "rules": {"model_choice": "model_name", "aspect_ratio": "gpt_image_2"}},
+            {"model_type": "img_gen", "sdk": "manifold_img_gen", "rules": {"model_choice": "model_name", "aspect_ratio": "gpt_image_2"}},
         ),
     ]
 
@@ -108,19 +108,19 @@ class PipelexHostedExtrasBySpecTestData:
         (
             "unknown_taxonomy",
             "nano-banana-next",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_completions", "rules": {"aspect_ratio": "gemini_from_the_future"}},
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"aspect_ratio": "gemini_from_the_future"}},
             "unknown aspect_ratio taxonomy 'gemini_from_the_future'",
         ),
         (
             "gemini_id_without_rules",
             "gemini-lookalike",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_completions", "model_id": "gemini-2.5-flash-image"},
+            {"model_type": "img_gen", "sdk": "manifold_completions", "model_id": "gemini-2.5-flash-image"},
             "declares no aspect_ratio rule",
         ),
         (
             "rules_without_aspect_ratio",
             "nano-banana-bare",
-            {"model_type": "img_gen", "sdk": "pipelex_hosted_completions", "rules": {"prompt": "positive_only"}},
+            {"model_type": "img_gen", "sdk": "manifold_completions", "rules": {"prompt": "positive_only"}},
             "declares no aspect_ratio rule",
         ),
     ]
@@ -128,12 +128,12 @@ class PipelexHostedExtrasBySpecTestData:
     # (topic, handle, catalog entry, whether the job gets a seed): the Mistral seed still keys on the model id's prefix,
     # which the one hosted Mistral handle carries whether or not the entry names the provider's id.
     MISTRAL_SEED_CASES: ClassVar[list[tuple[str, str, dict[str, Any], bool]]] = [
-        ("mistral_handle_only", "mistral-large", {"sdk": "pipelex_hosted_completions", "structure_method": "instructor/mistral_tools"}, True),
+        ("mistral_handle_only", "mistral-large", {"sdk": "manifold_completions", "structure_method": "instructor/mistral_tools"}, True),
         (
             "mistral_provider_id",
             "mistral-large",
-            {"sdk": "pipelex_hosted_completions", "model_id": "Mistral-Large-3", "structure_method": "instructor/mistral_tools"},
+            {"sdk": "manifold_completions", "model_id": "Mistral-Large-3", "structure_method": "instructor/mistral_tools"},
             True,
         ),
-        ("not_mistral", "gpt-4o", {"sdk": "pipelex_hosted_responses"}, False),
+        ("not_mistral", "gpt-4o", {"sdk": "manifold_responses"}, False),
     ]

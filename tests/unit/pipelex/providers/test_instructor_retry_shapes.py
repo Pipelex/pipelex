@@ -257,7 +257,7 @@ class TestInstructorRetryShapes:
         inference_model = mocker.MagicMock()
         inference_model.name = _MODEL_HANDLE
         inference_model.model_id = _WIRE_ID
-        inference_model.desc = f"{_MODEL_HANDLE} → SDK[pipelex_hosted_completions]•Backend[pipelex_hosted]•Model[{_WIRE_ID}]"
+        inference_model.desc = f"{_MODEL_HANDLE} → SDK[manifold_completions]•Backend[pipelex_manifold]•Model[{_WIRE_ID}]"
         inference_model.thinking_mode = None
         inference_model.listed_constraints = []
         worker.inference_model = inference_model

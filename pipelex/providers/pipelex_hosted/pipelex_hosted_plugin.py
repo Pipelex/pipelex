@@ -1,12 +1,12 @@
 """The hosted sdk set, registered.
 
 One registration per ``(family, sdk)`` the Pipelex service serves. The pairing worth
-noticing is ``(IMG_GEN, pipelex_hosted_completions)``: some image models answer on the Chat Completions
+noticing is ``(IMG_GEN, manifold_completions)``: some image models answer on the Chat Completions
 shape rather than on the Images API, and the catalog says which by giving them ``model_type =
 "img_gen"`` while leaving them on the default completions sdk — so the same sdk name is registered
 under two families, served by two different workers.
 
-Claude reaches the Pipelex service on ``pipelex_hosted_anthropic``: the open Anthropic worker, built with
+Claude reaches the Pipelex service on ``manifold_anthropic``: the open Anthropic worker, built with
 the package's extras factory so that every call carries the metadata header, and a client that
 authenticates on whichever header the backend names. A catalog entry left on the plain ``anthropic``
 sdk would still answer, without the header.
@@ -201,7 +201,8 @@ def _make_pipelex_hosted_search_worker(
 class PipelexHostedPlugin:
     """Built-in driver for the Pipelex service, serving all inference families."""
 
-    name = "pipelex_hosted"
+    # The plugin name the hosted plane's config selects, so it keeps that spelling
+    name = "manifold"
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:

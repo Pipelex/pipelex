@@ -54,28 +54,29 @@ PIPELEX_HOSTED_SEARCH_ROUTE = "/pipelex/search"
 class PipelexHostedSdk(StrEnum):
     """The sdk values the hosted model catalog section may name.
 
-    `pipelex_hosted_anthropic` is the open Anthropic worker with this package's extras factory, which adds
+    The values are the spellings the hosted plane's catalog uses, so they keep them although the
+    member names do not. `manifold_anthropic` is the open Anthropic worker with this package's extras factory, which adds
     the metadata header to every Claude call.
     """
 
-    ANTHROPIC = "pipelex_hosted_anthropic"
-    COMPLETIONS = "pipelex_hosted_completions"
-    RESPONSES = "pipelex_hosted_responses"
-    IMG_GEN = "pipelex_hosted_img_gen"
-    EXTRACT = "pipelex_hosted_extract"
-    SEARCH = "pipelex_hosted_search"
+    ANTHROPIC = "manifold_anthropic"
+    COMPLETIONS = "manifold_completions"
+    RESPONSES = "manifold_responses"
+    IMG_GEN = "manifold_img_gen"
+    EXTRACT = "manifold_extract"
+    SEARCH = "manifold_search"
 
 
 class PipelexHostedOpenAISdkVariant(StrEnum):
     """The two OpenAI-substrate sdks, and which of the two shapes each factory serves.
 
-    A factory checks its own variant so that a catalog entry naming `pipelex_hosted_responses` cannot be
+    A factory checks its own variant so that a catalog entry naming `manifold_responses` cannot be
     served by the completions factory (or the reverse) through a mis-registration — the failure
     would otherwise be a wrong request shape at the provider rather than a refusal at build time.
     """
 
-    PIPELEX_HOSTED_COMPLETIONS = "pipelex_hosted_completions"
-    PIPELEX_HOSTED_RESPONSES = "pipelex_hosted_responses"
+    PIPELEX_HOSTED_COMPLETIONS = "manifold_completions"
+    PIPELEX_HOSTED_RESPONSES = "manifold_responses"
 
     @classmethod
     def is_completions(cls, sdk: str) -> bool:
