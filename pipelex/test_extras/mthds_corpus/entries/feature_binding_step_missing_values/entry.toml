@@ -1,0 +1,11 @@
+name = "feature_binding_step_missing_values"
+description = "An invoice whose scan is missing binds nothing from it, and a courtesy copy that was never provided skips its binding"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+  "feature.optionals",
+]

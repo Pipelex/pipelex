@@ -1,0 +1,13 @@
+domain      = "catalog_pages"
+description = "Gathering the photographs of a printed catalog"
+main_pipe   = "gather_page_views"
+
+[pipe.gather_page_views]
+type = "PipeSequence"
+description = "Binds the view of the cover, then the views of every page, which the sequence returns"
+inputs = { cover = "Page", pages = "Page[]" }
+output = "Image[]"
+steps = [
+  { from = "cover.page_view", result = "cover_view" },
+  { from = "pages.page_view", result = "page_views" },
+]

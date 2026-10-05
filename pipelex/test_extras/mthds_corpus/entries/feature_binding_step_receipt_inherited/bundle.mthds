@@ -1,0 +1,31 @@
+domain      = "shop_till"
+description = "Reading the amount paid off a till receipt"
+main_pipe   = "read_amount_paid"
+
+[concept.Invoice]
+description = "A bill for goods sold"
+
+[concept.Invoice.structure]
+shop  = { type = "text", description = "The shop that sold the goods", required = true }
+total = { type = "number", description = "The amount of the bill, in euros", required = true }
+
+[concept.Receipt]
+description = "A bill once it has been paid at the till"
+refines     = "Invoice"
+
+[pipe.read_amount_paid]
+type = "PipeSequence"
+description = "Binds the total a receipt inherits from the invoice, then writes it out"
+inputs = { receipt = "Receipt" }
+output = "Text"
+steps = [
+  { from = "receipt.total", result = "amount_paid" },
+  { pipe = "write_amount_paid", result = "line" },
+]
+
+[pipe.write_amount_paid]
+type        = "PipeCompose"
+description = "Writes the amount paid"
+inputs      = { amount_paid = "Number" }
+output      = "Text"
+template    = "Paid: $amount_paid euros"

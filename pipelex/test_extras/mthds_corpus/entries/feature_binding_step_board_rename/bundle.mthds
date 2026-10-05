@@ -1,0 +1,27 @@
+domain      = "station_board"
+description = "Reading out the departure board of a small station"
+main_pipe   = "read_out_board"
+
+[concept.DepartureBoard]
+description = "The board listing the next departures from a station"
+
+[concept.DepartureBoard.structure]
+station    = { type = "text", description = "The station the board stands in", required = true }
+next_train = { type = "text", description = "Where the next train goes", required = true }
+
+[pipe.read_out_board]
+type = "PipeSequence"
+description = "Binds the departure board under the name the announcement reads, then writes the announcement"
+inputs = { departure_board = "DepartureBoard" }
+output = "Text"
+steps = [
+  { from = "departure_board", result = "board" },
+  { pipe = "write_board_announcement", result = "announcement" },
+]
+
+[pipe.write_board_announcement]
+type        = "PipeCompose"
+description = "Writes the announcement read out from a board"
+inputs      = { board = "DepartureBoard" }
+output      = "Text"
+template    = "At {{ board.station }}, the next train goes to {{ board.next_train }}."

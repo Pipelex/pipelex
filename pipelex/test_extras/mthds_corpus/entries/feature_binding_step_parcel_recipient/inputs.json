@@ -1,0 +1,13 @@
+{
+  "parcel": {
+    "concept": "parcel_counter.Parcel",
+    "content": {
+      "is_fragile": true,
+      "recipient": {
+        "name": "Maëlle Le Gall",
+        "street": "12 rue des Tanneurs",
+        "town": "Morlaix"
+      }
+    }
+  }
+}

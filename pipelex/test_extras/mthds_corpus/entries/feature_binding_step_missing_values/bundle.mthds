@@ -1,0 +1,34 @@
+domain      = "invoice_filing"
+description = "Filing a supplier invoice, with its scan and courtesy copy when they exist"
+main_pipe   = "file_invoice"
+
+[concept.Invoice]
+description = "An invoice received from a supplier"
+
+[concept.Invoice.structure]
+number = { type = "text", description = "The invoice number", required = true }
+total  = { type = "number", description = "The amount due, in euros", required = true }
+scan   = { type = "concept", concept_ref = "Document", description = "The scan of the paper invoice, when one was made" }
+
+[pipe.file_invoice]
+type = "PipeSequence"
+description = "Binds the scan's link and the courtesy copy's total, then writes the filing note"
+inputs = { invoice = "Invoice", courtesy_copy = "Invoice?" }
+output = "Text"
+steps = [
+  { from = "invoice.number", result = "invoice_number" },
+  { from = "invoice.scan.url", result = "scan_link" },
+  { from = "courtesy_copy.total", result = "copy_total" },
+  { pipe = "write_filing_note", result = "filing_note" },
+]
+
+[pipe.write_filing_note]
+type = "PipeCompose"
+description = "Writes the note that goes into the filing cabinet with the invoice"
+inputs = { invoice_number = "Text", scan_link = "Text?", copy_total = "Number?" }
+output = "Text"
+template = """
+Invoice $invoice_number filed.
+{% if scan_link is defined %}Scan: {{ scan_link.text }}{% else %}No scan on file.{% endif %}
+{% if copy_total is defined %}Courtesy copy total: {{ copy_total.number }}{% else %}No courtesy copy.{% endif %}
+"""

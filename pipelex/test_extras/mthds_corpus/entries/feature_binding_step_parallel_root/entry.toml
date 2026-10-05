@@ -1,0 +1,11 @@
+name = "feature_binding_step_parallel_root"
+description = "A field bound from the result of a parallel branch, the root typed by the branch that produced it"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+  "controller.parallel",
+]

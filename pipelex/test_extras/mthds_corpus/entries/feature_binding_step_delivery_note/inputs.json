@@ -1,0 +1,15 @@
+{
+  "morning_round": {
+    "concept": "delivery_rounds.DeliveryRound",
+    "content": {
+      "driver": "Yann",
+      "note": "Gate code changed to 4471"
+    }
+  },
+  "evening_round": {
+    "concept": "delivery_rounds.DeliveryRound",
+    "content": {
+      "driver": "Soizic"
+    }
+  }
+}

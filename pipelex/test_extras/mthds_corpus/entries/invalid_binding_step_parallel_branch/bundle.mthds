@@ -1,0 +1,36 @@
+domain      = "supplier_invoices"
+description = "Acknowledging a supplier invoice by the amount it asks for"
+main_pipe   = "acknowledge_invoice"
+
+[concept.InvoiceLine]
+description = "One line of an invoice"
+
+[concept.InvoiceLine.structure]
+amount = { type = "number", description = "What the line costs, in euros", required = true }
+
+[concept.Invoice]
+description = "An invoice received from a supplier"
+
+[concept.Invoice.structure]
+total         = { type = "number", description = "The amount due, in euros", required = true }
+lines         = { type = "list", item_type = "concept", item_concept_ref = "InvoiceLine", description = "The lines of the invoice", required = true }
+order_details = { type = "dict", key_type = "text", value_type = "text", description = "The references the supplier printed for the order", required = true }
+
+[pipe.write_receipt]
+type        = "PipeCompose"
+description = "Writes the receipt for an amount"
+inputs      = { total_amount = "Number" }
+output      = "Text"
+template    = "Received: $total_amount euros"
+
+[pipe.acknowledge_invoice]
+type            = "PipeParallel"
+description     = "Writes the receipt and binds the total at the same time"
+inputs          = { invoice = "Invoice", total_amount = "Number" }
+output          = "Composite"
+add_each_output = true
+# Wrong on purpose: a parallel branch is always a pipe step; bind the total in a sequence before the parallel.
+branches = [
+  { from = "invoice.total", result = "bound_total" },
+  { pipe = "write_receipt", result = "receipt" },
+]

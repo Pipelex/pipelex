@@ -1,0 +1,26 @@
+{
+  "order": {
+    "concept": "order_desk.Order",
+    "content": {
+      "lines": [
+        {
+          "article": "Linen tea towel",
+          "amount": 12.5
+        },
+        {
+          "article": "Sample swatch"
+        },
+        {
+          "article": "Enamel mug",
+          "amount": 9.0
+        }
+      ]
+    }
+  },
+  "backorder": {
+    "concept": "order_desk.Order",
+    "content": {
+      "lines": []
+    }
+  }
+}

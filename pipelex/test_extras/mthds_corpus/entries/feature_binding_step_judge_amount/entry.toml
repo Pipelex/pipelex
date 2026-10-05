@@ -1,0 +1,10 @@
+name = "feature_binding_step_judge_amount"
+description = "The total of an invoice bound alone and handed to a judge, which sees nothing else of the invoice"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

@@ -1,0 +1,9 @@
+{
+  "departure_board": {
+    "concept": "station_board.DepartureBoard",
+    "content": {
+      "station": "Landerneau",
+      "next_train": "Brest"
+    }
+  }
+}

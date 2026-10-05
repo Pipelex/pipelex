@@ -1,0 +1,10 @@
+name = "feature_binding_step_receipt_inherited"
+description = "A receipt refining an invoice binds a field it inherits from the invoice's structure"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

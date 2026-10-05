@@ -1,0 +1,30 @@
+domain      = "ferry_timetable"
+description = "Announcing a ferry departure from a row of the timetable"
+main_pipe   = "announce_departure"
+
+[concept.Departure]
+description = "One departure listed in the ferry timetable"
+
+[concept.Departure.structure]
+day          = { type = "date", description = "The day the ferry leaves", required = true }
+scheduled_at = { type = "datetime", description = "The moment the ferry is scheduled to cast off", required = true }
+boarding     = { type = "time", description = "The time boarding opens", required = true }
+
+[pipe.announce_departure]
+type = "PipeSequence"
+description = "Binds the day, the scheduled moment and the boarding time of a departure, then announces it"
+inputs = { departure = "Departure" }
+output = "Text"
+steps = [
+  { from = "departure.day", result = "day" },
+  { from = "departure.scheduled_at", result = "scheduled_at" },
+  { from = "departure.boarding", result = "boarding_time" },
+  { pipe = "write_announcement", result = "announcement" },
+]
+
+[pipe.write_announcement]
+type        = "PipeCompose"
+description = "Writes the announcement read out on the quay"
+inputs      = { day = "Date", scheduled_at = "Date", boarding_time = "Time" }
+output      = "Text"
+template    = "The ferry of $day leaves at $scheduled_at. Boarding opens at $boarding_time."

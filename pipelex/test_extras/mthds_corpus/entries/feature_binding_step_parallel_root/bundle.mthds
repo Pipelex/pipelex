@@ -1,0 +1,56 @@
+domain      = "market_stall"
+description = "Preparing a market stall's price tag and sign at once"
+main_pipe   = "prepare_stall"
+
+[concept.PriceTag]
+description = "The tag stuck on a crate of produce"
+
+[concept.PriceTag.structure]
+produce = { type = "text", description = "What is in the crate", required = true }
+price   = { type = "number", description = "The price per kilogram, in euros", required = true }
+
+[pipe.prepare_stall]
+type = "PipeSequence"
+description = "Prepares the tag and the sign in parallel, then binds the price off the tag"
+inputs = { produce = "Text" }
+output = "Text"
+steps = [
+  { pipe = "prepare_tag_and_sign", result = "stall" },
+  { from = "price_tag.price", result = "price" },
+  { pipe = "write_price_line", result = "price_line" },
+]
+
+[pipe.prepare_tag_and_sign]
+type = "PipeParallel"
+description = "Writes the price tag and the stall sign at the same time"
+inputs = { produce = "Text" }
+output = "Composite"
+add_each_output = true
+branches = [
+  { pipe = "write_price_tag", result = "price_tag" },
+  { pipe = "write_stall_sign", result = "stall_sign" },
+]
+
+[pipe.write_price_tag]
+type        = "PipeCompose"
+description = "Writes the price tag for a crate of produce"
+inputs      = { produce = "Text" }
+output      = "PriceTag"
+
+[pipe.write_price_tag.construct]
+produce = { from = "produce.text" }
+price   = 3.2
+
+[pipe.write_stall_sign]
+type        = "PipeCompose"
+description = "Writes the sign hung above the stall"
+inputs      = { produce = "Text" }
+output      = "Text"
+template    = "Fresh $produce today"
+
+[pipe.write_price_line]
+type        = "PipeCompose"
+description = "Writes the price line read out to customers"
+inputs      = { price = "Number" }
+output      = "Text"
+template    = "$price euros a kilo"

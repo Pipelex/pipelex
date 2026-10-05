@@ -1,0 +1,10 @@
+name = "feature_binding_step_extracted_pages"
+description = "The pages read out of a scan by an earlier step, their views then bound, the root typed by the step that made it"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

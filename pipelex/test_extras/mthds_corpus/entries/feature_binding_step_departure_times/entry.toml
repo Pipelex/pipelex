@@ -1,0 +1,10 @@
+name = "feature_binding_step_departure_times"
+description = "A departure announced from its day, its scheduled moment and its boarding time, each bound from a timetable row"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

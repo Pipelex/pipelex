@@ -1,0 +1,55 @@
+domain      = "supplier_invoices"
+description = "Acknowledging a supplier invoice from the fields printed on it"
+main_pipe   = "acknowledge_invoice"
+
+[concept.Address]
+description = "A postal address"
+
+[concept.Address.structure]
+city = { type = "text", description = "The town of the address", required = true }
+
+[concept.Supplier]
+description = "A company that sends invoices"
+
+[concept.Supplier.structure]
+name    = { type = "text", description = "The supplier's trading name", required = true }
+address = { type = "concept", concept_ref = "Address", description = "Where the supplier is based", required = true }
+
+[concept.Invoice]
+description = "An invoice received from a supplier"
+
+[concept.Invoice.structure]
+supplier_name = { type = "text", description = "The name printed at the top of the invoice", required = true }
+total = { type = "number", description = "The amount due, in euros", required = true }
+line_count = { type = "integer", description = "How many lines the invoice lists", required = true }
+priority = { choices = [
+  "routine",
+  "urgent",
+], description = "How soon the invoice must be paid", required = true }
+order_details = { type = "dict", key_type = "text", value_type = "text", description = "The references the supplier printed for the order", required = true }
+supplier = { type = "concept", concept_ref = "Supplier", description = "The supplier who sent the invoice", required = true }
+
+[pipe.acknowledge_invoice]
+type = "PipeSequence"
+description = "Binds the fields of an invoice, then writes the acknowledgement from them"
+inputs = { invoice = "Invoice" }
+output = "Text"
+steps = [
+  { from = "invoice.supplier_name", result = "supplier_name" },
+  { from = "invoice.total", result = "total_amount" },
+  { from = "invoice.line_count", result = "line_count" },
+  { from = "invoice.priority", result = "priority" },
+  { from = "invoice.order_details", result = "order_details" },
+  { from = "invoice.supplier.address.city", result = "supplier_city" },
+  { pipe = "write_acknowledgement", result = "acknowledgement" },
+]
+
+[pipe.write_acknowledgement]
+type = "PipeCompose"
+description = "Writes the acknowledgement of an invoice from its total, its supplier and the supplier's town"
+inputs = { supplier_name = "Text", total_amount = "Number", line_count = "Number", priority = "Text", order_details = "JSON", supplier_city = "Text" }
+output = "Text"
+template = """
+Received from $supplier_name of $supplier_city: $line_count lines, $total_amount euros due, $priority.
+Order details: $order_details
+"""

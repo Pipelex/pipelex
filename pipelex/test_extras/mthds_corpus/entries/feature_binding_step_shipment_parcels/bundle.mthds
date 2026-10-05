@@ -1,0 +1,34 @@
+domain      = "depot_loading"
+description = "Listing every parcel to load from the shipments of the day"
+main_pipe   = "list_parcels"
+
+[concept.Parcel]
+description = "A parcel waiting at the depot"
+
+[concept.Parcel.structure]
+tracking_number = { type = "text", description = "The number on the parcel's label", required = true }
+
+[concept.Shipment]
+description = "A shipment leaving the depot"
+
+[concept.Shipment.structure]
+parcels = { type = "list", item_type = "concept", item_concept_ref = "Parcel", description = "The parcels of the shipment", required = true }
+
+[pipe.list_parcels]
+type = "PipeSequence"
+description = "Binds the parcels of every shipment into one list, then writes the loading list"
+inputs = { shipments = "Shipment[]" }
+output = "Text"
+steps = [
+  { from = "shipments.parcels", result = "parcels" },
+  { pipe = "write_loading_list", result = "loading_list" },
+]
+
+[pipe.write_loading_list]
+type = "PipeCompose"
+description = "Writes one line per parcel to load"
+inputs = { parcels = "Parcel[]" }
+output = "Text"
+template = """
+{% for parcel in parcels %}- {{ parcel.tracking_number }}
+{% endfor %}"""
