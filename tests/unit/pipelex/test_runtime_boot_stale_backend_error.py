@@ -42,11 +42,15 @@ import pytest
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_boot import BACKEND_LIBRARY_REFUSED, BootComponent, RuntimeBoot
-from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, CONFIG_DIR_NAME, INFERENCE_DIR_NAME
+from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, INFERENCE_DIR_NAME
+from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
 
 RETIRED_KEY = "prompting_target"
 """What `#1104` removed, and what the ledger entry explains."""

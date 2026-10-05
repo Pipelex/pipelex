@@ -17,11 +17,15 @@ import pytest
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
-from pipelex.system.configuration.config_loader import CONFIG_DIR_NAME, INFERENCE_DIR_NAME
+from pipelex.system.configuration.config_loader import INFERENCE_DIR_NAME
+from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
 
 # Ollama needs no credential, so whether it loads depends on the override alone.
 OLLAMA_OFF_OVERRIDE = "[ollama]\nenabled = false\n"

@@ -32,7 +32,11 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
+
 from tests.unit.pipelex.test_kernel_layer_import_closure import INTERPRETER_PACKAGES
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
 
 #: Wall-clock bound on the booted-runtime subprocess, matching the import-closure harness: a boot
 #: that deadlocks must present as a failure, not as a hung suite

@@ -524,7 +524,7 @@ Both files are optional and git-ignored: `pipelex init` writes the rule into `.p
 Where a file lives decides its reach. The base file resolves as before — the project's copy if it has one, otherwise the global one — and the overrides merge over it in this order:
 
 1. the base `backends.toml` / `routing_profiles.toml`
-2. `~/.pipelex/inference/<file>_override.toml` — the global override, applied in every project on the machine
+2. `~/.pipelex/inference/<file>_override.toml` — the global override, applied in every project on the machine (under the directory `PIPELEX_HOME` names, when it is set: see [the home configuration directory](../index.md#the-home-configuration-directory-pipelex_home))
 3. `{project}/.pipelex/inference/<file>_override.toml` — the project override, which wins
 
 The global override reaches a project that carries its own tracked base, which is the point: one edit under `~/.pipelex/inference/` and every project follows. Deleting the override files restores the shipped default.
