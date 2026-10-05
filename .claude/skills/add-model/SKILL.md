@@ -7,7 +7,7 @@ description: >
   every backend it lands on, and the changelog entry. Use when the user says "add a
   model", "add GPT-X", "add Claude X", "add Gemini X", "new model", "register a model",
   "support model X", "add model to backend", or names a model that no backend TOML
-  declares yet and wants it available. The Pipelex Manifold catalog is
+  declares yet and wants it available. The hosted model catalog is
   not in this repository: in the Pipelex workspace, the workspace-level `/add-model`
   carries a model through them and runs this skill as its pipelex leg.
 ---
@@ -16,7 +16,7 @@ description: >
 
 A model is added once per backend that serves it. Each backend TOML under `.pipelex/inference/backends/` declares the models that backend can call, the kit copy under `pipelex/kit/configs/` is what ships in the package, and `.pipelex-dev/test_profiles.toml` decides which models the parametrized inference tests can select. Those are the files that declare a model; the steps below also write the changelog, and regenerate the goldens and references that follow from them.
 
-The Pipelex Manifold catalog is not in this repository: the hosted plane carries it. See step 8.
+The hosted model catalog is not in this repository: the hosted plane carries it. See step 8.
 
 ## 1. Establish the facts, from the provider
 
@@ -75,9 +75,9 @@ For an LLM, go past `TestLLMInference` and exercise what the entry declares: `Te
 - **Changelog.** One bullet under `## [Unreleased]` → `### Added` in `CHANGELOG.md`: the handle, the backends, what it takes and produces, and anything unusual such as a refused parameter.
 - **Checks.** `make tb` boots the config, which parses and validates the backends `backends.toml` enables — and only those, so an entry added to a disabled backend such as `vertexai` is never read. To validate one, enable that backend in the gitignored `.pipelex/inference/backends_override.toml` for the run, and delete the file afterwards. Then stage your changes (the drift digest reads the git index) and run `make agent-check`.
 
-## 8. The manifold catalog
+## 8. The hosted model catalog
 
-This repository cannot add the model to Pipelex Manifold: its catalog lives with the hosted plane. Tell the user so, and say which handle, model ids and capabilities the catalog needs. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
+This repository cannot add the model to the hosted model catalog, which lives with the hosted plane. Tell the user so, and say which handle, model ids and capabilities the catalog needs. **In the Pipelex workspace, the workspace-level `/add-model` does that part**, and runs this skill as its pipelex leg.
 
 
 ## Checklist
@@ -92,4 +92,4 @@ Show this to the user at the end, each box ticked or explained:
 - [ ] Deck left alone, or the promotion decided by the user, made after a shipped backend serves the model, and mirrored in `docs/`
 - [ ] Changelog entry under `[Unreleased]`
 - [ ] `make tb` and `make agent-check` green
-- [ ] Manifold catalog handed off to the hosted plane
+- [ ] Hosted model catalog handed off to the hosted plane

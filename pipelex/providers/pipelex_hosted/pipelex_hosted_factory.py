@@ -1,0 +1,170 @@
+"""How every hosted client is built: the endpoint rule, the token, and the per-request extras.
+
+**The endpoint rule is normative and it is why this class exists at all.** The backend declares the
+Pipelex service's *origin* — scheme, host and port, with no version segment — and each
+client appends what its own SDK expects beneath it. See `pipelex_hosted_constants` for the probe that
+established which SDK appends what.
+
+**There is no fallback endpoint, deliberately.** The Portkey-path sibling reads
+``backend.endpoint or PORTKEY_GATEWAY_URL``, which is right there: an unset endpoint means "use the
+vendor's cloud". Copied here it would mean that an empty-resolving ``PIPELEX_HOSTED_ENDPOINT``
+silently builds a client aimed at ``api.portkey.ai`` carrying the *Pipelex* service token — a live
+billable request to the wrong vendor, with nothing anywhere reporting it. So an absent endpoint is a
+refusal, and the backend loader's own missing-variable path disables the backend with a named
+warning long before this is reached.
+"""
+
+from __future__ import annotations
+
+import random
+from typing import TYPE_CHECKING, Any
+
+from pipelex.cogt.img_gen.img_gen_gemini_mapping import ImgGenGeminiMapping
+from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
+from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.providers.pipelex_hosted.pipelex_hosted_constants import PIPELEX_HOSTED_API_VERSION_SEGMENT, PIPELEX_HOSTED_AUTH_HEADER
+from pipelex.providers.pipelex_hosted.pipelex_hosted_exceptions import PipelexHostedCredentialsError, PipelexHostedEndpointError
+from pipelex.providers.pipelex_hosted.pipelex_hosted_metadata import make_pipelex_hosted_metadata_headers
+
+if TYPE_CHECKING:
+    from portkey_ai import AsyncPortkey
+
+    from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobParams
+    from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
+    from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
+    from pipelex.cogt.model_backends.backend import InferenceBackend
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+
+
+class PipelexHostedFactory:
+    @classmethod
+    def get_origin(cls, backend: InferenceBackend) -> str:
+        """The service origin the backend declares, with any trailing slash removed.
+
+        A trailing slash is stripped rather than refused because it is the one shape of a correct
+        answer a human types by accident, and it would otherwise produce a doubled separator in
+        every path this class builds.
+        """
+        endpoint = (backend.endpoint or "").strip().rstrip("/")
+        if not endpoint:
+            msg = (
+                f"Backend '{backend.name}' declares no endpoint for the Pipelex service. "
+                f"Set PIPELEX_HOSTED_ENDPOINT to the service origin (scheme, host and port, with no '/v1'). "
+                f"There is no default: a request built without one would reach a vendor this token is not for."
+            )
+            raise PipelexHostedEndpointError(msg)
+        return endpoint
+
+    @classmethod
+    def get_base_url(cls, backend: InferenceBackend) -> str:
+        """The origin plus the version segment, for the SDKs that expect one in their `base_url`."""
+        return f"{cls.get_origin(backend=backend)}{PIPELEX_HOSTED_API_VERSION_SEGMENT}"
+
+    @classmethod
+    def get_api_key(cls, backend: InferenceBackend) -> str:
+        if not backend.api_key:
+            msg = f"Backend '{backend.name}' carries no api_key for the Pipelex service; set PIPELEX_HOSTED_API_KEY"
+            raise PipelexHostedCredentialsError(msg)
+        return backend.api_key
+
+    @classmethod
+    def make_auth_headers(cls, backend: InferenceBackend) -> dict[str, str]:
+        """The whole of what the hosted dialect puts on the wire about itself: one token header.
+
+        No config id, no provider name, no routing of any kind — the service decides which provider
+        serves a model from the model id in the request body, and refuses a client that tries to say
+        otherwise. Building this dict by hand rather than through the vendor's header helper is what
+        makes that property readable here instead of dependent on a library's constructor defaults.
+        """
+        return {PIPELEX_HOSTED_AUTH_HEADER: cls.get_api_key(backend=backend)}
+
+    @classmethod
+    def make_portkey_client(cls, backend: InferenceBackend) -> AsyncPortkey:
+        """The image path's client.
+
+        `portkey_ai` is a beta-only dependency of this package: the image worker reuses the vendor
+        SDK's `images.generate` / `images.edit` methods for their multipart serialization, which is
+        the part that was expensive to get right. Everything else in this package is built on the
+        OpenAI SDK or on plain HTTP. See the deletion trigger in `pipelex_hosted_img_gen_worker`.
+        """
+        from portkey_ai import AsyncPortkey  # ruff: ignore[import-outside-top-level]
+
+        return AsyncPortkey(
+            base_url=cls.get_base_url(backend=backend),
+            api_key=cls.get_api_key(backend=backend),
+            debug=cls.is_debug_enabled(backend=backend),
+        )
+
+    @classmethod
+    def is_debug_enabled(cls, backend: InferenceBackend) -> bool:
+        """Read from the backend's own configuration and from nothing else.
+
+        The Portkey-path sibling routes this through the telemetry manager's
+        Portkey-path telemetry knobs. Reusing those here would put one configuration block in
+        charge of two services, which is the seam the two-gateways design exists to avoid.
+        """
+        return bool(backend.extra_config.get("debug", False))
+
+    @classmethod
+    def _make_gemini_image_config(cls, taxonomy: AspectRatioTaxonomy, *, job_params: ImgGenJobParams, model_name: str) -> dict[str, str]:
+        """The gemini `image_config` block, honouring the portable size.
+
+        Same resolution as the native Google worker: the requested ratio and size (tier or exact)
+        are checked against the model's Gemini taxonomy, and an unset size omits `image_size` so the
+        provider applies its own default.
+        """
+        resolved = ImgGenGeminiMapping.resolve_image_config(
+            taxonomy,
+            aspect_ratio=job_params.aspect_ratio,
+            size=job_params.size,
+            model_name=model_name,
+        )
+        image_config: dict[str, str] = {"aspect_ratio": resolved.aspect_ratio}
+        if resolved.image_size is not None:
+            image_config["image_size"] = resolved.image_size
+        return image_config
+
+    @classmethod
+    def make_extras(
+        cls, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
+        """The per-request headers and body additions.
+
+        The headers always include `x-pipelex-metadata`, naming the run and the step this call
+        serves (see `pipelex_hosted_metadata`). It is built here, per request, because it differs per job:
+        the token is a client default, this is not.
+
+        `output_desc` is part of the shared factory signature and is unused on this path: it exists
+        for the Portkey-path tracing header that names the job, and the hosted dialect sends no
+        tracing headers in the beta.
+        """
+        del output_desc
+        extra_headers: dict[str, str] = {}
+        extra_body: dict[str, Any] = {}
+        if inference_model.extra_headers:
+            # Per-model outbound headers the catalog sets — `anthropic-beta` is the live example.
+            # None of these is routing: the service refuses any client header that tries to choose a
+            # provider, and passes the rest through to whichever one it picked.
+            extra_headers.update(inference_model.extra_headers)
+        # After the catalog's headers, so a catalog entry cannot restate whose call this is.
+        extra_headers.update(make_pipelex_hosted_metadata_headers(job_metadata=inference_job.job_metadata))
+
+        if isinstance(inference_job, LLMJob):
+            # Mistral models really want a non-null seed. The spec carries no Mistral-specific field
+            # to key this on, so the model id's prefix decides, and it holds whether the catalog
+            # gives the provider's id or leaves the id to default to a `mistral-` handle.
+            if inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
+                extra_body["seed"] = random.randint(0, 1000000)
+        elif isinstance(inference_job, ImgGenJob):
+            # Decided by the spec, not the name: the catalog may serve a Gemini image model under a
+            # handle such as `nano-banana`, and the model id defaults to the handle when the catalog
+            # gives none. A Gemini taxonomy in the image rules is what makes it one, and a spec whose
+            # rules cannot say is refused rather than read as non-Gemini.
+            if (gemini_taxonomy := ImgGenGeminiMapping.optional_gemini_taxonomy(inference_model)) is not None:
+                extra_body["image_config"] = cls._make_gemini_image_config(
+                    gemini_taxonomy,
+                    job_params=inference_job.job_params,
+                    model_name=inference_model.name,
+                )
+
+        return extra_headers, extra_body

@@ -17,9 +17,9 @@ from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.providers.blackboxai.blackboxai_plugin import BlackboxaiPlugin
-from pipelex.providers.manifold.manifold_plugin import ManifoldPlugin
 from pipelex.providers.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker
 from pipelex.providers.openrouter.openrouter_plugin import OpenRouterPlugin
+from pipelex.providers.pipelex_hosted.pipelex_hosted_plugin import PipelexHostedPlugin
 from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:
@@ -111,11 +111,11 @@ class TestEachRegistrationPassesItsFormat:
     @pytest.mark.parametrize(
         ("plugin", "sdk", "expected"),
         [
-            (ManifoldPlugin(), "manifold_completions", ImageFormat.PNG),
+            (PipelexHostedPlugin(), "pipelex_hosted_completions", ImageFormat.PNG),
             (BlackboxaiPlugin(), "blackboxai_img_gen", ImageFormat.JPEG),
             (OpenRouterPlugin(), "openrouter_img_gen", None),
         ],
-        ids=["manifold", "blackboxai", "openrouter"],
+        ids=["pipelex_hosted", "blackboxai", "openrouter"],
     )
     def test_the_registration_builds_the_worker_with_its_format(
         self, mocker: MockerFixture, plugin: Any, sdk: str, expected: ImageFormat | None

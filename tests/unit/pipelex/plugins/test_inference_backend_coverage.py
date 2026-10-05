@@ -37,8 +37,8 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     (InferenceFamily.LLM, "azure_openai"),
     (InferenceFamily.LLM, "openai_responses"),
     (InferenceFamily.LLM, "azure_openai_responses"),
-    (InferenceFamily.LLM, "manifold_completions"),
-    (InferenceFamily.LLM, "manifold_responses"),
+    (InferenceFamily.LLM, "pipelex_hosted_completions"),
+    (InferenceFamily.LLM, "pipelex_hosted_responses"),
     (InferenceFamily.LLM, "portkey_completions"),
     (InferenceFamily.LLM, "portkey_responses"),
     (InferenceFamily.LLM, "anthropic"),
@@ -48,8 +48,8 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     (InferenceFamily.LLM, "bedrock_aioboto"),
     (InferenceFamily.LLM, "google"),
     # IMG_GEN
-    (InferenceFamily.IMG_GEN, "manifold_img_gen"),
-    (InferenceFamily.IMG_GEN, "manifold_completions"),
+    (InferenceFamily.IMG_GEN, "pipelex_hosted_img_gen"),
+    (InferenceFamily.IMG_GEN, "pipelex_hosted_completions"),
     (InferenceFamily.IMG_GEN, "openai_img_gen"),
     (InferenceFamily.IMG_GEN, "blackboxai_img_gen"),
     (InferenceFamily.IMG_GEN, "openrouter_img_gen"),
@@ -58,14 +58,14 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     (InferenceFamily.IMG_GEN, "azure_rest_img_gen"),
     (InferenceFamily.IMG_GEN, "google"),
     # EXTRACT
-    (InferenceFamily.EXTRACT, "manifold_extract"),
+    (InferenceFamily.EXTRACT, "pipelex_hosted_extract"),
     (InferenceFamily.EXTRACT, "mistral"),
     (InferenceFamily.EXTRACT, "pypdfium2"),
     (InferenceFamily.EXTRACT, "docling_sdk"),
     (InferenceFamily.EXTRACT, "linkup_fetch"),
     # SEARCH
     (InferenceFamily.SEARCH, "linkup"),
-    (InferenceFamily.SEARCH, "manifold_search"),
+    (InferenceFamily.SEARCH, "pipelex_hosted_search"),
     # JUDGMENT
     (InferenceFamily.JUDGMENT, "typesafe"),
 ]
@@ -88,13 +88,13 @@ class TestInferenceBackendCoverage:
             pytest.param([(InferenceFamily.EXTRACT, "linkup_fetch"), (InferenceFamily.SEARCH, "linkup")], "linkup", id="linkup"),
             pytest.param(
                 [
-                    (InferenceFamily.LLM, "manifold_completions"),
-                    (InferenceFamily.IMG_GEN, "manifold_img_gen"),
-                    (InferenceFamily.EXTRACT, "manifold_extract"),
-                    (InferenceFamily.SEARCH, "manifold_search"),
+                    (InferenceFamily.LLM, "pipelex_hosted_completions"),
+                    (InferenceFamily.IMG_GEN, "pipelex_hosted_img_gen"),
+                    (InferenceFamily.EXTRACT, "pipelex_hosted_extract"),
+                    (InferenceFamily.SEARCH, "pipelex_hosted_search"),
                 ],
-                "manifold",
-                id="manifold",
+                "pipelex_hosted",
+                id="pipelex_hosted",
             ),
         ],
     )

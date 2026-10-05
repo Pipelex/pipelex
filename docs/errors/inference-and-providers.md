@@ -100,18 +100,18 @@ own page. Classes are grouped by subsystem.
 - [`LinkupError`](linkup-error.md) — Linkup
 - [`LinkupSearchEmptyResultError`](linkup-search-empty-result-error.md) — Linkup search empty result
 - [`LinkupSearchResponseError`](linkup-search-response-error.md) — Linkup search response
-- [`ManifoldCredentialsError`](manifold-credentials-error.md) — Inference backend credentials missing
-- [`ManifoldEndpointError`](manifold-endpoint-error.md) — Inference backend endpoint missing
-- [`ManifoldError`](manifold-error.md) — Inference backend error
-- [`ManifoldExtractResponseError`](manifold-extract-response-error.md) — Extract response unreadable
-- [`ManifoldFactoryError`](manifold-factory-error.md) — Inference client setup error
-- [`ManifoldSearchEmptyResultError`](manifold-search-empty-result-error.md) — Search returned no result
-- [`ManifoldSearchResponseError`](manifold-search-response-error.md) — Search response unreadable
 - [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
 - [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
 - [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
 - [`MistralWorkerConfigurationError`](mistral-worker-configuration-error.md) — Mistral worker configuration
 - [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory error
+- [`PipelexHostedCredentialsError`](pipelex-hosted-credentials-error.md) — Inference backend credentials missing
+- [`PipelexHostedEndpointError`](pipelex-hosted-endpoint-error.md) — Inference backend endpoint missing
+- [`PipelexHostedError`](pipelex-hosted-error.md) — Inference backend error
+- [`PipelexHostedExtractResponseError`](pipelex-hosted-extract-response-error.md) — Extract response unreadable
+- [`PipelexHostedFactoryError`](pipelex-hosted-factory-error.md) — Inference client setup error
+- [`PipelexHostedSearchEmptyResultError`](pipelex-hosted-search-empty-result-error.md) — Search returned no result
+- [`PipelexHostedSearchResponseError`](pipelex-hosted-search-response-error.md) — Search response unreadable
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
