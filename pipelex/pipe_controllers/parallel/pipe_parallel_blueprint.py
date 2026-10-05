@@ -1,11 +1,15 @@
-from typing import Literal
+from typing import Any, Literal
 
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.pipe_controllers.binding.binding_step_blueprint import is_binding_step_dict, raw_step_mapping
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class PipeParallelBlueprint(PipeBlueprint):
@@ -19,6 +23,26 @@ class PipeParallelBlueprint(PipeBlueprint):
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes from the parallel branches."""
         return {branch.pipe for branch in self.branches}
+
+    @field_validator("branches", mode="before")
+    @classmethod
+    def refuse_binding_branches(cls, branches: list[Any]) -> list[Any]:
+        """Refuse a branch written as a binding step: a branch is always a pipe step.
+
+        A binding orders a value before the steps that read it, and branches run concurrently, so a binding
+        among them would only be a binding before the parallel, written in the wrong place.
+        """
+        for branch_index, branch in enumerate(branches):
+            raw_branch = raw_step_mapping(raw_step=branch)
+            if raw_branch is not None and is_binding_step_dict(raw_step=raw_branch):
+                from_path = raw_branch.get("from", raw_branch.get("from_path"))
+                msg = (
+                    f"Branch {branch_index + 1} of the parallel is a binding step (it carries `from`), but a PipeParallel branch is always "
+                    f"a pipe step: bind the value in a step of the calling PipeSequence, before the PipeParallel step "
+                    f'(`{{ from = "{from_path}", result = "<name>" }}`), and have the branch read that name.'
+                )
+                raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID)
+        return branches
 
     @override
     def validate_output(self):
