@@ -83,12 +83,14 @@ def _collect_possible_outputs(
 
             last_sub_pipe = sequential_sub_pipes[-1]
             if isinstance(last_sub_pipe, BindingStep):
-                # A binding ending the sequence outputs the spec it derives, rendered like a pipe's output.
-                binding_spec = the_pipe.build_typed_flow().binding_specs.get(len(sequential_sub_pipes) - 1)
-                if binding_spec is None:
-                    return []
+                # A binding ending the sequence outputs the spec it derives, rendered like a pipe's output. The library
+                # lookup sits outside the try, as in the branches beside it; deriving the binding sits inside, since a
+                # path that does not resolve is, like a structure that cannot be rendered, a pipe with no output to show.
                 binding_concept_provider = get_concept_library()
                 try:
+                    binding_spec = the_pipe.build_typed_flow().binding_specs.get(len(sequential_sub_pipes) - 1)
+                    if binding_spec is None:
+                        return []
                     binding_output_dict = binding_spec.render_stuff_spec(concept_provider=binding_concept_provider, output_format=output_format)
                 except (PipelexError, ValueError):
                     return []
