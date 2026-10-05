@@ -253,6 +253,10 @@ class MockedInitEnvironment:
         # Mock prompt_credentials to avoid env-dependent Prompt.ask calls for missing API keys
         self.mocker.patch("pipelex.cli.commands.init.command.prompt_credentials")
 
+        # The IDE extension suggestion asks to install into the editor it finds on this machine, so it would
+        # consume a queued answer and install into the real editor wherever the extension is missing
+        self.mocker.patch("pipelex.cli.commands.init.backends.suggest_extension_install_if_needed")
+
     def get_backend_indices(self, backend_names: list[str]) -> list[int]:
         """Get 1-based indices for backend names.
 

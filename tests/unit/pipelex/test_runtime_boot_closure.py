@@ -17,11 +17,20 @@ It is also strictly stronger than the import-closure entry point it complements:
 registrar from `KERNEL_BUILTIN_PLUGINS` alone, so `OrchestratorRegistry`, `BundleValidatorRegistry`
 and the PipeFunc executor modes are all empty on it — an import-time check cannot notice a boot step
 that tries to resolve out of one of them.
+
+A boot that meets a **stale configuration file** takes a path a healthy boot never does: the loader's
+validation fails, and the boot-tolerance retry replays the migration ledger over the file in memory
+(`docs/migration-ledger.md`). That retry imports the migration engine, so the property has to hold on
+it too — and it once did not, because the engine applied its operations through an applier that lived
+under `pipelex.pipeline`. A clean machine cannot see that path, so one case here boots with a home
+directory holding a stale file on purpose.
 """
 
+import os
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
+from pathlib import Path
 
 from tests.unit.pipelex.test_kernel_layer_import_closure import INTERPRETER_PACKAGES
 
@@ -31,7 +40,7 @@ from tests.unit.pipelex.test_kernel_layer_import_closure import INTERPRETER_PACK
 SUBPROCESS_TIMEOUT_SECONDS = 300
 
 #: Boot the kernel layer in a fresh interpreter, then answer the three questions this module exists
-#: to ask. `needs_inference=False` keeps it offline: no gateway terms gate, no model-deck validation.
+#: to ask. `needs_inference=False` skips model-deck validation.
 #: The `sys.modules` sweep runs *before* `pipelex.interpreter_hub` is imported for the hub assertion,
 #: so importing it to ask the question cannot be what makes the answer wrong.
 _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(
@@ -41,7 +50,8 @@ _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(
     from pipelex.runtime_boot import RuntimeBoot
     from pipelex.system.runtime import IntegrationMode
 
-    interpreter_packages = frozenset(sys.argv[1:])
+    expects_replay = sys.argv[1] == "expect-replay"
+    interpreter_packages = frozenset(sys.argv[2:])
     # An empty set would make the sweep below flag nothing and the test pass vacuously — the same
     # guard the import-closure harness carries, for the same reason.
     if not interpreter_packages:
@@ -49,6 +59,12 @@ _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(
         raise SystemExit(2)
 
     RuntimeBoot.make(integration_mode=IntegrationMode.PYTEST, needs_inference=False)
+
+    # A boot over a stale file must actually have taken the replay path, or the sweep below says
+    # nothing about it: the engine is imported only inside the retry.
+    if expects_replay and "pipelex.migration.engine" not in sys.modules:
+        print("the boot never replayed the migration ledger — the stale file was not stale")
+        raise SystemExit(3)
 
     offenders = sorted(
         name
@@ -99,16 +115,37 @@ _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(
 #: import-closure module carries the same control for the same reason (its `DIRTY_ENTRY_POINT`).
 CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS = "cogt"
 
+#: A telemetry override in the flat format that predates `[custom_posthog]`. Ledger entry
+#: `telemetry-config@2` carries it forward and the surface supports every version from 0, so this
+#: file stays stale-but-recoverable for as long as that ledger exists. It sits in the *global*
+#: directory because the boot always walks it, whatever project the test runs from.
+STALE_TELEMETRY_OVERRIDE = 'telemetry_mode = "off"\n'
 
-def _run_booted_runtime(*, interpreter_packages: "tuple[str, ...]") -> subprocess.CompletedProcess[str]:
-    """Boot the kernel layer in a fresh interpreter and return the sweep's verdict."""
+
+def _run_booted_runtime(
+    *,
+    interpreter_packages: "tuple[str, ...]",
+    stale_home: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Boot the kernel layer in a fresh interpreter and return the sweep's verdict.
+
+    With `stale_home`, the subprocess runs with that directory as its home (both spellings, so
+    `Path.home()` resolves to it on every platform), and the script additionally requires that the
+    boot went through the migration replay.
+    """
+    env: dict[str, str] | None = None
+    mode = "healthy"
+    if stale_home is not None:
+        env = {**os.environ, "HOME": str(stale_home), "USERPROFILE": str(stale_home)}
+        mode = "expect-replay"
     try:
         return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-            [sys.executable, "-c", _BOOTED_RUNTIME_SCRIPT, *interpreter_packages],
+            [sys.executable, "-c", _BOOTED_RUNTIME_SCRIPT, mode, *interpreter_packages],
             capture_output=True,
             text=True,
             check=False,
             timeout=SUBPROCESS_TIMEOUT_SECONDS,
+            env=env,
         )
     except subprocess.TimeoutExpired as exc:
         message = f"the booted-runtime subprocess did not finish within {SUBPROCESS_TIMEOUT_SECONDS}s"
@@ -135,6 +172,20 @@ class TestBootedKernelLayer:
             "booting the kernel layer must load zero interpreter modules and install no InterpreterHub.\n"
             "This is the boot-time half of the hub-layering property — see docs/contribute/hub-layering.md "
             "for how to find the shortest import path to an offender.\n"
+            f"stdout={result.stdout}\nstderr={result.stderr}"
+        )
+        assert "runtime boot OK" in result.stdout
+
+    def test_booting_over_a_stale_configuration_file_loads_no_interpreter_module(self, tmp_path: Path) -> None:
+        """The boot-tolerance replay is part of the kernel layer's boot, so it obeys the same property."""
+        global_config_dir = tmp_path / ".pipelex"
+        global_config_dir.mkdir()
+        (global_config_dir / "telemetry_override.toml").write_text(STALE_TELEMETRY_OVERRIDE, encoding="utf-8")
+
+        result = _run_booted_runtime(interpreter_packages=INTERPRETER_PACKAGES, stale_home=tmp_path)
+        assert result.returncode == 0, (
+            "a kernel-layer boot that replays the migration ledger over a stale file must load zero interpreter "
+            "modules. Exit 3 means the boot never reached the replay, so the fixture has stopped being stale.\n"
             f"stdout={result.stdout}\nstderr={result.stderr}"
         )
         assert "runtime boot OK" in result.stdout

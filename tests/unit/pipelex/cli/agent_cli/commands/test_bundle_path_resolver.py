@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 import typer
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
+from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 
 
 class TestResolveBundleTarget:

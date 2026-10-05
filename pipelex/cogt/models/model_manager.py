@@ -6,29 +6,20 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.doc_gen.doc_gen_format import parse_doc_gen_choice_key
-from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError, PluginModelDeclarationError
-from pipelex.cogt.extract.extract_setting import ExtractSetting
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
-from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
-from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.exceptions import ModelManagerError, PluginModelDeclarationError
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
-from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
-from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
@@ -71,8 +62,6 @@ class ModelManager(ModelManagerAbstract):
         self,
         *,
         secrets_provider: SecretsProviderAbstract,
-        managed_gateway_configs: dict[str, GatewayConfig] | None,
-        gateway_config_source: RemoteConfigSource | None,
         plugin_model_declarations: PluginModelDeclarations,
         needs_inference: bool = True,
         backends_library_paths: Sequence[Path] | None = None,
@@ -89,7 +78,6 @@ class ModelManager(ModelManagerAbstract):
             secrets_provider=secrets_provider,
             backends_library_paths=backends_library_paths or config_manager.backends_file_paths(),
             backends_dir_path=resolved_backends_dir_path,
-            managed_gateway_configs=managed_gateway_configs,
             lenient=not needs_inference,
         )
         # The loader parks its stale-configuration warning rather than logging it, so that the
@@ -98,8 +86,8 @@ class ModelManager(ModelManagerAbstract):
         # single copy, and by here logging is configured.
         if (stale_warning := self.inference_backend_library.take_stale_configuration_warning()) is not None:
             log.warning(stale_warning)
-        # The plugins' internal models join the internal backend before anything reads the library, so routing, the
-        # deck and the gateway check below see them exactly as they see a model `internal.toml` declares.
+        # The plugins' internal models join the internal backend before anything reads the library, so routing
+        # and the deck see them exactly as they see a model `internal.toml` declares.
         has_internal_backend = self.inference_backend_library.merge_plugin_internal_models(
             plugin_model_declarations=plugin_model_declarations,
             backends_dir_path=resolved_backends_dir_path,
@@ -119,18 +107,12 @@ class ModelManager(ModelManagerAbstract):
         )
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 
-        self._enforce_gateway_model_membership(
-            managed_gateway_configs=managed_gateway_configs,
-            gateway_config_source=gateway_config_source,
-            enabled_backends=enabled_backends,
-        )
-
     @classmethod
     def _make_plugin_deck_base(cls, *, plugin_model_declarations: PluginModelDeclarations, has_internal_backend: bool) -> dict[str, Any]:
         """The model deck document the plugins' defaults make, for the deck files to be merged over.
 
         Left out entirely without an internal backend, as the plugins' models are: a default pointing at a model this
-        boot does not serve is exactly what a live gateway's membership check refuses, and a plugin must not make a
+        boot does not serve would fail the deck's validation, and a plugin must not make a
         boot fail that would succeed without it. The kit's own internal models set the precedent: with the backend
         disabled their files' models are not loaded, and nothing a plugin adds changes that.
 
@@ -146,246 +128,6 @@ class ModelManager(ModelManagerAbstract):
                 msg = f"Plugin '{doc_gen_default.plugin}' declares a default document engine that no step can use: {exc}"
                 raise PluginModelDeclarationError(msg, plugin=doc_gen_default.plugin) from exc
         return plugin_model_declarations.make_deck_base()
-
-    def _enforce_gateway_model_membership(
-        self,
-        managed_gateway_configs: dict[str, GatewayConfig] | None,
-        *,
-        gateway_config_source: RemoteConfigSource | None,
-        enabled_backends: list[str],
-    ) -> None:
-        """Fail loudly when a handle routed to a managed gateway is absent from that gateway's specs.
-
-        Runs even when ``missing_presets_reaction = "log"`` (the default), because a missing
-        gateway model is a distinct failure mode from a generic preset mismatch: it means the
-        active gateway specs (fresh or cached) are out of sync with what the deck author
-        declared. Surfacing this as ``GatewayUnknownModelError`` lets the agent CLI hint at
-        cache-refresh remediation when the config was sourced from the on-disk fallback.
-
-        We only fire the check when both the configs and ``gateway_config_source`` are set — that
-        is, when a managed gateway is actually live in this setup pass.
-
-        **One check per live managed service, run separately — not a union across them.** With two
-        services the old shape breaks in two directions at once. It was a union membership test
-        ("is this handle in the deck *or* in the one gateway's specs?"), which with two sections
-        would pass a handle that neither service can actually serve as long as the *other* one can.
-        And ``_collect_deck_referenced_handles`` walks the whole deck, so running the old check
-        separately against both would demand every deck handle appear in *both* sections — which
-        the mixed profile cannot satisfy and the parked families contradict.
-
-        **The resolution is the routing profile.** Each per-service check validates only the deck
-        handles the active profile actually routes to that service. A handle legitimately absent
-        from one section is then not an error, the mixed profile stays expressible, and the case
-        that matters — the profile routes a handle to a service whose section does not carry it —
-        still fails loudly at boot.
-
-        Waterfall semantics: a waterfall reference is "known" if AT LEAST ONE of its
-        fallbacks resolves to a known handle. At runtime the deck walks the list and uses
-        the first available model (when ``is_model_fallback_enabled`` is true, the default),
-        so a deck like ``["future-model", "current-model"]`` is perfectly valid as long as
-        ``current-model`` is in the gateway specs.
-        """
-        if not managed_gateway_configs or gateway_config_source is None:
-            return
-        deck = self.get_model_deck()
-        referenced_handles = self._collect_deck_referenced_handles(deck)
-
-        for backend_name, gateway_config in managed_gateway_configs.items():
-            gateway_spec_names = {name for name in gateway_config.model_specs if name != "defaults"}
-            for handle, model_type in referenced_handles:
-                try:
-                    ref = ModelReference.parse(handle)
-                except ModelReferenceParseError:
-                    continue
-                candidates = self._resolve_terminal_candidates(deck=deck, ref=ref, model_type=model_type)
-                # Only the candidates this service is responsible for. A candidate the profile sends
-                # to a BYOK backend, to the internal one, or to the *other* managed service is not
-                # this check's business; the generic missing-handle path covers those.
-                routed_here = [
-                    candidate
-                    for candidate in candidates
-                    if self._routes_to_backend(candidate=candidate, backend_name=backend_name, enabled_backends=enabled_backends)
-                ]
-                if not routed_here:
-                    continue
-                # ``deck.inference_models`` is consulted over the WHOLE candidate list, not just the
-                # part routed here, and the difference is load-bearing. That map is built by routing
-                # every handle through the active profile and keeping the ones whose matched backend
-                # has a spec, so membership in it already means "resolvable under this profile",
-                # whichever backend serves it — which is exactly what ``_resolve_waterfall`` walks at
-                # runtime. Narrowing this half to ``routed_here`` would refuse a waterfall whose
-                # working fallback lives on another backend, and the runtime would have served it.
-                if any(candidate in deck.inference_models for candidate in candidates):
-                    continue
-                # The section lookup, by contrast, is only about what THIS service carries.
-                if any(candidate in gateway_spec_names for candidate in routed_here):
-                    continue
-                # No candidate resolves to a known handle. Report the first one — it's the
-                # primary the user is asking for; subsequent entries are fallbacks.
-                raise GatewayUnknownModelError(model_name=routed_here[0], backend_name=backend_name, source=gateway_config_source)
-
-    def _routes_to_backend(self, *, candidate: str, backend_name: str, enabled_backends: list[str]) -> bool:
-        """Whether the active routing profile sends this handle to this backend."""
-        backend_match = self.routing_profile.get_backend_match_for_model(
-            enabled_backends=enabled_backends,
-            model_name=candidate,
-        )
-        return backend_match is not None and backend_match.backend_name == backend_name
-
-    @classmethod
-    def _collect_deck_referenced_handles(cls, deck: ModelDeck) -> list[tuple[str, ModelType]]:
-        """Gather the (handle, model_type) pairs that the deck advertises as usable.
-
-        Covers presets and choice defaults across every model type a managed gateway can serve.
-        Aliases and waterfalls are intentionally NOT enumerated directly — they are reachable via
-        preset/choice references, and the resolver walks through them. Including them here would
-        force the check on dangling helpers the user has not actively wired into a preset.
-
-        Document engines (``doc_gen``) are left out: they are software on the host, which no
-        gateway serves, and a step whose engine is undeclared is refused at load naming the engine
-        and the fix, where a gateway error at boot would stop every method and blame the gateway.
-        """
-        references: list[tuple[str, ModelType]] = []
-        for llm_setting in deck.llm_presets.values():
-            references.append((llm_setting.model, ModelType.LLM))
-        llm_text_handle = cls._extract_choice_handle(deck.llm_choice_defaults.for_text)
-        if llm_text_handle is not None:
-            references.append((llm_text_handle, ModelType.LLM))
-        llm_object_handle = cls._extract_choice_handle(deck.llm_choice_defaults.for_object)
-        if llm_object_handle is not None:
-            references.append((llm_object_handle, ModelType.LLM))
-        for extract_setting in deck.extract_presets.values():
-            references.append((extract_setting.model, ModelType.TEXT_EXTRACTOR))
-        extract_default_handle = cls._extract_choice_handle(deck.extract_choice_default)
-        if extract_default_handle is not None:
-            references.append((extract_default_handle, ModelType.TEXT_EXTRACTOR))
-        for img_gen_setting in deck.img_gen_presets.values():
-            references.append((img_gen_setting.model, ModelType.IMG_GEN))
-        img_gen_default_handle = cls._extract_choice_handle(deck.img_gen_choice_default)
-        if img_gen_default_handle is not None:
-            references.append((img_gen_default_handle, ModelType.IMG_GEN))
-        for search_setting in deck.search_presets.values():
-            references.append((search_setting.model, ModelType.SEARCH))
-        search_default_handle = cls._extract_choice_handle(deck.search_choice_default)
-        if search_default_handle is not None:
-            references.append((search_default_handle, ModelType.SEARCH))
-        for judgment_setting in deck.judgment_presets.values():
-            references.append((judgment_setting.model, ModelType.JUDGMENT))
-        judgment_default_handle = cls._extract_choice_handle(deck.judgment_choice_default)
-        if judgment_default_handle is not None:
-            references.append((judgment_default_handle, ModelType.JUDGMENT))
-        return references
-
-    @classmethod
-    def _extract_choice_handle(
-        cls,
-        choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | JudgmentSetting | ModelReference | str | None,
-    ) -> str | None:
-        """Normalise a ``*ModelChoice`` union (LLMModelChoice etc.) to a raw handle string.
-
-        Choice defaults can be a typed setting object, a parsed ``ModelReference``, or a raw
-        string — all three paths point at a handle we need to validate.
-        """
-        if choice is None:
-            return None
-        if isinstance(choice, str):
-            return choice
-        if isinstance(choice, ModelReference):
-            return choice.raw
-        return choice.model
-
-    @classmethod
-    def _resolve_terminal_candidates(cls, *, deck: ModelDeck, ref: ModelReference, model_type: ModelType) -> list[str]:
-        """Return every terminal handle reachable from ``ref`` via aliases/waterfalls.
-
-        For ``HANDLE`` references: returns ``[name]`` (bare strings are HANDLEs by design —
-        see ``ModelReference.parse`` for the BREAKING CHANGE note).
-
-        For ``ALIAS`` references: follows the alias target. Cycles return ``[]``.
-
-        For ``WATERFALL`` references: follows EVERY fallback in order (or only the first
-        when ``model_deck_config.is_model_fallback_enabled`` is false, matching runtime
-        behaviour at ``model_deck._get_optional_inference_model_with_fallback``). Cycles
-        across either alias or waterfall keys return ``[]`` for the cycling branch but do
-        not poison the rest of the candidate list.
-
-        For ``PRESET`` references: returns ``[]`` (presets are not handles).
-        """
-        aliases, waterfalls = deck.get_aliases_and_waterfalls_for_type(model_type)
-        is_fallback_enabled = deck.model_deck_config.is_model_fallback_enabled
-        return cls._collect_candidates(
-            ref=ref,
-            aliases=aliases,
-            waterfalls=waterfalls,
-            is_fallback_enabled=is_fallback_enabled,
-            visited=set(),
-        )
-
-    @classmethod
-    def _collect_candidates(
-        cls,
-        ref: ModelReference,
-        *,
-        aliases: dict[str, str],
-        waterfalls: dict[str, list[str]],
-        is_fallback_enabled: bool,
-        visited: set[tuple[ModelReferenceKind, str]],
-    ) -> list[str]:
-        # Cycle key is (kind, name): an alias and a waterfall can share a name yet be distinct nodes.
-        visit_key: tuple[ModelReferenceKind, str]
-        match ref.kind:
-            case ModelReferenceKind.HANDLE:
-                return [ref.name]
-            case ModelReferenceKind.ALIAS:
-                visit_key = (ref.kind, ref.name)
-                if visit_key in visited:
-                    return []
-                visited.add(visit_key)
-                target = aliases.get(ref.name)
-                if target is None:
-                    return [ref.name]
-                try:
-                    next_ref = ModelReference.parse(target)
-                except ModelReferenceParseError:
-                    return []
-                return cls._collect_candidates(
-                    ref=next_ref,
-                    aliases=aliases,
-                    waterfalls=waterfalls,
-                    is_fallback_enabled=is_fallback_enabled,
-                    visited=visited,
-                )
-            case ModelReferenceKind.WATERFALL:
-                visit_key = (ref.kind, ref.name)
-                if visit_key in visited:
-                    return []
-                visited.add(visit_key)
-                fallback_list = waterfalls.get(ref.name)
-                if not fallback_list:
-                    return [ref.name]
-                # Runtime only tries the first fallback when fallback is disabled; mirror
-                # that here so the membership check stays consistent with what actually runs.
-                entries = fallback_list if is_fallback_enabled else fallback_list[:1]
-                candidates: list[str] = []
-                for entry in entries:
-                    try:
-                        next_ref = ModelReference.parse(entry)
-                    except ModelReferenceParseError:
-                        continue
-                    # Fresh visited set per branch so two waterfall entries that legitimately
-                    # share an alias don't kill the second one.
-                    candidates.extend(
-                        cls._collect_candidates(
-                            ref=next_ref,
-                            aliases=aliases,
-                            waterfalls=waterfalls,
-                            is_fallback_enabled=is_fallback_enabled,
-                            visited=set(visited),
-                        )
-                    )
-                return candidates
-            case ModelReferenceKind.PRESET:
-                return []
 
     @override
     def validate_model_deck(self):

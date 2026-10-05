@@ -141,7 +141,6 @@ class TestAgentCodegenTypesCmd:
         )
 
         assert boot.call_args.kwargs["needs_inference"] is False
-        assert boot.call_args.kwargs["needs_model_specs"] is True
 
     def test_expands_home_relative_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         self._neutralize_boot(mocker)

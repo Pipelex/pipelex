@@ -2,8 +2,9 @@
 
 The run's identity and the host's labels are forwarded to our own gateway, which bills and logs the
 call; a vendor reached directly with the caller's own key has no use for them and must not receive
-them. The shared Anthropic driver is the path most at risk, because it serves both a direct Anthropic
-backend and Claude behind Manifold from the same code.
+them. The Anthropic worker is the path most at risk, because it serves both a direct Anthropic
+backend and Claude behind Manifold from the same code: only the extras factory the manifold package
+builds it with adds the header, so a worker built without one sends nothing, whatever its backend.
 """
 
 from __future__ import annotations
@@ -19,7 +20,6 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, LLMJ
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
-from pipelex.providers.gateway.gateway_factory import GatewayFactory
 from pipelex.providers.manifold.manifold_constants import MANIFOLD_METADATA_HEADER
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory
@@ -63,6 +63,7 @@ def _anthropic_worker(mocker: MockerFixture, *, sdk_client: AsyncAnthropic, back
 
     worker = object.__new__(AnthropicLLMWorker)
     worker.inference_model = _model(mocker, backend_name=backend_name)
+    worker.extras_factory = None
     worker.default_max_tokens = 4096
     worker.anthropic_async_client = sdk_client
     worker.instructor_for_objects = from_anthropic(client=sdk_client, mode=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS.as_instructor_mode())
@@ -93,9 +94,8 @@ class TestManifoldMetadataScope:
             OpenAICompletionsFactory(is_http_url_enabled=False),
             OpenAIResponsesFactory(is_http_url_enabled=False),
             PortkeyFactory,
-            GatewayFactory,
         ],
-        ids=["openai-completions", "openai-responses", "portkey", "gateway"],
+        ids=["openai-completions", "openai-responses", "portkey"],
     )
     async def test_other_backends_extras_carry_no_metadata_header(self, mocker: MockerFixture, factory: Any) -> None:
         model = _model(mocker, backend_name="openai")
@@ -106,8 +106,8 @@ class TestManifoldMetadataScope:
         assert MANIFOLD_METADATA_HEADER not in extra_headers
         assert "x-portkey-metadata" not in extra_headers
 
-    @pytest.mark.parametrize("backend_name", ["anthropic", "bedrock", "pipelex_gateway"])
-    async def test_direct_claude_sends_no_headers_on_the_text_call(self, mocker: MockerFixture, backend_name: str) -> None:
+    @pytest.mark.parametrize("backend_name", ["anthropic", "bedrock", "pipelex_manifold"])
+    async def test_a_plain_anthropic_worker_sends_no_headers_on_the_text_call(self, mocker: MockerFixture, backend_name: str) -> None:
         sdk_client = AsyncAnthropic(api_key="test-key")
         stream = mocker.MagicMock(side_effect=_RequestCapturedError)
         mocker.patch.object(sdk_client.messages, "stream", new=stream)
@@ -118,11 +118,12 @@ class TestManifoldMetadataScope:
 
         assert "extra_headers" not in stream.call_args.kwargs
 
-    async def test_direct_claude_sends_no_headers_on_the_structured_call(self, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize("backend_name", ["anthropic", "pipelex_manifold"])
+    async def test_a_plain_anthropic_worker_sends_no_headers_on_the_structured_call(self, mocker: MockerFixture, backend_name: str) -> None:
         sdk_client = AsyncAnthropic(api_key="test-key")
         create = mocker.AsyncMock(return_value=_tool_call_message())
         mocker.patch.object(sdk_client.messages, "create", new=create)
-        worker = _anthropic_worker(mocker, sdk_client=sdk_client, backend_name="anthropic")
+        worker = _anthropic_worker(mocker, sdk_client=sdk_client, backend_name=backend_name)
 
         await worker._gen_object(_llm_job(), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 

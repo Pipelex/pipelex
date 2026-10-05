@@ -84,7 +84,6 @@ class TestCodegenCli:
                 library_dir=None,
             )
         assert boot.call_args.kwargs["needs_inference"] is False
-        assert boot.call_args.kwargs["needs_model_specs"] is True
 
     def test_types_invalid_library_verdict_propagates(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=TYPES)

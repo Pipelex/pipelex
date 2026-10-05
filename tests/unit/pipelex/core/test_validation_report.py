@@ -157,16 +157,13 @@ class TestWhatTheScanFinds:
 
         assert report.migration is None
 
-    def test_another_surfaces_base_file_is_not_swept_up_by_this_ones_glob(self, machine: Path) -> None:
-        """Scoping narrows the answer; it must not narrow the registry that decides ownership.
+    def test_a_retired_file_is_not_swept_up_by_this_surfaces_glob(self, machine: Path) -> None:
+        """A retired configuration file left on the machine is inert, even when its name matches the glob.
 
-        `pipelex_service.toml` is `pipelex-service-config`'s base file *and* a match for
-        `pipelex-config`'s tier glob `pipelex_*.toml`, and the registry resolves that by letting an
-        exact base file claim before any glob — **across all surfaces**. Scoping the scan by
-        building a registry that holds only the surface asked about removes the other claimant from
-        that arbitration, and the glob then wins: the file is replayed under the wrong ledger and
-        diagnosed against the wrong model, so its perfectly ordinary settings come back reported as
-        paths this build knows nothing about. Measured, not imagined — that is what it did.
+        `pipelex_service.toml` matches `pipelex-config`'s tier glob `pipelex_*.toml`, but the file it
+        names is no longer read by anything. Replayed under `pipelex-config`'s ledger, its ordinary
+        settings would come back reported as paths this build knows nothing about, so the registry
+        claims it for no surface and the scan leaves it out.
         """
         machine.joinpath("pipelex.toml").write_text("not_a_real_setting = true\n", encoding="utf-8")
         machine.joinpath("pipelex_service.toml").write_text("[agreement]\nterms_accepted = true\n", encoding="utf-8")

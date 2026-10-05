@@ -236,7 +236,7 @@ def execute_validate(
     runtime — so this flag does not change *what* validation does; it controls how Pipelex boots,
     which is the lever for exercising the "validation stays in-process on an orchestrator backend" contract.
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True, boot_orchestrator=orchestrator)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, boot_orchestrator=orchestrator)
 
     try:
         with get_telemetry_manager().telemetry_context():

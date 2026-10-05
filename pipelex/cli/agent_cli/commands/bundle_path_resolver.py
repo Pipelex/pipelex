@@ -8,7 +8,6 @@ decision-making; this wrapper owns agent error envelopes.
 from pathlib import Path
 from typing import NoReturn
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.cli.bundle_target_resolution import (
     BundleTargetResolutionError,
@@ -16,6 +15,7 @@ from pipelex.cli.bundle_target_resolution import (
     BundleTargetResolutionSuccess,
     resolve_bundle_target_core,
 )
+from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 
 
 def _stringify_library_dirs(library_dirs: list[Path] | None) -> list[str] | None:

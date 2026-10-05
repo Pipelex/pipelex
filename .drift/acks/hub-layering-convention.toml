@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:644cc1387406a8e2c330a76f4139ec25318bd56a7d78caa46f9bb54f2bf7b682"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-04T00:24:05Z"
-rationale = "clean-pass: runtime_hub.py changed only in a docstring, which adds PipeJudge to the list of inference operators resolving the content generator; no layer placement or hub member moved, so docs/contribute/hub-layering.md is unaffected."
+digest = "sha256:0d04191133ff7766daf3182784f868d2da5a724f655b9d23428a3634ec97e8d3"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-04T20:43:02Z"
+rationale = "real-catch: the guard now declares pipelex.fix_ops and pipelex.migration; hub-layering.md's declared-package list, the paragraph that called declaring migration an overreach, and a new known inversion now say so. Re-deriving the 'every top-level package accounted for' claim from ls pipelex/ found pipelex.methods unaccounted for; measured it (structures_check imports pipelex.codegen, loading interpreter modules without reaching the hub) and added it to both the doc and the guard's note."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fe10deb00e0d30f300352a0696258ab108668e3c"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:b6dcef79b73d5ce05669c478bff9dc4b367696e5"
+"pipelex/runtime_hub.py" = "blob:05f84b9604b9f904e7df96d222b8856123ce9e91"

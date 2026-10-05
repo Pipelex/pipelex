@@ -261,7 +261,7 @@ def execute_fix(
     verdict semantics.
     """
     try:
-        make_pipelex_for_cli(context=ErrorContext.FIX, needs_inference=False, needs_model_specs=True)
+        make_pipelex_for_cli(context=ErrorContext.FIX, needs_inference=False)
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())

@@ -1,17 +1,17 @@
 ---
-title: "Manifold"
+title: "Inference backend error"
 description: "Reference for the `ManifoldError` Pipelex error class."
 ---
 
 <!-- pipelex:generated -->
 
-# Manifold
+# Inference backend error
 
 | Field | Value |
 |---|---|
 | `error_type` | `ManifoldError` |
-| `title` | Manifold |
-| `type_uri` | `https://docs.pipelex.com/latest/errors/manifold-error/` |
+| `title` | Inference backend error |
+| `type_uri` | `https://docs.pipelex.com/latest/errors/cogt-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.providers.manifold.manifold_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |

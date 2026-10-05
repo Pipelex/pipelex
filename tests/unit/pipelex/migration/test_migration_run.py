@@ -93,16 +93,16 @@ class TestTheWalkIsNotRecursive:
     """A subdirectory of a configuration directory holds a different kind of thing.
 
     The specimen is real and it is the reason this is pinned rather than assumed:
-    `.pipelex/inference/backends/pipelex_gateway.toml` matches the `pipelex-config` tier glob
+    `.pipelex/inference/backends/pipelex_manifold.toml` matches the `pipelex-config` tier glob
     `pipelex_*.toml` exactly, and is an inference backend definition rather than a main-configuration
     tier file. The walk *does* reach it now, because `inference/backends/` has a surface of its own —
     which makes the directory half of the claim rule load-bearing rather than academic: get it wrong
     and the main configuration's ledger is replayed over a backend definition and rewrites it.
     """
 
-    SPECIMEN = Path("inference") / "backends" / "pipelex_gateway.toml"
+    SPECIMEN = Path("inference") / "backends" / "pipelex_manifold.toml"
 
-    def test_the_real_gateway_backend_file_is_claimed_by_its_own_directorys_surface(self, tmp_path: Path) -> None:
+    def test_the_real_manifold_backend_file_is_claimed_by_its_own_directorys_surface(self, tmp_path: Path) -> None:
         specimen = tmp_path / self.SPECIMEN
         specimen.parent.mkdir(parents=True)
         specimen.write_text("", encoding="utf-8")

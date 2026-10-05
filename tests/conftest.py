@@ -10,15 +10,6 @@ from pipelex import log
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
-from pipelex.system.pipelex_service.pipelex_service_config import (
-    PipelexServiceConfig,
-)
-from pipelex.system.pipelex_service.pipelex_service_config import (
-    load_pipelex_service_config_if_exists as _original_load_pipelex_service_config,
-)
-from pipelex.system.pipelex_service.remote_config import RemoteConfig
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher, RemoteConfigResult
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
@@ -30,37 +21,6 @@ pytest_plugins = [
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
-
-# Session-level cache for remote config (using dict to avoid global statement)
-_remote_config_cache: dict[str, RemoteConfig] = {}
-_original_fetch_remote_config = RemoteConfigFetcher.fetch_remote_config
-
-
-def _cached_fetch_remote_config(require_fresh: bool = False) -> "RemoteConfigResult":  # ruff: ignore[unused-function-argument]
-    """Wrapper that caches the remote config for the entire test session.
-
-    The ``require_fresh`` arg matches the new fetcher signature; ignored here because the
-    test-session cache exists precisely so we don't re-hit the network mid-suite.
-    """
-    if "config" not in _remote_config_cache:
-        result = _original_fetch_remote_config()
-        _remote_config_cache["config"] = result.config
-    return RemoteConfigResult(config=_remote_config_cache["config"], source=RemoteConfigSource.FRESH, cached_at=None)
-
-
-# Session-level cache for pipelex service config to avoid flaky tests from concurrent file reads
-_pipelex_service_config_cache: dict[Path, PipelexServiceConfig | None] = {}
-
-
-def _cached_load_pipelex_service_config(config_dir: Path) -> PipelexServiceConfig | None:
-    """Wrapper that caches the pipelex service config for the entire test session.
-
-    This prevents flaky tests caused by concurrent file reads during parallel pytest-xdist execution.
-    The cache key includes the config_dir to handle different config directories.
-    """
-    if config_dir not in _pipelex_service_config_cache:
-        _pipelex_service_config_cache[config_dir] = _original_load_pipelex_service_config(config_dir)
-    return _pipelex_service_config_cache[config_dir]
 
 
 def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
@@ -89,14 +49,7 @@ def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def cache_configs_for_session(session_mocker: MockerFixture):
-    """Cache configurations and optimize teardown for the entire test session."""
-    # Cache remote config to avoid repeated network fetches
-    session_mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _cached_fetch_remote_config)
-    # Cache pipelex service config to avoid flaky tests from concurrent file reads
-    session_mocker.patch(
-        "pipelex.runtime_boot.load_pipelex_service_config_if_exists",
-        _cached_load_pipelex_service_config,
-    )
+    """Optimize teardown for the entire test session."""
     # Skip expensive telemetry shutdown (OTel + PostHog flush) during tests
     from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # ruff: ignore[import-outside-top-level]
 
@@ -106,8 +59,7 @@ def cache_configs_for_session(session_mocker: MockerFixture):
 def _get_test_integration_mode() -> IntegrationMode:
     """Return the appropriate integration mode for tests.
 
-    Uses CI mode in CI environments (no terms acceptance required),
-    PYTEST mode for local development (terms acceptance required).
+    Uses CI mode in CI environments, PYTEST mode for local development.
     """
     if runtime_manager.is_ci_testing:
         return IntegrationMode.CI

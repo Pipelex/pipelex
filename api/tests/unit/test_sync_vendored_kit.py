@@ -79,9 +79,9 @@ enabled = false
         assert plan.drifts == []
         assert plan.is_clean
 
-    def test_committed_tree_enables_the_gateway(self) -> None:
+    def test_committed_tree_enables_openai(self) -> None:
         switches: dict[str, bool] = sync_vendored_kit.read_enabled_switches(_VENDORED_CONFIG_DIR / "inference" / "backends.toml")
-        assert switches["pipelex_gateway"] is True
+        assert switches["openai"] is True
         assert switches["internal"] is True
 
     def test_a_table_without_a_switch_is_read_as_on(self, tmp_path: Path) -> None:
@@ -102,10 +102,10 @@ enabled = false
         ("backends_toml_text", "reason"),
         [
             (None, "is missing"),
-            ("[pipelex_gateway\nenabled = true\n", "is not valid TOML"),
+            ("[acme\nenabled = true\n", "is not valid TOML"),
             ("", "holds no backend table"),
-            ("[pipelex_gateway]\nenabled = 'yes'\n", "is not a boolean"),
-            ("[pipelex_gateway]\nenabled = true\n", "has no table for"),
+            ("[openai]\nenabled = 'yes'\n", "is not a boolean"),
+            ("[openai]\nenabled = true\n", "has no table for"),
         ],
     )
     def test_sync_stops_when_the_switch_record_is_unusable(self, vendored_copy: Path, backends_toml_text: str | None, reason: str) -> None:

@@ -15,18 +15,11 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     set_agent_cli_error_format,
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
-from pipelex.cli.commands.init.command import attempt_prime_remote_config_cache
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
-from pipelex.cogt.model_backends.backend import MANAGED_GATEWAY_BACKEND_NAMES, PipelexBackend
-from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.pipelex_service_agreement import (
-    update_inference_setup_completed,
-    update_service_terms_acceptance,
-)
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -75,13 +68,7 @@ def _format_init_markdown(result: dict[str, Any]) -> str:
         f"**Backends enabled:** {', '.join(backends_enabled) or 'none'}",
         "",
         f"**Routing profile:** `{result['routing_profile']}`",
-        "",
-        f"**Inference setup completed:** {result.get('inference_setup_completed', False)}",
-        "",
-        f"**Remote config cache primed:** {result.get('cache_primed', False)}",
     ]
-    if result.get("cache_priming_error"):
-        lines.extend(["", f"> ⚠ Cache priming error: {result['cache_priming_error']}"])
     return "\n".join(lines)
 
 
@@ -215,15 +202,6 @@ def _configure_backends(
     update_backends_in_toml(toml_doc, selected_indices=selected_indices, backend_options=backend_options)
     save_toml_to_path(toml_doc, path=backends_toml_path)
 
-    # Any managed gateway backend puts this installation behind the service terms — the same
-    # question the boot asks. Asked the gateway-only way, `accept_gateway_terms` was silently
-    # dropped for a manifold-only request and the next inference boot refused to start.
-    if any(backend_name in requested_backends for backend_name in MANAGED_GATEWAY_BACKEND_NAMES):
-        accept_terms = config.get("accept_gateway_terms")
-        if accept_terms is not None:
-            config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
-            update_service_terms_acceptance(accepted=accept_terms, config_dir=config_manager.global_config_dir)
-
     return requested_backends
 
 
@@ -232,7 +210,7 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
 
     Args:
         selected_backend_keys: List of enabled backend keys.
-        config: Parsed config dict with optional 'primary_backend' key.
+        config: Parsed config dict with optional 'backends' and 'primary_backend' keys.
         target_dir: Target config directory.
 
     Returns:
@@ -245,13 +223,12 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
 
     toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
 
-    # Case 1: pipelex_gateway is enabled → use all_pipelex_gateway
-    if PipelexBackend.GATEWAY in selected_backend_keys:
-        toml_doc["active"] = PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
-        save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
-        return PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
+    # Template defaults with no primary named: the template's own profile already routes among
+    # every backend the template enables, so it stays active.
+    if config.get("backends") is None and config.get("primary_backend") is None:
+        return str(toml_doc["active"])
 
-    # Case 2: Only one backend → use all_{backend_key}
+    # Case 1: Only one backend → use all_{backend_key}
     if len(selected_backend_keys) == 1:
         backend_key = selected_backend_keys[0]
         profile_name = f"all_{backend_key}"
@@ -271,13 +248,12 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
         save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
         return profile_name
 
-    # Case 3: Multiple backends (no pipelex_gateway) → need primary_backend
+    # Case 2: Multiple backends → need primary_backend
     primary_backend: str | None = config.get("primary_backend")
 
     if primary_backend is None:
         agent_error(
-            f"primary_backend is required when multiple backends are selected ({', '.join(selected_backend_keys)}) "
-            "and pipelex_gateway is not among them",
+            f"primary_backend is required when multiple backends are selected ({', '.join(selected_backend_keys)})",
             error_type="ArgumentError",
         )
 
@@ -324,11 +300,11 @@ def agent_init_cmd(
             "-c",
             help=(
                 "Inline JSON string or path to a JSON file. "
-                'Schema: {"backends": list[str], "primary_backend": str, "accept_gateway_terms": bool}. '
+                'Schema: {"backends": list[str], "primary_backend": str}. '
                 "All fields are optional. "
-                "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'pipelex_gateway'). Omit to keep template defaults. "
-                "primary_backend: required only when 2+ backends are selected and pipelex_gateway is not among them. "
-                "accept_gateway_terms: true/false, required when pipelex_gateway is in backends."
+                "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'openrouter'). Omit to keep template defaults "
+                "and the template's routing profile. "
+                "primary_backend: required when 2+ backends are named."
             ),
         ),
     ] = None,
@@ -361,15 +337,14 @@ def agent_init_cmd(
     Config JSON schema::
 
         {
-            "backends": ["pipelex_gateway", "openai"],
-            "accept_gateway_terms": true,
+            "backends": ["openrouter", "openai"],
             "primary_backend": "openai"
         }
 
-    - backends: list of backend keys to enable. Omit to keep all template defaults.
-    - accept_gateway_terms: sets gateway terms acceptance (true/false).
-    - primary_backend: required when 2+ backends are selected and pipelex_gateway
-      is not among them. Auto-derived when only 1 backend or pipelex_gateway is present.
+    - backends: list of backend keys to enable. Omit to keep all template defaults and the
+      template's routing profile, which routes among every backend it enables.
+    - primary_backend: required when 2+ backends are named. Auto-derived when only
+      1 backend is selected. Named alone, it keeps the template's backends and routes to it first.
 
     Telemetry: global init seeds an active `telemetry.toml` template with all destinations
     off; project init drops in a commented-out template that inherits the user's global
@@ -405,26 +380,13 @@ def agent_init_cmd(
         # Step 3: Configure routing
         routing_profile = _configure_routing(backends_enabled, config=parsed_config, target_dir=target_dir)
 
-        # Step 4: Mark inference setup as completed
-        update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
-
-        # Step 5: Prime the remote-config cache so subsequent offline dry-runs can fall back.
-        # No-op when gateway is disabled or terms have not been accepted; surfaces failure as
-        # structured fields on the success envelope rather than crashing init. We forward the
-        # init target directory so the gateway-enabled check inspects the backends.toml we
-        # just wrote, not a sibling layered config.
-        priming_result = attempt_prime_remote_config_cache(target_config_dir=target_dir)
         result_payload: dict[str, Any] = {
             "success": True,
             "target_dir": str(target_dir),
             "config_files_copied": config_files_copied,
             "backends_enabled": backends_enabled,
             "routing_profile": routing_profile,
-            "inference_setup_completed": True,
-            "cache_primed": priming_result.primed,
         }
-        if priming_result.error_message is not None:
-            result_payload["cache_priming_error"] = priming_result.error_message
 
         # Output result
         agent_success_formatted(result_payload, markdown_renderer=_format_init_markdown, output_format=output_format)

@@ -25,7 +25,6 @@ from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import (
     CogtError,
-    GatewayUnknownModelError,
     InferenceBackendCredentialsError,
     InferenceBackendLibraryError,
     InferenceBackendLibraryNotFoundError,
@@ -64,16 +63,6 @@ from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_I
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import get_optional_env
-from pipelex.system.pipelex_service.exceptions import (
-    RemoteConfigUnavailableError,
-    RemoteConfigValidationError,
-)
-from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
-from pipelex.system.pipelex_service.pipelex_service_config import (
-    enabled_managed_gateway_sections,
-    load_pipelex_service_config_if_exists,
-)
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import LogConfig
@@ -88,9 +77,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_base_and_overrides, loa
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from pipelex.cogt.model_backends.gateway_config import GatewayConfig
     from pipelex.plugins.registrar import PluginRegistrar
-    from pipelex.system.pipelex_service.types import RemoteConfigSource
     from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -632,11 +619,11 @@ def check_backend_files(
             # Create a temporary backend library and try to load this backend
             temp_library = InferenceBackendLibrary.make_empty()
 
-            # This row reports on file shape, so the load is lenient: a backend whose gateway
-            # model specs were not handed to the loader (no fetch happens here) or whose
-            # credentials do not resolve is skipped rather than reported — those are the
-            # Models row's and the Credentials row's findings. A malformed file stays fatal
-            # in lenient mode, which is what this probe exists to catch.
+            # This row reports on file shape, so the load is lenient: a backend whose
+            # credentials do not resolve is skipped rather than reported — that is the
+            # Credentials row's finding. A malformed file stays fatal in lenient mode, which
+            # is what this probe exists to catch, and so do the library's refusals of an
+            # enabled backend that declares no model or still carries `model_specs_section`.
             temp_library.load(
                 secrets_provider=secrets_provider,
                 backends_library_paths=backends_file_paths,
@@ -1469,35 +1456,6 @@ def check_models(
             msg = f"Backend configuration error: {first_error}"
             return False, msg, backend_file_reports
 
-    # Fetch the managed gateways' model specs if any managed gateway backend is enabled.
-    # Probe the same backends document / pipelex_service.toml the doctor is reporting on
-    # (project-vs-global) instead of always defaulting to the global path — otherwise
-    # --global on a machine with a project-local backends.toml would mis-report gateway
-    # state because the layered `config_manager.backends_file_paths()` would still resolve
-    # its base to the project file.
-    service_config_dir = config_dir if config_dir is not None else config_manager.global_config_dir
-    managed_gateway_configs: dict[str, GatewayConfig] | None = None
-    gateway_config_source: RemoteConfigSource | None = None
-    try:
-        managed_gateway_sections = enabled_managed_gateway_sections(config_dir=config_dir)
-    except InferenceBackendLibraryValidationError as exc:
-        return False, f"Error checking models: {exc}", backend_file_reports
-    if managed_gateway_sections:
-        pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=service_config_dir)
-        if pipelex_service_config is None:
-            return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
-        if not pipelex_service_config.agreement.terms_accepted:
-            return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
-        try:
-            result = RemoteConfigFetcher.fetch_remote_config()
-            gateway_config_source = result.source
-            managed_gateway_configs = build_managed_gateway_configs(
-                remote_config=result.config,
-                managed_gateway_sections=managed_gateway_sections,
-            )
-        except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
-            return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
-
     # When --global (config_dir set), pin every path so layered config_manager.X
     # resolution doesn't silently fall back to the project-local files. The two documents
     # are pinned as sequences: that directory's base file and its own override.
@@ -1524,8 +1482,6 @@ def check_models(
     try:
         models_manager.setup(
             secrets_provider=secrets_provider,
-            managed_gateway_configs=managed_gateway_configs,
-            gateway_config_source=gateway_config_source,
             plugin_model_declarations=plugin_model_declarations,
             backends_library_paths=backends_library_override,
             backends_dir_path=backends_dir_override,
@@ -1552,7 +1508,6 @@ def check_models(
         InferenceBackendLibraryValidationError,
         ModelDeckValidationError,
         InferenceBackendCredentialsError,
-        GatewayUnknownModelError,
         PluginModelDeclarationError,
     ) as exc:
         return False, f"Error checking models: {redacted_failure(exc=exc, log_config=log_config)}", backend_file_reports

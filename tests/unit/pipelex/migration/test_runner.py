@@ -13,12 +13,12 @@ from pathlib import Path
 
 from pytest_mock import MockerFixture
 
+from pipelex.fix_ops.exceptions import FixTransactionError, FixWriteConflictError
+from pipelex.fix_ops.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates
 from pipelex.migration.backup import WrittenBackup, existing_backups_of, write_backup
 from pipelex.migration.plan import FileBlockedReason
 from pipelex.migration.runner import migrate_directories, migrate_file
 from pipelex.migration.surfaces import SurfaceRegistry
-from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
-from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates
 from pipelex.suggested_fix import RenameTableKeyOp
 from tests.unit.pipelex.migration.conftest import EXAMPLE_SURFACE_ID, EntryBuilder, LedgerBuilder, SurfaceBuilder
 

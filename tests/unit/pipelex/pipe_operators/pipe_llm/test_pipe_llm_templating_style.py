@@ -1,4 +1,4 @@
-"""Authored `templating_style` on PipeLLM: parsing shapes, spec passthrough, factory widening.
+"""Authored `templating_style` on PipeLLM: parsing shapes, factory widening.
 
 The authored surface is a typed union — a bare string is the `tag_style` shorthand, an inline
 table is the full struct — and the union never travels past parsing: the factory widens a bare
@@ -8,7 +8,6 @@ table is the full struct — and the union never travels past parsing: the facto
 from collections.abc import Callable
 from typing import Any
 
-from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
@@ -38,19 +37,6 @@ class TestPipeLLMTemplatingStyle:
     def test_inline_table_is_full_struct(self):
         blueprint = _make_blueprint(templating_style={"tag_style": "xml", "text_format": "markdown"})
         assert blueprint.templating_style == TemplatingStyle(tag_style=TagStyle.XML, text_format=TextFormat.MARKDOWN)
-
-    def test_spec_passes_through_to_blueprint(self):
-        spec = PipeLLMSpec.model_validate(
-            {
-                "pipe_code": "templating_style_spec_case",
-                "description": "templating style spec passthrough",
-                "inputs": {},
-                "output": "native.Text",
-                "prompt": "Say hello",
-                "templating_style": "square_brackets",
-            }
-        )
-        assert spec.to_blueprint().templating_style is TagStyle.SQUARE_BRACKETS
 
     def test_factory_widens_bare_tag_style(self, load_empty_library: Callable[[], str]):
         load_empty_library()

@@ -16,7 +16,7 @@ from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
 from mthds.protocol.protocol import PROTOCOL_VERSION
 
-from pipelex.builder.operations.models_ops import ModelCategory
+from pipelex.cogt.models.model_listing import ModelCategory
 from pipelex.pipeline.runner import (
     PipelexModelDeck,
     PipelexMTHDSProtocol,
@@ -119,34 +119,34 @@ class TestRunnerProtocolSurfaces:
         assert deck.model_dump(mode="json")["models"][1] == {"name": "strict_verdict", "type": "judgment"}
         assert deck.aliases["judgment"] == {"default-judgment": "strict_verdict"}
 
-    @pytest.mark.parametrize("builder_category", list(ModelCategory))
-    async def test_models_types_every_builder_category_by_the_protocol_member_of_its_name(
+    @pytest.mark.parametrize("listing_category", list(ModelCategory))
+    async def test_models_types_every_listing_category_by_the_protocol_member_of_its_name(
         self,
         mocker: MockerFixture,
-        builder_category: ModelCategory,
+        listing_category: ModelCategory,
     ) -> None:
-        """Every category the builder serves has a protocol category of the same name, so none of
+        """Every category the model listing serves has a protocol category of the same name, so none of
         its presets is left out of the flat list or typed by an invented value.
         """
         payload: dict[str, Any] = {
-            "presets": {builder_category: [{"name": "some_preset"}]},
-            "aliases": {builder_category: {}},
-            "waterfalls": {builder_category: {}},
+            "presets": {listing_category: [{"name": "some_preset"}]},
+            "aliases": {listing_category: {}},
+            "waterfalls": {listing_category: {}},
         }
         mocker.patch("pipelex.pipeline.runner.list_models", return_value=payload)
         runner = PipelexMTHDSProtocol()
 
         deck = await runner.models()
 
-        assert [(model_info.name, model_info.type) for model_info in deck.models] == [("some_preset", MthdsModelCategory(builder_category))]
+        assert [(model_info.name, model_info.type) for model_info in deck.models] == [("some_preset", MthdsModelCategory(listing_category))]
 
     @pytest.mark.parametrize("protocol_category", list(MthdsModelCategory))
-    async def test_models_category_filter_translates_to_builder_enum(
+    async def test_models_category_filter_translates_to_listing_enum(
         self,
         mocker: MockerFixture,
         protocol_category: MthdsModelCategory,
     ) -> None:
-        """Each protocol-level category filter reaches list_models as the builder's member of the same name."""
+        """Each protocol-level category filter reaches list_models as the model listing's member of the same name."""
         one_category_payload: dict[str, Any] = {
             "presets": {protocol_category: [{"name": "some_preset"}]},
             "aliases": {protocol_category: {"best": "some_preset"}},

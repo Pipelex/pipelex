@@ -80,13 +80,6 @@ class NormalizedAnswer(StructuredContent):
         return f"INV-{value}"
 
 
-class SpecWithPipeCode(StructuredContent):
-    """Pipe-spec-shaped item: carries the ``pipe_code`` field the mock_main coordination targets."""
-
-    pipe_code: str
-    description: str
-
-
 def _dry_object_assignment(object_class: type[StructuredContent], nb_items: int | None = None) -> ObjectAssignment:
     llm_assignment = LLMAssignment(
         job_metadata=JobMetadata(
@@ -117,34 +110,6 @@ class TestLeafDryObjectMocks:
         mocks = dry_llm_gen_object_list(_dry_object_assignment(RepresentativeInvoiceLine, nb_items=nb_items))
 
         assert len(mocks) == nb_items
-
-    async def test_dry_object_list_stamps_mock_main_coordination(self) -> None:
-        """The dry leaf stamps the first pipe-spec-shaped item with pipe_code='mock_main' (D3).
-
-        This is what keeps builder-bundle dry-validation working through the leaf mock: the mocked
-        ``BundleHeaderSpec.main_pipe`` (``examples=["mock_main"]``) must name an existing pipe.
-        """
-        mocks = dry_llm_gen_object_list(_dry_object_assignment(SpecWithPipeCode, nb_items=3))
-
-        first_item_pipe_code = getattr(mocks[0], "pipe_code", None)
-        assert first_item_pipe_code == "mock_main"
-
-    async def test_dry_object_list_stamps_regardless_of_mock_usage(self) -> None:
-        """The stamp is unconditional on the is_mock_usage sub-flag — it only changes reporting (D3)."""
-        llm_assignment = LLMAssignment(
-            job_metadata=JobMetadata(
-                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_mock_usage_stamp")
-            ),
-            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY, is_mock_usage=True),
-            llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
-            llm_prompt=LLMPrompt(user_text="make specs"),
-        )
-        object_assignment = ObjectAssignment.make_for_class(object_class=SpecWithPipeCode, llm_assignment=llm_assignment, nb_items=3)
-
-        mocks = dry_llm_gen_object_list(object_assignment)
-
-        first_item_pipe_code = getattr(mocks[0], "pipe_code", None)
-        assert first_item_pipe_code == "mock_main"
 
     async def test_dry_object_list_defaults_to_config_length(self) -> None:
         """Without nb_items the dry list falls back to inference.dry_run.nb_list_items."""

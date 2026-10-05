@@ -43,9 +43,7 @@ def resolve_cmd(
     ] = None,
 ) -> None:
     """Emit the normalized library crate for a bundle closure to stdout."""
-    # needs_model_specs=True (like `validate`): library validation checks pipe model pins
-    # against the deck, so the specs must be loaded even though resolving needs no inference.
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
 
     try:
         with get_telemetry_manager().telemetry_context():

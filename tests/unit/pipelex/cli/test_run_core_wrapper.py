@@ -80,14 +80,12 @@ class TestExecuteRunWrapper:
 
     def test_dry_run_boots_keyless_with_real_model_specs(self, wrapper_mocks: dict[str, Any]) -> None:
         """`--dry-run` makes no inference call, so it must not demand credentials — the same boot
-        `pipelex-agent run --dry-run` uses: keyless (every run forced to DRY) but with real model
-        specs, so model handles resolve as they would on a live run.
+        `pipelex-agent run --dry-run` uses: keyless, every run forced to DRY.
         """
         _call_execute_run(dry_run=True)
 
         make_kwargs = wrapper_mocks["make_pipelex"].call_args.kwargs
         assert make_kwargs["needs_inference"] is False
-        assert make_kwargs["needs_model_specs"] is True
 
     def test_model_choice_error_dispatched_to_handler(self, wrapper_mocks: dict[str, Any], mocker: MockerFixture) -> None:
         """A model-choice error is routed to its dedicated handler."""

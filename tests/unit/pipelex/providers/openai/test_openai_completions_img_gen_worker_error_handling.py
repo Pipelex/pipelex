@@ -24,6 +24,7 @@ def _make_response(status_code: int, headers: dict[str, str] | None = None) -> h
 def _make_worker(mocker: MockerFixture) -> OpenAICompletionsImgGenWorker:
     """Create a minimal worker with mocked internals."""
     worker = object.__new__(OpenAICompletionsImgGenWorker)
+    worker.fixed_output_format = None
     mock_model = mocker.MagicMock()
     mock_model.desc = "test-openai-completions-img"
     mock_model.model_id = "gemini-2.5-flash-image-preview"

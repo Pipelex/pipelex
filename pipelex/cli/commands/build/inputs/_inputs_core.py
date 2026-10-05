@@ -6,7 +6,6 @@ from pathlib import Path
 import typer
 from posthog import tag
 
-from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -19,6 +18,7 @@ from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
+from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_telemetry_manager
@@ -135,9 +135,7 @@ def execute_generate_inputs(
     telemetry_command_label: str = f"{COMMAND} {SUB_COMMAND_INPUTS}",
 ) -> None:
     """Synchronous entry point wrapping the async inputs generation with Pipelex setup/teardown."""
-    pipelex_instance = make_pipelex_for_cli(
-        context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dir, needs_inference=False, needs_model_specs=True
-    )
+    pipelex_instance = make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dir, needs_inference=False)
 
     try:
         with get_telemetry_manager().telemetry_context():

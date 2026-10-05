@@ -35,15 +35,12 @@ from pipelex.system.configuration import config_surface as config_surface_module
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
-    PIPELEX_SERVICE_CONFIG_SURFACE_ID,
     TELEMETRY_CONFIG_SURFACE_ID,
     replay_surface_files_in_memory,
     stale_configuration_warning,
 )
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.exceptions import ConfigValidationError
-from pipelex.system.pipelex_service.exceptions import PipelexServiceConfigValidationError
-from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
 from pipelex.system.telemetry import telemetry_loader as telemetry_loader_module
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig
@@ -642,36 +639,3 @@ class TestTheMainConfigurationLoader:
         ConfigLoader().load_config_validated(config_cls=PipelexConfig)
 
         assert retry.call_count == 0
-
-
-class TestTheServiceConfigLoader:
-    """One file, no tiers — the merge the shared helper performs is a merge of one."""
-
-    def test_an_old_shape_file_boots_with_a_warning(self, tmp_path: Path, synthetic_migration_dir: Path, mocker: MockerFixture) -> None:
-        write_synthetic_ledger(
-            migration_dir=synthetic_migration_dir,
-            surface_id=PIPELEX_SERVICE_CONFIG_SURFACE_ID,
-            base_file="pipelex_service.toml",
-            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = []\nkey = "terms"\nnew_key = "agreement"\n',
-        )
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        stale = config_dir / "pipelex_service.toml"
-        stale.write_text("[terms]\nterms_accepted = true\n", encoding="utf-8")
-        warning = mocker.patch("pipelex.system.pipelex_service.pipelex_service_config.log.warning")
-
-        config = load_pipelex_service_config_if_exists(config_dir=config_dir)
-
-        assert config is not None
-        assert config.agreement.terms_accepted is True
-        assert stale.read_bytes() == b"[terms]\nterms_accepted = true\n", "a tolerated boot writes nothing"
-        assert "pipelex migrate" in warning.call_args.args[0]
-
-    @pytest.mark.usefixtures("synthetic_migration_dir")
-    def test_a_file_the_ledger_cannot_explain_still_raises(self, tmp_path: Path) -> None:
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        (config_dir / "pipelex_service.toml").write_text("[nonsense]\nwhat = true\n", encoding="utf-8")
-
-        with pytest.raises(PipelexServiceConfigValidationError):
-            load_pipelex_service_config_if_exists(config_dir=config_dir)

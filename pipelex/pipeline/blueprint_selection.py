@@ -5,7 +5,7 @@ report's ``bundle_blueprint``, the graph arm's target derivation, the Temporal a
 library acquisition, dry-run and inputs derivation) — one rule, one implementation.
 
 Lives in its own dedicated module (not next to ``validate_bundle``) so that callers below
-the validation layer (``execution_seams``, ``dry_run_pipeline``, ``inputs_ops``) can use it
+the validation layer (``execution_seams``, ``dry_run_pipeline``, ``inputs_template``) can use it
 without an import cycle through ``bundle_validator``.
 """
 

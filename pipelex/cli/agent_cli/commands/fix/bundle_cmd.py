@@ -122,7 +122,7 @@ def fix_bundle_cmd(
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
     try:
-        make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
+        make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
         result = asyncio.run(
             fix_bundle_file(
                 Path(bundle_path),

@@ -85,7 +85,7 @@ For `bundle`, additional options are available:
     A refusal of your input raised while the bundle is loaded or validated is answered with the invalid-verdict envelope — `is_valid: false` and a `validation_errors` array — and exit code `1`, never the no-verdict envelope and exit code `2`, which is kept for failures of the tool or its environment. A pipe whose dry run fails gives one `dry_run` item per failing pipe, with `error_type: DryRunError`, the `pipe_code`, `domain_code` and `source` of the innermost pipe that failed and is not allowed to fail (its `source` whenever the pipe is in your files; a validator of submitted content beside a host's library directories names only that content's files), and a message that keeps the failure's own text only when it is caller-facing, on `validate bundle`, `validate pipe <code>` and `validate pipe --all` alike; a controller that failed because a pipe it runs failed is reported once, at that pipe. Every error found while parsing is its own item, so a misspelled field is reported beside the categorized errors as an item without an `error_type`, carrying its `pipe_code`, `source` and `field_path`. A TOML syntax error's item carries its 1-based `line` and `column`, and an `unresolved_concept` item lists the concepts the validated bundle declares in its domain in `declared_concepts`. A pipe naming a model the model deck does not define gives one `pipe_validation` item with `error_type: unknown_model`, carrying `pipe_code`, `domain_code`, `source`, `field_path` (`pipe.<code>.model`), `model_reference` (the reference as written), `model_type` and `suggestions` (the deck's close matches), plus a `rename-model` `suggested_fix` when there is exactly one suggestion. That fix's `safety` is `unsafe`, because a close name can still be a different model: `fix bundle` never applies it, and the Markdown labels it `💡 Suggested fix (unsafe, confirm before applying):` where a safe fix reads `💡 Suggested fix:`. Any other refusal of your input with no code of its own gives one item without an `error_type`, located on its pipe when it was raised while that pipe was built. A pipe factory's refusal, such as a `PipeExtract` whose input is neither an image nor a document, is one of these items, located on its pipe. See [Error Model](../../under-the-hood/error-model.md#validation_errors-structured-bundle-validation-diagnostics).
 
 !!! note "Advisory warnings on validate"
-    Whole-bundle and whole-library validate surfaces (`validate bundle`, `validate method`, `validate pipe --all`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. Three families ride the array, always in this order: the useless-`!` lint (`optional_force_redundant`), a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire; the vacuous-presence lint (`input_presence_vacuous`), an entry-pipe input that must be supplied but whose concept declares no required field, so the empty object satisfies it and a caller cannot tell what to fill in (see [Understanding Optionality](../../building-methods/pipes/understanding-optionality.md)); and the [intent-hint](../../building-methods/concepts/intent-hints.md) lints (`hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`). Every whole-bundle validate channel — this CLI, the bare CLI, the builder ops and the protocol validation report — assembles them from one composition point, so which advisories you see does not depend on which command you typed. Hint findings are bounded per site: a site naming many undefined keys reports the first few and then how many more there were, and a long authored key or value is elided in the message. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; `validate pipe` omits it (no flow context to lint in). `validate bundle`/`validate method` with `--pipe` keep it, and it stays bundle-wide there — the slice narrows the dry run, not the validation.
+    Whole-bundle and whole-library validate surfaces (`validate bundle`, `validate method`, `validate pipe --all`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. Three families ride the array, always in this order: the useless-`!` lint (`optional_force_redundant`), a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire; the vacuous-presence lint (`input_presence_vacuous`), an entry-pipe input that must be supplied but whose concept declares no required field, so the empty object satisfies it and a caller cannot tell what to fill in (see [Understanding Optionality](../../building-methods/pipes/understanding-optionality.md)); and the [intent-hint](../../building-methods/concepts/intent-hints.md) lints (`hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`). Every whole-bundle validate channel — this CLI, the bare CLI and the protocol validation report — assembles them from one composition point, so which advisories you see does not depend on which command you typed. Hint findings are bounded per site: a site naming many undefined keys reports the first few and then how many more there were, and a long authored key or value is elided in the message. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; `validate pipe` omits it (no flow context to lint in). `validate bundle`/`validate method` with `--pipe` keep it, and it stays bundle-wide there — the slice narrows the dry run, not the validation.
 
 ### Fix
 
@@ -138,7 +138,7 @@ The JSON success envelope names the pipe the template was generated for as `pipe
 A pipe that declares no inputs is not an error: the envelope carries `"inputs": {}` and the command exits `0`; under `--format toml` it prints the comment `# Pipe 'my_domain.main_pipe' declares no inputs.`
 
 !!! note "`inputs --format` is `json|toml`, not `markdown|json`"
-    Unlike `run`/`validate`, the `inputs` command's `--format` selects the **template serialization**, not a presentation style. `json` (the default) emits the structured JSON success envelope; `toml` prints the raw TOML template straight to stdout (a pipe with no inputs prints a TOML comment line, which loads back as an empty dict). This mirrors the raw-TOML output of the `concept` and `pipe` commands. `inputs` has no `--error-format` — its errors stay JSON.
+    Unlike `run`/`validate`, the `inputs` command's `--format` selects the **template serialization**, not a presentation style. `json` (the default) emits the structured JSON success envelope; `toml` prints the raw TOML template straight to stdout (a pipe with no inputs prints a TOML comment line, which loads back as an empty dict). `inputs` has no `--error-format` — its errors stay JSON.
 
 !!! note "`--explicit` and concept hints"
     The light `--format toml` template carries the declared concept for each key as a `# concept: ...` comment; the light `--format json` template (the default) cannot (JSON has no comments), so pass `--explicit` when you want the concept written out inline. The JSON success envelope shape (`success` / `pipe_ref` / `inputs`) is unchanged — only the `inputs` payload flips between the light values and the envelope form.
@@ -151,8 +151,6 @@ These commands do not have subcommands:
 |---------|-------------|
 | `fmt` | Format a `.mthds`/`.toml`/`.plx` file in-place (delegates to `plxt`) |
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
-| `concept` | Convert a JSON concept spec into raw TOML (stdout) |
-| `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
 | `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `doctor` | Check config, credentials, and model health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
@@ -162,7 +160,6 @@ Commands use different stdout formats depending on their purpose:
 
 - **Markdown or JSON**: `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor`, `migrate`, `codegen types`, `codegen check` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
 - **JSON or raw TOML**: `inputs` — structured JSON via `agent_success()` by default (`--format json`), or the raw TOML template printed directly to stdout with `--format toml`
-- **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output
 
 **JSON success** — written to stdout:
@@ -176,22 +173,6 @@ Commands use different stdout formats depending on their purpose:
 ```
 
 JSON commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
-
-**Warnings** — non-fatal setup conditions are surfaced on a top-level `warnings` array of the success envelope, so consumers don't have to parse stderr. The field is absent when there is nothing to report. Each entry is an object with a `type` and a `message`:
-
-```json
-{
-  "success": true,
-  "target_dir": "/path/to/.pipelex",
-  "warnings": [
-    { "type": "RemoteConfigStale", "message": "Using a cached gateway config; run `pipelex init` while online to refresh." }
-  ]
-}
-```
-
-`RemoteConfigStale` is emitted when the gateway is enabled but the remote config service is unreachable and Pipelex falls back to its on-disk cache (offline mode).
-
-Do not confuse this setup-warning shape with the `warnings` array on the `validate` envelope — validate warnings are advisory lint items that reuse the validation-error item shape (see "Advisory warnings on validate" above).
 
 **Error** — written to stderr:
 

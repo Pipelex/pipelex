@@ -48,7 +48,7 @@ type        = "PipeLLM"
 description = "Write the tide note for the harbour board"
 inputs      = { tide_times = "Text" }
 output      = "Text"
-model       = "gpt-5.1"
+model       = "gpt-5.6-lunna"
 prompt      = "Write a short note for the harbour board from these tide times: $tide_times"
 """
 
@@ -96,7 +96,7 @@ class TestValidateLoadRefusalsCli:
         assert "Bundle validation failed" in output
         assert "Pipe Validation Errors:" in output
         assert "Unknown Model" in output
-        assert "Model handle 'gpt-5.1' was not found in the model deck" in output
+        assert "Model handle 'gpt-5.6-lunna' was not found in the model deck" in output
         assert "Path: pipe.write_tide_note.model" in output
         assert "Traceback" not in output
 
@@ -130,7 +130,7 @@ class TestValidateLoadRefusalsCli:
         assert item["domain_code"] == "tide_tables"
         assert item["source"] == str(unknown_model_bundle)
         assert item["field_path"] == "pipe.write_tide_note.model"
-        assert item["model_reference"] == "gpt-5.1"
+        assert item["model_reference"] == "gpt-5.6-lunna"
         assert item["model_type"] == "llm"
         assert item["suggestions"]
 

@@ -128,10 +128,6 @@ fails_at = "runtime"
 code = "inadequate_output_multiplicity"
 fails_at = "runtime"
 
-[error.circular_dependency_error]
-code = "circular_dependency_error"
-excluded = "Raised only from the pipe sorter, and the pipe sorter runs only on `PipelexBundleSpec.to_blueprint()` — the builder's spec-to-blueprint conversion, which is how an AI-authored spec becomes a bundle. A `.mthds` file parses straight into a blueprint and never passes through it, so no corpus entry can produce this. Measured rather than read off the call graph: a self-referencing PipeSequence fails the dry run with `DryRunError`, and a mutually recursive PipeCondition pair exhausts the interpreter's stack — neither reports a circular dependency."
-
 [error.llm_output_cannot_be_image]
 code = "llm_output_cannot_be_image"
 fails_at = "runtime"

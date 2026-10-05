@@ -7,8 +7,8 @@ execution time whatever is loaded — the **kernel layer**, in the language-impl
 
 **The one rule:** ``interpreter_hub`` imports ``runtime_hub``; ``runtime_hub`` must never import
 ``interpreter_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
-``codegen``, ``builder``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature``,
-``mthds_parsing``, ``pipeline`` or ``pipe_run`` at module level. That list is the interpreter's
+``codegen``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature``, ``mthds_parsing``,
+``pipeline`` or ``pipe_run`` at module level. That list is the interpreter's
 top-level packages — all of them, with no qualification — so the property it buys is stated
 outright: **importing the Pipelex kernel layer loads zero interpreter modules.** It used to have to trail
 "…or the Pipe-touching modules of ``core.pipes``", because some of what it forbids lived under a
@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     # Rich is the `cli` extra: the console is built when it is first asked for, never at import or at boot.
     from rich.console import Console
 
+    from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
     from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
     from pipelex.plugins.model_lister_registry import ModelListerRegistry
@@ -119,6 +120,7 @@ class RuntimeHub:
         self._bundle_validator_registry: BundleValidatorRegistry | None = None
         self._storage_provider_registry: StorageProviderRegistry | None = None
         self._secrets_provider_registry: SecretsProviderRegistry | None = None
+        self._service_error_vocabulary: ServiceErrorVocabulary | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
@@ -293,6 +295,9 @@ class RuntimeHub:
     def set_secrets_provider_registry(self, secrets_provider_registry: "SecretsProviderRegistry"):
         self._secrets_provider_registry = secrets_provider_registry
 
+    def set_service_error_vocabulary(self, *, service_error_vocabulary: "ServiceErrorVocabulary"):
+        self._service_error_vocabulary = service_error_vocabulary
+
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
 
@@ -439,6 +444,9 @@ class RuntimeHub:
             raise RuntimeError(msg)
         return self._secrets_provider_registry
 
+    def get_optional_service_error_vocabulary(self) -> "ServiceErrorVocabulary | None":
+        return self._service_error_vocabulary
+
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
 
@@ -549,6 +557,16 @@ def get_orchestrator_registry() -> "OrchestratorRegistry":
 
 def get_bundle_validator_registry() -> "BundleValidatorRegistry":
     return get_runtime_hub().get_bundle_validator_registry()
+
+
+def get_optional_service_error_vocabulary() -> "ServiceErrorVocabulary | None":
+    """Non-raising by contract: the error classifier runs on paths that may precede a boot, or follow a partial one.
+
+    Covers the no-hub-at-all state and the hub booted without the plugins' contributions alike; the
+    classifier then reads every error on the status ladder alone.
+    """
+    runtime_hub = RuntimeHub.get_optional_instance()
+    return runtime_hub.get_optional_service_error_vocabulary() if runtime_hub is not None else None
 
 
 def get_storage_provider_registry() -> "StorageProviderRegistry":

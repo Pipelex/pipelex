@@ -214,7 +214,9 @@ Use `pipelex plugins list` to see every discovered plugin, the entry-point group
 
 ## The Inference SPI
 
-What an out-of-tree backend plugin imports *is* the contract. The published surface:
+What an out-of-tree backend plugin imports *is* the contract. The published surface is listed below, one module per row, grouped by what a plugin does with it. The plugin contract and the worker contracts are what every backend plugin needs; the rest is what a plugin reaching an OpenAI- or Anthropic-compatible service, or a gateway with error codes of its own, builds on.
+
+**The plugin contract**
 
 | Symbol | Module | Role |
 |--------|--------|------|
@@ -227,10 +229,82 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `SdkClientRegistry` | `pipelex.plugins.sdk_client_registry` | per-handle client memoization |
 | `InferenceModelSpec` | `pipelex.cogt.model_backends.model_spec` | the resolved model record |
 | `InferenceBackend` | `pipelex.cogt.model_backends.backend` | the backend config record (api key, extras) |
-| `InferenceWorkerAbstract` and the `{LLM,ImgGen,Extract,Search,Judgment}WorkerAbstract` subclasses | `pipelex.cogt.…` | the worker contracts a plugin returns |
 | `MissingDependencyError` | `pipelex.exceptions` | raised by `require_sdk` |
 
-The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_VERSION` — not an `__init__.py` re-export shim (the repo bans re-exports; import by full path). Anything a plugin needs to import outside this surface is a design gap to resolve, not an accident to live with.
+**The worker contracts, their jobs and their outputs**
+
+| Symbol | Module | Role |
+|--------|--------|------|
+| `InferenceWorkerAbstract` | `pipelex.cogt.inference.inference_worker_abstract` | the base of every worker a plugin returns |
+| `InferenceJobAbstract` | `pipelex.cogt.inference.inference_job_abstract` | the base of every job a worker serves |
+| `LLMWorkerAbstract` | `pipelex.cogt.llm.llm_worker_abstract` | the LLM worker contract |
+| `LLMJob` | `pipelex.cogt.llm.llm_job` | the LLM job |
+| `ImgGenWorkerAbstract` | `pipelex.cogt.img_gen.img_gen_worker_abstract` | the image-generation worker contract |
+| `ImgGenJob` | `pipelex.cogt.img_gen.img_gen_job` | the image-generation job |
+| `ImgGenJobParams` | `pipelex.cogt.img_gen.img_gen_job_components` | the image-generation job's parameters |
+| `GeneratedImageRawDetails` | `pipelex.cogt.image.generated_image` | what an image worker returns per image |
+| `ImageSize` | `pipelex.cogt.image.image_size` | an image's pixel size |
+| `ImageFormat` | `pipelex.tools.misc.image_utils` | an image's file format |
+| `ExtractWorkerAbstract` | `pipelex.cogt.extract.extract_worker_abstract` | the extraction worker contract |
+| `ExtractJob` | `pipelex.cogt.extract.extract_job` | the extraction job |
+| `ExtractOutput` | `pipelex.cogt.extract.extract_output` | what an extraction worker returns |
+| `ExtractInputError` | `pipelex.cogt.extract.exceptions` | an extraction input the worker cannot take |
+| `SearchWorkerAbstract` | `pipelex.cogt.search.search_worker_abstract` | the search worker contract |
+| `SearchJob` | `pipelex.cogt.search.search_job` | the search job |
+| `extract_structured_search_payload` | `pipelex.cogt.search.structured_search_payload` | turns a sourced answer into the structured output a search pipe asks for |
+| `SearchResultContent` | `pipelex.core.stuffs.search_result_content` | a search result |
+| `DocumentContent` | `pipelex.core.stuffs.document_content` | a source document a search result cites |
+| `JudgmentWorkerAbstract` | `pipelex.cogt.judgment.judgment_worker_abstract` | the judgment worker contract |
+| `DocGenWorkerAbstract` | `pipelex.cogt.doc_gen.doc_gen_worker_abstract` | the document-generation worker contract |
+| `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
+| `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
+| `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
+
+**Building on an OpenAI- or Anthropic-compatible service**
+
+| Symbol | Module | Role |
+|--------|--------|------|
+| `BackendExtrasFactory` | `pipelex.plugins.backend_extras_factory` | the per-request headers and body additions a worker asks its factory for |
+| `OpenAICompletionsFactory` | `pipelex.providers.openai.openai_completions_factory` | extension base for a Chat Completions service: messages, client, extras |
+| `OpenAIResponsesFactory` | `pipelex.providers.openai.openai_responses_factory` | extension base for a Responses service |
+| `OpenAICompletionsLLMWorker` | `pipelex.providers.openai.openai_completions_llm_worker` | the Chat Completions LLM worker, built with a factory |
+| `OpenAIResponsesLLMWorker` | `pipelex.providers.openai.openai_responses_llm_worker` | the Responses LLM worker, built with a factory |
+| `OpenAICompletionsImgGenWorker` | `pipelex.providers.openai.openai_completions_img_gen_worker` | the image worker over Chat Completions, built with a factory and, for a service with one, its fixed output format |
+| `AnthropicLLMWorker` | `pipelex.providers.anthropic.anthropic_llm_worker` | the Anthropic-protocol LLM worker, built with an optional extras factory |
+| `AnthropicFactory`, `AnthropicSdkVariant` | `pipelex.providers.anthropic.anthropic_factory` | the Anthropic-protocol client, for a variant named apart from the sdk token |
+| `request_with_transport_retry` | `pipelex.cogt.inference.transport_retry` | the transport retry a plain-HTTP client wraps its calls in |
+| `ImgGenArgsFactory`, `ImageFileTuple` | `pipelex.cogt.img_gen.img_gen_args_factory` | the portable image-generation arguments, mapped to an Images API |
+| `ImgGenGeminiMapping` | `pipelex.cogt.img_gen.img_gen_gemini_mapping` | the portable aspect ratio and size, mapped to Gemini's image config |
+| `AspectRatioTaxonomy` | `pipelex.cogt.img_gen.img_gen_model_rules` | the aspect-ratio vocabulary a model's rules name |
+| `prep_prompt_images` | `pipelex.cogt.image.prompt_image_utils` | prompt images, prepared for a request |
+| `PromptImageDetail` | `pipelex.cogt.image.prompt_image` | the detail level a prompt image asks for |
+| `prep_prompt_documents` | `pipelex.cogt.document.prompt_document_utils` | prompt documents, prepared for a request |
+| `PreparedFileBase64`, `PreparedFileHttpUrl`, `PreparedFileLocalPath` | `pipelex.tools.uri.prepared_file` | the forms a prepared file takes |
+| `make_base64_url_from_any_uri` | `pipelex.tools.uri.uri_base64` | a file reference, inlined as a data URL |
+
+**Errors: distilling, classifying and rendering a failure**
+
+| Symbol | Module | Role |
+|--------|--------|------|
+| `ProviderErrorMetadata`, `UserAction`, `UserActionKind` | `pipelex.cogt.inference.error_classification` | the structured failure a worker distils, and the advice it carries |
+| `parse_retry_after_seconds`, `error_code_from_body_code_first` | `pipelex.cogt.inference.error_classification` | the parsers a distiller of a plain-HTTP failure shares |
+| `extract_gateway_metadata` | `pipelex.cogt.inference.error_classification` | the distiller of a Portkey-substrate failure |
+| `ProviderName` | `pipelex.cogt.inference.provider_name` | which provider a distilled failure reports |
+| `classify_inference_error` | `pipelex.cogt.inference.error_classify` | the shared Classify step |
+| `InferenceErrorFamily`, `render_inference_error` | `pipelex.cogt.inference.error_render` | the shared Render step |
+| `ServiceErrorCode` | `pipelex.cogt.inference.service_error_vocabulary` | one error code a plugin's service emits, contributed through `PluginRegistrar.add_service_error_codes` ([Service Error Codes](service-error-codes.md)) |
+| `URLs` | `pipelex.urls` | the public error docs base a plugin error's declared type URI points under |
+
+**The runtime a worker runs in**
+
+| Symbol | Module | Role |
+|--------|--------|------|
+| `get_config` | `pipelex.config` | the runtime configuration |
+| `get_storage_provider` | `pipelex.runtime_hub` | the storage a worker reads a stored input from |
+| `JobMetadata` | `pipelex.system.job_metadata` | the run and the step a job belongs to |
+| `ReportingProtocol` | `pipelex.reporting.reporting_protocol` | where a worker reports its usage |
+
+The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_VERSION` — not an `__init__.py` re-export shim (the repo bans re-exports; import by full path). Anything a plugin needs to import outside this surface is a design gap to resolve, not an accident to live with: either the symbol is published here, or the plugin keeps its own copy of it. The built-in provider plugin for the hosted gateway is held to it by a test that scans its imports against this table.
 
 ---
 
@@ -243,6 +317,8 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 | a `pipelex.plugins.kernel` plugin registers an interpreter-layer capability | `PluginLayerViolationError` (names the capability and the group to move to) |
 | duplicate `(family, sdk)` | `DuplicateInferenceBackendError` (names both plugins) |
 | duplicate `sdk` model lister | `DuplicateModelListerError` (names both plugins) |
+| a service error code two plugins contribute | `DuplicateServiceErrorCodeError` (names both plugins) |
+| a service error code the runtime classifies itself | `ReservedServiceErrorCodeError` |
 | `name` in `runtime.plugins.disabled` but core-unconditional | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
 | lookup for an unregistered `(family, sdk)` | `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?") |

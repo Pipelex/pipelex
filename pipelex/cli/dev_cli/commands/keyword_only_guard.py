@@ -751,7 +751,7 @@ def find_violations_in_source(source: str, *, module_qname: str, relative_path: 
 
     Args:
         source: The Python source text to scan.
-        module_qname: The dotted module path used to qualify each def (e.g. ``pipelex.builder.foo``).
+        module_qname: The dotted module path used to qualify each def (e.g. ``pipelex.cogt.foo``).
         relative_path: The source file path relative to the repo root (used in the violation's sort/identity key).
         grants: The subject-grants registry content (see :func:`load_subject_grants`).
 
@@ -812,7 +812,7 @@ def fix_source(
 
     Args:
         source: The Python source text to fix.
-        module_qname: The dotted module path used to qualify each def (e.g. ``pipelex.builder.foo``).
+        module_qname: The dotted module path used to qualify each def (e.g. ``pipelex.cogt.foo``).
         relative_path: The source file path relative to the repo root (used in each violation's key).
         grants: The subject-grants registry content (an ungranted subject is a fixable violation).
     """

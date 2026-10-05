@@ -24,7 +24,6 @@ from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.providers.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
-from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory
 
@@ -52,15 +51,12 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
 
 FACTORY_MODULE = "pipelex.cogt.img_gen.img_gen_worker_factory"
 
-GATEWAY_CLIENT = "pipelex.providers.gateway.gateway_factory.GatewayFactory.make_portkey_client"
-GATEWAY_COMPLETIONS_CLIENT = (
-    "pipelex.providers.gateway.gateway_completions_factory.GatewayCompletionsFactory.make_portkey_openai_client_for_completions"
-)
+MANIFOLD_CLIENT = "pipelex.providers.manifold.manifold_factory.ManifoldFactory.make_portkey_client"
 OPENAI_CLIENT = "pipelex.providers.openai.openai_client_factory.OpenAIClientFactory.make_openai_client"
 GOOGLE_CLIENT = "pipelex.providers.google.google_factory.GoogleFactory.make_google_client"
 HUGGINGFACE_PROVIDER = "pipelex.providers.huggingface.huggingface_factory.HuggingFaceFactory.make_huggingface_inference_provider"
 
-GATEWAY_WORKER = "pipelex.providers.gateway.gateway_img_gen_worker.GatewayImgGenWorker"
+MANIFOLD_WORKER = "pipelex.providers.manifold.manifold_img_gen_worker.ManifoldImgGenWorker"
 FAL_WORKER = "pipelex.providers.fal.fal_img_gen_worker.FalImgGenWorker"
 HUGGINGFACE_WORKER = "pipelex.providers.huggingface.huggingface_img_gen_worker.HuggingFaceImgGenWorker"
 OPENAI_WORKER = "pipelex.providers.openai.openai_img_gen_worker.OpenAIImgGenWorker"
@@ -114,19 +110,10 @@ class TestImgGenWorkerFactory:
     @pytest.mark.parametrize(
         ("sdk", "client_target", "worker_target", "factory_cls", "http_flag", "passes_model_handle"),
         [
-            pytest.param("gateway_img_gen", GATEWAY_CLIENT, GATEWAY_WORKER, None, None, False, id="gateway_img_gen"),
+            pytest.param("manifold_img_gen", MANIFOLD_CLIENT, MANIFOLD_WORKER, None, None, False, id="manifold_img_gen"),
             pytest.param("openai_img_gen", OPENAI_CLIENT, OPENAI_WORKER, None, None, True, id="openai_img_gen"),
             pytest.param("blackboxai_img_gen", OPENAI_CLIENT, COMPLETIONS_WORKER, BlackboxaiCompletionsFactory, True, True, id="blackboxai_img_gen"),
             pytest.param("openrouter_img_gen", OPENAI_CLIENT, COMPLETIONS_WORKER, OpenRouterCompletionsFactory, True, True, id="openrouter_img_gen"),
-            pytest.param(
-                "gateway_completions",
-                GATEWAY_COMPLETIONS_CLIENT,
-                COMPLETIONS_WORKER,
-                GatewayCompletionsFactory,
-                False,
-                True,
-                id="gateway_completions",
-            ),
             pytest.param("google", GOOGLE_CLIENT, GOOGLE_WORKER, None, None, False, id="google"),
         ],
     )
@@ -242,12 +229,12 @@ class TestImgGenWorkerFactory:
         """A pre-seeded registry entry is reused: the client factory must not be called."""
         backend = make_backend()
         registry = patch_hub_getters(mocker, backend=backend)
-        inference_model = make_img_gen_model_spec(sdk="gateway_img_gen")
+        inference_model = make_img_gen_model_spec(sdk="manifold_img_gen")
         model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         cached_client = mocker.MagicMock(name="cached_client")
         registry.set(model_handle=model_handle, sdk_instance=cached_client)
-        client_factory_mock = mocker.patch(GATEWAY_CLIENT)
-        worker_cls_mock = mocker.patch(GATEWAY_WORKER)
+        client_factory_mock = mocker.patch(MANIFOLD_CLIENT)
+        worker_cls_mock = mocker.patch(MANIFOLD_WORKER)
 
         ImgGenWorkerFactory.make_img_gen_worker(inference_model=inference_model)
 

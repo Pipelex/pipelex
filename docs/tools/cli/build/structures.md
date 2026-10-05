@@ -92,7 +92,6 @@ class CandidateProfile(StructuredContent):
 ## Related Documentation
 
 - [Codegen projections](../../../under-the-hood/codegen-projections.md) - The engine behind this command (`codegen types`, stamps, lock, offline check)
-- [Build Runner](runner.md) - Generate Python runner scripts
 - [Build Inputs](inputs.md) - Generate example input JSON for a pipe
 - [Build Output](output.md) - Generate example output JSON for a pipe
 - [Concepts](../../../building-methods/concepts/define_your_concepts.md) - Understanding concept definitions

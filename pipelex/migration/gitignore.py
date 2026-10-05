@@ -75,7 +75,7 @@ of it: a developer's own choices (their observability, the backend they run on) 
 project's defaults ship as the project wrote them. The two inference overrides are named with their
 subdirectory, because a rule with a slash in it is anchored to this directory rather than matched at
 any depth. What is *not* here: `pipelex_local.toml` and the `pipelex_{{environment}}.toml` tier, which
-are part of a project's tracked configuration, and `pipelex_service.toml`, which is not an override.
+are part of a project's tracked configuration.
 """
 
 _GITIGNORE_CONTENT = f"""\

@@ -20,9 +20,9 @@ PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD = "main_pipe"
 PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD = "pipe"
 
-# Distinctive fragments of the two type-tag errors raised by the `pipe` before-validators (via
-# `normalize_typeless_signature_section` in `pipe_blueprint.py`, shared by the blueprint and spec
-# layers). Kept in sync with those single-source messages. They map to DIFFERENT structured
+# Distinctive fragments of the two type-tag errors raised by the bundle blueprint's `pipe`
+# before-validator (via `normalize_typeless_signature_section` in `pipe_blueprint.py`). Kept in sync
+# with those single-source messages. They map to DIFFERENT structured
 # categories — no-type-declared is `MISSING_PIPE_TYPE`, the retired-tag-declared is `UNKNOWN_PIPE_TYPE`
 # (a declared-but-invalid type) — and both name the pipe as ``Pipe `<code>``` so the pipe code is
 # recoverable from the message. See `_categorize_typeless_pipe_error`.

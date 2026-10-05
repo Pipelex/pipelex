@@ -4,7 +4,7 @@ The header differs per job, so it cannot be a client default: each path adds it 
 each is pinned here where the request leaves the runtime — the kwargs handed to the SDK call, or the
 headers handed to `httpx` on the native routes. The paths are the OpenAI-substrate chat completions
 (text, and image generation over completions) and responses, the vendor-SDK image path, the native
-extract and search routes, and Claude over the shared Anthropic driver behind the manifold backend.
+extract and search routes, and Claude over the Anthropic worker the package registers as `manifold_anthropic`.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
+from pipelex.providers.manifold.manifold_anthropic_extras import ManifoldAnthropicExtrasFactory
 from pipelex.providers.manifold.manifold_completions_factory import ManifoldCompletionsFactory
 from pipelex.providers.manifold.manifold_constants import MANIFOLD_METADATA_HEADER
 from pipelex.providers.manifold.manifold_extract_worker import ManifoldExtractWorker
@@ -82,6 +83,7 @@ def _anthropic_worker(mocker: MockerFixture, *, sdk_client: AsyncAnthropic, back
     model = _model(mocker, backend_name=backend_name, model_id="claude-test")
     model.structure_method = StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS
     worker.inference_model = model
+    worker.extras_factory = ManifoldAnthropicExtrasFactory()
     worker.default_max_tokens = 4096
     worker.instructor_for_objects = from_anthropic(client=sdk_client, mode=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS.as_instructor_mode())
     config = mocker.MagicMock()

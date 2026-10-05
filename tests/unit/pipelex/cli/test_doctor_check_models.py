@@ -1,13 +1,11 @@
-"""Unit tests for doctor's check_models — gateway gating and model deck validation paths.
+"""Unit tests for doctor's check_models — backend file and model deck validation paths.
 
-All inference-adjacent collaborators (backend files probe, gateway config fetch,
-ModelManager) are mocked at the doctor module namespace: these tests cover the
+All inference-adjacent collaborators (backend files probe, ModelManager) are mocked at the doctor module namespace: these tests cover the
 decision tree, not the model loading itself.
 """
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -21,10 +19,6 @@ from pipelex.cogt.exceptions import (
     ModelDeckValidationError,
     RoutingProfileLibraryError,
 )
-from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, PipelexBackend
-from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
-from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
@@ -45,10 +39,6 @@ class TestCheckModels:
             "pipelex.cli.commands.doctor_cmd.check_backend_files",
             return_value=(True, {}, "All backend files are valid"),
         )
-
-    @pytest.fixture
-    def gateway_disabled(self, mocker: MockerFixture) -> None:
-        mocker.patch("pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections", return_value={})
 
     @pytest.fixture
     def models_manager(self, mocker: MockerFixture) -> Any:
@@ -77,96 +67,18 @@ class TestCheckModels:
         assert reports == {"openai": bad_report}
         manager_class_mock.assert_not_called()
 
-    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
-    def test_gateway_disabled_happy_path(self, models_manager: Any) -> None:
-        """With the gateway disabled and a valid deck, models are healthy."""
+    @pytest.mark.usefixtures("healthy_backend_files")
+    def test_happy_path(self, models_manager: Any) -> None:
+        """With valid backend files and a valid deck, models are healthy."""
         healthy, message, reports = check_models(secrets_provider=SECRETS_PROVIDER)
 
         assert healthy is True
         assert message == "Models are valid"
         assert reports == {}
         models_manager.setup.assert_called_once()
-        assert models_manager.setup.call_args.kwargs["managed_gateway_configs"] is None
         models_manager.validate_model_deck.assert_called_once()
 
     @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_missing_service_config(self, mocker: MockerFixture) -> None:
-        """Gateway enabled without a service config is unhealthy."""
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=None)
-
-        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
-
-        assert healthy is False
-        assert message == "Pipelex Gateway is enabled but service configuration is missing"
-
-    @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_terms_not_accepted(self, mocker: MockerFixture) -> None:
-        """Gateway enabled with unaccepted terms is unhealthy."""
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        service_config = SimpleNamespace(agreement=SimpleNamespace(terms_accepted=False))
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=service_config)
-
-        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
-
-        assert healthy is False
-        assert message == "Pipelex Gateway is enabled but terms have not been accepted"
-
-    @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_remote_fetch_failure(self, mocker: MockerFixture) -> None:
-        """A failed remote-config fetch is unhealthy with the fetch error in the message."""
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        service_config = SimpleNamespace(agreement=SimpleNamespace(terms_accepted=True))
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=service_config)
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.RemoteConfigFetcher.fetch_remote_config",
-            side_effect=RemoteConfigUnavailableError("offline, cold cache"),
-        )
-
-        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
-
-        assert healthy is False
-        assert message == "Failed to fetch Pipelex Gateway remote configuration: offline, cold cache"
-
-    @pytest.mark.usefixtures("healthy_backend_files")
-    def test_gateway_enabled_passes_gateway_config_to_setup(self, mocker: MockerFixture, models_manager: Any) -> None:
-        """A successful fetch builds one GatewayConfig per managed backend and threads them into the model setup."""
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
-        )
-        service_config = SimpleNamespace(agreement=SimpleNamespace(terms_accepted=True))
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_pipelex_service_config_if_exists", return_value=service_config)
-        fetch_result = SimpleNamespace(
-            config=RemoteConfig(
-                posthog=PipelexPosthogConfig(project_api_key="", endpoint="", is_geoip_enabled=False, is_debug_enabled=False),
-                backend_model_specs={},
-                aws_region="eu-west-3",
-            ),
-            source=RemoteConfigSource.FRESH,
-        )
-        mocker.patch("pipelex.cli.commands.doctor_cmd.RemoteConfigFetcher.fetch_remote_config", return_value=fetch_result)
-
-        healthy, message, _ = check_models(secrets_provider=SECRETS_PROVIDER)
-
-        assert healthy is True
-        assert message == "Models are valid"
-        setup_kwargs = models_manager.setup.call_args.kwargs
-        managed_gateway_configs = setup_kwargs["managed_gateway_configs"]
-        assert managed_gateway_configs is not None
-        assert managed_gateway_configs[PipelexBackend.GATEWAY].aws_region == "eu-west-3"
-        assert setup_kwargs["gateway_config_source"] == RemoteConfigSource.FRESH
-
-    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
     def test_model_deck_validation_error(self, models_manager: Any) -> None:
         """A deck validation failure is reported as a models error."""
         models_manager.validate_model_deck.side_effect = ModelDeckValidationError("preset broken")
@@ -176,7 +88,6 @@ class TestCheckModels:
         assert healthy is False
         assert message == "Error checking models: preset broken"
 
-    @pytest.mark.usefixtures("gateway_disabled")
     def test_backend_library_error_updates_declared_backend_report(self, mocker: MockerFixture, models_manager: Any) -> None:
         """A library error declaring a known backend flips that backend's report to invalid."""
         openai_report = BackendFileReport(
@@ -197,7 +108,6 @@ class TestCheckModels:
         assert reports["openai"].is_valid is False
         assert reports["openai"].error_message == "cannot resolve model"
 
-    @pytest.mark.usefixtures("gateway_disabled")
     def test_backend_library_error_spares_backend_named_only_in_prose(self, mocker: MockerFixture, models_manager: Any) -> None:
         """The loader's unknown-key advice names `x-portkey-provider`, so portkey's name rides in every
         such message. Only the backend the error declares records it — portkey's file is untouched.
@@ -223,7 +133,7 @@ class TestCheckModels:
         assert reports["portkey"].is_valid is True
         assert reports["portkey"].error_message is None
 
-    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    @pytest.mark.usefixtures("healthy_backend_files")
     def test_an_active_profile_naming_no_profile_is_a_reported_finding(self, models_manager: Any) -> None:
         """The likeliest override typo — `active = "nope"` — is the routing library's own refusal, and the doctor must report it, not crash."""
         models_manager.setup.side_effect = RoutingProfileLibraryError("Active profile 'nope' not found in the routing profile library")
@@ -234,7 +144,7 @@ class TestCheckModels:
         assert "Active profile 'nope' not found" in message
         assert reports == {}
 
-    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    @pytest.mark.usefixtures("healthy_backend_files")
     def test_global_pins_both_documents_as_base_plus_override(self, models_manager: Any, tmp_path: Path) -> None:
         """`--global` hands the model manager that directory's base and its own override, for both documents."""
         check_models(secrets_provider=SECRETS_PROVIDER, config_dir=tmp_path)
@@ -247,11 +157,10 @@ class TestCheckModels:
         ]
 
     @pytest.mark.usefixtures("healthy_backend_files")
-    def test_a_backends_document_that_does_not_parse_is_a_reported_finding(self, mocker: MockerFixture, models_manager: Any) -> None:
-        """The managed-gateway gate reads the merged document before any load; its refusal is the Models row's, not a crash."""
-        mocker.patch(
-            "pipelex.cli.commands.doctor_cmd.enabled_managed_gateway_sections",
-            side_effect=InferenceBackendLibraryValidationError("Invalid inference backend library 'x' with overrides 'y': TOML parsing error"),
+    def test_a_backends_document_that_does_not_parse_is_a_reported_finding(self, models_manager: Any) -> None:
+        """The merged backends document failing to parse is the Models row's finding, not a crash."""
+        models_manager.setup.side_effect = InferenceBackendLibraryValidationError(
+            "Invalid inference backend library 'x' with overrides 'y': TOML parsing error"
         )
 
         healthy, message, reports = check_models(secrets_provider=SECRETS_PROVIDER)
@@ -259,9 +168,7 @@ class TestCheckModels:
         assert healthy is False
         assert "TOML parsing error" in message
         assert reports == {}
-        models_manager.setup.assert_not_called()
 
-    @pytest.mark.usefixtures("gateway_disabled")
     def test_the_configured_secrets_provider_is_the_one_the_backends_are_checked_against(self, mocker: MockerFixture, models_manager: Any) -> None:
         """Not a provider of the doctor's own choosing: a deployment on another secrets method is diagnosed against its own secrets."""
         check_backend_files = mocker.patch(
@@ -286,7 +193,7 @@ class TestCheckModels:
         check_backend_files.assert_not_called()
         models_manager.setup.assert_not_called()
 
-    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    @pytest.mark.usefixtures("healthy_backend_files")
     def test_a_provider_failing_on_a_lookup_is_a_row_finding_quoted_redacted(self, models_manager: Any) -> None:
         """An external provider may raise anything on a lookup: the row reports it, scrubbed, instead of the doctor stopping."""
         models_manager.setup.side_effect = ConnectionError(f"vault unreachable; request headers had Authorization: Bearer {VAULT_TOKEN}")
@@ -298,7 +205,7 @@ class TestCheckModels:
         assert "Authorization: Bearer [REDACTED]" in message
         assert VAULT_TOKEN not in message
 
-    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    @pytest.mark.usefixtures("healthy_backend_files")
     def test_a_credentials_error_quoting_the_providers_text_is_redacted_in_the_row(self, models_manager: Any) -> None:
         """The loader copies a provider's not-found text into its own error, so the row scrubs a Pipelex error too."""
         models_manager.setup.side_effect = InferenceBackendCredentialsError(

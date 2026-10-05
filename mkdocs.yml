@@ -79,7 +79,6 @@ plugins:
         'home/1-features/cost-tracking.md': 'features/cost-tracking.md'
         'home/1-features/document-extraction.md': 'features/document-extraction.md'
         'home/1-features/execution-graph.md': 'features/execution-graph.md'
-        'home/1-features/gateway.md': 'features/gateway.md'
         'home/1-features/image-generation.md': 'features/image-generation.md'
         'home/1-features/index.md': 'features/index.md'
         'home/1-features/llm-integration.md': 'features/llm-integration.md'
@@ -138,7 +137,6 @@ plugins:
         'cookbook/cv-batch-screening.md': 'get-started/cv-batch-screening.md'
         'cookbook/using-inference-plugins.md': 'under-the-hood/writing-an-inference-plugin.md'
         'home/5-setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
-        'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
         'home/5-setup/index.md': 'get-started/quick-start.md'
         'home/5-setup/project-organization.md': 'get-started/quick-start.md'
         'home/5-setup/telemetry.md': 'setup/telemetry.md'
@@ -236,7 +234,6 @@ plugins:
         - features/concepts.md: "Concepts & Structured Types"
         - features/pipe-operators.md: "Pipe Operators"
         - features/pipeline-orchestration.md: "Pipeline Orchestration"
-        - features/gateway.md: "Pipelex Gateway & Model Access"
         - features/llm-integration.md: "LLM Integration"
         - features/document-extraction.md: "Document Extraction"
         - features/image-generation.md: "Image Generation"
@@ -302,7 +299,6 @@ plugins:
         - tools/cli/show.md: "CLI Show"
         - tools/cli/pkg.md: "CLI Pkg"
         - tools/cli/build/index.md: "CLI Build Overview"
-        - tools/cli/build/runner.md: "CLI Build Runner"
         - tools/cli/build/structures.md: "CLI Build Structures"
         - tools/cli/build/inputs.md: "CLI Build Inputs"
         - tools/cli/build/output.md: "CLI Build Output"
@@ -323,7 +319,6 @@ plugins:
         - tools/logging.md: "Logging"
         - analytics/data-extraction.md: "Observer Data Extraction"
         - setup/telemetry.md: "Telemetry"
-        - setup/gateway-models.md: "Gateway Available Models"
         Advanced:
         - advanced/index.md: "Advanced Customizations Overview"
         - advanced/secrets-provider-injection.md: "Secrets Provider"
@@ -353,6 +348,7 @@ plugins:
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
         - under-the-hood/writing-an-inference-plugin.md: "Writing an Inference Plugin"
+        - under-the-hood/service-error-codes.md: "Service Error Codes"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
         - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
@@ -460,7 +456,6 @@ nav:
         - Pipe Operators: features/pipe-operators.md
         - Pipeline Orchestration: features/pipeline-orchestration.md
       - AI Capabilities:
-        - Pipelex Gateway & Model Access: features/gateway.md
         - LLM Integration: features/llm-integration.md
         - Document Extraction: features/document-extraction.md
         - Image Generation: features/image-generation.md
@@ -530,7 +525,6 @@ nav:
       - Durable Execution: reliability/durable-execution.md
     - Distributed Execution: distributed-execution/index.md
   - Reference:
-    - Gateway Available Models: setup/gateway-models.md
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
@@ -544,10 +538,10 @@ nav:
       - Pkg: tools/cli/pkg.md
       - Build:
         - Overview: tools/cli/build/index.md
-        - Runner: tools/cli/build/runner.md
         - Structures: tools/cli/build/structures.md
         - Inputs: tools/cli/build/inputs.md
         - Output: tools/cli/build/output.md
+        - Runner (Removed): tools/cli/build/runner.md
       - Agent CLI: tools/cli/agent-cli.md
     - Tools:
       - plxt (Formatter & Linter): tools/plxt.md
@@ -607,6 +601,7 @@ nav:
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
       - Writing an Inference Plugin: under-the-hood/writing-an-inference-plugin.md
+      - Service Error Codes: under-the-hood/service-error-codes.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
       - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md

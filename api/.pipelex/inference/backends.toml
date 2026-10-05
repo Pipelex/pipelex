@@ -14,20 +14,6 @@
 #
 ####################################################################################################
 
-[pipelex_gateway]
-display_name = "⭐ Pipelex Gateway"
-enabled = true                         # Enable after accepting terms via `pipelex init config`
-api_key = "${PIPELEX_GATEWAY_API_KEY}"
-
-# Pipelex Manifold is a closed private beta: leave it off unless you have been invited.
-[pipelex_manifold]
-display_name = "Pipelex Manifold (private beta)"
-enabled = false
-endpoint = "${PIPELEX_MANIFOLD_ENDPOINT}"
-api_key = "${PIPELEX_MANIFOLD_API_KEY}"
-model_specs_section = "manifold_model_specs"
-auth_header = "x-pipelex-api-key"
-
 [anthropic]
 enabled = false
 api_key = "${ANTHROPIC_API_KEY}"
@@ -93,7 +79,7 @@ endpoint = "http://localhost:11434/v1"
 
 [openai]
 display_name = "OpenAI"
-enabled = false
+enabled = true
 api_key = "${OPENAI_API_KEY}"
 
 [openrouter]
