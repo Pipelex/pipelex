@@ -26,6 +26,9 @@ from pipelex.tools.misc.exceptions import TomlError
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+# Some cases stand in a home directory of their own by patching `Path.home`, which `PIPELEX_HOME` would bypass
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
 
 class _TinyModel(BaseModel):
     value: int

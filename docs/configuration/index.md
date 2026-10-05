@@ -34,7 +34,7 @@ The global layer lives in `~/.pipelex/` unless the `PIPELEX_HOME` environment va
 export PIPELEX_HOME=/path/to/ci/pipelex-home
 ```
 
-Everything that reads or writes the global layer follows it: its `pipelex.toml` and override files, the inference files and their personal overrides, the credentials in its `.env`, the telemetry configuration, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate`, and the agent CLI's `--global` flag. The first boot creates the directory from the kit's templates when it does not exist, as it does for `~/.pipelex/`. A `~` is expanded, a relative path resolves against the working directory at the moment Pipelex is imported, and an empty value counts as unset.
+Everything that reads or writes the global layer follows it: its `pipelex.toml` and override files, the inference files and their personal overrides, the credentials in its `.env`, the telemetry configuration, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate`, and the agent CLI's `--global` flag. The first boot fills the directory from the kit's templates when it does not exist or is empty, as it does for `~/.pipelex/`, so a fresh `mktemp -d` or an empty volume mount works as it is; a directory with anything in it is left alone. A `~` is expanded, a relative path resolves against the working directory at the moment Pipelex is imported, and an empty value counts as unset.
 
 It is meant for any process that should not share the machine's settings: a test run or a CI job that commits a configuration of its own, a container, or a checkout that must not read the developer's personal backends. A project's own `.pipelex/` keeps winning over it, exactly as it wins over `~/.pipelex/`.
 

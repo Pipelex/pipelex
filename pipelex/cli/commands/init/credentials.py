@@ -145,7 +145,7 @@ def prompt_credentials(*, console: Console, backends_toml_path: Path) -> None:
     if collected_count > 0:
         write_env_file(global_env_path, entries=entries)
         console.print()
-        console.print(f"[green]Saved {collected_count} credential(s) to {global_env_path}[/green]")
+        console.print(f"[green]Saved {collected_count} credential(s) to {escape(str(global_env_path))}[/green]")
     else:
         console.print()
         console.print("[dim]No credentials entered. You can set them later by running:[/dim] [cyan]pipelex init credentials[/cyan]")

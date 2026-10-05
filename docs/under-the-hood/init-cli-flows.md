@@ -319,7 +319,7 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ### Global Config Bootstrap
 
-`ensure_global_config_exists()` creates `~/.pipelex/` with kit template files on first use (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
+`ensure_global_config_exists()` creates the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`) with kit template files on first use, and fills it the same way when it exists but is empty (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
 
 ### Config Loading Chain
 

@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`PIPELEX_HOME` relocates the home configuration directory**: when set and not empty, it names the directory Pipelex uses in place of `~/.pipelex`, for the configuration layers, the inference files and their overrides, the credentials `.env`, the first-boot copy of the kit, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate` and the agent CLI's `--global`. It must be in the process environment before Pipelex is imported, a relative value is resolved against the working directory at import, and a `PIPELEX_HOME` line in a `.env` file is ignored.
+- **`PIPELEX_HOME` relocates the home configuration directory**: when set and not empty, it names the directory Pipelex uses in place of `~/.pipelex`, for the configuration layers, the inference files and their overrides, the credentials `.env`, the first-boot copy of the kit, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate` and the agent CLI's `--global`. It must be in the process environment before Pipelex is imported, a relative value is resolved against the working directory at import, and a `PIPELEX_HOME` line in a `.env` file is ignored. The first boot now fills the home directory from the kit when it exists but is empty, as it already did when it was missing, so an empty volume mount or a `mktemp -d` works as it is.
 
 ## [v0.74.0] - 2026-10-05
 

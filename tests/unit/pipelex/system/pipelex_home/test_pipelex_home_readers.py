@@ -89,6 +89,23 @@ class TestEveryReaderFollows:
         assert (not_yet_there / "inference" / "backends.toml").is_file()
         assert not (decoy_home / ".pipelex").exists()
 
+    def test_the_first_boot_seeds_an_existing_empty_relocated_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An empty directory is what `mktemp -d` and a fresh volume mount give, and it holds nothing to keep."""
+        empty_home = tmp_path / "empty-home"
+        empty_home.mkdir()
+        monkeypatch.setenv(PIPELEX_HOME_ENV_KEY, str(empty_home))
+
+        ConfigLoader().ensure_global_config_exists()
+
+        assert (empty_home / "pipelex.toml").is_file()
+        assert (empty_home / "inference" / "backends.toml").is_file()
+
+    def test_the_first_boot_leaves_a_relocated_home_with_files_alone(self, relocated: Path) -> None:
+        ConfigLoader().ensure_global_config_exists()
+
+        assert (relocated / "pipelex.toml").read_text(encoding="utf-8") == "[relocated_marker]\nseen = true\n"
+        assert not (relocated / "telemetry.toml").exists()
+
     def test_pipelex_init_says_where_it_will_save_the_credentials(self, relocated: Path) -> None:
         panel = build_initialization_panel(
             needs_config=False, needs_inference=False, needs_routing=False, needs_telemetry=False, reset=False, check_credentials=True

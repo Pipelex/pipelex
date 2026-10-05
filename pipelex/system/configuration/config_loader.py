@@ -176,9 +176,8 @@ class ConfigLoader:
         resolved directly under that directory.
 
         Otherwise, the project .pipelex/ directory is checked first; if the file
-        exists there it wins, otherwise the global ~/.pipelex/ is used.
-        This works on all platforms (macOS, Linux, Windows) because Path.home()
-        returns the correct home directory everywhere.
+        exists there it wins, otherwise the home configuration directory is used
+        (`global_config_dir`: ~/.pipelex/, or the directory PIPELEX_HOME names).
 
         Args:
             relative_path: Path relative to the .pipelex directory (e.g. "telemetry.toml",
@@ -254,10 +253,11 @@ class ConfigLoader:
 
         Without ``config_dir`` the sequence is::
 
-            [resolved base, ~/.pipelex/inference/<override>, <project>/.pipelex/inference/<override>]
+            [resolved base, <home>/inference/<override>, <project>/.pipelex/inference/<override>]
 
         The base keeps today's winner-takes-all resolution — a project's file if it has one, else
         the global one — and the overrides layer over whichever was picked, global then project.
+        ``<home>`` is the home configuration directory, ``~/.pipelex`` unless ``PIPELEX_HOME`` names another.
         That order is deliberately not ``pipelex.toml``'s, where a project base beats a global
         override: a global inference override exists so that one machine-wide choice ("run on this
         backend") reaches every project on the machine, and every project carries a tracked
@@ -290,9 +290,13 @@ class ConfigLoader:
         return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{MODEL_DECKS_DIR_NAME}")
 
     def ensure_global_config_exists(self) -> None:
-        """Create the home configuration directory with kit template files if it doesn't exist."""
+        """Create the home configuration directory with kit template files if it doesn't exist or is empty.
+
+        An empty directory is what `mktemp -d` or a fresh volume mount gives for `PIPELEX_HOME`, and it
+        holds nothing to keep. A directory with anything in it is left exactly as it is.
+        """
         global_dir = self.global_config_dir
-        if global_dir.is_dir():
+        if global_dir.is_dir() and any(global_dir.iterdir()):
             return
 
         from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir  # ruff: ignore[import-outside-top-level]
@@ -390,7 +394,7 @@ class ConfigLoader:
 
         1. Packaged default: ``{package_dir}/{name}.toml`` — the plugin's bundled
            default, shipped inside its own distribution.
-        2. Global override sequence from ``~/.pipelex/``:
+        2. Global override sequence from the home configuration directory (``~/.pipelex/``, or ``PIPELEX_HOME``):
            ``{name}_{environment}.toml`` then ``{name}_override.toml``.
         3. Project override sequence from ``{project_root}/.pipelex/`` (same two
            files), when a project dir is found and distinct from the global dir.
@@ -436,8 +440,8 @@ class ConfigLoader:
         (later wins per leaf key):
 
         1. Package defaults (pipelex/pipelex.toml)
-        2. Global base (~/.pipelex/pipelex.toml)
-        3. Global override sequence (from ~/.pipelex/):
+        2. Global base (pipelex.toml in the home configuration directory, ~/.pipelex/ or PIPELEX_HOME)
+        3. Global override sequence (from the same directory):
            - pipelex_local.toml
            - pipelex_{environment}.toml
            - pipelex_{run_mode}.toml (omitted under unit testing — see below)

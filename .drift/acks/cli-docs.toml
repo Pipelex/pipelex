@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:25619e899396a39389345ec9bf1640f6376cf6b87fb4a4dc2a55b19d075466a3"
+digest = "sha256:731ea2ebe457df66277ad5a8175682faa7153284fa7f88e5ea22a68efc744b54"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-05T15:54:48Z"
-rationale = "clean-pass: the modified CLI files changed only docstrings and comments that named ~/.pipelex as the only global location (init, credentials, telemetry, the agent init and doctor); no flag, help text, output or behaviour moved, and docs/tools/cli and the agent CLI guide already say the home configuration directory, or PIPELEX_HOME."
+reviewed_at = "2026-10-05T16:08:22Z"
+rationale = "clean-pass: pipelex init now escapes the target directory and the credentials path before printing them as Rich markup, so a bracketed PIPELEX_HOME prints verbatim; no flag, help text or documented output changed, and docs/tools/cli/init.md already names the home configuration directory."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -83,9 +83,9 @@ rationale = "clean-pass: the modified CLI files changed only docstrings and comm
 "pipelex/cli/commands/graph_cmd.py" = "blob:d54737af7efc9ab9bbf3f978050d017af0e27a41"
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:04a1a06f1003ed0c7157ec4ca6c8659e4e09fe6b"
-"pipelex/cli/commands/init/command.py" = "blob:4a5fa378939d91bda6bfe1a26a05a7d30bcb64e2"
+"pipelex/cli/commands/init/command.py" = "blob:f17d58fe1813d4bb9552cc418914ea4aebae2d2a"
 "pipelex/cli/commands/init/config_files.py" = "blob:c13be6b8d2a8b211ce9ef0f4889ee131ffc3d2d8"
-"pipelex/cli/commands/init/credentials.py" = "blob:e239536ddd8200c6f87eb505c4fed63f34a8c5b1"
+"pipelex/cli/commands/init/credentials.py" = "blob:a9c3ee9e8bdcc5d0f3148f055ab6e2ff34a940fc"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:9f0ec1494c07062246ecc906bc55b7f2cf95c715"
 "pipelex/cli/commands/init/routing.py" = "blob:c73927deb99804556cb545cdaa6eabf8d1fc3450"
 "pipelex/cli/commands/init/telemetry.py" = "blob:07a33b6540e1fc4146d0777463c93abd4ea70231"

@@ -302,7 +302,7 @@ def init_cmd(
     else:
         # Default: create the global config in the home configuration directory
         target_config_dir = config_manager.global_config_dir
-    console.print(f"[dim]Target directory: {target_config_dir}[/dim]")
+    console.print(f"[dim]Target directory: {escape(str(target_config_dir))}[/dim]")
 
     pipelex_config_dir = target_config_dir
     telemetry_config_path = pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME
