@@ -259,3 +259,34 @@ class TestBindContent:
 
         with pytest.raises(BindingStepRunError, match="cannot be stored as"):
             bind_content(root_content=invoice, derivation=_derive("invoice.supplier_name"))
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            pytest.param("invoice.total", id="a-path"),
+            pytest.param("invoice", id="a-bare-name"),
+        ],
+    )
+    def test_a_single_binding_over_a_list_root_never_selects_an_item(self, path: str) -> None:
+        """Regression: a derivation saying single met a list of invoices, and the binding kept the first total, losing the second."""
+        second_invoice = make_invoice_record()
+        second_invoice.total = 999.0
+        invoices = ListContent[StuffContent](items=[make_invoice_record(), second_invoice])
+
+        with pytest.raises(BindingStepRunError) as exc_info:
+            bind_content(root_content=invoices, derivation=_derive(path))
+
+        message = str(exc_info.value)
+        assert f"Binding '{path}'" in message
+        assert "a single value" in message
+        assert "'invoice' holds a list of 2 items" in message
+
+    def test_a_list_bare_name_over_a_single_root_is_a_run_error(self) -> None:
+        """A bare name binds its root's value as it is, so a root derived as a list must hold one."""
+        with pytest.raises(BindingStepRunError) as exc_info:
+            bind_content(root_content=make_invoice_record(), derivation=_derive("invoices", root=make_root("billing.Invoice", multiplicity=True)))
+
+        message = str(exc_info.value)
+        assert "Binding 'invoices'" in message
+        assert "a list" in message
+        assert "'invoices' holds a single value" in message

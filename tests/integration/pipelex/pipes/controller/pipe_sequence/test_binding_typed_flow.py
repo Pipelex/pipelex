@@ -261,6 +261,82 @@ steps = [
 """
 
 
+_CALLED_BINDING_BUNDLE = """domain = "depot_totals"
+description = "Reading totals through a sequence that ends with a binding"
+
+[concept.Invoice]
+description = "An invoice received at the depot"
+
+[concept.Invoice.structure]
+total = { type = "number", description = "The amount due, in euros", required = true }
+amounts = { type = "list", item_type = "number", description = "The amounts of its lines, in euros", required = true }
+
+[pipe.read_total]
+type = "PipeSequence"
+description = "Binds the total of an invoice"
+inputs = { invoice = "Invoice" }
+output = "Number"
+steps = [
+  { from = "invoice.total", result = "total" },
+]
+
+[pipe.read_amounts]
+type = "PipeSequence"
+description = "Binds the amounts of an invoice's lines"
+inputs = { invoice = "Invoice" }
+output = "Number[]"
+steps = [
+  { from = "invoice.amounts", result = "amounts" },
+]
+
+"""
+
+
+_WRITTEN_INVOICE_BUNDLE = """domain = "depot_reads"
+description = "Reading the total of an invoice a step writes"
+main_pipe = "read_written_total"
+
+[concept.Invoice]
+description = "An invoice received at the depot"
+
+[concept.Invoice.structure]
+total = { type = "number", description = "The amount due, in euros", required = true }
+
+[pipe.write_invoice]
+type = "PipeLLM"
+description = "Writes an invoice from a note"
+inputs = { note = "Text" }
+output = "Invoice"
+model = "$testing-text"
+prompt = "Write the invoice described in $note"
+
+[pipe.read_written_total]
+type = "PipeSequence"
+description = "Writes an invoice, then binds its total"
+inputs = { note = "Text" }
+output = "Number"
+steps = [
+  { pipe = "write_invoice", result = "invoice" },
+  { from = "invoice.total", result = "total" },
+]
+"""
+
+
+def _called_binding_bundle(*, called_pipe: str, step_count: str, output: str) -> str:
+    """The bundle with a sequence calling one of those ending with a binding, asking it for a count of outputs."""
+    return (
+        f"{_CALLED_BINDING_BUNDLE}\n"
+        "[pipe.read_totals]\n"
+        'type = "PipeSequence"\n'
+        'description = "Reads an invoice through a sequence ending with a binding"\n'
+        'inputs = { invoice = "Invoice" }\n'
+        f'output = "{output}"\n'
+        "steps = [\n"
+        f'  {{ pipe = "{called_pipe}", result = "totals", {step_count} }},\n'
+        "]\n"
+    )
+
+
 def _load_sequence(*, mthds_content: str, library_id: str, pipe_code: str) -> PipeSequence:
     blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="flow.mthds")
     pipes = get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
@@ -543,3 +619,55 @@ class TestBindingTypedFlow:
         message = validation_errors[0].message or ""
         for fragment in message_fragments:
             assert fragment in message, f"'{fragment}' not in: {message}"
+
+    @pytest.mark.parametrize(
+        ("called_pipe", "step_count", "output", "requested"),
+        [
+            pytest.param("read_total", "nb_output = 2", "Number[]", "2 outputs", id="a-count-of-a-single-value"),
+            pytest.param("read_total", "multiple_output = true", "Number[]", "multiple outputs", id="a-list-of-a-single-value"),
+            pytest.param("read_amounts", "nb_output = 3", "Number[]", "3 outputs", id="a-count-of-a-list"),
+            pytest.param("read_amounts", "nb_output = 1", "Number", "a single output", id="a-single-value-of-a-list"),
+        ],
+    )
+    def test_a_count_a_final_binding_cannot_honour_is_refused(
+        self, load_empty_library: Callable[[], str], called_pipe: str, step_count: str, output: str, requested: str
+    ) -> None:
+        """A binding binds what its path derives, whatever count its caller asks for, so a step asking a sequence ending with one for
+        another count is refused, rather than run with the count reaching the sequence's own steps.
+        """
+        mthds_content = _called_binding_bundle(called_pipe=called_pipe, step_count=step_count, output=output)
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_totals")
+
+        assert exc_info.value.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+        assert exc_info.value.pipe_code == "read_totals"
+        assert f"step 1 asks pipe '{called_pipe}' for {requested}, but '{called_pipe}' ends with the binding step" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("called_pipe", "step_count", "output"),
+        [
+            pytest.param("read_total", "nb_output = 1", "Number", id="one-output-of-a-single-value"),
+            pytest.param("read_amounts", "multiple_output = true", "Number[]", id="multiple-outputs-of-a-list"),
+        ],
+    )
+    def test_a_count_a_final_binding_honours_is_accepted(
+        self, load_empty_library: Callable[[], str], called_pipe: str, step_count: str, output: str
+    ) -> None:
+        mthds_content = _called_binding_bundle(called_pipe=called_pipe, step_count=step_count, output=output)
+
+        _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_totals")
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_single_binding_over_a_root_the_run_made_a_list_is_a_run_error(self) -> None:
+        """Regression: a count asked of the whole run reaches the sequence's own steps, so the step typed as writing one invoice
+        wrote two, and the binding of its total returned the first total alone. It now refuses to choose.
+        """
+        with pytest.raises(PipelexError) as exc_info:
+            await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY).execute(
+                mthds_contents=[_WRITTEN_INVOICE_BUNDLE], inputs={"note": "Two invoices from the depot"}, output_multiplicity=2
+            )
+
+        message = str(exc_info.value)
+        assert "Pipe 'read_written_total' failed" in message
+        assert "Binding 'invoice.total' was derived as a single value, but its root 'invoice' holds a list of 2 items" in message

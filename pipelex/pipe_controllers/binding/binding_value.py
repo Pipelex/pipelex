@@ -5,7 +5,8 @@ root's stuff. It is null-aware and list-aware, as the standard says:
 
 - across a list, whether the root holds one or a field does, the rest of the path is applied to every item,
   and every list crossed is flattened into one list, items holding nothing being dropped;
-- on a single value, a segment holding nothing ends the walk, and the binding records an absence naming it.
+- on a single value, a segment holding nothing ends the walk, and the binding records an absence naming it;
+- a root whose shape contradicts the derived multiplicity is a run error: a single result never chooses one item of a list.
 
 The value reached is a deep copy, never an alias of the root: a concept's content is copied whole, every field
 included, and a plain value is stored as the native concept its field derives (`str` as `TextContent`, a number
@@ -48,8 +49,9 @@ def bind_content(*, root_content: StuffContent, derivation: BindingDerivation) -
         result whose path reached nothing.
 
     Raises:
-        BindingStepRunError: When the value contradicts its declared structure.
+        BindingStepRunError: When the value contradicts its declared structure, or its shape the derived multiplicity.
     """
+    _refuse_shape_mismatch(root_content=root_content, derivation=derivation)
     if derivation.is_bare_name:
         return copy.deepcopy(root_content)
 
@@ -86,9 +88,36 @@ def bind_content(*, root_content: StuffContent, derivation: BindingDerivation) -
     if derivation.is_plural:
         stored_items = [_store_value(value=value, leaf_kind=derivation.leaf_kind, path=derivation.path) for value in values if value is not None]
         return ListContent[StuffContent](items=stored_items)
+    # A single result walks one value at most: its root holds a single value (`_refuse_shape_mismatch`) and its path crosses no list.
     if not values or values[0] is None:
         return FoundNothing(empty_path=empty_path or reached_path)
     return _store_value(value=values[0], leaf_kind=derivation.leaf_kind, path=derivation.path)
+
+
+def _refuse_shape_mismatch(*, root_content: StuffContent, derivation: BindingDerivation) -> None:
+    """Refuse a root whose shape contradicts the multiplicity derived for the binding, rather than bind a value of the wrong shape.
+
+    A single result over a list would have to choose one item and drop the others, which a binding never does. A bare name
+    binds its root's value as it is, so a root derived as a list must hold one. A path whose derivation is a list maps a
+    single root as a list of one, so that shape binds as derived.
+    """
+    if isinstance(root_content, ListContent):
+        if derivation.is_plural:
+            return
+        item_count = len(cast("ListContent[StuffContent]", root_content).items)
+        msg = (
+            f"Binding '{derivation.path}' was derived as a single value, but its root '{derivation.root_name}' holds a list of "
+            f"{item_count} items, and a binding never chooses one item of a list. The root was typed before the run as a single value, "
+            "so whatever stored it stored a list instead, such as a step whose caller asked for several outputs."
+        )
+        raise BindingStepRunError(msg)
+    if derivation.is_bare_name and derivation.is_plural:
+        msg = (
+            f"Binding '{derivation.path}' was derived as a list, but its root '{derivation.root_name}' holds a single value, "
+            "and a bare name binds its root's value as it is. The root was typed before the run as a list, so whatever stored it "
+            "stored a single value instead."
+        )
+        raise BindingStepRunError(msg)
 
 
 def _list_items(*, value: Any, reached_path: str, path: str) -> list[Any]:

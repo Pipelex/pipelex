@@ -247,7 +247,11 @@ class PipeSequence(PipeController):
 
     @override
     def validate_inputs_with_library(self):
-        """Derive every binding step through the typed flow, then check the steps reading a binding's result against it."""
+        """Derive every binding step through the typed flow, then check the steps reading a binding's result against it.
+
+        A step asking a sequence ending with a binding for a count of outputs is checked against what that binding binds first.
+        """
+        self._refuse_unhonoured_output_counts()
         if not self.has_binding_step:
             return
         typed_flow = self.build_typed_flow()
@@ -283,6 +287,67 @@ class PipeSequence(PipeController):
                 self._check_binding_consumer(
                     step_index=step_index, step_pipe_code=step_pipe.code, variable_name=input_name, slot=slot, needed_spec=needed_spec
                 )
+
+    def final_binding_spec(self) -> StuffSpec | None:
+        """The spec the binding step ending the sequence binds, `None` when the last step runs a pipe or the flow cannot type the binding's root.
+
+        Raises:
+            PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked, as validating the sequence
+                itself reports.
+        """
+        if not isinstance(self.sequential_sub_pipes[-1], BindingStep):
+            return None
+        return self.build_typed_flow().binding_specs.get(len(self.sequential_sub_pipes) - 1)
+
+    def _refuse_unhonoured_output_counts(self) -> None:
+        """Refuse a step asking, with `nb_output` or `multiple_output`, a sequence ending with a binding for a count its binding
+        does not bind.
+
+        A binding binds what its path derives, whatever count its caller asks for, so the request could only reach the called
+        sequence's own steps, where a value typed single would hold a list. A batched step runs each branch with the pipe's own
+        multiplicity, so its count is never asked of the sequence.
+
+        Raises:
+            PipeValidationError: ``INADEQUATE_OUTPUT_MULTIPLICITY`` naming the step and the binding.
+        """
+        for step_index, step in enumerate(self.sequential_sub_pipes):
+            if not isinstance(step, SubPipe) or step.output_multiplicity is None or step.batch_params is not None:
+                continue
+            step_pipe = get_optional_pipe(pipe_code=step.pipe_code)
+            if not isinstance(step_pipe, PipeSequence):
+                continue
+            bound_spec = step_pipe.final_binding_spec()
+            if bound_spec is None:
+                continue
+            requested = output_multiplicity_to_apply(base_multiplicity=step_pipe.output.multiplicity, override_multiplicity=step.output_multiplicity)
+            requested_multiplicity: VariableMultiplicity | None
+            if not requested.is_multiple_outputs_enabled:
+                requested_multiplicity = None
+                requested_label = "a single output"
+            elif requested.specific_output_count is not None:
+                requested_multiplicity = requested.specific_output_count
+                requested_label = f"{requested.specific_output_count} outputs"
+            else:
+                requested_multiplicity = True
+                requested_label = "multiple outputs"
+            if is_multiplicity_compatible(source_multiplicity=bound_spec.multiplicity, target_multiplicity=requested_multiplicity):
+                continue
+            final_binding = step_pipe.sequential_sub_pipes[-1]
+            binding_label = final_binding.as_written if isinstance(final_binding, BindingStep) else "a binding step"
+            bound_ref = bound_spec.to_bundle_representation(relative_to_domain=self.domain_code)
+            msg = (
+                f"In pipe '{self.code}', step {step_index + 1} asks pipe '{step_pipe.code}' for {requested_label}, but '{step_pipe.code}' "
+                f"ends with the binding step {binding_label}, which binds '{bound_ref}': a binding binds what its path derives, whatever "
+                f"count its caller asks for. Remove the step's `nb_output` or `multiple_output`, or ask for what the binding binds."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=bound_spec.concept.concept_ref,
+                required_concept_codes=[step_pipe.output.concept.concept_ref],
+            )
 
     def _check_binding_consumer(self, *, step_index: int, step_pipe_code: str, variable_name: str, slot: FlowSlot, needed_spec: StuffSpec) -> None:
         """Refuse a step reading a binding's result as a concept or multiplicity the binding does not derive."""

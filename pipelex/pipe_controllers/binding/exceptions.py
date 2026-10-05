@@ -20,5 +20,6 @@ class BindingStepRunError(PipelexError):
     """A binding step that could not bind its value at run time, although its path was derived before the run.
 
     The derivation walk vouches for the path, so this signals a value whose shape contradicts its concept's
-    declared structure, such as an attribute the declared field promised and the value lacks.
+    declared structure, such as an attribute the declared field promised and the value lacks, or the derived
+    multiplicity, such as a list held by a root derived as a single value.
     """

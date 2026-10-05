@@ -113,6 +113,8 @@ A path ending on a list with no declared item type is refused too, since nothing
 
 When the path crosses a list, whether the root holds a list or a field does, the rest of the path is applied to every item, and every list crossed is flattened into one. The result is always one flat list, `X[]`: binding `pages.page_view` over `Page[]` gives `Image[]`, one image per page, and binding `shipments.parcels` over `Shipment[]` gives every parcel of every shipment. Items holding nothing are dropped, and an empty list is a valid result, so a list result is never absent.
 
+A single result never chooses one item of a list. When the run finds a list under a root typed as a single value, as when a count asked of the whole run reaches the steps of the sequence, the binding step fails with a run error naming the path and both shapes, rather than keep the first item. A bare name typed as a list that finds a single value fails the same way.
+
 ### Absence
 
 A binding that finds nothing records an absence, under the optionality model (see [Understanding Optionality](../understanding-optionality.md#binding-steps-under-absence)):
@@ -130,6 +132,7 @@ The bound value is a deep copy taken when the step runs: changing the root after
 
 -   A step that reads a bound name is checked against the derived concept and multiplicity: reading `total_amount` as `Text` when the binding derives a `Number` is refused with `input_stuff_spec_mismatch`, and `batch_over` a bound name requires a list.
 -   A sequence ending with a binding step is checked as one ending with a pipe: its output concept with `inadequate_output_concept`, its multiplicity with `inadequate_output_multiplicity`, and a maybe-absent result with `optional_not_handled`.
+-   A step asking a sequence that ends with a binding step for a count of outputs, with `nb_output` or `multiple_output`, is refused with `inadequate_output_multiplicity` when the binding does not bind that count: a binding binds what its path derives, whatever count its caller asks for. A batched step asks its branches for nothing, so it is not checked.
 -   A root that is neither an input of the sequence nor stored by an earlier step on every run is refused with `missing_input_variable`.
 -   A malformed step is refused with `binding_step_invalid`: `pipe` beside `from`, a binding without `result`, a binding carrying `nb_output`, `multiple_output`, `batch_over` or `batch_as`, a `from` or a `result` outside its grammar. The schema refuses each of these too.
 
