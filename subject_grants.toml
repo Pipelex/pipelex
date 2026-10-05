@@ -4008,10 +4008,6 @@ rationale = "Predicate on the pipe's step result; modifiers stay keyword."
 param = "pipe"
 rationale = "Verb-object: scans the pipe for taint triggers; slot_taints is context."
 
-["pipelex/pipe_controllers/batch/pipe_batch.py::PipeBatch._live_run_controller_pipe._run_branch"]
-param = "item_input_stuff"
-rationale = "Verb-object: runs the branch for the item stuff; invoked positionally via functools.partial."
-
 ["pipelex/pipe_controllers/condition/special_outcome.py::SpecialOutcome.is_continue"]
 param = "outcome"
 rationale = "Predicate on the outcome string; single operand."

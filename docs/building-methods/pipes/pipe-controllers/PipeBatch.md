@@ -14,7 +14,7 @@ This is the ideal controller for processing collections of documents, images, or
 
 1.  **Input List**: It identifies an input list from the working memory.
 2.  **Branching**: For each item in the input list, it creates a new, isolated execution branch.
-3.  **Isolation & Injection**: Each branch gets a deep copy of the `WorkingMemory`. The specific item for that branch is injected into this memory with a defined name.
+3.  **Isolation & Injection**: Each branch gets a deep copy of the `WorkingMemory`. The specific item for that branch, taken from the branch's own copy of the list, is injected into this memory with a defined name, so a branch that rewrites its item in place leaves the batched list and the other branches as they were.
 4.  **Concurrent Execution**: The specified `branch_pipe_code` runs across the branches concurrently — in bounded chunks, by default at most `max_concurrency` branches at a time. Each branch pipe operates only on its own item.
 5.  **Aggregation**: After all branches have completed, `PipeBatch` collects the individual output from each one and aggregates them into a single new list. This list becomes the final output of the `PipeBatch` pipe.
 
