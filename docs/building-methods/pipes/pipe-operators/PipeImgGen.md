@@ -200,7 +200,7 @@ prompt = "Combine the styles of these reference images into a single coherent sc
 model = "$gen-image"
 ```
 
-Image references also work through a dotted path to a nested image field (e.g. `$page.page_view` when `page` is a `Page`), and through any of the `$var`, `@var`, or `{{ var }}` syntaxes.
+Image references also work through a dotted path to a nested image field (e.g. `$page.page_view` when the pipe declares `page = "Page"`), and through any of the `$var`, `@var`, or `{{ var }}` syntaxes. The image is detected from the concept the path reaches, so only the root is declared: an input name is a plain name, and a key such as `"page.page_view" = "Image"` is refused as `invalid_input_name`.
 
 ### Inputs and outputs
 

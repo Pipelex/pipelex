@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex fix bundle` deletes a dotted input key beside its root**: the new safe rule `delete-redundant-dotted-input` removes a key such as `"page.page_view" = "Image"` from a pipe's `inputs` when the same table declares its root `page`, which already supplies every field a template reads through it. A lone dotted key gets no automatic fix, since nothing states its root's concept, and its refusal names the two remedies instead.
+
+### Changed
+
+- **An input name is a plain name (Breaking)**: every key of a pipe's `inputs`, on every operator, controller and signature, and a PipeBatch's `input_list_name` must match `[a-z][a-z0-9_]*`, so a dotted name such as `"invoice.total" = "Number"` or a malformed one such as `InvoiceTotal` is refused when the bundle is parsed, as the new `PipeValidationErrorType` value `invalid_input_name`, which also replaces PipeJudge's own refusal that reached callers with no `error_type`. Its message names the remedies: declare the root with its whole concept (`invoice = "Invoice"`) and read the field in the template (`$invoice.total`), which every operator handles by the concept the path reaches, so `@page.page_view` with `page = "Page"` is still attached as an image, or have the calling sequence bind the field with a binding step (`{ from = "invoice.total", result = "total_amount" }`). The generated MTHDS JSON Schema refuses the same names, through `patternProperties` on every `inputs` table and a `pattern` on `input_list_name`, and the corpus vocabulary records `error.invalid_input_name` with `fails_at = "schema"`.
+
+### Removed
+
+- **The dotted-input fold (Breaking)**: `InputStuffSpecs` no longer rewrites an input key to its root, `NamedStuffSpec.requirement_expression` is gone, `pipelex.pipe_machinery.validation` drops `is_variable_satisfied_by_inputs`, `validate_input_name` and the `dotted_input_supplies_its_path` argument of `check_inputs_match_variables` and `check_variables_are_declared`, in favour of `validate_input_names` and `check_input_list_name`, and `build_judgment_material` no longer walks a dotted input name as a path.
+
 ## [v0.74.0] - 2026-10-05
 
 ### Added

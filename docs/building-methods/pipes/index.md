@@ -86,6 +86,8 @@ Every pipe defines a **contract** through its `inputs` and `output` fields. This
 *   **`inputs`**: This dictionary defines the **mandatory and necessary** data that must be present in the [Working Memory](working-memory.md) before the pipe can execute. Each key in the dictionary becomes a variable name that you can reference in your pipe's logic (e.g., in prompts), and each value specifies the concept type that the data must conform to. If any required input is missing or doesn't match the expected concept, the pipeline will fail a clear error message.
 You can specify multiple inputs by using a list of concepts. For example, `inputs = { description = "ProductDescription", keywords = "Keyword[]" }` will require a `ProductDescription` and a list of `Keyword`s. (See more about [Understanding Multiplicity](./understanding-multiplicity.md) for details.)
 
+    An input name is a plain `snake_case` identifier, matching `[a-z][a-z0-9_]*`, and it names one whole value of the concept its slot declares. A dotted key such as `"invoice.total" = "Number"` does not declare a field of `invoice`: it is refused as `invalid_input_name`, on every pipe. A pipe that needs one field of a value declares the value with its whole concept, `invoice = "Invoice"`, and reads the field through it in its template, as `$invoice.total`. `pipelex fix bundle` deletes a dotted key whose root is declared beside it, since that root already supplies the field.
+
     Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can carry [intent hints](../concepts/intent-hints.md) beside its concept:
 
     ```toml
