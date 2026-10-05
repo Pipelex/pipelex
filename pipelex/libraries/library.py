@@ -257,13 +257,28 @@ class Library(BaseModel):
         A dependency's own references carry its alias (`crate_qualification.qualify_crate`), so this covers a
         package's calls to its own pipes as well as a consumer's calls into it. A reference whose alias names no
         loaded package is tolerated: that is a crate loaded without its packages, as a worker loads one, and the
-        package is validated where it is loaded.
+        package is validated where it is loaded. So is a dependency's reference to another package: a dependency's own
+        dependencies are never loaded, and its alias for one may name a different package the consumer loaded.
+
+        A reference naming a pipe the package declares but could not build is refused naming that failure before
+        anything is looked up, so a bare `alias->code` never falls through to another pipe of the same code.
 
         Raises:
             LibraryLoadingError: The package is loaded and has no such pipe, withholds it, or holds it as private
                 while the referring pipe is not the package's own.
         """
         ref_alias, remainder = QualifiedRef.split_cross_package_ref(sub_pipe_code)
+        if ref_alias not in self.dependency_libraries or (dep_alias is not None and ref_alias != dep_alias):
+            return
+        unbuilt_reason = self.pipe_library.unbuilt_dependency_pipe_reason(pipe_code=sub_pipe_code)
+        if unbuilt_reason is not None:
+            msg = (
+                f"Pipe '{pipe_key}' references '{sub_pipe_code}', which the package loaded as '{ref_alias}' declares "
+                f"but could not build: {unbuilt_reason}"
+            )
+            raise _pipe_dependency_refusal(
+                pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+            )
         try:
             sub_pipe = self.pipe_library.get_optional_pipe(pipe_code=sub_pipe_code)
         except PipeLibraryError as pipe_error:
@@ -272,8 +287,6 @@ class Library(BaseModel):
                 pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
             ) from pipe_error
         if sub_pipe is None:
-            if ref_alias not in self.dependency_libraries:
-                return
             if self.pipe_library.is_withheld_dependency_pipe(pipe_code=sub_pipe_code):
                 raise _pipe_dependency_refusal(
                     pipe=pipe,
@@ -281,17 +294,10 @@ class Library(BaseModel):
                     error_type=PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY,
                     message=_describe_unexported_pipe_dependency(referring_pipe_key=pipe_key, private_ref=sub_pipe_code, package_alias=ref_alias),
                 )
-            unbuilt_reason = self.pipe_library.unbuilt_dependency_pipe_reason(pipe_code=sub_pipe_code)
-            if unbuilt_reason is not None:
-                msg = (
-                    f"Pipe '{pipe_key}' references '{sub_pipe_code}', which the package loaded as '{ref_alias}' declares "
-                    f"but could not build: {unbuilt_reason}"
-                )
-            else:
-                msg = (
-                    f"Pipe '{pipe_key}' references '{sub_pipe_code}', which does not exist. "
-                    f"The package loaded as '{ref_alias}' has no pipe '{remainder}'."
-                )
+            msg = (
+                f"Pipe '{pipe_key}' references '{sub_pipe_code}', which does not exist. "
+                f"The package loaded as '{ref_alias}' has no pipe '{remainder}'."
+            )
             raise _pipe_dependency_refusal(
                 pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
             )

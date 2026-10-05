@@ -210,14 +210,20 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         self._unbuilt_dependency_reasons[f"{alias}->{pipe_ref}"] = reason
 
     def unbuilt_dependency_pipe_reason(self, *, pipe_code: str) -> str | None:
-        """Why the dependency pipe a cross-package reference names failed to build, or `None` when it did not fail.
+        """Why the dependency pipe a cross-package reference names failed to build, or `None` when none it names failed.
 
-        The reference may name the pipe as `alias->domain.code` or as `alias->code`, as `get_optional_pipe` accepts.
+        The reference may name the pipe as `alias->domain.code` or as `alias->code`, as `get_optional_pipe` accepts. A
+        bare code matching a pipe that failed is answered even when another pipe of that code loaded, since the failed
+        one may be the one meant.
         """
         keys = self._dependency_keys_named_by(pipe_code=pipe_code, keys=set(self._unbuilt_dependency_reasons))
-        if len(keys) != 1:
+        if not keys:
             return None
-        return self._unbuilt_dependency_reasons[keys[0]]
+        return (
+            "; ".join(f"'{key}': {self._unbuilt_dependency_reasons[key]}" for key in keys)
+            if len(keys) > 1
+            else self._unbuilt_dependency_reasons[keys[0]]
+        )
 
     @classmethod
     def _dependency_keys_named_by(cls, *, pipe_code: str, keys: set[str]) -> list[str]:

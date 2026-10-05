@@ -25,7 +25,11 @@ from tests.integration.pipelex.libraries.installed_packages import (
     sole_step_target,
     write_consumer,
 )
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData, TwoPackagesSharingADomainTestData
+from tests.integration.pipelex.libraries.test_data import (
+    FailedExportWithAPrivateNamesakeTestData,
+    ProbePackageTestData,
+    TwoPackagesSharingADomainTestData,
+)
 
 PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
 
@@ -191,3 +195,65 @@ class TestDependencyPipeScope:
         assert "could not build" in str(exc_info.value)
         assert "no_such_function_anywhere" in str(exc_info.value)
         assert "has no pipe" not in str(exc_info.value)
+
+    def test_a_bare_self_reference_to_a_failed_exported_pipe_never_falls_to_a_private_namesake(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """`alias->x` names an exported `dom_a.x` that failed to build: the load is refused, never resolved to the private `dom_b.x`."""
+        isolate_installed_methods(mocker=mocker, root=tmp_path)
+        install_package(
+            root=tmp_path,
+            method_name=ProbePackageTestData.METHOD_NAME,
+            manifest=FailedExportWithAPrivateNamesakeTestData.MANIFEST,
+            bundles={
+                "dom_a.mthds": FailedExportWithAPrivateNamesakeTestData.BUNDLE_A,
+                "dom_b.mthds": FailedExportWithAPrivateNamesakeTestData.BUNDLE_B,
+            },
+        )
+        consumer_files = write_consumer(
+            root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.consumer_calling(pipe_ref=f"{PROBE_ALIAS}->dom_a.entry")}
+        )
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with pytest.raises(LibraryLoadingError) as exc_info:
+                library_manager.load_libraries(library_id=library_id, library_file_paths=consumer_files)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert refusal_types(exc_info.value) == [PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY]
+        assert "could not build" in str(exc_info.value)
+
+    def test_a_dependency_s_reference_to_another_package_is_not_validated_against_the_consumer_s(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A package's own dependencies are never loaded, so the consumer's package of the same alias says nothing about its reference."""
+        isolate_installed_methods(mocker=mocker, root=tmp_path)
+        left_alias = TwoPackagesSharingADomainTestData.PACKAGES["left"]
+        install_probe(
+            root=tmp_path,
+            bundle=ProbePackageTestData.DEP_BUNDLE.replace(
+                '{ pipe = "helper", result = "helped" }',
+                f'{{ pipe = "helper", result = "helped" }}, {{ pipe = "{left_alias}->shared.not_in_left", result = "further" }}',
+            ),
+        )
+        install_package(
+            root=tmp_path,
+            method_name="left",
+            manifest=TwoPackagesSharingADomainTestData.manifest(name="left"),
+            bundles={"shared.mthds": TwoPackagesSharingADomainTestData.bundle(name="left")},
+        )
+        consumer_files = write_consumer(
+            root=tmp_path,
+            bundles={
+                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
+                "left.mthds": ProbePackageTestData.consumer_calling(pipe_ref=f"{left_alias}->shared.entry").replace(
+                    "probe_consumer", "left_consumer"
+                ),
+            },
+        )
+        library_manager = get_library_manager()
+        library_id, library = library_manager.open_library()
+        try:
+            library_manager.load_libraries(library_id=library_id, library_file_paths=consumer_files)
+            loaded_aliases = set(library.dependency_libraries)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert loaded_aliases == {PROBE_ALIAS, left_alias}

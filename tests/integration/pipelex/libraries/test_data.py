@@ -308,3 +308,56 @@ inputs      = { data = "Text" }
 output      = "Text"
 prompt      = "x: $data"
 """
+
+
+class FailedExportWithAPrivateNamesakeTestData:
+    """A probe package whose exported `dom_a.x` fails to build while a private `dom_b.x` of the same code loads; nothing here is real.
+
+    `dom_a.entry` names `x` through the package's own alias and no domain, and `dom_a.other` reaches the private `dom_b.x`.
+    """
+
+    MANIFEST: ClassVar[str] = """[package]
+name        = "probe"
+address     = "github.com/invented/probe-lib"
+version     = "1.0.0"
+description = "An invented probe package"
+
+[exports.dom_a]
+pipes = ["x", "entry", "other"]
+"""
+
+    BUNDLE_A: ClassVar[str] = """domain      = "dom_a"
+description = "The exported domain"
+
+[pipe.x]
+type          = "PipeFunc"
+description   = "The exported x, which fails to build"
+inputs        = { data = "Text" }
+output        = "Text"
+function_name = "no_such_function_anywhere"
+
+[pipe.entry]
+type        = "PipeSequence"
+description = "Call x by the package's alias and its bare code"
+inputs      = { data = "Text" }
+output      = "Text"
+steps       = [{ pipe = "github.com/invented/probe-lib/probe->x", result = "out" }]
+
+[pipe.other]
+type        = "PipeSequence"
+description = "Reach the private domain's x"
+inputs      = { data = "Text" }
+output      = "Text"
+steps       = [{ pipe = "dom_b.x", result = "out" }]
+"""
+
+    BUNDLE_B: ClassVar[str] = """domain      = "dom_b"
+description = "The private domain"
+
+[pipe.x]
+type        = "PipeLLM"
+description = "The private x"
+inputs      = { data = "Text" }
+output      = "Text"
+prompt      = "private x: $data"
+"""
