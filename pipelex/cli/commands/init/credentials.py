@@ -15,7 +15,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
 def get_global_env_path() -> Path:
-    """Return the path to the global credentials file (~/.pipelex/.env)."""
+    """Return the path to the credentials file in the home configuration directory (`~/.pipelex/.env`, or under `PIPELEX_HOME`)."""
     return config_manager.global_config_dir / ".env"
 
 
@@ -101,7 +101,7 @@ def get_required_vars_for_enabled_backends(backends_toml_path: Path) -> dict[str
 
 
 def prompt_credentials(*, console: Console, backends_toml_path: Path) -> None:
-    """Prompt the user for missing credentials and persist them to ~/.pipelex/.env.
+    """Prompt the user for missing credentials and persist them to the `.env` in the home configuration directory.
 
     Reads the backends.toml to find which env vars are needed by enabled backends,
     checks which are already set, and prompts only for missing ones.
@@ -145,7 +145,7 @@ def prompt_credentials(*, console: Console, backends_toml_path: Path) -> None:
     if collected_count > 0:
         write_env_file(global_env_path, entries=entries)
         console.print()
-        console.print(f"[green]Saved {collected_count} credential(s) to {global_env_path}[/green]")
+        console.print(f"[green]Saved {collected_count} credential(s) to {escape(str(global_env_path))}[/green]")
     else:
         console.print()
         console.print("[dim]No credentials entered. You can set them later by running:[/dim] [cyan]pipelex init credentials[/cyan]")

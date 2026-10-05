@@ -9,6 +9,7 @@ from pytest_mock import MockerFixture
 from pipelex import log
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
+from pipelex.system.environment import PIPELEX_HOME_ENV_KEY
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -72,6 +73,18 @@ def reset_pipelex_config_fixture():
     Pipelex.make(integration_mode=_get_test_integration_mode())
     yield
     Pipelex.teardown_if_needed()
+
+
+@pytest.fixture
+def no_pipelex_home(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unset `PIPELEX_HOME` for a test that stands in a home directory of its own.
+
+    A test that fakes `Path.home()` or `HOME` is asserting about the default `~/.pipelex`, and a
+    `PIPELEX_HOME` exported in the developer's shell would move the home configuration directory
+    away from the one it faked. A module of such tests opts in with
+    `pytestmark = pytest.mark.usefixtures("no_pipelex_home")`.
+    """
+    monkeypatch.delenv(PIPELEX_HOME_ENV_KEY, raising=False)
 
 
 @pytest.fixture(scope="class")

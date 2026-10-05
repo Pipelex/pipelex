@@ -14,7 +14,7 @@ Pipelex uses a layered TOML configuration system that lets you define sensible d
 ## Configuration Levels
 
 1. **Package defaults** — Built into Pipelex (`pipelex.toml` in the package)
-2. **Global tier** — `~/.pipelex/` for user-wide settings: the base `pipelex.toml`, then its override sequence
+2. **Global tier** — `~/.pipelex/` for user-wide settings, or the directory the `PIPELEX_HOME` environment variable names (see [the home configuration directory](../configuration/index.md#the-home-configuration-directory-pipelex_home)): the base `pipelex.toml`, then its override sequence
 3. **Project tier** — `{project_root}/.pipelex/` for project-specific settings: the base `pipelex.toml`, then the same override sequence
 
 Within each tier, the base `pipelex.toml` is followed by an override sequence, merged in order (later wins per key):

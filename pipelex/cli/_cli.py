@@ -170,10 +170,18 @@ def init_command(
         ),
     ] = InitFocus.ALL,
     local: Annotated[
-        bool, typer.Option("--local", "-l", help="Create project-level .pipelex/ at the detected project root instead of global ~/.pipelex/")
+        bool,
+        typer.Option(
+            "--local",
+            "-l",
+            help=(
+                "Create project-level .pipelex/ at the detected project root instead of the home configuration directory "
+                "(~/.pipelex/, or PIPELEX_HOME)"
+            ),
+        ),
     ] = False,
 ) -> None:
-    """Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local).
+    """Initialize Pipelex configuration in the home configuration directory (~/.pipelex, or PIPELEX_HOME) or project .pipelex (--local).
 
     Focus options:
 
@@ -181,7 +189,7 @@ def init_command(
 
       config       Reset configuration files and prompt for missing API keys
 
-      credentials  Prompt for missing API keys only (reads enabled backends, saves to ~/.pipelex/.env)
+      credentials  Prompt for missing API keys only (reads enabled backends, saves to the .env in the home configuration directory)
 
       inference    Reset inference backends selection and prompt for missing API keys
 
@@ -223,7 +231,9 @@ def migrate_command(
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Report what would change and write nothing")] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Apply without the interactive confirmation")] = False,
 ) -> None:
-    """Bring the configuration files in ~/.pipelex/ and the project .pipelex/ up to the current schema.
+    """Bring the configuration files in the home configuration directory and the project .pipelex/ up to the current schema.
+
+    The home configuration directory is ~/.pipelex/, or the directory PIPELEX_HOME names.
 
     Runs on a configuration that cannot load — it needs the migration ledger, the applier and the
     filesystem, and nothing else. Every file it rewrites is backed up beside itself first.
