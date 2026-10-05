@@ -279,8 +279,27 @@ def snake_to_title_case(snake_str: str) -> str:
     return snake_str.replace("_", " ").title()
 
 
+# The two identifier grammars of MTHDS, written once as unanchored regex fragments that every anchored
+# pattern is composed from, so the grammars of pipe codes, input names, a binding step's `result` and the
+# segments of a field path cannot drift apart:
+# - a snake_case identifier, the grammar of a pipe code, of a domain segment and of an input name;
+# - a field-path segment, the grammar of each segment of a path a binding step reads: a letter, then
+#   letters, digits and underscores, so a segment never starts with the underscore that marks a private name.
+SNAKE_CASE_IDENTIFIER_REGEX = r"[a-z][a-z0-9_]*"
+FIELD_PATH_SEGMENT_REGEX = r"[A-Za-z][A-Za-z0-9_]*"
+
+# The anchored forms, as a JSON Schema `pattern` writes them.
+SNAKE_CASE_PATTERN = rf"^{SNAKE_CASE_IDENTIFIER_REGEX}$"
+FIELD_PATH_PATTERN = rf"^{FIELD_PATH_SEGMENT_REGEX}(?:\.{FIELD_PATH_SEGMENT_REGEX})*$"
+
+
 def is_snake_case(word: str) -> bool:
-    return re.match(r"^[a-z][a-z0-9_]*$", word) is not None
+    return re.fullmatch(SNAKE_CASE_IDENTIFIER_REGEX, word) is not None
+
+
+def is_field_path(*, path: str) -> bool:
+    """Whether a string is a field path: segments matching ``FIELD_PATH_SEGMENT_REGEX``, separated by single dots."""
+    return re.fullmatch(FIELD_PATH_PATTERN, path) is not None
 
 
 def is_pascal_case(word: str) -> bool:

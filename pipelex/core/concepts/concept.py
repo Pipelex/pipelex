@@ -1,12 +1,13 @@
 from typing import Any, Callable
 
 from mthds.protocol.concept import ConceptAbstract
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from pipelex.core.concepts.concept_representation_generator import (
     ConceptRepresentationFormat,
     ConceptRepresentationGenerator,
 )
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid, validate_concept_code
@@ -37,6 +38,15 @@ class Concept(ConceptAbstract):
     description: str
     structure_class_name: str
     refines: str | None = None
+    declared_structure: dict[str, ConceptStructureBlueprint] | None = Field(default=None, exclude=True)
+    """The structure the concept's blueprint declares, field by field, normalized; `None` when it declares none.
+
+    A concept that refines another, one whose structure is a Python class, a native (whose definition is
+    pinned, see `pinned_blueprints`) and one declared with a description alone carry `None`. The walk that
+    derives a binding step's concept reads the declared fields here, because a structure class cannot say
+    which concept a field holds when several concepts share one class. Excluded from serialization, like
+    every definition field the concept's ref stands for on the wire.
+    """
 
     @field_validator("code")
     @classmethod

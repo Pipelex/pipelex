@@ -450,6 +450,22 @@ $draft.text
 \"\"\"
 """
 
+_UNREADABLE_DOTTED_INPUT_MTHDS = """domain = "dottedfix_unreadable"
+main_pipe = "summarize_draft"
+
+# Wrong on purpose: a dotted input key beside a root declared with a concept that lacks the field. The key
+# typed the root `Text` under the fold, so the template read worked; deleting it leaves `data` a Number.
+[pipe.summarize_draft]
+type = "PipeLLM"
+description = "Summarize the text of a draft."
+inputs = { data = "Number", "data.text" = "Text" }
+output = "Text"
+prompt = \"\"\"
+Summarize this draft:
+$data.text
+\"\"\"
+"""
+
 _LONE_DOTTED_INPUT_MTHDS = """domain = "dottedfix_lone"
 main_pipe = "describe_page"
 
@@ -1028,3 +1044,25 @@ class TestFixConvergenceLoop:
         assert "replace `?` with `!` on 'draft' if the root must be forced" in remaining.suggested_fix.description
         assert remaining.message is not None
         assert "Deleting 'draft.text' drops its forced presence (`!`), where 'draft' is optional (`?`)" in remaining.message
+
+    async def test_unreadable_dotted_input_is_offered_but_never_applied(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A dotted input whose path the root's declared concept cannot hold gets an UNSAFE fix naming the walk's refusal, never applied."""
+        load_empty_library()
+        bundle_path = tmp_path / "unreadable_dotted.mthds"
+        bundle_path.write_text(_UNREADABLE_DOTTED_INPUT_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is False
+        assert result.fixes_applied == []
+        assert bundle_path.read_text(encoding="utf-8") == _UNREADABLE_DOTTED_INPUT_MTHDS
+        assert [item.error_type for item in result.remaining_errors] == ["invalid_input_name"]
+        remaining = result.remaining_errors[0]
+        assert remaining.suggested_fix is not None
+        assert remaining.suggested_fix.fix_code == "delete-redundant-dotted-input"
+        assert not remaining.suggested_fix.safety.is_safe
+        assert "'data' holds a 'native.Number', which has no field 'text'" in remaining.suggested_fix.description

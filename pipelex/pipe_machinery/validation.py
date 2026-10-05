@@ -15,14 +15,24 @@ from pipelex.core.pipes.variable_multiplicity import (
     presence_from_symbol,
     presence_symbol,
 )
-from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
+from pipelex.tools.misc.string_utils import FIELD_PATH_PATTERN, SNAKE_CASE_PATTERN, get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # The grammar of an input name, the standard's `[a-z][a-z0-9_]*`: a plain snake_case identifier, which
 # is never dotted. It applies to every key of a pipe's `inputs`, whatever the pipe, and to a PipeBatch's
 # `input_list_name`. The MTHDS JSON Schema generator writes this same pattern on both, so a structural
-# check refuses exactly what `validate_input_names` and `check_input_list_name` refuse.
-INPUT_NAME_PATTERN = r"^[a-z][a-z0-9_]*$"
+# check refuses exactly what `validate_input_names` and `check_input_list_name` refuse. It is the
+# snake_case grammar of `string_utils`, the one source every name grammar here is composed from.
+INPUT_NAME_PATTERN = SNAKE_CASE_PATTERN
+
+# The grammar of a binding step's `result`: a plain input name, since it exists to be read by a later
+# step's input or as a later binding's root, both of which are plain names.
+BINDING_RESULT_PATTERN = INPUT_NAME_PATTERN
+
+# The grammar of a binding step's `from`: a root name followed by zero or more field names, separated by
+# single dots, each segment a letter followed by letters, digits and underscores. Subscripts, expressions,
+# whitespace and underscore-led segments are outside it.
+BINDING_PATH_PATTERN = FIELD_PATH_PATTERN
 
 # The marker of an input declaration as `_input_marker` writes it after the concept: an optional multiplicity
 # suffix (`[]` or `[N]`), then an optional presence symbol (`?` or `!`). Group 1 is the bracket content, group 2

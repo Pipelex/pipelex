@@ -8,6 +8,7 @@ of the validation report — CLI, API, MCP — sees fixes with zero extra plumbi
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipe_machinery.validation import dropped_input_marker_warning
 from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixOp, FixSafety, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
 SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
@@ -203,9 +204,12 @@ def _plan_delete_redundant_dotted_input(*, error_data: PipelexBundleBlueprintVal
     a run requires, so ``pipelex fix bundle`` never applies it, and its description names the part that
     differs, the multiplicity, the presence or both, and the edit that carries it onto the root. The two
     markers are set together; a dropped marker without its root's is an incomplete enrichment and yields
-    no fix, never a ``SAFE`` one. A lone dotted name, whose root's concept nothing states, and a malformed
-    name carry no enrichment and are suppressed here structurally; their message names the remedies for
-    the author.
+    no fix, never a ``SAFE`` one. The fix is also ``UNSAFE`` when ``redundant_input_unwalkable_reason`` is set:
+    the root's declared concept does not hold the field the key named (``data = "Number"`` beside
+    ``"data.text" = "Text"``), so deleting the key would leave the template reading a field the root lacks,
+    and the description carries the walk's reason. A lone dotted name, whose root's concept nothing states,
+    and a malformed name carry no enrichment and are suppressed here structurally; their message names the
+    remedies for the author.
     """
     if error_data.redundant_input_name is None or error_data.pipe_code is None:
         return None
@@ -223,6 +227,14 @@ def _plan_delete_redundant_dotted_input(*, error_data: PipelexBundleBlueprintVal
             root_input_marker=error_data.root_input_marker,
         )
         description = f"{description}. {marker_warning}"
+        safety = FixSafety.UNSAFE
+    if error_data.redundant_input_unwalkable_reason is not None:
+        root_name = get_root_from_dotted_path(error_data.redundant_input_name)
+        description = (
+            f"{description}. Warning: '{error_data.redundant_input_name}' cannot be read through the concept declared for '{root_name}', "
+            f"so a template reading it may fail once the key is deleted. {error_data.redundant_input_unwalkable_reason} "
+            f"Declare '{root_name}' with the concept whose structure holds the field"
+        )
         safety = FixSafety.UNSAFE
     return SuggestedFix(
         fix_code=DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE,

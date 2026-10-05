@@ -589,6 +589,9 @@ class ConceptFactory:
 
             case ConceptDeclarationType.BLUEPRINT_WITH_STRUCTURE:
                 blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
+                if not isinstance(blueprint.structure, dict):
+                    msg = f"Expected structure to be a dict, got {type(blueprint.structure)}"
+                    raise ConceptFactoryError(msg)
                 return Concept(
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
@@ -599,6 +602,7 @@ class ConceptFactory:
                         domain_code=domain_code,
                     ),
                     refines=None,
+                    declared_structure=normalize_structure_blueprint(blueprint.structure),
                 )
 
             case ConceptDeclarationType.REFINES:
