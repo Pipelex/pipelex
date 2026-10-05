@@ -1,14 +1,14 @@
 # Changelog
 
-## [Unreleased]
-
-### Changed
-
-- **The hosted-only inference provider plugin is no longer shipped (Breaking)**: its built-in plugin, its sdk tokens, its error classes and their reference pages, and the `PipelexBackend` member naming its backend are removed, leaving `PipelexBackend.INTERNAL` alone. A project config that still declares the hosted backend disabled, or a routing profile that names it but is not active, keeps booting; a model spec naming one of its sdk tokens now fails when its worker is built, unless a plugin of your own registers that token.
+## [v0.74.0] - 2026-10-05
 
 ### Added
 
 - **A reference to a package's private pipe is refused as unexported**: a consumer naming a pipe that a loaded dependency package declares but does not export is refused at load with the new `PipeValidationErrorType` value `unexported_pipe_dependency`, whose item names the referring pipe in `pipe_code` and the reference in `missing_pipe_code`.
+
+### Changed
+
+- **The hosted-only inference provider plugin is no longer shipped (Breaking)**: its built-in plugin, its sdk tokens, its error classes and their reference pages, and the `PipelexBackend` member naming its backend are removed, leaving `PipelexBackend.INTERNAL` alone. A project config that still declares the hosted backend disabled, or a routing profile that names it but is not active, keeps booting; a model spec naming one of its sdk tokens now fails when its worker is built, unless a plugin of your own registers that token.
 
 ### Fixed
 
