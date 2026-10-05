@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
+# The name of a configuration directory, in the user's home directory and in a project
+CONFIG_DIR_NAME = ".pipelex"
+
 # Environment variable relocating the home configuration directory, which is ~/.pipelex otherwise
 PIPELEX_HOME_ENV_KEY = "PIPELEX_HOME"
 
@@ -26,7 +29,7 @@ def get_pipelex_home_dir() -> Path:
     """
     configured_home = os.environ.get(PIPELEX_HOME_ENV_KEY)
     if not configured_home:
-        return Path.home() / ".pipelex"
+        return Path.home() / CONFIG_DIR_NAME
     return Path(configured_home).expanduser().resolve()
 
 

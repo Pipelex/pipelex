@@ -238,7 +238,7 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
     # any third-party log line.
     silence_logging_for_agent_cli()
     try:
-        # When --global, force checking ~/.pipelex/ only; otherwise use layered resolution
+        # When --global, force checking the home configuration directory only; otherwise use layered resolution
         config_dir = config_manager.global_config_dir if global_ else None
 
         # Gather config location info (override for --global flag)

@@ -10,7 +10,7 @@ from pipelex.system.configuration.config_surface import (
     stale_configuration_warning,
     strip_reserved_meta,
 )
-from pipelex.system.environment import get_pipelex_home_dir
+from pipelex.system.environment import CONFIG_DIR_NAME, get_pipelex_home_dir
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
@@ -44,7 +44,6 @@ def pydantic_error_behind(*, config_error: Exception) -> ValidationError | None:
     return cause if isinstance(cause, ValidationError) else None
 
 
-CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
 
 PROJECT_ROOT_MARKERS: frozenset[str] = frozenset({CONFIG_DIR_NAME, ".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"})
@@ -291,7 +290,7 @@ class ConfigLoader:
         return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{MODEL_DECKS_DIR_NAME}")
 
     def ensure_global_config_exists(self) -> None:
-        """Create the global ~/.pipelex/ directory with kit template files if it doesn't exist."""
+        """Create the home configuration directory with kit template files if it doesn't exist."""
         global_dir = self.global_config_dir
         if global_dir.is_dir():
             return

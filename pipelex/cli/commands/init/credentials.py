@@ -101,7 +101,7 @@ def get_required_vars_for_enabled_backends(backends_toml_path: Path) -> dict[str
 
 
 def prompt_credentials(*, console: Console, backends_toml_path: Path) -> None:
-    """Prompt the user for missing credentials and persist them to ~/.pipelex/.env.
+    """Prompt the user for missing credentials and persist them to the `.env` in the home configuration directory.
 
     Reads the backends.toml to find which env vars are needed by enabled backends,
     checks which are already set, and prompts only for missing ones.

@@ -148,7 +148,7 @@ def _copy_telemetry_template(target_dir: Path, *, for_project: bool) -> None:
     Args:
         target_dir: Target config directory (e.g. .pipelex/).
         for_project: True when targeting a project's `.pipelex/`; False when
-            targeting the global `~/.pipelex/`.
+            targeting the home configuration directory.
     """
     template_name = TELEMETRY_PROJECT_TEMPLATE_FILE_NAME if for_project else TELEMETRY_CONFIG_FILE_NAME
     template_path = Path(str(get_kit_configs_dir())) / template_name

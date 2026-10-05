@@ -38,10 +38,10 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import (
     BACKENDS_DIR_NAME,
     BACKENDS_FILE_NAME,
-    CONFIG_DIR_NAME,
     INFERENCE_DIR_NAME,
     ROUTING_PROFILES_FILE_NAME,
 )
+from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
