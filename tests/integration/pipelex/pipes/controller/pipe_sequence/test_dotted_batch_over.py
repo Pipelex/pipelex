@@ -351,6 +351,45 @@ class TestDottedBatchOver:
         lines = [item.text for item in response.pipe_output.main_stuff_as_items(item_type=TextContent)]
         assert lines == ["Tea towel: 12.5 euros", "Mug: 9.0 euros"]
 
+    async def test_a_batched_pipe_keeps_its_other_inputs_after_a_pipe_step_stores_its_list(self, load_empty_library: Callable[[], str]) -> None:
+        """Regression: the same fault without any binding, a pipe step storing the list, so the sequence never needed `shop`."""
+        mthds_content = (
+            _ORDER_BUNDLE_HEADER.replace(
+                'inputs = { order = "Order", currency = "Text" }', 'inputs = { lines = "OrderLine[]", currency = "Text", shop = "Text" }'
+            )
+            + "steps = [\n"
+            + '  { pipe = "price_line", batch_over = "lines", batch_as = "line", result = "priced_lines" },\n'
+            + '  { pipe = "sign_line", batch_over = "priced_lines", batch_as = "priced_line", result = "signed_lines" },\n'
+            + "]\n\n"
+            + '[pipe.sign_line]\ntype = "PipeCompose"\ndescription = "Signs a priced line with the shop name"\n'
+            + 'inputs = { priced_line = "Text", shop = "Text" }\noutput = "Text"\ntemplate = "$priced_line, from $shop"\n'
+        )
+        sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="price_order")
+
+        assert sorted(sequence.needed_inputs().variables) == ["currency", "lines", "shop"]
+
+        response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(
+            mthds_contents=[mthds_content],
+            inputs={
+                "lines": {"concept": "order_pricing.OrderLine", "content": [{"article": "Mug", "amount": 9}]},
+                "currency": "euros",
+                "shop": "Ty Coz",
+            },
+        )
+        lines = [item.text for item in response.pipe_output.main_stuff_as_items(item_type=TextContent)]
+        assert lines == ["Mug: 9.0 euros, from Ty Coz"]
+
+    async def test_an_absent_optional_root_batches_over_no_page(self) -> None:
+        """An absent root lifts the binding, which binds an empty list, as a list result is never absent: the batch runs no branch."""
+        mthds_content = _catalog_bundle(
+            inputs='{ catalog = "Catalog?" }',
+            steps=['{ pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "index_lines" }'],
+        )
+
+        response = await _index_lines(mthds_content=mthds_content, inputs={})
+
+        assert response.pipe_output.main_stuff_as_items(item_type=TextContent) == []
+
     async def test_a_batch_over_a_result_that_is_not_a_plain_name_runs(self) -> None:
         """Regression: the batch a step runs was built from a blueprint, which refused any list name but a plain input name, so a
         batch over a result named `IndexLines`, which a pipe step may store under, failed when it ran.
