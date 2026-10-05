@@ -64,6 +64,8 @@ Each entry in the `branches` array is a table with the following keys:
 | `pipe`   | string | The name of the pipe to execute for this branch.                                         | Yes      |
 | `result` | string | The name for this branch's output. Must be unique within the `PipeParallel` definition. | Yes      |
 
+A branch is always a pipe step. A [binding step](PipeSequence.md#binding-steps), `{ from = "invoice.total", result = "total_amount" }`, is refused in `branches` with `binding_step_invalid`: the branches run at once, and a binding orders a value before the steps that read it, so bind the value in the calling sequence, in a step before the `PipeParallel`, and have the branch read the bound name.
+
 ### Example: Extracting different details from a text
 
 Imagine you have a product description and you want to extract the product features and the product sentiment at the same time.
