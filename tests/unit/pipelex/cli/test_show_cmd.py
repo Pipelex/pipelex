@@ -15,6 +15,7 @@ from rich.console import Console
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.show_cmd import do_list_pipes, do_show_backends, do_show_config, do_show_pipe
 from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.tools.misc.exceptions import TomlError
 
 if TYPE_CHECKING:
@@ -148,7 +149,7 @@ class TestShowCmd:
 
     @pytest.mark.usefixtures("telemetry")
     def test_do_show_backends_show_all_includes_status_column(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
-        """--all loads the library leniently and shows Enabled/Disabled status."""
+        """--all loads the library keyless, disabled backends included, and shows Enabled/Disabled status."""
         backends = [
             _make_backend("openai", enabled=True, model_count=1),
             _make_backend("anthropic", enabled=False, model_count=1),
@@ -162,15 +163,15 @@ class TestShowCmd:
         mocked_config_manager = mocker.patch("pipelex.cli.commands.show_cmd.config_manager")
         mocked_config_manager.backends_file_paths.return_value = [tmp_path / "backends.toml"]
         mocked_config_manager.backends_dir_path = tmp_path / "backends"
-        lenient_library = SimpleNamespace(root={backend.name: backend for backend in backends}, load=mocker.Mock())
-        library_class_mock = mocker.patch("pipelex.cli.commands.show_cmd.InferenceBackendLibrary", return_value=lenient_library)
+        keyless_library = SimpleNamespace(root={backend.name: backend for backend in backends}, load=mocker.Mock())
+        library_class_mock = mocker.patch("pipelex.cli.commands.show_cmd.InferenceBackendLibrary", return_value=keyless_library)
 
         do_show_backends(show_all=True)
 
         library_class_mock.assert_called_once()
-        load_kwargs = lenient_library.load.call_args.kwargs
+        load_kwargs = keyless_library.load.call_args.kwargs
         assert load_kwargs["include_disabled"] is True
-        assert load_kwargs["lenient"] is True
+        assert load_kwargs["credentials"] is CredentialResolution.SKIP
         output = console.export_text()
         assert "All Configured Backends" in output
         assert "Status" in output

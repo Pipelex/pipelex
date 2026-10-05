@@ -90,6 +90,24 @@ def substitute_vars(
     return VAR_PLACEHOLDER_PATTERN.sub(replace_var, content)
 
 
+def placeholder_var_names(*, content: str) -> list[str]:
+    """The names of the variables the placeholders in `content` reference, in order and without repeats.
+
+    Resolves nothing: `${VAR}`, `${env:VAR}`, `${secret:VAR}` and every candidate of a fallback
+    pattern such as `${env:VAR|secret:OTHER}` each contribute their name. A prefix this module does
+    not know still contributes its name, since naming is all this does; resolving it is what refuses
+    the prefix.
+    """
+    var_names: list[str] = []
+    for match in VAR_PLACEHOLDER_PATTERN.finditer(content):
+        for part in match.group(1).split("|"):
+            var_name = part.split(":", 1)[1] if ":" in part else part
+            var_name = var_name.strip()
+            if var_name not in var_names:
+                var_names.append(var_name)
+    return var_names
+
+
 def _handle_fallback_pattern(var_spec: str, *, secrets_provider: SecretsProviderAbstract) -> str:
     """Handle fallback pattern like 'env:VAR|secret:VAR'."""
     parts = [part.strip() for part in var_spec.split("|")]

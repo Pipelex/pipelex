@@ -106,9 +106,10 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         an `Image` or a `Document` input, or a list of either, is sent to the model as a file. Whether the
         model reads one is its own capability, stated in its spec's `inputs`: a model that does not is
         refused here, naming the input and what it reads. That needs the model's spec, which a boot that
-        skipped its backend, a keyless one with the backend's key unset, does not hold, and neither does
-        one serving none of a waterfall's models: the check is then left to the worker when the step runs,
-        as it is for a `Dynamic` input, whose declaration names no kind of value.
+        does not enable the model's backend does not hold, and neither does one serving none of a
+        waterfall's models: the check is then left to the worker when the step runs, as it is for a
+        `Dynamic` input, whose declaration names no kind of value. A keyless boot holds the spec: it keeps
+        every enabled backend, whether or not its key is set.
         """
         with self.locating_model_choice(field_name="model"):
             judgment_setting = judgment_setting_of_choice(judgment_choice=self.judgment_choice, pipe_code=self.code)

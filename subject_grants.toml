@@ -1972,6 +1972,10 @@ rationale = "Factory from source: builds the result from the name; single operan
 param = "backend_name"
 rationale = "Loads model specs for the named backend; single operand."
 
+["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary._record_placeholder_var_names"]
+param = "content"
+rationale = "A string transform: apply_to_strings_recursive calls transform_func with the string positionally, as it calls substitute_vars on a load that resolves credentials."
+
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.get_inference_backend"]
 param = "backend_name"
 rationale = "Keyed accessor by the backend_name; single operand."

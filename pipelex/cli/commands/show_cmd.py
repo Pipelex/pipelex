@@ -18,6 +18,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
@@ -75,7 +76,7 @@ def do_show_backends(*, show_all: bool = False) -> None:
                 backends_library_paths=config_manager.backends_file_paths(),
                 backends_dir_path=str(config_manager.backends_dir_path),
                 include_disabled=True,
-                lenient=True,
+                credentials=CredentialResolution.SKIP,
             )
         else:
             backend_library = models_manager.inference_backend_library
