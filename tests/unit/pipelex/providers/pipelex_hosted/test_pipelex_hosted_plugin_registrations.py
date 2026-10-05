@@ -6,11 +6,11 @@ it is an `InferenceBackendNotFoundError` at the first request against that model
 production, for one model, on whatever day someone first uses it. The claim is cheap to pin and
 expensive to discover.
 
-Two of the entries are worth reading rather than skimming. `(IMG_GEN, pipelex_hosted_completions)` is the
+Two of the entries are worth reading rather than skimming. `(IMG_GEN, manifold_completions)` is the
 same sdk name registered under a second family, because some image models answer on the Chat
 Completions shape rather than on the Images API and the catalog says which by giving them
 `model_type = "img_gen"` while leaving them on the default completions sdk. And Claude has a token of
-its own, `pipelex_hosted_anthropic`, rather than the plain `anthropic` the open Anthropic plugin owns: it is
+its own, `manifold_anthropic`, rather than the plain `anthropic` the open Anthropic plugin owns: it is
 the same worker built with the package's extras factory, which is what adds the metadata header.
 """
 
@@ -35,13 +35,13 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 _EXPECTED_KEYS = {
-    (InferenceFamily.LLM, "pipelex_hosted_anthropic"),
-    (InferenceFamily.LLM, "pipelex_hosted_completions"),
-    (InferenceFamily.LLM, "pipelex_hosted_responses"),
-    (InferenceFamily.IMG_GEN, "pipelex_hosted_img_gen"),
-    (InferenceFamily.IMG_GEN, "pipelex_hosted_completions"),
-    (InferenceFamily.EXTRACT, "pipelex_hosted_extract"),
-    (InferenceFamily.SEARCH, "pipelex_hosted_search"),
+    (InferenceFamily.LLM, "manifold_anthropic"),
+    (InferenceFamily.LLM, "manifold_completions"),
+    (InferenceFamily.LLM, "manifold_responses"),
+    (InferenceFamily.IMG_GEN, "manifold_img_gen"),
+    (InferenceFamily.IMG_GEN, "manifold_completions"),
+    (InferenceFamily.EXTRACT, "manifold_extract"),
+    (InferenceFamily.SEARCH, "manifold_search"),
 }
 
 
@@ -68,20 +68,20 @@ class TestPipelexHostedPluginRegistrations:
 
         PipelexHostedPlugin().register(registrar)
 
-        assert all(sdk.startswith("pipelex_hosted_") for _, sdk in registrar.inference_backends)
+        assert all(sdk.startswith("manifold_") for _, sdk in registrar.inference_backends)
 
     def test_claude_is_built_with_the_metadata_extras_factory(self, mocker: MockerFixture) -> None:
         registrar = _registrar(mocker)
         PipelexHostedPlugin().register(registrar)
-        make_worker = registrar.inference_backends[InferenceFamily.LLM, "pipelex_hosted_anthropic"]
+        make_worker = registrar.inference_backends[InferenceFamily.LLM, "manifold_anthropic"]
         model = mocker.MagicMock()
-        model.sdk = "pipelex_hosted_anthropic"
+        model.sdk = "manifold_anthropic"
         model.max_tokens = 4096
         model.get_instructor_mode.return_value = None
-        backend = InferenceBackend(name="pipelex_hosted", endpoint="https://pipelex_hosted.example.com", api_key="token")
+        backend = InferenceBackend(name="pipelex_manifold", endpoint="https://pipelex_hosted.example.com", api_key="token")
         sdk_clients = mocker.MagicMock()
         sdk_clients.get_or_create.side_effect = _build_now
-        mocker.patch.object(ModelHandle, "make_for_inference_model", return_value=mocker.MagicMock(sdk="pipelex_hosted_anthropic"))
+        mocker.patch.object(ModelHandle, "make_for_inference_model", return_value=mocker.MagicMock(sdk="manifold_anthropic"))
 
         worker = make_worker(inference_model=model, backend=backend, sdk_clients=sdk_clients, reporting_delegate=None)
 

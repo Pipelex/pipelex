@@ -34,7 +34,7 @@ _TOKEN = "hosted-service-token"
 
 
 def _client() -> PipelexHostedNativeClient:
-    return PipelexHostedNativeClient(backend=InferenceBackend(name="pipelex_hosted", endpoint=_ORIGIN, api_key=_TOKEN))
+    return PipelexHostedNativeClient(backend=InferenceBackend(name="pipelex_manifold", endpoint=_ORIGIN, api_key=_TOKEN))
 
 
 def _inference_model(mocker: MockerFixture) -> Any:

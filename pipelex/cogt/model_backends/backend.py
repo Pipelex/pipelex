@@ -12,7 +12,7 @@ from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_lis
 class PipelexBackend(StrEnum):
     """Special Pipelex-managed inference backends."""
 
-    PIPELEX_HOSTED = "pipelex_hosted"
+    PIPELEX_HOSTED = "pipelex_manifold"
     INTERNAL = "internal"  # Software-only backend, runs locally without AI
 
     @property

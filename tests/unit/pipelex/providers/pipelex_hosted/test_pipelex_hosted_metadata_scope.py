@@ -106,7 +106,7 @@ class TestPipelexHostedMetadataScope:
         assert PIPELEX_HOSTED_METADATA_HEADER not in extra_headers
         assert "x-portkey-metadata" not in extra_headers
 
-    @pytest.mark.parametrize("backend_name", ["anthropic", "bedrock", "pipelex_hosted"])
+    @pytest.mark.parametrize("backend_name", ["anthropic", "bedrock", "pipelex_manifold"])
     async def test_a_plain_anthropic_worker_sends_no_headers_on_the_text_call(self, mocker: MockerFixture, backend_name: str) -> None:
         sdk_client = AsyncAnthropic(api_key="test-key")
         stream = mocker.MagicMock(side_effect=_RequestCapturedError)
@@ -118,7 +118,7 @@ class TestPipelexHostedMetadataScope:
 
         assert "extra_headers" not in stream.call_args.kwargs
 
-    @pytest.mark.parametrize("backend_name", ["anthropic", "pipelex_hosted"])
+    @pytest.mark.parametrize("backend_name", ["anthropic", "pipelex_manifold"])
     async def test_a_plain_anthropic_worker_sends_no_headers_on_the_structured_call(self, mocker: MockerFixture, backend_name: str) -> None:
         sdk_client = AsyncAnthropic(api_key="test-key")
         create = mocker.AsyncMock(return_value=_tool_call_message())

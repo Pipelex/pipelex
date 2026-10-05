@@ -111,11 +111,11 @@ class TestEachRegistrationPassesItsFormat:
     @pytest.mark.parametrize(
         ("plugin", "sdk", "expected"),
         [
-            (PipelexHostedPlugin(), "pipelex_hosted_completions", ImageFormat.PNG),
+            (PipelexHostedPlugin(), "manifold_completions", ImageFormat.PNG),
             (BlackboxaiPlugin(), "blackboxai_img_gen", ImageFormat.JPEG),
             (OpenRouterPlugin(), "openrouter_img_gen", None),
         ],
-        ids=["pipelex_hosted", "blackboxai", "openrouter"],
+        ids=["manifold", "blackboxai", "openrouter"],
     )
     def test_the_registration_builds_the_worker_with_its_format(
         self, mocker: MockerFixture, plugin: Any, sdk: str, expected: ImageFormat | None

@@ -67,10 +67,10 @@ def _make_worker(mocker: MockerFixture, *, worker_kind: str, rules: ImgGenModelR
             return OpenAIImgGenWorker(
                 sdk_instance=mocker.MagicMock(spec=AsyncOpenAI), inference_model=_model(backend_name="openai", sdk="openai_img_gen", rules=rules)
             )
-        case "pipelex_hosted":
+        case "manifold":
             return PipelexHostedImgGenWorker(
                 sdk_instance=mocker.MagicMock(spec=AsyncPortkey),
-                inference_model=_model(backend_name="pipelex_hosted", sdk="pipelex_hosted_img_gen", rules=rules),
+                inference_model=_model(backend_name="pipelex_manifold", sdk="manifold_img_gen", rules=rules),
             )
         case "fal":
             return FalImgGenWorker(
@@ -101,14 +101,14 @@ class TestImgGenWorkerConfigFaults:
         ("worker_kind", "rules", "error_match"),
         [
             ("openai", None, "does not have rules configured"),
-            ("pipelex_hosted", None, "does not have rules configured"),
+            ("manifold", None, "does not have rules configured"),
             ("fal", None, "does not have rules configured"),
             ("huggingface", None, "does not have rules configured"),
             ("azure", None, "does not have rules configured"),
             ("fal", PROMPT_ONLY_RULES, "must include a 'model_choice' entry"),
             ("huggingface", PROMPT_ONLY_RULES, "must include a 'model_choice' entry"),
             ("openai", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
-            ("pipelex_hosted", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
+            ("manifold", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
             ("azure", UNKNOWN_ASPECT_RATIO_RULES, "unknown aspect_ratio taxonomy 'gemini_9_turbo'"),
             ("openai", UNKNOWN_PROMPT_RULES, "unknown prompt taxonomy 'weird'"),
             ("fal", UNKNOWN_PROMPT_RULES, "unknown prompt taxonomy 'weird'"),

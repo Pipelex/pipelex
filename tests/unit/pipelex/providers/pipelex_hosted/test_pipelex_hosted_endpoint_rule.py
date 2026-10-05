@@ -8,8 +8,8 @@ a 200-shaped failure.
 
 **The absent-endpoint case is the one worth a test of its own.** The Portkey-path sibling reads
 `backend.endpoint or PORTKEY_GATEWAY_URL`, which is correct there — an unset endpoint means "use the
-vendor's cloud". The same line on this path would mean that an empty-resolving
-`PIPELEX_HOSTED_ENDPOINT` silently builds a client aimed at `api.portkey.ai` carrying the
+vendor's cloud". The same line on this path would mean that an endpoint that resolves empty
+silently builds a client aimed at `api.portkey.ai` carrying the
 *Pipelex* service token: a live billable request to the wrong vendor, with nothing anywhere
 reporting it. There is no symptom to notice, which is why the refusal is pinned here.
 """
@@ -27,7 +27,7 @@ _TOKEN = "hosted-service-token"
 
 
 def _backend(*, endpoint: str | None = _ORIGIN, api_key: str | None = _TOKEN) -> InferenceBackend:
-    return InferenceBackend(name="pipelex_hosted", endpoint=endpoint, api_key=api_key)
+    return InferenceBackend(name="pipelex_manifold", endpoint=endpoint, api_key=api_key)
 
 
 class TestPipelexHostedEndpointRule:
@@ -49,10 +49,10 @@ class TestPipelexHostedEndpointRule:
 
         # The vendor's cloud must appear nowhere in the outcome — neither as a value nor as a hint.
         assert "portkey" not in exc_info.value.message.lower()
-        assert "PIPELEX_HOSTED_ENDPOINT" in exc_info.value.message
+        assert "`endpoint`" in exc_info.value.message
 
     def test_an_absent_api_key_is_refused_by_name(self) -> None:
-        with pytest.raises(PipelexHostedCredentialsError, match="PIPELEX_HOSTED_API_KEY"):
+        with pytest.raises(PipelexHostedCredentialsError, match="`api_key`"):
             PipelexHostedFactory.get_api_key(_backend(api_key=None))
 
     def test_the_only_header_about_us_is_the_service_token(self) -> None:

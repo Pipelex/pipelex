@@ -7,7 +7,7 @@ established which SDK appends what.
 
 **There is no fallback endpoint, deliberately.** The Portkey-path sibling reads
 ``backend.endpoint or PORTKEY_GATEWAY_URL``, which is right there: an unset endpoint means "use the
-vendor's cloud". Copied here it would mean that an empty-resolving ``PIPELEX_HOSTED_ENDPOINT``
+vendor's cloud". Copied here it would mean that an endpoint that resolves empty
 silently builds a client aimed at ``api.portkey.ai`` carrying the *Pipelex* service token — a live
 billable request to the wrong vendor, with nothing anywhere reporting it. So an absent endpoint is a
 refusal, and the backend loader's own missing-variable path disables the backend with a named
@@ -49,7 +49,7 @@ class PipelexHostedFactory:
         if not endpoint:
             msg = (
                 f"Backend '{backend.name}' declares no endpoint for the Pipelex service. "
-                f"Set PIPELEX_HOSTED_ENDPOINT to the service origin (scheme, host and port, with no '/v1'). "
+                f"Set the backend's `endpoint` to the service origin (scheme, host and port, with no '/v1'). "
                 f"There is no default: a request built without one would reach a vendor this token is not for."
             )
             raise PipelexHostedEndpointError(msg)
@@ -63,7 +63,7 @@ class PipelexHostedFactory:
     @classmethod
     def get_api_key(cls, backend: InferenceBackend) -> str:
         if not backend.api_key:
-            msg = f"Backend '{backend.name}' carries no api_key for the Pipelex service; set PIPELEX_HOSTED_API_KEY"
+            msg = f"Backend '{backend.name}' carries no api_key for the Pipelex service; set the backend's `api_key`"
             raise PipelexHostedCredentialsError(msg)
         return backend.api_key
 

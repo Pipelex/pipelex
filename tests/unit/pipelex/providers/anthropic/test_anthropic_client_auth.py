@@ -62,7 +62,7 @@ class TestAnthropicClientAuth:
         _patch_config(mocker)
         mock_client = mocker.patch("pipelex.providers.anthropic.anthropic_factory.AsyncAnthropic")
         backend = InferenceBackend(
-            name="pipelex_hosted",
+            name="pipelex_manifold",
             endpoint=_PIPELEX_HOSTED_ORIGIN,
             api_key="hosted-service-token",
             extra_config={"auth_header": _PIPELEX_HOSTED_AUTH_HEADER},
@@ -82,7 +82,7 @@ class TestAnthropicClientAuth:
         _patch_config(mocker)
         mocker.patch("pipelex.providers.anthropic.anthropic_factory.AsyncAnthropic")
         backend = InferenceBackend(
-            name="pipelex_hosted",
+            name="pipelex_manifold",
             endpoint=_PIPELEX_HOSTED_ORIGIN,
             api_key=None,
             extra_config={"auth_header": _PIPELEX_HOSTED_AUTH_HEADER},

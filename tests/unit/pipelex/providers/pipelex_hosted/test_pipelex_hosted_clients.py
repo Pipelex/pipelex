@@ -42,11 +42,11 @@ _ROUTING_MARKERS = ("x-portkey-config", "x-portkey-provider", "x-portkey-virtual
 
 
 def _backend() -> InferenceBackend:
-    return InferenceBackend(name="pipelex_hosted", endpoint=_ORIGIN, api_key=_TOKEN)
+    return InferenceBackend(name="pipelex_manifold", endpoint=_ORIGIN, api_key=_TOKEN)
 
 
 def _handle(sdk: PipelexHostedSdk) -> ModelHandle:
-    return ModelHandle(sdk=str(sdk), backend="pipelex_hosted")
+    return ModelHandle(sdk=str(sdk), backend="pipelex_manifold")
 
 
 def _patch_config(mocker: MockerFixture, module: str) -> None:
@@ -131,7 +131,7 @@ class TestPipelexHostedImageClient:
         hosted one.
         """
         mocker.patch("portkey_ai.AsyncPortkey")
-        backend = InferenceBackend(name="pipelex_hosted", endpoint=_ORIGIN, api_key=_TOKEN, extra_config={"debug": True})
+        backend = InferenceBackend(name="pipelex_manifold", endpoint=_ORIGIN, api_key=_TOKEN, extra_config={"debug": True})
 
         assert PipelexHostedFactory.is_debug_enabled(backend) is True
         assert PipelexHostedFactory.is_debug_enabled(_backend()) is False
