@@ -156,6 +156,12 @@ model       = "no_such_model_anywhere"
 prompt      = "Orphan: $data"
 """
 
+    #: The same package with `entry` naming its helper through the package's own alias and no domain, `alias->helper`.
+    DEP_BUNDLE_CALLING_ITS_HELPER_BY_ALIAS: ClassVar[str] = DEP_BUNDLE.replace(
+        'steps       = [{ pipe = "helper", result = "helped" }]',
+        f'steps       = [{{ pipe = "{DEP_ALIAS}->helper", result = "helped" }}]',
+    )
+
     #: A consumer whose sequence calls the package's entry.
     CONSUMER_BUNDLE: ClassVar[str] = """domain      = "probe_consumer"
 description = "A consumer of the invented probe package"
@@ -179,6 +185,18 @@ description = "CONSUMER helper"
 inputs      = { data = "Text" }
 output      = "Text"
 prompt      = "CONSUMER helper: $data"
+"""
+
+    #: A consumer pipe of the dependency's own `domain.code`, `probe_dep.entry`, wrapping the dependency's entry.
+    CONSUMER_ENTRY_WRAPPING_THE_DEPENDENCY_BUNDLE: ClassVar[str] = """domain      = "probe_dep"
+description = "The consumer's own entry, in a domain named like the dependency's"
+
+[pipe.entry]
+type        = "PipeSequence"
+description = "Wrap the dependency's entry of the same domain and code"
+inputs      = { data = "Text" }
+output      = "Text"
+steps       = [{ pipe = "github.com/invented/probe-lib/probe->probe_dep.entry", result = "out" }]
 """
 
     @classmethod

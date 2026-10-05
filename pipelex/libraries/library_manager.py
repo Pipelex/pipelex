@@ -137,7 +137,7 @@ def _public_dependency_pipe_refs(*, resolved_dep: ResolvedDependency, blueprints
     return public_pipe_refs
 
 
-def _reachable_dependency_pipe_refs(
+def reachable_dependency_pipe_refs(
     *, public_pipe_refs: set[str], qualified_pipes: "Mapping[str, PipeBlueprintUnion]", package_alias: str
 ) -> set[str]:
     """The `domain.code` of every pipe of a dependency its public pipes reach through the package's own references.
@@ -145,7 +145,8 @@ def _reachable_dependency_pipe_refs(
     The pipes are the package's qualified blueprints, whose in-package refs carry `package_alias`. A public pipe's
     private helpers, a build-time elaboration's synthetic helpers among them, travel with it; a private pipe nothing
     public reaches is left out. A ref to another package, or to a pipe the package does not declare, is not followed:
-    validation reports the latter.
+    validation reports the latter. A ref written `alias->code`, with no domain, is followed to every pipe of that code,
+    since lookup resolves it by code within the package and reports the ambiguity when more than one matches.
     """
     reachable: set[str] = set()
     pending = [pipe_ref for pipe_ref in public_pipe_refs if pipe_ref in qualified_pipes]
@@ -158,8 +159,13 @@ def _reachable_dependency_pipe_refs(
             if not QualifiedRef.has_cross_package_prefix(dependency_ref):
                 continue
             ref_alias, in_package_ref = QualifiedRef.split_cross_package_ref(dependency_ref)
-            if ref_alias == package_alias and in_package_ref in qualified_pipes:
-                pending.append(in_package_ref)
+            if ref_alias != package_alias:
+                continue
+            if "." in in_package_ref:
+                if in_package_ref in qualified_pipes:
+                    pending.append(in_package_ref)
+            else:
+                pending.extend(candidate for candidate in qualified_pipes if candidate.rsplit(".", 1)[-1] == in_package_ref)
     return reachable
 
 
@@ -1324,7 +1330,7 @@ class LibraryManager(LibraryManagerAbstract):
             if public_pipe_refs is None:
                 loaded_pipe_refs = set(qualified_dep_pipes)
             else:
-                loaded_pipe_refs = _reachable_dependency_pipe_refs(
+                loaded_pipe_refs = reachable_dependency_pipe_refs(
                     public_pipe_refs=public_pipe_refs, qualified_pipes=qualified_dep_pipes, package_alias=alias
                 )
             for pipe_ref, pipe_blueprint in qualified_dep_pipes.items():
