@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`InferenceBackendLibrary.load` takes `credentials` (Breaking)**: its `lenient` flag is replaced by `credentials: CredentialResolution`, `REQUIRE` or `SKIP`. A backend a `SKIP` load built records what it left unresolved in `InferenceBackend.unresolved_credentials`, and `ModelManager.get_required_inference_backend` refuses it with an `InferenceBackendCredentialsError` of type `not_resolved_on_keyless_boot` that names the variables.
+- **A routing profile naming a disabled backend is refused on every boot (Breaking)**: a boot without inference, such as `pipelex validate`, now refuses a routing profile whose default or routes name a backend that is not enabled, as a boot with inference already did, and `load_active_routing_profile` loses its `lenient` argument.
+- **`pipelex show backends` lists every backend with its credential variables**: a backend whose key is unset is listed instead of hidden, a new column names the variables each backend reads its credentials from, and an endpoint read from a variable is shown as not resolved.
+
+### Fixed
+
+- **Validation and dry runs no longer depend on which keys the machine holds**: a boot without inference (`Pipelex.make(needs_inference=False)`, used by `pipelex validate`, `pipelex run --dry-run`, `pipelex show` and the agent CLI's validation) now loads every enabled backend with its models and constraints and resolves none of their credentials, where it dropped every backend whose key was missing. A method using a search preset or pinning a bare handle such as `model = "gpt-4o-mini"` now validates on a machine or CI runner with no key, and such a boot no longer reads the backends' keys or requests a Vertex AI token.
+- **Linkup uses the key its backend names**: the Linkup search and fetch workers take the key from the `[linkup]` table's `api_key`, like every other provider, where they read `LINKUP_API_KEY` themselves and ignored a configuration naming another variable. A Linkup backend with no `api_key` is refused with `LinkupError` when its worker is built.
+
 ## [v0.74.1] - 2026-10-05
 
 ### Added

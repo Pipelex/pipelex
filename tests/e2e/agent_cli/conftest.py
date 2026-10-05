@@ -82,21 +82,19 @@ def offline_subprocess_env(hermetic_home: Path) -> dict[str, str]:
     """Base subprocess env that points the CLI at the hermetic HOME.
 
     Tests extend this dict before passing it to ``subprocess.run``. Dummy credentials are
-    populated for every backend that the kit's ``backends.toml`` references so the dry-run
-    setup doesn't fail with ``InferenceBackendCredentialsError`` for backends we don't care
-    about — under ``needs_inference=False`` Pipelex is lenient on credential validation, but
-    only at the resolution layer; the env-var substitution itself still requires the var to
-    exist.
+    populated for every backend that the kit's ``backends.toml`` references. A dry run or a
+    validation boots without inference and resolves none of them, so it needs none; they are here
+    for the commands that check credentials, ``pipelex doctor`` above all, whose report and prompts
+    must not depend on which keys the developer's shell happens to hold.
     """
     env: dict[str, str] = {
         "HOME": str(hermetic_home),
         "PATH": "/usr/bin:/bin:/usr/local/bin",
         # Force CI test mode so vertexai is skipped.
         "RUN_MODE": "ci_test",
-        # Dummy credentials — the test never makes a real provider call (dry-run only) and
-        # ``lenient=True`` (set by ``--dry-run``) skips backends whose env vars are missing
-        # rather than raising. We populate every key so backend loading is deterministic
-        # regardless of the developer's shell environment.
+        # Dummy credentials — no test makes a real provider call. A keyless boot (a dry run, a
+        # validation) reads none of them; the doctor does, and with a key missing it would prompt
+        # for it before anything else.
         "ANTHROPIC_API_KEY": "dummy-anthropic-key",
         "AWS_REGION": "us-east-1",
         "AZURE_API_BASE": "https://example.invalid",

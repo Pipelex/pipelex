@@ -183,5 +183,5 @@ class TestKeylessBootModelMetadata:
         override_path.parent.mkdir(parents=True)
         override_path.write_text('active = "all_vertexai"\n')
 
-        with pytest.raises(PipelexSetupError, match="'vertexai'.*is not enabled"):
+        with pytest.raises(PipelexSetupError, match=r"'vertexai'.*is not enabled"):
             _boot(needs_inference=needs_inference, secrets_provider=RecordingSecretsProvider.make_credentialed())
