@@ -131,11 +131,7 @@ Anything that names no caller of its own keeps reporting under the `user_id` you
 
 The extras do not depend on that. A run that leaves `user_id` at its default still carries its `extras` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
 
-The extras also travel with the run's inference calls when they go through Pipelex Manifold. Every request the Manifold backend makes carries one `x-pipelex-metadata` header: a flat JSON object holding the run's extras as they are, plus the run's `user_id` and `pipeline_run_id` and the step's `pipe_run_id`, `pipe_code` and `content_generation_job_id` when it has them, so the service can attribute and log each call. If an extras key has the same name as one of those ids, the run's own value is the one sent, since the extras are yours to set and must not be able to restate whose run it is. No other backend receives this header: a provider you reach directly with your own key gets none of your labels.
-
-```text
-x-pipelex-metadata: {"org_id":"org_acme","user_id":"user_42","pipeline_run_id":"run_abc","pipe_run_id":"0123456789abcdef","pipe_code":"summarize_doc"}
-```
+The extras are also available to the inference workers, on the job metadata of every call. None of the backends Pipelex ships sends them anywhere: a provider you reach directly with your own key gets none of your labels. An inference backend plugin of your own may forward them to a service you operate, for instance so that it can attribute each call's spend, and if it does, the run's own ids should win over an extras key of the same name, since the extras are caller data and must not be able to restate whose run it is.
 
 ### Work that is not a run, and crashes
 

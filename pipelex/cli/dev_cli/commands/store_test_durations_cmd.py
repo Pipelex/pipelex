@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
+import tempfile
 from pathlib import Path
 
 from rich.markup import escape
@@ -90,9 +91,15 @@ def _run_and_store(*, markers: str, node_ids: list[str] | None) -> int:
         "-m",
         markers,
     ]
-    if node_ids is not None:
-        extra.extend(node_ids)
-    return subprocess.run(_pytest_command(extra=extra), check=False).returncode  # ruff: ignore[subprocess-without-shell-equals-true]
+    if node_ids is None:
+        return subprocess.run(_pytest_command(extra=extra), check=False).returncode  # ruff: ignore[subprocess-without-shell-equals-true]
+    # The node ids go through pytest's `@file` argument rather than argv: a refresh after a large
+    # change misses well over a thousand parametrized ids, which overflows the OS argument limit.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        args_file = Path(tmp_dir) / "node_ids.txt"
+        args_file.write_text("\n".join(node_ids) + "\n", encoding="utf-8")
+        extra.append(f"@{args_file}")
+        return subprocess.run(_pytest_command(extra=extra), check=False).returncode  # ruff: ignore[subprocess-without-shell-equals-true]
 
 
 def store_test_durations_cmd(*, markers: str, force: bool = False, quiet: bool = False) -> None:

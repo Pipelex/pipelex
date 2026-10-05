@@ -50,7 +50,6 @@ from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.pipe_run.exceptions import PipeRouterError
-from pipelex.providers.manifold.manifold_error_metadata import extract_manifold_metadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
@@ -120,13 +119,6 @@ def _as_the_anthropic_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -
     return client._make_status_error_from_response(response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
 
-def _as_plain_httpx_raises_it(*, status_code: int, body: dict[str, Any]) -> BaseException:
-    """The Manifold service's native ``/v1/pipelex/*`` routes, which the runtime calls over plain ``httpx``."""
-    request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
-    response = httpx.Response(status_code=status_code, request=request, json=body)
-    return httpx.HTTPStatusError(f"Client error '{status_code}'", request=request, response=response)
-
-
 def _envelope(code: str | None, *, status_code: int = 412, provider: ProviderName = ProviderName.GATEWAY) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=provider,
@@ -167,7 +159,7 @@ class TestTheCodeIsRecognized:
 
     @pytest.mark.parametrize(
         "code",
-        [None, "pig-01", "invalid_request_error", "model_not_found", "model_not_allowed", "MODEL_NOT_ALLOWED_ERROR", ""],
+        [None, "rate_limit_exceeded", "invalid_request_error", "model_not_found", "model_not_allowed", "MODEL_NOT_ALLOWED_ERROR", ""],
     )
     def test_any_other_code_is_not_a_model_not_allowed_refusal(self, code: str | None) -> None:
         assert _envelope(code).is_model_not_allowed is False
@@ -185,7 +177,6 @@ class TestTheCodeSurvivesEveryExtractHop:
             pytest.param(_as_the_openai_sdk_raises_it, extract_openai_metadata, id="openai-substrate"),
             pytest.param(_as_the_anthropic_sdk_raises_it, extract_anthropic_metadata, id="anthropic-driver"),
             pytest.param(_as_the_portkey_sdk_raises_it, extract_gateway_metadata, id="portkey-substrate"),
-            pytest.param(_as_plain_httpx_raises_it, extract_manifold_metadata, id="native-routes-httpx"),
         ],
     )
     def test_the_refusal_through_every_hop(
@@ -195,9 +186,7 @@ class TestTheCodeSurvivesEveryExtractHop:
     ) -> None:
         """The substrate's own envelope, at 412, through each SDK's own factory.
 
-        Its code sits in ``type`` with ``code`` null. The two vendor-facing hops read
-        ``type`` first; the two Pipelex-service hops read ``code`` first and fall back
-        to ``type``, which is the fallback this case exercises.
+        Its code sits in ``type`` with ``code`` null, so every hop must find it there.
         """
         exc = raise_it(status_code=412, body=_MODEL_NOT_ALLOWED_BODY)
 

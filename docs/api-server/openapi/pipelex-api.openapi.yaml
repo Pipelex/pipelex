@@ -11,7 +11,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.73.0
+  version: 0.74.0
 paths:
   /health:
     get:
@@ -5521,6 +5521,7 @@ components:
       - native_concept_redeclaration
       - unresolved_concept
       - unresolved_pipe_dependency
+      - unexported_pipe_dependency
       - unknown_model
       - unknown_validation_error
       title: PipeValidationErrorType

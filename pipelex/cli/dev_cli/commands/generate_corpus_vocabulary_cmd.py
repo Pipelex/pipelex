@@ -157,6 +157,13 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "a caller — so there is no `expected_error` an entry could carry. Revisit if the manifest ever grows a "
         "warnings axis."
     ),
+    PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY: (
+        "It refuses a reference to a pipe an installed dependency package loads but does not export, so the "
+        "bundle that produces it needs that package installed beside it, with a manifest declaring `[exports]`. "
+        "A focused entry is one self-contained bundle validated where nothing is installed, and an "
+        "address-based reference to a package that is not installed fails as a missing method instead. "
+        "Revisit if an entry can ever carry the packages it depends on."
+    ),
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_INAPPLICABLE_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,

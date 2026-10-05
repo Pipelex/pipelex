@@ -57,8 +57,8 @@ The `[exports]` section controls which pipes are visible outside the package.
 
 ### Default Behavior
 
-- **Without `METHODS.toml`**: local bundles are still available to your project
-- **With `METHODS.toml`**: pipes are private by default — only pipes listed in `[exports]` (and each bundle's `main_pipe`) are visible from outside
+- **Without `METHODS.toml`, or with one that declares no `[exports]`**: every pipe of the package is visible from outside
+- **With an `[exports]` section**: pipes are private by default — only the pipes listed in `[exports]` (and each bundle's `main_pipe`) are visible from outside
 
 ### Declaring Exports
 
@@ -72,7 +72,26 @@ pipes = ["extract_clause", "analyze_contract"]
 pipes = ["compute_weighted_score"]
 ```
 
-This manifest exports two pipes from `legal.contracts` and one pipe from `scoring`.
+This manifest exports two pipes from `legal.contracts` and one pipe from `scoring`. Exports are read by domain: exporting `compute_weighted_score` from `scoring` does not export a pipe of the same name declared in another domain of the package.
+
+### Pipes Call Their Own Package
+
+Inside a package, a pipe calls the package's own pipes, private ones included. A sequence exported by the package can call a helper the manifest does not export, and that helper is loaded with it. A private pipe that no exported pipe calls is not loaded at all, so a problem in it never stops a consumer from loading the package.
+
+A reference written inside a package always reaches that package's pipe. If the consumer declares a pipe with the same domain and code, or another loaded package does, the package's own call is never redirected to it.
+
+### What a Consumer Is Refused
+
+When a consumer references a loaded package, two mistakes are refused when the consumer loads, rather than surfacing later as an unrelated error:
+
+- **A pipe the package does not have** is refused as an unresolved pipe dependency (`unresolved_pipe_dependency`), naming the reference and the package. The same refusal names the error when the package declares the pipe but it failed to build.
+- **A pipe the package does not export** is refused as an unexported pipe dependency (`unexported_pipe_dependency`). The pipe exists, so the remedy is to call one of the package's exported pipes, or to export this one in the package's manifest.
+
+These checks apply to the consumer's references and to a package's references to its own pipes. A package's reference to one of its own dependencies is not checked when the consumer loads, because a package's dependencies are not loaded with it.
+
+A reference by bare code, `alias->code`, ignores the package's private pipes when it also matches an exported one, so a private helper sharing an exported pipe's code in another domain does not make the reference ambiguous.
+
+Naming a private pipe by hand, as the pipe to run at the command line or in an API request, is not a reference from inside a method, so `[exports]` does not apply to it: a loaded private pipe can be run that way by its `alias->domain.code`.
 
 ## Cross-Package References
 

@@ -93,6 +93,9 @@ class PipeValidationErrorType(StrEnum):
     # merged library (a referenced concept or dependency pipe does not resolve).
     UNRESOLVED_CONCEPT = "unresolved_concept"
     UNRESOLVED_PIPE_DEPENDENCY = "unresolved_pipe_dependency"
+    # A reference from outside a dependency package to a pipe the package loads but does not export: the pipe
+    # exists, so the remedy is to export it in the package or to call one of its public pipes.
+    UNEXPORTED_PIPE_DEPENDENCY = "unexported_pipe_dependency"
 
     # A pipe's model field names a handle, alias, preset or waterfall its model deck does not define,
     # refused when the pipe is built. The item carries the field's path, the reference as written, the
@@ -131,6 +134,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
@@ -162,6 +166,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
@@ -200,6 +205,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
@@ -232,6 +238,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
@@ -269,6 +276,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
@@ -302,6 +310,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False

@@ -287,9 +287,9 @@ def _resolve_model_specs(*, model_reference: str, model_type: ModelType, visited
 
 def _visit(*, pipe: PipeAbstract, frame: _Frame, is_conditional: bool, visiting: frozenset[str], consumers: list[FileInputConsumer]) -> None:
     """Visit one pipe with the frame of tracked variables it sees, recording the consumers it holds."""
-    if pipe.pipe_ref in visiting or not frame:
+    if pipe.visit_key in visiting or not frame:
         return
-    visiting |= {pipe.pipe_ref}
+    visiting |= {pipe.visit_key}
     if isinstance(pipe, PipeSequence):
         _visit_sequence(sequence=pipe, frame=frame, is_conditional=is_conditional, visiting=visiting, consumers=consumers)
     elif isinstance(pipe, PipeParallel):
@@ -371,9 +371,9 @@ def _pipe_writes(*, pipe: PipeAbstract, visiting: frozenset[str]) -> _Writes:
     only its branch results, when it adds each of them. A batch runs on copies. An operator writes
     only its result.
     """
-    if pipe.pipe_ref in visiting:
+    if pipe.visit_key in visiting:
         return _NO_WRITES
-    visiting |= {pipe.pipe_ref}
+    visiting |= {pipe.visit_key}
     if isinstance(pipe, PipeSequence):
         return _merge_writes(
             writes=[

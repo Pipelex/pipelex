@@ -168,7 +168,7 @@ class RunMetadata(BaseModel):
 
     # The opaque labels the host attaches to this run. Never read by name;
     # telemetry forwards the whole mapping as the groups of each capture, and
-    # the Manifold dialect forwards it in its `x-pipelex-metadata` header
+    # an inference backend plugin may forward it to the service it calls
     # — see `pipelex.system.run_extras` for why the host's own concepts
     # (organization, tenant, plan tier) deliberately do not cross this boundary,
     # and for the charset and the size bound.

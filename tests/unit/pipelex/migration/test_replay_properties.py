@@ -45,6 +45,9 @@ PROPERTY_SETTINGS = settings(max_examples=MAX_EXAMPLES, deadline=None)
 """Bounded on purpose. `deadline=None` because these run under `xdist`, where a per-example
 wall-clock deadline measures machine contention rather than anything about the engine."""
 
+FIND_SETTINGS = settings(max_examples=2000, deadline=None)
+"""`find`'s own search budget, with the deadline off for the same reason as `PROPERTY_SETTINGS`."""
+
 REAL_SURFACES = build_config_surface_registry().surfaces
 REAL_SURFACE_IDS = [surface.surface_id for surface in REAL_SURFACES]
 
@@ -214,7 +217,7 @@ class TestTheReplayProperties:
     @pytest.mark.parametrize("surface", REAL_SURFACES, ids=REAL_SURFACE_IDS)
     def test_the_generator_does_not_merely_re_emit_the_reference_document(self, surface: Surface) -> None:
         """The other direction of vacuity. A sampler of one document satisfies every property."""
-        found = find(_documents_for(surface=surface), lambda generated: bool(generated.mutations))
+        found = find(_documents_for(surface=surface), lambda generated: bool(generated.mutations), settings=FIND_SETTINGS)
 
         assert found.mutations
 
@@ -240,7 +243,7 @@ class TestTheReplayProperties:
         Asking it of the real surfaces would couple this test to whichever fields they happen to
         have today, and the service surface has no enumerated field at all.
         """
-        found = find(_documents_for(surface=SYNTHETIC_SURFACE), lambda generated: mutation in generated.mutations)
+        found = find(_documents_for(surface=SYNTHETIC_SURFACE), lambda generated: mutation in generated.mutations, settings=FIND_SETTINGS)
 
         assert mutation in found.mutations
 
@@ -284,7 +287,11 @@ class TestTheReplayProperties:
         the injector ever stopped injecting, both properties would stay green over a sampler of
         documents the ledger never touches.
         """
-        found = find(_documents_at_an_older_shape(), lambda text: replay_ledger_over_text(ledger=SYNTHETIC_LEDGER, text=text).did_change_document)
+        found = find(
+            _documents_at_an_older_shape(),
+            lambda text: replay_ledger_over_text(ledger=SYNTHETIC_LEDGER, text=text).did_change_document,
+            settings=FIND_SETTINGS,
+        )
 
         assert replay_ledger_over_text(ledger=SYNTHETIC_LEDGER, text=found).did_change_document
 
@@ -301,7 +308,7 @@ class TestTheReplayProperties:
             applied = [op for step in replay.steps for op in step.applied_ops]
             return not replay.blocked and any(isinstance(op, RenameTableKeyOp) for op in applied) and any(isinstance(op, MoveKeyOp) for op in applied)
 
-        found = find(_documents_at_an_older_shape(), rename_and_move_applied)
+        found = find(_documents_at_an_older_shape(), rename_and_move_applied, settings=FIND_SETTINGS)
 
         assert rename_and_move_applied(found)
 
@@ -346,5 +353,6 @@ class TestTheReplayProperties:
         found = find(
             _documents_for(surface=SYNTHETIC_SURFACE),
             lambda generated: replay_ledger_over_text(ledger=illegal, text=generated.text).text != generated.text,
+            settings=FIND_SETTINGS,
         )
         assert DocumentMutation.SWAPPED_ENUM_MEMBER in found.mutations
