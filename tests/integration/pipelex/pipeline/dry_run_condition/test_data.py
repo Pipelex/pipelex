@@ -462,3 +462,61 @@ inputs = { verdict = "Text", follow_up = "Anything" }
 output = "Text"
 prompt = "Assemble $verdict and $follow_up"
 """
+
+    # A condition run as a batch's branch: the batch gives the branch its stuff code, so both
+    # outcomes mint the same digest and nothing is merged, but they write a Number and a Text, so
+    # the condition's `Anything` must still type the stuff.
+    BATCH_BRANCH_CONDITION_MTHDS: ClassVar[str] = """
+domain = "dry_condition_batch_branch"
+description = "A batch whose branch is a condition with differing outcomes"
+main_pipe = "screen"
+
+[pipe.screen]
+type = "PipeSequence"
+description = "Screen topics"
+inputs = { topics = "Text[]" }
+output = "Text"
+steps = [
+  { pipe = "route_each", result = "follow_ups" },
+  { pipe = "assemble", result = "result" },
+]
+
+[pipe.route_each]
+type = "PipeBatch"
+description = "Route each topic"
+inputs = { topics = "Text[]" }
+output = "Anything[]"
+branch_pipe_code = "route"
+input_list_name = "topics"
+input_item_name = "topic"
+
+[pipe.route]
+type = "PipeCondition"
+description = "Score or summarize one topic"
+inputs = { topic = "Text" }
+output = "Anything"
+expression = "topic"
+outcomes = { numeric = "score_topic" }
+default_outcome = "summarize_topic"
+
+[pipe.score_topic]
+type = "PipeLLM"
+description = "Score the topic"
+inputs = { topic = "Text" }
+output = "Number"
+prompt = "Score $topic"
+
+[pipe.summarize_topic]
+type = "PipeLLM"
+description = "Summarize the topic"
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Summarize $topic"
+
+[pipe.assemble]
+type = "PipeLLM"
+description = "Assemble the follow-ups"
+inputs = { follow_ups = "Anything[]" }
+output = "Text"
+prompt = "Assemble $follow_ups"
+"""

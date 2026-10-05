@@ -555,7 +555,9 @@ class PipeCondition(PipeController):
         merged outcomes write or declare different concepts or multiplicities, the shared stuff is
         typed by this condition's declared output, the one typing that covers them all. The
         declarations count because an outcome's stuff can stand for several: a nested condition
-        hands back only its last outcome's stuff, while its declaration covers all of them.
+        hands back only its last outcome's stuff, while its declaration covers all of them. A
+        record carrying a typing and no merged digest is still left when the outcomes already
+        share the stuff code, as under a batch that gives its branch its own stuff code.
 
         Args:
             job_metadata: The condition's job metadata, whose trace context names its graph node.
@@ -573,14 +575,17 @@ class PipeCondition(PipeController):
         shared_stuff = shared_slot.stuff
         if shared_stuff is None or shared_stuff.stuff_code in received_stuff_codes:
             return
-        merged_stuffs: dict[str, DryRunOutcomeSlot] = {}
-        for slot in outcome_slots[:-1]:
-            if slot.stuff is not None and slot.stuff.stuff_code not in received_stuff_codes and slot.stuff.stuff_code != shared_stuff.stuff_code:
-                merged_stuffs[slot.stuff.stuff_code] = slot
-        if not merged_stuffs:
+        # The outcomes that wrote a stuff minted inside the condition. Their stuffs can already carry
+        # the shared digest: a condition run as a batch's branch is given the branch's stuff code,
+        # which every outcome mints under, so only the typing is left to record.
+        merging_slots = [slot for slot in outcome_slots[:-1] if slot.stuff is not None and slot.stuff.stuff_code not in received_stuff_codes]
+        if not merging_slots:
             return
+        merging_slots.append(shared_slot)
+        merged_digests = sorted(
+            {slot.stuff.stuff_code for slot in merging_slots if slot.stuff is not None and slot.stuff.stuff_code != shared_stuff.stuff_code}
+        )
 
-        merging_slots = [*merged_stuffs.values(), shared_slot]
         shared_typing: ConditionOutputTyping | None = None
         if len({slot.written_typing for slot in merging_slots}) > 1 or len({slot.declared_typing for slot in merging_slots}) > 1:
             multiplicity_resolution = output_multiplicity_to_apply(
@@ -592,12 +597,15 @@ class PipeCondition(PipeController):
                 multiplicity=True if multiplicity_resolution.is_multiple_outputs_enabled else None,
             )
 
+        if not merged_digests and shared_typing is None:
+            return
+
         tracer_manager.register_condition_output_merge(
             lookup_key=trace_context.lookup_key,
             merge=ConditionOutputMerge(
                 condition_node_id=trace_context.parent_node_id,
                 shared_digest=shared_stuff.stuff_code,
-                merged_digests=sorted(merged_stuffs),
+                merged_digests=merged_digests,
                 shared_typing=shared_typing,
             ),
         )

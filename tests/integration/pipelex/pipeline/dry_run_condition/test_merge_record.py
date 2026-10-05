@@ -117,6 +117,28 @@ class TestDryRunConditionMergeRecord:
         [merge] = self._recorded_merges(tracer_manager)
         assert merge.shared_typing == ConditionOutputTyping(concept="Text", multiplicity=True)
 
+    def test_outcomes_sharing_one_stuff_code_still_carry_the_declared_typing(self, route: PipeCondition, tracer_manager: MockType) -> None:
+        """Run as a batch's branch, every outcome mints under the branch's stuff code: nothing to merge, a typing to record."""
+        branch_stuff = _text_stuff(text="branch")
+
+        self._register(route=route, received=[], outcome_slots=[_slot(branch_stuff, declared_concept="Number"), _slot(branch_stuff)])
+
+        assert self._recorded_merges(tracer_manager) == [
+            ConditionOutputMerge(
+                condition_node_id=_CONDITION_NODE_ID,
+                shared_digest=branch_stuff.stuff_code,
+                merged_digests=[],
+                shared_typing=ConditionOutputTyping(concept="Text", multiplicity=None),
+            )
+        ]
+
+    def test_outcomes_sharing_one_stuff_code_and_agreeing_record_nothing(self, route: PipeCondition, tracer_manager: MockType) -> None:
+        branch_stuff = _text_stuff(text="branch")
+
+        self._register(route=route, received=[], outcome_slots=[_slot(branch_stuff), _slot(branch_stuff)])
+
+        assert self._recorded_merges(tracer_manager) == []
+
     def test_a_received_stuff_is_never_merged(self, route: PipeCondition, tracer_manager: MockType) -> None:
         """An outcome handing back a stuff it was given would drag that stuff's producer into the result."""
         cv, rejection = _text_stuff(text="cv"), _text_stuff(text="rejection")

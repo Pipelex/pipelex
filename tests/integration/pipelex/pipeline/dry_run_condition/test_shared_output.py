@@ -140,6 +140,21 @@ class TestDryRunConditionSharedOutput:
         assert analysis.shared_stuff_controllers == {shared_digest: node_by_code(graph_spec, "outer").node_id}
         assert analysis.stuff_registry[shared_digest].concept == "Anything"
 
+    async def test_a_condition_run_as_a_batch_branch_types_its_stuff_by_the_declaration(self) -> None:
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.BATCH_BRANCH_CONDITION_MTHDS])
+
+        analysis = GraphAnalysis.from_graphspec(graph_spec)
+        route_nodes = nodes_by_code(graph_spec, "route")
+        assert route_nodes, "the batch runs its condition branch"
+        for route_node in route_nodes:
+            branch_output = only_output(route_node)
+            assert branch_output.digest is not None
+            # Both outcomes already write the branch's stuff code; only the typing had to move.
+            producer_codes = {analysis.nodes_by_id[node_id].pipe_code for node_id in analysis.get_producers(branch_output.digest)}
+            assert producer_codes == {"score_topic", "summarize_topic"}
+            assert branch_output.concept == "Anything"
+            assert analysis.stuff_registry[branch_output.digest].concept == "Anything"
+
     async def test_a_parallel_outcome_writes_the_stuff_its_condition_owns(self) -> None:
         graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.PARALLEL_OUTCOME_MTHDS])
 
