@@ -13,6 +13,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeKind, NodeSpec
 from pipelex.interpreter_hub import get_library_manager
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
@@ -143,6 +144,30 @@ description = "Prices every line of an order"
 inputs = { order = "Order", currency = "Text" }
 output = "Text[]"
 """
+
+
+def _nested_binding_bundle(*, featured_lines_name: str) -> str:
+    """A sequence storing the index lines of the featured pages under a name, then calling `index_pages`, which binds
+    `catalog.pages` in the same working memory, then copying the featured lines it batches over by that name.
+    """
+    return _SINGLE_ROOT_BUNDLE.replace('main_pipe = "index_pages"', 'main_pipe = "index_featured"') + (
+        "\n[pipe.copy_line]\n"
+        'type = "PipeCompose"\n'
+        'description = "Copies a line"\n'
+        'inputs = { line = "Text" }\n'
+        'output = "Text"\n'
+        'template = "Copy of $line"\n'
+        "\n[pipe.index_featured]\n"
+        'type = "PipeSequence"\n'
+        'description = "Indexes the featured pages and the catalog, then copies the featured lines"\n'
+        'inputs = { catalog = "Catalog", featured = "Catalog" }\n'
+        'output = "Text[]"\n'
+        "steps = [\n"
+        f'  {{ pipe = "write_index_line", batch_over = "featured.pages", batch_as = "page", result = "{featured_lines_name}" }},\n'
+        '  { pipe = "index_pages", result = "index_lines" },\n'
+        f'  {{ pipe = "copy_line", batch_over = "{featured_lines_name}", batch_as = "line", result = "featured_lines" }},\n'
+        "]\n"
+    )
 
 
 def _load_sequence(*, mthds_content: str, library_id: str, pipe_code: str) -> PipeSequence:
@@ -413,20 +438,60 @@ class TestDottedBatchOver:
         lines = [item.text for item in response.pipe_output.main_stuff_as_items(item_type=TextContent)]
         assert lines == ["Copy of Page: Garden chairs", "Copy of Page: Parasols"]
 
-    async def test_a_private_name_never_takes_a_name_of_the_sequence(self, load_empty_library: Callable[[], str]) -> None:
-        """A pipe step may store under any name, an underscore-led one included, so the private name steps aside from it."""
-        taken_name = f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages"
+    async def test_two_dotted_batch_overs_of_one_path_take_two_private_names(self, load_empty_library: Callable[[], str]) -> None:
         mthds_content = _catalog_bundle(
             inputs='{ catalog = "Catalog" }',
             steps=[
-                f'{{ pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "{taken_name}" }}',
+                '{ pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "first_lines" }',
                 '{ pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "index_lines" }',
             ],
         )
         sequence = _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="index_pages")
 
         private_names = [step.output_name for step in sequence.sequential_sub_pipes if isinstance(step, BindingStep)]
-        assert private_names == [f"{taken_name}_2", f"{taken_name}_3"]
+        private_name = f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages"
+        assert private_names == [private_name, f"{private_name}_2"]
+
+    async def test_a_caller_never_stores_under_the_name_a_nested_sequence_binds(self) -> None:
+        """Regression: a nested sequence binds in its caller's working memory, so a caller's step storing its `result` under
+        `_bound_catalog_pages` had it overwritten by the pages a nested `batch_over = "catalog.pages"` binds, and a later step
+        batching over that name read the catalog's pages in place of the featured lines. The `_bound_` prefix is the runtime's.
+        """
+        reserved_name = f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages"
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(
+                mthds_content=_nested_binding_bundle(featured_lines_name=reserved_name),
+                mthds_source="flow.mthds",
+            )
+
+        errors = exc_info.value.validation_errors
+        assert {error.error_type for error in errors} == {PipeValidationErrorType.INVALID_INPUT_NAME}
+        assert {error.pipe_code for error in errors} == {"index_featured"}
+        result_refusals = [error for error in errors if "The `result` of the step running pipe 'write_index_line'" in error.message]
+        assert len(result_refusals) == 1
+        assert result_refusals[0].variable_names == [reserved_name]
+        assert (
+            f"'{reserved_name}', takes the `_bound_` prefix, which is reserved for the bound list of a dotted `batch_over`"
+            in result_refusals[0].message
+        )
+        assert "Choose another name, such as 'catalog_pages'." in result_refusals[0].message
+
+    async def test_a_caller_name_outside_the_prefix_keeps_its_value_across_a_nested_binding(self) -> None:
+        response = await _index_lines(
+            mthds_content=_nested_binding_bundle(featured_lines_name="featured_index_lines"),
+            inputs={
+                "catalog": {"concept": "catalog_index.Catalog", "content": _SPRING_CATALOG},
+                "featured": {"concept": "catalog_index.Catalog", "content": _SUMMER_CATALOG},
+            },
+        )
+
+        featured_lines = [item.text for item in response.pipe_output.main_stuff_as_items(item_type=TextContent)]
+        assert featured_lines == ["Copy of Page: Deckchairs"]
+        working_memory = response.pipe_output.working_memory
+        index_lines = working_memory.get_stuff_as_list("index_lines", item_type=TextContent)
+        assert [item.text for item in index_lines.items] == ["Page: Garden chairs", "Page: Parasols"]
+        nested_bound_pages = working_memory.get_stuff(f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages")
+        assert nested_bound_pages.concept.concept_ref == "catalog_index.CatalogPage"
 
     @pytest.mark.parametrize(
         ("inputs", "steps", "error_type", "message_fragments"),

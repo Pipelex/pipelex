@@ -49,9 +49,11 @@ class PipeValidationErrorType(StrEnum):
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
     # An input name that is not a plain snake_case identifier, a dotted name (`invoice.total`) included,
-    # on any pipe's `inputs` or as a PipeBatch's `input_list_name`. Detected at blueprint parse time; a
-    # dotted name whose root the same `inputs` table declares carries the enrichment the fix planner
-    # turns into deleting the key.
+    # on any pipe's `inputs` or as a PipeBatch's `input_list_name`; or a name taking the `_bound_` prefix
+    # the runtime reserves for the bound list of a dotted `batch_over`, as a pipe step's or a parallel
+    # branch's `result`, `batch_as` or plain `batch_over`, or a PipeBatch's `input_item_name`. Detected at
+    # blueprint parse time; a dotted name whose root the same `inputs` table declares carries the
+    # enrichment the fix planner turns into deleting the key.
     INVALID_INPUT_NAME = "invalid_input_name"
     UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
     # A `[pipe.x]` section declared no `type` yet carries fields beyond the signature contract

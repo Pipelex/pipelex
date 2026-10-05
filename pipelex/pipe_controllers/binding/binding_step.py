@@ -56,8 +56,10 @@ def make_private_binding_name(*, path: str, taken_names: set[str]) -> str:
     """The private name a sequence binds a dotted `batch_over`'s list under: underscore-led, so no template or input reads it.
 
     It spells the path, `_bound_catalog_pages` for `catalog.pages`, and takes a numbered suffix when a name of the sequence
-    already holds that spelling. It is generated once the bundle is validated, and never checked against the plain-name
-    grammar of a binding step's `result`, which governs the steps an author writes.
+    already holds that spelling, as when two of its steps batch over the same dotted path. It is generated once the bundle is
+    validated, and never checked against the plain-name grammar of a binding step's `result`, which governs the steps an author
+    writes. No name an author writes takes the prefix, which validation refuses, so a private name never takes the name of a
+    value the sequence's caller holds in the working memory they share.
     """
     base_name = f"{PRIVATE_BINDING_NAME_PREFIX}{path.replace('.', '_')}"
     private_name = base_name

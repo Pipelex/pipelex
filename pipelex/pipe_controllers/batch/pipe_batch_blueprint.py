@@ -4,7 +4,7 @@ from typing_extensions import override
 
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_machinery.validation import check_input_list_name
+from pipelex.pipe_machinery.validation import check_input_list_name, check_name_is_not_reserved
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -35,6 +35,9 @@ class PipeBatchBlueprint(PipeBlueprint):
         if not self.input_item_name:
             msg = "Empty input item name is not allowed"
             raise ValueError(msg)
+        # The item is written into each branch's working memory under its name, so the name never takes the prefix the runtime
+        # reserves for the bound list of a dotted `batch_over`. The list's name needs no such check: it is a plain input name.
+        check_name_is_not_reserved(name=self.input_item_name, field_label="The PipeBatch's `input_item_name`")
         # Specialization: catch the most common mistake (item name == list name) with a targeted message
         if self.input_item_name == self.input_list_name:
             msg = (

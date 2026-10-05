@@ -84,3 +84,38 @@ class TestPipeBatchValidation:
                 input_list_name="items",
                 input_item_name="",
             )
+
+    @pytest.mark.parametrize(
+        ("input_list_name", "input_item_name", "reserved_name", "message_fragment"),
+        [
+            pytest.param(
+                "items",
+                "_bound_item",
+                "_bound_item",
+                "The PipeBatch's `input_item_name`, '_bound_item', takes the `_bound_` prefix, which is reserved for the bound list of a "
+                "dotted `batch_over`",
+                id="input-item-name",
+            ),
+            pytest.param("_bound_items", "item", "_bound_items", "is not a valid input name", id="input-list-name"),
+        ],
+    )
+    def test_rejects_a_name_taking_the_reserved_prefix(
+        self, input_list_name: str, input_item_name: str, reserved_name: str, message_fragment: str
+    ) -> None:
+        """The batch writes its item into the branch's memory under its own name, so the runtime's `_bound_` prefix is refused there too."""
+        with pytest.raises(ValidationError) as exc_info:
+            PipeBatchBlueprint(
+                description="Process each item",
+                inputs={"items": "Item[]"},
+                output="Result[]",
+                branch_pipe_code="process_item",
+                input_list_name=input_list_name,
+                input_item_name=input_item_name,
+            )
+        refusals = [raw_error.get("ctx", {}).get("error") for raw_error in exc_info.value.errors()]
+        reserved_name_refusals = [
+            refusal for refusal in refusals if isinstance(refusal, PipeValidationError) and refusal.variable_names == [reserved_name]
+        ]
+        assert len(reserved_name_refusals) == 1
+        assert reserved_name_refusals[0].error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert message_fragment in str(reserved_name_refusals[0])
