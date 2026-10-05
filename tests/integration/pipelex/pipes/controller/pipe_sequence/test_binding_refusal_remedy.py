@@ -6,6 +6,7 @@ from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.binding.binding_step_blueprint import BindingStepBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -47,6 +48,38 @@ output = "Text"
 template = "View: {{{{ page_view.caption }}}}"
 """
 
+# A root that is not a plain name: no input can bear it, so only an earlier pipe step's `result`, which the standard leaves
+# unrestricted, can store a value under it.
+_UPPERCASE_ROOT_BUNDLE = """domain = "billing"
+description = "Reading the total of an invoice stored under a name that is not a plain name"
+main_pipe = "read_total"
+
+[concept.Invoice]
+description = "An invoice sent by a supplier"
+
+[concept.Invoice.structure]
+total = { type = "number", description = "The amount due", required = true }
+
+[pipe.make_invoice]
+type = "PipeCompose"
+description = "Writes out an invoice for an amount"
+inputs = { amount = "Number" }
+output = "Invoice"
+
+[pipe.make_invoice.construct]
+total = { from = "amount.number" }
+
+[pipe.read_total]
+type = "PipeSequence"
+description = "Writes out an invoice, then binds its total"
+inputs = { amount = "Number" }
+output = "Number"
+steps = [
+  { pipe = "make_invoice", result = "Invoice" },
+  { from = "Invoice.total", result = "total" },
+]
+"""
+
 
 class TestBindingRefusalRemedy:
     @pytest.mark.asyncio(loop_scope="class")
@@ -82,3 +115,27 @@ class TestBindingRefusalRemedy:
             },
         )
         assert result.pipe_output.main_stuff.as_text.text == "View: Garden chairs on a lawn"
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_root_that_is_not_a_plain_name_reads_an_earlier_steps_result(self) -> None:
+        """The path grammar lets the root be any segment, so it can read a pipe step's `result` that is not a plain name."""
+        result = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(
+            mthds_contents=[_UPPERCASE_ROOT_BUNDLE], inputs={"amount": {"concept": "native.Number", "content": {"number": 120}}}
+        )
+
+        assert result.pipe_output.main_stuff_as_number.number == 120
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_missing_root_that_is_not_a_plain_name_is_never_asked_for_as_an_input(self) -> None:
+        """Regression: the refusal of a root nothing stores never tells the author to declare an input no input name can match."""
+        mthds_content = _UPPERCASE_ROOT_BUNDLE.replace('  { pipe = "make_invoice", result = "Invoice" },\n', "")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[mthds_content])
+
+        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        assert [error.error_type for error in validation_errors] == [PipeValidationErrorType.MISSING_INPUT_VARIABLE]
+        message = validation_errors[0].message or ""
+        assert "Declare 'Invoice'" not in message
+        assert "'Invoice' cannot be an input of the sequence" in message
+        assert "store a value under 'Invoice' in an earlier step" in message

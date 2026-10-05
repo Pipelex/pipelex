@@ -41,6 +41,7 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
 )
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, taint_after_write
+from pipelex.pipe_machinery.validation import is_valid_input_name
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -214,16 +215,27 @@ class PipeSequence(PipeController):
 
     @override
     def refuse_undeclared_needed_input(self, *, variable_name: str) -> None:
-        """Refuse a binding's root that the sequence neither declares nor always stores, asking for the concept its path walks."""
+        """Refuse a binding's root that the sequence neither declares nor always stores, asking for the concept its path walks.
+
+        A root that is not a plain input name cannot be declared, so the refusal asks for a step storing it instead.
+        """
         _, binding_root_needs = self._walk_needed_inputs(visited_pipes=set())
         if variable_name not in binding_root_needs:
             return
         for step in self.sequential_sub_pipes:
             if isinstance(step, BindingStep) and step.root_name == variable_name:
+                if is_valid_input_name(variable_name):
+                    remedy = (
+                        f"Declare '{variable_name}' in the sequence's `inputs`, with the concept whose structure holds the path '{step.from_path}'."
+                    )
+                else:
+                    remedy = (
+                        f"'{variable_name}' cannot be an input of the sequence, since an input name is a plain snake_case identifier: "
+                        f"store a value under '{variable_name}' in an earlier step, whose `result` names it, or bind from a plain name."
+                    )
                 msg = (
                     f"In pipe '{self.code}', the binding step {step.as_written} reads '{variable_name}', which is neither an input of the "
-                    f"sequence nor always stored by an earlier step. Declare '{variable_name}' in the sequence's `inputs`, with the concept "
-                    f"whose structure holds the path '{step.from_path}'."
+                    f"sequence nor always stored by an earlier step. {remedy}"
                 )
                 raise PipeValidationError(
                     message=msg,
