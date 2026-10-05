@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeKind, NodeSpec, NodeStatus
@@ -106,3 +107,19 @@ class TestBindingGraph:
             assert note_node.kind == NodeKind.BINDING
             assert note_node.status == NodeStatus.SUCCEEDED
             assert note_node.node_io.outputs == []
+
+    async def test_a_binding_failing_on_any_error_closes_its_node_as_failed(self, mocker: MockerFixture) -> None:
+        """An error that is not a Pipelex one, such as a content failing its own validation, still closes the node."""
+        mocker.patch("pipelex.pipe_controllers.binding.binding_step.bind_content", side_effect=ValueError("the content failed its validation"))
+        teardown_spy = mocker.spy(GraphTracer, "teardown")
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=True)
+        runner = PipelexMTHDSProtocol(execution_config=execution_config, pipe_run_mode=PipeRunMode.LIVE)
+
+        with scoped_event_log(InMemoryEventLog()), pytest.raises(PipelexError):
+            await runner.execute(mthds_contents=[_BUNDLE], inputs={"amount": {"concept": "native.Number", "content": {"number": 318}}})
+
+        binding_node = _node(_in_process_graph(teardown_spy), pipe_code="invoice.total")
+        assert binding_node.status == NodeStatus.FAILED
+        assert binding_node.error is not None
+        assert binding_node.error.error_type == "ValueError"
+        assert binding_node.error.message == "the content failed its validation"

@@ -1,9 +1,9 @@
+import sys
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import field_validator
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError
@@ -24,7 +24,7 @@ from pipelex.pipe_controllers.absence_taint import (
     scan_taint_triggers,
 )
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation
-from pipelex.pipe_controllers.binding.binding_step import BindingStep
+from pipelex.pipe_controllers.binding.binding_step import BindingOutcome, BindingStep
 from pipelex.pipe_controllers.binding.exceptions import BindingStepRunError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -659,6 +659,7 @@ class PipeSequence(PipeController):
             )
             raise BindingStepRunError(msg)
         node_id = binding_step.trace_start(job_metadata=job_metadata, working_memory=working_memory, domain_code=self.domain_code)
+        outcome: BindingOutcome | None = None
         try:
             outcome = binding_step.bind(
                 working_memory=working_memory,
@@ -668,9 +669,12 @@ class PipeSequence(PipeController):
                 run_mode=pipe_run_params.run_mode,
                 stuff_code=pipe_run_params.final_stuff_code if is_last_step else None,
             )
-        except PipelexError as exc:
-            binding_step.trace_error(job_metadata=job_metadata, node_id=node_id, exc=exc)
-            raise
+        finally:
+            # The node is closed on the way out whatever stopped the binding, a content failing its own validation or a
+            # cancellation included, so no binding node is left running. `bind` returned nothing only if it raised, and
+            # the error it raised is the one propagating.
+            if outcome is None:
+                binding_step.trace_error(job_metadata=job_metadata, node_id=node_id, error=sys.exc_info()[1])
         binding_step.trace_end(job_metadata=job_metadata, node_id=node_id, outcome=outcome)
 
     @override

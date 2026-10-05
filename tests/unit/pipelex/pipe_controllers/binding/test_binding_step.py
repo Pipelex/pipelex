@@ -186,6 +186,24 @@ class TestBindingStep:
         assert outcome.absence.upstream == root_absence
         assert working_memory.get_optional_absence("lines") == outcome.absence
 
+    def test_an_empty_list_over_an_absent_root_takes_the_stuff_code_the_run_fixes(self) -> None:
+        """A binding ending a sequence takes the run's final stuff code, which the graph tracer links its producer by."""
+        working_memory, _ = _memory_with_absent_invoice()
+        step = BindingStep(from_path="invoice.lines", output_name="lines")
+
+        outcome = step.bind(
+            working_memory=working_memory,
+            derivation=_derive("invoice.lines"),
+            result_concept=_LINE_CONCEPT,
+            calling_pipe_code=_SEQUENCE_CODE,
+            run_mode=PipeRunMode.LIVE,
+            stuff_code="final_code",
+        )
+
+        assert outcome.stuff is not None
+        assert outcome.stuff.stuff_code == "final_code"
+        assert working_memory.get_stuff("lines").stuff_code == "final_code"
+
     def test_a_root_neither_present_nor_recorded_absent_is_a_run_error(self) -> None:
         step = BindingStep(from_path="invoice.total", output_name="total_amount")
 

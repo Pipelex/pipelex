@@ -107,7 +107,13 @@ class BindingStep(BaseModel):
                     variable_name=self.root_name,
                     concept_code=None,
                 )
-            return self._lift(working_memory=working_memory, derivation=derivation, result_concept=result_concept, root_absence=root_absence)
+            return self._lift(
+                working_memory=working_memory,
+                derivation=derivation,
+                result_concept=result_concept,
+                root_absence=root_absence,
+                stuff_code=stuff_code,
+            )
 
         bound_content = bind_content(root_content=root_stuff.content, derivation=derivation)
         if isinstance(bound_content, FoundNothing):
@@ -137,11 +143,13 @@ class BindingStep(BaseModel):
         derivation: BindingDerivation,
         result_concept: Concept,
         root_absence: AbsenceRecord,
+        stuff_code: str | None,
     ) -> BindingOutcome:
         """Skip the binding because its root is absent, as an absent plain input lifts a pipe.
 
         A single result is recorded as a skipped absence chained to the root's record; a list result is an empty
-        list, since a plural slot is never absent, with the skip kept as a note for observability.
+        list, since a plural slot is never absent, with the skip kept as a note for observability. The empty list
+        takes the stuff code the run fixes, when it fixes one, as a bound value would.
         """
         record = AbsenceRecord(
             variable_name=self.output_name,
@@ -154,6 +162,7 @@ class BindingStep(BaseModel):
                 concept=result_concept,
                 content=ListContent[StuffContent](items=[]),
                 name=self.output_name,
+                code=stuff_code,
             )
             working_memory.set_new_main_stuff(empty_list_stuff, name=self.output_name)
             working_memory.record_absence(record)
@@ -218,8 +227,8 @@ class BindingStep(BaseModel):
             output_spec=output_spec,
         )
 
-    def trace_error(self, *, job_metadata: JobMetadata, node_id: str | None, exc: Exception) -> None:
-        """Close the binding's node as failed, with the error that stopped it."""
+    def trace_error(self, *, job_metadata: JobMetadata, node_id: str | None, error: BaseException | None) -> None:
+        """Close the binding's node as failed, with the error that stopped it, whatever its class."""
         trace_context = job_metadata.trace_context
         if trace_context is None or node_id is None:
             return
@@ -230,6 +239,6 @@ class BindingStep(BaseModel):
             lookup_key=trace_context.lookup_key,
             node_id=node_id,
             ended_at=datetime.now(UTC),
-            error_type=type(exc).__name__,
-            error_message=str(exc),
+            error_type=type(error).__name__ if error is not None else "UnknownError",
+            error_message=str(error) if error is not None else "the binding step stopped without binding a value",
         )
