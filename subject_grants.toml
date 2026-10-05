@@ -3548,6 +3548,10 @@ rationale = "Factory from source: builds the table from the template mapping; si
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
+["pipelex/language/mthds_schema_generator.py::_constrain_input_names"]
+param = "schema"
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
+
 ["pipelex/language/mthds_schema_generator.py::_convert_to_draft4"]
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."

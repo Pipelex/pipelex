@@ -318,6 +318,48 @@ class TestMthdsSchemaGeneration:
         table = {**_minimal_pipe_table("PipeImgGen"), "size": size_value}
         assert validator.is_valid(table) is should_validate, f"size={size_value!r} should {'' if should_validate else 'not '}validate"
 
+    @pytest.mark.parametrize("pipe_type", [*sorted(_PIPE_KIND_EXTRA_FIELDS), None])
+    @pytest.mark.parametrize(
+        ("input_name", "should_validate"),
+        [
+            pytest.param("invoice", True, id="plain"),
+            pytest.param("invoice_total_2", True, id="plain-with-digits"),
+            pytest.param("invoice.total", False, id="dotted"),
+            pytest.param("InvoiceTotal", False, id="pascal-case"),
+            pytest.param("2nd_total", False, id="leading-digit"),
+            pytest.param("_total", False, id="leading-underscore"),
+        ],
+    )
+    def test_input_names_follow_the_plain_name_grammar(
+        self, schema: dict[str, Any], pipe_type: str | None, input_name: str, should_validate: bool
+    ) -> None:
+        """Every pipe kind's `inputs` keys, the typeless signature's included, are refused by the schema unless plain.
+
+        This is what makes `invalid_input_name` a schema fault: a structural check refuses a dotted or
+        malformed input name before the runtime is asked, on every pipe, with no per-kind exception.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        if pipe_type is None:
+            table: dict[str, Any] = {"description": "A signature", "output": "Text"}
+        else:
+            table = _minimal_pipe_table(pipe_type)
+        table["inputs"] = {input_name: "Text"}
+        assert validator.is_valid(table) is should_validate, f"{pipe_type or 'signature'} inputs key {input_name!r}"
+
+    @pytest.mark.parametrize(
+        ("input_list_name", "should_validate"),
+        [
+            pytest.param("pages", True, id="plain"),
+            pytest.param("catalog.pages", False, id="dotted"),
+            pytest.param("Pages", False, id="pascal-case"),
+        ],
+    )
+    def test_batch_input_list_name_follows_the_plain_name_grammar(self, schema: dict[str, Any], input_list_name: str, should_validate: bool) -> None:
+        """A PipeBatch's `input_list_name` is a plain input name, refused by the schema otherwise, as the runtime does."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeBatch"), "input_list_name": input_list_name}
+        assert validator.is_valid(table) is should_validate
+
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
         """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.
 

@@ -219,6 +219,11 @@ _ERROR_TYPE_SCHEMA_FAULTS: frozenset[ValidationErrorType] = frozenset(
         # A `type` naming a pipe kind that does not exist, which the schema's closed enum of pipe
         # kinds rejects on sight.
         PipeValidationErrorType.UNKNOWN_PIPE_TYPE,
+        # An input name that is not a plain snake_case identifier, a dotted `"page.page_view"` included,
+        # which the schema's pattern on every `inputs` key and on `input_list_name` rejects. Measured on
+        # both of its entries: plxt reports `error[schema]` on the lone dotted key and on the one beside
+        # its declared root.
+        PipeValidationErrorType.INVALID_INPUT_NAME,
     }
 )
 

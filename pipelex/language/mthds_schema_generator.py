@@ -11,6 +11,8 @@ import copy
 from typing import TYPE_CHECKING, Any, cast, get_args
 
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_machinery.validation import INPUT_NAME_PATTERN
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -56,6 +58,7 @@ def generate_mthds_schema() -> dict[str, Any]:
     schema = _normalize_type_on_pipe_definitions(schema)
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
+    schema = _constrain_input_names(schema)
 
     return _add_taplo_metadata(schema)
 
@@ -252,6 +255,38 @@ def _patch_construct_schema(schema: dict[str, Any]) -> dict[str, Any]:
             "title": "ConstructFieldBlueprint",
             **construct_field_schema,
         }
+
+    return schema
+
+
+def _constrain_input_names(schema: dict[str, Any]) -> dict[str, Any]:
+    """Constrain every input name to the plain-name grammar, so a structural check refuses a dotted one.
+
+    An input name is a plain snake_case identifier (`INPUT_NAME_PATTERN`), on every pipe's `inputs` keys
+    and on a PipeBatch's `input_list_name`; the runtime refuses anything else as `invalid_input_name`, and
+    this makes the schema refuse it first, which is what that error type's `fails_at = "schema"` records.
+
+    The keys are constrained with `patternProperties` plus `additionalProperties: false` rather than with
+    `propertyNames`: the schema is Draft 4, which has no `propertyNames`, and a Draft-4 validator such as
+    plxt's ignores the keyword silently. Moving the value schema under the pattern says the same thing in
+    every draft: a key matching the pattern takes the slot schema, and any other key is refused.
+    """
+    schema = copy.deepcopy(schema)
+    definitions = schema.get("definitions", {})
+
+    for def_name in _PIPE_DEFINITION_NAMES:
+        inputs_schema = definitions.get(def_name, {}).get("properties", {}).get("inputs")
+        if inputs_schema is None:
+            continue
+        for arm in inputs_schema.get("anyOf", [inputs_schema]):
+            if arm.get("type") != "object" or "additionalProperties" not in arm:
+                continue
+            arm["patternProperties"] = {INPUT_NAME_PATTERN: arm.pop("additionalProperties")}
+            arm["additionalProperties"] = False
+
+    input_list_name_schema = definitions.get(PipeBatchBlueprint.__name__, {}).get("properties", {}).get("input_list_name")
+    if input_list_name_schema is not None:
+        input_list_name_schema["pattern"] = INPUT_NAME_PATTERN
 
     return schema
 
