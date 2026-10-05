@@ -60,7 +60,7 @@ url = { template = "{{ where }}" }
 [pipe.describe_photo]
 type = "PipeLLM"
 description = "Describe the photo"
-inputs = { "photo.picture" = "Image", photo = "Photo" }
+inputs = { photo = "Photo" }
 output = "Text"
 prompt = \"\"\"
 Describe this image.

@@ -131,39 +131,45 @@ class TestPipeLLMBlueprint:
         assert error.variable_names == ["aaa", "bbb"]
         assert "Reference them in the prompt or system_prompt" in str(error)
 
-    def test_validate_inputs_correct_with_dotted_input_name(self):
-        """A dotted input name is read by the path it names, and its root input by another path."""
+    def test_validate_inputs_correct_reading_fields_through_the_root(self):
+        """R1: every template form reads a field through the root it names, with only the root declared."""
         blueprint = PipeLLMBlueprint(
             description="lorem ipsum",
-            inputs={"page": "Page", "page.page_view": "native.Image"},
+            inputs={"page": "Page"},
             output="native.Text",
-            prompt="Describe:\n@page.page_view\n\nText: $page.text_and_images.text.text",
+            prompt="Describe:\n@page.page_view\n\nText: $page.text_and_images.text.text\nStored at {{ page.page_view.url }}",
         )
-        assert set(blueprint.input_names) == {"page", "page.page_view"}
+        assert blueprint.input_names == ["page"]
 
-    def test_validate_inputs_correct_with_lone_dotted_input_name(self):
-        """PipeLLM resolves a dotted input name as that attribute of the stuff, so it needs no root input beside it."""
-        blueprint = PipeLLMBlueprint(
-            description="lorem ipsum",
-            inputs={"page.page_view": "native.Image"},
-            output="native.Text",
-            prompt="Describe $page.page_view",
-        )
-        assert set(blueprint.input_names) == {"page.page_view"}
-
-    def test_validate_inputs_incorrect_read_beside_lone_dotted_input_name(self):
-        """A dotted input name supplies its own path only, not the other attributes of its root."""
+    def test_validate_inputs_refuses_a_lone_dotted_input_name(self):
+        """I1: an input name is a plain name, so a dotted one is refused before the prompt is read, naming both remedies."""
         error = refused_input_error(
             blueprint_class=PipeLLMBlueprint,
             blueprint_kwargs={
                 "description": "lorem ipsum",
                 "inputs": {"page.page_view": "native.Image"},
                 "output": "native.Text",
-                "prompt": "Describe $page.page_view in the light of $page.title",
+                "prompt": "Describe:\n@page.page_view",
             },
         )
-        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
-        assert error.variable_names == ["page"]
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == ["page.page_view"]
+        assert error.redundant_input_name is None
+
+    def test_validate_inputs_refuses_a_dotted_input_name_beside_its_root(self):
+        """I2: the root declared beside the dotted key makes the key redundant, which the error names for the fix planner."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"page.page_view": "native.Image", "page": "Page"},
+                "output": "native.Text",
+                "prompt": "Describe:\n@page.page_view",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == ["page.page_view"]
+        assert error.redundant_input_name == "page.page_view"
 
     def test_validate_inputs_correct_with_attribute_after_subscript(self):
         """An input read only through a subscript followed by an attribute counts as read."""

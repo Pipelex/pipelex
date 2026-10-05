@@ -165,15 +165,16 @@ class TestPipeLLMBasic:
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         for attribute_path in attribute_paths:
-            stuff_name = attribute_path
-            if not stuff_name:
+            # The pipe declares the stuff under its plain name, the path's root, and reads the attribute through it
+            root_name = attribute_path.split(".", maxsplit=1)[0]
+            if not root_name:
                 pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
             working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
             # Build prompt dynamically to include the input variable reference
-            prompt_with_input = f"Here is the input: ${stuff_name}\n{PipeTestCases.MULTI_IMG_DESC_PROMPT}"
+            prompt_with_input = f"Here is the input: ${attribute_path}\n{PipeTestCases.MULTI_IMG_DESC_PROMPT}"
             pipe_llm_blueprint = PipeLLMBlueprint(
                 description="LLM test for image processing with attributes",
-                inputs={stuff_name: "native.Image"},
+                inputs={root_name: "native.Image"},
                 output=NativeConceptCode.TEXT,
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 prompt=prompt_with_input,

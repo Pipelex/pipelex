@@ -184,6 +184,7 @@ class PipeValidationError(ValueError):
         declared_inputs: dict[str, str] | None = None,
         file_path: str | None = None,
         explanation: str | None = None,
+        redundant_input_name: str | None = None,
     ):
         self.error_type = error_type
         self.domain_code = domain_code
@@ -203,6 +204,10 @@ class PipeValidationError(ValueError):
         # planner (pure, no file access) can emit a minimal diff instead of a table rewrite.
         self.expected_inputs = expected_inputs
         self.declared_inputs = declared_inputs
+        # A dotted input name whose root the same `inputs` table also declares, set only at the
+        # input-name check when that holds — the semantic fact the fix planner translates into
+        # deleting the key, since the declared root already supplies every field a template reads.
+        self.redundant_input_name = redundant_input_name
         self.file_path = file_path
         self.explanation = explanation
         super().__init__(message)
@@ -223,6 +228,8 @@ class PipeValidationError(ValueError):
             msg += f" • expected_inputs='{self.expected_inputs}'"
         if self.declared_inputs:
             msg += f" • declared_inputs='{self.declared_inputs}'"
+        if self.redundant_input_name:
+            msg += f" • redundant_input_name='{self.redundant_input_name}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
         if self.explanation:

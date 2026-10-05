@@ -4124,14 +4124,6 @@ rationale = "Predicate on the pipe code; single operand."
 param = "input_name"
 rationale = "Predicate on the input name; single operand."
 
-["pipelex/pipe_machinery/validation.py::is_variable_satisfied_by_inputs"]
-param = "variable_path"
-rationale = "Predicate on the variable path; the inputs stay keyword."
-
-["pipelex/pipe_machinery/validation.py::validate_input_name"]
-param = "input_name"
-rationale = "Verb-object: validates the input name; single operand."
-
 ["pipelex/pipe_operators/compose/construct_blueprint.py::ConstructBlueprint.make_from_raw"]
 param = "raw"
 rationale = "Factory from source: builds the blueprint from the raw value; single operand."

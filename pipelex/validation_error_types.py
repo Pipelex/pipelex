@@ -48,6 +48,11 @@ class PipeValidationErrorType(StrEnum):
 
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
+    # An input name that is not a plain snake_case identifier, a dotted name (`invoice.total`) included,
+    # on any pipe's `inputs` or as a PipeBatch's `input_list_name`. Detected at blueprint parse time; a
+    # dotted name whose root the same `inputs` table declares carries the enrichment the fix planner
+    # turns into deleting the key.
+    INVALID_INPUT_NAME = "invalid_input_name"
     UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
     # A `[pipe.x]` section declared no `type` yet carries fields beyond the signature contract
     # (`description`, `inputs`, `output`). The author is describing an implementation without naming
@@ -120,6 +125,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
@@ -152,6 +158,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
@@ -191,6 +198,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
@@ -225,6 +233,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
@@ -262,6 +271,46 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_INPUT_NAME
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_invalid_input_name(self) -> bool:
+        """True for the invalid-input-name refusal, which the fix planner acts on when it is enriched.
+
+        Gates entry to ``delete-redundant-dotted-input``; the planner still requires the
+        ``redundant_input_name`` enrichment, so a lone dotted name or a malformed one, whose repair is the
+        author's to choose, falls through as ``None`` even though it shares this ``error_type``.
+        """
+        match self:
+            case PipeValidationErrorType.INVALID_INPUT_NAME:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
@@ -296,6 +345,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION

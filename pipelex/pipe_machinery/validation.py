@@ -1,34 +1,15 @@
+import re
+from collections.abc import Sequence
+
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
-
-def is_variable_satisfied_by_inputs(variable_path: str, *, input_names: set[str]) -> bool:
-    """Check if a variable path is satisfied by the declared inputs.
-
-    A variable path is satisfied if:
-    - It exactly matches an input name, OR
-    - Its root (or any prefix) matches an input name (attribute access on an input)
-
-    Args:
-        variable_path: The full dotted variable path (e.g., 'page.text_and_images.text')
-        input_names: Set of declared input names
-
-    Returns:
-        True if the variable path is satisfied by the inputs.
-    """
-    # Check for exact match
-    if variable_path in input_names:
-        return True
-
-    # Check if any prefix of the path matches an input name
-    parts = variable_path.split(".")
-    for idx in range(1, len(parts)):
-        prefix = ".".join(parts[:idx])
-        if prefix in input_names:
-            return True
-
-    return False
+# The grammar of an input name, the standard's `[a-z][a-z0-9_]*`: a plain snake_case identifier, which
+# is never dotted. It applies to every key of a pipe's `inputs`, whatever the pipe, and to a PipeBatch's
+# `input_list_name`. The MTHDS JSON Schema generator writes this same pattern on both, so a structural
+# check refuses exactly what `validate_input_names` and `check_input_list_name` refuse.
+INPUT_NAME_PATTERN = r"^[a-z][a-z0-9_]*$"
 
 
 def is_input_used_by_variables(input_name: str, *, variable_paths: set[str]) -> bool:
@@ -60,7 +41,6 @@ def check_inputs_match_variables(
     declared_inputs: set[str],
     variable_paths: set[str],
     reader: str,
-    dotted_input_supplies_its_path: bool,
 ) -> None:
     """Refuse a variable the templates read that no input declares, then a declared input no template reads.
 
@@ -73,12 +53,7 @@ def check_inputs_match_variables(
         PipeValidationError: ``MISSING_INPUT_VARIABLE`` with the undeclared root names, or
             ``EXTRANEOUS_INPUT_VARIABLE`` with the unread input names, each sorted.
     """
-    check_variables_are_declared(
-        declared_inputs=declared_inputs,
-        variable_paths=variable_paths,
-        reader=reader,
-        dotted_input_supplies_its_path=dotted_input_supplies_its_path,
-    )
+    check_variables_are_declared(declared_inputs=declared_inputs, variable_paths=variable_paths, reader=reader)
     check_inputs_are_read(declared_inputs=declared_inputs, variable_paths=variable_paths, reader=reader)
 
 
@@ -87,29 +62,18 @@ def check_variables_are_declared(
     declared_inputs: set[str],
     variable_paths: set[str],
     reader: str,
-    dotted_input_supplies_its_path: bool,
 ) -> None:
     """Refuse a variable the templates read that no input declares.
 
     ``variable_paths`` are the full dotted paths the operator's templates read, already rid of the
     operator's special names, and ``reader`` names the fields that read them, for the message
-    ("prompt or system_prompt", "template").
-
-    ``dotted_input_supplies_its_path`` keeps each operator's own rule for a dotted input name such as
-    ``page.page_view`` declared without its root. PipeLLM takes it as supplying the path it names, a shape its
-    tests run; PipeCompose, PipeSearch, PipeImgGen and PipeJudge require every read's root to be declared.
-    Whether they should agree is a language question this check leaves open.
+    ("prompt or system_prompt", "template"). A path reads the input its root names, on every operator
+    alike: ``page.page_view`` reads ``page``, and the field is reached through that input's concept.
 
     Raises:
         PipeValidationError: ``MISSING_INPUT_VARIABLE`` with the undeclared root names, sorted.
     """
-    if dotted_input_supplies_its_path:
-        unsatisfied_paths = {
-            variable_path for variable_path in variable_paths if not is_variable_satisfied_by_inputs(variable_path, input_names=declared_inputs)
-        }
-    else:
-        unsatisfied_paths = {variable_path for variable_path in variable_paths if get_root_from_dotted_path(variable_path) not in declared_inputs}
-    missing_names = sorted({get_root_from_dotted_path(variable_path) for variable_path in unsatisfied_paths})
+    missing_names = sorted({get_root_from_dotted_path(variable_path) for variable_path in variable_paths} - declared_inputs)
     if missing_names:
         quoted_names = _quoted_names(names=missing_names)
         if len(missing_names) == 1:
@@ -120,7 +84,7 @@ def check_variables_are_declared(
 
 
 def check_inputs_are_read(*, declared_inputs: set[str], variable_paths: set[str], reader: str) -> None:
-    """Refuse a declared input no template reads. A dotted input name counts as read by the path it names.
+    """Refuse a declared input no template reads: an input is read by a path equal to its name or rooted in it.
 
     Raises:
         PipeValidationError: ``EXTRANEOUS_INPUT_VARIABLE`` with the unread input names, sorted.
@@ -140,73 +104,97 @@ def _quoted_names(*, names: list[str]) -> str:
 
 
 def is_valid_input_name(input_name: str) -> bool:
-    """Check if an input name is valid.
-
-    An input name is valid if:
-    - It's not empty
-    - It doesn't start or end with a dot
-    - All parts separated by dots are in snake_case
-    - There are no consecutive dots
-
-    Args:
-        input_name: The input name to validate
-
-    Returns:
-        bool: True if the input name is valid, False otherwise
-
-    Examples:
-        >>> is_valid_input_name("my_input")
-        True
-        >>> is_valid_input_name("my_input.field_name")
-        True
-        >>> is_valid_input_name("my_input.field_name.nested_field")
-        True
-        >>> is_valid_input_name("myInput")
-        False
-        >>> is_valid_input_name("my_input.fieldName")
-        False
-        >>> is_valid_input_name("")
-        False
-        >>> is_valid_input_name(".")
-        False
-        >>> is_valid_input_name(".my_input")
-        False
-        >>> is_valid_input_name("my_input.")
-        False
-        >>> is_valid_input_name("my_input..field")
-        False
-
-    """
-    if not input_name:
-        return False
-
-    # Check for leading/trailing dots or consecutive dots
-    if input_name.startswith(".") or input_name.endswith(".") or ".." in input_name:
-        return False
-
-    # Split by dots and validate each part is snake_case
-    parts = input_name.split(".")
-    return all(is_snake_case(part) for part in parts)
+    """Whether a name is a plain input name: a snake_case identifier matching ``INPUT_NAME_PATTERN``, never dotted."""
+    return re.fullmatch(INPUT_NAME_PATTERN, input_name) is not None
 
 
-def validate_input_name(input_name: str) -> None:
-    """Validate an input name and raise an error if invalid.
+_PLAIN_NAME_RULE = (
+    "an input name is a plain snake_case identifier, matching `[a-z][a-z0-9_]*`: a lowercase letter, then lowercase letters, digits and underscores"
+)
 
-    Args:
-        input_name: The input name to validate
+
+def _is_dotted_field_path(*, name: str) -> bool:
+    """Whether a name reads as a root followed by field names (``invoice.total``), each segment snake_case."""
+    segments = name.split(".")
+    return len(segments) > 1 and all(is_snake_case(segment) for segment in segments)
+
+
+def _binding_step(*, dotted_path: str) -> str:
+    """The binding step a calling sequence writes to hand the field a dotted path reaches to a pipe under a plain name."""
+    plain_name = dotted_path.rsplit(".", maxsplit=1)[-1]
+    return f'`{{ from = "{dotted_path}", result = "{plain_name}" }}`'
+
+
+def _dotted_input_message(*, input_name: str, is_root_declared: bool) -> str:
+    """The refusal of a dotted input name, naming both remedies: read the field through the root, or bind it."""
+    root_name = get_root_from_dotted_path(input_name)
+    preamble = f"Input '{input_name}' is not a plain input name: an input names one whole value, so its name cannot reach into a field with a dot."
+    binding_remedy = f"have the calling sequence bind the field to a plain name with a binding step ({_binding_step(dotted_path=input_name)})"
+    if is_root_declared:
+        return (
+            f"{preamble} '{root_name}' is already declared, so delete this key and read the field through '{root_name}' in the template "
+            f"(`${input_name}`). To hand the field to this pipe under a name of its own instead, {binding_remedy} and declare that name."
+        )
+    return (
+        f"{preamble} Either declare '{root_name}' with its whole concept and read the field through it in the template (`${input_name}`), "
+        f"or {binding_remedy} and declare that name."
+    )
+
+
+def validate_input_names(*, input_names: Sequence[str]) -> None:
+    """Refuse an `inputs` table holding a name that is not a plain input name.
+
+    An input names one whole value, of the concept its slot declares, so its name is a plain snake_case
+    identifier and never a dotted path into a field. One name is reported, chosen so the fix loop can
+    make progress: the first dotted name whose root the same table declares, which is redundant and
+    which the fix planner deletes, else the first name that is not plain, in declaration order.
 
     Raises:
-        ValueError: If the input name is invalid
-
+        PipeValidationError: ``INVALID_INPUT_NAME`` naming the input, with ``redundant_input_name`` set
+            when the name is dotted and its root is declared beside it.
     """
-    if not is_valid_input_name(input_name):
+    invalid_names = [input_name for input_name in input_names if not is_valid_input_name(input_name)]
+    if not invalid_names:
+        return
+    declared_names = set(input_names)
+    for invalid_name in invalid_names:
+        if _is_dotted_field_path(name=invalid_name) and get_root_from_dotted_path(invalid_name) in declared_names:
+            raise PipeValidationError(
+                message=_dotted_input_message(input_name=invalid_name, is_root_declared=True),
+                error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
+                variable_names=[invalid_name],
+                redundant_input_name=invalid_name,
+            )
+    first_invalid_name = invalid_names[0]
+    if _is_dotted_field_path(name=first_invalid_name):
+        msg = _dotted_input_message(input_name=first_invalid_name, is_root_declared=False)
+    else:
+        msg = f"Input '{first_invalid_name}' is not a valid input name: {_PLAIN_NAME_RULE}."
+    raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[first_invalid_name])
+
+
+def check_input_list_name(*, input_list_name: str) -> None:
+    """Refuse a PipeBatch's `input_list_name` that is not a plain input name.
+
+    It names one of the batch's own inputs, so it follows the input-name grammar: a list held in a field
+    of a larger value is declared by the batch under a plain name, and handed to it by the calling sequence.
+
+    Raises:
+        PipeValidationError: ``INVALID_INPUT_NAME`` naming the list.
+    """
+    if is_valid_input_name(input_list_name):
+        return
+    if _is_dotted_field_path(name=input_list_name):
+        plain_name = input_list_name.rsplit(".", maxsplit=1)[-1]
         msg = (
-            f"Invalid input name syntax '{input_name}'. "
-            "Input names must be in snake_case. "
-            "Nested field access is allowed using dots (e.g., 'my_input.field_name'), "
-            "where each part must also be in snake_case."
+            f"`input_list_name` '{input_list_name}' is not a plain input name: a PipeBatch maps over a list it declares as an input "
+            f'of its own, under a plain name. Declare the list itself (`{plain_name} = "<Concept>[]"`, with '
+            f'`input_list_name = "{plain_name}"`), and have the calling sequence bind the field to that name with a binding step '
+            f"({_binding_step(dotted_path=input_list_name)})."
         )
-        raise ValueError(msg)
+    else:
+        msg = f"`input_list_name` '{input_list_name}' is not a valid input name: {_PLAIN_NAME_RULE}."
+    raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[input_list_name])
 
 
 def is_pipe_code_valid(pipe_code: str) -> bool:

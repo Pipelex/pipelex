@@ -65,6 +65,12 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # rename, ``None`` for a ``main_pipe`` value strip (which is a root ``set_key``, not a rename).
     stripped_pipe_code: str | None = None
 
+    # A dotted input name whose root the same `inputs` table also declares (``delete-redundant-dotted-input``
+    # enrichment), set on an ``invalid_input_name`` error only when it holds: the declared root already
+    # supplies every field a template reads through it, so the planner can delete the key. A lone dotted
+    # name or a malformed one leaves it unset, because its repair is the author's to choose.
+    redundant_input_name: str | None = None
+
 
 class PipesAndConceptValidationErrorData(BaseModel):
     """Structured validation error data for Pipe/Concept validation errors.

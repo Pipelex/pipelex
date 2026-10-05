@@ -161,12 +161,12 @@ class PipeImgGenInputCheckTestCases:
         ["avoid"],
     )
 
-    # A dotted input name alone does not supply the stuff its path is read from: the root must be declared
+    # An input name is a plain name: a dotted one is refused by the shared input-name check, before the template is read
     REFUSED_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
         "lone_dotted_input",
         {"description": "d", "inputs": {"scene.subject": "Text"}, "output": "Image", "prompt": "Sketch of $scene.subject"},
-        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-        ["scene"],
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        ["scene.subject"],
     )
 
     REFUSED_CASES: ClassVar[list[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]]] = [

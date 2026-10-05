@@ -5507,6 +5507,7 @@ components:
       - inadequate_output_multiplicity
       - llm_output_cannot_be_image
       - invalid_pipe_code_syntax
+      - invalid_input_name
       - unknown_pipe_type
       - missing_pipe_type
       - batch_item_name_collision

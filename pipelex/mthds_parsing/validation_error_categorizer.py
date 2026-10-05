@@ -356,6 +356,7 @@ def categorize_blueprint_validation_error(
             pipe_code=wrapped_pipe_error.pipe_code or pipe_code,
             message=wrapped_pipe_error.explanation or str(wrapped_pipe_error),
             variable_names=wrapped_pipe_error.variable_names,
+            redundant_input_name=wrapped_pipe_error.redundant_input_name,
         )
 
     # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``

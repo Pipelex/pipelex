@@ -131,16 +131,6 @@ class PipeJudgeBlueprint(PipeBlueprint):
     def validate_inputs(self):
         template_category = TemplateCategory.BASIC
         declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
-        # A step's inputs are keyed by their root once loaded, so a dotted input would be judged as its whole
-        # root, fields the step never declared included: refused until the runtime keeps the path.
-        for input_name in sorted(declared_inputs):
-            if "." in input_name:
-                root_name = get_root_from_dotted_path(input_name)
-                msg = (
-                    f"A PipeJudge sends each of its inputs whole, keyed by its name, so input '{input_name}' cannot name a field: "
-                    f"declare '{root_name}' instead."
-                )
-                raise ValueError(msg)
         try:
             preprocessed_template = preprocess_template(self.question, declared_inputs=declared_inputs)
         except TemplateSigilSyntaxError as exc:
@@ -163,9 +153,7 @@ class PipeJudgeBlueprint(PipeBlueprint):
         variable_paths = {path for path in full_paths if not get_root_from_dotted_path(path).startswith("_")}
         # Every declared input is material to judge, read whether the question names it or not: only
         # the variables the question does name must be declared.
-        check_variables_are_declared(
-            declared_inputs=declared_inputs, variable_paths=variable_paths, reader="question", dotted_input_supplies_its_path=False
-        )
+        check_variables_are_declared(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="question")
 
     @override
     def validate_output(self):

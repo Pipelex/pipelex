@@ -1,104 +1,114 @@
 import pytest
 
-from pipelex.pipe_machinery.validation import is_valid_input_name, validate_input_name
+from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.pipe_machinery.validation import check_input_list_name, is_valid_input_name, validate_input_names
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class TestInputNameValidation:
-    """Test input name validation functions."""
-
     @pytest.mark.parametrize(
         ("input_name", "expected_result"),
         [
-            # Valid cases
+            # A plain snake_case identifier
             ("my_input", True),
             ("input_123", True),
             ("my_input_field", True),
-            ("my_input.field_name", True),
-            ("my_input.field_name.nested_field", True),
-            ("input_1.field_2.nested_3", True),
             ("a", True),
             ("a_b", True),
-            ("a.b", True),
-            ("a.b.c", True),
-            # Invalid cases - not snake_case
+            ("trailing_", True),
+            # Dotted: an input names one whole value, never a field of one
+            ("my_input.field_name", False),
+            ("my_input.field_name.nested_field", False),
+            ("a.b", False),
+            # Not snake_case
             ("myInput", False),
             ("MyInput", False),
             ("my-input", False),
             ("my input", False),
-            ("123_input", False),  # Cannot start with number
-            # Invalid cases - dot issues
+            ("123_input", False),
+            ("2nd_total", False),
+            ("_private", False),
             ("", False),
             (".", False),
             (".my_input", False),
             ("my_input.", False),
             ("my_input..field", False),
-            ("my_input...field", False),
-            ("..", False),
-            ("...", False),
-            # Invalid cases - mixed with valid dots
-            ("my_input.fieldName", False),  # Second part not snake_case
-            ("myInput.field_name", False),  # First part not snake_case
-            ("my_input.Field_name", False),  # Second part starts with uppercase
-            ("my_input..field_name", False),  # Consecutive dots
-            ("my_input.field_name.", False),  # Trailing dot
-            (".my_input.field_name", False),  # Leading dot
+            ("my_input\n", False),
         ],
     )
     def test_is_valid_input_name(self, input_name: str, expected_result: bool):
-        """Test is_valid_input_name with various input names."""
         assert is_valid_input_name(input_name) == expected_result
 
-    @pytest.mark.parametrize(
-        "valid_input_name",
-        [
-            "my_input",
-            "input_123",
-            "my_input_field",
-            "my_input.field_name",
-            "my_input.field_name.nested_field",
-            "input_1.field_2.nested_3",
-            "a",
-            "a_b",
-            "a.b",
-            "a.b.c",
-        ],
-    )
-    def test_validate_input_name_valid(self, valid_input_name: str):
-        """Test validate_input_name does not raise for valid input names."""
-        validate_input_name(valid_input_name)  # Should not raise
+    def test_plain_names_pass(self):
+        validate_input_names(input_names=["invoice", "supplier_name", "line_2"])
+        validate_input_names(input_names=[])
 
-    @pytest.mark.parametrize(
-        "invalid_input_name",
-        [
-            "myInput",
-            "MyInput",
-            "my-input",
-            "my input",
-            "123_input",
-            "",
-            ".",
-            ".my_input",
-            "my_input.",
-            "my_input..field",
-            "my_input...field",
-            "..",
-            "...",
-            "my_input.fieldName",
-            "myInput.field_name",
-            "my_input.Field_name",
-        ],
-    )
-    def test_validate_input_name_invalid(self, invalid_input_name: str):
-        """Test validate_input_name raises ValueError for invalid input names."""
-        with pytest.raises(ValueError, match="Invalid input name syntax"):
-            validate_input_name(invalid_input_name)
+    def test_a_lone_dotted_name_names_both_remedies(self):
+        """I1: the root is not declared, so the message offers declaring it or binding the field, and no key is deletable."""
+        with pytest.raises(PipeValidationError) as exc_info:
+            validate_input_names(input_names=["invoice.total"])
 
-    def test_validate_input_name_error_message(self):
-        """Test that the error message is helpful and descriptive."""
-        with pytest.raises(ValueError, match="Invalid input name syntax") as exc_info:
-            validate_input_name("myInput.fieldName")
+        error = exc_info.value
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == ["invoice.total"]
+        assert error.redundant_input_name is None
+        message = str(error)
+        assert "Input 'invoice.total' is not a plain input name" in message
+        assert "declare 'invoice' with its whole concept and read the field through it in the template (`$invoice.total`)" in message
+        assert 'binding step (`{ from = "invoice.total", result = "total" }`)' in message
 
-        error_message = str(exc_info.value)
-        assert "Invalid input name syntax 'myInput.fieldName'" in error_message
-        assert "snake_case" in error_message
-        assert "dots" in error_message or "nested field" in error_message.lower()
+    def test_a_dotted_name_beside_its_root_is_redundant(self):
+        """I2: the root is declared in the same table, so the key is named as deletable, and the message still names the binding step."""
+        with pytest.raises(PipeValidationError) as exc_info:
+            validate_input_names(input_names=["page", "page.page_view"])
+
+        error = exc_info.value
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == ["page.page_view"]
+        assert error.redundant_input_name == "page.page_view"
+        message = str(error)
+        assert "'page' is already declared, so delete this key" in message
+        assert 'binding step (`{ from = "page.page_view", result = "page_view" }`)' in message
+
+    def test_the_redundant_name_is_reported_first(self):
+        """The fixable name wins over an earlier lone one, so the fix loop can delete it before the author repairs the rest."""
+        with pytest.raises(PipeValidationError) as exc_info:
+            validate_input_names(input_names=["supplier.name", "invoice", "invoice.total"])
+
+        assert exc_info.value.redundant_input_name == "invoice.total"
+
+    @pytest.mark.parametrize("malformed_name", ["InvoiceTotal", "2nd_total", "invoice-total", "Invoice.total", "invoice..total"])
+    def test_a_malformed_name_is_refused_with_the_grammar(self, malformed_name: str):
+        """I4: a name that is not snake_case is refused with the grammar it breaks, even beside a declared root."""
+        with pytest.raises(PipeValidationError) as exc_info:
+            validate_input_names(input_names=["invoice", malformed_name])
+
+        error = exc_info.value
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == [malformed_name]
+        assert error.redundant_input_name is None
+        assert f"Input '{malformed_name}' is not a valid input name" in str(error)
+        assert "`[a-z][a-z0-9_]*`" in str(error)
+
+    def test_a_plain_list_name_passes(self):
+        check_input_list_name(input_list_name="pages")
+
+    def test_a_dotted_list_name_is_refused(self):
+        """I5: a PipeBatch's list is one of its own inputs, so a dotted list name is refused, naming the binding step."""
+        with pytest.raises(PipeValidationError) as exc_info:
+            check_input_list_name(input_list_name="catalog.pages")
+
+        error = exc_info.value
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == ["catalog.pages"]
+        message = str(error)
+        assert "`input_list_name` 'catalog.pages' is not a plain input name" in message
+        assert '`input_list_name = "pages"`' in message
+        assert '{ from = "catalog.pages", result = "pages" }' in message
+
+    def test_a_malformed_list_name_is_refused(self):
+        with pytest.raises(PipeValidationError) as exc_info:
+            check_input_list_name(input_list_name="CatalogPages")
+
+        assert exc_info.value.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert "is not a valid input name" in str(exc_info.value)
