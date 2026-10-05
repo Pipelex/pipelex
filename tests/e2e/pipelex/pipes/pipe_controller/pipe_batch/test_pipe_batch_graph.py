@@ -7,7 +7,10 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.config import get_config
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.working_memory import PRIVATE_BINDING_NAME_PREFIX
 from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeSpec
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -303,11 +306,11 @@ class TestPipeBatchGraph:
         log.info("Structural validation passed: BATCH_AGGREGATE edges correctly target PipeBatch")
 
     async def test_article_briefing_dotted_batch_over(self, pipe_run_mode: PipeRunMode):
-        """Test that the article_briefing pipeline with dotted-path batch_over runs end-to-end.
+        """The article_briefing pipeline batches over `search_result.sources`, a list field of the search result, end to end.
 
-        This exercises batch_over="search_result.sources" where sources is a nested
-        attribute of the SearchResult stuff, validating the dotted-path resolution
-        implemented in SubPipe.run_pipe().
+        A dotted `batch_over` is a binding followed by a batch: the sequence binds the list at that path under the private
+        name `_bound_search_result_sources`, then batches the fetch over it, and the bound list stays in the run's working
+        memory beside the search result it was read from.
         """
         runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
@@ -323,13 +326,14 @@ class TestPipeBatchGraph:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-        # Verify the synthetic flat name was cleaned up after dotted-path batch processing
+        # The binding the dotted `batch_over` was rewritten into holds the sources as a list of documents
         final_memory = pipe_output.working_memory
-        assert final_memory.get_optional_stuff("search_result__sources") is None, (
-            "Synthetic flat name 'search_result__sources' should be cleaned up after batch processing"
-        )
+        bound_sources = final_memory.get_optional_stuff(f"{PRIVATE_BINDING_NAME_PREFIX}search_result_sources")
+        assert bound_sources is not None, "The bound list '_bound_search_result_sources' should be held in the run's working memory"
+        assert isinstance(bound_sources.content, ListContent), f"The bound sources should be a list, got {type(bound_sources.content).__name__}"
+        assert bound_sources.concept.concept_ref == NativeConceptCode.DOCUMENT.concept_ref
 
-        # Verify the original search_result remains in working memory
+        # The search result the sources were read from stays in working memory
         search_result = final_memory.get_optional_stuff("search_result")
         assert search_result is not None, "search_result should remain in working memory after batch processing"
 
