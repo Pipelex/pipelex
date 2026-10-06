@@ -307,6 +307,39 @@ output = "Text"
 steps = [{{ pipe = "{UNRESOLVED_PACKAGE_REFERENCE}", result = "out" }}]
 """
 
+# The invented package `UNRESOLVED_PACKAGE_MTHDS` calls, as a request ships it under `.mthds/methods/probe/` beside its
+# bundle. Its entry composes a text that says whose copy it is, which a dry run renders too, so a run's output tells which
+# copy answered the call: a test installing a competing copy in the store replaces `VENDORED_PROBE_MARKER` with another one.
+VENDORED_PROBE_ADDRESS = "github.com/invented/probe-lib/probe"
+VENDORED_PROBE_MARKER = "VENDORED copy"
+VENDORED_PROBE_MANIFEST = """\
+[package]
+name = "probe"
+address = "github.com/invented/probe-lib"
+version = "0.1.0"
+description = "An invented package a request ships with its bundle"
+
+[exports.probe_dep]
+pipes = ["entry"]
+"""
+VENDORED_PROBE_MTHDS = f"""\
+domain = "probe_dep"
+
+[pipe.entry]
+type = "PipeCompose"
+description = "Say which copy of the package answered"
+inputs = {{ text = "Text" }}
+output = "Text"
+template = "{VENDORED_PROBE_MARKER}: $text"
+"""
+
+# The `files` map of a bundle calling the invented package and shipping it: the bundle's own file, then the package.
+VENDORED_PROBE_FILES: dict[str, str] = {
+    "bundle.mthds": UNRESOLVED_PACKAGE_MTHDS,
+    ".mthds/methods/probe/METHODS.toml": VENDORED_PROBE_MANIFEST,
+    ".mthds/methods/probe/probe.mthds": VENDORED_PROBE_MTHDS,
+}
+
 # A bundle that loads but whose run fails one step down, in a live run and a dry run alike since no
 # pipe calls a model: `review_topic` runs the parallel `analyze_topic`, whose branch `draft_idea` gives
 # one `Idea` for the field `ideas`, which `TopicReview` declares as a list. The combine of the branch

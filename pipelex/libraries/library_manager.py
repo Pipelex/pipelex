@@ -24,7 +24,7 @@ from pipelex.core.concepts.helpers import make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -49,7 +49,7 @@ from pipelex.libraries.library_utils import (
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
 from pipelex.methods.exceptions import MethodDependencyFetchError, MethodFetchDisabledError
-from pipelex.methods.fetch_on_miss import resolve_address_based_method
+from pipelex.methods.fetch_on_miss import find_vendored_method, resolve_address_based_method
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, is_generated_structures_module
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
@@ -126,6 +126,44 @@ def _dependency_bundle_source(*, package_address: str, package_root: Path, mthds
             if candidate_path.is_relative_to(candidate_root):
                 return f"{package_address}/{candidate_path.relative_to(candidate_root).as_posix()}"
     return f"{package_address}/{mthds_path.name}"
+
+
+def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_address: str) -> PipelexBundleBlueprint:
+    """Parse one bundle of a dependency package under its caller-facing source, refusing the load when it does not parse.
+
+    The bundle is parsed from its text under ``bundle_source`` rather than from its path, so the blueprint, every item
+    a parse failure gives and every message the parser writes name the bundle by the package's address and its path
+    inside the package: parsing from the path would put the host's path into a TOML error's message and into the
+    blueprint's own messages. A file discovery has just listed that cannot be read is the host's fault and propagates.
+
+    Args:
+        mthds_path: The bundle's file on this host.
+        bundle_source: The bundle's caller-facing name, ``<package_address>/<path inside the package>``.
+        package_address: The package's address, which the refusal's summary names.
+
+    Returns:
+        The parsed blueprint, its ``source`` the caller-facing name.
+
+    Raises:
+        MthdsParserError: The bundle is not UTF-8 or does not parse; each item carries ``bundle_source`` as its source,
+            and the summary names the bundle and the package.
+    """
+    try:
+        mthds_content = mthds_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        msg = f"Bundle '{bundle_source}' of method package '{package_address}' is not valid UTF-8."
+        raise MthdsParserError(msg, validation_errors=[PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)]) from exc
+    try:
+        return MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_source)
+    except MthdsParserError as exc:
+        # Each item names the bundle in its text too: the verdict's summary is an item's message, and a caller reading
+        # it must learn that the fault is in a package the bundle calls, not in the bundle itself.
+        context = f"Bundle '{bundle_source}' of method package '{package_address}' does not parse"
+        items = [item.model_copy(update={"source": bundle_source, "message": f"{context}: {item.message}"}) for item in exc.validation_errors]
+        msg = f"{context}: {exc.message}"
+        raise MthdsParserError(
+            msg, validation_errors=items or [PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)]
+        ) from exc
 
 
 def _public_dependency_pipe_refs(*, resolved_dep: ResolvedDependency, blueprints: list[PipelexBundleBlueprint]) -> set[str] | None:
@@ -780,7 +818,9 @@ class LibraryManager(LibraryManagerAbstract):
             return all_pipes
 
     @override
-    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(
+        self, *, library_id: str, blueprints: list[PipelexBundleBlueprint], methods_dirs: list[Path] | None = None
+    ) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
         Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
@@ -789,6 +829,9 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The ID of the library to load into
             blueprints: List of parsed MTHDS blueprints to load
+            methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone, such as
+                the ones a request ships with its bundle. An address-based reference is looked up there first, and a
+                package found there is never installed anywhere.
 
         Returns:
             List of all pipes that were loaded
@@ -805,6 +848,7 @@ class LibraryManager(LibraryManagerAbstract):
             self._load_address_based_dependencies(
                 library_id=library_id,
                 blueprints=blueprints,
+                methods_dirs=methods_dirs,
             )
 
             # Build the crate (merges, qualifies, detects duplicates)
@@ -1238,10 +1282,17 @@ class LibraryManager(LibraryManagerAbstract):
         path on the host (see ``_dependency_bundle_source``), so a refusal inside the dependency names it
         that way on every surface.
 
+        A bundle of the dependency that does not parse refuses the load (``_parse_dependency_bundle``): a
+        package shipped with a request is the caller's own content, and a fetched package's author is owed
+        the same report rather than a later refusal saying the package lacks a pipe.
+
         Args:
             library: The main library to load into
             resolved_dep: The resolved dependency info
             package_address: The dependency's address as a reference names it, without any ``@<tag>``
+
+        Raises:
+            MthdsParserError: A bundle of the dependency does not parse, its items named by the bundle's source.
         """
         alias = resolved_dep.alias
 
@@ -1250,13 +1301,8 @@ class LibraryManager(LibraryManagerAbstract):
         # Where each bundle is on this host, by its caller-facing source, for the pipes that read a file beside it.
         bundle_files_by_source: dict[str, Path] = {}
         for mthds_path in resolved_dep.mthds_files:
-            try:
-                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
-            except (FileNotFoundError, MthdsParserError) as exc:
-                log.warning(f"Could not parse dependency '{alias}' bundle '{mthds_path}': {exc}")
-                continue
             bundle_source = _dependency_bundle_source(package_address=package_address, package_root=resolved_dep.package_root, mthds_path=mthds_path)
-            blueprint.source = bundle_source
+            blueprint = _parse_dependency_bundle(mthds_path=mthds_path, bundle_source=bundle_source, package_address=package_address)
             bundle_files_by_source[bundle_source] = mthds_path
             dep_blueprints.append(blueprint)
 
@@ -1409,15 +1455,17 @@ class LibraryManager(LibraryManagerAbstract):
         *,
         library_id: str,
         blueprints: list[PipelexBundleBlueprint],
+        methods_dirs: list[Path] | None = None,
     ) -> None:
         """Scan blueprints for cross-package pipe refs with address-based aliases and load them.
 
         Collects all cross-package pipe references from controller blueprints
         (sequences, batches, conditions, parallels), identifies those whose
         alias contains '/' (i.e. a full package address), and loads each
-        unique address-based dependency. A dependency missing from the
-        installed methods is fetched by address (honoring an ``@<tag>`` pin)
-        and installed when fetch-on-miss is enabled.
+        unique address-based dependency. A dependency is looked up first among
+        the packages of ``methods_dirs``, the load's own, then among the
+        installed methods; one missing from both is fetched by address
+        (honoring an ``@<tag>`` pin) and installed when fetch-on-miss is enabled.
 
         A package that cannot be resolved is the caller's to fix, since the reference is part of their bundle: every
         address is tried, then the load is refused with one ``unresolved_package_dependency`` item per address that
@@ -1431,6 +1479,7 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The library to load into
             blueprints: The parsed bundle blueprints to scan
+            methods_dirs: The load's own methods directories, searched before everything else and never written
 
         Raises:
             LibraryLoadingError: One or more referenced packages could not be resolved.
@@ -1461,6 +1510,7 @@ class LibraryManager(LibraryManagerAbstract):
                     library=library,
                     full_address=full_address,
                     extra_search_dirs=extra_search_dirs,
+                    methods_dirs=methods_dirs,
                 )
             except (MethodFetchDisabledError, MethodDependencyFetchError) as exc:
                 # The item carries the caller-facing text; the host's log keeps the whole cause chain, git's raw output
@@ -1494,25 +1544,29 @@ class LibraryManager(LibraryManagerAbstract):
         *,
         full_address: str,
         extra_search_dirs: list[Path] | None = None,
+        methods_dirs: list[Path] | None = None,
     ) -> None:
         """Load a method package on demand using its full address, fetching it on a miss.
 
-        Resolves the address to an installed method — fetching and installing the package
-        (honoring an ``@<tag>`` pin) when no installed method matches and fetch-on-miss is
-        enabled — builds a ResolvedDependency, and delegates to _load_single_dependency()
-        to load it as a child library with the full address as alias.
+        Looks the address up among the packages of ``methods_dirs`` first, which win over an installed copy of the same
+        address since they are the ones the caller chose, and on a miss resolves it to an installed method, fetching
+        and installing the package (honoring an ``@<tag>`` pin) when no installed method matches and fetch-on-miss is
+        enabled. It then builds a ResolvedDependency and delegates to _load_single_dependency() to load it as a child
+        library with the full address as alias.
 
         Args:
             library: The main library to load into
             full_address: The full package address (e.g. "github.com/Pipelex/methods/documents")
             extra_search_dirs: Additional .mthds/methods/ directories to scan
+            methods_dirs: The load's own methods directories, searched before everything else and never written
 
         Raises:
-            MethodRefError: The address resolves to no installed method and could not be
+            MethodRefError: The address resolves to no vendored or installed method and could not be
                 fetched — fetch-on-miss disabled, an unfetchable address, a failed fetch,
                 or a failed install. Never a silent pass.
         """
-        installed = resolve_address_based_method(full_address=full_address, extra_search_dirs=extra_search_dirs)
+        vendored = find_vendored_method(full_address=full_address, methods_dirs=methods_dirs) if methods_dirs else None
+        installed = vendored or resolve_address_based_method(full_address=full_address, extra_search_dirs=extra_search_dirs)
 
         exported_pipe_codes = determine_exported_pipes(manifest=installed.manifest)
 

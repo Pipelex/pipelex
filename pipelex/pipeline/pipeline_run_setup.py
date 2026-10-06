@@ -69,6 +69,7 @@ async def pipeline_run_setup(
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
     library_dirs_are_callers: bool = False,
+    methods_dirs: list[Path] | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -169,6 +170,11 @@ async def pipeline_run_setup(
         loading them is the caller's invalid bundle. ``False`` (a host's own directories) loads them
         untranslated. The ``mthds_contents`` are always the caller's: a refusal while loading them is
         always the ``ValidateBundleError`` verdict. See :func:`acquire_library`.
+    methods_dirs:
+        Directories laid out like ``.mthds/methods/`` holding the method packages the caller ships with
+        ``mthds_contents``, for this run alone. An address-based reference is looked up there before the
+        installed stores and fetch-on-miss, and a package found there is never installed. See
+        :func:`acquire_library`.
 
     Returns:
     -------
@@ -298,6 +304,7 @@ async def pipeline_run_setup(
             mthds_contents=mthds_contents,
             bundle_uris=bundle_uris,
             library_dirs_are_callers=library_dirs_are_callers,
+            methods_dirs=methods_dirs,
         )
         library_acquired = True
 

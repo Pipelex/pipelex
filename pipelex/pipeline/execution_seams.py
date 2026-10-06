@@ -68,6 +68,7 @@ def acquire_library(
     mthds_contents: list[str] | None = None,
     bundle_uris: list[str] | None = None,
     library_dirs_are_callers: bool = False,
+    methods_dirs: list[Path] | None = None,
 ) -> tuple[str, str | None]:
     """Set the current library, open it, and load dirs + blueprints into it.
 
@@ -95,6 +96,11 @@ def acquire_library(
     them is the caller's invalid bundle too, reported as ``validate`` reports it. On a host they are
     the host's (installed libraries, a temporary directory of shipped Python): a fault there is not
     the caller's to fix and its paths are not the caller's to read, so by default they load untranslated.
+
+    ``methods_dirs`` are directories laid out like ``.mthds/methods/`` holding the packages the caller ships with the
+    ``mthds_contents`` (on a host, the ones a request carries under ``.mthds/methods/<name>/``). An address-based
+    reference of the contents is looked up there first, before the installed stores and fetch-on-miss, and a package
+    found there is never installed; the bundles of a package are named by its address, never by these directories.
 
     Returns the ``library_id`` and the bundle's qualified ``main_pipe`` ref
     (``domain.pipe_code``) when an ``mthds_contents`` bundle declares one, else
@@ -148,7 +154,7 @@ def acquire_library(
                             blueprints_to_load.append(blueprint)
 
                 if blueprints_to_load:
-                    library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
+                    library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load, methods_dirs=methods_dirs)
 
             # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with
             # the same code — via the one shared selection rule (first declaring main_pipe, else first).
