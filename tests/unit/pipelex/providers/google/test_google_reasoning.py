@@ -19,12 +19,20 @@ _GOOGLE_LEVEL_MAP: dict[str, str] = {
 }
 
 
-def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> GoogleLLMWorker:
-    """Create a minimal GoogleLLMWorker with a mocked inference_model."""
+def _make_worker(
+    mocker: MockerFixture,
+    thinking_mode: ThinkingMode,
+    *,
+    min_thinking_budget: int | None = None,
+    max_thinking_budget: int | None = None,
+) -> GoogleLLMWorker:
+    """Create a minimal GoogleLLMWorker with a mocked inference_model, declaring no thinking budget bounds by default."""
     worker = object.__new__(GoogleLLMWorker)
     mock_model = mocker.MagicMock()
     mock_model.thinking_mode = thinking_mode
     mock_model.desc = "test-model"
+    mock_model.min_thinking_budget = min_thinking_budget
+    mock_model.max_thinking_budget = max_thinking_budget
     worker.inference_model = mock_model
     return worker
 
@@ -202,3 +210,61 @@ class TestGoogleReasoning:
         result = worker._build_thinking_config(job_params=job_params, max_tokens=2000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 1500
+
+    @pytest.mark.parametrize(
+        ("min_thinking_budget", "max_thinking_budget", "reasoning_budget", "max_tokens", "expected_budget"),
+        [
+            # gemini-2.5-flash-lite takes 512 to 24576: a budget under it is raised to it
+            (512, 24576, 200, 100000, 512),
+            # and a max_tokens of 800 leaves 600 after the answer reserve, inside the range
+            (512, 24576, 1024, 800, 600),
+            # gemini-2.5-pro takes 128 to 32768
+            (128, 32768, 64, 100000, 128),
+            # gemini-2.5-flash takes at most 24576, with or without a max_tokens to fit in
+            (None, 24576, 32768, None, 24576),
+            (None, 24576, 65536, 100000, 24576),
+        ],
+    )
+    def test_explicit_budget_held_within_the_model_bounds(
+        self,
+        mocker: MockerFixture,
+        min_thinking_budget: int | None,
+        max_thinking_budget: int | None,
+        reasoning_budget: int,
+        max_tokens: int | None,
+        expected_budget: int,
+    ):
+        worker = _make_worker(
+            mocker, thinking_mode=ThinkingMode.MANUAL, min_thinking_budget=min_thinking_budget, max_thinking_budget=max_thinking_budget
+        )
+        job_params = LLMJobParams(temperature=0.5, reasoning_budget=reasoning_budget)
+        result = worker._build_thinking_config(job_params=job_params, max_tokens=max_tokens)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_budget == expected_budget
+
+    def test_effort_budget_without_max_tokens_is_cut_to_the_model_maximum(self, mocker: MockerFixture):
+        """`max` effort's 65,536 is beyond every Gemini 2.5 model, so a model's declared maximum applies when no max_tokens is set."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL, min_thinking_budget=128, max_thinking_budget=32768)
+        google_config = GoogleConfig(effort_to_level_map=_GOOGLE_LEVEL_MAP)
+        mocker.patch(
+            "pipelex.providers.google.google_llm_worker.get_config",
+            return_value=mocker.MagicMock(
+                inference=mocker.MagicMock(
+                    llm=mocker.MagicMock(
+                        get_reasoning_budget=mocker.MagicMock(return_value=65536),
+                        google=google_config,
+                    ),
+                ),
+            ),
+        )
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.MAX)
+        result = worker._build_thinking_config(job_params=job_params, max_tokens=None)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_budget == 32768
+
+    def test_max_tokens_too_small_for_the_model_minimum_is_refused(self, mocker: MockerFixture):
+        """gemini-2.5-flash-lite takes no budget under 512, and 600 output tokens leave 450 after the answer reserve."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL, min_thinking_budget=512, max_thinking_budget=24576)
+        job_params = LLMJobParams(temperature=0.5, reasoning_budget=1024)
+        with pytest.raises(LLMCapabilityError, match="max_tokens=600"):
+            worker._build_thinking_config(job_params=job_params, max_tokens=600)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

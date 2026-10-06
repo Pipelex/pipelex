@@ -64,8 +64,6 @@ class _ThinkingParams:
 class AnthropicLLMWorker(LLMWorkerAbstract):
     # Key into inference.llm.effort_to_budget_maps for manual-thinking budget resolution
     reasoning_budget_family: ClassVar[str] = "anthropic"
-    # The smallest budget_tokens Anthropic accepts for manual thinking; it refuses a smaller one by name
-    min_thinking_budget: ClassVar[int] = 1024
 
     def __init__(
         self,
@@ -193,7 +191,11 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     effort=effort,
                 )
                 safe_budget = fit_thinking_budget(
-                    budget=budget, max_tokens=max_tokens, min_budget=self.min_thinking_budget, model_desc=self.inference_model.desc
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=self.inference_model.min_thinking_budget,
+                    max_budget=self.inference_model.max_thinking_budget,
+                    model_desc=self.inference_model.desc,
                 )
                 log.verbose(f"Anthropic manual thinking with budget_tokens={safe_budget} (from effort={effort})")
                 thinking_config = {"type": "enabled", "budget_tokens": safe_budget}
@@ -223,7 +225,11 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 raise LLMCapabilityError(msg)
             case ThinkingMode.MANUAL:
                 safe_budget = fit_thinking_budget(
-                    budget=budget, max_tokens=max_tokens, min_budget=self.min_thinking_budget, model_desc=self.inference_model.desc
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=self.inference_model.min_thinking_budget,
+                    max_budget=self.inference_model.max_thinking_budget,
+                    model_desc=self.inference_model.desc,
                 )
                 log.verbose(f"Anthropic thinking with explicit budget_tokens={safe_budget}")
                 thinking_config: ThinkingConfigParam = {"type": "enabled", "budget_tokens": safe_budget}
@@ -346,13 +352,19 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         model to the tool call, the request instructor makes for manual thinking. A model that refuses a forced tool
         choice even without thinking, Fable 5.1 among them, names `anthropic_reasoning_tools` to get the same request
         always. instructor leaves a `tool_choice` it is given as it is, and sends a `system` it is given ahead of the
-        prompt's.
+        prompt's. An auto choice would let the model answer with several tool calls, which instructor's parser
+        refuses, so parallel tool use is disabled as instructor does on a forced choice. All of this concerns the
+        tool modes only: a JSON mode defines no tool, and its request is left as instructor makes it.
         """
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
+
+        if self.instructor_for_objects.mode != InstructorMode.TOOLS:
+            return {}
         is_thinking = thinking_params.thinking is not None
         if not is_thinking and self.inference_model.structure_method != StructureMethod.INSTRUCTOR_ANTHROPIC_REASONING_TOOLS:
             return {}
         return {
-            "tool_choice": {"type": "auto"},
+            "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
             "system": [{"type": "text", "text": "Return only the tool call and no additional text."}],
         }
 

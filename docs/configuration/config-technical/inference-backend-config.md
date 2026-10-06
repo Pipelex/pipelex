@@ -233,7 +233,22 @@ A file whose format the consuming model does not declare is refused with an inpu
 
 One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice. A structured call with thinking on, manual or adaptive, makes that same request on any Anthropic tool method, since a forced choice cannot carry thinking; so `instructor/anthropic_reasoning_tools` is only needed for a model that refuses a forced choice even without thinking.
 
+On the `mistral` SDK, a reasoning setting on a structured output needs `instructor/mistral_tools`: a reasoning reply carries its answer beside a thinking chunk, which `instructor/mistral_structured_outputs` cannot parse, so that method refuses one.
+
 The `google` backend uses `instructor/genai_structured_outputs`, Gemini's native JSON output. `instructor/genai_tools` works on it too: Gemini returns the function-call arguments as plain values, so pipelex validates them in pydantic's lax mode, where a string reaches an enum field as its member.
+
+#### Thinking budget bounds
+
+A model that thinks on a token budget (`thinking_mode = "manual"` on the `anthropic`, `bedrock_anthropic` and `google` SDKs) may declare the range of budgets its provider accepts, as two valued constraints, both inclusive and both optional:
+
+```toml
+# google.toml
+["gemini-2.5-flash-lite"]
+model_id = "gemini-2.5-flash-lite"
+valued_constraints = { min_thinking_budget = 512, max_thinking_budget = 24576 }
+```
+
+A budget resolved from a reasoning effort, or set explicitly, is held within that range, and a `max_tokens` too small to hold the minimum beside the quarter kept for the answer is refused before the call is sent. The kit's Anthropic models declare Anthropic's minimum of 1,024 tokens, and its Gemini 2.5 models declare their ranges; a model that declares neither gets its budget fitted inside `max_tokens` alone.
 
 #### Sending extra request headers per model
 

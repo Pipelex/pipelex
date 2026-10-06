@@ -228,7 +228,7 @@ Both modes first check `inference.llm.anthropic.effort_to_level_map` to gate rea
 
 **ADAPTIVE mode** uses `{"type": "adaptive"}` with an `OutputConfigParam(effort=...)` where the effort value comes from the level map.
 
-**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config (keyed by the worker-owned reasoning family — `"anthropic"` for the Anthropic worker), then sends `{"type": "enabled", "budget_tokens": N}`. The budget is fitted inside `max_tokens` as described in [Fitting a Budget Inside max_tokens](#fitting-a-budget-inside-max_tokens): a quarter of `max_tokens` is kept for the answer, and a budget below Anthropic's minimum of 1,024 tokens is raised to it.
+**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config (keyed by the worker-owned reasoning family — `"anthropic"` for the Anthropic worker), then sends `{"type": "enabled", "budget_tokens": N}`. The budget is fitted inside `max_tokens` as described in [Fitting a Budget Inside max_tokens](#fitting-a-budget-inside-max_tokens): a quarter of `max_tokens` is kept for the answer, and a budget below Anthropic's minimum of 1,024 tokens, which the kit's Anthropic models declare as their `min_thinking_budget`, is raised to it.
 
 **`reasoning_budget`** (explicit) uses `{"type": "enabled", "budget_tokens": N}` on a manual-mode model, fitted the same way. An adaptive-mode model refuses an explicit budget with `LLMCapabilityError`, since adaptive thinking takes an effort.
 
@@ -274,7 +274,7 @@ If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is dis
 | `XHIGH` | `32768` |
 | `MAX` | `65536` |
 
-**`reasoning_budget`** (explicit) passes through directly as `thinking_budget`. When `max_tokens` is known, the budget is fitted inside it as described in [Fitting a Budget Inside max_tokens](#fitting-a-budget-inside-max_tokens), keeping a quarter of `max_tokens` for the answer. Gemini has no minimum budget.
+**`reasoning_budget`** (explicit) is sent as `thinking_budget`, fitted as described in [Fitting a Budget Inside max_tokens](#fitting-a-budget-inside-max_tokens): a quarter of `max_tokens` is kept for the answer when the request sets one, and the budget is held within the range the model accepts, which each Gemini 2.5 model declares in its spec (`gemini-2.5-pro` takes 128 to 32,768, `gemini-2.5-flash` at most 24,576 and `gemini-2.5-flash-lite` 512 to 24,576). The same fitting applies to a budget resolved from an effort, so `MAX` effort's 65,536 tokens are cut to the model's maximum even when no `max_tokens` is set.
 
 !!! note
     An explicit `reasoning_budget` always produces a `thinking_budget`-based config, even when the model uses `thinking_mode = "adaptive"`. This overrides the `thinking_level` approach that adaptive mode normally uses.
@@ -324,9 +324,9 @@ Gateway and proxy backends (Azure OpenAI, Portkey, BlackBoxAI, OpenRouter) route
 - **Azure OpenAI** uses `sdk = "azure_openai_responses"`, routing through the OpenAI Responses worker. Reasoning models declare `thinking_mode = "manual"` and use OpenAI-style `reasoning_effort`.
 - **Portkey** uses `portkey_completions` or `portkey_responses` SDKs, both routing through OpenAI workers. All models — including Anthropic and Google models proxied via Portkey — follow OpenAI reasoning semantics.
 - **BlackBoxAI** uses `sdk = "openai"` or `"openai_responses"`. Proxied models follow OpenAI reasoning semantics.
+- **OpenRouter** uses `sdk = "openai"` for its language models, which declare `thinking_mode = "none"`, so the kit's OpenRouter models take no reasoning controls.
 
 Whether a server behind the OpenAI chat-completions SDK accepts a reasoning effort beside the function tool a structured output uses is that server's decision; see [Structured Generation](#structured-generation).
-- **OpenRouter** uses `sdk = "openai"` for its language models, which declare `thinking_mode = "none"`, so the kit's OpenRouter models take no reasoning controls.
 
 !!! note
     When a provider's models are accessed through a gateway using an OpenAI-compatible SDK, the reasoning controls follow OpenAI semantics (`reasoning_effort`) rather than the provider's native semantics. For native reasoning controls (e.g., Anthropic thinking budgets, Google thinking levels), use the direct provider backend.
@@ -373,9 +373,9 @@ The budget is resolved at runtime via `LLMConfig.get_reasoning_budget()` (`pipel
 
 Anthropic and Gemini count the thinking budget against `max_tokens`, so a budget that fills it leaves the answer, a tool call on a structured output, nothing to be written in. Every manual budget, resolved from an effort or set explicitly, is therefore fitted by `fit_thinking_budget()` (`pipelex/cogt/llm/thinking_budget.py`) before it is sent:
 
-- A quarter of `max_tokens` is reserved for the answer, so the budget is cut to at most `max_tokens` minus that reserve.
-- Where the provider has a minimum budget, the budget is raised to it. Anthropic refuses a `budget_tokens` below 1,024 (`AnthropicLLMWorker.min_thinking_budget`); Gemini has no minimum.
-- When `max_tokens` cannot hold the minimum beside the reserve, the call is refused with an `LLMCapabilityError` naming `max_tokens`, the reserve and the minimum, rather than sent to fail at the provider.
+- The budget is held within the range the provider accepts for the model, which the model's spec declares as two valued constraints, `min_thinking_budget` and `max_thinking_budget`, both inclusive and both optional. The kit's Anthropic models declare Anthropic's minimum of 1,024, and its Gemini 2.5 models declare their ranges. A server reached through the `anthropic` SDK that is not Anthropic, such as MiniMax, declares no minimum and gets none.
+- When the request sets `max_tokens`, a quarter of it is reserved for the answer, so the budget is cut to at most `max_tokens` minus that reserve.
+- When `max_tokens` cannot hold the model's minimum beside the reserve, the call is refused with an `LLMCapabilityError` naming `max_tokens`, the reserve and the minimum, rather than sent to fail at the provider.
 
 On the Anthropic structured path, `max_tokens` is first capped by the structured-output timeout (`inference.llm.anthropic.structured_output_timeout_seconds`, 42,666 tokens at the default 1,200 seconds), so a `MAX` effort's 65,536-token budget becomes 32,000 there.
 
@@ -420,11 +420,11 @@ How each provider carries the setting beside its structuring path:
 
 - **OpenAI Responses** (`openai_responses`, `azure_openai_responses`, `portkey_responses` and the hosted gateway) sends `reasoning={"effort": …}` beside the function tool and drops `temperature`, as on text.
 - **OpenAI chat completions** sends `reasoning_effort` beside the tool or JSON schema and drops `temperature`. Whether the server accepts a reasoning effort beside a function tool is its own decision: OpenAI's own chat-completions endpoint refuses it on GPT-5 models ("Function tools with reasoning_effort are not supported"), and accepts it with the `instructor/json_schema` structure method or on the Responses SDK, which every OpenAI model in the kit uses. Gemini's OpenAI-compatible endpoint accepts it beside a function tool.
-- **Anthropic** sends `thinking` (and `output_config` for adaptive models) and leaves the tool choice to the model whenever thinking is on, with a system line steering it to the tool call. A forced tool choice cannot carry thinking: Anthropic refuses it beside manual thinking, and under adaptive thinking it accepts it and the model silently does not think. The same request is what `instructor/anthropic_reasoning_tools` sends without thinking, for a model that refuses a forced choice outright.
+- **Anthropic** sends `thinking` (and `output_config` for adaptive models). On the tool structure methods it leaves the tool choice to the model whenever thinking is on, with parallel tool use disabled and a system line steering it to the tool call. A forced tool choice cannot carry thinking: Anthropic refuses it beside manual thinking, and under adaptive thinking it accepts it and the model silently does not think. The same request is what `instructor/anthropic_reasoning_tools` sends without thinking, for a model that refuses a forced choice outright. `instructor/anthropic_json` defines no tool, so its request carries thinking and nothing about a tool choice.
 - **Google** passes the same `ThinkingConfig` as on text, under both `instructor/genai_structured_outputs` and `instructor/genai_tools`.
-- **Mistral** sends `reasoning_effort` beside its tool call, as on text.
+- **Mistral** sends `reasoning_effort` beside its tool call, as on text. A reasoning reply carries its answer in a list of content chunks beside the thinking, which instructor's JSON parsers cannot read, so a model whose structure method is `instructor/mistral_structured_outputs` refuses a reasoning setting on a structured output with an `LLMCapabilityError` naming `instructor/mistral_tools`.
 
-Bedrock native models (`bedrock_aioboto`) refuse every reasoning parameter on both paths.
+Bedrock native models (`bedrock_aioboto`) refuse every reasoning parameter on text, and have no structured path at all: their worker refuses every structured output.
 
 Reasoning spends the same output budget as the answer, so a structured output on a high effort needs room for both; see [Fitting a Budget Inside max_tokens](#fitting-a-budget-inside-max_tokens) for the budget-based providers.
 
@@ -449,7 +449,8 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `reasoning_budget` on a provider that doesn't support it | "does not support reasoning_budget" |
 | `thinking_mode = "adaptive"` on OpenAI or Mistral | "adaptive ... not supported" |
 | Any reasoning param on Bedrock (aiobotocore) models | "does not support reasoning parameters" |
-| A manual Anthropic budget that `max_tokens` cannot hold beside the answer reserve | "cannot think within max_tokens" |
+| A manual budget that `max_tokens` cannot hold beside the answer reserve, under the model's `min_thinking_budget` | "cannot think within max_tokens" |
+| A reasoning setting on a Mistral structured output whose structure method is not `instructor/mistral_tools` | "cannot reason on a structured output" |
 | Both `reasoning_effort` and `reasoning_budget` set | `ValueError` / `LLMSettingValueError` (mutual exclusivity) |
 
 ---
@@ -463,12 +464,12 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `pipelex/cogt/llm/reasoning_config_base.py` | Shared helpers: `EffortToLevelMap`, `validate_effort_to_level_map()`, `get_reasoning_level_str()` |
 | `pipelex/cogt/llm/llm_setting.py` | `LLMSetting` with reasoning fields and `make_llm_job_params()` |
 | `pipelex/cogt/config_cogt.py` | `LLMConfig` with `get_reasoning_budget()` and effort-to-budget map validation |
-| `pipelex/cogt/llm/thinking_budget.py` | `fit_thinking_budget()`: the answer reserve and the provider minimum |
+| `pipelex/cogt/llm/thinking_budget.py` | `fit_thinking_budget()`: the answer reserve and the model's budget bounds |
 | `pipelex/providers/openai/openai_config.py` | `OpenAIConfig` with `get_reasoning_level()` returning `ChatCompletionReasoningEffort \| None` |
 | `pipelex/providers/anthropic/anthropic_config.py` | `AnthropicConfig` with `get_reasoning_level()` returning `AnthropicEffortLevel \| None` |
 | `pipelex/providers/google/google_config.py` | `GoogleConfig` with `get_reasoning_level()` returning `genai_types.ThinkingLevel \| None` |
 | `pipelex/providers/mistral/mistral_config.py` | `MistralConfig` with `get_reasoning_level()` returning Mistral's `ReasoningEffort \| None` |
-| `pipelex/cogt/model_backends/model_spec.py` | `InferenceModelSpec.thinking_mode` field |
+| `pipelex/cogt/model_backends/model_spec.py` | `InferenceModelSpec.thinking_mode` field, and the `min_thinking_budget` and `max_thinking_budget` bounds read from its valued constraints |
 | `pipelex/providers/openai/openai_completions_llm_worker.py` | OpenAI Completions reasoning resolution |
 | `pipelex/providers/openai/openai_responses_llm_worker.py` | OpenAI Responses reasoning resolution |
 | `pipelex/providers/anthropic/anthropic_llm_worker.py` | Anthropic thinking params builder |

@@ -37,6 +37,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 1.25, output = 10.0 }
+valued_constraints = { min_thinking_budget = 128, max_thinking_budget = 32768 }
 
 ["gemini-2.5-flash"]
 model_id = "gemini-2.5-flash"
@@ -44,6 +45,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.30, output = 2.50 }
+valued_constraints = { max_thinking_budget = 24576 }
 
 ["gemini-2.5-flash-lite"]
 model_id = "gemini-2.5-flash-lite"
@@ -51,6 +53,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.10, output = 0.40 }
+valued_constraints = { min_thinking_budget = 512, max_thinking_budget = 24576 }
 
 # --- Gemini 3.0 Series ----------------------------------------
 ["gemini-3.0-flash"]

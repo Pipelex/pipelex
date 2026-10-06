@@ -154,8 +154,13 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     family=self.reasoning_budget_family,
                     effort=effort,
                 )
-                if max_tokens is not None:
-                    budget = fit_thinking_budget(budget=budget, max_tokens=max_tokens, min_budget=None, model_desc=self.inference_model.desc)
+                budget = fit_thinking_budget(
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=self.inference_model.min_thinking_budget,
+                    max_budget=self.inference_model.max_thinking_budget,
+                    model_desc=self.inference_model.desc,
+                )
                 log.verbose(f"Google manual thinking with thinking_budget={budget} (from effort={effort})")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.ADAPTIVE:
@@ -179,8 +184,13 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         """Build thinking config when reasoning_budget is specified."""
         match thinking_mode:
             case ThinkingMode.MANUAL | ThinkingMode.ADAPTIVE:
-                if max_tokens is not None:
-                    budget = fit_thinking_budget(budget=budget, max_tokens=max_tokens, min_budget=None, model_desc=self.inference_model.desc)
+                budget = fit_thinking_budget(
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=self.inference_model.min_thinking_budget,
+                    max_budget=self.inference_model.max_thinking_budget,
+                    model_desc=self.inference_model.desc,
+                )
                 log.verbose(f"Google thinking with explicit thinking_budget={budget}")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:

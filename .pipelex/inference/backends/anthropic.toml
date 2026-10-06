@@ -25,6 +25,7 @@ model_type = "llm"
 sdk = "anthropic"
 structure_method = "instructor/anthropic_tools"
 thinking_mode = "manual"
+valued_constraints = { min_thinking_budget = 1024 } # Anthropic refuses a smaller budget_tokens
 
 ################################################################################
 # LANGUAGE MODELS

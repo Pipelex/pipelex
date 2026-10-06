@@ -9,3 +9,6 @@ class ListedConstraint(StrEnum):
 
 class ValuedConstraint(StrEnum):
     FIXED_TEMPERATURE = "fixed_temperature"
+    # The bounds of the manual thinking budget the provider accepts for the model, both inclusive
+    MIN_THINKING_BUDGET = "min_thinking_budget"
+    MAX_THINKING_BUDGET = "max_thinking_budget"

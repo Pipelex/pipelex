@@ -18,13 +18,15 @@ _ANTHROPIC_LEVEL_MAP: dict[str, str] = {
 }
 
 
-def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> AnthropicLLMWorker:
-    """Create a minimal AnthropicLLMWorker with a mocked inference_model."""
+def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode, *, min_thinking_budget: int | None = 1024) -> AnthropicLLMWorker:
+    """Create a minimal AnthropicLLMWorker with a mocked inference_model, by default declaring Anthropic's minimum budget."""
     worker = object.__new__(AnthropicLLMWorker)
     worker.extras_factory = None
     mock_model = mocker.MagicMock()
     mock_model.thinking_mode = thinking_mode
     mock_model.desc = "test-model"
+    mock_model.min_thinking_budget = min_thinking_budget
+    mock_model.max_thinking_budget = None
     worker.inference_model = mock_model
     return worker
 
@@ -91,6 +93,14 @@ class TestAnthropicReasoning:
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.LOW)
         with pytest.raises(LLMCapabilityError, match="max_tokens=1200"):
             worker._build_thinking_params(job_params=job_params, max_tokens=1200)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+    def test_a_model_declaring_no_minimum_is_sent_the_fitted_budget(self, mocker: MockerFixture):
+        """A server behind the anthropic SDK that declares no minimum, MiniMax among them, is neither raised nor refused."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL, min_thinking_budget=None)
+        _mock_config(mocker, budget_mock=mocker.MagicMock(return_value=1024))
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.LOW)
+        result = worker._build_thinking_params(job_params=job_params, max_tokens=1200)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result.thinking == {"type": "enabled", "budget_tokens": 900}
 
     def test_manual_mode_effort_none_disables_thinking(self, mocker: MockerFixture):
         """MANUAL mode with NONE effort disables thinking entirely (no budget lookup)."""

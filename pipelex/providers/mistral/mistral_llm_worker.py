@@ -227,9 +227,19 @@ class MistralLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
-        messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
-        # Deferred import: avoid pulling heavy SDK at module-load time
+        # Deferred imports: avoid pulling heavy SDK at module-load time
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
+
+        if reasoning_effort is not UNSET and self.instructor_for_objects.mode != InstructorMode.TOOLS:
+            # A reasoning reply carries its answer beside a thinking chunk in a list of content chunks, which instructor's
+            # JSON parsers read as one string and refuse on every attempt; its tool mode reads the tool call and validates
+            msg = (
+                f"Model '{self.inference_model.desc}' cannot reason on a structured output with structure method "
+                f"'{self.inference_model.structure_method}': use 'instructor/mistral_tools', or remove the reasoning setting"
+            )
+            raise LLMCapabilityError(msg)
+        messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
