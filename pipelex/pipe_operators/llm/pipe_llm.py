@@ -158,14 +158,16 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         """Refuse the model setting this pipe generates its output with when the model it resolves to refuses it.
 
         A single text is generated with the `model` setting, any other output with the setting for objects:
-        `model_to_structure`, else `model`, else the deck's default for structured outputs. A `Dynamic` output
-        is checked as text, its default, since the concept it stands for is only known when the pipe runs, and
-        a text output a run asks to multiply is generated as objects, which only that run knows. A reference
-        the deck does not define is refused when the pipe is built, so it is not looked up again here.
+        `model_to_structure`, else `model`, else the deck's override or default for structured outputs. A
+        declared multiplicity sends any output down the object path, a `Dynamic` one included. A single
+        `Dynamic` output is checked as text, its default, since the concept it stands for is only known when
+        the pipe runs, and a text output a run asks to multiply is generated as objects, which only that run
+        knows. A reference the deck does not define is refused when the pipe is built, so it is not looked up
+        again here.
         """
         llm_for_text_choice = self.llm_choices.for_text if self.llm_choices else None
         llm_for_object_choice = self.llm_choices.for_object if self.llm_choices else None
-        is_structured = not is_dynamic_output and not self._generates_single_text()
+        is_structured = not self._generates_single_text(is_dynamic_output=is_dynamic_output)
         llm_choice: LLMModelChoice | None
         field_name: str | None
         try:
@@ -193,12 +195,17 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             is_structured=is_structured,
         )
 
-    def _generates_single_text(self) -> bool:
-        """Whether the pipe's declared output is generated as one text, on the text path, rather than as objects."""
+    def _generates_single_text(self, *, is_dynamic_output: bool) -> bool:
+        """Whether the pipe's declared output is generated as one text, on the text path, rather than as objects.
+
+        A single `Dynamic` output counts as text, the concept a run resolves it to when its caller names none.
+        """
         is_multiple_output = output_multiplicity_to_apply(
             base_multiplicity=self.output_multiplicity, override_multiplicity=None
         ).is_multiple_outputs_enabled
-        return not is_multiple_output and get_concept_library().is_compatible(
+        if is_multiple_output:
+            return False
+        return is_dynamic_output or get_concept_library().is_compatible(
             tested_concept=self.output.concept,
             wanted_concept=get_native_concept(NativeConceptCode.TEXT),
             strict=True,

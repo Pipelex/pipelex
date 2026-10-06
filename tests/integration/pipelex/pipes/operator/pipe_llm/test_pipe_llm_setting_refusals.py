@@ -73,6 +73,41 @@ class TestPipeLLMSettingRefusals:
         )
         await validate_bundle(mthds_contents=[bundle])
 
+    async def test_a_list_of_dynamic_outputs_is_checked_against_its_structuring_setting(self) -> None:
+        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+            output="Dynamic[]",
+            model_fields=(
+                f'model = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_effort = "high" }}\n'
+                f'model_to_structure = {{ model = "{_WITHOUT_THINKING}", temperature = 1, reasoning_effort = "low" }}'
+            ),
+        )
+        item = await _the_refusal(bundle)
+        assert item.field_name == "model_to_structure"
+        assert "PipeLLM 'answer_it' generates a structured output" in item.message
+
+    @pytest.mark.parametrize("output", ["Dynamic", "Text"])
+    async def test_a_single_dynamic_or_text_output_is_checked_against_its_text_setting(self, output: str) -> None:
+        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+            output=output,
+            model_fields=(
+                f'model = {{ model = "{_WITHOUT_THINKING}", temperature = 1, reasoning_effort = "high" }}\n'
+                f'model_to_structure = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_effort = "low" }}'
+            ),
+        )
+        item = await _the_refusal(bundle)
+        assert item.field_name == "model"
+        assert "PipeLLM 'answer_it' generates text" in item.message
+
+    async def test_a_list_of_dynamic_outputs_is_not_checked_against_its_text_setting(self) -> None:
+        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+            output="Dynamic[]",
+            model_fields=(
+                f'model = {{ model = "{_WITHOUT_THINKING}", temperature = 1, reasoning_effort = "high" }}\n'
+                f'model_to_structure = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_effort = "low" }}'
+            ),
+        )
+        await validate_bundle(mthds_contents=[bundle])
+
     @pytest.mark.parametrize("output", ["Verdict", "Text"])
     async def test_a_reasoning_effort_the_model_takes_validates(self, output: str) -> None:
         bundle = LLMSettingCheckTestData.pipe_llm_bundle(

@@ -225,7 +225,7 @@ class PluginRegistrar:
     ) -> None:
         """Register the worker factory serving one sdk of one inference family.
 
-        ``check_llm_request`` is read for the LLM family only: the checks the worker ``make_worker`` builds
+        ``check_llm_request`` is read for the LLM family only: the check the worker ``make_worker`` builds
         applies to a request before calling its provider, which bundle validation runs against the model a
         pipe's setting resolves to (see ``CheckLLMRequestFn``). A duplicate backend is refused before its
         check is recorded, so a check never outlives the backend it belongs to.
@@ -240,8 +240,12 @@ class PluginRegistrar:
                 family=family, sdk=sdk, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )
-        if family == InferenceFamily.LLM and check_llm_request is not None:
-            self.llm_request_checks[sdk] = check_llm_request
+        match family:
+            case InferenceFamily.LLM:
+                if check_llm_request is not None:
+                    self.llm_request_checks[sdk] = check_llm_request
+            case InferenceFamily.IMG_GEN | InferenceFamily.EXTRACT | InferenceFamily.SEARCH | InferenceFamily.DOC_GEN | InferenceFamily.JUDGMENT:
+                pass
 
     def add_model_lister(self, *, sdk: str, lister: ListModelsFn) -> None:
         self._add(

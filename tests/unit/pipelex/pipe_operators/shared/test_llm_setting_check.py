@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -20,6 +21,11 @@ _WORKER_REFUSAL = "Model 'some-model' does not support reasoning (thinking_mode=
 
 
 class TestLLMSettingCheck:
+    @classmethod
+    def _patch_deck_overrides(cls, mocker: MockerFixture, *, for_text: LLMModelChoice | None, for_object: LLMModelChoice | None) -> None:
+        deck = SimpleNamespace(llm_choice_overrides=SimpleNamespace(for_text=for_text, for_object=for_object))
+        mocker.patch("pipelex.pipe_operators.shared.llm_setting_check.get_model_deck", return_value=deck)
+
     @pytest.mark.parametrize(
         ("llm_choice", "field_name", "is_structured", "expected_message", "expected_model_reference"),
         [
@@ -47,7 +53,8 @@ class TestLLMSettingCheck:
                 None,
                 False,
                 "PipeLLM 'answer_it' generates text with the model deck's default setting for text, "
-                f"which the model it resolves to refuses: {_WORKER_REFUSAL} Name a model setting in the pipe, or change the deck's default for text.",
+                f"which the model it resolves to refuses: {_WORKER_REFUSAL} "
+                "Name a model setting in the pipe, or change `for_text` in the deck's `[llm.choice_defaults]`.",
                 None,
                 id="deck_default_for_text",
             ),
@@ -57,7 +64,7 @@ class TestLLMSettingCheck:
                 True,
                 "PipeLLM 'answer_it' generates a structured output with the model deck's default setting for structured outputs, "
                 f"which the model it resolves to refuses: {_WORKER_REFUSAL} "
-                "Name a model setting in the pipe, or change the deck's default for structured outputs.",
+                "Name a model setting in the pipe, or change `for_object` in the deck's `[llm.choice_defaults]`.",
                 None,
                 id="deck_default_for_structured_outputs",
             ),
@@ -72,6 +79,7 @@ class TestLLMSettingCheck:
         expected_message: str,
         expected_model_reference: str | None,
     ) -> None:
+        self._patch_deck_overrides(mocker, for_text=None, for_object=None)
         check = mocker.patch(
             "pipelex.pipe_operators.shared.llm_setting_check.check_llm_setting_with_served_model",
             side_effect=LLMCapabilityError(_WORKER_REFUSAL),
@@ -106,3 +114,44 @@ class TestLLMSettingCheck:
             field_name="model",
             is_structured=True,
         )
+
+    @pytest.mark.parametrize(
+        ("is_structured", "expected_setting", "expected_remedy"),
+        [
+            pytest.param(
+                False,
+                "the model deck's override for text",
+                "change `for_text` in the deck's `[llm.choice_overrides]`.",
+                id="text",
+            ),
+            pytest.param(
+                True,
+                "the model deck's override for structured outputs",
+                "change `for_object` in the deck's `[llm.choice_overrides]`.",
+                id="structured_output",
+            ),
+        ],
+    )
+    def test_a_deck_override_is_named_as_the_source_of_the_setting(
+        self, mocker: MockerFixture, is_structured: bool, expected_setting: str, expected_remedy: str
+    ) -> None:
+        """The deck's chain reads its override before its default, so changing the default would not move the setting."""
+        self._patch_deck_overrides(mocker, for_text=_SETTING, for_object=_SETTING)
+        mocker.patch(
+            "pipelex.pipe_operators.shared.llm_setting_check.check_llm_setting_with_served_model",
+            side_effect=LLMCapabilityError(_WORKER_REFUSAL),
+        )
+        with pytest.raises(PipeValidationError) as exc_info:
+            refuse_llm_setting_its_model_refuses(
+                pipe_type="PipeLLM",
+                pipe_code="answer_it",
+                domain_code="some_domain",
+                llm_setting=_SETTING,
+                llm_choice=None,
+                field_name=None,
+                is_structured=is_structured,
+            )
+        message = str(exc_info.value)
+        assert expected_setting in message
+        assert message.endswith(expected_remedy)
+        assert "choice_defaults" not in message
