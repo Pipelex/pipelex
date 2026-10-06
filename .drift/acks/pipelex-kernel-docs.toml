@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:3b0caaabd67aa654f0b4155d7cb463aa866d01f7ebc559d66cac181c9df3c888"
+digest = "sha256:addbfcd90ea8a0100ee69a13463a8395abb247307b2e13af3708ff7dbab19e25"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-06T03:07:41Z"
-rationale = "clean-pass: re-acked on the merge of dev into the dotted-input branch, whose two acks each covered one side. The merged judgment_ops.py carries the branch's build_judgment_material (each entry one plain-named input's whole value, no path walk) and dev's resolve_judgment_setting docstring (a model whose backend is disabled keeps the deck's handle on a dry run); docs/under-the-hood/pipelex-kernel.md auto-merged both sides' sentences, the judgment paragraph stating plain names and the keyless-boot paragraph stating every enabled backend loaded with no credential resolved, and both still match the merged code."
+reviewed_at = "2026-10-06T21:37:29Z"
+rationale = "real-catch: llm_ops gained served_llm_model and check_llm_setting_with_served_model; the kernel doc's llm_ops entry-point row lacked them, so it now lists both and a new paragraph states what each returns or raises and when the interpreter and a programmatic caller call it. Re-derived the boot-contract exception set from the calls test_kernel_boot_contract.py executes: neither new function nor served_judgment_model is called there, so the doc and the test docstring now name served_*_model and check_llm_setting_with_served_model beside resolve_*_setting and concrete_llm_model_handle."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -18,7 +18,7 @@ rationale = "clean-pass: re-acked on the merge of dev into the dotted-input bran
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/judgment_ops.py" = "blob:fe66d7d00433a9924d60710e9bb25838197c52e0"
 "pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
-"pipelex/kernel/llm_ops.py" = "blob:64a6d3d77a165f4f70614ced69876f56d873a8c7"
+"pipelex/kernel/llm_ops.py" = "blob:26e84c80fd16123445b4e8cb81f3d305470190d7"
 "pipelex/kernel/llm_prompt_content.py" = "blob:3fade4a660226e63ad4f916952ee37d34e7d2bbd"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"
@@ -27,4 +27,4 @@ rationale = "clean-pass: re-acked on the merge of dev into the dotted-input bran
 "pipelex/kernel/search_ops.py" = "blob:f9c1dc09dd3beaf1a54ac8e3774db1d510cbdaa3"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
 "pipelex/kernel/templating_style_ops.py" = "blob:395473806d600dfc4f124c07f2afebb951fc086b"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:39543269189511ac813fa99242b04d5c528ebfa2"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:63c06904e9f53f80f98a0a45e00aa8116c9beb31"

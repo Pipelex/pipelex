@@ -5,7 +5,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import iter_cause_chain
-from pipelex.cogt.exceptions import LLMCompletionError
+from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.models.model_reference import ModelReference
@@ -33,6 +33,7 @@ from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_machinery.validation import is_input_used_by_variables
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
 from pipelex.pipe_run.pipe_run_params import (
     PipeRunParams,
     output_multiplicity_to_apply,
@@ -133,10 +134,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # and PipeLLM is not the only one with this kind of constraints
 
         # Allow Dynamic output concept as it's flexible and can represent anything
-        if NativeConceptCode.is_dynamic_concept(concept_code=self.output.concept.code):
-            return
-
-        if get_concept_library().is_compatible(
+        is_dynamic_output = NativeConceptCode.is_dynamic_concept(concept_code=self.output.concept.code)
+        if not is_dynamic_output and get_concept_library().is_compatible(
             tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
         ):
@@ -152,6 +151,58 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
             )
+
+        self._refuse_a_setting_its_model_refuses(is_dynamic_output=is_dynamic_output)
+
+    def _refuse_a_setting_its_model_refuses(self, *, is_dynamic_output: bool) -> None:
+        """Refuse the model setting this pipe generates its output with when the model it resolves to refuses it.
+
+        A single text is generated with the `model` setting, any other output with the setting for objects:
+        `model_to_structure`, else `model`, else the deck's default for structured outputs. A `Dynamic` output
+        is checked as text, its default, since the concept it stands for is only known when the pipe runs, and
+        a text output a run asks to multiply is generated as objects, which only that run knows. A reference
+        the deck does not define is refused when the pipe is built, so it is not looked up again here.
+        """
+        llm_for_text_choice = self.llm_choices.for_text if self.llm_choices else None
+        llm_for_object_choice = self.llm_choices.for_object if self.llm_choices else None
+        is_structured = not is_dynamic_output and not self._generates_single_text()
+        llm_choice: LLMModelChoice | None
+        field_name: str | None
+        try:
+            if is_structured:
+                llm_setting = resolve_llm_setting_for_object(llm_choice=llm_for_object_choice, llm_choice_for_text=llm_for_text_choice)
+                if llm_for_object_choice is not None:
+                    llm_choice, field_name = llm_for_object_choice, "model_to_structure"
+                elif llm_for_text_choice is not None:
+                    llm_choice, field_name = llm_for_text_choice, "model"
+                else:
+                    llm_choice, field_name = None, None
+            else:
+                llm_setting = resolve_llm_setting_for_text(llm_choice=llm_for_text_choice)
+                llm_choice = llm_for_text_choice
+                field_name = "model" if llm_for_text_choice is not None else None
+        except ModelChoiceNotFoundError:
+            return
+        refuse_llm_setting_its_model_refuses(
+            pipe_type=self.class_name,
+            pipe_code=self.code,
+            domain_code=self.domain_code,
+            llm_setting=llm_setting,
+            llm_choice=llm_choice,
+            field_name=field_name,
+            is_structured=is_structured,
+        )
+
+    def _generates_single_text(self) -> bool:
+        """Whether the pipe's declared output is generated as one text, on the text path, rather than as objects."""
+        is_multiple_output = output_multiplicity_to_apply(
+            base_multiplicity=self.output_multiplicity, override_multiplicity=None
+        ).is_multiple_outputs_enabled
+        return not is_multiple_output and get_concept_library().is_compatible(
+            tested_concept=self.output.concept,
+            wanted_concept=get_native_concept(NativeConceptCode.TEXT),
+            strict=True,
+        )
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:

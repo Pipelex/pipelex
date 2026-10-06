@@ -27,6 +27,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 
 if TYPE_CHECKING:
@@ -139,6 +140,7 @@ def _make_inference_model(backend_name: str = WORKER_PROVIDER) -> SimpleNamespac
         desc="stub-desc",
         max_tokens=None,
         max_prompt_images=None,
+        thinking_mode=ThinkingMode.MANUAL,
         listed_constraints=[],
         valued_constraints={},
         is_img2img_supported=True,

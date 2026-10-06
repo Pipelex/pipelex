@@ -205,19 +205,24 @@ def categorize_pipe_validation_with_libraries_error(
     ):
         required_refs = ", ".join(pipe_error.required_concept_codes)
         message += f" (required: {required_refs}, provided: {pipe_error.provided_concept_code})"
+    # A refusal about one of the pipe's fields is located on it, as an unknown model is; any other keeps the file path
+    field_path = pipe_error.file_path or ""
+    if pipe_error.field_name and pipe_error.pipe_code:
+        field_path = f"pipe.{pipe_error.pipe_code}.{pipe_error.field_name}"
     return PipesAndConceptValidationErrorData(
         error_type=error_type,
         domain_code=pipe_error.domain_code,
         source=pipe_error.file_path,
         pipe_code=pipe_error.pipe_code,
         concept_code=None,  # This is a pipe error, not a concept error
-        field_name=None,  # Field name is not provided in PipeValidationError
+        field_name=pipe_error.field_name,
         message=message,
-        field_path=pipe_error.file_path or "",
+        field_path=field_path,
         variable_names=pipe_error.variable_names,
         expected_output_ref=pipe_error.expected_output_ref,
         expected_inputs=pipe_error.expected_inputs,
         declared_inputs=pipe_error.declared_inputs,
+        model_reference=pipe_error.model_reference,
     )
 
 

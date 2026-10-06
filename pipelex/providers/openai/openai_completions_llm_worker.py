@@ -84,17 +84,25 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
     # Reasoning helpers
     #########################################################
 
-    def _resolve_reasoning_effort(self, job_params: LLMJobParams) -> ChatCompletionReasoningEffort | None:
+    @classmethod
+    @override
+    def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+        """Refuse a reasoning setting the Chat Completions API cannot carry for the model, on text and structured outputs alike."""
+        cls._resolve_reasoning_effort(inference_model=inference_model, job_params=job_params)
+
+    @classmethod
+    def _resolve_reasoning_effort(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams) -> ChatCompletionReasoningEffort | None:
         """Resolve reasoning parameters to an OpenAI Chat Completions reasoning_effort value.
 
         Args:
+            inference_model: The spec of the model the request goes to.
             job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
 
         Returns:
             The OpenAI reasoning_effort string, or None if reasoning is not requested.
 
         """
-        thinking_mode = self.inference_model.thinking_mode
+        thinking_mode = inference_model.thinking_mode
 
         if job_params.reasoning_effort is not None:
             effort = job_params.reasoning_effort
@@ -104,22 +112,22 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     log.verbose(f"OpenAI Chat Completions reasoning_effort={openai_effort}")
                     return openai_effort
                 case ThinkingMode.ADAPTIVE:
-                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
+                    msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.NONE:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
 
         if job_params.reasoning_budget is not None:
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.ADAPTIVE:
-                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
+                    msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.NONE:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
 
         return None
@@ -132,7 +140,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
 
-        openai_reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
+        openai_reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
 
         try:
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
@@ -210,7 +218,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        openai_reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
+        openai_reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]

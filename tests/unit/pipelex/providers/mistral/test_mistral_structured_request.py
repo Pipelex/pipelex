@@ -56,7 +56,10 @@ class TestMistralStructuredRequest:
         complete_async.assert_not_awaited()
 
     async def test_a_json_structure_method_refuses_reasoning(self, mocker: MockerFixture) -> None:
-        """A reasoning reply's content is a list of chunks, which instructor's JSON parsers cannot read, so the call is refused up front."""
+        """A reasoning reply's content is a list of chunks, which instructor's JSON parsers cannot read, so the request check refuses it.
+
+        The worker runs its request check before every call (``gen_object``), and validation runs the same one.
+        """
         worker, complete_async = make_worker(
             mocker,
             thinking_mode=ThinkingMode.MANUAL,
@@ -67,5 +70,6 @@ class TestMistralStructuredRequest:
         llm_job.job_params.reasoning_effort = ReasoningEffort.HIGH
 
         with pytest.raises(LLMCapabilityError, match="instructor/mistral_tools"):
-            await worker._gen_object(llm_job=llm_job, schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker.check_request(inference_model=worker.inference_model, job_params=llm_job.job_params, is_structured=True)
+        worker.check_request(inference_model=worker.inference_model, job_params=llm_job.job_params, is_structured=False)
         complete_async.assert_not_awaited()

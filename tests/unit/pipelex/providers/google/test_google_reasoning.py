@@ -91,7 +91,7 @@ class TestGoogleReasoning:
             ),
         )
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == expected_budget
         budget_mock.assert_called_once_with(family="gemini", effort=effort)
@@ -117,7 +117,7 @@ class TestGoogleReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE)
         _mock_config_for_adaptive(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_level == expected_level
 
@@ -136,7 +136,7 @@ class TestGoogleReasoning:
             ),
         )
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 0
 
@@ -145,7 +145,7 @@ class TestGoogleReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE)
         _mock_config_for_adaptive(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 0
 
@@ -156,13 +156,13 @@ class TestGoogleReasoning:
         _mock_config_for_adaptive(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
         with pytest.raises(LLMCapabilityError, match="cannot turn thinking off"):
-            worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_another_effort_still_thinks_on_a_model_that_cannot_turn_thinking_off(self, mocker: MockerFixture):
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE, listed_constraints=[ListedConstraint.THINKING_CANNOT_BE_DISABLED])
         _mock_config_for_adaptive(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.LOW)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_level == genai_types.ThinkingLevel.LOW
 
@@ -178,7 +178,7 @@ class TestGoogleReasoning:
         """Explicit reasoning_budget passes through directly as thinking_budget."""
         worker = _make_worker(mocker, thinking_mode=thinking_mode)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=8192)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 8192
 
@@ -186,7 +186,7 @@ class TestGoogleReasoning:
         """When neither reasoning_effort nor reasoning_budget is set, returns None."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is None
 
     def test_thinking_mode_none_raises_capability_error(self, mocker: MockerFixture):
@@ -194,20 +194,20 @@ class TestGoogleReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_reasoning_budget_with_thinking_mode_none_raises(self, mocker: MockerFixture):
         """reasoning_budget with thinking_mode=none should raise LLMCapabilityError."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_explicit_budget_capped_by_max_tokens(self, mocker: MockerFixture):
         """Explicit reasoning_budget is capped to leave a quarter of max_tokens for the answer."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=8192)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=4000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=4000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 3000
 
@@ -227,7 +227,7 @@ class TestGoogleReasoning:
             ),
         )
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=2000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=2000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 1500
 
@@ -258,7 +258,7 @@ class TestGoogleReasoning:
             mocker, thinking_mode=ThinkingMode.MANUAL, min_thinking_budget=min_thinking_budget, max_thinking_budget=max_thinking_budget
         )
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=reasoning_budget)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=max_tokens)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=max_tokens)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == expected_budget
 
@@ -278,7 +278,7 @@ class TestGoogleReasoning:
             ),
         )
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.MAX)
-        result = worker._build_thinking_config(job_params=job_params, max_tokens=None)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=None)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 32768
 
@@ -287,4 +287,4 @@ class TestGoogleReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL, min_thinking_budget=512, max_thinking_budget=24576)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=1024)
         with pytest.raises(LLMCapabilityError, match="max_tokens=600"):
-            worker._build_thinking_config(job_params=job_params, max_tokens=600)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker._build_thinking_config(inference_model=worker.inference_model, job_params=job_params, max_tokens=600)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
