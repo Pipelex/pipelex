@@ -1,5 +1,6 @@
 import importlib.util
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol, TypeAlias
 
@@ -42,9 +43,23 @@ class CheckLLMRequestFn(Protocol):
     worker class's own ``check_request``, the check the worker runs before every call, so the two never
     disagree. An LLM sdk that registers none is checked against ``LLMWorkerAbstract.check_request``, the
     rule every worker shares.
+
+    A refusal is an ``LLMCapabilityError``, and a validation verdict shows it to whoever wrote the setting.
+    A built-in backend's refusal is shown with the model named by its deck handle, since this library writes
+    those messages. An external plugin's refusal is shown as written only when the plugin raises it as
+    caller-facing copy (``as_caller_fault()``), vouching that it names nothing the plugin keeps private;
+    any other is named by its title alone.
     """
 
     def __call__(self, *, inference_model: "InferenceModelSpec", job_params: "LLMJobParams", is_structured: bool) -> None: ...
+
+
+@dataclass(frozen=True)
+class LLMRequestCheck:
+    """A registered request check, and whether a built-in plugin registered it, which decides how its refusals are shown."""
+
+    check: CheckLLMRequestFn
+    is_builtin: bool
 
 
 def require_sdk(*, spec: str | Sequence[str], extra: str, msg: str, dependency_name: str | None = None) -> None:
@@ -91,10 +106,10 @@ class InferenceBackendRegistry:
     def __init__(
         self,
         backends: dict[tuple[InferenceFamily, str], MakeWorkerFn],
-        llm_request_checks: dict[str, CheckLLMRequestFn] | None = None,
+        llm_request_checks: dict[str, LLMRequestCheck] | None = None,
     ):
         self._backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = dict(backends)
-        self._llm_request_checks: dict[str, CheckLLMRequestFn] = dict(llm_request_checks or {})
+        self._llm_request_checks: dict[str, LLMRequestCheck] = dict(llm_request_checks or {})
 
     def lookup(self, *, family: InferenceFamily, sdk: str) -> MakeWorkerFn:
         make_worker = self._backends.get((family, sdk))
@@ -102,7 +117,7 @@ class InferenceBackendRegistry:
             raise InferenceBackendNotFoundError(family=family, sdk=sdk)
         return make_worker
 
-    def lookup_llm_request_check(self, *, sdk: str) -> CheckLLMRequestFn | None:
+    def lookup_llm_request_check(self, *, sdk: str) -> LLMRequestCheck | None:
         """The request check the LLM backend serving `sdk` registered, `None` when it registered none."""
         return self._llm_request_checks.get(sdk)
 

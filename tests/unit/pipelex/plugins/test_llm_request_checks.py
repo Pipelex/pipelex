@@ -7,8 +7,8 @@ import pytest
 
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS
-from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry, InferenceFamily
-from pipelex.plugins.registrar import PluginRegistrar
+from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry, InferenceFamily, LLMRequestCheck
+from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker
 from pipelex.providers.google.google_llm_worker import GoogleLLMWorker
@@ -38,6 +38,7 @@ class TestLLMRequestChecks:
         llm_sdks = {sdk for family, sdk in registrar.inference_backends if family == InferenceFamily.LLM}
         assert llm_sdks
         assert set(registrar.llm_request_checks) == llm_sdks
+        assert all(registered_check.is_builtin for registered_check in registrar.llm_request_checks.values())
 
     @pytest.mark.parametrize(
         ("sdk", "worker_class"),
@@ -62,8 +63,9 @@ class TestLLMRequestChecks:
         """The registered check delegates to the worker class's own check_request, which the worker runs before every call."""
         registrar = _build_registrar()
         registry = InferenceBackendRegistry(registrar.inference_backends, llm_request_checks=registrar.llm_request_checks)
-        check_request = registry.lookup_llm_request_check(sdk=sdk)
-        assert check_request is not None
+        registered_check = registry.lookup_llm_request_check(sdk=sdk)
+        assert registered_check is not None
+        check_request = registered_check.check
         worker_check = mocker.patch.object(worker_class, "check_request")
         inference_model = cast("InferenceModelSpec", mocker.MagicMock())
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
@@ -80,9 +82,17 @@ class TestLLMRequestChecks:
         registrar.add_inference_backend(
             family=InferenceFamily.IMG_GEN, sdk="some_img_gen", make_worker=mocker.MagicMock(), check_llm_request=mocker.MagicMock()
         )
-        assert registrar.llm_request_checks == {"some_llm": llm_check}
+        assert registrar.llm_request_checks == {"some_llm": LLMRequestCheck(check=llm_check, is_builtin=True)}
 
         registry = InferenceBackendRegistry(registrar.inference_backends, llm_request_checks=registrar.llm_request_checks)
         swapped = registry.with_family(family=InferenceFamily.LLM, backends={})
-        assert swapped.lookup_llm_request_check(sdk="some_llm") is llm_check
+        assert swapped.lookup_llm_request_check(sdk="some_llm") == LLMRequestCheck(check=llm_check, is_builtin=True)
         assert swapped.lookup_llm_request_check(sdk="unregistered") is None
+
+    def test_an_external_plugin_s_check_is_recorded_as_not_built_in(self, mocker: MockerFixture) -> None:
+        """Its refusals reach a caller only when it vouches for them, so validation must know who registered it."""
+        registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace()))
+        registrar.begin_plugin(name="some_plugin", origin=PluginOrigin.EXTERNAL, targets_api=1, group=None)
+        llm_check = mocker.MagicMock()
+        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="some_llm", make_worker=mocker.MagicMock(), check_llm_request=llm_check)
+        assert registrar.llm_request_checks == {"some_llm": LLMRequestCheck(check=llm_check, is_builtin=False)}

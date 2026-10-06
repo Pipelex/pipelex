@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:519450e1c7e80aa5f9d5d7ec43c40e872a2074b71e0659bc80af5c37fe9a7edb"
+digest = "sha256:31f0c6b43ae0e9120f1103aa12068a80fdf1e10ec120ca5b289f454f85667449"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-06T22:21:37Z"
-rationale = "real-catch: check_llm_setting_with_served_model now re-raises a worker refusal as LLMSettingRefusedError naming the model by its deck handle; the kernel doc's paragraph said it raised the worker's own LLMCapabilityError, so it now names the new class and why its message is caller-facing. Re-read the llm_ops entry-point row and the boot-contract exception list against the module: no entry point was added or removed by this change."
+reviewed_at = "2026-10-06T22:38:42Z"
+rationale = "real-catch: llm_ops.py now raises LLMSettingRefusedError only for a built-in backend's refusal and re-raises an external plugin's as written; pipelex-kernel.md entry paragraph rewritten to say so, re-read against check_llm_setting_with_served_model; rest of the page unaffected."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -18,7 +18,7 @@ rationale = "real-catch: check_llm_setting_with_served_model now re-raises a wor
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/judgment_ops.py" = "blob:fe66d7d00433a9924d60710e9bb25838197c52e0"
 "pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
-"pipelex/kernel/llm_ops.py" = "blob:b340af4289766dc42c2832d4aece15227bb7251c"
+"pipelex/kernel/llm_ops.py" = "blob:6555af22cadf5316cfcadf975d96b6792043c3a6"
 "pipelex/kernel/llm_prompt_content.py" = "blob:3fade4a660226e63ad4f916952ee37d34e7d2bbd"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"

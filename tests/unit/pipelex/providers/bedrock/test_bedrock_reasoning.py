@@ -48,5 +48,5 @@ class TestBedrockReasoning:
     def test_structured_output_raises_capability_error(self, mocker: MockerFixture):
         """A structured output is refused, with or without a reasoning setting: the worker cannot generate objects."""
         job_params = LLMJobParams(temperature=0.5)
-        with pytest.raises(LLMCapabilityError, match="It is not possible to generate objects with a BedrockLLMWorker"):
+        with pytest.raises(LLMCapabilityError, match="Model 'test-bedrock-model' does not support structured outputs"):
             BedrockLLMWorker.check_request(inference_model=_make_model(mocker), job_params=job_params, is_structured=True)

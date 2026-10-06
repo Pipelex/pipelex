@@ -93,7 +93,8 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
         is_structured: Whether the step generates a structured output rather than text.
 
     Raises:
-        LLMSettingRefusedError: The worker's refusal, naming the model by its deck handle and what it refuses.
+        LLMSettingRefusedError: A built-in worker's refusal, naming the model by its deck handle and what it refuses.
+        LLMCapabilityError: An external plugin's refusal, as the plugin raised it.
 
     """
     inference_model = served_llm_model(model_handle=llm_setting.model)
@@ -101,15 +102,19 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
         return
     job_params = llm_setting.make_llm_job_params()
     job_params = LLMWorkerAbstract.constrained_job_params(inference_model=inference_model, job_params=job_params) or job_params
-    check_request = get_inference_backend_registry().lookup_llm_request_check(sdk=inference_model.sdk) or LLMWorkerAbstract.check_request
+    registered_check = get_inference_backend_registry().lookup_llm_request_check(sdk=inference_model.sdk)
+    check_request = registered_check.check if registered_check else LLMWorkerAbstract.check_request
     try:
         check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
     except MissingDependencyError:
         # The backend's SDK is not installed here, so no worker for the model can be built: the run says so
         log.verbose(f"Model '{inference_model.desc}' was not checked: its backend's SDK is not installed")
     except LLMCapabilityError as refusal:
-        # A worker names the model by its description, which carries the SDK, the backend and the provider's
-        # model id: the caller who wrote the setting knows the model by its deck handle alone.
+        if registered_check and not registered_check.is_builtin:
+            # An external plugin's text may carry what it keeps private: it reaches the caller only if the plugin vouched for it
+            raise
+        # A built-in worker names the model by its description, which carries the SDK, the backend and the
+        # provider's model id: the caller who wrote the setting knows the model by its deck handle alone.
         msg = str(refusal).replace(inference_model.desc, inference_model.name)
         raise LLMSettingRefusedError(msg) from refusal
 

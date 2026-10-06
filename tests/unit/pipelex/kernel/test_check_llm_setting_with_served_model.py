@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex.base_exceptions import DisclosureMode
-from pipelex.cogt.exceptions import LLMSettingRefusedError, ModelWaterfallError
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError, ModelWaterfallError
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -14,6 +14,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.kernel.llm_ops import check_llm_setting_with_served_model
+from pipelex.plugins.inference_backend_registry import LLMRequestCheck
 from pipelex.system.exceptions import MissingDependencyError
 
 if TYPE_CHECKING:
@@ -39,7 +40,7 @@ def _make_model(*, thinking_mode: ThinkingMode, valued_constraints: dict[ValuedC
     )
 
 
-def _serve(mocker: MockerFixture, *, served: InferenceModelSpec | Exception | None, check: Any) -> Any:
+def _serve(mocker: MockerFixture, *, served: InferenceModelSpec | Exception | None, check: Any, is_builtin: bool = True) -> Any:
     """Patch the deck to serve `served` for any handle, and the registry to hand out `check` for any sdk; return the deck lookup."""
     deck = mocker.MagicMock()
     if isinstance(served, Exception):
@@ -48,7 +49,7 @@ def _serve(mocker: MockerFixture, *, served: InferenceModelSpec | Exception | No
         deck.get_optional_inference_model.return_value = served
     mocker.patch("pipelex.kernel.llm_ops.get_model_deck", return_value=deck)
     registry = mocker.MagicMock()
-    registry.lookup_llm_request_check.return_value = check
+    registry.lookup_llm_request_check.return_value = LLMRequestCheck(check=check, is_builtin=is_builtin) if check else None
     mocker.patch("pipelex.kernel.llm_ops.get_inference_backend_registry", return_value=registry)
     return deck.get_optional_inference_model
 
@@ -86,6 +87,22 @@ class TestCheckLLMSettingWithServedModel:
         for internal_name in ("some_sdk", "some_backend", "some-model-id"):
             assert internal_name not in message
         assert exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == message
+
+    def test_an_external_plugin_s_refusal_is_raised_as_it_wrote_it(self, mocker: MockerFixture) -> None:
+        """Its text may carry what the plugin keeps private, so it stays internal under strict disclosure."""
+        refusal = LLMCapabilityError("Model 'some-model' is refused by tenant 1234 at internal.example")
+        _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.NONE), check=mocker.MagicMock(side_effect=refusal), is_builtin=False)
+        with pytest.raises(LLMCapabilityError) as exc_info:
+            check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=False)
+        assert exc_info.value is refusal
+        assert "tenant 1234" not in exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"]
+
+    def test_an_external_plugin_s_refusal_it_vouches_for_is_shown_under_strict_disclosure(self, mocker: MockerFixture) -> None:
+        refusal = LLMCapabilityError("Model 'some-model' takes no reasoning").as_caller_fault()
+        _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.NONE), check=mocker.MagicMock(side_effect=refusal), is_builtin=False)
+        with pytest.raises(LLMCapabilityError) as exc_info:
+            check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=False)
+        assert exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == "Model 'some-model' takes no reasoning"
 
     @pytest.mark.parametrize(
         "served",

@@ -54,11 +54,11 @@ class BedrockLLMWorker(LLMWorkerAbstract):
             )
             raise LLMCapabilityError(msg)
         if is_structured:
-            raise LLMCapabilityError(cls._structured_output_refusal())
+            raise LLMCapabilityError(cls._structured_output_refusal(inference_model=inference_model))
 
     @classmethod
-    def _structured_output_refusal(cls) -> str:
-        return f"It is not possible to generate objects with a {cls.__name__}."
+    def _structured_output_refusal(cls, *, inference_model: InferenceModelSpec) -> str:
+        return f"Model '{inference_model.desc}' does not support structured outputs; Bedrock native models generate text only"
 
     @override
     async def _gen_text(
@@ -101,4 +101,4 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         # Refused by check_request before this is reached. TODO: try with the newest instructor release
-        raise LLMCapabilityError(self._structured_output_refusal())
+        raise LLMCapabilityError(self._structured_output_refusal(inference_model=self.inference_model))
