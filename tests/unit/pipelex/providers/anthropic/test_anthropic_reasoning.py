@@ -47,7 +47,6 @@ class TestAnthropicReasoning:
     @pytest.mark.parametrize(
         ("effort", "expected_budget"),
         [
-            (ReasoningEffort.MINIMAL, 512),
             (ReasoningEffort.LOW, 1024),
             (ReasoningEffort.MEDIUM, 5000),
             (ReasoningEffort.HIGH, 16384),
@@ -71,6 +70,28 @@ class TestAnthropicReasoning:
         assert result.suppress_temperature is True
         budget_mock.assert_called_once_with(family="anthropic", effort=effort)
 
+    def test_manual_mode_budget_under_the_minimum_is_raised_to_it(self, mocker: MockerFixture):
+        """Anthropic refuses a budget_tokens below 1,024, so the 512 that MINIMAL maps to is raised to 1,024."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        _mock_config(mocker, budget_mock=mocker.MagicMock(return_value=512))
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.MINIMAL)
+        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result.thinking == {"type": "enabled", "budget_tokens": 1024}
+
+    def test_explicit_budget_under_the_minimum_is_raised_to_it(self, mocker: MockerFixture):
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        job_params = LLMJobParams(temperature=0.5, reasoning_budget=200)
+        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result.thinking == {"type": "enabled", "budget_tokens": 1024}
+
+    def test_max_tokens_too_small_for_the_minimum_budget_is_refused(self, mocker: MockerFixture):
+        """1,200 output tokens leave 900 for thinking after the answer reserve, under Anthropic's minimum of 1,024."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        _mock_config(mocker, budget_mock=mocker.MagicMock(return_value=1024))
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.LOW)
+        with pytest.raises(LLMCapabilityError, match="max_tokens=1200"):
+            worker._build_thinking_params(job_params=job_params, max_tokens=1200)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
     def test_manual_mode_effort_none_disables_thinking(self, mocker: MockerFixture):
         """MANUAL mode with NONE effort disables thinking entirely (no budget lookup)."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
@@ -83,13 +104,13 @@ class TestAnthropicReasoning:
         budget_mock.assert_not_called()
 
     def test_effort_budget_capped_by_max_tokens(self, mocker: MockerFixture):
-        """Effort-resolved budget is capped to max_tokens - 1 when max_tokens is small."""
+        """Effort-resolved budget is capped to leave a quarter of max_tokens for the answer when max_tokens is small."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         budget_mock = mocker.MagicMock(return_value=16384)
         _mock_config(mocker, budget_mock=budget_mock)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         result = worker._build_thinking_params(job_params=job_params, max_tokens=2000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-        assert result.thinking == {"type": "enabled", "budget_tokens": 1999}
+        assert result.thinking == {"type": "enabled", "budget_tokens": 1500}
 
     def test_explicit_budget_passes_through(self, mocker: MockerFixture):
         """Explicit reasoning_budget passes through directly as budget_tokens in MANUAL mode."""

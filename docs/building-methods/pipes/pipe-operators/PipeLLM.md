@@ -251,7 +251,7 @@ When `model` is specified as a table (inline LLM setting), it accepts the follow
 | `model` | string | Model name or alias (e.g., `"claude-4.5-sonnet"`, `"@default-premium"`) |
 | `temperature` | float | Sampling temperature (0.0 – 1.0) |
 | `max_tokens` | integer | Maximum output tokens |
-| `reasoning_effort` | string | Reasoning depth: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. Not supported for structured generation. |
+| `reasoning_effort` | string | Reasoning depth: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. Applies to structured outputs too, generated with this setting when no `model_to_structure` is named. |
 | `reasoning_budget` | integer | Explicit token budget for reasoning. Mutually exclusive with `reasoning_effort`. Supported by Anthropic and Google only. |
 | `description` | string | Human-readable description (for presets) |
 

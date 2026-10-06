@@ -176,15 +176,15 @@ class TestGoogleReasoning:
             worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_explicit_budget_capped_by_max_tokens(self, mocker: MockerFixture):
-        """Explicit reasoning_budget is capped to max_tokens - 1."""
+        """Explicit reasoning_budget is capped to leave a quarter of max_tokens for the answer."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=8192)
         result = worker._build_thinking_config(job_params=job_params, max_tokens=4000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
-        assert result.thinking_budget == 3999
+        assert result.thinking_budget == 3000
 
     def test_effort_budget_capped_by_max_tokens(self, mocker: MockerFixture):
-        """Effort-resolved budget is capped to max_tokens - 1 when max_tokens is small."""
+        """Effort-resolved budget is capped to leave a quarter of max_tokens for the answer when max_tokens is small."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         google_config = GoogleConfig(effort_to_level_map=_GOOGLE_LEVEL_MAP)
         mocker.patch(
@@ -201,4 +201,4 @@ class TestGoogleReasoning:
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         result = worker._build_thinking_config(job_params=job_params, max_tokens=2000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
-        assert result.thinking_budget == 1999
+        assert result.thinking_budget == 1500

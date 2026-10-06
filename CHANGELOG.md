@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A reasoning setting reaches a structured output**: a pipe whose model setting carries `reasoning_effort` or `reasoning_budget`, the deck's `$deep-analysis`, `$quick-reasoning` and `$retrieval-premium` presets included, now generates its structured output with that setting on every provider, where every language-model worker refused it with `LLMCapabilityError` "does not support reasoning parameters for structured generation". A model refuses a reasoning setting on a structured output only where it refuses it on text, and a structured call on an Anthropic model with thinking on leaves the tool choice to the model, since a forced tool choice cannot carry thinking.
+- **A manual thinking budget leaves room for the answer (Breaking)**: an Anthropic or Gemini thinking budget, resolved from an effort or set explicitly, is cut to leave a quarter of `max_tokens` for the answer, where it could take all but one token of it, and an Anthropic budget below the API's minimum of 1,024 tokens, such as the 512 that `minimal` maps to, is raised to that minimum. A `max_tokens` too small to hold the minimum beside the answer reserve is refused with an `LLMCapabilityError` naming the numbers, where the request was sent.
+- **Mistral reasoning is sent as `reasoning_effort`**: a reasoning effort on a Mistral model is sent as `reasoning_effort = "high"`, the only reasoning value Mistral's reasoning models accept, where it was sent as `prompt_mode = "reasoning"`, which every current Mistral model refuses, so any reasoning effort on Mistral failed. The `reasoning` level of `[inference.llm.mistral.effort_to_level_map]` is unchanged.
+- **A structured output on Google without a system prompt no longer fails**: a structured call on the `google` backend whose prompt has no system text failed with `TypeError` "generate_content() got an unexpected keyword argument 'system'", and is now sent with no system instruction.
+
 ## [v0.76.0] - 2026-10-06
 
 ### Added

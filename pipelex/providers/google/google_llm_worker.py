@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import httpx
 from google.genai import errors as genai_errors
@@ -22,6 +22,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.thinking_budget import fit_thinking_budget
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
@@ -154,7 +155,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     effort=effort,
                 )
                 if max_tokens is not None:
-                    budget = min(budget, max_tokens - 1)
+                    budget = fit_thinking_budget(budget=budget, max_tokens=max_tokens, min_budget=None, model_desc=self.inference_model.desc)
                 log.verbose(f"Google manual thinking with thinking_budget={budget} (from effort={effort})")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.ADAPTIVE:
@@ -179,7 +180,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         match thinking_mode:
             case ThinkingMode.MANUAL | ThinkingMode.ADAPTIVE:
                 if max_tokens is not None:
-                    budget = min(budget, max_tokens - 1)
+                    budget = fit_thinking_budget(budget=budget, max_tokens=max_tokens, min_budget=None, model_desc=self.inference_model.desc)
                 log.verbose(f"Google thinking with explicit thinking_budget={budget}")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:
@@ -265,7 +266,10 @@ class GoogleLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         """Generate structured output using Google Gemini API with instructor."""
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
+        thinking_config = self._build_thinking_config(job_params=job_params, max_tokens=job_params.max_tokens)
+        # instructor's genai handlers read the system prompt only from `system`, and pop it only when it is not
+        # None: a `system=None` reaches `generate_content`, which refuses the unknown keyword
+        system_kwargs: dict[str, Any] = {"system": system_text} if (system_text := llm_job.llm_prompt.system_text) else {}
         contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
         # Deferred import: avoid pulling heavy SDK at module-load time
@@ -283,12 +287,14 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 model=self.inference_model.model_id,
                 # instructor's genai handlers build the Google config themselves and read these as
                 # top-level OpenAI-style kwargs: a `GenerateContentConfig` passed as `generation_config`
-                # or `config` is dropped, and the system prompt is read only from `system`.
-                system=llm_job.llm_prompt.system_text,
+                # or `config` is dropped.
+                **system_kwargs,
                 temperature=job_params.temperature,
                 max_tokens=job_params.max_tokens,
                 n=1,
                 strict=self._validates_structured_output_strictly(),
+                # Read into the config the handlers build, as the other kwargs above; None sets no thinking config
+                thinking_config=thinking_config,
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying

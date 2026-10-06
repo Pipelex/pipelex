@@ -210,7 +210,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
+        openai_reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
@@ -222,10 +222,11 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 model=self.inference_model.model_id,
-                temperature=omit if temperature_unsupported else job_params.temperature,
+                temperature=omit if (openai_reasoning_effort is not None or temperature_unsupported) else job_params.temperature,
                 max_tokens=job_params.max_tokens or NOT_GIVEN,
                 seed=job_params.seed,
                 messages=messages,
+                reasoning_effort=openai_reasoning_effort if openai_reasoning_effort is not None else omit,
                 response_model=schema,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
                 # re-asks on a malformed/invalid output but never retries a transport error, which ends the
