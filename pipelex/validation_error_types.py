@@ -47,6 +47,12 @@ class PipeValidationErrorType(StrEnum):
     INADEQUATE_OUTPUT_MULTIPLICITY = "inadequate_output_multiplicity"
 
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
+    # A PipeLLM or a PipeStructure whose model setting the model it resolves to refuses for the output it
+    # generates: a reasoning setting the model's thinking mode refuses, a reasoning budget where it takes only
+    # an effort, a thinking budget its max_tokens cannot hold, or a structured output its worker cannot
+    # generate. Detected when the pipe is validated against the library, by the request check the model's
+    # worker runs before every call, so a run never starts only to fail at its first call.
+    LLM_SETTING_REFUSED_BY_MODEL = "llm_setting_refused_by_model"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
     # An input name that is not a plain snake_case identifier, a dotted name (`invoice.total`) included,
     # on any pipe's `inputs` or as a PipeBatch's `input_list_name`; or a name taking the `_bound_` prefix
@@ -140,6 +146,7 @@ class PipeValidationErrorType(StrEnum):
                 PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -176,6 +183,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -219,6 +227,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -257,6 +266,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
@@ -299,6 +309,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL
                 | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
@@ -341,6 +352,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
@@ -378,6 +390,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                 | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE

@@ -158,7 +158,7 @@ flowchart TB
     C -->|Anthropic| E["_build_thinking_params()<br>-> _ThinkingParams"]
     C -->|Google| F["_build_thinking_config()<br>-> ThinkingConfig"]
     C -->|Mistral| G["_resolve_reasoning_effort()<br>-> reasoning_effort"]
-    C -->|Bedrock (aiobotocore)| H["_validate_no_reasoning_params()<br>-> LLMCapabilityError if set"]
+    C -->|Bedrock (aiobotocore)| H["check_request()<br>-> LLMCapabilityError if set"]
 ```
 
 ---
@@ -439,9 +439,13 @@ The behavior of `ReasoningEffort.NONE` varies by provider:
 
 ---
 
+## Checked When the Method Loads
+
+Every refusal below is raised by a worker's `check_request` classmethod, which reads only the model's spec and the job params and builds no SDK client. The worker runs it before every call, on text and structured outputs alike, and bundle validation runs the same check: when a method loads, each `PipeLLM` and `PipeStructure` resolves the setting its output is generated with (`model` for a single text, or a single `Dynamic` output, which a run generates as text unless its caller names another concept; `model_to_structure`, else `model`, else the deck's override or default for structured outputs, for anything else, a declared list of any concept included) to the model the deck serves, applies the model's constraints to the job params as the worker does, and calls the check its backend registered beside its worker factory. A refusal is an `llm_setting_refused_by_model` validation error on the field holding the setting, naming the pipe, the setting and the worker's reason, with the model named by its deck handle and never by its SDK or backend (an external plugin's refusal is shown as written only when the plugin raised it as caller-facing copy, and by its title otherwise), so `pipelex validate`, the API's validate route and a run all refuse the method before any credit is spent, where it used to validate as runnable and fail at the first call. A model no backend serves on the boot, or whose backend's SDK is not installed, is left to the run. A backend that registers no check, an external plugin's for instance, is held to the rule every worker shares: a model whose spec declares `thinking_mode = "none"` takes no reasoning setting.
+
 ## Error Handling
 
-All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.py`):
+All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.py`), raised by the worker's `check_request` before the call and, when the method loads, reported as an `llm_setting_refused_by_model` validation error:
 
 | Scenario | Error |
 |----------|-------|
@@ -477,6 +481,9 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `pipelex/providers/google/google_llm_worker.py` | Google thinking config builder |
 | `pipelex/providers/mistral/mistral_llm_worker.py` | Mistral reasoning effort resolution |
 | `pipelex/providers/bedrock/bedrock_llm_worker.py` | Bedrock reasoning validation |
+| `pipelex/cogt/llm/llm_worker_abstract.py` | `check_request()`, the shared rule each worker overrides and runs before every call, and `constrained_job_params()` |
+| `pipelex/kernel/llm_ops.py` | `check_llm_setting_with_served_model()`: a setting checked against the model it resolves to, with the check its backend registered |
+| `pipelex/pipe_operators/shared/llm_setting_check.py` | The load-time `llm_setting_refused_by_model` refusal of a `PipeLLM` or `PipeStructure` |
 | `pipelex/pipelex.toml` | Default effort-to-budget maps and effort-to-level maps |
 
 ---

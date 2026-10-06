@@ -175,6 +175,13 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "address-based reference to a package that is not installed fails as `unresolved_package_dependency` instead. "
         "Revisit if an entry can ever carry the packages it depends on."
     ),
+    PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL: (
+        "It refuses a model setting the model it resolves to refuses, such as reasoning on a model that does not "
+        "think, so the bundle that produces it must name a model the deck defines with that particular capability. "
+        "The corpus rule that an entry names no model forbids exactly that: whether a model takes a setting is a "
+        "fact of each consumer's deck, not of the language. "
+        "Revisit if the corpus ever grows a deck axis."
+    ),
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_INAPPLICABLE_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,

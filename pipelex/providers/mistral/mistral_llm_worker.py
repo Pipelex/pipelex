@@ -31,6 +31,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
+    from instructor import Mode as InstructorMode
     from mistralai.client.models import ChatCompletionResponse
     from mistralai.client.types import OptionalNullable
 
@@ -62,35 +63,64 @@ class MistralLLMWorker(LLMWorkerAbstract):
         self.mistral_factory = mistral_factory
         from instructor import from_mistral  # ruff: ignore[import-outside-top-level]
 
-        if instructor_mode := self.inference_model.get_instructor_mode():
-            self.instructor_for_objects = from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
-        else:
-            self.instructor_for_objects = from_mistral(client=sdk_instance, use_async=True)
+        self.instructor_for_objects = from_mistral(client=sdk_instance, mode=self._instructor_mode(inference_model=inference_model), use_async=True)
 
-    def _resolve_reasoning_effort(self, job_params: LLMJobParams) -> "OptionalNullable[MistralReasoningEffort]":
+    @classmethod
+    @override
+    def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+        """Refuse a reasoning setting Mistral cannot carry for the model, and one on a structured output it cannot read back.
+
+        A reasoning reply carries its answer beside a thinking chunk in a list of content chunks, which instructor's
+        JSON parsers read as one string and refuse on every attempt; its tool mode reads the tool call and validates.
+        So a structured output with a reasoning setting needs the tool structure method.
+        """
+        reasoning_effort = cls._resolve_reasoning_effort(inference_model=inference_model, job_params=job_params)
+        if not is_structured or reasoning_effort is UNSET:
+            return
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
+
+        if cls._instructor_mode(inference_model=inference_model) != InstructorMode.TOOLS:
+            msg = (
+                f"Model '{inference_model.desc}' cannot reason on a structured output with structure method "
+                f"'{inference_model.structure_method}': use 'instructor/mistral_tools', or remove the reasoning setting"
+            )
+            raise LLMCapabilityError(msg)
+
+    @classmethod
+    def _instructor_mode(cls, *, inference_model: InferenceModelSpec) -> "InstructorMode":
+        """The instructor mode structured outputs use: the model's structure method's, else the tool mode."""
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
+
+        return inference_model.get_instructor_mode() or InstructorMode.TOOLS
+
+    @classmethod
+    def _resolve_reasoning_effort(
+        cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams
+    ) -> "OptionalNullable[MistralReasoningEffort]":
         """Resolve reasoning parameters to a Mistral reasoning_effort value.
 
         Mistral's reasoning models take `reasoning_effort` and refuse the older `prompt_mode="reasoning"`.
 
         Args:
+            inference_model: The spec of the model the request goes to.
             job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
 
         Returns:
             The Mistral reasoning_effort value, or UNSET if reasoning is not requested.
 
         """
-        thinking_mode = self.inference_model.thinking_mode
+        thinking_mode = inference_model.thinking_mode
 
         if job_params.reasoning_budget is not None:
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; Mistral uses reasoning_effort instead"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning_budget; Mistral uses reasoning_effort instead"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.ADAPTIVE:
-                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
+                    msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.NONE:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
 
         if job_params.reasoning_effort is not None:
@@ -104,10 +134,10 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     log.verbose(f"Mistral reasoning_effort={mistral_effort}")
                     return mistral_effort
                 case ThinkingMode.ADAPTIVE:
-                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
+                    msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.NONE:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
 
         return UNSET
@@ -119,7 +149,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
-        reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
+        reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
         try:
             response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
                 messages=messages,
@@ -226,19 +256,10 @@ class MistralLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
-        # Deferred imports: avoid pulling heavy SDK at module-load time
-        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
+        reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
-        if reasoning_effort is not UNSET and self.instructor_for_objects.mode != InstructorMode.TOOLS:
-            # A reasoning reply carries its answer beside a thinking chunk in a list of content chunks, which instructor's
-            # JSON parsers read as one string and refuse on every attempt; its tool mode reads the tool call and validates
-            msg = (
-                f"Model '{self.inference_model.desc}' cannot reason on a structured output with structure method "
-                f"'{self.inference_model.structure_method}': use 'instructor/mistral_tools', or remove the reasoning setting"
-            )
-            raise LLMCapabilityError(msg)
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
 
         try:

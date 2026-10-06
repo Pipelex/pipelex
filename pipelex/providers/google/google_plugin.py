@@ -1,4 +1,5 @@
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -34,6 +35,14 @@ def _make_google_worker(
         inference_model=inference_model,
         reporting_delegate=reporting_delegate,
     )
+
+
+def _check_google_request(*, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+    require_sdk(spec="google.genai", dependency_name="google-genai", extra="google", msg=_GOOGLE_MISSING_MSG)
+
+    from pipelex.providers.google.google_llm_worker import GoogleLLMWorker  # ruff: ignore[import-outside-top-level]
+
+    GoogleLLMWorker.check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
 
 
 def _make_google_img_gen_worker(
@@ -80,6 +89,8 @@ class GooglePlugin:
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="google", make_worker=_make_google_worker)
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM, sdk="google", make_worker=_make_google_worker, check_llm_request=_check_google_request
+        )
         registrar.add_inference_backend(family=InferenceFamily.IMG_GEN, sdk="google", make_worker=_make_google_img_gen_worker)
         registrar.add_model_lister(sdk="google", lister=_list_google_models)

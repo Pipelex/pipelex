@@ -187,6 +187,8 @@ class PipeValidationError(ValueError):
         redundant_input_name: str | None = None,
         dropped_input_marker: str | None = None,
         root_input_marker: str | None = None,
+        field_name: str | None = None,
+        model_reference: str | None = None,
     ):
         self.error_type = error_type
         self.domain_code = domain_code
@@ -218,6 +220,10 @@ class PipeValidationError(ValueError):
         # Set together with `dropped_input_marker`: the marker the root declares, written the same way. The warning
         # compares the two markers' multiplicity and presence apart, so it names only the part the deletion drops.
         self.root_input_marker = root_input_marker
+        # The pipe's field the refusal is about, set where one field is at fault (`model` or `model_to_structure`
+        # for a model setting its model refuses), and the model reference that field holds, as the author wrote it.
+        self.field_name = field_name
+        self.model_reference = model_reference
         self.file_path = file_path
         self.explanation = explanation
         super().__init__(message)

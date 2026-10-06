@@ -1,4 +1,5 @@
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -92,6 +93,18 @@ async def _list_openai_models(
     await list_openai_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
 
 
+def _check_openai_completions_request(*, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+    from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # ruff: ignore[import-outside-top-level]
+
+    OpenAICompletionsLLMWorker.check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
+
+
+def _check_openai_responses_request(*, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+    from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # ruff: ignore[import-outside-top-level]
+
+    OpenAIResponsesLLMWorker.check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
+
+
 class OpenAIPlugin:
     """Always-on built-in driver for OpenAI and Azure OpenAI (no optional SDK)."""
 
@@ -99,10 +112,27 @@ class OpenAIPlugin:
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="openai", make_worker=_make_openai_completions_worker)
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="azure_openai", make_worker=_make_openai_completions_worker)
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="openai_responses", make_worker=_make_openai_responses_worker)
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="azure_openai_responses", make_worker=_make_openai_responses_worker)
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM, sdk="openai", make_worker=_make_openai_completions_worker, check_llm_request=_check_openai_completions_request
+        )
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM,
+            sdk="azure_openai",
+            make_worker=_make_openai_completions_worker,
+            check_llm_request=_check_openai_completions_request,
+        )
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM,
+            sdk="openai_responses",
+            make_worker=_make_openai_responses_worker,
+            check_llm_request=_check_openai_responses_request,
+        )
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM,
+            sdk="azure_openai_responses",
+            make_worker=_make_openai_responses_worker,
+            check_llm_request=_check_openai_responses_request,
+        )
         registrar.add_inference_backend(family=InferenceFamily.IMG_GEN, sdk="openai_img_gen", make_worker=_make_openai_img_gen_worker)
         registrar.add_model_lister(sdk="openai", lister=_list_openai_models)
         registrar.add_model_lister(sdk="azure_openai", lister=_list_openai_models)

@@ -26,7 +26,7 @@ from pipelex.plugins.exceptions import (
     PluginLayerViolationError,
     ReservedServiceErrorCodeError,
 )
-from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
+from pipelex.plugins.inference_backend_registry import CheckLLMRequestFn, InferenceFamily, LLMRequestCheck, MakeWorkerFn
 from pipelex.plugins.log_sink_registry import LogSinkFactoryFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
@@ -166,6 +166,7 @@ class PluginRegistrar:
         # unit test can build a registrar without naming one.
         self.boot_orchestrator = boot_orchestrator
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
+        self.llm_request_checks: dict[str, LLMRequestCheck] = {}
         self.model_listers: dict[str, ListModelsFn] = {}
         self.orchestrators: dict[OrchestrationMode, OrchestratorProtocol] = {}
         self.bundle_validators: dict[OrchestrationMode, BundleValidatorProtocol] = {}
@@ -214,7 +215,22 @@ class PluginRegistrar:
     # Menu methods — the only surface a plugin's register() may call
     # ------------------------------------------------------------------ #
 
-    def add_inference_backend(self, *, family: InferenceFamily, sdk: str, make_worker: MakeWorkerFn) -> None:
+    def add_inference_backend(
+        self,
+        *,
+        family: InferenceFamily,
+        sdk: str,
+        make_worker: MakeWorkerFn,
+        check_llm_request: CheckLLMRequestFn | None = None,
+    ) -> None:
+        """Register the worker factory serving one sdk of one inference family.
+
+        ``check_llm_request`` is read for the LLM family only: the check the worker ``make_worker`` builds
+        applies to a request before calling its provider, which bundle validation runs against the model a
+        pipe's setting resolves to (see ``CheckLLMRequestFn``). The check is recorded with the registering
+        plugin's origin, which decides how its refusals are shown to a caller. A duplicate backend is refused
+        before its check is recorded, so a refused duplicate leaves no check behind.
+        """
         self._add(
             store=self.inference_backends,
             sources=self._inference_sources,
@@ -225,6 +241,12 @@ class PluginRegistrar:
                 family=family, sdk=sdk, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )
+        match family:
+            case InferenceFamily.LLM:
+                if check_llm_request is not None:
+                    self.llm_request_checks[sdk] = LLMRequestCheck(check=check_llm_request, is_builtin=self._active.origin == PluginOrigin.BUILTIN)
+            case InferenceFamily.IMG_GEN | InferenceFamily.EXTRACT | InferenceFamily.SEARCH | InferenceFamily.DOC_GEN | InferenceFamily.JUDGMENT:
+                pass
 
     def add_model_lister(self, *, sdk: str, lister: ListModelsFn) -> None:
         self._add(
