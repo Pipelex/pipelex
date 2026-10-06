@@ -52,6 +52,21 @@ class FetchedMethodPackage(BaseModel):
         return MethodProvenance(address=self.full_address, tag=self.ref.tag, commit_sha=self.commit_sha)
 
 
+def _without_host_directory(*, text: str, directory: Path) -> str:
+    """Remove from git's output everything that names `directory`, a clone directory on this host.
+
+    Git's own explanation (`remote: Repository not found.`, `fatal: … not found`) is what the caller can use; its
+    progress line `Cloning into '<directory>'...` names a temporary directory of the host, gone once the fetch ends.
+    That fragment is cut where a prefix shares its line, and any other line naming the directory is dropped. Both
+    spellings of the directory are matched, since macOS reaches its temporary directory through a symlink.
+    """
+    spellings = {str(directory), str(directory.resolve())}
+    for spelling in spellings:
+        text = text.replace(f"Cloning into '{spelling}'...", "")
+    kept_lines = [line.rstrip() for line in text.splitlines() if not any(spelling in line for spelling in spellings)]
+    return "\n".join(kept_lines).strip()
+
+
 def resolve_head_commit_sha(*, clone_dir: Path) -> str:
     """Resolve the commit SHA a clone's HEAD points at.
 
@@ -76,10 +91,10 @@ def resolve_head_commit_sha(*, clone_dir: Path) -> str:
         msg = "git is not installed or not found on PATH"
         raise MethodFetchError(msg) from exc
     except subprocess.CalledProcessError as exc:
-        msg = f"Failed to resolve the fetched commit in '{clone_dir}': {exc.stderr.strip()}"
+        msg = f"Failed to resolve the fetched commit: {_without_host_directory(text=exc.stderr.strip(), directory=clone_dir)}"
         raise MethodFetchError(msg) from exc
     except subprocess.TimeoutExpired as exc:
-        msg = f"Timed out resolving the fetched commit in '{clone_dir}'"
+        msg = "Timed out resolving the fetched commit"
         raise MethodFetchError(msg) from exc
     return result.stdout.strip()
 
@@ -110,7 +125,7 @@ def ensure_cloned_at_tag(*, clone_dir: Path, ref: MethodRef) -> None:
         msg = "git is not installed or not found on PATH"
         raise MethodFetchError(msg) from exc
     except subprocess.TimeoutExpired as exc:
-        msg = f"Timed out verifying tag '{ref.tag}' in '{clone_dir}'"
+        msg = f"Timed out verifying tag '{ref.tag}' of method reference '{ref.ref_str}'"
         raise MethodFetchError(msg) from exc
     if result.returncode != 0:
         msg = (
@@ -201,7 +216,7 @@ def fetch_method_package(
         else:
             clone_default_branch(clone_url=effective_clone_url, destination=dest_dir)
     except VCSFetchError as exc:
-        msg = f"Failed to fetch method '{ref.ref_str}': {exc.message}"
+        msg = f"Failed to fetch method '{ref.ref_str}': {_without_host_directory(text=exc.message, directory=dest_dir)}"
         raise MethodFetchError(msg) from exc
 
     if ref.tag:

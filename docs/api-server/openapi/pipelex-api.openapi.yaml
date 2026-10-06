@@ -5554,6 +5554,7 @@ components:
       - native_concept_redeclaration
       - unresolved_concept
       - unresolved_pipe_dependency
+      - unresolved_package_dependency
       - unexported_pipe_dependency
       - unknown_model
       - unknown_validation_error

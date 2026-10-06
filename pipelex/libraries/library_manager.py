@@ -24,6 +24,7 @@ from pipelex.core.concepts.helpers import make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
+from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -47,18 +48,26 @@ from pipelex.libraries.library_utils import (
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
+from pipelex.methods.exceptions import MethodDependencyFetchError, MethodFetchDisabledError
 from pipelex.methods.fetch_on_miss import resolve_address_based_method
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, is_generated_structures_module
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipeBlueprintUnion, PipelexBundleBlueprint, StepRole
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import (
+    ElaborationMetadata,
+    LocatedPipeReference,
+    PipeBlueprintUnion,
+    PipelexBundleBlueprint,
+    StepRole,
+)
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -1408,8 +1417,12 @@ class LibraryManager(LibraryManagerAbstract):
         alias contains '/' (i.e. a full package address), and loads each
         unique address-based dependency. A dependency missing from the
         installed methods is fetched by address (honoring an ``@<tag>`` pin)
-        and installed when fetch-on-miss is enabled; an unresolvable
-        dependency raises a diagnostic rather than passing silently.
+        and installed when fetch-on-miss is enabled.
+
+        A package that cannot be resolved is the caller's to fix, since the reference is part of their bundle: every
+        address is tried, then the load is refused with one ``unresolved_package_dependency`` item per address that
+        failed, located on the first pipe naming it. A failure of the host's own store (``MethodInstallError``) and the
+        refusal of a package's Python structures (``MethodStructuresRefusedError``) propagate as they are.
 
         Also searches for .mthds/methods/ directories relative to the bundle
         source path, walking up ancestor directories to find installed methods
@@ -1418,36 +1431,58 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The library to load into
             blueprints: The parsed bundle blueprints to scan
+
+        Raises:
+            LibraryLoadingError: One or more referenced packages could not be resolved.
         """
         library = self.get_library(library_id=library_id)
 
-        # Collect unique address-based aliases from all pipe references
-        address_aliases: set[str] = set()
+        # Each address-based alias, with the first reference naming it and the bundle that makes it, in bundle order.
+        first_references: dict[str, tuple[LocatedPipeReference, PipelexBundleBlueprint]] = {}
         for blueprint in blueprints:
-            for pipe_ref_str, _context in blueprint.collect_pipe_references():
-                if QualifiedRef.has_cross_package_prefix(pipe_ref_str):
-                    alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref_str)
-                    if QualifiedRef.is_address_based_alias(alias):
-                        address_aliases.add(alias)
+            for reference in blueprint.collect_located_pipe_references():
+                if QualifiedRef.has_cross_package_prefix(reference.pipe_ref):
+                    alias, _remainder = QualifiedRef.split_cross_package_ref(reference.pipe_ref)
+                    if QualifiedRef.is_address_based_alias(alias) and alias not in first_references:
+                        first_references[alias] = (reference, blueprint)
 
-        if not address_aliases:
+        if not first_references:
             return
 
         # Derive extra search dirs from bundle source paths
         extra_search_dirs = _find_methods_dirs_from_blueprints(blueprints)
 
-        for full_address in sorted(address_aliases):
+        unresolved_items: list[PipesAndConceptValidationErrorData] = []
+        for full_address, (reference, blueprint) in first_references.items():
             if full_address in library.dependency_libraries:
                 continue
-            self._load_address_based_dependency(
-                library=library,
-                full_address=full_address,
-                extra_search_dirs=extra_search_dirs,
+            try:
+                self._load_address_based_dependency(
+                    library=library,
+                    full_address=full_address,
+                    extra_search_dirs=extra_search_dirs,
+                )
+            except (MethodFetchDisabledError, MethodDependencyFetchError) as exc:
+                unresolved_items.append(
+                    PipesAndConceptValidationErrorData(
+                        error_type=PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY,
+                        domain_code=blueprint.domain,
+                        source=blueprint.source,
+                        pipe_code=reference.referring_pipe_code,
+                        missing_pipe_code=reference.pipe_ref,
+                        message=exc.message,
+                        field_path=reference.field_path,
+                    )
+                )
+
+        if unresolved_items:
+            raise LibraryLoadingError(
+                message=" ".join(item.message for item in unresolved_items),
+                pipe_concept_validation_errors=unresolved_items,
             )
 
         # Wire concept resolver after all deps are loaded
-        if address_aliases:
-            library.concept_library.set_concept_resolver(library.resolve_concept)
+        library.concept_library.set_concept_resolver(library.resolve_concept)
 
     def _load_address_based_dependency(
         self,

@@ -1,0 +1,12 @@
+domain      = "harbour_berths"
+description = "Allocate a berth to an arriving vessel with a scheduling package published on a host no runtime fetches from"
+main_pipe   = "allocate_berth"
+
+[pipe.allocate_berth]
+type = "PipeSequence"
+description = "Allocate a berth to the arriving vessel"
+inputs = { arrival = "Text" }
+output = "Text"
+steps = [
+  { pipe = "gitlab.com/harbour-authority/berth-scheduling->berth_scheduling.pick_berth", result = "berth" },
+]
