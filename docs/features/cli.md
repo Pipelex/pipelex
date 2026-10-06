@@ -1,6 +1,6 @@
 ---
 title: "CLI"
-description: "The Pipelex command-line interface for developing, validating, and running AI methods. Covers login, init, build, validate, run, graph, show, and more."
+description: "The Pipelex command-line interface for developing, validating, and running AI methods. Covers init, build, validate, run, graph, show, and more."
 ---
 
 # Command-Line Interface
@@ -9,13 +9,12 @@ A comprehensive CLI for developing, validating, and running AI methods.
 
 ## Overview
 
-The `pipelex` CLI is the primary tool for working with Pipelex methods. It covers the full development lifecycle: authentication, initialization, building, validation, execution, inspection, and diagnostics.
+The `pipelex` CLI is the primary tool for working with Pipelex methods. It covers the full development lifecycle: initialization, building, validation, execution, inspection, and diagnostics.
 
 ## Core Commands
 
 | Command | Description |
 |---------|-------------|
-| **`pipelex login`** | Authenticate with Pipelex Gateway via the browser and save your API key |
 | **`pipelex init`** | Initialize configuration, backends, credentials, routing, and telemetry |
 | **`pipelex update`** | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
 | **`pipelex doctor`** | Check configuration health and suggest fixes |

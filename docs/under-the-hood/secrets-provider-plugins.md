@@ -43,7 +43,7 @@ There is no `match runtime.secrets.method:` anywhere in boot — the token set i
 
 ### Where in boot secrets is resolved
 
-Secrets is the **first capability resolved out of the registrar** — right after plugin discovery, after the gateway/terms precondition gate, before the log sink and well before storage selection. Three consequences that this ordering guarantees:
+Secrets is the **first capability resolved out of the registrar** — right after plugin discovery and the unknown-orchestrator check, before the log sink and well before storage selection. Three consequences that this ordering guarantees:
 
 - **The log sink**, its first consumer, receives the provider as the `secrets_provider` keyword of its factory, so a sink's settings can name secrets: the built-in `otlp` sink's header values and the `gcp` sink's key path accept `${…}` placeholders (see [Log Sink Plugins](log-sink-plugins.md#logsinkfactoryfn)). The provider goes on the hub only after the sink is installed, so the keyword is the one way a sink reaches it. Because the sink does not exist yet, what the provider logs while it is built is held and replayed into the sink, and a provider whose factory raises stops the boot with those held lines written to stderr, redacted, rather than through the configured sink.
 - **Telemetry** receives the config-selected secrets provider when it is constructed.

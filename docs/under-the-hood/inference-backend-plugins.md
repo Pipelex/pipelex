@@ -7,7 +7,7 @@ description: "How Pipelex discovers inference backends through the plugin seam, 
 
 Every model call in Pipelex — an LLM completion, an image generation, a document extraction, a web search, a judgment — is served by an **inference worker**. Which worker handles a given model is decided entirely by data: a model's `sdk` field selects a backend, and a **backend plugin** is what teaches Pipelex how to build the worker for that `sdk`.
 
-Core names no backend by import or by string. The built-in drivers (OpenAI, Gateway, Anthropic, Mistral, Bedrock, Google, FAL, HuggingFace, Docling, …) are plugins too — they ride the exact same seam an out-of-tree plugin would. This page documents that seam, the **Inference SPI** a plugin compiles against, and how to write one.
+Core names no backend by import or by string. The built-in drivers (OpenAI, Anthropic, Mistral, Bedrock, Google, FAL, HuggingFace, OpenRouter, Portkey, Docling, …) are plugins too — they ride the exact same seam an out-of-tree plugin would. This page documents that seam, the **Inference SPI** a plugin compiles against, and how to write one.
 
 ---
 
@@ -65,7 +65,7 @@ registrar.add_inference_backend(
 
 A registry key is `(family, sdk)`. The same `sdk` string may appear in two families (e.g. `google` serves both `LLM` and `IMG_GEN`); they are distinct keys. A duplicate `(family, sdk)` fails loud with `DuplicateInferenceBackendError` naming **both** contributing plugins.
 
-One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves the four inference families, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`, and `typesafe` serves `JUDGMENT` alone. This is the cross-family-vendor coordination point: one plugin, many backends. `DOC_GEN` is the family of the document engines a `PipeDocGen` step prints with, local libraries rather than inference, which the built-in `reportlab` plugin and the Pipelex document generation plugin serve (see [Document Engine Plugins](document-engine-plugins.md)).
+One plugin may register across several families from a single `register` — `openai` and `google` serve `LLM` + `IMG_GEN`, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`, and `typesafe` serves `JUDGMENT` alone. This is the cross-family-vendor coordination point: one plugin, many backends. `DOC_GEN` is the family of the document engines a `PipeDocGen` step prints with, local libraries rather than inference, which the built-in `reportlab` plugin and the Pipelex document generation plugin serve (see [Document Engine Plugins](document-engine-plugins.md)).
 
 A plugin whose backend runs without an external service, such as a document engine, may also declare the models it serves rather than leave them to a backend file. `add_internal_model(name=…, spec=…)` declares a model in the `internal` backend, the spec being the table a backend file would hold for it, and `add_doc_gen_default(doc_gen_format=…, source=…, model=…)` declares the model deck's default engine for a document format and source. Both are stored at registration and merged by the model manager at boot, and [Document Engine Plugins](document-engine-plugins.md#registering-an-engine) gives their rules.
 
@@ -304,7 +304,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `JobMetadata` | `pipelex.system.job_metadata` | the run and the step a job belongs to |
 | `ReportingProtocol` | `pipelex.reporting.reporting_protocol` | where a worker reports its usage |
 
-The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_VERSION` — not an `__init__.py` re-export shim (the repo bans re-exports; import by full path). Anything a plugin needs to import outside this surface is a design gap to resolve, not an accident to live with: either the symbol is published here, or the plugin keeps its own copy of it. The built-in provider plugin for the hosted gateway is held to it by a test that scans its imports against this table.
+The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_VERSION` — not an `__init__.py` re-export shim (the repo bans re-exports; import by full path). Anything a plugin needs to import outside this surface is a design gap to resolve, not an accident to live with: either the symbol is published here, or the plugin keeps its own copy of it. Pipelex's own out-of-tree inference plugin is held to it by a test, in that plugin's repository, that scans its imports against this table.
 
 ---
 

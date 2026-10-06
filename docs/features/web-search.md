@@ -9,7 +9,7 @@ Structured web search integrated into your pipelines.
 
 ## Overview
 
-PipeSearch brings web search directly into your methods. Results come back as structured data with source citations, making them ready for downstream processing by LLMs or other pipes. Search is powered by Linkup (direct SDK) or via Pipelex Gateway.
+PipeSearch brings web search directly into your methods. Results come back as structured data with source citations, making them ready for downstream processing by LLMs or other pipes. Search is powered by Linkup, through its SDK with your own `LINKUP_API_KEY`.
 
 ## Key Capabilities
 
