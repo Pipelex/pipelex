@@ -186,6 +186,19 @@ class TestShowCmd:
         assert "none" in rows["ollama"]
         assert "does not resolve credentials" in output
 
+    def test_do_show_backends_prints_a_bracketed_variable_name_as_written(self, mocker: MockerFixture, console: Console) -> None:
+        """The placeholder syntax allows brackets in a name, which Rich would otherwise read as markup."""
+        backends = [
+            _make_backend("acme", enabled=True, model_count=1, unresolved_credentials={"endpoint": ["ACME[/x]"], "api_key": ["KEY[bold]X"]}),
+        ]
+        self._mock_backend_setup(mocker, backends=backends, routing_profile=_make_routing_profile())
+
+        do_show_backends(show_all=False)
+
+        output = console.export_text()
+        assert "not resolved (ACME[/x])" in output
+        assert "KEY[bold]X" in output
+
     @pytest.mark.usefixtures("telemetry")
     def test_do_show_backends_show_all_includes_status_column(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
         """--all loads the library keyless, disabled backends included, and shows Enabled/Disabled status."""

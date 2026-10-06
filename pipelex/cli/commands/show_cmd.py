@@ -116,14 +116,15 @@ def do_show_backends(*, show_all: bool = False) -> None:
         # This command boots without inference, which keeps every backend and resolves no credential:
         # an endpoint read from a variable is shown by its variable, never by a value it never looked up.
         if backend.endpoint:
-            endpoint = backend.endpoint
+            endpoint = escape(backend.endpoint)
         elif endpoint_var_names := backend.unresolved_credentials.get("endpoint"):
-            endpoint = f"[dim]not resolved ({', '.join(endpoint_var_names)})[/dim]"
+            endpoint = f"[dim]not resolved ({escape(', '.join(endpoint_var_names))})[/dim]"
         elif "endpoint" in backend.unresolved_credentials:
             endpoint = "[dim]not resolved[/dim]"
         else:
             endpoint = "[dim]N/A[/dim]"
-        credential_variables = ", ".join(backend.unresolved_credential_vars) or "[dim]none[/dim]"
+        # A variable name is the user's text, and the placeholder syntax allows brackets in it.
+        credential_variables = escape(", ".join(backend.unresolved_credential_vars)) or "[dim]none[/dim]"
         model_count = str(len(backend.model_specs))
 
         if show_all:
