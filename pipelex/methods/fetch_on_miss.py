@@ -40,6 +40,10 @@ from pipelex.methods.structures_check import (
 # The remedy every refusal ends with. It names no directory: on a host, the runtime's own store is not the caller's to write.
 MANUAL_INSTALL_HINT = "install the package where this runtime runs (for example with `mthds install <address>`)"
 
+# The remedy a caller can always apply, a hosted one included: the bundle carries the package, which the runtime then
+# finds before its own store, beside a bundle on disk as in a bundle sent over HTTP.
+VENDORING_HINT = "ship the package with the bundle under `.mthds/methods/<name>/`"
+
 
 class _LookupAddress(NamedTuple):
     """The address a reference is looked up by, with the parsed reference or the reason it did not parse."""
@@ -157,13 +161,13 @@ def resolve_address_based_method(
     if ref is None:
         msg = (
             f"Method '{full_address}' is referenced but not installed, and this runtime cannot fetch it: only github.com/... addresses "
-            f"are fetchable. Correct the address, or {MANUAL_INSTALL_HINT}."
+            f"are fetchable. Correct the address, {VENDORING_HINT}, or {MANUAL_INSTALL_HINT}."
         )
         raise MethodDependencyFetchError(msg)
     if not is_method_fetch_on_miss_enabled():
         msg = (
             f"Method '{ref.ref_str}' is referenced but not installed, and fetch-on-miss is disabled on this runtime, so it does not "
-            f"fetch it. Correct the address if it is wrong, or {MANUAL_INSTALL_HINT}. Fetch-on-miss is enabled by "
+            f"fetch it. Correct the address if it is wrong, {VENDORING_HINT}, or {MANUAL_INSTALL_HINT}. Fetch-on-miss is enabled by "
             f"`fetch_on_miss = true` under [interpreter.methods] in the runtime's pipelex.toml, or {METHODS_FETCH_ON_MISS_ENV_VAR}=1."
         )
         raise MethodFetchDisabledError(msg)
@@ -180,7 +184,7 @@ def resolve_address_based_method(
         except MethodRefError as exc:
             msg = (
                 f"Method '{ref.ref_str}' is referenced but not installed, and fetching it failed: {exc} "
-                f"Correct the address or the tag, or {MANUAL_INSTALL_HINT}."
+                f"Correct the address or the tag, {VENDORING_HINT}, or {MANUAL_INSTALL_HINT}."
             )
             raise MethodDependencyFetchError(msg) from exc
 

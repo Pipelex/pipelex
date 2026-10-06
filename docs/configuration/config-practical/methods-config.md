@@ -15,7 +15,7 @@ class MethodsConfig(ConfigModel):
 
 ### Fields
 
-- `fetch_on_miss`: When a bundle references another method by address (`github.com/...->domain.pipe`) and no installed method matches, fetch the package by address and install it into `~/.mthds/methods/` so the load can proceed. When disabled, such a miss refuses the bundle with an `unresolved_package_dependency` item naming the address and how to install the package, and the network is never touched at load time.
+- `fetch_on_miss`: When a bundle references another method by address (`github.com/...->domain.pipe`) and no installed method matches, fetch the package by address and install it into `~/.mthds/methods/` so the load can proceed. When disabled, such a miss refuses the bundle with an `unresolved_package_dependency` item naming the address and how to ship the package with the bundle or install it, and the network is never touched at load time.
 
 ## Example Configuration
 

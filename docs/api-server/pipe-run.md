@@ -35,7 +35,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `output_name` (string, optional): Name for the output slot
 - `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
-- `bundle_b64` (string, optional): **Pipelex-API extension.** Base64-encoded zip of a whole method bundle — see [Shipping a method bundle](#shipping-a-method-bundle-custom-pipefunc). Mutually exclusive with `files`.
+- `bundle_b64` (string, optional): **Pipelex-API extension.** Base64-encoded zip of a whole method bundle, which may carry the method packages it calls — see [Shipping a method bundle](#shipping-a-method-bundle-custom-pipefunc). Mutually exclusive with `files`.
 - `files` (dict[str, str], optional): **Pipelex-API extension.** The same bundle as a `{relative_path: text}` map (the unzipped equivalent of `bundle_b64`). Mutually exclusive with `bundle_b64`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method bundle; `pipe_code` may accompany it to override the package's `main_pipe`.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
@@ -115,7 +115,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `output_name` (string, optional): Name for the output slot
 - `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
-- `bundle_b64` (string, optional): **Pipelex-API extension.** Base64-encoded zip of a whole method bundle — see [Shipping a method bundle](#shipping-a-method-bundle-custom-pipefunc). Mutually exclusive with `files`.
+- `bundle_b64` (string, optional): **Pipelex-API extension.** Base64-encoded zip of a whole method bundle, which may carry the method packages it calls — see [Shipping a method bundle](#shipping-a-method-bundle-custom-pipefunc). Mutually exclusive with `files`.
 - `files` (dict[str, str], optional): **Pipelex-API extension.** The same bundle as a `{relative_path: text}` map (the unzipped equivalent of `bundle_b64`). Mutually exclusive with `bundle_b64`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method bundle; `pipe_code` may accompany it to override the package's `main_pipe`.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
@@ -238,6 +238,32 @@ The server materializes the bundle into a temporary library directory for the ru
 
 **No Python structure classes.** A structure class (a `StructuredContent` subclass) can only be used by importing its module into the runner's own process, which a sandbox-hosted deployment never does, so a bundle whose Python declares one is refused with a `403` (`MethodStructuresRefusedError`) naming each file and class, before anything is loaded. The rule is the same however the method arrives: inline as a bundle, or fetched by `method_ref`. Declare the types as MTHDS concepts with inline structures instead; a PipeFunc returns them by importing the classes the sandbox generates from those concepts (`from structures import <domain>__<Concept>`). The `structures` module that `pipelex build structures` writes is accepted as long as it is left as generated, and it is not sent to the sandbox, which generates its own.
 
+### Shipping the method packages the bundle calls
+
+A bundle can call a pipe of another method package by its address, such as `github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views`. A `files` or `bundle_b64` request can carry that package with the bundle, so the run needs no copy installed on the server and no fetch. Put each package under `.mthds/methods/<name>/` at the bundle's root, with its `METHODS.toml` at `.mthds/methods/<name>/METHODS.toml`, which is the layout of a local method store:
+
+```text
+bundle.mthds
+.mthds/methods/documents/METHODS.toml
+.mthds/methods/documents/documents.mthds
+```
+
+- **A reference finds the package by its manifest.** The package that answers is the one whose `METHODS.toml` declares the referenced address and name, whatever its directory is called. A reference pinned with `@<tag>` is answered by the shipped copy too, and the server logs a warning when the copy's `version` is not that tag.
+- **The shipped copy comes first.** The server searches the shipped packages before the copies installed on it and before fetch-on-miss, so a shipped package wins over an installed copy of the same address, and it runs even where fetching is disabled or the address is not one the server can fetch. It serves this run alone: nothing is installed.
+- **It is not the bundle's own content.** A shipped package's files are kept out of the bundle's `.mthds` content and out of its library directory, so its domains never merge with the bundle's, and a bundle whose only `.mthds` files are shipped ones is refused as having no `.mthds` file of its own.
+- **Its Python never runs in the server's process.** A `.py` file in a shipped package counts for the sandbox gate like any other, so a deployment that is not sandbox-hosted refuses the bundle with `403 CustomCodeRequiresSandbox`. On a sandbox-hosted deployment, a shipped package whose Python declares a structure class is refused with `403 MethodStructuresRefusedError` naming the package's address, as a package fetched by address is.
+- **A shipped bundle that does not parse refuses the run** with the `422` verdict, whose items name the file as `<address>/<path inside the package>`, never by a path on the server.
+
+Any other `.mthds` path in the bundle is refused with `422 InvalidBundle`, naming the entry and the expected layout, rather than dropped:
+
+- a file under `.mthds/` outside `.mthds/methods/<name>/`, such as `.mthds/foo` or a file directly under `.mthds/methods/`;
+- a `.mthds/methods/` directory below the bundle's root, such as `sub/.mthds/methods/…`;
+- a `.mthds/` directory inside a shipped package, since a package's own dependencies are not loaded;
+- a package directory whose name starts with a dot;
+- a package directory without a `METHODS.toml`, or whose `METHODS.toml` is not a valid manifest.
+
+Shipping packages is a feature of the run routes. `POST /v1/validate` takes `mthds_contents` or `method_ref`, and a package reference in the validated content resolves there through the server's installed copies and fetch-on-miss only.
+
 ---
 
 ## Running a method by address (`method_ref`)
@@ -253,7 +279,7 @@ Both `/execute` and `/start` accept **`method_ref`** — a globally resolvable a
 
 **The reference grammar is `<address>[@<tag>]`.** The address is `github.com/<owner>/<repo>` optionally followed by a package selector within the repository (`github.com` only for now). A bare address means the repository's default branch at HEAD; `@<tag>` pins the repository at that **git tag** (recommended form `vX.Y.Z`) — branch names are refused, so a reference can never silently track a moving branch. Full browser URLs (`https://github.com/...`, including `/tree/<branch>/...` deep links) are accepted and normalized.
 
-**Resolution.** The server fetches the repository (shallow clone, at the tag when one is named), records the **commit SHA** of what was fetched, and locates the requested package **by manifest identity**: it scans the clone for `METHODS.toml` manifests and selects the one whose declared address (plus `name`, for a package in a library repo) equals the requested address — never by directory path. The package's `.mthds` files then run exactly like an inline submission; its non-`.mthds` files travel like a bundle's.
+**Resolution.** The server fetches the repository (shallow clone, at the tag when one is named), records the **commit SHA** of what was fetched, and locates the requested package **by manifest identity**: it scans the clone for `METHODS.toml` manifests and selects the one whose declared address (plus `name`, for a package in a library repo) equals the requested address — never by directory path. The package's `.mthds` files then run exactly like an inline submission; its non-`.mthds` files travel like a bundle's, and so do the packages it ships under its own `.mthds/methods/<name>/` ([Shipping the method packages the bundle calls](#shipping-the-method-packages-the-bundle-calls)), under the same refusals. `POST /v1/validate` by `method_ref` keeps those shipped packages out of the validated content without searching them, so a dependency the package ships resolves there through the installed copies and fetch-on-miss only.
 
 **Entry pipe.** The pipe to run defaults to the package manifest's `main_pipe`; an explicit `pipe_code` in the request overrides it (to run another pipe from the fetched package).
 
