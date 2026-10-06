@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cogt.exceptions import LLMCapabilityError
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.models.model_reference import ModelReference
@@ -34,7 +34,7 @@ class TestLLMSettingCheck:
                 "model",
                 True,
                 "PipeLLM 'answer_it' generates a structured output with the model setting `$deep-analysis` its `model` names, "
-                f"which the model it resolves to refuses: {_WORKER_REFUSAL} Name another setting in `model`, or one whose model takes it.",
+                f"which the model it resolves to refuses: {_WORKER_REFUSAL}. Name another setting in `model`, or one whose model takes it.",
                 "$deep-analysis",
                 id="preset_reference",
             ),
@@ -43,7 +43,7 @@ class TestLLMSettingCheck:
                 "model_to_structure",
                 True,
                 "PipeLLM 'answer_it' generates a structured output with the model setting its `model_to_structure` writes inline, "
-                f"which the model it resolves to refuses: {_WORKER_REFUSAL} "
+                f"which the model it resolves to refuses: {_WORKER_REFUSAL}. "
                 "Change the setting in `model_to_structure`, or name a model that takes it.",
                 None,
                 id="inline_setting",
@@ -53,7 +53,7 @@ class TestLLMSettingCheck:
                 None,
                 False,
                 "PipeLLM 'answer_it' generates text with the model deck's default setting for text, "
-                f"which the model it resolves to refuses: {_WORKER_REFUSAL} "
+                f"which the model it resolves to refuses: {_WORKER_REFUSAL}. "
                 "Name a model setting in the pipe, or change `for_text` in the deck's `[llm.choice_defaults]`.",
                 None,
                 id="deck_default_for_text",
@@ -63,7 +63,7 @@ class TestLLMSettingCheck:
                 None,
                 True,
                 "PipeLLM 'answer_it' generates a structured output with the model deck's default setting for structured outputs, "
-                f"which the model it resolves to refuses: {_WORKER_REFUSAL} "
+                f"which the model it resolves to refuses: {_WORKER_REFUSAL}. "
                 "Name a model setting in the pipe, or change `for_object` in the deck's `[llm.choice_defaults]`.",
                 None,
                 id="deck_default_for_structured_outputs",
@@ -82,7 +82,7 @@ class TestLLMSettingCheck:
         self._patch_deck_overrides(mocker, for_text=None, for_object=None)
         check = mocker.patch(
             "pipelex.pipe_operators.shared.llm_setting_check.check_llm_setting_with_served_model",
-            side_effect=LLMCapabilityError(_WORKER_REFUSAL),
+            side_effect=LLMSettingRefusedError(_WORKER_REFUSAL),
         )
         with pytest.raises(PipeValidationError) as exc_info:
             refuse_llm_setting_its_model_refuses(
@@ -139,7 +139,7 @@ class TestLLMSettingCheck:
         self._patch_deck_overrides(mocker, for_text=_SETTING, for_object=_SETTING)
         mocker.patch(
             "pipelex.pipe_operators.shared.llm_setting_check.check_llm_setting_with_served_model",
-            side_effect=LLMCapabilityError(_WORKER_REFUSAL),
+            side_effect=LLMSettingRefusedError(_WORKER_REFUSAL),
         )
         with pytest.raises(PipeValidationError) as exc_info:
             refuse_llm_setting_its_model_refuses(
@@ -155,3 +155,24 @@ class TestLLMSettingCheck:
         assert expected_setting in message
         assert message.endswith(expected_remedy)
         assert "choice_defaults" not in message
+
+    def test_a_refusal_not_worded_for_the_caller_is_named_by_its_title(self, mocker: MockerFixture) -> None:
+        """A worker's own refusal names the SDK and the backend, which a verdict kept under strict disclosure must not show."""
+        self._patch_deck_overrides(mocker, for_text=None, for_object=None)
+        mocker.patch(
+            "pipelex.pipe_operators.shared.llm_setting_check.check_llm_setting_with_served_model",
+            side_effect=LLMCapabilityError("Model 'some-model → SDK[internal]•Backend[internal]' refuses"),
+        )
+        with pytest.raises(PipeValidationError) as exc_info:
+            refuse_llm_setting_its_model_refuses(
+                pipe_type="PipeLLM",
+                pipe_code="answer_it",
+                domain_code="some_domain",
+                llm_setting=_SETTING,
+                llm_choice=_SETTING,
+                field_name="model",
+                is_structured=False,
+            )
+        message = str(exc_info.value)
+        assert "internal" not in message
+        assert "which the model it resolves to refuses: LLM capability. " in message

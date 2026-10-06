@@ -3,7 +3,7 @@
 from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.models.model_reference import ensure_model_reference
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeValidationError, caller_facing_refusal_text
 from pipelex.kernel.llm_ops import check_llm_setting_with_served_model
 from pipelex.runtime_hub import get_model_deck
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -59,7 +59,8 @@ def refuse_llm_setting_its_model_refuses(
             model_reference = ensure_model_reference(llm_choice).raw
             setting_desc = f"the model setting `{model_reference}` its `{field_name}` names"
             remedy = f"Name another setting in `{field_name}`, or one whose model takes it."
-        msg = f"{pipe_type} '{pipe_code}' generates {output_desc} with {setting_desc}, which the model it resolves to refuses: {refusal} {remedy}"
+        reason = caller_facing_refusal_text(refusal=refusal).rstrip(".")
+        msg = f"{pipe_type} '{pipe_code}' generates {output_desc} with {setting_desc}, which the model it resolves to refuses: {reason}. {remedy}"
         raise PipeValidationError(
             message=msg,
             error_type=PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL,

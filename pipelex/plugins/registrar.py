@@ -228,7 +228,7 @@ class PluginRegistrar:
         ``check_llm_request`` is read for the LLM family only: the check the worker ``make_worker`` builds
         applies to a request before calling its provider, which bundle validation runs against the model a
         pipe's setting resolves to (see ``CheckLLMRequestFn``). A duplicate backend is refused before its
-        check is recorded, so a check never outlives the backend it belongs to.
+        check is recorded, so a refused duplicate leaves no check behind.
         """
         self._add(
             store=self.inference_backends,

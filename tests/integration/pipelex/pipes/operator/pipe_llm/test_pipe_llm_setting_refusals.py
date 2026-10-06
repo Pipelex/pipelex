@@ -40,8 +40,9 @@ class TestPipeLLMSettingRefusals:
         assert item.field_name == "model"
         assert item.field_path == "pipe.answer_it.model"
         assert f"PipeLLM 'answer_it' generates {output_desc} with the model setting its `model` writes inline" in item.message
-        assert "does not support reasoning (thinking_mode=none)" in item.message
-        assert _WITHOUT_THINKING in item.message
+        assert f"Model '{_WITHOUT_THINKING}' does not support reasoning (thinking_mode=none). " in item.message
+        assert "SDK" not in item.message
+        assert "Backend" not in item.message
 
     async def test_a_reasoning_budget_on_a_model_taking_an_effort_is_refused(self) -> None:
         bundle = LLMSettingCheckTestData.pipe_llm_bundle(

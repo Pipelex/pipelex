@@ -150,7 +150,7 @@ class PipesAndConceptValidationErrorData(BaseModel):
         "so a fix planner can diff the two without file access",
     )
 
-    # === Model locators (for unknown_model and llm_setting_refused_by_model errors) ===
+    # === Model locators: all three on unknown_model errors, model_reference alone on llm_setting_refused_by_model errors ===
     model_reference: str | None = Field(default=None, description="The model reference exactly as the author wrote it")
     model_type: str | None = Field(default=None, description="The model type the field takes (llm, text_extractor, img_gen, search)")
     suggestions: list[str] | None = Field(

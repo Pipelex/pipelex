@@ -20,7 +20,7 @@ from typing import Any
 
 from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelNotFoundError
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError, ModelChoiceNotFoundError, ModelNotFoundError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -93,7 +93,7 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
         is_structured: Whether the step generates a structured output rather than text.
 
     Raises:
-        LLMCapabilityError: The worker's refusal, naming the model and what it refuses.
+        LLMSettingRefusedError: The worker's refusal, naming the model by its deck handle and what it refuses.
 
     """
     inference_model = served_llm_model(model_handle=llm_setting.model)
@@ -107,6 +107,11 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
     except MissingDependencyError:
         # The backend's SDK is not installed here, so no worker for the model can be built: the run says so
         log.verbose(f"Model '{inference_model.desc}' was not checked: its backend's SDK is not installed")
+    except LLMCapabilityError as refusal:
+        # A worker names the model by its description, which carries the SDK, the backend and the provider's
+        # model id: the caller who wrote the setting knows the model by its deck handle alone.
+        msg = str(refusal).replace(inference_model.desc, inference_model.name)
+        raise LLMSettingRefusedError(msg) from refusal
 
 
 # A resolution chain is at most a handful of hops (preset -> alias -> handle); this only

@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.cogt.exceptions import LLMCapabilityError, ModelWaterfallError
+from pipelex.base_exceptions import DisclosureMode
+from pipelex.cogt.exceptions import LLMSettingRefusedError, ModelWaterfallError
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -72,8 +73,19 @@ class TestCheckLLMSettingWithServedModel:
     def test_a_backend_without_a_check_is_held_to_the_shared_rule(self, mocker: MockerFixture) -> None:
         """A model with no thinking takes no reasoning setting, whatever plugin serves it."""
         _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.NONE), check=None)
-        with pytest.raises(LLMCapabilityError, match=r"does not support reasoning \(thinking_mode=none\)"):
+        with pytest.raises(LLMSettingRefusedError, match=r"does not support reasoning \(thinking_mode=none\)"):
             check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=True)
+
+    def test_a_refusal_names_the_model_by_its_handle_and_is_shown_under_strict_disclosure(self, mocker: MockerFixture) -> None:
+        """A worker names the model with its SDK, backend and provider id, which only its operator may see."""
+        _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.NONE), check=None)
+        with pytest.raises(LLMSettingRefusedError) as exc_info:
+            check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=False)
+        message = str(exc_info.value)
+        assert message.startswith("Model 'some-model' does not support reasoning")
+        for internal_name in ("some_sdk", "some_backend", "some-model-id"):
+            assert internal_name not in message
+        assert exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == message
 
     @pytest.mark.parametrize(
         "served",
