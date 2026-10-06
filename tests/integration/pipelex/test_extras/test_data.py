@@ -189,4 +189,23 @@ class OfflineRunExpectations:
             ),
             "loading_list": Bound(concept_ref="native.Text", content={"text": "- QP-1001\n- QP-1002\n- BR-2001\n"}),
         },
+        "controller_sequence_house_rules": {
+            "house_rules": Bound(
+                concept_ref="native.Markdown",
+                content={"text": "- Quiet after ten in the evening\n- No smoking indoors\n- Bins out on Tuesday evening"},
+            ),
+            "hall_notice": Bound(
+                concept_ref="native.Markdown",
+                content={"text": "# House rules\n\n- Quiet after ten in the evening\n- No smoking indoors\n- Bins out on Tuesday evening"},
+            ),
+            "arrival_message": Bound(
+                concept_ref="native.Text",
+                content={
+                    "text": (
+                        "Welcome! A few house rules before you settle in: "
+                        "- Quiet after ten in the evening\n- No smoking indoors\n- Bins out on Tuesday evening"
+                    )
+                },
+            ),
+        },
     }

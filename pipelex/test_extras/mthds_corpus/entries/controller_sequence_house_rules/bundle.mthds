@@ -1,0 +1,28 @@
+domain      = "holiday_lets"
+description = "Passing a holiday let's house rules on to arriving guests, pinned in the hall and in a text message"
+main_pipe   = "pass_on_house_rules"
+
+[pipe.pass_on_house_rules]
+type        = "PipeSequence"
+description = "Lays the house rules out as the notice pinned in the hall, then writes the text message sent to arriving guests"
+# The first step reads `house_rules` as Markdown and the second as Text: the sequence declares the Markdown, which both accept.
+inputs = { house_rules = "Markdown" }
+output = "Text"
+steps = [
+  { pipe = "lay_out_hall_notice", result = "hall_notice" },
+  { pipe = "write_arrival_message", result = "arrival_message" },
+]
+
+[pipe.lay_out_hall_notice]
+type        = "PipeCompose"
+description = "Lays the house rules out as the notice pinned in the hall"
+inputs      = { house_rules = "Markdown" }
+output      = "Markdown"
+template    = "# House rules\n\n$house_rules"
+
+[pipe.write_arrival_message]
+type        = "PipeCompose"
+description = "Writes the text message sent to guests on the day they arrive"
+inputs      = { house_rules = "Text" }
+output      = "Text"
+template    = "Welcome! A few house rules before you settle in: $house_rules"
