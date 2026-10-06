@@ -121,6 +121,11 @@ _FEATURE_TAGS: dict[str, str] = {
         "`bundle.mthds` entry point, so a pipe can be forward-declared as a signature in one file and "
         "satisfied by a concrete definition in another."
     ),
+    "markdown_filter": (
+        "The `markdown` filter of an HTML template, `{{ order.notes | markdown }}`, which turns Markdown held "
+        "in a plain text field into HTML: raw HTML in the source is shown as text, and only a URL with a "
+        "scheme becomes a link."
+    ),
 }
 
 # Same contract as `_NATIVE_EXCLUSIONS`, keyed on `PipeType` for the same reason: an exclusion whose
