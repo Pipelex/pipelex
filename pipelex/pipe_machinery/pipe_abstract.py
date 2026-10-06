@@ -296,10 +296,11 @@ class PipeAbstract(ABC, BaseModel):
         is deliberately not part of the drift contract) whenever the validator would accept it:
         either its concept + multiplicity already match the needed spec, or the needed spec is a
         flexible type (``Dynamic``/``Anything``), which the validator accepts against any concrete
-        declaration. This mirrors the flexible-type carve-out in ``generic_validate_inputs_with_library``
-        so a co-occurring drift on another input never rewrites a valid concrete declaration back
-        to ``Dynamic``/``Anything``. Refs are derived from the needed spec only for variables being
-        added or whose concept/multiplicity genuinely changes against a non-flexible need.
+        declaration, or the pipe's own check accepts the declaration (``accepts_declared_input_spec``).
+        This mirrors the carve-outs in ``generic_validate_inputs_with_library`` so a co-occurring
+        drift on another input never rewrites a valid concrete declaration back to ``Dynamic``/``Anything``,
+        or to the need of the last step reading it. Refs are derived from the needed spec only for
+        variables being added or whose concept/multiplicity genuinely changes against a non-flexible need.
         """
         if not self.is_controller:
             return None
@@ -310,6 +311,7 @@ class PipeAbstract(ABC, BaseModel):
             if declared_stuff_spec is not None and (
                 named_stuff_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
                 or (declared_stuff_spec.concept == named_stuff_spec.concept and declared_stuff_spec.multiplicity == named_stuff_spec.multiplicity)
+                or self.accepts_declared_input_spec(variable_name=var_name)
             ):
                 spec_to_render: StuffSpec = declared_stuff_spec
             else:
@@ -329,6 +331,16 @@ class PipeAbstract(ABC, BaseModel):
             var_name: declared_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
             for var_name, declared_stuff_spec in self.inputs.root.items()
         }
+
+    def accepts_declared_input_spec(self, *, variable_name: str) -> bool:  # ruff: ignore[unused-method-argument] (the overrides read it)
+        """Whether the pipe's own check accepts the concept and multiplicity it declares for an input; False by default.
+
+        The generic check holds a controller's declared input to exactly the spec ``needed_inputs()`` gives it, unless the
+        controller's own check, the authority on whether a declaration fits the pipes reading it, accepts the declaration. A
+        PipeSequence overrides it: it checks every step against what it reads, and the need ``needed_inputs()`` gives an input
+        is the last step's only, so a declaration every step accepts may differ from it.
+        """
+        return False
 
     def refuse_undeclared_needed_input(self, *, variable_name: str) -> None:
         """Raise a pipe's own refusal of a needed input it does not declare, before the generic one; nothing by default.
@@ -382,13 +394,19 @@ class PipeAbstract(ABC, BaseModel):
                 declared_stuff_spec = self.inputs.root[var_name]
                 needed_stuff_spec = the_needed_inputs.root[var_name]
 
-                # Allow mismatch if the needed stuff_spec is a flexible type (Dynamic or Anything).
+                # Allow mismatch if the needed stuff_spec is a flexible type (Dynamic or Anything), or when the
+                # controller's own check accepts the declaration (`accepts_declared_input_spec`), which it judges
+                # against every step reading the input rather than this one need.
                 # Presence markers are deliberately NOT compared: a controller's boundary marker may
                 # legitimately differ from a child's need (e.g. a sequence declares `X?` while a step
                 # needs `X` plain — that is exactly the lift-skip case, D3). Only concept and
                 # multiplicity define the spec contract here.
-                if needed_stuff_spec.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING} and (
-                    declared_stuff_spec.concept != needed_stuff_spec.concept or declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity
+                if (
+                    needed_stuff_spec.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
+                    and (
+                        declared_stuff_spec.concept != needed_stuff_spec.concept or declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity
+                    )
+                    and not self.accepts_declared_input_spec(variable_name=var_name)
                 ):
                     # Render both specs the way an author would write them in this pipe's domain
                     # (bare `Number` / `Text[]`, qualified only for foreign domains) — never the

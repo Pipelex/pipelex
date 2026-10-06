@@ -64,6 +64,27 @@ inputs = { parcel = "Parcel" }
 output = "Text"
 template = "Parcel of $parcel.weight kilograms"
 
+[pipe.render_note]
+type = "PipeCompose"
+description = "Renders a note written in Markdown"
+inputs = { note = "Markdown" }
+output = "Text"
+template = "Rendered: $note"
+
+[pipe.archive_note]
+type = "PipeCompose"
+description = "Archives a note"
+inputs = { note = "Text" }
+output = "Text"
+template = "Archived: $note"
+
+[pipe.list_three_parcels]
+type = "PipeCompose"
+description = "Writes the manifest of a crate of three parcels"
+inputs = { parcels = "Parcel[3]" }
+output = "Text"
+template = "Crate: $parcels"
+
 [pipe.label_record]
 type = "PipeCompose"
 description = "Writes the label of the parcel on record"
@@ -210,6 +231,33 @@ class TestInterStepConceptCheck:
                 id="a-declared-input-read-as-another-concept",
             ),
             pytest.param(
+                # A declared input the last step reading it accepts, but an earlier one reads as a concept refining it.
+                _flow(
+                    inputs='note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_note", result = "rendered" }', '{ pipe = "archive_note", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 1 (pipe 'render_note') reads 'note' as 'Markdown', but the sequence declares it as 'Text'. "
+                    "Declare the input as 'Text' in pipe 'render_note', or declare 'note' as 'Markdown' in the inputs of pipe 'flow'."
+                ),
+                id="a-declared-input-an-earlier-step-reads-as-a-refinement",
+            ),
+            pytest.param(
+                # A declared list the last step reading it accepts, but an earlier one reads as a fixed count.
+                _flow(
+                    inputs='parcels = "Parcel[]"',
+                    output="Text",
+                    steps=['{ pipe = "list_three_parcels", result = "crate" }', '{ pipe = "list_parcels", result = "manifest" }'],
+                ),
+                (
+                    "In pipe 'flow', step 1 (pipe 'list_three_parcels') reads 'parcels' as 'Parcel[3]', but the sequence declares it as "
+                    "'Parcel[]'. Declare the input as 'Parcel[]' in pipe 'list_three_parcels', or declare 'parcels' as 'Parcel[3]' in the "
+                    "inputs of pipe 'flow'."
+                ),
+                id="a-declared-list-an-earlier-step-reads-as-a-fixed-count",
+            ),
+            pytest.param(
                 _flow(
                     inputs='amount = "Number"',
                     output="Text[]",
@@ -331,6 +379,24 @@ class TestInterStepConceptCheck:
                 ),
                 id="a-declared-input-replaced-by-what-a-step-stores",
             ),
+            pytest.param(
+                # The last step reading `note` reads a `Text`, so only the check of each step against the flow accepts a
+                # declaration other than the last reader's need.
+                _flow(
+                    inputs='note = "Markdown"',
+                    output="Text",
+                    steps=['{ pipe = "render_note", result = "rendered" }', '{ pipe = "archive_note", result = "archived" }'],
+                ),
+                id="a-declared-input-read-as-a-refinement-then-as-its-parent",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcels = "Parcel[3]"',
+                    output="Text",
+                    steps=['{ pipe = "list_three_parcels", result = "crate" }', '{ pipe = "list_parcels", result = "manifest" }'],
+                ),
+                id="a-declared-fixed-count-read-as-it-then-as-a-variable-list",
+            ),
         ],
     )
     def test_a_step_reading_what_the_flow_carries_validates(self, load_empty_library: Callable[[], str], flow: str) -> None:
@@ -338,6 +404,56 @@ class TestInterStepConceptCheck:
         sequence = _load_flow(flow=flow, library_id=load_empty_library())
 
         assert sequence.code == "flow"
+
+    @pytest.mark.parametrize(
+        ("flow", "error_type", "message", "expected_inputs"),
+        [
+            pytest.param(
+                _flow(
+                    inputs='note = "Markdown", remark = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_note", result = "rendered" }', '{ pipe = "archive_note", result = "archived" }'],
+                ),
+                PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                "Extraneous input 'remark' found in the inputs of pipe flow",
+                {"note": "Markdown"},
+                id="a-declared-input-no-step-reads",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='note = "Markdown"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "render_note", result = "rendered" }',
+                        '{ pipe = "archive_note", result = "archived" }',
+                        '{ pipe = "label_record", result = "record_label" }',
+                    ],
+                ),
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                "Required variable 'record' is not in the inputs of pipe 'flow'.",
+                {"note": "Markdown", "record": "Parcel"},
+                id="a-needed-input-not-declared",
+            ),
+        ],
+    )
+    def test_the_declared_names_are_checked_beside_a_declaration_every_step_accepts(
+        self,
+        load_empty_library: Callable[[], str],
+        flow: str,
+        error_type: PipeValidationErrorType,
+        message: str,
+        expected_inputs: dict[str, str],
+    ) -> None:
+        """A declaration every step reading it accepts leaves the sequence's inputs checked for missing and extraneous names, and
+        the inputs a fix would write keep that declaration rather than the need of the last step reading it.
+        """
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_flow(flow=flow, library_id=load_empty_library())
+
+        assert exc_info.value.error_type == error_type
+        assert exc_info.value.pipe_code == "flow"
+        assert message in str(exc_info.value)
+        assert exc_info.value.expected_inputs == expected_inputs
 
     def test_a_name_an_unresolved_pipe_stores_is_assumed_to_deliver(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
         """A pipe that does not resolve at validation, as a dependency not loaded yet, gives the flow nothing to check a reader

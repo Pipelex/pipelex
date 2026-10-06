@@ -78,7 +78,7 @@ In pipe 'process_cv', step 2 (pipe 'analyze_one_cv') reads 'cv_pages' as 'Page',
 -   A name whose values may have different concepts, as when the outcomes of a `PipeCondition` store it under different concepts, must satisfy the read with each of them.
 -   A name a pipe that does not resolve at validation stored, such as a pipe of a dependency not loaded yet, is assumed to hold what the step reads.
 
-Every step reading a declared input is checked this way, not only the last one: the sequence's `inputs` must still match exactly what its steps need from its caller, and that check reads the need of the last step reading each input.
+Every step reading a declared input is checked this way, not only the last one, so a declared input must satisfy each step that reads it, and one that does is valid even when the last step reads it as something else. When a first step reads `note` as `Markdown` and a later one reads it as `Text`, the sequence declares `note = "Markdown"`, which both accept, and declaring `note = "Text"` is refused at the first step; when a first step reads `pages` as `Page[3]` and a later one as `Page[]`, it declares `pages = "Page[3]"`. A declared input no step reads is still refused with `extraneous_input_variable`, and a name a step reads from the caller that the sequence does not declare with `missing_input_variable`.
 
 ## Binding steps
 
