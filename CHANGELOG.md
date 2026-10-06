@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A binding step survives a kajson round trip**: `BindingStepBlueprint` is encoded under `from`, the key it validates, where kajson wrote its field name `from_path`, which decoding refused as an extra field. A library crate holding a sequence with a binding step can now cross a process boundary, so a run of such a method no longer fails to start on a Temporal worker with "Could not instantiate pydantic BaseModel … BindingStepBlueprint".
+
 ## [v0.76.0] - 2026-10-06
 
 ### Added
