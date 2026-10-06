@@ -55,6 +55,9 @@ if TYPE_CHECKING:
     from pipelex.migration.plan import MigrationPlan
 
 
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
+
 def old_shape_telemetry_document() -> str:
     """The flat pre-`[custom_posthog]` document the shipped entry is about, read from the package."""
     path = pre_history_document_path(migration_dir=packaged_migration_dir(), surface_id=TELEMETRY_CONFIG_SURFACE_ID, schema_version=2)

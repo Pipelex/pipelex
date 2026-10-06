@@ -5,13 +5,13 @@ This is the fourth loader to join boot tolerance, and it is the one the toleranc
 existing file, so the key survives in `inference/backends/*.toml` on every machine that was set up
 before the change — where it is fatal twice over. In `[defaults]` it is copied wholesale into every
 model of the file and fails all of them with `extra_forbidden`; on one model it is rejected by name
-as `NOT_HEADER_SHAPED`, which has been fatal in lenient mode too since the rogue-headers guard.
+as `NOT_HEADER_SHAPED`, which has been fatal on a keyless load too since the rogue-headers guard.
 
 The two standing properties are the same as for the other three surfaces, and most of what follows
 holds one of them:
 
 - **Only what the ledger explains is tolerated.** A key the user chose to have still stops the boot,
-  in both lenient modes, with exactly the error it produced before. Tolerance widens what starts, it
+  in both credential modes, with exactly the error it produced before. Tolerance widens what starts, it
   never widens what is accepted.
 - **Boot never writes.** Only `pipelex migrate` does, which is why the warning keeps coming back
   until it is run.
@@ -33,19 +33,23 @@ import pytest
 
 from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceBackendLibraryValidationError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import (
     BACKENDS_DIR_NAME,
     BACKENDS_FILE_NAME,
-    CONFIG_DIR_NAME,
     INFERENCE_DIR_NAME,
     ROUTING_PROFILES_FILE_NAME,
 )
+from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
 
 # Two backends, both with a literal key: what is under test is the *shape* of the per-backend files,
 # and a `${VAR}` here would make every case below depend on the machine's environment instead.
@@ -145,44 +149,44 @@ class TestAStaleBackendDirectory:
         plant_on_model(path=portkey_file, table_header='["gemini-2.5-pro"]')
         return openai_file, portkey_file
 
-    def _load(self, machine: Path, *, lenient: bool) -> InferenceBackendLibrary:
+    def _load(self, machine: Path, *, credentials: CredentialResolution) -> InferenceBackendLibrary:
         library_path = self._write_library(machine)
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
             backends_library_paths=[library_path],
             backends_dir_path=str(self._backends_dir(machine)),
-            lenient=lenient,
+            credentials=credentials,
         )
         return library
 
-    @pytest.mark.parametrize("lenient", [True, False])
-    def test_a_healthy_directory_loads_and_says_nothing(self, machine: Path, lenient: bool) -> None:
+    @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
+    def test_a_healthy_directory_loads_and_says_nothing(self, machine: Path, credentials: CredentialResolution) -> None:
         """The control. Without it every case below would pass on a library that loaded nothing."""
-        library = self._load(machine, lenient=lenient)
+        library = self._load(machine, credentials=credentials)
 
         assert set(library.root) == {"openai", "portkey"}
         assert library.take_stale_configuration_warning() is None
 
-    @pytest.mark.parametrize("lenient", [True, False])
-    def test_a_stale_directory_loads_the_same_models_the_current_files_would(self, machine: Path, lenient: bool) -> None:
+    @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
+    def test_a_stale_directory_loads_the_same_models_the_current_files_would(self, machine: Path, credentials: CredentialResolution) -> None:
         """The whole point: what boots is the migrated configuration, not a degraded one.
 
         Comparing against the library the untouched kit files produce is what makes "everything else
         intact" a real claim — every model, every cost, every request header, from both files.
         """
-        pristine = self._load(machine, lenient=lenient)
+        pristine = self._load(machine, credentials=credentials)
         self._make_stale(machine)
 
-        recovered = self._load(machine, lenient=lenient)
+        recovered = self._load(machine, credentials=credentials)
 
         assert recovered.root == pristine.root
 
-    @pytest.mark.parametrize("lenient", [True, False])
-    def test_it_parks_one_warning_naming_every_stale_file_and_the_remedy(self, machine: Path, lenient: bool) -> None:
+    @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
+    def test_it_parks_one_warning_naming_every_stale_file_and_the_remedy(self, machine: Path, credentials: CredentialResolution) -> None:
         openai_file, portkey_file = self._make_stale(machine)
 
-        library = self._load(machine, lenient=lenient)
+        library = self._load(machine, credentials=credentials)
 
         warning = library.take_stale_configuration_warning()
         assert warning is not None
@@ -197,7 +201,7 @@ class TestAStaleBackendDirectory:
         """Ledger text only, the same rule the migration report obeys."""
         self._make_stale(machine)
 
-        library = self._load(machine, lenient=False)
+        library = self._load(machine, credentials=CredentialResolution.REQUIRE)
 
         warning = library.take_stale_configuration_warning()
         assert warning is not None
@@ -210,22 +214,24 @@ class TestAStaleBackendDirectory:
         backends_dir = self._backends_dir(machine)
         before = {path.name: path.read_bytes() for path in sorted(backends_dir.iterdir())}
 
-        self._load(machine, lenient=False)
+        self._load(machine, credentials=CredentialResolution.REQUIRE)
 
         assert {path.name: path.read_bytes() for path in sorted(backends_dir.iterdir())} == before
 
-    @pytest.mark.parametrize("lenient", [True, False])
-    def test_a_key_the_user_chose_to_have_is_still_fatal(self, machine: Path, lenient: bool) -> None:
-        """Tolerance is not leniency. The ledger explains what *we* removed and nothing else."""
+    @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
+    def test_a_key_the_user_chose_to_have_is_still_fatal(self, machine: Path, credentials: CredentialResolution) -> None:
+        """Tolerance is not a pass for any key: the ledger explains what *we* removed and nothing else."""
         plant_on_model(path=self._backends_dir(machine) / "openai.toml", table_header="[gpt-4o]", key="foo", value="1")
 
         with pytest.raises(InferenceBackendLibraryError) as exc_info:
-            self._load(machine, lenient=lenient)
+            self._load(machine, credentials=credentials)
 
         assert "'foo'" in str(exc_info.value)
 
-    @pytest.mark.parametrize("lenient", [True, False])
-    def test_a_file_the_ledger_only_half_explains_raises_the_users_own_error(self, machine: Path, lenient: bool, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
+    def test_a_file_the_ledger_only_half_explains_raises_the_users_own_error(
+        self, machine: Path, credentials: CredentialResolution, mocker: MockerFixture
+    ) -> None:
         """The branch where the replay does real work and still does not get there.
 
         This file carries both the key the ledger removes and one it has never heard of, and the
@@ -240,7 +246,7 @@ class TestAStaleBackendDirectory:
         retry = mocker.spy(InferenceBackendLibrary, "_local_model_specs_the_ledger_can_explain")
 
         with pytest.raises(InferenceBackendLibraryError) as exc_info:
-            self._load(machine, lenient=lenient)
+            self._load(machine, credentials=credentials)
 
         assert "'foo'" in str(exc_info.value)
         assert retry.call_count == 1, "the retry was attempted"
@@ -250,7 +256,7 @@ class TestAStaleBackendDirectory:
         """The retry runs on the failure path only, so a current machine pays nothing for it."""
         retry = mocker.spy(InferenceBackendLibrary, "_local_model_specs_the_ledger_can_explain")
 
-        self._load(machine, lenient=False)
+        self._load(machine, credentials=CredentialResolution.REQUIRE)
 
         assert retry.call_count == 0
 
@@ -296,23 +302,23 @@ class TestThePreviousReleaseKit:
             monkeypatch.delenv(var_name, raising=False)
 
     @pytest.mark.usefixtures("environment")
-    @pytest.mark.parametrize("lenient", [True, False])
-    def test_as_left_its_enabled_gateway_serving_no_model_is_refused(self, inference_dir: Path, lenient: bool) -> None:
+    @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
+    def test_as_left_its_enabled_gateway_serving_no_model_is_refused(self, inference_dir: Path, credentials: CredentialResolution) -> None:
         library = InferenceBackendLibrary.make_empty()
         with pytest.raises(InferenceBackendLibraryValidationError) as refused:
             library.load(
                 secrets_provider=EnvSecretsProvider(),
                 backends_library_paths=[inference_dir / BACKENDS_FILE_NAME],
                 backends_dir_path=str(inference_dir / BACKENDS_DIR_NAME),
-                lenient=lenient,
+                credentials=credentials,
             )
 
         assert refused.value.backend_name == PREVIOUS_RELEASE_EMPTY_ENABLED_BACKEND
         assert "declares no model" in str(refused.value)
 
     @pytest.mark.usefixtures("environment")
-    @pytest.mark.parametrize("lenient", [True, False])
-    def test_its_backends_and_active_routing_profile_load_once_remedied(self, inference_dir: Path, lenient: bool) -> None:
+    @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
+    def test_its_backends_and_active_routing_profile_load_once_remedied(self, inference_dir: Path, credentials: CredentialResolution) -> None:
         replace_once(path=inference_dir / BACKENDS_FILE_NAME, old=PREVIOUS_RELEASE_GATEWAY_ENABLED_LINE, new="enabled = false")
         replace_once(path=inference_dir / ROUTING_PROFILES_FILE_NAME, old='active = "all_pipelex_gateway"', new='active = "all_openai"')
         library = InferenceBackendLibrary.make_empty()
@@ -320,7 +326,7 @@ class TestThePreviousReleaseKit:
             secrets_provider=EnvSecretsProvider(),
             backends_library_paths=[inference_dir / BACKENDS_FILE_NAME],
             backends_dir_path=str(inference_dir / BACKENDS_DIR_NAME),
-            lenient=lenient,
+            credentials=credentials,
         )
 
         enabled_backends = library.all_enabled_backends()
@@ -331,7 +337,6 @@ class TestThePreviousReleaseKit:
         routing_profile = load_active_routing_profile(
             routing_profile_library_paths=[inference_dir / ROUTING_PROFILES_FILE_NAME],
             enabled_backends=enabled_backends,
-            lenient=lenient,
         )
 
         assert routing_profile.default in enabled_backends

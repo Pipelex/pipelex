@@ -19,7 +19,7 @@ pipelex migrate --yes      # apply without asking
 
 Two directories, and only those:
 
-- the global `~/.pipelex/`
+- the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home))
 - the project `.pipelex/`, when the current directory is inside a project that has one
 
 Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers — and at the inference backend definitions in `inference/backends/`.

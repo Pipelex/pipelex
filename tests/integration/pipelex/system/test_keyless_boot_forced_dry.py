@@ -124,7 +124,7 @@ class TestKeylessBootForcedDry:
             Pipelex.teardown_if_needed()
 
     def test_keyless_boot_needs_no_key_for_an_enabled_judgment_backend(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """An enabled judgment backend whose key is unset is skipped by a keyless boot, as Linkup's is.
+        """A keyless boot resolves no key, so an enabled judgment backend whose key is unset still boots.
 
         The kit ships `[typesafe]` enabled like every other bring-your-own-key backend, so a machine
         without `TYPESAFE_API_KEY` must still validate and dry-run. The keyed boot is the one that
@@ -144,12 +144,11 @@ class TestKeylessBootForcedDry:
             Pipelex.teardown_if_needed()
 
     @pytest.mark.asyncio
-    async def test_keyless_boot_validates_a_judge_whose_model_backend_it_skipped(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A PipeJudge naming the TypeSafe model still loads and dry-runs when the keyless boot skipped TypeSafe.
+    async def test_keyless_boot_validates_a_judge_whose_model_backend_has_no_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A PipeJudge naming the TypeSafe model loads and dry-runs on a keyless boot without `TYPESAFE_API_KEY`.
 
-        The deck still names the alias, so the pipe names a model the deck knows; what the keyless boot
-        cannot read is the spec of a model whose backend it skipped, so it leaves what that model reads
-        to the keyed boot that runs the step.
+        The keyless boot keeps the TypeSafe backend and its model's spec without resolving its key, so it
+        validates the judge exactly as a keyed boot would.
         """
         monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
         bundle_path = Path("pipelex/test_extras/mthds_corpus/entries/operator_judge_urgent_message/bundle.mthds")

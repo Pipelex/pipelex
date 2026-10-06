@@ -42,6 +42,9 @@ from pipelex.system.exceptions import ConfigValidationError
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
 #: The shipped `telemetry-config@2` entry is about a real flat document the package carries, so a
 #: stale machine can be built out of our own files rather than out of an invented schema change.
 TELEMETRY_ENTRY_ID = "telemetry-config@2"

@@ -15,7 +15,7 @@ class _DeckWithoutJudgmentDefault:
 
 
 def _deck_serving_no_judgment_model(mocker: MockerFixture) -> Any:
-    """A deck whose judgment alias names a model no backend serves, as on a keyless boot that skipped TypeSafe."""
+    """A deck whose judgment alias names a model no backend serves, as when TypeSafe's backend is disabled."""
     model_deck = mocker.Mock(judgment_choice_default=None)
     model_deck.get_judgment_setting.return_value = JudgmentSetting(model="jev-1.13.0")
     model_deck.get_optional_inference_model.return_value = None

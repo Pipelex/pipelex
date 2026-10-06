@@ -96,7 +96,7 @@ def resolve_judgment_setting(
 
     The returned setting is pinned to the *resolved* handle, so it doubles as a distributed run's
     routing key. A dry run calls no judging worker, so a model the deck names that no backend serves on
-    this boot, as on a keyless boot that skipped the backend whose key is unset, keeps the deck's handle.
+    this boot, as when its backend is disabled, keeps the deck's handle.
     """
     model_deck = get_model_deck()
     judgment_setting = judgment_setting_of_choice(judgment_choice=judgment_choice, pipe_code=pipe_code)

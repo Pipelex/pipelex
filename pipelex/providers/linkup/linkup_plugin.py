@@ -5,10 +5,19 @@ from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.inference_backend_registry import InferenceFamily, require_sdk
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
+from pipelex.providers.linkup.linkup_exceptions import LinkupError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 _LINKUP_MISSING_MSG = "The linkup SDK is required in order to use Linkup Fetch extraction models."
 _LINKUP_SEARCH_MISSING_MSG = "The linkup SDK is required in order to use Linkup search models."
+
+
+def _required_linkup_api_key(*, backend: InferenceBackend) -> str:
+    """The backend's own key, like every other provider's: whichever variable its configuration names."""
+    if not backend.api_key:
+        msg = f"Inference backend '{backend.name}' has no API key configured, so Linkup cannot be called"
+        raise LinkupError(msg)
+    return backend.api_key
 
 
 def _make_linkup_extract_worker(
@@ -25,6 +34,7 @@ def _make_linkup_extract_worker(
     return LinkupExtractWorker(
         extra_config=backend.extra_config,
         inference_model=inference_model,
+        api_key=_required_linkup_api_key(backend=backend),
         reporting_delegate=reporting_delegate,
     )
 
@@ -32,7 +42,7 @@ def _make_linkup_extract_worker(
 def _make_linkup_search_worker(
     *,
     inference_model: InferenceModelSpec,
-    backend: InferenceBackend,  # ruff: ignore[unused-function-argument] - uniform MakeWorkerFn signature; the search worker builds its own client
+    backend: InferenceBackend,
     sdk_clients: SdkClientRegistry,  # ruff: ignore[unused-function-argument] - stateless worker, no SDK-client caching
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
@@ -42,6 +52,7 @@ def _make_linkup_search_worker(
 
     return LinkupSearchWorker(
         inference_model=inference_model,
+        api_key=_required_linkup_api_key(backend=backend),
         reporting_delegate=reporting_delegate,
     )
 
