@@ -32,6 +32,9 @@ from pipelex.system.configuration.config_surface import TELEMETRY_CONFIG_SURFACE
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
 # A realistic PostHog project key, at the path the shipped entry moves. The old flat format is
 # exactly where a real one would be, which makes this the right specimen for the rendering rule.
 PLANTED_KEY = "phc_L1VE_telemetry_key_that_must_never_be_rendered"

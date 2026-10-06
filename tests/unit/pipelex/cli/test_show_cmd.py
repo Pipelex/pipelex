@@ -15,6 +15,7 @@ from rich.console import Console
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.show_cmd import do_list_pipes, do_show_backends, do_show_config, do_show_pipe
 from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.tools.misc.exceptions import TomlError
 
 if TYPE_CHECKING:
@@ -23,12 +24,21 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _make_backend(name: str, enabled: bool, endpoint: str | None = None, model_count: int = 0) -> SimpleNamespace:
+def _make_backend(
+    name: str,
+    enabled: bool,
+    endpoint: str | None = None,
+    model_count: int = 0,
+    unresolved_credentials: dict[str, list[str]] | None = None,
+) -> SimpleNamespace:
+    unresolved = unresolved_credentials or {}
     return SimpleNamespace(
         name=name,
         enabled=enabled,
         endpoint=endpoint,
         model_specs={f"model_{model_index}": object() for model_index in range(model_count)},
+        unresolved_credentials=unresolved,
+        unresolved_credential_vars=sorted({var_name for var_names in unresolved.values() for var_name in var_names}),
     )
 
 
@@ -147,8 +157,51 @@ class TestShowCmd:
         assert call_kwargs["properties"] == {"nb_backends": 2}
 
     @pytest.mark.usefixtures("telemetry")
+    def test_do_show_backends_lists_a_backend_whose_credentials_this_boot_did_not_resolve(self, mocker: MockerFixture, console: Console) -> None:
+        """The command boots keyless, which keeps every backend: one whose key is unset is listed with its variables."""
+        backends = [
+            _make_backend(
+                "azure_openai",
+                enabled=True,
+                model_count=3,
+                unresolved_credentials={"endpoint": ["AZURE_API_BASE"], "api_key": ["AZURE_API_KEY"]},
+            ),
+            _make_backend("groq", enabled=True, endpoint="https://api.groq.com", model_count=1, unresolved_credentials={"api_key": ["GROQ_API_KEY"]}),
+            _make_backend("ollama", enabled=True, endpoint="http://localhost:11434", model_count=1),
+        ]
+        self._mock_backend_setup(mocker, backends=backends, routing_profile=_make_routing_profile())
+
+        do_show_backends(show_all=False)
+
+        output = console.export_text()
+        rows = {line.split()[1]: line for line in output.splitlines() if line.startswith("│") and len(line.split()) > 1}
+        assert "Credential variables" in output
+        assert "not resolved" in rows["azure_openai"]
+        assert "AZURE_API_BASE" in rows["azure_openai"]
+        assert "AZURE_API_KEY" in rows["azure_openai"]
+        assert "https://api.groq.com" in rows["groq"]
+        assert "not resolved" not in rows["groq"]
+        assert "GROQ_API_KEY" in rows["groq"]
+        assert "http://localhost:11434" in rows["ollama"]
+        assert "none" in rows["ollama"]
+        assert "does not resolve credentials" in output
+
+    def test_do_show_backends_prints_a_bracketed_variable_name_as_written(self, mocker: MockerFixture, console: Console) -> None:
+        """The placeholder syntax allows brackets in a name, which Rich would otherwise read as markup."""
+        backends = [
+            _make_backend("acme", enabled=True, model_count=1, unresolved_credentials={"endpoint": ["ACME[/x]"], "api_key": ["KEY[bold]X"]}),
+        ]
+        self._mock_backend_setup(mocker, backends=backends, routing_profile=_make_routing_profile())
+
+        do_show_backends(show_all=False)
+
+        output = console.export_text()
+        assert "not resolved (ACME[/x])" in output
+        assert "KEY[bold]X" in output
+
+    @pytest.mark.usefixtures("telemetry")
     def test_do_show_backends_show_all_includes_status_column(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
-        """--all loads the library leniently and shows Enabled/Disabled status."""
+        """--all loads the library keyless, disabled backends included, and shows Enabled/Disabled status."""
         backends = [
             _make_backend("openai", enabled=True, model_count=1),
             _make_backend("anthropic", enabled=False, model_count=1),
@@ -162,15 +215,15 @@ class TestShowCmd:
         mocked_config_manager = mocker.patch("pipelex.cli.commands.show_cmd.config_manager")
         mocked_config_manager.backends_file_paths.return_value = [tmp_path / "backends.toml"]
         mocked_config_manager.backends_dir_path = tmp_path / "backends"
-        lenient_library = SimpleNamespace(root={backend.name: backend for backend in backends}, load=mocker.Mock())
-        library_class_mock = mocker.patch("pipelex.cli.commands.show_cmd.InferenceBackendLibrary", return_value=lenient_library)
+        keyless_library = SimpleNamespace(root={backend.name: backend for backend in backends}, load=mocker.Mock())
+        library_class_mock = mocker.patch("pipelex.cli.commands.show_cmd.InferenceBackendLibrary", return_value=keyless_library)
 
         do_show_backends(show_all=True)
 
         library_class_mock.assert_called_once()
-        load_kwargs = lenient_library.load.call_args.kwargs
+        load_kwargs = keyless_library.load.call_args.kwargs
         assert load_kwargs["include_disabled"] is True
-        assert load_kwargs["lenient"] is True
+        assert load_kwargs["credentials"] is CredentialResolution.SKIP
         output = console.export_text()
         assert "All Configured Backends" in output
         assert "Status" in output

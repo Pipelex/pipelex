@@ -181,7 +181,8 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
 
     Args:
         library_dirs: Optional library directories to use for the Pipelex instance.
-        needs_inference: When False, skip inference setup (credentials, telemetry).
+        needs_inference: When False, boot without inference: every enabled backend and its models
+            load, no credential is resolved, and every run this process starts is forced to DRY.
 
     Returns:
         Initialized Pipelex instance.

@@ -15,6 +15,7 @@ from pipelex.graph.graphspec import (
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
 from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_metadata
+from pipelex.tools.mermaid.mermaid_utils import sanitize_mermaid_id
 
 from .conftest import make_graph_config
 
@@ -507,3 +508,74 @@ class TestMermaidflow:
         metadata = collect_stuff_metadata(graph)
         assert metadata[make_stuff_id("records_digest")]["concept"] == "Record[]"
         assert metadata[make_stuff_id("summary_digest")]["concept"] == "Text"
+
+    def _merged_condition_graph(self) -> GraphSpec:
+        """A dry-run condition whose two outcomes both produce the stuff the next step reads."""
+        return self._make_graph(
+            nodes=[
+                {"node_id": "screen", "kind": NodeKind.CONTROLLER, "pipe_code": "screen", "status": NodeStatus.SUCCEEDED},
+                {
+                    "node_id": "route",
+                    "kind": NodeKind.CONTROLLER,
+                    "pipe_code": "route",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Anything", digest="d_shared")]),
+                },
+                {
+                    "node_id": "write_questions",
+                    "kind": NodeKind.OPERATOR,
+                    "pipe_code": "write_questions",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Question", multiplicity=True, digest="d_shared")]),
+                },
+                {
+                    "node_id": "write_rejection",
+                    "kind": NodeKind.OPERATOR,
+                    "pipe_code": "write_rejection",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(outputs=[IOSpec(name="follow_up", concept="Rejection", digest="d_shared")]),
+                },
+                {
+                    "node_id": "assemble",
+                    "kind": NodeKind.OPERATOR,
+                    "pipe_code": "assemble",
+                    "status": NodeStatus.SUCCEEDED,
+                    "node_io": NodeIOSpec(
+                        inputs=[IOSpec(name="follow_up", concept="Anything", digest="d_shared")],
+                        outputs=[IOSpec(name="result", concept="Text", digest="d_result")],
+                    ),
+                },
+            ],
+            edges=[
+                {"edge_id": "c1", "source": "screen", "target": "route", "kind": EdgeKind.CONTAINS},
+                {"edge_id": "c2", "source": "screen", "target": "assemble", "kind": EdgeKind.CONTAINS},
+                {"edge_id": "c3", "source": "route", "target": "write_questions", "kind": EdgeKind.CONTAINS},
+                {"edge_id": "c4", "source": "route", "target": "write_rejection", "kind": EdgeKind.CONTAINS},
+            ],
+        )
+
+    def test_a_merged_stuff_renders_once_inside_its_condition(self) -> None:
+        result = MermaidflowFactory.make_from_graphspec(self._merged_condition_graph(), graph_config=make_graph_config())
+        lines = result.mermaid_code.split("\n")
+        stuff_id = make_stuff_id("d_shared")
+
+        stuff_node_lines = [
+            index for index, line in enumerate(lines) if line.strip().startswith(f"{stuff_id}[") or line.strip().startswith(f"{stuff_id}(")
+        ]
+        assert len(stuff_node_lines) == 1, result.mermaid_code
+        route_start = next(index for index, line in enumerate(lines) if line.strip().startswith(f"subgraph sg_{sanitize_mermaid_id('route')}"))
+        route_end = next(index for index in range(route_start, len(lines)) if lines[index].strip() == "end")
+        assert route_start < stuff_node_lines[0] < route_end, result.mermaid_code
+        # Typed by the condition's own item, which covers both outcomes.
+        assert "Anything" in lines[stuff_node_lines[0]]
+
+    def test_a_merged_stuff_has_an_edge_from_each_producer(self) -> None:
+        for include_subgraphs in (True, False):
+            result = MermaidflowFactory.make_from_graphspec(
+                self._merged_condition_graph(), graph_config=make_graph_config(), include_subgraphs=include_subgraphs
+            )
+            stuff_id = make_stuff_id("d_shared")
+
+            assert f"{sanitize_mermaid_id('write_questions')} --> {stuff_id}" in result.mermaid_code
+            assert f"{sanitize_mermaid_id('write_rejection')} --> {stuff_id}" in result.mermaid_code
+            assert f"{stuff_id} --> {sanitize_mermaid_id('assemble')}" in result.mermaid_code

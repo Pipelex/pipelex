@@ -57,7 +57,7 @@ def agent_migrate_cmd(
 ) -> None:
     """Migrate this machine's Pipelex configuration files to the current schema.
 
-    Walks the global ``~/.pipelex/`` and the project ``.pipelex/``, replays each configuration
+    Walks the home configuration directory (``~/.pipelex/``, or ``PIPELEX_HOME``) and the project ``.pipelex/``, replays each configuration
     surface's ledger over every file it claims, and — with ``--yes`` — rewrites what changed,
     backing up each original beside itself.
     """

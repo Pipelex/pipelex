@@ -1972,6 +1972,10 @@ rationale = "Factory from source: builds the result from the name; single operan
 param = "backend_name"
 rationale = "Loads model specs for the named backend; single operand."
 
+["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary._record_placeholder_var_names"]
+param = "content"
+rationale = "A string transform: apply_to_strings_recursive calls transform_func with the string positionally, as it calls substitute_vars on a load that resolves credentials."
+
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.get_inference_backend"]
 param = "backend_name"
 rationale = "Keyed accessor by the backend_name; single operand."
@@ -3152,7 +3156,7 @@ rationale = "Query accessor keyed by the node it inspects; single operand."
 param = "digest"
 rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
-["pipelex/graph/graph_analysis.py::GraphAnalysis.get_producer"]
+["pipelex/graph/graph_analysis.py::GraphAnalysis.get_producers"]
 param = "digest"
 rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
@@ -6995,6 +6999,10 @@ rationale = "Dispatch handler: handles the event; single operand."
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_batch_item"]
 param = "event"
 rationale = "Dispatch handler: handles the event; single operand."
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_condition_output_merge"]
+param = "event"
+rationale = "An event handler of the assembler's pass one, called with the one event it folds in, like its sibling handlers."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_controller_output"]
 param = "event"

@@ -81,6 +81,8 @@ This is not a contradiction of "the run mode never changes the backend" — it's
 
 When a process boots without inference configured — `Pipelex.make(needs_inference=False)`, e.g. no AI provider set up — every run that process initiates is forced to dry-run mode. This is a property of the run, not of the backend: under a Temporal-enabled boot the forced-dry run still dispatches activities and mocks inside them, like any other dry run. A warning logs whenever a live-requested run is forced dry.
 
+Such a boot knows every model a boot with inference knows: it loads every enabled backend with its models and their constraints, and resolves none of their credentials. That is why a dry run validates a method the same way whether or not the machine holds the keys. What it cannot do is call a provider: if live work reaches it from another process, as it can on a Temporal worker, the call is refused with an `InferenceBackendCredentialsError` that names the variables this process did not resolve, and the remedy is to boot that process with inference.
+
 ## See Also
 
 - [Validation & Dry Run](../../features/validation-dry-run.md) — feature overview

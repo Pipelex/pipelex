@@ -145,19 +145,6 @@ class TestRoutingProfileOverrides:
         with pytest.raises(RoutingProfileDisabledBackendError):
             load_active_routing_profile(routing_profile_library_paths=[base_path, override_path], enabled_backends=["acme"])
 
-    def test_lenient_tolerates_a_disabled_backend(self, tmp_path: Path) -> None:
-        base_path = self._write_base(tmp_path)
-        override_path = tmp_path / "routing_profiles_override.toml"
-        override_path.write_text('active = "with_routes"\n')
-
-        profile = load_active_routing_profile(
-            routing_profile_library_paths=[base_path, override_path],
-            enabled_backends=["acme"],
-            lenient=True,
-        )
-
-        assert profile.name == "with_routes"
-
     def test_an_override_that_does_not_parse_is_the_librarys_refusal_and_names_the_file(self, tmp_path: Path) -> None:
         base_path = self._write_base(tmp_path)
         override_path = tmp_path / "routing_profiles_override.toml"

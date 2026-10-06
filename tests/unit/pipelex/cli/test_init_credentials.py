@@ -6,6 +6,8 @@ import os
 import stat
 from typing import TYPE_CHECKING
 
+from rich.console import Console
+
 from pipelex.cli.commands.init.credentials import (
     get_required_vars_for_enabled_backends,
     prompt_credentials,
@@ -163,6 +165,22 @@ class TestInitCredentials:
         assert os.environ.get("OPENAI_API_KEY") == "sk-test-value"
 
         # Cleanup
+        os.environ.pop("OPENAI_API_KEY", None)
+
+    def test_prompt_credentials_names_a_bracketed_home_directory_verbatim(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The home directory can be any path `PIPELEX_HOME` names, so it is printed as text, never read as Rich markup."""
+        backends_toml = tmp_path / "backends.toml"
+        backends_toml.write_text('[openai]\nenabled = true\napi_key = "${OPENAI_API_KEY}"\n')
+        mocker.patch.dict(os.environ, {}, clear=False)
+        os.environ.pop("OPENAI_API_KEY", None)
+        home_dir = tmp_path / "[ci]" / "home"
+        mocker.patch("pipelex.cli.commands.init.credentials.config_manager", global_config_dir=home_dir)
+        mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask", return_value="sk-test-value")
+        console = Console(record=True, width=1000)
+
+        prompt_credentials(console=console, backends_toml_path=backends_toml)
+
+        assert str(home_dir / ".env") in console.export_text()
         os.environ.pop("OPENAI_API_KEY", None)
 
     def test_prompt_credentials_skips_empty_input(self, tmp_path: Path, mocker: MockerFixture) -> None:

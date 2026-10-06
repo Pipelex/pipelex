@@ -13,7 +13,7 @@ pipelex init [FOCUS]
 pipelex init --local [FOCUS]
 ```
 
-By default, `pipelex init` writes to the global config directory at `~/.pipelex/`. Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials always remain in the global `~/.pipelex/` directory regardless of `--local`.
+By default, `pipelex init` writes to the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home)). Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials always remain in the home configuration directory regardless of `--local`.
 
 !!! note "Config updates not yet supported"
     The `pipelex init` command always performs a full reset of the configuration. Incremental config updates will be supported in a future release.
@@ -87,7 +87,7 @@ pipelex-agent init [--config/-c JSON] [--global/-g]
 **Target directory:**
 
 - **Default:** project-level `.pipelex/` at the detected project root (looks for `.git`, `pyproject.toml`, etc.). Errors out if no project root is found.
-- **`--global`/`-g`:** forces `~/.pipelex/`.
+- **`--global`/`-g`:** forces the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`).
 
 **Config JSON schema:**
 
