@@ -221,13 +221,18 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     f"or disable the backend."
                 )
                 raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
-            self._refuse_placeholders_in_literal_fields(
-                table=backend_table,
-                declared_fields=backend_blueprint_standard_fields,
-                templatable_fields=TEMPLATABLE_BACKEND_FIELDS,
-                where=f"inference backend '{backend_name}' in {library_paths_description}",
-                backend_name=backend_name,
-            )
+            try:
+                self._refuse_placeholders_in_literal_fields(
+                    table=backend_table,
+                    declared_fields=backend_blueprint_standard_fields,
+                    templatable_fields=TEMPLATABLE_BACKEND_FIELDS,
+                    where=f"inference backend '{backend_name}' in {library_paths_description}",
+                    backend_name=backend_name,
+                )
+            except UnknownVarPrefixError as unknown_var_prefix_exc:
+                raise self._unknown_var_prefix_credentials_error(
+                    unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=library_paths_description
+                ) from unknown_var_prefix_exc
             unresolved_credentials: dict[str, list[str]] = {}
             model_spec_var_names: list[str] = []
             match credentials:
@@ -243,10 +248,16 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     )
                     model_specs_transform: StringTransform = substitute_vars_with_provider
                 case CredentialResolution.SKIP:
-                    inference_backend_blueprint_dict = self._backend_table_without_templated_fields(
-                        backend_table=inference_backend_blueprint_dict_raw,
-                        unresolved_credentials=unresolved_credentials,
-                    )
+                    try:
+                        inference_backend_blueprint_dict = self._backend_table_without_templated_fields(
+                            backend_table=inference_backend_blueprint_dict_raw,
+                            unresolved_credentials=unresolved_credentials,
+                        )
+                    except UnknownVarPrefixError as unknown_var_prefix_exc:
+                        # The prefix is refused as the load that resolves credentials refuses it.
+                        raise self._unknown_var_prefix_credentials_error(
+                            unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=library_paths_description
+                        ) from unknown_var_prefix_exc
                     model_specs_transform = partial(self._record_placeholder_var_names, var_names=model_spec_var_names)
 
             for backend_blueprint_key in list(inference_backend_blueprint_dict):
@@ -354,14 +365,25 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 key_name=var_not_found_exc.var_name,
             ) from var_not_found_exc
         except UnknownVarPrefixError as unknown_var_prefix_exc:
-            raise InferenceBackendCredentialsError(
-                credentials_error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
-                backend_name=backend_name,
-                message=(
-                    f"Variable substitution failed due to an unknown variable prefix error in {library_paths_description}:\n{unknown_var_prefix_exc}"
-                ),
-                key_name=unknown_var_prefix_exc.var_name,
+            raise cls._unknown_var_prefix_credentials_error(
+                unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=library_paths_description
             ) from unknown_var_prefix_exc
+
+    @classmethod
+    def _unknown_var_prefix_credentials_error(
+        cls,
+        *,
+        unknown_var_prefix_exc: UnknownVarPrefixError,
+        backend_name: str,
+        source: str,
+    ) -> InferenceBackendCredentialsError:
+        """A placeholder's unknown prefix, said the same way whether the load resolves credentials or not."""
+        return InferenceBackendCredentialsError(
+            credentials_error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
+            backend_name=backend_name,
+            message=f"Variable substitution failed due to an unknown variable prefix error in {source}:\n{unknown_var_prefix_exc}",
+            key_name=unknown_var_prefix_exc.var_name,
+        )
 
     @classmethod
     def _backend_table_without_templated_fields(

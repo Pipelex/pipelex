@@ -1,6 +1,7 @@
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.tools.secrets.exceptions import UnknownVarPrefixError
 from pipelex.tools.secrets.secrets_utils import placeholder_var_names
 
 
@@ -15,12 +16,17 @@ class TestPlaceholderVarNames:
             ("${env:PRIMARY|secret:FALLBACK}", ["PRIMARY", "FALLBACK"]),
             ("${env: SPACED | secret: OTHER }", ["SPACED", "OTHER"]),
             ("${A}/${B}/${A}", ["A", "B"]),
-            ("${foo:BAR}", ["BAR"]),
             ('"${QUOTED}"', ["QUOTED"]),
         ],
     )
     def test_it_names_every_variable_once_in_order(self, content: str, expected: list[str]) -> None:
         assert placeholder_var_names(content=content) == expected
+
+    @pytest.mark.parametrize("content", ["${foo:BAR}", "${env:A|secrte:B}"])
+    def test_it_refuses_a_prefix_substitution_would_refuse(self, content: str) -> None:
+        """A keyless load names variables where the boot with inference resolves them: both refuse the same typo."""
+        with pytest.raises(UnknownVarPrefixError, match="Unknown variable prefix"):
+            placeholder_var_names(content=content)
 
     def test_it_asks_no_provider_and_reads_no_environment(self, mocker: MockerFixture) -> None:
         """Naming is all it does: the keyless boot relies on that to resolve nothing."""

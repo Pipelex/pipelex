@@ -180,3 +180,18 @@ enabled = true
 api_key = "sk-not-a-real-key"
 listed_constraints = ["${{{LITERAL_FIELD_VAR}}}"]
 """
+
+    BACKENDS_TOML_WITH_AN_UNKNOWN_PREFIX = """
+[acme]
+enabled = true
+api_key = "${secrte:ACME_API_KEY}"
+"""
+
+    MODEL_SPECS_TOML_WITH_AN_UNKNOWN_PREFIX = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "${secrte:ACME_MODEL}"
+"""

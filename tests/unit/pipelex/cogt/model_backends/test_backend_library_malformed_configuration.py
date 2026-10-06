@@ -10,9 +10,15 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceBackendLibraryValidationError
+from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
+    InferenceBackendLibraryError,
+    InferenceBackendLibraryValidationError,
+)
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from tests.helpers.backend_library_loading import BOTH_MODES, load_library, required_backend
+from tests.helpers.recording_secrets_provider import RecordingSecretsProvider
 from tests.unit.pipelex.cogt.model_backends.test_data import LITERAL_FIELD_VAR, BackendLibraryTomls
 
 
@@ -189,3 +195,31 @@ class TestMalformedConfigurationIsFatalInBothModes:
         message = str(exc_info.value)
         assert f"'{field_name}' references {LITERAL_FIELD_VAR}" in message
         assert "write it literally" in message
+
+    @pytest.mark.parametrize("credentials", BOTH_MODES)
+    @pytest.mark.parametrize(
+        ("backends_toml", "model_specs_toml", "var_name"),
+        [
+            pytest.param(
+                BackendLibraryTomls.BACKENDS_TOML_WITH_AN_UNKNOWN_PREFIX, BackendLibraryTomls.MODEL_SPECS_TOML, "ACME_API_KEY", id="backend_table"
+            ),
+            pytest.param(
+                BackendLibraryTomls.BACKENDS_TOML, BackendLibraryTomls.MODEL_SPECS_TOML_WITH_AN_UNKNOWN_PREFIX, "ACME_MODEL", id="model_spec"
+            ),
+        ],
+    )
+    def test_an_unknown_placeholder_prefix_is_fatal_in_both_modes(
+        self, tmp_path: Path, credentials: CredentialResolution, backends_toml: str, model_specs_toml: str, var_name: str
+    ) -> None:
+        """A load that only names its variables refuses a mistyped prefix as the load that resolves them does."""
+        with pytest.raises(InferenceBackendCredentialsError) as exc_info:
+            load_library(
+                tmp_path,
+                backends_toml=backends_toml,
+                model_specs_toml=model_specs_toml,
+                credentials=credentials,
+                secrets_provider=RecordingSecretsProvider.make_credentialed(),
+            )
+
+        assert exc_info.value.credentials_error_type is InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX
+        assert exc_info.value.key_name == var_name
