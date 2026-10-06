@@ -216,7 +216,8 @@ def fetch_method_mthds_files(method_ref: str) -> FetchedMthdsFiles:
     as `source`, so crate provenance and diagnostics carry true per-file labels. Only the
     package's own `.mthds` data travels, never that of a package it ships under its
     `.mthds/methods/`, since these routes resolve no address-based dependency. The package's
-    Python (if any) never loads on these routes, so the execution-locus gate does not apply here. The manifest's `main_pipe` rides beside the
+    Python (if any) never loads on these routes, so the execution-locus gate does not apply
+    here. The manifest's `main_pipe` rides beside the
     files so a per-pipe projection can default its selector the way a run does — the manifest
     is the package author's declaration of the entry pipe, and dropping it here would make
     `main_pipe` buy them nothing on the tooling routes.
