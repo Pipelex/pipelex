@@ -181,10 +181,32 @@ api_key = "sk-not-a-real-key"
 listed_constraints = ["${{{LITERAL_FIELD_VAR}}}"]
 """
 
+    BACKENDS_TOML_WITH_A_TEMPLATED_KEY_IN_A_LIST = f"""
+[acme]
+enabled = true
+api_key = ["${{{LITERAL_FIELD_VAR}}}"]
+"""
+
+    BACKENDS_TOML_WITH_A_TEMPLATED_EXTRA_CONFIG_TABLE = f"""
+[acme]
+enabled = true
+api_key = "sk-not-a-real-key"
+extra_config = "${{{LITERAL_FIELD_VAR}}}"
+"""
+
     BACKENDS_TOML_WITH_AN_UNKNOWN_PREFIX = """
 [acme]
 enabled = true
 api_key = "${secrte:ACME_API_KEY}"
+"""
+
+    MODEL_SPECS_TOML_WITH_AN_UNKNOWN_PREFIX_IN_A_LITERAL_FIELD = """
+[defaults]
+model_type = "llm"
+sdk = "${secrte:ACME_SDK}"
+
+["acme-one"]
+model_id = "acme-one"
 """
 
     MODEL_SPECS_TOML_WITH_AN_UNKNOWN_PREFIX = """

@@ -119,8 +119,14 @@ def placeholder_var_names(*, content: str) -> list[str]:
 
 
 def _handle_fallback_pattern(var_spec: str, *, secrets_provider: SecretsProviderAbstract) -> str:
-    """Handle fallback pattern like 'env:VAR|secret:VAR'."""
+    """Handle fallback pattern like 'env:VAR|secret:VAR'.
+
+    Every candidate's prefix is checked before any is resolved, so an unknown one is refused whether or
+    not an earlier candidate resolves: the verdict on a file's syntax never depends on which variables
+    the machine holds, and `placeholder_var_names` gives the same one without resolving anything.
+    """
     parts = [part.strip() for part in var_spec.split("|")]
+    placeholder_var_names(content=f"${{{var_spec}}}")
 
     for part in parts:
         if ":" in part:

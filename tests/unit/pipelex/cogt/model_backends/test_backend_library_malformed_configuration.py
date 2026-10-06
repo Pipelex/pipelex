@@ -198,6 +198,27 @@ class TestMalformedConfigurationIsFatalInBothModes:
 
     @pytest.mark.parametrize("credentials", BOTH_MODES)
     @pytest.mark.parametrize(
+        ("backends_toml", "field_name"),
+        [
+            pytest.param(BackendLibraryTomls.BACKENDS_TOML_WITH_A_TEMPLATED_KEY_IN_A_LIST, "api_key", id="api_key_in_a_list"),
+            pytest.param(BackendLibraryTomls.BACKENDS_TOML_WITH_A_TEMPLATED_EXTRA_CONFIG_TABLE, "extra_config", id="extra_config_as_a_string"),
+        ],
+    )
+    def test_a_templated_field_of_the_wrong_type_is_fatal_in_both_modes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, credentials: CredentialResolution, backends_toml: str, field_name: str
+    ) -> None:
+        """A keyless load strips a templated field, but not before its type is checked, so stripping hides no malformed field."""
+        monkeypatch.setenv(LITERAL_FIELD_VAR, "sk-not-a-real-key")
+
+        with pytest.raises(InferenceBackendLibraryValidationError) as exc_info:
+            load_library(tmp_path, backends_toml=backends_toml, model_specs_toml=BackendLibraryTomls.MODEL_SPECS_TOML, credentials=credentials)
+
+        message = str(exc_info.value)
+        assert "Invalid inference backend 'acme'" in message
+        assert field_name in message
+
+    @pytest.mark.parametrize("credentials", BOTH_MODES)
+    @pytest.mark.parametrize(
         ("backends_toml", "model_specs_toml", "var_name"),
         [
             pytest.param(
@@ -205,6 +226,12 @@ class TestMalformedConfigurationIsFatalInBothModes:
             ),
             pytest.param(
                 BackendLibraryTomls.BACKENDS_TOML, BackendLibraryTomls.MODEL_SPECS_TOML_WITH_AN_UNKNOWN_PREFIX, "ACME_MODEL", id="model_spec"
+            ),
+            pytest.param(
+                BackendLibraryTomls.BACKENDS_TOML,
+                BackendLibraryTomls.MODEL_SPECS_TOML_WITH_AN_UNKNOWN_PREFIX_IN_A_LITERAL_FIELD,
+                "ACME_SDK",
+                id="model_spec_literal_field",
             ),
         ],
     )

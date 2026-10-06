@@ -248,6 +248,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     )
                     model_specs_transform: StringTransform = substitute_vars_with_provider
                 case CredentialResolution.SKIP:
+                    # The shape is checked before a templated field is stripped: substitution turns text into
+                    # text, so the raw table is refused wherever the resolved one would be, a key written as a
+                    # list included, and stripping cannot hide a field of the wrong type.
+                    self._validated_backend_blueprint(
+                        table=inference_backend_blueprint_dict_raw, backend_name=backend_name, library_paths_description=library_paths_description
+                    )
                     try:
                         inference_backend_blueprint_dict = self._backend_table_without_templated_fields(
                             backend_table=inference_backend_blueprint_dict_raw,
@@ -263,15 +269,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             for backend_blueprint_key in list(inference_backend_blueprint_dict):
                 if backend_blueprint_key not in backend_blueprint_standard_fields:
                     extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
-            try:
-                backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
-            except ValidationError as validation_error:
-                # The index file's own refusal, said with the backend and the file in front of the
-                # analysis: pydantic's error alone names a field, and every table of this file has
-                # that field.
-                validation_error_msg = format_pydantic_validation_error(validation_error)
-                msg = f"Invalid inference backend '{backend_name}' in {library_paths_description}: {validation_error_msg}"
-                raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name) from validation_error
+            backend_blueprint = self._validated_backend_blueprint(
+                table=inference_backend_blueprint_dict, backend_name=backend_name, library_paths_description=library_paths_description
+            )
 
             model_specs_dict, backend_config_source = self._load_local_model_specs(
                 backend_name=backend_name,
@@ -368,6 +368,31 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             raise cls._unknown_var_prefix_credentials_error(
                 unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=library_paths_description
             ) from unknown_var_prefix_exc
+
+    @classmethod
+    def _validated_backend_blueprint(
+        cls,
+        *,
+        table: dict[str, Any],
+        backend_name: str,
+        library_paths_description: str,
+    ) -> InferenceBackendBlueprint:
+        """The blueprint of a backend's `backends.toml` table, built from its declared fields alone.
+
+        Raises:
+            InferenceBackendLibraryValidationError: The index file's own refusal, said with the backend
+                and the file in front of the analysis: pydantic's error alone names a field, and every
+                table of this file has that field.
+        """
+        declared_fields = InferenceBackendBlueprint.model_fields.keys()
+        try:
+            return InferenceBackendBlueprint.model_validate(
+                {field_name: value for field_name, value in table.items() if field_name in declared_fields}
+            )
+        except ValidationError as validation_error:
+            validation_error_msg = format_pydantic_validation_error(validation_error)
+            msg = f"Invalid inference backend '{backend_name}' in {library_paths_description}: {validation_error_msg}"
+            raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name) from validation_error
 
     @classmethod
     def _unknown_var_prefix_credentials_error(
@@ -588,13 +613,18 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backend_config_source = f"file '{path_to_model_specs_toml}'"
         for model_spec_name, model_spec_table in model_specs_dict_raw.items():
             if isinstance(model_spec_table, dict):
-                self._refuse_placeholders_in_literal_fields(
-                    table=cast("dict[str, Any]", model_spec_table),
-                    declared_fields=InferenceModelSpecBlueprint.model_fields.keys(),
-                    templatable_fields=TEMPLATABLE_MODEL_SPEC_FIELDS,
-                    where=f"model '{model_spec_name}' for backend '{backend_name}' in {backend_config_source}",
-                    backend_name=backend_name,
-                )
+                try:
+                    self._refuse_placeholders_in_literal_fields(
+                        table=cast("dict[str, Any]", model_spec_table),
+                        declared_fields=InferenceModelSpecBlueprint.model_fields.keys(),
+                        templatable_fields=TEMPLATABLE_MODEL_SPEC_FIELDS,
+                        where=f"model '{model_spec_name}' for backend '{backend_name}' in {backend_config_source}",
+                        backend_name=backend_name,
+                    )
+                except UnknownVarPrefixError as unknown_var_prefix_exc:
+                    raise self._unknown_var_prefix_credentials_error(
+                        unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=backend_config_source
+                    ) from unknown_var_prefix_exc
         model_specs_dict = self._substitute_model_spec_vars(
             model_specs_dict=model_specs_dict_raw,
             backend_name=backend_name,
