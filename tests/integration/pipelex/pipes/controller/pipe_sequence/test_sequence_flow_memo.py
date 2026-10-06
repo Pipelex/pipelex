@@ -1,4 +1,5 @@
 import copy
+import pickle  # ruff: ignore[suspicious-pickle-import] - the test pickles a sequence it built itself
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -107,6 +108,12 @@ def _deep_model_copy(sequence: PipeSequence) -> PipeSequence:
     return sequence.model_copy(deep=True)
 
 
+def _pickled_copy(sequence: PipeSequence) -> PipeSequence:
+    copied = pickle.loads(pickle.dumps(sequence))  # ruff: ignore[suspicious-pickle-usage] - a sequence this test pickled itself
+    assert isinstance(copied, PipeSequence)
+    return copied
+
+
 class TestSequenceFlowMemo:
     def test_a_flow_is_built_once_per_state_of_the_library(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
         """Validating every sequence builds each flow once, and the walks that follow read it, until the library changes."""
@@ -171,6 +178,7 @@ class TestSequenceFlowMemo:
             pytest.param(_shallow_model_copy, id="a-shallow-copy"),
             pytest.param(_deep_model_copy, id="a-deep-copy"),
             pytest.param(copy.deepcopy, id="a-copy-module-deep-copy"),
+            pytest.param(_pickled_copy, id="a-pickled-copy"),
         ],
     )
     def test_a_copy_of_a_sequence_builds_its_own_flow(
@@ -187,3 +195,28 @@ class TestSequenceFlowMemo:
         read_weight.build_typed_flow()
 
         assert flow_builder_spy.call_count == 1
+
+    def test_a_memo_never_changes_what_a_sequence_equals(self, load_empty_library: Callable[[], str]) -> None:
+        """Two sequences of one definition are equal whatever each has derived, and a memo never makes a comparison recurse."""
+        first_pipes = _load_pipes(mthds_content=_WEIGHING_BUNDLE, library_id=load_empty_library())
+        first_read_weight = _sequence(pipes=first_pipes, pipe_code="read_weight")
+        first_read_weight.build_typed_flow()
+        never_validated = copy.deepcopy(first_read_weight)
+
+        library_manager = get_library_manager()
+        second_library_id, _ = library_manager.open_library()
+        try:
+            second_pipes = _load_pipes(mthds_content=_WEIGHING_BUNDLE, library_id=second_library_id)
+            second_read_weight = _sequence(pipes=second_pipes, pipe_code="read_weight")
+            with scoped_current_library(library_id=second_library_id):
+                second_read_weight.build_typed_flow()
+        finally:
+            library_manager.teardown(library_id=second_library_id)
+
+        assert first_read_weight is not second_read_weight
+        assert first_read_weight == second_read_weight
+        assert second_read_weight == first_read_weight
+        assert first_read_weight == never_validated
+        assert never_validated == second_read_weight
+        assert first_read_weight != _sequence(pipes=first_pipes, pipe_code="read_one_weight")
+        assert second_read_weight != _sequence(pipes=first_pipes, pipe_code="read_all_weights")

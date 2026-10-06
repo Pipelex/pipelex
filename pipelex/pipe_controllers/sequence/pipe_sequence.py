@@ -59,8 +59,9 @@ class PipeSequence(PipeController):
     # The steps in order: pipe steps, which run a pipe, and binding steps, which bind a value already in working memory.
     sequential_sub_pipes: list[SequenceStep]
     # The typed flow and what the sequence stores in its caller's memory, kept for the state of the libraries they were
-    # derived in (`SequenceFlowMemo`).
-    _flow_memo: SequenceFlowMemo | None = PrivateAttr(default=None)
+    # derived in (`SequenceFlowMemo`). An empty memo until the sequence derives them, never `None`: pydantic compares private
+    # attributes, and every memo equals every other, so what the sequence derived never changes what it equals.
+    _flow_memo: SequenceFlowMemo = PrivateAttr(default_factory=SequenceFlowMemo)
 
     @override
     def required_variables(self) -> set[str]:
@@ -126,7 +127,7 @@ class PipeSequence(PipeController):
         """The memo of what this sequence derived from the current pipe and concept libraries, a fresh one once either changed."""
         library_state = (get_pipe_library().state_token, get_concept_library().state_token)
         memo = self._flow_memo
-        if memo is None or not memo.is_valid_for(owner=self, library_state=library_state):
+        if not memo.is_valid_for(owner=self, library_state=library_state):
             memo = SequenceFlowMemo(owner=self, library_state=library_state)
             self._flow_memo = memo
         return memo

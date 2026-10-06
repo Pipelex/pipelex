@@ -25,7 +25,7 @@ and a binding ending the sequence is checked against the sequence's output.
 
 from typing import Any, NamedTuple, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
@@ -96,14 +96,25 @@ class SequenceFlowMemo(BaseModel):
     A walk that cut a cycle short, having already visited a pipe the sequence reaches, builds a flow that depends on what it
     visited, so only the flows built by a walk that visited none of `reachable_visit_keys` are kept: those are the same
     whatever else the walk visited.
+
+    The memo rests on one assumption: a pipe is never changed in place after it is built, and a changed pipe enters a library
+    as a new pipe, which replaces the library's state token.
+
+    A memo is a cache, never part of what its sequence is. Pydantic compares the private attributes of two models, where a
+    sequence keeps its memo, so every memo compares equal to every other: two sequences of one definition are equal whatever
+    each has derived, and comparing them never walks from a memo to its owner, whose memo it would compare again without end.
+    A sequence holds a memo from its creation, an empty one that is valid for no sequence, so that no comparison weighs a memo
+    against none. A copy of a memo, by `copy`, `deepcopy` or pickling, is empty.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # The sequence that built the memo. A shallow copy of the sequence shares the memo object, and must not read it.
-    owner: Any
-    # The state tokens of the pipe library and of the concept library the memo was built in.
-    library_state: tuple[int, int]
+    # The sequence that built the memo, `None` for an empty memo, compared by identity only. A shallow copy of the sequence
+    # shares the memo object, and must not read it.
+    owner: Any = Field(default=None, repr=False)
+    # The state tokens of the pipe library and of the concept library the memo was built in, `(0, 0)` for an empty memo: no
+    # library state has the token 0.
+    library_state: tuple[int, int] = (0, 0)
     # The `visit_key` of every pipe the sequence reaches through its steps, at any depth, itself excepted.
     reachable_visit_keys: frozenset[str] | None = None
     typed_flow: SequenceTypedFlow | None = None
@@ -113,14 +124,30 @@ class SequenceFlowMemo(BaseModel):
         return self.owner is owner and self.library_state == library_state
 
     @override
+    def __eq__(self, other: object) -> bool:
+        """Every memo equals every other, so that what a sequence derived never takes part in what it equals."""
+        if isinstance(other, SequenceFlowMemo):
+            return True
+        return NotImplemented
+
+    # A memo is never hashed, as the sequence holding it, a mutable model, is not. Python's own idiom for an unhashable class
+    # beside its `__eq__`, which mypy reads as an override of `object.__hash__`.
+    __hash__ = None  # type: ignore[assignment]
+
+    @override
     def __copy__(self) -> Self:
-        """A copy keeps nothing: what it derived belongs to the sequence that built it."""
-        return self.__class__(owner=None, library_state=(0, 0))
+        """A copy is empty: what the memo derived belongs to the sequence that built it."""
+        return self.__class__()
 
     @override
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
-        """A copy keeps nothing, and never copies the sequence that owns the memo, which would copy the memo again."""
-        return self.__class__(owner=None, library_state=(0, 0))
+        """A copy is empty, and never copies the sequence that owns the memo, which would copy the memo again."""
+        return self.__class__()
+
+    @override
+    def __reduce__(self) -> tuple[type[Self], tuple[()]]:
+        """A pickled memo comes back empty, as a copy does: the sequence unpickled beside it never built what it derived."""
+        return (self.__class__, ())
 
 
 class DerivedBinding(NamedTuple):
