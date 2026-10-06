@@ -28,7 +28,8 @@ def make_pipelex_for_cli(
     Args:
         context: The CLI context for error messages.
         library_dirs: The library directories to use for the Pipelex instance.
-        needs_inference: When False, skip inference setup (credentials, telemetry).
+        needs_inference: When False, boot without inference: every enabled backend and its models
+            load, no credential is resolved, and every run this process starts is forced to DRY.
         boot_orchestrator: When provided, boots this process under the orchestrator plugin of this name.
 
     Returns:

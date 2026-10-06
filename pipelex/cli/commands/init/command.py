@@ -152,7 +152,7 @@ def execute_initialization(
         is_first_time_backends_setup: Whether backends.toml didn't exist before this run.
         target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
         for_project: True when initializing a project's .pipelex/; False when initializing
-            the global ~/.pipelex/. Selects which telemetry template gets copied.
+            the home configuration directory. Selects which telemetry template gets copied.
 
     """
     # Step 1: Initialize config if needed
@@ -271,7 +271,8 @@ def init_cmd(
     Args:
         focus: What to initialize - 'all', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
-        local: If True, create project-level .pipelex/ at the detected project root. Otherwise, create global ~/.pipelex/.
+        local: If True, create project-level .pipelex/ at the detected project root.
+            Otherwise, create the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
     """
     console = get_console()
 
@@ -299,9 +300,9 @@ def init_cmd(
         else:
             target_config_dir = Path.cwd() / ".pipelex"
     else:
-        # Default: create global config at ~/.pipelex/
+        # Default: create the global config in the home configuration directory
         target_config_dir = config_manager.global_config_dir
-    console.print(f"[dim]Target directory: {target_config_dir}[/dim]")
+    console.print(f"[dim]Target directory: {escape(str(target_config_dir))}[/dim]")
 
     pipelex_config_dir = target_config_dir
     telemetry_config_path = pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME

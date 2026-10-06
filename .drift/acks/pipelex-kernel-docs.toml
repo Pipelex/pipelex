@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:554a09621df341e871854d61cc8252fcd1098379b570369130ff103e94733a21"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-05T16:19:24Z"
-rationale = "real-catch: build_judgment_material no longer walks a dotted input name as a path, since an input name is a plain name; docs/under-the-hood/pipelex-kernel.md still described a dotted input as the value at its path keyed by its full name, and now says each entry is one input's whole value under its plain name."
+digest = "sha256:3b0caaabd67aa654f0b4155d7cb463aa866d01f7ebc559d66cac181c9df3c888"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-06T03:07:41Z"
+rationale = "clean-pass: re-acked on the merge of dev into the dotted-input branch, whose two acks each covered one side. The merged judgment_ops.py carries the branch's build_judgment_material (each entry one plain-named input's whole value, no path walk) and dev's resolve_judgment_setting docstring (a model whose backend is disabled keeps the deck's handle on a dry run); docs/under-the-hood/pipelex-kernel.md auto-merged both sides' sentences, the judgment paragraph stating plain names and the keyless-boot paragraph stating every enabled backend loaded with no credential resolved, and both still match the merged code."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,7 +16,7 @@ rationale = "real-catch: build_judgment_material no longer walks a dotted input 
 "pipelex/kernel/img_gen_ops.py" = "blob:b85360f6c118e93be53bf8d1a04504ccb7552469"
 "pipelex/kernel/img_gen_prompt.py" = "blob:e4f72040561929aa0d96ad5f00b1c4af652d3f77"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
-"pipelex/kernel/judgment_ops.py" = "blob:cdf01be8bfc2951d63936530acc006c2b33a4a23"
+"pipelex/kernel/judgment_ops.py" = "blob:fe66d7d00433a9924d60710e9bb25838197c52e0"
 "pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
 "pipelex/kernel/llm_ops.py" = "blob:64a6d3d77a165f4f70614ced69876f56d873a8c7"
 "pipelex/kernel/llm_prompt_content.py" = "blob:3fade4a660226e63ad4f916952ee37d34e7d2bbd"

@@ -14,7 +14,7 @@ Pipelex uses a layered TOML configuration system that lets you define sensible d
 ## Configuration Levels
 
 1. **Package defaults** — Built into Pipelex (`pipelex.toml` in the package)
-2. **Global tier** — `~/.pipelex/` for user-wide settings: the base `pipelex.toml`, then its override sequence
+2. **Global tier** — `~/.pipelex/` for user-wide settings, or the directory the `PIPELEX_HOME` environment variable names (see [the home configuration directory](../configuration/index.md#the-home-configuration-directory-pipelex_home)): the base `pipelex.toml`, then its override sequence
 3. **Project tier** — `{project_root}/.pipelex/` for project-specific settings: the base `pipelex.toml`, then the same override sequence
 
 Within each tier, the base `pipelex.toml` is followed by an override sequence, merged in order (later wins per key):
@@ -31,7 +31,7 @@ The two inference documents, `.pipelex/inference/backends.toml` and `.pipelex/in
 
 ## Environment Variables
 
-Two configuration areas support `${...}` variable substitution in their TOML files: the inference backend configuration (`.pipelex/inference/backends.toml` and the per-backend TOML files under `.pipelex/inference/backends/`) and the telemetry configuration (`.pipelex/telemetry.toml`). In those files, use `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`. The `pipelex.toml` layering described above does not perform substitution — a `${env:VAR}` there stays a literal string.
+Two configuration areas support `${...}` variable substitution in their TOML files: the inference backend configuration (`.pipelex/inference/backends.toml` and the per-backend TOML files under `.pipelex/inference/backends/`) and the telemetry configuration (`.pipelex/telemetry.toml`). In those files, use `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`; a prefix other than `env` or `secret` is refused wherever it stands in a chain, even after a candidate that resolves. In the inference backend files, a variable stands only in a value a call sends, such as a key, an endpoint or a model id, never in a field that describes the model (see [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md)). The `pipelex.toml` layering described above does not perform substitution — a `${env:VAR}` there stays a literal string.
 
 ## Key Configuration Areas
 

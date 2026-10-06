@@ -36,7 +36,7 @@ Pipelex manages two areas of an install, each tracked by its own small JSON mani
 - the model deck, `~/.pipelex/inference/deck/` (or `.pipelex/inference/deck/` for a project-local install);
 - the backends directory, `~/.pipelex/inference/backends/` (or `.pipelex/inference/backends/`), where only `internal.toml` is managed.
 
-Each area is found the way the runtime finds it: a project's `.pipelex/` directory wins when it has one, and the global `~/.pipelex/` one is used otherwise, so the command refreshes the files your runs actually read. A manifest stores the kit version that produced the install and a SHA-256 of each managed file at install time.
+Each area is found the way the runtime finds it: a project's `.pipelex/` directory wins when it has one, and the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home)) is used otherwise, so the command refreshes the files your runs actually read. A manifest stores the kit version that produced the install and a SHA-256 of each managed file at install time.
 
 On `update`, Pipelex compares three states for each area — what the kit ships, what is on disk, what the manifest recorded — and produces a per-file plan:
 

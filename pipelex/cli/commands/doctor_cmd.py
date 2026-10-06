@@ -38,6 +38,7 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory, BackendCredentialsReport
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.models.deck_manifest import (
     MANAGED_BACKEND_FILENAME,
     DeckFileStatus,
@@ -561,8 +562,8 @@ def check_backend_files(
     """Check individual backend configuration files for validity.
 
     Args:
-        secrets_provider: The provider the configuration selects, which the backends' credentials resolve
-            through, as they do at boot.
+        secrets_provider: The provider the configuration selects. The probe resolves no credential, so it
+            never asks it anything; the load takes it all the same.
         config_dir: Explicit config directory override (e.g. for --global).
             If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
@@ -619,17 +620,17 @@ def check_backend_files(
             # Create a temporary backend library and try to load this backend
             temp_library = InferenceBackendLibrary.make_empty()
 
-            # This row reports on file shape, so the load is lenient: a backend whose
-            # credentials do not resolve is skipped rather than reported — that is the
-            # Credentials row's finding. A malformed file stays fatal in lenient mode, which
-            # is what this probe exists to catch, and so do the library's refusals of an
-            # enabled backend that declares no model or still carries `model_specs_section`.
+            # This row reports on file shape, so the load resolves no credential: a backend
+            # whose credentials do not resolve is the Credentials row's finding, not this one's.
+            # A malformed file stays fatal on such a load, which is what this probe exists to
+            # catch, and so do the library's refusals of an enabled backend that declares no
+            # model or still carries `model_specs_section`.
             temp_library.load(
                 secrets_provider=secrets_provider,
                 backends_library_paths=backends_file_paths,
                 backends_dir_path=str(backends_dir_path),
                 include_disabled=False,
-                lenient=True,
+                credentials=CredentialResolution.SKIP,
             )
 
         except Exception as exc:  # ruff: ignore[blind-except]
@@ -1490,9 +1491,9 @@ def check_models(
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
-        # The setup load is strict and reaches backends the file probe skipped leniently, so it can
-        # be the first thing to name a broken backend. Attribution is the file probe's, for the same
-        # reason: the loader's own advice text names other backends in passing.
+        # The setup load resolves credentials, which the file probe does not, so it can still be the
+        # first thing to name a broken backend. Attribution is the file probe's: the loader's own
+        # advice text names other backends in passing.
         error_str = str(exc)
         for backend_name, backend_file_report in backend_file_reports.items():
             if _is_error_about_backend(exc=exc, backend_name=backend_name, backend_file_path=backend_file_report.file_path):

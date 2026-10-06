@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
+
 class TestLoadTelemetryConfigLayering:
     """Cover global → project layering for telemetry.toml and telemetry_override.toml."""
 

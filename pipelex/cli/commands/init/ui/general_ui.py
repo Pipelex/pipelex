@@ -1,6 +1,9 @@
 """General UI components for the init command."""
 
+from rich.markup import escape
 from rich.panel import Panel
+
+from pipelex.cli.commands.init.credentials import get_global_env_path
 
 
 def build_initialization_panel(
@@ -27,6 +30,7 @@ def build_initialization_panel(
     """
     # Build message based on what's being initialized
     message_parts: list[str] = []
+    credentials_file = escape(str(get_global_env_path()))
     if reset:
         if needs_config:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
@@ -34,7 +38,7 @@ def build_initialization_panel(
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
             message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
         if check_credentials:
-            message_parts.append("• Prompt for missing API keys (saved to [cyan]~/.pipelex/.env[/cyan])")
+            message_parts.append(f"• Prompt for missing API keys (saved to [cyan]{credentials_file}[/cyan])")
         if needs_routing:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] routing profile")
         if needs_telemetry:
@@ -46,7 +50,7 @@ def build_initialization_panel(
             message_parts.append("• Ask you to choose your inference backends")
             message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
         if check_credentials:
-            message_parts.append("• Prompt for missing API keys (saved to [cyan]~/.pipelex/.env[/cyan])")
+            message_parts.append(f"• Prompt for missing API keys (saved to [cyan]{credentials_file}[/cyan])")
         if needs_routing:
             message_parts.append("• Ask you to configure your routing profile")
         if needs_telemetry:
