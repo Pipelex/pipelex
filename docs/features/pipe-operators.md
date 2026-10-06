@@ -37,7 +37,7 @@ See [PipeImgGen reference](../building-methods/pipes/pipe-operators/PipeImgGen.m
 
 ## PipeSearch
 
-Web search with structured results and source citations. Powered by Linkup or Pipelex Gateway, results come back as typed SearchResult concepts ready for downstream processing.
+Web search with structured results and source citations. Powered by Linkup, results come back as typed SearchResult concepts ready for downstream processing.
 
 See [PipeSearch reference](../building-methods/pipes/pipe-operators/PipeSearch.md).
 
