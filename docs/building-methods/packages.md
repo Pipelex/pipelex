@@ -135,7 +135,7 @@ An address-based reference resolves against the **installed methods** — `~/.mt
 A few behaviors worth knowing:
 
 - **Installed wins.** Once a method is installed, it is used as-is — including when a reference pins a different `@<tag>` than what is installed (a warning tells you so). Remove the installed directory to re-fetch.
-- **A miss that cannot be bridged is a loud diagnostic, never a silent pass**: fetch disabled, an unfetchable address, or a failed fetch each raise an error naming the address and the remedy.
+- **A miss that cannot be bridged refuses the bundle, never a silent pass.** Fetch disabled, an address this runtime cannot fetch, or a failed fetch (a repository that does not exist, a `@tag` that is not a tag, a repository holding no package at that address) refuses the load with one `unresolved_package_dependency` item per package, located on the first pipe that calls it, with the reference as written in `missing_pipe_code` and the reason and the remedy in its message. It is the same invalid verdict as any other mistake in the bundle: `pipelex validate` reports it, `POST /v1/validate` answers `200` with `is_valid: false`, and a run is refused with a `422` before any pipe runs. Every package of the bundle is tried before the refusal, so two bad references give two items.
 - **Hosted parity warning.** A fetched method declaring Python structure classes runs locally but triggers the same warning as a direct CLI fetch: hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python. On a sandbox-hosted deployment the fetch refuses such a package outright, with the same rule-naming error. The refusal is not specific to fetching: a sandbox-hosted deployment refuses every method whose Python declares structure classes, however it arrived (see [Python classes](concepts/python-classes.md)).
 
 To **disable network fetches at load time**, set the switch in your `pipelex.toml` (or use the environment variable, which takes precedence):
@@ -149,7 +149,7 @@ fetch_on_miss = false
 export PIPELEX_METHODS_FETCH_ON_MISS=0
 ```
 
-With fetching disabled, a miss raises a diagnostic that names the address and how to install the method manually (e.g. `mthds install <address>`, or by copying the package into `~/.mthds/methods/`). See [Methods Configuration](../configuration/config-practical/methods-config.md).
+With fetching disabled, a miss refuses the bundle with that item, whose message names the address and says to install the package where the runtime runs (for example with `mthds install <address>`). See [Methods Configuration](../configuration/config-practical/methods-config.md).
 
 ### Example Layout
 

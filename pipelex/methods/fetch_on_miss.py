@@ -32,7 +32,8 @@ from pipelex.methods.structures_check import (
     scan_structured_content_classes,
 )
 
-MANUAL_INSTALL_HINT = "install the method manually (e.g. `mthds install <address>`, or copy the package into ~/.mthds/methods/)"
+# The remedy every refusal ends with. It names no directory: on a host, the runtime's own store is not the caller's to write.
+MANUAL_INSTALL_HINT = "install the package where this runtime runs (for example with `mthds install <address>`)"
 
 
 def _warn_on_tag_mismatch(*, installed: InstalledMethod, ref: MethodRef | None) -> None:
@@ -102,20 +103,21 @@ def resolve_address_based_method(
 
     if parse_error is not None:
         msg = (
-            f"Method '{full_address}' is not installed and its reference cannot be parsed: {parse_error} Fix the reference, or {MANUAL_INSTALL_HINT}."
+            f"Method '{full_address}' is referenced but not installed, and its address cannot be parsed: {parse_error} "
+            f"Correct the address, or {MANUAL_INSTALL_HINT}."
         )
         raise MethodDependencyFetchError(msg) from parse_error
     if ref is None:
         msg = (
-            f"Method '{full_address}' is not installed and cannot be fetched (only github.com/... addresses are fetchable). "
-            f"Install it into ~/.mthds/methods/ or .mthds/methods/."
+            f"Method '{full_address}' is referenced but not installed, and this runtime cannot fetch it: only github.com/... addresses "
+            f"are fetchable. Correct the address, or {MANUAL_INSTALL_HINT}."
         )
         raise MethodDependencyFetchError(msg)
     if not is_method_fetch_on_miss_enabled():
         msg = (
-            f"Method '{ref.ref_str}' is referenced but not installed, and fetch-on-miss is disabled. "
-            f"Enable it with `fetch_on_miss = true` under [interpreter.methods] in your pipelex.toml "
-            f"(or {METHODS_FETCH_ON_MISS_ENV_VAR}=1), or {MANUAL_INSTALL_HINT}."
+            f"Method '{ref.ref_str}' is referenced but not installed, and fetch-on-miss is disabled on this runtime, so it does not "
+            f"fetch it. Correct the address if it is wrong, or {MANUAL_INSTALL_HINT}. Fetch-on-miss is enabled by "
+            f"`fetch_on_miss = true` under [interpreter.methods] in the runtime's pipelex.toml, or {METHODS_FETCH_ON_MISS_ENV_VAR}=1."
         )
         raise MethodFetchDisabledError(msg)
 
@@ -130,8 +132,8 @@ def resolve_address_based_method(
             raise
         except MethodRefError as exc:
             msg = (
-                f"Method '{ref.ref_str}' is not installed and fetching it failed: {exc} "
-                f"Check the address, tag, and network access, or {MANUAL_INSTALL_HINT}."
+                f"Method '{ref.ref_str}' is referenced but not installed, and fetching it failed: {exc} "
+                f"Correct the address or the tag, or {MANUAL_INSTALL_HINT}."
             )
             raise MethodDependencyFetchError(msg) from exc
 

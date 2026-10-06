@@ -291,6 +291,22 @@ model = "no-such-model-in-any-deck"
 prompt = "@text"
 """
 
+# A bundle whose sequence calls a pipe of an invented method package by its address. With fetch-on-miss
+# off and an empty installed store, the load refuses it as an `unresolved_package_dependency` item
+# located on `pipe.echo.steps[0].pipe`. A run or a validation of it used to answer a no-verdict 500.
+UNRESOLVED_PACKAGE_REFERENCE = "github.com/invented/probe-lib/probe->probe_dep.entry"
+UNRESOLVED_PACKAGE_MTHDS = f"""\
+domain = "smoke"
+main_pipe = "echo"
+
+[pipe.echo]
+type = "PipeSequence"
+description = "Call an invented package"
+inputs = {{ text = "Text" }}
+output = "Text"
+steps = [{{ pipe = "{UNRESOLVED_PACKAGE_REFERENCE}", result = "out" }}]
+"""
+
 # A bundle that loads but whose run fails one step down, in a live run and a dry run alike since no
 # pipe calls a model: `review_topic` runs the parallel `analyze_topic`, whose branch `draft_idea` gives
 # one `Idea` for the field `ideas`, which `TopicReview` declares as a list. The combine of the branch

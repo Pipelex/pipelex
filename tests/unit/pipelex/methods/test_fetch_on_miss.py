@@ -104,7 +104,7 @@ class TestResolveAddressBasedMethod:
 
     @pytest.mark.usefixtures("isolated_methods_dirs")
     def test_miss_with_fetch_disabled_raises_the_disabled_diagnostic(self, mocker: MockerFixture) -> None:
-        """A miss with fetch-on-miss disabled names the address, the switch, and the manual remedy."""
+        """A miss with fetch-on-miss disabled names the address, the switch as the runtime's, and a remedy naming no directory."""
         mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=False)
         fetch_mock = mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package")
 
@@ -115,7 +115,8 @@ class TestResolveAddressBasedMethod:
         assert FULL_ADDRESS in message
         assert "PIPELEX_METHODS_FETCH_ON_MISS" in message
         assert "fetch_on_miss" in message
-        assert "install the method manually" in message
+        assert "install the package where this runtime runs" in message
+        assert "~/.mthds" not in message
         fetch_mock.assert_not_called()
 
     @pytest.mark.usefixtures("isolated_methods_dirs")
@@ -132,12 +133,13 @@ class TestResolveAddressBasedMethod:
         assert f"{FULL_ADDRESS}@v0.1.0" in message
         assert "fetching it failed" in message
         assert "clone timed out" in message
+        assert "Correct the address or the tag" in message
         assert exc_info.value.__cause__ is fetch_error
 
     @pytest.mark.usefixtures("isolated_methods_dirs")
     def test_miss_with_unfetchable_address_raises_a_diagnostic(self) -> None:
         """An address-based alias that is not a fetchable reference gets a diagnostic, not a silent pass."""
-        with pytest.raises(MethodDependencyFetchError, match="cannot be fetched"):
+        with pytest.raises(MethodDependencyFetchError, match="this runtime cannot fetch it"):
             resolve_address_based_method(full_address="example.com/foo/bar")
 
     def test_miss_fetches_installs_and_returns_the_method(self, isolated_methods_dirs: Path, tmp_path: Path, mocker: MockerFixture) -> None:

@@ -105,6 +105,46 @@ class TestFetchMethodPackage:
         with pytest.raises(MethodFetchError, match=re.escape("github.com/Pipelex/methods/documents")):
             fetch_method_package(ref=parse_method_ref("github.com/Pipelex/methods/documents"), dest_dir=tmp_path)
 
+    @pytest.mark.parametrize("spelling", ["as_given", "resolved"])
+    def test_clone_failure_names_no_clone_directory(self, mocker: MockerFixture, tmp_path: Path, spelling: str) -> None:
+        """Git's progress line naming the clone directory is cut; a line giving git's reason keeps it, the directory masked."""
+        dest_dir = tmp_path / "clone"
+        named_dir = dest_dir if spelling == "as_given" else dest_dir.resolve()
+        git_failure = (
+            f"Failed to clone 'https://github.com/Pipelex/methods.git': Cloning into '{named_dir}'...\n"
+            f"fatal: could not create work tree dir '{named_dir}': Permission denied\n"
+            "remote: Repository not found."
+        )
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError(git_failure))
+
+        with pytest.raises(MethodFetchError) as exc_info:
+            fetch_method_package(ref=parse_method_ref("github.com/Pipelex/methods/documents"), dest_dir=dest_dir)
+
+        message = str(exc_info.value)
+        assert str(dest_dir) not in message
+        assert str(dest_dir.resolve()) not in message
+        assert "Cloning into" not in message
+        assert "Failed to clone 'https://github.com/Pipelex/methods.git':" in message
+        assert "fatal: could not create work tree dir '<clone directory>': Permission denied" in message
+        assert "remote: Repository not found." in message
+
+    def test_a_reason_sharing_the_prefix_line_survives(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """When git's only line names the clone directory, as when it cannot create it, that line is git's whole reason."""
+        dest_dir = tmp_path / "clone"
+        git_failure = (
+            f"Failed to clone 'https://github.com/Pipelex/methods.git': fatal: could not create work tree dir '{dest_dir}': Permission denied"
+        )
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError(git_failure))
+
+        with pytest.raises(MethodFetchError) as exc_info:
+            fetch_method_package(ref=parse_method_ref("github.com/Pipelex/methods/documents"), dest_dir=dest_dir)
+
+        message = str(exc_info.value)
+        assert str(dest_dir) not in message
+        assert message.endswith(
+            "Failed to clone 'https://github.com/Pipelex/methods.git': fatal: could not create work tree dir '<clone directory>': Permission denied"
+        )
+
     def test_refusal_fires_before_any_module_import(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Guardrail: a fetched package carrying a StructuredContent subclass is refused with the
         rule-naming error before anything reaches the module-import machinery.

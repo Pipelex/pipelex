@@ -13,10 +13,11 @@ from mthds.package.manifest.parser import parse_methods_toml
 
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.interpreter_hub import get_library_manager
-from pipelex.methods.exceptions import MethodFetchDisabledError
+from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.methods.fetching import FetchedMethodPackage
 from pipelex.methods.method_ref import parse_method_ref
 from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -135,7 +136,7 @@ class TestAddressDependencyFetchOnMiss:
 
     @pytest.mark.usefixtures("global_methods_dir")
     def test_load_miss_with_fetch_disabled_raises_the_diagnostic(self, mocker: MockerFixture) -> None:
-        """With fetch-on-miss disabled, the former silent-miss warning is now a raised diagnostic."""
+        """With fetch-on-miss disabled, a miss refuses the load with the diagnostic as its item, never a silent pass."""
         mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=False)
         fetch_mock = mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package")
 
@@ -143,12 +144,14 @@ class TestAddressDependencyFetchOnMiss:
         library_id, _library = library_manager.open_library()
         try:
             blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=CONSUMER_BUNDLE)
-            with pytest.raises(MethodFetchDisabledError) as exc_info:
+            with pytest.raises(LibraryLoadingError) as exc_info:
                 library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
         finally:
             library_manager.teardown(library_id=library_id)
 
-        message = str(exc_info.value)
-        assert DEP_ALIAS in message
-        assert "fetch-on-miss is disabled" in message
+        (item,) = exc_info.value.pipe_concept_validation_errors or []
+        assert item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
+        assert item.missing_pipe_code == f"{DEP_ALIAS}->fom_scoring.fom_compute_score"
+        assert DEP_ALIAS in item.message
+        assert "fetch-on-miss is disabled" in item.message
         fetch_mock.assert_not_called()
