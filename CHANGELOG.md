@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **The documentation no longer describes the Pipelex Gateway**: **Configure AI Providers** offers your own provider keys, with OpenRouter as the single-key option, or a local model, and points to the Quick Start for running on the hosted API; the MTHDS language tutorial no longer runs `pipelex login`. The telemetry, logging, feature and under-the-hood pages describe only the telemetry streams you configure yourself and the backends the runtime ships, without the Gateway stream, its backend or its plugin.
+- **The documentation no longer describes the Pipelex Gateway**: **Configure AI Providers** offers your own provider keys or a local model, says that the shipped defaults run as they are on OpenAI or Azure OpenAI and must be repointed for any other provider, OpenRouter included, and points to the Quick Start for running on the hosted API; the MTHDS language tutorial no longer runs `pipelex login`. The telemetry, logging, feature and under-the-hood pages describe only the telemetry streams you configure yourself and the backends the runtime ships, without the Gateway stream, its backend or its plugin.
 
 ## [v0.75.0] - 2026-10-06
 

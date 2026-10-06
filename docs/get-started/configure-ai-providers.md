@@ -53,7 +53,7 @@ AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=...
 ```
 
-You only need to add keys for the providers you plan to use. A single OpenRouter key reaches models from many providers, which is the shortest way to try several of them.
+You only need to add keys for the providers you plan to use. A single OpenRouter key reaches models from many providers, but the deck's shipped defaults are OpenAI models that OpenRouter does not serve under those names: before running on OpenRouter alone, point the deck at models it serves, as [What the deck resolves to out of the box](#what-the-deck-resolves-to-out-of-the-box) describes.
 
 **Enable Your Providers:**
 
@@ -149,7 +149,7 @@ The deck files `pipelex init` installs resolve their defaults to these models, a
 - **Document extraction** — `default-extract-document` tries Mistral OCR, which needs your Mistral key, and otherwise reads a PDF's text layer locally with pypdfium2, which needs no key but recovers no text from a scanned page. `default-extract-image` and `default-premium` are Mistral OCR only. `default-text-from-pdf` and `default-no-inference` always read the PDF locally and call no model. See [Document Extraction](../features/document-extraction.md#the-default-extractor).
 - **Web search and web pages** — everything in `4_search_deck.toml`, and `default-extract-web-page` in `3_extract_deck.toml`, resolve to Linkup, so a method that searches the web or extracts from a web page needs a Linkup key.
 
-With an OpenAI key alone, the language and image defaults run as shipped. With any other provider, point the aliases at models it serves, as the next paragraph describes.
+With an OpenAI or Azure OpenAI key alone, the language and image defaults run as shipped. With any other provider, OpenRouter included, point the aliases at models it serves, as the next paragraph describes; the models each provider serves are listed under `~/.pipelex/inference/backends/`. A few presets name a model directly rather than through an alias, `retrieval-cheap`, `retrieval-premium`, `engineering-code-cheap` and `engineering-code-cheaper`, so they need overriding too. On OpenRouter, the presets that set a reasoning effort, `deep-analysis`, `quick-reasoning` and `retrieval-premium`, also need overriding without it, because its models are declared without reasoning support.
 
 Nothing about this locks you in. The deck is a vocabulary of aliases and presets, not a provider commitment: point any of them at a model from any backend you have enabled, by editing `x_custom_llm_deck.toml`, which `pipelex update` never touches. That is also how you bring back an alias the shipped deck does not define.
 
