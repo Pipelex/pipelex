@@ -363,8 +363,8 @@ class PipeSequence(PipeController):
 
         A slot the flow cannot type, a value a pipe that does not resolve stored, is assumed to deliver, and so is the concept of
         a value a pipe step stored as `Anything` or `Dynamic`. A slot whose possible values have different specs is checked
-        against each of them. The refusal is returned rather than raised, so that the same check answers which declared inputs
-        are accepted (`_accepted_declared_names`).
+        against each of them, each read as what stored it. The refusal is returned rather than raised, so that the same check
+        answers which declared inputs are accepted (`_accepted_declared_names`).
 
         Returns:
             ``INPUT_STUFF_SPEC_MISMATCH`` naming the step, the name and what stored it, or `None`.
@@ -485,8 +485,10 @@ class PipeSequence(PipeController):
 
         A refined concept satisfies its parent, and a fixed count a variable list; a flexible need (`Dynamic`, `Anything`)
         takes any value, and a value a pipe step stored as `Anything` or `Dynamic` has a concept known only when it runs, so
-        its concept is assumed to satisfy the read while its multiplicity is still checked. The message names what stored the
-        value: a binding step, an earlier pipe step, or the sequence's own declared input.
+        its concept is assumed to satisfy the read while its multiplicity is still checked. Among the values a disagreement
+        lists, only those a pipe step stored are read that way: the value a step may leave in place, when the caller declared it
+        or a binding stored it, is checked as any other. The message names what stored the value: a binding step, an earlier
+        pipe step, or the sequence's own declared input.
 
         Returns:
             ``INPUT_STUFF_SPEC_MISMATCH`` naming the step, the name and what stored it, or `None`.
@@ -500,11 +502,14 @@ class PipeSequence(PipeController):
             if slot.disagreement is None:
                 # A value a pipe that does not resolve at validation stored: nothing types it, so it is assumed to deliver.
                 return None
-            # Every value a disagreement lists is one a step's run may leave, so each is read as a pipe step's store.
+            # Each value a disagreement lists is read as what stored it: a condition's outcome is a pipe store, while the value
+            # the name held before may be the caller's declared input or a binding's, which is checked as any other.
             unreadable_specs = [
                 stored_spec.stuff_spec
                 for stored_spec in slot.disagreement.stored_specs
-                if not self._is_readable_as(provided_spec=stored_spec.stuff_spec, needed_spec=needed_spec, is_stored_by_pipe_step=True)
+                if not self._is_readable_as(
+                    provided_spec=stored_spec.stuff_spec, needed_spec=needed_spec, is_stored_by_pipe_step=stored_spec.is_stored_by_pipe_step
+                )
             ]
             if not unreadable_specs:
                 return None
@@ -522,7 +527,7 @@ class PipeSequence(PipeController):
                 provided_concept_code=unreadable_specs[0].concept.concept_ref,
                 required_concept_codes=[needed_spec.concept.concept_ref],
             )
-        if self._is_readable_as(provided_spec=provided_spec, needed_spec=needed_spec, is_stored_by_pipe_step=self._is_stored_by_pipe_step(slot=slot)):
+        if self._is_readable_as(provided_spec=provided_spec, needed_spec=needed_spec, is_stored_by_pipe_step=slot.is_stored_by_pipe_step):
             return None
         provided_ref = self._render_spec(stuff_spec=provided_spec)
         declare_remedy = f"Declare the input as '{provided_ref}' in pipe '{step_pipe_code}'"
@@ -566,15 +571,11 @@ class PipeSequence(PipeController):
         Only a pipe step's store is read this way. The run stores the concept the pipe actually produced, which nothing knows
         before it, so the step reading it is assumed to get what it reads, as from a pipe that does not resolve at validation.
         The sequence's own declared input is a contract its caller is held to, and a binding over a field holding `Anything`
-        binds a value whose concept is `Anything`, so both are checked as any other value. The multiplicity, which the pipe's
-        declaration and the step's batch or count set, is checked whatever the concept.
+        binds a value whose concept is `Anything`, so both are checked as any other value, also where a later step may leave
+        them in place (`FlowSlot.is_stored_by_pipe_step`, `StoredSpec.is_stored_by_pipe_step`). The multiplicity, which the
+        pipe's declaration and the step's batch or count set, is checked whatever the concept.
         """
         return stuff_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
-
-    @staticmethod
-    def _is_stored_by_pipe_step(*, slot: FlowSlot) -> bool:
-        """Whether an earlier pipe step stored the slot's value, as its result or as a name its pipe stores besides."""
-        return slot.producer_step_index is not None and slot.binding_step_index is None
 
     def _batched_list_refusal(
         self, *, step_index: int, step_pipe_code: str, batch_params: BatchParams, slot: FlowSlot, item_need: StuffSpec | None
@@ -584,8 +585,9 @@ class PipeSequence(PipeController):
 
         A dotted `batch_over` is named by the path its author wrote, never by the private name the sequence bound it under.
         A value the flow cannot type is assumed to deliver; one whose possible values have different specs is checked
-        against each of them. A list a pipe step stored as `Anything[]` or `Dynamic[]` holds items whose concept is known
-        only when it runs, so they are assumed to be what the pipe reads, while a single value is still no list.
+        against each of them, each read as what stored it. A list a pipe step stored as `Anything[]` or `Dynamic[]` holds
+        items whose concept is known only when it runs, so they are assumed to be what the pipe reads, while a single value
+        is still no list; a list the caller declared or a binding stored as `Anything[]` is checked as any other.
 
         Returns:
             ``INPUT_STUFF_SPEC_MISMATCH``, as a batch over a value that is not a list is refused, naming the step and what
@@ -596,13 +598,13 @@ class PipeSequence(PipeController):
         step_label = f"step {self._step_number(step_index=step_index)} (pipe '{step_pipe_code}')"
         binding_step = self.sequential_sub_pipes[slot.binding_step_index] if slot.binding_step_index is not None else None
         is_bound_list = isinstance(binding_step, BindingStep)
-        stored_specs: list[StuffSpec]
+        # Each value the list may be, with whether a pipe step stored it: the slot's own provenance for a typed slot, and each
+        # value's for the values a disagreement lists, where the value the name held before may be the caller's or a binding's.
+        stored_values: list[tuple[StuffSpec, bool]]
         batched_phrase: str
         list_label = list_name
-        # Every value a disagreement lists is one a step's run may leave, so each is read as a pipe step's store.
-        is_stored_by_pipe_step = slot.stuff_spec is None or self._is_stored_by_pipe_step(slot=slot)
         if slot.stuff_spec is not None:
-            stored_specs = [slot.stuff_spec]
+            stored_values = [(slot.stuff_spec, slot.is_stored_by_pipe_step)]
             if isinstance(binding_step, BindingStep):
                 if binding_step.is_dotted_batch_over:
                     batched_phrase = f"the dotted path '{binding_step.from_path}', which derives"
@@ -614,12 +616,12 @@ class PipeSequence(PipeController):
             else:
                 batched_phrase = f"'{list_name}', which the sequence declares as"
         elif slot.disagreement is not None:
-            stored_specs = [stored_spec.stuff_spec for stored_spec in slot.disagreement.stored_specs]
+            stored_values = [(stored_spec.stuff_spec, stored_spec.is_stored_by_pipe_step) for stored_spec in slot.disagreement.stored_specs]
             batched_phrase = f"'{list_name}', which may hold"
         else:
             # A list a pipe that does not resolve at validation stored: nothing types it, so it is assumed to deliver.
             return None
-        for stored_spec in stored_specs:
+        for stored_spec, is_stored_by_pipe_step in stored_values:
             stored_ref = self._render_spec(stuff_spec=stored_spec)
             if not stored_spec.is_multiple():
                 list_remedy = "a path that reaches a list, through a list root or a list field" if is_bound_list else "a name holding a list"

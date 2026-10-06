@@ -42,6 +42,11 @@ class StoredSpec(BaseModel):
     # What stores the value, written to precede "as 'X'", e.g. "outcome 'stash_parcel' of pipe 'stash_by_mode'".
     stored_by: str
     stuff_spec: StuffSpec
+    # Whether a pipe step's run stored the value, so that a step reading it takes the concept of a value stored as `Anything`
+    # or `Dynamic` to be the one it reads, which only the run knows. A condition's outcomes are pipe stores. The value a name
+    # held before a step that may leave it is not one when the sequence's caller passed it under a declared input or a binding
+    # step stored it (`FlowSlot.is_stored_by_pipe_step`): a step reading it is held to its spec, as to any other declaration.
+    is_stored_by_pipe_step: bool = True
 
 
 class SpecDisagreement(BaseModel):
@@ -82,6 +87,20 @@ class MemoryWrite(BaseModel):
     is_always_written: bool = True
 
 
+def possible_values(
+    *, stored_by: str, stuff_spec: StuffSpec | None, disagreement: SpecDisagreement | None, is_stored_by_pipe_step: bool
+) -> tuple[StoredSpec, ...] | None:
+    """The values one side may leave under a name, as a disagreement lists them: the one value of a typed side, which `stored_by`
+    names, or each value the side's own disagreement lists, with what stored it. `None` for a side nothing could type before
+    the run, a pipe that does not resolve having stored it.
+    """
+    if stuff_spec is not None:
+        return (StoredSpec(stored_by=stored_by, stuff_spec=stuff_spec, is_stored_by_pipe_step=is_stored_by_pipe_step),)
+    if disagreement is not None:
+        return disagreement.stored_specs
+    return None
+
+
 def is_same_value_spec(*, first_spec: StuffSpec | None, second_spec: StuffSpec | None) -> bool:
     """Whether two specs type the same value: the same concept and multiplicity. Presence aside, which an absence carries."""
     if first_spec is None or second_spec is None:
@@ -102,9 +121,10 @@ def merge_alternative_writes(*, alternatives: list[AlternativeWrites]) -> dict[s
     A name is always written only if every alternative always writes it. It may hold an absence if any alternative may leave
     one. It keeps a spec only if every alternative storing it stores the same value spec; an alternative that does not store
     it leaves the caller's value, which the caller merges with what the name held before (`is_always_written` is then false).
-    A name left untyped records why when it is seen before the run (`SpecDisagreement`): the alternatives typing it store it
-    under different specs, or one of them stores it with a disagreement of its own. Otherwise an alternative that could not
-    type it, a pipe that does not resolve having stored it, leaves it untyped with no disagreement.
+    A name left untyped records why when it is seen before the run (`SpecDisagreement`), listing every value an alternative
+    may leave: the alternatives typing it store it under different specs, or one of them stores it with a disagreement of its
+    own. Otherwise an alternative that could not type it, a pipe that does not resolve having stored it, leaves it untyped
+    with no disagreement.
     """
     merged_writes: dict[str, MemoryWrite] = {}
     for alternative in alternatives:
@@ -128,18 +148,20 @@ def merge_alternative_writes(*, alternatives: list[AlternativeWrites]) -> dict[s
 
 def _alternatives_disagreement(*, labeled_writes: list[tuple[str, MemoryWrite]]) -> SpecDisagreement | None:
     """Why the alternatives storing a name leave it untyped, when it is seen before the run: the specs they store disagree, or
-    one of them stores the name with a disagreement of its own. `None` when an alternative could not type the name at all.
+    one of them stores the name with a disagreement of its own. The disagreement lists every value an alternative may leave,
+    those its own disagreement lists included, so that a step reading the name is checked against each. An alternative nothing
+    could type, a pipe that does not resolve having stored the name, lists none. `None` when the values listed agree.
     """
-    typed_specs: list[StoredSpec] = []
+    stored_specs: list[StoredSpec] = []
     for label, name_write in labeled_writes:
-        if name_write.stuff_spec is not None:
-            typed_specs.append(StoredSpec(stored_by=label, stuff_spec=name_write.stuff_spec))
-    first_typed_spec = typed_specs[0].stuff_spec if typed_specs else None
-    if any(not is_same_value_spec(first_spec=first_typed_spec, second_spec=typed_spec.stuff_spec) for typed_spec in typed_specs):
-        return SpecDisagreement(stored_specs=tuple(typed_specs))
-    for _, name_write in labeled_writes:
-        if name_write.disagreement is not None:
-            return name_write.disagreement
+        alternative_values = possible_values(
+            stored_by=label, stuff_spec=name_write.stuff_spec, disagreement=name_write.disagreement, is_stored_by_pipe_step=True
+        )
+        if alternative_values is not None:
+            stored_specs.extend(alternative_values)
+    first_spec = stored_specs[0].stuff_spec if stored_specs else None
+    if any(not is_same_value_spec(first_spec=first_spec, second_spec=stored_spec.stuff_spec) for stored_spec in stored_specs):
+        return SpecDisagreement(stored_specs=tuple(stored_specs))
     return None
 
 

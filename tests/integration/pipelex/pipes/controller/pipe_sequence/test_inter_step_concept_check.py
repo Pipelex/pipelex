@@ -205,6 +205,109 @@ steps = [
   { pipe = "weigh_parcel", result = "weighed" },
   { pipe = "note_anything", result = "noted" },
 ]
+
+[pipe.archive_record]
+type = "PipeCompose"
+description = "Archives the record, read as a text"
+inputs = { record = "Text" }
+output = "Text"
+template = "Archived: $record"
+
+[pipe.store_note_as_record]
+type = "PipeSequence"
+description = "Stores the archived note under the record's name"
+inputs = { note = "Text" }
+output = "Text"
+steps = [
+  { pipe = "archive_note", result = "record" },
+]
+
+[pipe.maybe_store_note]
+type = "PipeCondition"
+description = "Stores the archived note under the record's name, or leaves the record as it is, as the mode says"
+inputs = { mode = "Text", note = "Text" }
+output = "Text?"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.maybe_store_note.outcomes]
+store = "store_note_as_record"
+keep = "continue"
+
+[pipe.summarize_records]
+type = "PipeCompose"
+description = "Writes a summary of the records, read as texts"
+inputs = { records = "Text[]" }
+output = "Text"
+template = "Records: $records"
+
+[pipe.store_notes_as_records]
+type = "PipeSequence"
+description = "Stores the archived notes under the records' name, then summarizes them"
+inputs = { notes = "Text[]" }
+output = "Text"
+steps = [
+  { pipe = "archive_note", batch_over = "notes", batch_as = "note", result = "records" },
+  { pipe = "summarize_records", result = "summary" },
+]
+
+[pipe.maybe_store_notes]
+type = "PipeCondition"
+description = "Stores the archived notes under the records' name, or leaves the records as they are, as the mode says"
+inputs = { mode = "Text", notes = "Text[]" }
+output = "Text?"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.maybe_store_notes.outcomes]
+store = "store_notes_as_records"
+keep = "continue"
+
+[pipe.weigh_anything_as_record]
+type = "PipeSequence"
+description = "Stores a parcel, declared as whatever it is, under the record's name"
+inputs = { amount = "Number" }
+output = "Anything"
+steps = [
+  { pipe = "weigh_anything", result = "record" },
+]
+
+[pipe.store_anything_or_note]
+type = "PipeCondition"
+description = "Stores a parcel declared as whatever it is, or the archived note, under the record's name, as the mode says"
+inputs = { amount = "Number", note = "Text", mode = "Text" }
+output = "Anything"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.store_anything_or_note.outcomes]
+weigh = "weigh_anything_as_record"
+note = "store_note_as_record"
+
+[pipe.maybe_store_anything_or_note]
+type = "PipeCondition"
+description = "Stores a parcel declared as whatever it is, or the archived note, under the record's name, or leaves the record as it is"
+inputs = { amount = "Number", note = "Text", mode = "Text" }
+output = "Anything?"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.maybe_store_anything_or_note.outcomes]
+weigh = "weigh_anything_as_record"
+note = "store_note_as_record"
+keep = "continue"
+
+[pipe.store_invoice_or_either]
+type = "PipeCondition"
+description = "Stores an invoice under the record's name, or a parcel declared as whatever it is, or the archived note"
+inputs = { amount = "Number", note = "Text", mode = "Text" }
+output = "Anything"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.store_invoice_or_either.outcomes]
+invoice = "swap_for_invoice"
+either = "store_anything_or_note"
 """
 
 
@@ -442,6 +545,86 @@ class TestInterStepConceptCheck:
                 "In pipe 'flow', input 'record' is declared as 'Anything' but its step needs 'Parcel'. Update the input to 'Parcel'.",
                 id="a-declared-anything-read-as-a-concept",
             ),
+            pytest.param(
+                # Regression: the condition may leave the caller's `Anything` in place, which is a declaration, not a pipe
+                # step's store, so it is checked even among the values the name may hold.
+                _flow(
+                    inputs='record = "Anything", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "maybe_store_note", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: the value it held before step 1 (pipe 'maybe_store_note'), which the step leaves when it stores nothing, as "
+                    "'Anything'; step 1 (pipe 'maybe_store_note'), when it stores a value, as 'Text'."
+                ),
+                id="a-declared-anything-a-condition-may-leave-read-as-a-concept",
+            ),
+            pytest.param(
+                # Regression: as above, for a list batched over.
+                _flow(
+                    inputs='records = "Anything[]", mode = "Text", notes = "Text[]"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "maybe_store_notes", result = "stored" }',
+                        '{ pipe = "archive_record", batch_over = "records", batch_as = "record", result = "archived" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') batches over 'records', which may hold 'Anything[]', but its pipe reads "
+                    "each item, 'record', as 'Text'."
+                ),
+                id="a-declared-anything-list-a-condition-may-leave-batched-over-as-a-concept",
+            ),
+            pytest.param(
+                # A binding's value is no pipe step's store either: binding a declared `Anything` binds an `Anything`.
+                _flow(
+                    inputs='given = "Anything", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=[
+                        '{ from = "given", result = "record" }',
+                        '{ pipe = "maybe_store_note", result = "stored" }',
+                        '{ pipe = "archive_record", result = "archived" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 3 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: the value it held before step 2 (pipe 'maybe_store_note'), which the step leaves when it stores nothing, as "
+                    "'Anything'; step 2 (pipe 'maybe_store_note'), when it stores a value, as 'Text'."
+                ),
+                id="a-bound-anything-a-condition-may-leave-read-as-a-concept",
+            ),
+            pytest.param(
+                # Regression: the outcomes that store `record` disagree among themselves, and the caller's `Anything`, which the
+                # `continue` outcome leaves, is listed beside them rather than dropped.
+                _flow(
+                    inputs='record = "Anything", amount = "Number", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "maybe_store_anything_or_note", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: the value it held before step 1 (pipe 'maybe_store_anything_or_note'), which the step leaves when it stores "
+                    "nothing, as 'Anything'; outcome 'store_note_as_record' of pipe 'maybe_store_anything_or_note' as 'Text'; outcome "
+                    "'weigh_anything_as_record' of pipe 'maybe_store_anything_or_note' as 'Anything'."
+                ),
+                id="a-declared-anything-a-condition-may-leave-beside-outcomes-that-disagree",
+            ),
+            pytest.param(
+                # Regression: one outcome stores an `Invoice`, the other a value whose own outcomes disagree, and the `Invoice` is
+                # listed beside their values rather than dropped.
+                _flow(
+                    inputs='amount = "Number", note = "Text", mode = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "store_invoice_or_either", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: outcome 'store_note_as_record' of pipe 'store_anything_or_note' as 'Text'; outcome 'weigh_anything_as_record' of "
+                    "pipe 'store_anything_or_note' as 'Anything'; outcome 'swap_for_invoice' of pipe 'store_invoice_or_either' as 'Invoice'."
+                ),
+                id="an-outcome-storing-another-concept-beside-one-whose-values-disagree",
+            ),
         ],
     )
     def test_a_step_reading_what_the_flow_does_not_carry_is_refused(self, load_empty_library: Callable[[], str], flow: str, message: str) -> None:
@@ -605,6 +788,29 @@ class TestInterStepConceptCheck:
                     ],
                 ),
                 id="a-batch-over-a-list-of-anything-whose-items-are-read-as-a-concept",
+            ),
+            pytest.param(
+                # The outcomes store `record` as `Anything` and as `Text`: both are pipe stores, so a step reading it as `Text`
+                # is assumed to get one.
+                _flow(
+                    inputs='amount = "Number", note = "Text", mode = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "store_anything_or_note", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                id="outcomes-storing-anything-and-a-concept-read-as-the-concept",
+            ),
+            pytest.param(
+                # The condition may leave the `Anything` an earlier pipe step stored, which is a pipe step's store too.
+                _flow(
+                    inputs='amount = "Number", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "weigh_anything", result = "record" }',
+                        '{ pipe = "maybe_store_note", result = "stored" }',
+                        '{ pipe = "archive_record", result = "archived" }',
+                    ],
+                ),
+                id="a-stored-anything-a-condition-may-leave-read-as-a-concept",
             ),
         ],
     )

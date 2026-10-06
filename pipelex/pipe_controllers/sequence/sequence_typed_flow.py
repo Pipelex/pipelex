@@ -24,7 +24,10 @@ and a binding ending the sequence is checked against the sequence's output.
 
 A pipe step's result is typed by the output its pipe declares. A pipe declaring `Anything` or `Dynamic`, as a
 condition whose outcomes produce different concepts must, stores a value whose concept is known only when it
-runs, so a step reading it is assumed to get the concept it reads, as from a pipe that does not resolve.
+runs, so a step reading it is assumed to get the concept it reads, as from a pipe that does not resolve. The
+flow keeps what stored each value (`FlowSlot.is_stored_by_pipe_step`), and so does each value a disagreement
+lists (`StoredSpec.is_stored_by_pipe_step`), so a declared input or a binding's value a step may leave in
+place is checked as any other, whatever spec it holds.
 """
 
 from typing import Any, NamedTuple, Self
@@ -44,7 +47,7 @@ from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivatio
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_machinery.memory_writes import MemoryWrite, SpecDisagreement, StoredSpec, is_same_value_spec
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, SpecDisagreement, is_same_value_spec, possible_values
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -66,6 +69,17 @@ class FlowSlot(BaseModel):
     # The index of the step that stored the value, as its result or as a name its pipe stores besides, `None` for a value
     # the sequence's caller passed in, one of its declared inputs.
     producer_step_index: int | None = None
+
+    @property
+    def is_stored_by_pipe_step(self) -> bool:
+        """Whether a pipe step stored the value, as its result or as a name its pipe stores besides, rather than the sequence's
+        caller under a declared input or a binding step.
+
+        The concept of a value a pipe step stored as `Anything` or `Dynamic` is known only when it runs, so a step reading it is
+        assumed to get the concept it reads. A declared input is a contract the caller is held to, and a binding derives its
+        concept from a path, so a value either one put there is checked as any other.
+        """
+        return self.producer_step_index is not None and self.binding_step_index is None
 
 
 class SequenceTypedFlow(BaseModel):
@@ -248,27 +262,34 @@ def slot_after_write(*, prior_slot: FlowSlot | None, memory_write: MemoryWrite, 
     """What a name holds once a step stored it: the stored spec, or, when the step may leave the name as it was, the spec
     the stored value and the value already there agree on, untyped when they do not.
 
-    A name left untyped records why when the two specs are known and differ, or when either side carries a disagreement
-    already; a side nothing could type, a pipe that does not resolve having stored it, leaves it untyped with no disagreement.
-    `step_index` is the storing step's, and `step_label` names it for that record, e.g. "step 2 (pipe 'swap_record')".
+    A name left untyped records why when both sides are seen before the run, each typed or carrying a disagreement already:
+    the disagreement lists every value of both sides, so that a step reading the name is checked against each. A side nothing
+    could type, a pipe that does not resolve having stored it, leaves the name untyped with only the other side's disagreement,
+    if it carries one. The value held before keeps what stored it, so a declared input or a binding's value the step may leave
+    in place is still read as one (`StoredSpec.is_stored_by_pipe_step`). `step_index` is the storing step's, and `step_label`
+    names it for that record, e.g. "step 2 (pipe 'swap_record')".
     """
     if memory_write.is_always_written or prior_slot is None:
         return FlowSlot(stuff_spec=memory_write.stuff_spec, disagreement=memory_write.disagreement, producer_step_index=step_index)
     if is_same_value_spec(first_spec=prior_slot.stuff_spec, second_spec=memory_write.stuff_spec):
         return prior_slot
+    prior_values = possible_values(
+        stored_by=f"the value it held before {step_label}, which the step leaves when it stores nothing,",
+        stuff_spec=prior_slot.stuff_spec,
+        disagreement=prior_slot.disagreement,
+        is_stored_by_pipe_step=prior_slot.is_stored_by_pipe_step,
+    )
+    written_values = possible_values(
+        stored_by=f"{step_label}, when it stores a value,",
+        stuff_spec=memory_write.stuff_spec,
+        disagreement=memory_write.disagreement,
+        is_stored_by_pipe_step=True,
+    )
     disagreement: SpecDisagreement | None
-    if prior_slot.stuff_spec is not None and memory_write.stuff_spec is not None:
-        disagreement = SpecDisagreement(
-            stored_specs=(
-                StoredSpec(
-                    stored_by=f"the value it held before {step_label}, which the step leaves when it stores nothing,",
-                    stuff_spec=prior_slot.stuff_spec,
-                ),
-                StoredSpec(stored_by=f"{step_label}, when it stores a value,", stuff_spec=memory_write.stuff_spec),
-            )
-        )
-    else:
+    if prior_values is None or written_values is None:
         disagreement = prior_slot.disagreement or memory_write.disagreement
+    else:
+        disagreement = SpecDisagreement(stored_specs=prior_values + written_values)
     return FlowSlot(stuff_spec=None, disagreement=disagreement, producer_step_index=step_index)
 
 
