@@ -95,11 +95,11 @@ class JudgmentDeckBlueprint(ConfigModel):
     """The judgment family's half of the deck.
 
     ``choice_default`` is optional here where every other family requires one, and the reason is
-    that no judgment model is served by default. The other families' defaults name a handle the
-    Pipelex Gateway carries, so they always resolve; a judgment backend is brought by the user, and
-    a deck naming a default that nothing serves fails the gateway's own membership check at boot —
-    for every user, whether or not they ever ask for a judgment. Absent says the honest thing: no
-    model is the default, so a judgment names its own until one is served.
+    that no judgment model is served by default: the judgment backend is one the user brings. A
+    default that nothing serves boots cleanly and fails the first judgment that relies on it, and
+    ``tests/unit/pipelex/kit/test_shipped_deck_defaults.py`` refuses a shipped default no kit
+    backend declares. Absent says the honest thing: no model is the default, so a judgment names
+    its own until one is served.
     """
 
     aliases: dict[str, str] = Field(default_factory=dict)

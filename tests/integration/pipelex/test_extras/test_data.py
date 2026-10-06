@@ -41,6 +41,21 @@ class OfflineRunExpectations:
                 concept_ref="shop_notices.PrintedNotice", content={"mime_type": "application/pdf", "filename": "notice-Boulangerie-Kerlann.pdf"}
             ),
         },
+        "feature_markdown_filter_cake_order_slip": {
+            MAIN_STUFF_NAME: Bound(
+                concept_ref="native.Html",
+                content={
+                    "inner_html": (
+                        "<h2>Order for Maëlle Le Goff</h2>\n"
+                        "<p><strong>Nut-free</strong>: one of the guests is allergic.</p>\n"
+                        "<ul>\n<li>Candles: 8</li>\n<li>Writing: <em>Joyeux anniversaire</em></li>\n</ul>\n"
+                        '<p>The cake to copy is at <a href="https://example.com/cakes/forest">https://example.com/cakes/forest</a>, '
+                        "saved as forest.jpg.</p>\n"
+                        "<p>Collection: Saturday&lt;br&gt;before noon</p>\n"
+                    )
+                },
+            ),
+        },
         "feature_binding_step_invoice_fields": {
             "supplier_name": Bound(concept_ref="native.Text", content={"text": "Atelier Morvan"}),
             "total_amount": Bound(concept_ref="native.Number", content={"number": 1250.5}),
@@ -173,5 +188,24 @@ class OfflineRunExpectations:
                 content={"items": [{"tracking_number": "QP-1001"}, {"tracking_number": "QP-1002"}, {"tracking_number": "BR-2001"}]},
             ),
             "loading_list": Bound(concept_ref="native.Text", content={"text": "- QP-1001\n- QP-1002\n- BR-2001\n"}),
+        },
+        "controller_sequence_house_rules": {
+            "house_rules": Bound(
+                concept_ref="native.Markdown",
+                content={"text": "- Quiet after ten in the evening\n- No smoking indoors\n- Bins out on Tuesday evening"},
+            ),
+            "hall_notice": Bound(
+                concept_ref="native.Markdown",
+                content={"text": "# House rules\n\n- Quiet after ten in the evening\n- No smoking indoors\n- Bins out on Tuesday evening"},
+            ),
+            "arrival_message": Bound(
+                concept_ref="native.Text",
+                content={
+                    "text": (
+                        "Welcome! A few house rules before you settle in: "
+                        "- Quiet after ten in the evening\n- No smoking indoors\n- Bins out on Tuesday evening"
+                    )
+                },
+            ),
         },
     }

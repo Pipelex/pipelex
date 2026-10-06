@@ -121,6 +121,11 @@ _FEATURE_TAGS: dict[str, str] = {
         "`bundle.mthds` entry point, so a pipe can be forward-declared as a signature in one file and "
         "satisfied by a concrete definition in another."
     ),
+    "markdown_filter": (
+        "The `markdown` filter of an HTML template, `{{ order.notes | markdown }}`, which turns Markdown held "
+        "in a plain text field into HTML: raw HTML in the source is shown as text, and only a URL with a "
+        "scheme becomes a link."
+    ),
 }
 
 # Same contract as `_NATIVE_EXCLUSIONS`, keyed on `PipeType` for the same reason: an exclusion whose
@@ -167,7 +172,7 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "It refuses a reference to a pipe an installed dependency package loads but does not export, so the "
         "bundle that produces it needs that package installed beside it, with a manifest declaring `[exports]`. "
         "A focused entry is one self-contained bundle validated where nothing is installed, and an "
-        "address-based reference to a package that is not installed fails as a missing method instead. "
+        "address-based reference to a package that is not installed fails as `unresolved_package_dependency` instead. "
         "Revisit if an entry can ever carry the packages it depends on."
     ),
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,

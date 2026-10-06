@@ -13,12 +13,10 @@ PipeImgGen generates images from text prompts using state-of-the-art models. Gen
 
 ## Supported Models
 
-Via **Pipelex Gateway**:
+- **GPT-Image-2 / GPT-Image-1.5 / GPT-Image-1 / GPT-Image-1-mini** — OpenAI image generation models, served by the `openai` and `azure_openai` backends
+- **Nano Banana / Nano Banana Pro / Nano Banana 2 / Nano Banana 2 Lite** — Google Gemini-based image generation, served by the `google` backend
 
-- **GPT-Image-2 / GPT-Image-1.5 / GPT-Image-1 / GPT-Image-1-mini** — OpenAI image generation models
-- **Nano Banana / Nano Banana Pro / Nano Banana 2 / Nano Banana 2 Lite** — Google Gemini-based image generation
-
-Via **direct provider SDKs**:
+The backends that generate images, each with your own key:
 
 - **OpenAI** — Direct OpenAI API for GPT Image models
 - **Google Gemini** — Native Google image generation

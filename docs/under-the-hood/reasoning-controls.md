@@ -282,7 +282,7 @@ If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is dis
 Temperature is passed normally to the Google API regardless of reasoning mode.
 
 !!! note "VertexAI Backend"
-    Reasoning controls are not implemented for Gemini models on the VertexAI backend because Google favors the newer Gen-AI SDK. The VertexAI backend uses `sdk = "openai"` (the OpenAI-compatible endpoint), which routes through the OpenAI worker and does not expose Google's native thinking controls (`thinking_budget` / `thinking_level`). For Gemini reasoning support, use the `google` backend with the native Gen-AI SDK. Or better yet, use the Pipelex Gateway.
+    Reasoning controls are not implemented for Gemini models on the VertexAI backend because Google favors the newer Gen-AI SDK. The VertexAI backend uses `sdk = "openai"` (the OpenAI-compatible endpoint), which routes through the OpenAI worker and does not expose Google's native thinking controls (`thinking_budget` / `thinking_level`). For Gemini reasoning support, use the `google` backend with the native Gen-AI SDK.
 
 ### Mistral
 
@@ -317,11 +317,12 @@ Bedrock native models using the `bedrock_aioboto` SDK do not support reasoning p
 
 ### Gateway and Proxy Backends
 
-Gateway and proxy backends (Azure OpenAI, Portkey, BlackBoxAI, Pipelex Gateway) route API calls through an intermediary but use the same provider worker classes as direct backends. Their reasoning capabilities depend on the `sdk` field in each model's backend TOML, which determines which worker handles the request.
+Gateway and proxy backends (Azure OpenAI, Portkey, BlackBoxAI, OpenRouter) route API calls through an intermediary but use the same provider worker classes as direct backends. Their reasoning capabilities depend on the `sdk` field in each model's backend TOML, which determines which worker handles the request.
 
 - **Azure OpenAI** uses `sdk = "azure_openai_responses"`, routing through the OpenAI Responses worker. Reasoning models declare `thinking_mode = "manual"` and use OpenAI-style `reasoning_effort`.
 - **Portkey** uses `portkey_completions` or `portkey_responses` SDKs, both routing through OpenAI workers. All models — including Anthropic and Google models proxied via Portkey — follow OpenAI reasoning semantics.
 - **BlackBoxAI** uses `sdk = "openai"` or `"openai_responses"`. Proxied models follow OpenAI reasoning semantics.
+- **OpenRouter** uses `sdk = "openai"` for its language models, which declare `thinking_mode = "none"`, so the kit's OpenRouter models take no reasoning controls.
 
 !!! note
     When a provider's models are accessed through a gateway using an OpenAI-compatible SDK, the reasoning controls follow OpenAI semantics (`reasoning_effort`) rather than the provider's native semantics. For native reasoning controls (e.g., Anthropic thinking budgets, Google thinking levels), use the direct provider backend.

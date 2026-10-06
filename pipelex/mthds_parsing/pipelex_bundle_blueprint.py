@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, NamedTuple, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -30,6 +30,14 @@ from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBluepr
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.urls import URLs
+
+
+class LocatedPipeReference(NamedTuple):
+    """A pipe reference a controller makes, with the controller that makes it and where in it the reference is written."""
+
+    pipe_ref: str
+    referring_pipe_code: str
+    field_path: str
 
 
 def _strippable_same_domain_pipe_code(code: str, *, domain: str | None, existing_pipe_codes: set[str] | None = None) -> str | None:
@@ -213,7 +221,11 @@ class PipelexBundleBlueprint(BaseModel):
         Returns:
             List of (pipe_ref_string, context_description) tuples
         """
-        pipe_refs: list[tuple[str, str]] = []
+        return [(reference.pipe_ref, reference.field_path) for reference in self.collect_located_pipe_references()]
+
+    def collect_located_pipe_references(self) -> list[LocatedPipeReference]:
+        """Collect all pipe references from controller blueprints, each with the controller making it, in declaration order."""
+        pipe_refs: list[LocatedPipeReference] = []
         if not self.pipe:
             return pipe_refs
 
@@ -222,16 +234,16 @@ class PipelexBundleBlueprint(BaseModel):
                 for step_index, step in enumerate(pipe_blueprint.steps):
                     # A binding step names no pipe, only a path in working memory.
                     if isinstance(step, SubPipeBlueprint):
-                        pipe_refs.append((step.pipe, f"pipe.{pipe_code}.steps[{step_index}].pipe"))
+                        pipe_refs.append(LocatedPipeReference(step.pipe, pipe_code, f"pipe.{pipe_code}.steps[{step_index}].pipe"))
             elif isinstance(pipe_blueprint, PipeBatchBlueprint):
-                pipe_refs.append((pipe_blueprint.branch_pipe_code, f"pipe.{pipe_code}.branch_pipe_code"))
+                pipe_refs.append(LocatedPipeReference(pipe_blueprint.branch_pipe_code, pipe_code, f"pipe.{pipe_code}.branch_pipe_code"))
             elif isinstance(pipe_blueprint, PipeConditionBlueprint):
                 for outcome_key, outcome_pipe in pipe_blueprint.outcomes.items():
-                    pipe_refs.append((outcome_pipe, f"pipe.{pipe_code}.outcomes[{outcome_key}]"))
-                pipe_refs.append((pipe_blueprint.default_outcome, f"pipe.{pipe_code}.default_outcome"))
+                    pipe_refs.append(LocatedPipeReference(outcome_pipe, pipe_code, f"pipe.{pipe_code}.outcomes[{outcome_key}]"))
+                pipe_refs.append(LocatedPipeReference(pipe_blueprint.default_outcome, pipe_code, f"pipe.{pipe_code}.default_outcome"))
             elif isinstance(pipe_blueprint, PipeParallelBlueprint):
                 for branch_index, branch in enumerate(pipe_blueprint.branches):
-                    pipe_refs.append((branch.pipe, f"pipe.{pipe_code}.branches[{branch_index}].pipe"))
+                    pipe_refs.append(LocatedPipeReference(branch.pipe, pipe_code, f"pipe.{pipe_code}.branches[{branch_index}].pipe"))
 
         return pipe_refs
 

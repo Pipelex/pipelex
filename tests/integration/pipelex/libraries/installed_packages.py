@@ -35,6 +35,25 @@ def install_probe(
     install_package(root=root, method_name=ProbePackageTestData.METHOD_NAME, manifest=manifest, bundles={"probe_dep.mthds": bundle})
 
 
+def vendor_probe(
+    *,
+    methods_dir: Path,
+    manifest: str = ProbePackageTestData.MANIFEST_EXPORTING_EVERYTHING,
+    bundle: str = ProbePackageTestData.DEP_BUNDLE,
+) -> Path:
+    """Write the probe package into a methods directory, laid out as `<methods_dir>/probe/…`, and return the directory."""
+    package_dir = methods_dir / ProbePackageTestData.METHOD_NAME
+    package_dir.mkdir(parents=True)
+    (package_dir / "METHODS.toml").write_text(manifest, encoding="utf-8")
+    (package_dir / "probe_dep.mthds").write_text(bundle, encoding="utf-8")
+    return methods_dir
+
+
+def install_probe_globally(*, root: Path, bundle: str = ProbePackageTestData.DEP_BUNDLE) -> None:
+    """Install the probe package into the global store `isolate_installed_methods` points at under `root`."""
+    vendor_probe(methods_dir=root / "global-methods", bundle=bundle)
+
+
 def write_consumer(*, root: Path, bundles: dict[str, str]) -> list[Path]:
     paths: list[Path] = []
     for file_name, bundle in bundles.items():

@@ -7,14 +7,19 @@ fetch), installs it into the installed-methods store (``~/.mthds/methods/``) wit
 provenance recorded, and hands it back so library loading can proceed. A miss that cannot be
 bridged — fetch disabled, an unfetchable address, a failed fetch — raises a diagnostic that
 names the address and the remedy; it is never a silent pass.
+
+A load can also be handed methods directories of its own, holding the packages a request ships
+with its bundle under `.mthds/methods/<name>/`. They are looked up first, by the same manifest
+identity, and only searched, never written (:func:`find_vendored_method`).
 """
 
 import shutil
 import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 from pipelex import log
-from pipelex.cli.installed_methods import InstalledMethod, find_method_by_full_address, install_method_package
+from pipelex.cli.installed_methods import InstalledMethod, discover_installed_methods, find_method_by_full_address, install_method_package
 from pipelex.config import METHODS_FETCH_ON_MISS_ENV_VAR, is_method_fetch_on_miss_enabled, is_pipe_func_sandbox_hosted
 from pipelex.methods.exceptions import (
     MethodDependencyFetchError,
@@ -32,7 +37,60 @@ from pipelex.methods.structures_check import (
     scan_structured_content_classes,
 )
 
-MANUAL_INSTALL_HINT = "install the method manually (e.g. `mthds install <address>`, or copy the package into ~/.mthds/methods/)"
+# The remedy every refusal ends with. It names no directory: on a host, the runtime's own store is not the caller's to write.
+MANUAL_INSTALL_HINT = "install the package where this runtime runs (for example with `mthds install <address>`)"
+
+# The remedy a caller can always apply, a hosted one included: the bundle carries the package, which the runtime then
+# finds before its own store, beside a bundle on disk as in a bundle sent over HTTP.
+VENDORING_HINT = "ship the package with the bundle under `.mthds/methods/<name>/`"
+
+
+class _LookupAddress(NamedTuple):
+    """The address a reference is looked up by, with the parsed reference or the reason it did not parse."""
+
+    address: str
+    ref: MethodRef | None
+    parse_error: MethodRefParseError | None
+
+
+def _lookup_address(*, full_address: str) -> _LookupAddress:
+    """Strip any ``@<tag>`` from a reference for the lookup: an installed or vendored copy is keyed by its address alone."""
+    if not looks_like_method_ref(full_address):
+        return _LookupAddress(address=full_address, ref=None, parse_error=None)
+    try:
+        ref = parse_method_ref(full_address)
+    except MethodRefParseError as exc:
+        return _LookupAddress(address=full_address, ref=None, parse_error=exc)
+    return _LookupAddress(address=ref.address, ref=ref, parse_error=None)
+
+
+def find_vendored_method(*, full_address: str, methods_dirs: list[Path]) -> InstalledMethod | None:
+    """Look an address-based reference up among the packages a load was handed, and nowhere else.
+
+    ``methods_dirs`` are laid out like ``.mthds/methods/`` (one directory per package, its ``METHODS.toml`` at its
+    root) and hold the packages a request ships with its bundle. A package matches by the manifest identity the
+    installed stores are matched by, any ``@<tag>`` stripped, so a vendored copy answers an address this runtime could
+    not fetch too. The installed stores are not read, and nothing is fetched or installed. A ``@<tag>`` pin answered by
+    a vendored copy uses the copy, as an installed copy is used, with a warning unless the copy's version is that tag.
+
+    Args:
+        full_address: The address-based alias as written in the bundle, with any ``@<tag>``.
+        methods_dirs: The load's own methods directories.
+
+    Returns:
+        The vendored package the reference names, or ``None`` when none of the directories holds it.
+    """
+    lookup = _lookup_address(full_address=full_address)
+    vendored_methods = discover_installed_methods(include_global=False, include_project=False, extra_search_dirs=methods_dirs)
+    vendored = find_method_by_full_address(lookup.address, methods=vendored_methods)
+    if vendored is not None and lookup.ref is not None and lookup.ref.tag is not None:
+        version = vendored.manifest.version
+        if lookup.ref.tag not in {version, f"v{version}"}:
+            log.warning(
+                f"Method '{lookup.ref.address}' is shipped with the request at version {version} while the reference pins "
+                f"'@{lookup.ref.tag}'; using the shipped copy."
+            )
+    return vendored
 
 
 def _warn_on_tag_mismatch(*, installed: InstalledMethod, ref: MethodRef | None) -> None:
@@ -85,37 +143,32 @@ def resolve_address_based_method(
             the install target being occupied by a different package that shares the bare
             directory name (never silently loaded, never silently overwritten).
     """
-    ref: MethodRef | None = None
-    parse_error: MethodRefParseError | None = None
-    lookup_address = full_address
-    if looks_like_method_ref(full_address):
-        try:
-            ref = parse_method_ref(full_address)
-            lookup_address = ref.address
-        except MethodRefParseError as exc:
-            parse_error = exc
+    lookup = _lookup_address(full_address=full_address)
+    ref = lookup.ref
+    parse_error = lookup.parse_error
 
-    installed = find_method_by_full_address(lookup_address, extra_search_dirs=extra_search_dirs)
+    installed = find_method_by_full_address(lookup.address, extra_search_dirs=extra_search_dirs)
     if installed is not None:
         _warn_on_tag_mismatch(installed=installed, ref=ref)
         return installed
 
     if parse_error is not None:
         msg = (
-            f"Method '{full_address}' is not installed and its reference cannot be parsed: {parse_error} Fix the reference, or {MANUAL_INSTALL_HINT}."
+            f"Method '{full_address}' is referenced but not installed, and its address cannot be parsed: {parse_error} "
+            f"Correct the address, or {MANUAL_INSTALL_HINT}."
         )
         raise MethodDependencyFetchError(msg) from parse_error
     if ref is None:
         msg = (
-            f"Method '{full_address}' is not installed and cannot be fetched (only github.com/... addresses are fetchable). "
-            f"Install it into ~/.mthds/methods/ or .mthds/methods/."
+            f"Method '{full_address}' is referenced but not installed, and this runtime cannot fetch it: only github.com/... addresses "
+            f"are fetchable. Correct the address, {VENDORING_HINT}, or {MANUAL_INSTALL_HINT}."
         )
         raise MethodDependencyFetchError(msg)
     if not is_method_fetch_on_miss_enabled():
         msg = (
-            f"Method '{ref.ref_str}' is referenced but not installed, and fetch-on-miss is disabled. "
-            f"Enable it with `fetch_on_miss = true` under [interpreter.methods] in your pipelex.toml "
-            f"(or {METHODS_FETCH_ON_MISS_ENV_VAR}=1), or {MANUAL_INSTALL_HINT}."
+            f"Method '{ref.ref_str}' is referenced but not installed, and fetch-on-miss is disabled on this runtime, so it does not "
+            f"fetch it. Correct the address if it is wrong, {VENDORING_HINT}, or {MANUAL_INSTALL_HINT}. Fetch-on-miss is enabled by "
+            f"`fetch_on_miss = true` under [interpreter.methods] in the runtime's pipelex.toml, or {METHODS_FETCH_ON_MISS_ENV_VAR}=1."
         )
         raise MethodFetchDisabledError(msg)
 
@@ -130,8 +183,8 @@ def resolve_address_based_method(
             raise
         except MethodRefError as exc:
             msg = (
-                f"Method '{ref.ref_str}' is not installed and fetching it failed: {exc} "
-                f"Check the address, tag, and network access, or {MANUAL_INSTALL_HINT}."
+                f"Method '{ref.ref_str}' is referenced but not installed, and fetching it failed: {exc} "
+                f"Correct the address or the tag, {VENDORING_HINT}, or {MANUAL_INSTALL_HINT}."
             )
             raise MethodDependencyFetchError(msg) from exc
 

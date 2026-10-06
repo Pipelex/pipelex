@@ -1,56 +1,24 @@
 ---
-description: "Set up API keys for OpenAI, Anthropic, Mistral, and other providers to power your Pipelex executable AI methods — or use the gateway for instant access."
+description: "Set up API keys for OpenAI, Anthropic, Mistral, OpenRouter and other providers, or a local model, to run your Pipelex executable AI methods on your own machine."
 ---
 
 # Configure AI Providers
 
 ## Configure API Access
 
-To run pipelines with LLMs, you need to configure API access. **You have three options** - choose what works best for you:
+To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Nothing reports to Pipelex either way. If you would rather hold no provider keys at all, the [Quick Start](./quick-start.md) runs methods on the hosted Pipelex API instead.
 
-### Option 1: Pipelex Gateway — Easiest and most Powerful for Getting Started
-
-Get **free credits** for testing and development with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, open-source, and more). New models added constantly.
-
-**Benefits:**
-
-- No credit card required
-- Access to OpenAI, Anthropic Claude, Google Gemini, xAI Grok, and more
-- New models added constantly
-- Perfect for development and testing
-- Single API key for all models
-
-**Setup:**
-
-1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
-
-2. Create a `.env` file in your project root:
-
-    ```env
-    PIPELEX_GATEWAY_API_KEY=your-key-here
-    ```
-
-3. Run `pipelex init` and accept the Gateway terms of service when prompted.
-
-That's it! Your pipelines can now access any supported LLM. See [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) for the backends and models available.
-
-!!! info "Terms of Service & Telemetry"
-    When using Pipelex Gateway, you'll be prompted to accept our terms of service. By using the Gateway, identified telemetry is automatically enabled (tied to your hashed API key) to help us monitor service quality and enforce fair usage.
-
-    **We collect only technical data** (model names, token counts, latency, error rates). We do **NOT** collect your prompts, completions, or business data. See [Telemetry](../setup/telemetry.md) for details and trade-offs, and our [Privacy Policy](https://go.pipelex.com/privacy-policy) for more.
-
-### Option 2: Bring Your Own API Keys
+### Option 1: Bring Your Own API Keys
 
 Use your existing API keys from LLM providers. This is ideal if you:
 
 - Already have API keys from providers
 - Need to use specific accounts for billing
 - Have negotiated rates or enterprise agreements
-- Prefer not to send any telemetry to Pipelex servers
 
 **Setup:**
 
-Create a `.env` file in your project root with your provider keys:
+Add your provider keys to a `.env` file in your project root, or to `~/.pipelex/.env` to use them in every project:
 
 ```bash
 # OpenAI
@@ -64,6 +32,9 @@ GOOGLE_API_KEY=...
 
 # Mistral
 MISTRAL_API_KEY=...
+
+# OpenRouter — one key for many providers' models
+OPENROUTER_API_KEY=...
 
 # FAL (for image generation)
 FAL_API_KEY=...
@@ -82,7 +53,7 @@ AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=...
 ```
 
-You only need to add keys for the providers you plan to use.
+You only need to add keys for the providers you plan to use. A single OpenRouter key reaches models from many providers, but the deck's shipped defaults are OpenAI models that OpenRouter does not serve under those names: before running on OpenRouter alone, point the deck at models it serves, as [What the deck resolves to out of the box](#what-the-deck-resolves-to-out-of-the-box) describes.
 
 **Enable Your Providers:**
 
@@ -108,7 +79,7 @@ When using your own keys, enable the corresponding backends:
 
 See [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) for all options.
 
-### Option 3: Local AI (No API Keys Required)
+### Option 2: Local AI (No API Keys Required)
 
 Run AI models locally without any API keys. This is perfect if you:
 
@@ -171,13 +142,14 @@ Learn more in our [Inference Backend Configuration](../configuration/config-tech
 
 ### What the deck resolves to out of the box
 
-The deck files `pipelex init` installs resolve the language, image-generation and document-extraction defaults to models the Pipelex Gateway serves from Azure, so a fresh install runs inside one provider's scope without you choosing anything:
+The deck files `pipelex init` installs resolve their defaults to these models, and the default routing profile, `all_enabled_backends`, sends each model to the first enabled backend that serves it:
 
-- **Language models** — the whole ladder is the GPT-5.6 range: the premium tier and `best-gpt` are GPT-5.6 Sol, the general and large-context tiers are GPT-5.6 Terra, and the small tiers are GPT-5.6 Luna.
-- **Image generation** — the general and premium tiers are GPT Image 2, the small tier is GPT Image 1 mini.
-- **Document extraction** — Azure Document Intelligence. `default-text-from-pdf` and `default-no-inference` are the exception within that family: they read the PDF locally with pypdfium2 and call no model, so they need no key of any kind.
+- **Language models** — the whole ladder is the GPT-5.6 range, served by `openai` and `azure_openai`: the premium tier and `best-gpt` are GPT-5.6 Sol, the general and large-context tiers are GPT-5.6 Terra, and the small tiers are GPT-5.6 Luna.
+- **Image generation** — the general and premium tiers are GPT Image 2, the small tier is GPT Image 1 mini, both served by `openai` and `azure_openai`.
+- **Document extraction** — `default-extract-document` tries Mistral OCR, which needs your Mistral key, and otherwise reads a PDF's text layer locally with pypdfium2, which needs no key but recovers no text from a scanned page. `default-extract-image` and `default-premium` are Mistral OCR only. `default-text-from-pdf` and `default-no-inference` always read the PDF locally and call no model. See [Document Extraction](../features/document-extraction.md#the-default-extractor).
+- **Web search and web pages** — everything in `4_search_deck.toml`, and `default-extract-web-page` in `3_extract_deck.toml`, resolve to Linkup, so a method that searches the web or extracts from a web page needs a Linkup key.
 
-**Where the deck leaves Azure, it goes to Linkup**, and it does so in two families rather than one. Azure serves no search model, so everything in `4_search_deck.toml` resolves to Linkup; and `default-extract-web-page` in `3_extract_deck.toml` resolves to `linkup-fetch`, which pulls a web page through Linkup rather than through Azure Document Intelligence. A method that searches the web, or that extracts from a web page, needs a Linkup key or the Gateway.
+With an OpenAI or Azure OpenAI key alone, the language and image defaults run as shipped. With any other provider, OpenRouter included, point the aliases at models it serves, as the next paragraph describes; the models each provider serves are listed under `~/.pipelex/inference/backends/`. A few presets name a model directly rather than through an alias, `retrieval-cheap`, `retrieval-premium`, `engineering-code-cheap` and `engineering-code-cheaper`, so they need overriding too. On OpenRouter, the presets that set a reasoning effort, `deep-analysis`, `quick-reasoning` and `retrieval-premium`, also need overriding without it, because its models are declared without reasoning support.
 
 Nothing about this locks you in. The deck is a vocabulary of aliases and presets, not a provider commitment: point any of them at a model from any backend you have enabled, by editing `x_custom_llm_deck.toml`, which `pipelex update` never touches. That is also how you bring back an alias the shipped deck does not define.
 

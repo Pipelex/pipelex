@@ -7,17 +7,16 @@ description: "Learn the declarative MTHDS language step by step — pipes, seque
 
 This tutorial walks you through writing `.mthds` files manually, step by step.
 
-Set up your project and get free AI access:
+Set up your project:
 
 ```bash
 uv tool install "pipelex[cli]"
 pipelex init
-pipelex login
 ```
 
 The `cli` extra installs Rich, which the `pipelex` command renders its output through.
 
-`pipelex init` creates your project configuration. `pipelex login` opens your browser to authenticate with Pipelex Gateway (free). See [Configure AI Providers](./configure-ai-providers.md) for other options: bring your own keys, local AI, etc.
+`pipelex init` creates your project configuration. To run your methods, add your own provider keys to `~/.pipelex/.env`, or point Pipelex at a local model: see [Configure AI Providers](./configure-ai-providers.md).
 
 !!! tip "VS Code Extension"
     We **highly** recommend installing the Pipelex extension for `.mthds` syntax highlighting and flowchart visualization:

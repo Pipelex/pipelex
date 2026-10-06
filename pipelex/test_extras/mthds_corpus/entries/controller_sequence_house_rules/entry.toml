@@ -1,0 +1,10 @@
+name = "controller_sequence_house_rules"
+description = "A holiday let's house rules declared as Markdown, laid out as a hall notice and then read as plain text for the arrival message"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "controller.sequence",
+]

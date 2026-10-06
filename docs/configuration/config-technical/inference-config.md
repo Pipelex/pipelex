@@ -30,7 +30,7 @@ transport_max_retries = 2
 
 - `transport_max_retries` (int, `0`–`10`, default `2`): the number of retries attempted **on top of** the initial request when a transport-level failure occurs — a connection error, or an HTTP `408` / `409` / `429` / `5xx` response. A value of `2` therefore allows up to 3 attempts total. Retries honor a `Retry-After` response header when present.
 
-This is "Tier 1" of the retry model. It is wired uniformly into every inference SDK client factory — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway clients, Mistral, and Google — as well as the raw-`httpx` Azure image-generation path, so the retry posture is a deliberate, uniform policy rather than a per-provider SDK default.
+This is "Tier 1" of the retry model. It is wired uniformly into every inference SDK client factory — Anthropic, OpenAI / Azure OpenAI and the other backends reached through the OpenAI SDK, Portkey, Mistral, Google, and TypeSafe — as well as the raw-`httpx` Azure image-generation path, so the retry posture is a deliberate, uniform policy rather than a per-provider SDK default.
 
 It is distinct from `inference.llm.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
 

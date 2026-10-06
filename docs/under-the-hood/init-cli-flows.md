@@ -33,7 +33,7 @@ These two categories are managed by separate steps. `init_config()` copies only 
 | `pipelex init telemetry` | `telemetry` | Telemetry config template copy |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
 
-All commands except `agreement` and `credentials` perform a **full reset** (overwrite existing files) — every setting in the file is replaced by the template's. That is why init is not the answer to a configuration file that has fallen behind the current schema: [`pipelex migrate`](../tools/cli/migrate.md) rewrites such a file in place and keeps what is in it.
+All commands except `credentials` perform a **full reset** (overwrite existing files) — every setting in the file is replaced by the template's. That is why init is not the answer to a configuration file that has fallen behind the current schema: [`pipelex migrate`](../tools/cli/migrate.md) rewrites such a file in place and keeps what is in it.
 
 ### Inputs
 
@@ -66,9 +66,6 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 ```mermaid
 flowchart TD
     START([pipelex init]) --> FOCUS{focus?}
-
-    FOCUS -- agreement --> AGREE[_init_agreement]
-    AGREE --> DONE([Done])
 
     FOCUS -- credentials --> CREDS_DIRECT["prompt_credentials<br/>Prompt for missing API keys"]
     CREDS_DIRECT --> DONE
@@ -258,7 +255,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 | Constant | Contents | Reason |
 |----------|----------|--------|
-| `INIT_SKIP_FILES` | Every name in `GIT_IGNORED_CONFIG_FILES` (`pipelex/kit/paths.py` is the list: the personal overrides, the service file, the generated gateway model pages, the custom deck files) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
+| `INIT_SKIP_FILES` | Every name in `GIT_IGNORED_CONFIG_FILES` (`pipelex/kit/paths.py` is the list: the personal overrides, `telemetry.project.toml`, the retired `pipelex_service.toml` an earlier release wrote, the custom deck files) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
 | `INIT_SKIP_DIRS` | `inference` | Managed independently by inference step |
 
 ### Source Modules

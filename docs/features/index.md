@@ -73,7 +73,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[CLI](cli.md)**
 
-    Full command-line interface: `login`, `init`, `doctor`, `build`, `validate`, `run`, `graph`, `show`, `which`, and more. Dry run mode, graph generation, and agent CLI.
+    Full command-line interface: `init`, `doctor`, `build`, `validate`, `run`, `graph`, `show`, `which`, and more. Dry run mode, graph generation, and agent CLI.
 
 -   **[plxt Formatter & Linter](plxt.md)**
 
@@ -101,7 +101,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Telemetry & Observability](telemetry.md)**
 
-    Production monitoring with Langfuse, OpenTelemetry, and PostHog integration. Gateway telemetry, span tracing, and custom destinations.
+    Production monitoring with Langfuse, OpenTelemetry and PostHog integration: span tracing and custom destinations, all of them yours and off until you turn them on.
 
 -   **[Cloud Storage](cloud-storage.md)**
 

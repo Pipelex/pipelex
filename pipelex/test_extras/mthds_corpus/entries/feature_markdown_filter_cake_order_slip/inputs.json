@@ -1,0 +1,9 @@
+{
+  "order": {
+    "concept": "cake_orders.CakeOrder",
+    "content": {
+      "customer": "Maëlle Le Goff",
+      "wishes": "**Nut-free**: one of the guests is allergic.\n\n- Candles: 8\n- Writing: *Joyeux anniversaire*\n\nThe cake to copy is at https://example.com/cakes/forest, saved as forest.jpg.\n\nCollection: Saturday<br>before noon"
+    }
+  }
+}

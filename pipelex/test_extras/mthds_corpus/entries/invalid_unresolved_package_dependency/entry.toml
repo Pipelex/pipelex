@@ -1,0 +1,12 @@
+name = "invalid_unresolved_package_dependency"
+description = "A harbour berth allocation calling a scheduling package by an address on a host no runtime fetches from"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.unresolved_package_dependency",
+]
+
+expected_error = "unresolved_package_dependency"

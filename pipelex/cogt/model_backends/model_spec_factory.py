@@ -31,7 +31,7 @@ class InferenceModelSpecBlueprint(ConfigModel):
     listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     rules: ImgGenModelRules | None = None
-    # Provider-side route for models the worker calls by raw path (today: the gateway image models). Our own
+    # Provider-side route for models a worker calls by raw path (no kit backend declares one; an out-of-tree plugin may). Our own
     # routing metadata, not a request header — which is why it is a declared field and not an `extra_headers` entry.
     endpoint_path: str | None = None
 

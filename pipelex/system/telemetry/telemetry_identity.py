@@ -2,7 +2,7 @@
 
 **Identity is a fact of the run, not of the process.** A `TelemetryManager` binds
 one `distinct_id` when it is built — the operator's configured `user_id` on their
-own stream, the gateway-key hash on Pipelex's — and before this module every span
+own stream — and before this module every span
 and every event carried that one id. On a host that serves many callers from one
 process that is exactly wrong: every tenant's generations land under one identity
 per deployment. The runtime already knows who each run belongs to, on
@@ -75,7 +75,7 @@ if TYPE_CHECKING:
 #
 # So for telemetry these mean "this run names nobody", and the stream's own
 # fallback answers instead: the operator's configured `user_id` on their stream,
-# the gateway-key hash on Pipelex's — which is exactly what a CLI run reported
+# which is exactly what a CLI run reported
 # under before per-run attribution existed, and still does.
 _NON_DISTINGUISHING_RUN_USER_IDS = frozenset({LOCAL_USER_ID, DRY_RUN_USER_ID, SINGLE_TENANT_USER_ID})
 
@@ -85,8 +85,7 @@ class RunIdentityPolicy(StrEnum):
 
     A run's `user_id` is the host's own identifier for its caller, and its
     groups are the host's own entities, so a stream that identifies people
-    sends both as they are: `DIRECT`. Pipelex's stream always does. The
-    operator's stream does unless the operator set `anonymous` mode, which turns
+    sends both as they are: `DIRECT`. The operator's stream does unless the operator set `anonymous` mode, which turns
     the whole thing off with `NONE`, because an operator who chose to identify
     nobody chose it for their users too.
     """

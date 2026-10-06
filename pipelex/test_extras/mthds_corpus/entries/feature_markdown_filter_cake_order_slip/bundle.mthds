@@ -1,0 +1,23 @@
+domain      = "cake_orders"
+description = "Writing out the slip a bakery pins to a cake order, with the customer's typed wishes formatted"
+main_pipe   = "write_order_slip"
+
+[concept.CakeOrder]
+description = "A cake ordered at the bakery counter"
+
+[concept.CakeOrder.structure]
+customer = { type = "text", description = "The name the order is under", required = true }
+wishes   = { type = "text", description = "What the customer asked for, typed at the counter with bold, italics and a bulleted list", required = true }
+
+[pipe.write_order_slip]
+type        = "PipeCompose"
+description = "Lays the order out as a slip, turning the typed wishes into formatted text"
+inputs      = { order = "CakeOrder" }
+output      = "Html"
+
+[pipe.write_order_slip.template]
+category = "html"
+template = """
+<h2>Order for {{ order.customer }}</h2>
+{{ order.wishes | markdown }}
+"""
