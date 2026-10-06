@@ -75,6 +75,15 @@ class TestGoogleLLMWorkerStructuredRequest:
         assert config.max_output_tokens is None
 
     @pytest.mark.parametrize("structure_method", GENAI_STRUCTURE_METHODS)
+    async def test_a_model_refusing_temperature_gets_none(self, mocker: MockerFixture, structure_method: StructureMethod) -> None:
+        captured: dict[str, Any] = {}
+        worker = make_structured_worker(mocker, structure_method=structure_method, captured=captured, accepts_temperature=False)
+
+        await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert captured["config"].temperature is None
+
+    @pytest.mark.parametrize("structure_method", GENAI_STRUCTURE_METHODS)
     async def test_an_enum_field_is_parsed_from_its_string_value(self, mocker: MockerFixture, structure_method: StructureMethod) -> None:
         """Gemini hands an enum back as its string value, under tool calling and JSON output alike."""
         worker = make_structured_worker(

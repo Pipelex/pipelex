@@ -72,6 +72,11 @@ class InferenceModelSpec(ConfigModel):
         return self.valued_constraints.get(ValuedConstraint.MAX_THINKING_BUDGET)
 
     @property
+    def accepts_temperature(self) -> bool:
+        """Whether the provider takes a temperature for this model: every LLM worker omits it when the model lists `temperature_unsupported`."""
+        return ListedConstraint.TEMPERATURE_UNSUPPORTED not in self.listed_constraints
+
+    @property
     def tag(self) -> str:
         return rf"{self.name} → \[{self.sdk}@{self.backend_name}]({self.model_id})"
 

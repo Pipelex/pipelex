@@ -33,7 +33,6 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_budget import fit_thinking_budget
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
-from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
@@ -279,15 +278,15 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=max_tokens)
         log.verbose(thinking_params, title="Thinking params")
         log.verbose(max_tokens, title="Max tokens")
+        sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         try:
             # Use streaming internally to avoid SDK long-request protection
-            temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
             async with self.anthropic_async_client.messages.stream(
                 messages=[message],
                 system=llm_job.llm_prompt.system_text or omit,
                 model=self.inference_model.model_id,
-                temperature=omit if (thinking_params.suppress_temperature or temperature_unsupported) else job_params.temperature,
+                temperature=job_params.temperature if sends_temperature else omit,
                 max_tokens=max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,
@@ -410,11 +409,11 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         # The thinking budget is fitted against the max_tokens this call actually sends
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=effective_max_tokens)
         log.verbose(thinking_params, title="Thinking params")
+        sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
-        temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=messages,
@@ -425,7 +424,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
-                temperature=omit if (thinking_params.suppress_temperature or temperature_unsupported) else job_params.temperature,
+                temperature=job_params.temperature if sends_temperature else omit,
                 max_tokens=effective_max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,

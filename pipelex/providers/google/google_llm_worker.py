@@ -235,7 +235,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
 
         # Build generation config
         generation_config = genai_types.GenerateContentConfig(
-            temperature=job_params.temperature,
+            temperature=job_params.temperature if self.inference_model.accepts_temperature else None,
             max_output_tokens=job_params.max_tokens,
             candidate_count=1,  # Generate one candidate
             thinking_config=thinking_config,
@@ -321,7 +321,8 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 # top-level OpenAI-style kwargs: a `GenerateContentConfig` passed as `generation_config`
                 # or `config` is dropped.
                 **system_kwargs,
-                temperature=job_params.temperature,
+                # None sets no temperature in the config the handlers build
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else None,
                 max_tokens=job_params.max_tokens,
                 n=1,
                 strict=self._validates_structured_output_strictly(),

@@ -185,3 +185,29 @@ thinking_mode = "adaptive"
 # instructor/anthropic_tools forces; the reasoning variant leaves tool_choice on auto.
 structure_method = "instructor/anthropic_reasoning_tools"
 listed_constraints = ["temperature_unsupported"]
+
+# --- Claude 5.5 Series --------------------------------------------------------
+["claude-5.5-sonnet"]
+model_id = "claude-sonnet-5-5"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 2.0, output = 10.0 }
+thinking_mode = "adaptive"
+# Sonnet 5.5 refuses tool_choice "tool" and "any", which is what the section default
+# instructor/anthropic_tools forces; the reasoning variant leaves tool_choice on auto.
+structure_method = "instructor/anthropic_reasoning_tools"
+listed_constraints = ["temperature_unsupported"]
+
+["claude-5.5-opus"]
+model_id = "claude-opus-5-5"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 4.0, output = 20.0 }
+thinking_mode = "adaptive"
+# Opus 5.5 refuses tool_choice "tool" and "any", like Sonnet 5.5 above.
+structure_method = "instructor/anthropic_reasoning_tools"
+listed_constraints = ["temperature_unsupported"]

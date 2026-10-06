@@ -69,6 +69,13 @@ class TestAnthropicStructureMethod:
         assert isinstance(request.get("thinking", Omit()), Omit)
         assert request["temperature"] == 0.5
 
+    async def test_a_model_refusing_temperature_omits_it_without_thinking(self, mocker: MockerFixture) -> None:
+        worker, create = make_structured_worker(mocker, structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS, accepts_temperature=False)
+
+        await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert isinstance(sent_request(create).get("temperature", Omit()), Omit)
+
     async def test_json_mode_with_thinking_adds_no_tool_choice(self, mocker: MockerFixture) -> None:
         """A JSON mode defines no tool, so thinking adds no tool choice and no tool steering to its request."""
         worker, create = make_structured_worker(

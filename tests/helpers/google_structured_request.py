@@ -64,8 +64,13 @@ def make_structured_worker(
     thinking_mode: ThinkingMode | None = None,
     min_thinking_budget: int | None = None,
     max_thinking_budget: int | None = None,
+    accepts_temperature: bool = True,
 ) -> GoogleLLMWorker:
-    """A worker over a real instructor client whose ``generate_content`` records what reaches it in ``captured``."""
+    """A worker over a real instructor client whose ``generate_content`` records what reaches it in ``captured``.
+
+    The worker's text client is the same SDK client, so its text call is captured too, and answered with the
+    response the structure method shapes: a text part under JSON output.
+    """
     client = genai.Client(api_key="test-key")
     response_payload = payload or {"text": "ok"}
 
@@ -86,7 +91,9 @@ def make_structured_worker(
     mock_model.thinking_mode = thinking_mode
     mock_model.min_thinking_budget = min_thinking_budget
     mock_model.max_thinking_budget = max_thinking_budget
+    mock_model.accepts_temperature = accepts_temperature
     worker.inference_model = mock_model
+    worker.genai_async_client = client.aio
     worker.instructor_for_objects = from_genai(client=client, mode=structure_method.as_instructor_mode(), use_async=True)
 
     config = mocker.MagicMock()

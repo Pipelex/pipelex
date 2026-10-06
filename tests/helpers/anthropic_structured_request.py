@@ -69,6 +69,7 @@ def make_structured_worker(
     thinking_mode: ThinkingMode = ThinkingMode.NONE,
     default_max_tokens: int = 4096,
     responses: list[Message] | None = None,
+    accepts_temperature: bool = True,
 ) -> tuple[AnthropicLLMWorker, AsyncMock]:
     """A worker whose instructor client is built as the worker builds it, over an SDK call that records the request."""
     from instructor import from_anthropic  # ruff: ignore[import-outside-top-level]
@@ -87,7 +88,7 @@ def make_structured_worker(
     model.desc = "test-model-desc"
     model.model_id = "claude-test"
     model.name = "claude-test"
-    model.listed_constraints = []
+    model.accepts_temperature = accepts_temperature
     model.structure_method = structure_method
     model.thinking_mode = thinking_mode
     model.min_thinking_budget = ANTHROPIC_MIN_THINKING_BUDGET

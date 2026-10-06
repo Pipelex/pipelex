@@ -154,7 +154,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
                 messages=messages,
                 model=self.inference_model.model_id,
-                temperature=job_params.temperature,
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else UNSET,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
                 reasoning_effort=reasoning_effort,
             )
@@ -267,7 +267,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 response_model=schema,
                 messages=messages,
                 model=self.inference_model.model_id,
-                temperature=job_params.temperature,
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else UNSET,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
                 reasoning_effort=reasoning_effort,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying

@@ -24,7 +24,6 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
-from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
@@ -146,10 +145,9 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
                 inference_model=self.inference_model, inference_job=llm_job, output_desc=InferenceOutputType.TEXT
             )
-            temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
-                temperature=omit if (openai_reasoning_effort is not None or temperature_unsupported) else job_params.temperature,
+                temperature=omit if (openai_reasoning_effort is not None or not self.inference_model.accepts_temperature) else job_params.temperature,
                 max_tokens=job_params.max_tokens or omit,
                 seed=job_params.seed,
                 messages=messages,
@@ -226,11 +224,10 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         extra_headers, extra_body = self.openai_completions_factory.make_extras(
             inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__
         )
-        temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 model=self.inference_model.model_id,
-                temperature=omit if (openai_reasoning_effort is not None or temperature_unsupported) else job_params.temperature,
+                temperature=omit if (openai_reasoning_effort is not None or not self.inference_model.accepts_temperature) else job_params.temperature,
                 max_tokens=job_params.max_tokens or NOT_GIVEN,
                 seed=job_params.seed,
                 messages=messages,

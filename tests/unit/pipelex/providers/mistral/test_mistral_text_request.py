@@ -1,6 +1,7 @@
 """The request the Mistral worker's text call sends, with and without a reasoning setting.
 
-Mistral refuses `prompt_mode="reasoning"` on every current model and takes `reasoning_effort` instead.
+Mistral refuses `prompt_mode="reasoning"` on every current model and takes `reasoning_effort` instead. It takes a
+temperature beside it, so one is sent unless the model lists `temperature_unsupported`.
 """
 
 from __future__ import annotations
@@ -37,4 +38,13 @@ class TestMistralTextRequest:
 
         await worker._gen_text(llm_job=make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert is_unset(sent_request(complete_async), "reasoning_effort")
+        request = sent_request(complete_async)
+        assert is_unset(request, "reasoning_effort")
+        assert request["temperature"] == 0.5
+
+    async def test_a_model_refusing_temperature_omits_it(self, mocker: MockerFixture) -> None:
+        worker, complete_async = make_worker(mocker, thinking_mode=ThinkingMode.MANUAL, response=text_response(), accepts_temperature=False)
+
+        await worker._gen_text(llm_job=make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert is_unset(sent_request(complete_async), "temperature")
