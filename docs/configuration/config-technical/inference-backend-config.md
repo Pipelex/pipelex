@@ -237,6 +237,23 @@ On the `mistral` SDK, a reasoning setting on a structured output needs `instruct
 
 The `google` backend uses `instructor/genai_structured_outputs`, Gemini's native JSON output. `instructor/genai_tools` works on it too: Gemini returns the function-call arguments as plain values, so pipelex validates them in pydantic's lax mode, where a string reaches an enum field as its member.
 
+#### Temperature constraints
+
+A job's temperature runs from 0 to 1, and three constraints adapt it to what a model's provider takes:
+
+- `temperature_unsupported`, a listed constraint, is for a model whose provider refuses a temperature: no temperature is sent to it, on any SDK, and the model samples at its own default.
+- `fixed_temperature`, a valued constraint, is for a model that takes one value only: the job's temperature is replaced by it, with a warning when the two differ.
+- `temperature_must_be_multiplied_by_2`, a listed constraint, is for a provider whose scale runs from 0 to 2: the job's temperature is doubled.
+
+```toml
+# anthropic.toml
+["claude-4.7-opus"]
+model_id = "claude-opus-4-7"
+listed_constraints = ["temperature_unsupported"]
+```
+
+A reasoning setting drops the temperature too on some SDKs, whatever the constraints say: the OpenAI SDKs, chat completions and Responses, send no temperature beside a reasoning effort, and the Anthropic SDKs none while thinking is on.
+
 #### Thinking budget bounds
 
 A model that thinks on a token budget (`thinking_mode = "manual"` on the `anthropic`, `bedrock_anthropic` and `google` SDKs) may declare the range of budgets its provider accepts, as two valued constraints, both inclusive and both optional:

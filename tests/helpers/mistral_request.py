@@ -72,6 +72,7 @@ def make_worker(
     thinking_mode: ThinkingMode,
     response: ChatCompletionResponse,
     structure_method: StructureMethod = StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
+    accepts_temperature: bool = True,
 ) -> tuple[MistralLLMWorker, AsyncMock]:
     """A worker whose text client and instructor client share one SDK client, whose call records the request."""
     from instructor import from_mistral  # ruff: ignore[import-outside-top-level]
@@ -87,6 +88,7 @@ def make_worker(
     model.name = "magistral-test"
     model.thinking_mode = thinking_mode
     model.structure_method = structure_method
+    model.accepts_temperature = accepts_temperature
     worker.inference_model = model
     worker.default_max_tokens = 4096
     worker.mistral_factory = MistralFactory()

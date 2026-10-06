@@ -5,7 +5,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.providers.bedrock.bedrock_client_protocol import BedrockClientProtocol
+from pipelex.providers.bedrock.bedrock_client_protocol import BedrockClientProtocol, make_converse_params
 from pipelex.providers.bedrock.bedrock_message import BedrockMessageDictList
 
 if TYPE_CHECKING:
@@ -25,19 +25,10 @@ class BedrockClientAiobotocore(BedrockClientProtocol):
         *,
         system_text: str | None,
         model: str,
-        temperature: float,
+        temperature: float | None,
         max_tokens: int | None = None,
     ) -> tuple[str, NbTokensByCategoryDict]:
-        params: dict[str, Any] = {
-            "modelId": model,
-            "messages": messages,
-            "inferenceConfig": {
-                "temperature": temperature,
-                "maxTokens": max_tokens,
-            },
-        }
-        if system_text:
-            params["system"] = [{"text": system_text}]
+        params = make_converse_params(messages=messages, system_text=system_text, model=model, temperature=temperature, max_tokens=max_tokens)
 
         async with self.session.create_client("bedrock-runtime", region_name=self.aws_region) as bedrock_runtime_client:  # pyright: ignore[reportUnknownMemberType]
             conversation_response: ConverseResponseTypeDef = await bedrock_runtime_client.converse(**params)
