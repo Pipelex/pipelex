@@ -1,0 +1,27 @@
+domain      = "job_applications"
+description = "Sizing up a job applicant from the scan of their CV"
+main_pipe   = "size_up_applicant"
+
+[pipe.size_up_applicant]
+type        = "PipeSequence"
+description = "Reads the pages out of the scanned CV, then sums up the applicant's work experience"
+inputs      = { cv_scan = "Document" }
+output      = "Text"
+# Wrong on purpose: `read_cv_pages` stores a list of pages under `cv_pages`, which `sum_up_experience` reads as a single page.
+steps = [
+  { pipe = "read_cv_pages", result = "cv_pages" },
+  { pipe = "sum_up_experience", result = "experience" },
+]
+
+[pipe.read_cv_pages]
+type        = "PipeExtract"
+description = "Reads each page out of the scanned CV"
+inputs      = { cv_scan = "Document" }
+output      = "Page[]"
+
+[pipe.sum_up_experience]
+type        = "PipeLLM"
+description = "Sums up the work experience a CV lists"
+inputs      = { cv_pages = "Page" }
+output      = "Text"
+prompt      = "Sum up in a few lines the work experience this CV lists: $cv_pages"

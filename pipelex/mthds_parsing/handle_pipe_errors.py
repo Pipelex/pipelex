@@ -191,11 +191,18 @@ def categorize_pipe_validation_with_libraries_error(
     """
     message = pipe_error.explanation or str(pipe_error)
     error_type = pipe_error.error_type or PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
-    # The required/provided concept refs are a debugging aid appended to the message. Suppress them
-    # for multiplicity errors (identical concept on both sides — see is_inadequate_output_multiplicity)
-    # and otherwise render the required refs as joined author-syntax refs, never a Python list repr
+    # The required/provided concept refs are a debugging aid appended to the message, for a disagreement on
+    # the concept. Suppress them for multiplicity errors (see is_inadequate_output_multiplicity) and whenever
+    # the provided concept is among the required ones, since the disagreement then lies elsewhere — a step
+    # reading one `Page` where a list of them is stored — and the suffix would print the same ref on both
+    # sides. Otherwise render the required refs as joined author-syntax refs, never a Python list repr
     # (whose `['x']` brackets read like MTHDS `[]` multiplicity syntax).
-    if not error_type.is_inadequate_output_multiplicity and pipe_error.required_concept_codes and pipe_error.provided_concept_code:
+    if (
+        not error_type.is_inadequate_output_multiplicity
+        and pipe_error.required_concept_codes
+        and pipe_error.provided_concept_code
+        and pipe_error.provided_concept_code not in pipe_error.required_concept_codes
+    ):
         required_refs = ", ".join(pipe_error.required_concept_codes)
         message += f" (required: {required_refs}, provided: {pipe_error.provided_concept_code})"
     return PipesAndConceptValidationErrorData(

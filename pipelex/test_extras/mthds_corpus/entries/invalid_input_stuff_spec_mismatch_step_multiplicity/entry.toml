@@ -1,0 +1,12 @@
+name = "invalid_input_stuff_spec_mismatch_step_multiplicity"
+description = "The pages read out of a scanned CV, stored as a list by one sequence step and read as a single page by the next"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.input_stuff_spec_mismatch",
+]
+
+expected_error = "input_stuff_spec_mismatch"
