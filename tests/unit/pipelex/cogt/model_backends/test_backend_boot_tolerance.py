@@ -220,7 +220,7 @@ class TestAStaleBackendDirectory:
 
     @pytest.mark.parametrize("credentials", [CredentialResolution.SKIP, CredentialResolution.REQUIRE])
     def test_a_key_the_user_chose_to_have_is_still_fatal(self, machine: Path, credentials: CredentialResolution) -> None:
-        """Tolerance is not leniency. The ledger explains what *we* removed and nothing else."""
+        """Tolerance is not a pass for any key: the ledger explains what *we* removed and nothing else."""
         plant_on_model(path=self._backends_dir(machine) / "openai.toml", table_header="[gpt-4o]", key="foo", value="1")
 
         with pytest.raises(InferenceBackendLibraryError) as exc_info:

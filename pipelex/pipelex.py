@@ -265,9 +265,9 @@ class Pipelex(RuntimeBoot):
                 backend with its models without resolving any credential, so it knows every model a
                 boot with inference knows; a backend it did not credential refuses to be called. This
                 skips model deck validation. Useful for commands like validate/show that don't call
-                inference APIs. Generator selection stays
-                backend-keyed. Submitter-side contract only: it does not constrain work this process
-                executes as a Temporal worker.
+                inference APIs. Generator selection stays backend-keyed. The forced DRY mode binds
+                only the runs this process submits, but the unresolved credentials bind everything
+                it executes: a Temporal worker that runs live work boots with inference.
             boot_orchestrator: When provided, boots this process under the orchestrator plugin
                 of this name (e.g. "temporal" to run pipes through the Temporal worker runtime).
                 Any other value (or None) leaves execution in-process. Core names no orchestrator;

@@ -90,7 +90,8 @@ def offline_subprocess_env(hermetic_home: Path) -> dict[str, str]:
     env: dict[str, str] = {
         "HOME": str(hermetic_home),
         "PATH": "/usr/bin:/bin:/usr/local/bin",
-        # Force CI test mode so vertexai is skipped.
+        # Force CI test mode, so a boot that resolves credentials (the doctor's) skips vertexai,
+        # whose token it would otherwise mint over the network.
         "RUN_MODE": "ci_test",
         # Dummy credentials — no test makes a real provider call. A keyless boot (a dry run, a
         # validation) reads none of them; the doctor does, and with a key missing it would prompt

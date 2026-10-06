@@ -244,8 +244,8 @@ class TestDoctorBackendChecks:
         assert reports
         assert all(report.is_valid for report in reports.values())
 
-    def test_backend_files_malformed_file_still_caught_under_leniency(self, tmp_path: Path) -> None:
-        """Leniency skips a backend whose credentials are missing, never a malformed file."""
+    def test_backend_files_malformed_file_still_caught_without_resolving_credentials(self, tmp_path: Path) -> None:
+        """The probe resolves no credential, yet still refuses a malformed file."""
         backends_dir = self._copy_kit_inference(tmp_path)
         anthropic_file = backends_dir / "anthropic.toml"
         anthropic_file.write_text(anthropic_file.read_text(encoding="utf-8") + '\n[bogus_key_table]\nfoo = "bar"\n', encoding="utf-8")
