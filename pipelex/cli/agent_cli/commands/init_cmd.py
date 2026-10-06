@@ -76,7 +76,7 @@ def _resolve_target_dir(*, global_: bool) -> Path:
     """Resolve the target directory for initialization.
 
     Args:
-        global_: If True, force global ~/.pipelex/ directory.
+        global_: If True, force the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
 
     Returns:
         Absolute path to the target config directory.
@@ -88,7 +88,7 @@ def _resolve_target_dir(*, global_: bool) -> Path:
     if project_root is None:
         agent_error(
             "No project root found (no .git, pyproject.toml, etc. in parent directories). "
-            "Use --global/-g to target the global ~/.pipelex/ directory.",
+            "Use --global/-g to target the home configuration directory (~/.pipelex/, or PIPELEX_HOME).",
             error_type="ArgumentError",
         )
     return project_root / ".pipelex"
@@ -148,7 +148,7 @@ def _copy_telemetry_template(target_dir: Path, *, for_project: bool) -> None:
     Args:
         target_dir: Target config directory (e.g. .pipelex/).
         for_project: True when targeting a project's `.pipelex/`; False when
-            targeting the global `~/.pipelex/`.
+            targeting the home configuration directory.
     """
     template_name = TELEMETRY_PROJECT_TEMPLATE_FILE_NAME if for_project else TELEMETRY_CONFIG_FILE_NAME
     template_path = Path(str(get_kit_configs_dir())) / template_name
@@ -313,7 +313,7 @@ def agent_init_cmd(
         typer.Option(
             "--global",
             "-g",
-            help="Force global ~/.pipelex/ directory.",
+            help="Force the home configuration directory (~/.pipelex/, or PIPELEX_HOME).",
         ),
     ] = False,
     output_format: Annotated[
@@ -332,7 +332,7 @@ def agent_init_cmd(
     health, and 'pipelex init credentials' if needed.
 
     Target directory: project .pipelex/ at detected project root by default.
-    Use --global/-g to force global ~/.pipelex/.
+    Use --global/-g to force the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
 
     Config JSON schema::
 

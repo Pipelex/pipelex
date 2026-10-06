@@ -6,6 +6,7 @@ import pytest
 
 from pipelex.cogt.exceptions import InferenceBackendLibraryValidationError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 BACKENDS_TOML_TEMPLATE = """
@@ -20,7 +21,7 @@ COMMENT_ONLY_BACKEND_TOML = "# The model specs of this backend are served remote
 
 
 class TestBackendRetiredModelSpecsSection:
-    def _load(self, *, tmp_path: Path, enabled: bool, lenient: bool = False) -> InferenceBackendLibrary:
+    def _load(self, *, tmp_path: Path, enabled: bool, credentials: CredentialResolution = CredentialResolution.REQUIRE) -> InferenceBackendLibrary:
         backends_dir = tmp_path / "backends"
         backends_dir.mkdir()
         (backends_dir / "retired_preview.toml").write_text(COMMENT_ONLY_BACKEND_TOML)
@@ -31,14 +32,14 @@ class TestBackendRetiredModelSpecsSection:
             secrets_provider=EnvSecretsProvider(),
             backends_library_paths=[base_path],
             backends_dir_path=str(backends_dir),
-            lenient=lenient,
+            credentials=credentials,
         )
         return library
 
-    @pytest.mark.parametrize("lenient", [False, True])
-    def test_an_enabled_backend_naming_it_is_refused_in_both_modes(self, tmp_path: Path, lenient: bool) -> None:
+    @pytest.mark.parametrize("credentials", [CredentialResolution.REQUIRE, CredentialResolution.SKIP])
+    def test_an_enabled_backend_naming_it_is_refused_in_both_modes(self, tmp_path: Path, credentials: CredentialResolution) -> None:
         with pytest.raises(InferenceBackendLibraryValidationError) as refused:
-            self._load(tmp_path=tmp_path, enabled=True, lenient=lenient)
+            self._load(tmp_path=tmp_path, enabled=True, credentials=credentials)
 
         message = str(refused.value)
         assert "retired_preview" in message

@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pipelex import log
+from pipelex.graph.condition_output_merge import ConditionOutputMerge, apply_condition_output_merges
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
@@ -33,6 +34,7 @@ from pipelex.tracing.trace_events import (
     UNATTRIBUTED_NODE_ID,
     BatchAggregateEvent,
     BatchItemEvent,
+    ConditionOutputMergeEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -173,6 +175,7 @@ class _AssemblerState:
         self._batch_item_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
         self._batch_aggregate_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
         self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+        self._condition_output_merges: list[ConditionOutputMerge] = []
 
         # Registries (accumulated from events, deduplicated)
         self._pipe_registry: dict[str, dict[str, Any]] = {}
@@ -212,6 +215,8 @@ class _AssemblerState:
                 self._handle_batch_aggregate(event)
             elif isinstance(event, ParallelCombineEvent):
                 self._handle_parallel_combine(event)
+            elif isinstance(event, ConditionOutputMergeEvent):
+                self._handle_condition_output_merge(event)
             elif isinstance(event, ExecutionDataEvent):
                 self._handle_execution_data(event)
             elif isinstance(event, UsageReportEvent):
@@ -235,7 +240,7 @@ class _AssemblerState:
         nodes = [node_data.to_node_spec() for node_data in self._nodes.values()]
         all_edges = self._explicit_edges + self._get_generated_edges()
 
-        return GraphSpec(
+        graph = GraphSpec(
             graph_id=self._graph_id,
             created_at=self._earliest_timestamp or datetime.now(UTC),
             pipeline_ref=self._pipeline_ref,
@@ -246,6 +251,8 @@ class _AssemblerState:
             pipe_registry=dict(self._pipe_registry),
             concept_registry=dict(self._concept_registry),
         )
+        # Mirrors GraphTracer.teardown(): the merges apply to the finished graph, through the same rewrite.
+        return apply_condition_output_merges(graph=graph, merges=self._condition_output_merges)
 
     # ------------------------------------------------------------------
     # Pass 1 handlers
@@ -403,6 +410,9 @@ class _AssemblerState:
             event.parallel_controller_node_id,
             list(event.branch_producer_node_ids),
         )
+
+    def _handle_condition_output_merge(self, event: ConditionOutputMergeEvent) -> None:
+        self._condition_output_merges.append(event.merge)
 
     def _mark_canceled_nodes(self) -> None:
         """Mark any still-RUNNING nodes as CANCELED (mirrors graph_tracer.py:160-164)."""

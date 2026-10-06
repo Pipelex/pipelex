@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
 
 class TestConfigResolution:
     """Test the hierarchical config resolution in ConfigLoader."""

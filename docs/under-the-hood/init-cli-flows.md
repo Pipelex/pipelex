@@ -52,10 +52,10 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 | `deck/*.toml` | Inference step | Project or global | `.pipelex/inference/deck/` |
 | `routing_profiles.toml` | Inference step | Project or global | `.pipelex/inference/routing_profiles.toml` |
 | `telemetry.toml` | Telemetry step | Project or global | `.pipelex/telemetry.toml` |
-| `.env` | Credentials step | **Always global** | `~/.pipelex/.env` (mode 0600) |
+| `.env` | Credentials step | **Always global** | `~/.pipelex/.env`, or `.env` under `PIPELEX_HOME` (mode 0600) |
 
 !!! info "Project vs global"
-    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from `~/.pipelex/`.
+    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from the global directory. Wherever this page says `~/.pipelex/`, the `PIPELEX_HOME` environment variable relocates it ([Configuration](../configuration/index.md#the-home-configuration-directory-pipelex_home)).
 
 ---
 
@@ -286,7 +286,7 @@ The `ConfigLoader` (singleton: `config_manager`) resolves where configuration fi
 
 | Property | Path | When it exists |
 |----------|------|----------------|
-| `global_config_dir` | `~/.pipelex/` | Always (created on first use) |
+| `global_config_dir` | `~/.pipelex/`, or `PIPELEX_HOME` | Always (created on first use) |
 | `project_config_dir` | `{project_root}/.pipelex/` | Only if the directory exists on disk |
 | `pipelex_config_dir` | Project if exists, else global | Always (backward-compat alias) |
 
@@ -319,7 +319,7 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ### Global Config Bootstrap
 
-`ensure_global_config_exists()` creates `~/.pipelex/` with kit template files on first use (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
+`ensure_global_config_exists()` creates the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`) with kit template files on first use, and fills it the same way when it exists but is empty (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
 
 ### Config Loading Chain
 
@@ -345,7 +345,7 @@ This means a project-level file **wins** over the global one, but only if it act
 | Flag | Target |
 |------|--------|
 | Default (no flag) | `{project_root}/.pipelex/` — project root detected via `find_project_root()` |
-| `--global` / `-g` | `~/.pipelex/` |
+| `--global` / `-g` | `~/.pipelex/`, or `PIPELEX_HOME` |
 
 If no project root is found and `--global` is not set, the command fails with an error.
 
@@ -405,7 +405,7 @@ flowchart TD
 
 `check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
 
-`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose credentials do not resolve is skipped rather than reported: that is the Credentials row's finding. Without leniency an enabled backend whose key is not set yet would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after that backend in `backends.toml` would go unreported. Leniency covers credentials and nothing else: a malformed file stays fatal, and so do the refusals of an enabled backend that declares no model or still carries `model_specs_section`. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
+`check_backend_files()` loads the backend library once per enabled backend, and loads it without resolving credentials (`CredentialResolution.SKIP`, the keyless boot's mode). The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend's credentials are the Credentials row's finding, not this one's. Resolving them here would report an enabled backend whose key is not set yet as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after that backend in `backends.toml` would go unreported. Skipping credentials skips nothing else: every enabled backend is loaded, a malformed file stays fatal, and so do the refusals of an enabled backend that declares no model or still carries `model_specs_section`. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load resolves credentials, which the probe's does not, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
 ### Fix Targeting
 

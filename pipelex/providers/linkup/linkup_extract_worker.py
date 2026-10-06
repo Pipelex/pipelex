@@ -25,7 +25,6 @@ from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inf
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.runtime_hub import get_secrets_provider
 
 
 class LinkupExtractWorker(ExtractWorkerAbstract):
@@ -33,6 +32,7 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
         self,
         extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
+        api_key: str,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> None:
         ExtractWorkerAbstract.__init__(
@@ -41,7 +41,6 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,
         )
-        api_key = get_secrets_provider().get_secret(secret_id="LINKUP_API_KEY")
         self._linkup_client = LinkupClient(api_key=api_key)
 
     @override

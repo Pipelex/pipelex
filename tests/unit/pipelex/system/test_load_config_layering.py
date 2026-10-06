@@ -18,6 +18,9 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
+pytestmark = pytest.mark.usefixtures("no_pipelex_home")
+
+
 class TestLoadConfigLayering:
     """Cover the four-layer merge: package → global base → global override → project base → project override."""
 

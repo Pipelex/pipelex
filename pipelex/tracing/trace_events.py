@@ -11,6 +11,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
+from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -28,6 +29,7 @@ class TraceEventKind(StrEnum):
     BATCH_ITEM = "batch_item"
     BATCH_AGGREGATE = "batch_aggregate"
     PARALLEL_COMBINE = "parallel_combine"
+    CONDITION_OUTPUT_MERGE = "condition_output_merge"
     EXECUTION_DATA = "execution_data"
     USAGE_REPORT = "usage_report"
 
@@ -171,6 +173,16 @@ class ParallelCombineEvent(TraceEvent):
     branch_producer_node_ids: list[tuple[str, str]]
 
 
+class ConditionOutputMergeEvent(TraceEvent):
+    """Emitted when a dry-run condition merges its outcomes' outputs onto its own output digest.
+
+    Applied by the assembler once the graph is built, through the same rewrite as GraphTracer's.
+    """
+
+    event_kind: Literal[TraceEventKind.CONDITION_OUTPUT_MERGE] = TraceEventKind.CONDITION_OUTPUT_MERGE
+    merge: ConditionOutputMerge
+
+
 class ExecutionDataEvent(TraceEvent):
     """Emitted when a pipe registers execution metadata (rendered prompts, resolved models, etc.)."""
 
@@ -207,6 +219,7 @@ AnyTraceEvent = Annotated[
     | BatchItemEvent
     | BatchAggregateEvent
     | ParallelCombineEvent
+    | ConditionOutputMergeEvent
     | ExecutionDataEvent
     | UsageReportEvent,
     Field(discriminator="event_kind"),

@@ -13,7 +13,7 @@ For the user-facing configuration guide, see [Configuration Overview](../configu
 Pipelex configuration is merged in layers:
 
 - **Shipped defaults**: maintained by the Pipelex project and used as the baseline by the installed package.
-- **Global config** (`~/.pipelex/`): machine-wide settings for a developer, applied to every project on the machine.
+- **Global config** (`~/.pipelex/`, or the directory `PIPELEX_HOME` names): machine-wide settings for a developer, applied to every project on the machine. One resolver, `get_pipelex_home_dir()` in `pipelex/system/environment.py`, locates it; `ConfigLoader.global_config_dir` and the import-time `.env` load both ask it, and a unit test refuses any other join of `Path.home()` with `.pipelex`.
 - **Project config** (`{project_root}/.pipelex/`): per-project settings, edited by teams using Pipelex.
 - **Override files** at each level (`pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml`, `pipelex_temporary_override.toml`): optional, typically gitignored, used for personal or ephemeral tweaks.
 

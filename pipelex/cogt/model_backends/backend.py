@@ -25,6 +25,16 @@ class InferenceBackend(ConfigModel):
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     extra_config: dict[str, Any] = Field(default_factory=dict)
     model_specs: dict[str, InferenceModelSpec] = Field(default_factory=dict)
+    # What a keyless load (`CredentialResolution.SKIP`) left unresolved: each field it left unset, or
+    # `model_specs` for the backend's own file, mapped to the names of the variables it references.
+    # A field minted at boot rather than read from a variable, as Vertex AI's token is, maps to no
+    # name. Empty after a load that resolved every credential, and only then may the backend be called.
+    unresolved_credentials: dict[str, list[str]] = Field(default_factory=dict)
+
+    @property
+    def unresolved_credential_vars(self) -> list[str]:
+        """The names of every variable this backend's credentials reference and its load left unresolved, sorted."""
+        return sorted({var_name for var_names in self.unresolved_credentials.values() for var_name in var_names})
 
     def list_model_names(self) -> list[str]:
         """List the names of all models in the backend."""
