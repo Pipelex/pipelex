@@ -1,0 +1,10 @@
+name = "feature_markdown_filter_cake_order_slip"
+description = "A bakery's cake order slip, with the wishes typed at the counter turned into formatted text"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.markdown_filter",
+]
