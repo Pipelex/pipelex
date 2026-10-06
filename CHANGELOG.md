@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **`GraphAnalysis.stuff_producers` lists every producer (Breaking)**: it maps a digest to a list of node ids, `get_producer` is replaced by `get_producers`, and the new `shared_stuff_controllers` names the controller a stuff with several writers belongs to, a parallel or batch controller combining or aggregating into the stuff counting as one of them. The Mermaid graph draws such a stuff once, inside that controller, with an edge from each producer.
 - **`InferenceBackendLibrary.load` takes `credentials` (Breaking)**: its `lenient` flag is replaced by `credentials: CredentialResolution`, `REQUIRE` or `SKIP`. A backend a `SKIP` load built records what it left unresolved in `InferenceBackend.unresolved_credentials`, and `ModelManager.get_required_inference_backend` refuses it with an `InferenceBackendCredentialsError` of type `not_resolved_on_keyless_boot` that names the variables.
 - **A routing profile naming a disabled backend is refused on every boot (Breaking)**: a boot without inference, such as `pipelex validate`, now refuses a routing profile whose default or routes name a backend that is not enabled, as a boot with inference already did, and `load_active_routing_profile` loses its `lenient` argument.
 - **A variable in a field that describes a model is refused on every boot (Breaking)**: a `${…}` placeholder may stand only in a value a call sends, which means `api_key`, `endpoint` and a backend's extra keys, or a model's `model_id`, `endpoint_path` and request headers. A placeholder in a field such as `model_type`, `sdk`, `thinking_mode` or the constraints is now refused with an error naming the field, where a boot with inference substituted it and a boot without inference could not, so the two gave different verdicts.
@@ -12,6 +13,7 @@
 
 ### Fixed
 
+- **A dry-run condition's output is one stuff every outcome produces**: in the graph of a dry run, every outcome of a `PipeCondition` now carries the condition's output digest, so the step reading the condition's result is wired to all of them rather than to the outcome whose pipe code sorts last, and when the outcomes write or declare different outputs, the condition's declared output types that stuff on every node outside the outcomes: the condition, the controllers whose output it is, such as a sequence ending on the condition, and the steps reading it, while each outcome keeps the concept it writes. Each outcome but the last now runs on a copy of the memory the condition received, so an outcome reading the condition's slot reads the value from before the condition rather than a sibling's output, and the default outcome runs last, so the steps after the condition read its value.
 - **Validation and dry runs no longer depend on which keys the machine holds**: a boot without inference (`Pipelex.make(needs_inference=False)`, used by `pipelex validate`, `pipelex run --dry-run`, `pipelex show` and the agent CLI's validation) now loads every enabled backend with its models and constraints and resolves none of their credentials, where it dropped every backend whose key was missing. A method using a search preset or pinning a bare handle such as `model = "gpt-4o-mini"` now validates on a machine or CI runner with no key, and such a boot no longer reads the backends' keys or requests a Vertex AI token.
 - **Linkup uses the key its backend names**: the Linkup search and fetch workers take the key from the `[linkup]` table's `api_key`, like every other provider, where they read `LINKUP_API_KEY` themselves and ignored a configuration naming another variable. A Linkup backend with no `api_key` is refused with `LinkupError` when its worker is built.
 
@@ -20,14 +22,6 @@
 ### Added
 
 - **`PIPELEX_HOME` relocates the home configuration directory**: when set and not empty, it names the directory Pipelex uses in place of `~/.pipelex`, for the configuration layers, the inference files and their overrides, the credentials `.env`, the first-boot copy of the kit, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate` and the agent CLI's `--global`. It must be in the process environment before Pipelex is imported, a relative value is resolved against the working directory at import, and a `PIPELEX_HOME` line in a `.env` file is ignored. The first boot now fills the home directory from the kit when it exists but is empty, as it already did when it was missing, so an empty volume mount or a `mktemp -d` works as it is.
-
-### Changed
-
-- **`GraphAnalysis.stuff_producers` lists every producer (Breaking)**: it maps a digest to a list of node ids, `get_producer` is replaced by `get_producers`, and the new `shared_stuff_controllers` names the controller a stuff with several writers belongs to, a parallel or batch controller combining or aggregating into the stuff counting as one of them. The Mermaid graph draws such a stuff once, inside that controller, with an edge from each producer.
-
-### Fixed
-
-- **A dry-run condition's output is one stuff every outcome produces**: in the graph of a dry run, every outcome of a `PipeCondition` now carries the condition's output digest, so the step reading the condition's result is wired to all of them rather than to the outcome whose pipe code sorts last, and the condition's own item takes its declared output concept when the outcomes write or declare different ones. Each outcome but the last now runs on a copy of the memory the condition received, so an outcome reading the condition's slot reads the value from before the condition rather than a sibling's output, and the default outcome runs last, so the steps after the condition read its value.
 
 ## [v0.74.0] - 2026-10-05
 
