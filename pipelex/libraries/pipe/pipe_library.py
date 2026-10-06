@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.libraries.library_state import next_library_state_token
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -24,6 +25,16 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     # The aliased keys of dependency pipes the package meant to load but that failed to build, with the reason, so a
     # reference to one is refused naming that failure rather than as a pipe the package does not have.
     _unbuilt_dependency_reasons: dict[str, str] = PrivateAttr(default_factory=dict)
+    # Replaced on every change to what the library holds, so a value derived from the pipes it resolves knows it is stale.
+    _state_token: int = PrivateAttr(default_factory=next_library_state_token)
+
+    @property
+    @override
+    def state_token(self) -> int:
+        return self._state_token
+
+    def _mark_changed(self) -> None:
+        self._state_token = next_library_state_token()
 
     @override
     def setup(self):
@@ -35,6 +46,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         self._private_dependency_keys = set()
         self._withheld_dependency_keys = set()
         self._unbuilt_dependency_reasons = {}
+        self._mark_changed()
 
     @override
     def reset(self):
@@ -58,6 +70,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             )
             raise PipeLibraryError(msg)
         self.root[pipe.pipe_ref] = pipe
+        self._mark_changed()
 
     @override
     def add_pipes(self, pipes: list[PipeAbstract]):
@@ -189,6 +202,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         self.root[key] = pipe
         if not is_exported:
             self._private_dependency_keys.add(key)
+        self._mark_changed()
 
     def is_private_dependency_pipe(self, *, pipe_key: str) -> bool:
         """Whether `pipe_key`, an aliased key `alias->domain.code`, holds a dependency pipe its package does not export."""
@@ -197,6 +211,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     def add_withheld_dependency_pipes(self, *, alias: str, pipe_refs: set[str]) -> None:
         """Record the `domain.code` of the pipes a dependency declares but does not load, being private and unreached."""
         self._withheld_dependency_keys.update(f"{alias}->{pipe_ref}" for pipe_ref in pipe_refs)
+        self._mark_changed()
 
     def is_withheld_dependency_pipe(self, *, pipe_code: str) -> bool:
         """Whether a cross-package reference names a pipe its package declares but withholds, as private and unreached.
@@ -208,6 +223,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     def add_unbuilt_dependency_pipe(self, *, alias: str, pipe_ref: str, reason: str) -> None:
         """Record a dependency pipe, by its `domain.code`, that failed to build, and why."""
         self._unbuilt_dependency_reasons[f"{alias}->{pipe_ref}"] = reason
+        self._mark_changed()
 
     def unbuilt_dependency_pipe_reason(self, *, pipe_code: str) -> str | None:
         """Why the dependency pipe a cross-package reference names failed to build, or `None` when none it names failed.
@@ -267,6 +283,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             if pipe_ref in self.root:
                 del self.root[pipe_ref]
             self._private_dependency_keys.discard(pipe_ref)
+        self._mark_changed()
 
     @override
     def pretty_list_pipes(self) -> None:

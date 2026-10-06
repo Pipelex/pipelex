@@ -1062,7 +1062,7 @@
     "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_list_output_bug.py::TestPipeSequenceListOutputBug::test_pipe_llm_list_output_produces_list_content_in_sequence": 8.8437,
     "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_list_output_bug.py::TestPipeSequenceListOutputBug::test_standalone_pipe_llm_with_list_output": 4.9491,
     "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_multiple_steps.py::TestPipeSequenceMultipleSteps::test_pipe_sequence_multiple_sub_pipes": 2.0117,
-    "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_output_multiplicity.py::TestPipeSequenceOutputMultiplicity::test_batch_over_with_nb_output_fixed_multiplicity": 0.267,
+    "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_output_multiplicity.py::TestPipeSequenceOutputMultiplicity::test_batch_over_with_nb_output_yields_a_variable_list": 0.267,
     "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_output_multiplicity.py::TestPipeSequenceOutputMultiplicity::test_batch_over_with_no_multiplicity_fails": 0.0716,
     "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_output_multiplicity.py::TestPipeSequenceOutputMultiplicity::test_batch_over_with_variable_multiplicity_passes": 0.0644,
     "tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_output_multiplicity.py::TestPipeSequenceOutputMultiplicity::test_fixed_multiplicity_compatible_with_variable_multiplicity": 0.0829,

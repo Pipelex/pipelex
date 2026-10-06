@@ -55,7 +55,31 @@ A binding step is a table with exactly these two keys:
 | `result` | string | The name the bound value is stored under, a plain snake_case input name. | Yes      |
 
 !!! important "Output Concept Matching"
-    The output concept of the `PipeSequence` has to match the output of its last step: the output of the last pipe, or the concept a binding step derives when the sequence ends with one.
+    The output concept of the `PipeSequence` has to match the output of its last step: the output of the last pipe, or the concept a binding step derives when the sequence ends with one. A batched last step yields the variable list of its branches' results, `X[]`, whatever `nb_output` it asks for, so the sequence declares a variable list.
+
+## What each step reads
+
+Validation follows the values through the sequence, one step after the other, and checks every pipe step against what it reads. At each step, a name in working memory holds the concept and multiplicity of the value last stored under it:
+
+-   the sequence's declared `inputs`, to begin with;
+-   a pipe step's `result`, its pipe's output, made a list by `nb_output` or `multiple_output`, and always a variable list `X[]` for a batched step, whatever `nb_output` it asks for;
+-   what a nested `PipeSequence` or a `PipeCondition`'s outcome stores in the caller's memory, and the branch results of a `PipeParallel` with `add_each_output`;
+-   what a binding step binds (see [What a binding binds](#what-a-binding-binds)).
+
+A pipe step is checked against the `inputs` its pipe declares. For a nested `PipeSequence`, `PipeCondition`, `PipeParallel` or `PipeBatch`, that declaration is its contract, which its own validation holds its steps, outcomes or branches to, whatever the last of them reads. A pipe step whose pipe reads a name as a concept or a multiplicity the name does not hold is refused with `input_stuff_spec_mismatch`, and the message names the step, the name and what stored it:
+
+```text
+In pipe 'process_cv', step 2 (pipe 'analyze_one_cv') reads 'cv_pages' as 'Page', but step 1 (pipe 'extract_one_cv') stores it as 'Page[]'. Declare the input as 'Page[]' in pipe 'analyze_one_cv', or make step 1 (pipe 'extract_one_cv') store a 'Page' under 'cv_pages'.
+```
+
+-   The concept must be compatible with the read, as a sequence's output must be with its last step's: the same concept or a concept refining it, for instance, and any concept when the step reads `Anything` or `Dynamic`.
+-   The multiplicity must match: a list is not a single value, and a single value is not a list. A fixed count such as `Color[5]` satisfies a step reading a variable list `Color[]`, and no other count.
+-   A step's `batch_over` must name a list, whose items its pipe reads as the batch item's concept.
+-   A name whose values may have different concepts, as when the outcomes of a `PipeCondition` store it under different concepts, must satisfy the read with each of them, including the value it held before when an outcome stores nothing under it.
+-   A name a pipe that does not resolve at validation stored, such as a pipe of a dependency not loaded yet, is assumed to hold what the step reads.
+-   A value a pipe step stores as `Anything` or `Dynamic`, as the result of a `PipeCondition` whose outcomes produce different concepts, has a concept the run alone knows, so it is assumed to be the concept the step reads, and the items of a list stored as `Anything[]` the concept a batched pipe reads. Its multiplicity is still checked: a single `Anything` read as a list, or batched over, is refused. The sequence's own input declared as `Anything`, and a binding's value of `Anything`, are checked as any other value, also where a `PipeCondition` whose outcomes do not all store the name may leave them in place, and a binding cannot walk a path through a value stored as `Anything`, which has no structure (`binding_path_unresolved`).
+
+Every step reading a declared input is checked this way, not only the last one, so a declared input must satisfy each step that reads it, and one that does is valid even when the last step reads it as something else. When a first step reads `note` as `Markdown` and a later one reads it as `Text`, the sequence declares `note = "Markdown"`, which both accept, and declaring `note = "Text"` is refused at the first step; when a first step reads `pages` as `Page[3]` and a later one as `Page[]`, it declares `pages = "Page[3]"`. That declaration is then what the sequence needs from whatever calls it: a step calling it with a `Text` under `note`, or a `Page[]` under `pages`, is refused. A declared input no step reads is still refused with `extraneous_input_variable`, and a name a step reads from the caller that the sequence does not declare with `missing_input_variable`.
 
 ## Binding steps
 
@@ -132,7 +156,7 @@ The bound value is a deep copy taken when the step runs: changing the root after
 
 ### What validation checks
 
--   A step that reads a bound name is checked against the derived concept and multiplicity: reading `total_amount` as `Text` when the binding derives a `Number` is refused with `input_stuff_spec_mismatch`, and `batch_over` a bound name requires a list.
+-   A step that reads a bound name is checked against the derived concept and multiplicity, as every step is checked against what it reads (see [What each step reads](#what-each-step-reads)): reading `total_amount` as `Text` when the binding derives a `Number` is refused with `input_stuff_spec_mismatch`, and `batch_over` a bound name requires a list.
 -   A sequence ending with a binding step is checked as one ending with a pipe: its output concept with `inadequate_output_concept`, its multiplicity with `inadequate_output_multiplicity`, and a maybe-absent result with `optional_not_handled`.
 -   A step asking a sequence that ends with a binding step for a count of outputs, with `nb_output` or `multiple_output`, is refused with `inadequate_output_multiplicity` when the binding does not bind that count: a binding binds what its path derives, whatever count its caller asks for. A batched step asks its branches for nothing, so it is not checked.
 -   A root that is neither an input of the sequence nor stored by an earlier step on every run is refused with `missing_input_variable`.

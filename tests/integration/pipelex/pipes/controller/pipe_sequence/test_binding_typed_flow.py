@@ -13,7 +13,6 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.pipe_controllers.sequence import pipe_sequence as sequence_module
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -405,27 +404,15 @@ class TestBindingTypedFlow:
         assert flow.binding_specs[2].concept.concept_ref == "native.Number"
         assert flow.binding_specs[3].concept.concept_ref == "native.Text"
         assert flow.binding_specs[3].multiplicity is True
-        assert sorted(flow.binding_slots_by_pipe_step[1]) == ["amount"]
-        assert sorted(flow.binding_slots_by_pipe_step[4]) == ["amount", "labels", "weight"]
+        binding_slot_names_by_pipe_step = {
+            step_index: sorted(name for name, slot in slots.items() if slot.binding_step_index is not None)
+            for step_index, slots in flow.slots_by_pipe_step.items()
+        }
+        assert binding_slot_names_by_pipe_step == {1: ["amount"], 4: ["amount", "labels", "weight"]}
+        assert sorted(flow.slots_by_pipe_step[4]) == ["amount", "labels", "record", "weight"]
+        assert flow.slots_by_pipe_step[4]["record"].producer_step_index == 1
         assert flow.final_slots["record"].stuff_spec is not None
         assert flow.final_slots["record"].stuff_spec.concept.concept_ref == "depot_records.Parcel"
-
-    def test_a_sequence_without_a_binding_step_never_builds_its_flow(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
-        """Only binding steps read the typed flow, so validating a sequence of pipe steps alone never builds it."""
-        flow_builder_spy = mocker.spy(sequence_module, "build_sequence_typed_flow")
-        mthds_content = _REBOUND_ROOT_BUNDLE.replace(
-            """  { from = "record.total", result = "amount" },
-  { pipe = "weigh_parcel", result = "record" },
-  { from = "record.weight", result = "weight" },
-  { from = "record.labels", result = "labels" },
-  { pipe = "write_line", result = "line" },""",
-            """  { pipe = "weigh_parcel", result = "parcel" },
-  { pipe = "write_line", result = "line" },""",
-        ).replace('inputs = { record = "Invoice" }', 'inputs = { amount = "Number", weight = "Number" }')
-
-        _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_records")
-
-        assert flow_builder_spy.call_count == 0
 
     def test_a_binding_walking_the_replaced_concept_is_refused(self, load_empty_library: Callable[[], str]) -> None:
         """The library refuses the sequence when it loads: the root was replaced by a Parcel, which has no `total`."""

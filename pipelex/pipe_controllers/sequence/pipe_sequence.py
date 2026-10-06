@@ -1,7 +1,7 @@
 import sys
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import field_validator
+from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -16,7 +16,7 @@ from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMul
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_optional_pipe, get_required_pipe
+from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_optional_pipe, get_pipe_library, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
     LiftableStepInfo,
@@ -33,6 +33,7 @@ from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
     DerivedBinding,
     FlowSlot,
+    SequenceFlowMemo,
     SequenceStep,
     SequenceTypedFlow,
     authored_step_number,
@@ -41,7 +42,7 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
     step_memory_writes,
 )
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, taint_after_write
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, is_same_value_spec, taint_after_write
 from pipelex.pipe_machinery.validation import is_valid_input_name
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
@@ -50,12 +51,17 @@ from pipelex.validation_error_types import PipeValidationErrorType
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
     from pipelex.libraries.library_crate import LibraryCrate
+    from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 
 class PipeSequence(PipeController):
     type: Literal["PipeSequence"] = "PipeSequence"
     # The steps in order: pipe steps, which run a pipe, and binding steps, which bind a value already in working memory.
     sequential_sub_pipes: list[SequenceStep]
+    # The typed flow and what the sequence stores in its caller's memory, kept for the state of the libraries they were
+    # derived in (`SequenceFlowMemo`). An empty memo until the sequence derives them, never `None`: pydantic compares private
+    # attributes, and every memo equals every other, so what the sequence derived never changes what it equals.
+    _flow_memo: SequenceFlowMemo = PrivateAttr(default_factory=SequenceFlowMemo)
 
     @override
     def required_variables(self) -> set[str]:
@@ -84,11 +90,16 @@ class PipeSequence(PipeController):
 
     @property
     def has_binding_step(self) -> bool:
-        """Whether a step binds a value: only binding steps read the typed flow, so a sequence without one never builds it."""
+        """Whether a step binds a value, which only a run of a sequence with one reads from the typed flow.
+
+        Every sequence builds its flow, to check each step against it and to say what it stores in its caller's memory
+        (`memory_writes`), once per state of the libraries it resolves in (`SequenceFlowMemo`): a run reads the flow kept
+        since validation, and a sequence without a binding step never reads it while it runs.
+        """
         return any(isinstance(step, BindingStep) for step in self.sequential_sub_pipes)
 
     def build_typed_flow(self) -> SequenceTypedFlow:
-        """The typed flow of the steps, deriving what each binding step binds.
+        """The typed flow of the steps, deriving what each binding step binds, built once per state of the current libraries.
 
         Raises:
             PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked.
@@ -96,20 +107,61 @@ class PipeSequence(PipeController):
         return self._build_typed_flow(visited_pipes=set())
 
     def _build_typed_flow(self, *, visited_pipes: set[str]) -> SequenceTypedFlow:
-        return build_sequence_typed_flow(
+        """The typed flow, from the memo when a walk that visited none of the pipes the sequence reaches already built it."""
+        memo = self._current_flow_memo()
+        is_kept = self._is_independent_of_walk(memo=memo, visited_pipes=visited_pipes)
+        if is_kept and memo.typed_flow is not None:
+            return memo.typed_flow
+        typed_flow = build_sequence_typed_flow(
             steps=self.sequential_sub_pipes,
             declared_inputs=self.inputs,
             sequence_code=self.code,
             domain_code=self.domain_code,
             visited_pipes=visited_pipes | {self.visit_key},
         )
+        if is_kept:
+            memo.typed_flow = typed_flow
+        return typed_flow
+
+    def _current_flow_memo(self) -> SequenceFlowMemo:
+        """The memo of what this sequence derived from the current pipe and concept libraries, a fresh one once either changed."""
+        library_state = (get_pipe_library().state_token, get_concept_library().state_token)
+        memo = self._flow_memo
+        if not memo.is_valid_for(owner=self, library_state=library_state):
+            memo = SequenceFlowMemo(owner=self, library_state=library_state)
+            self._flow_memo = memo
+        return memo
+
+    def _is_independent_of_walk(self, *, memo: SequenceFlowMemo, visited_pipes: set[str]) -> bool:
+        """Whether what the sequence derives inside a walk that visited `visited_pipes` is what it derives in any walk.
+
+        It is unless the walk visited a pipe the sequence reaches, which only a cycle does: the sequence's own walk then
+        stops at that pipe, which it would otherwise enter.
+        """
+        if memo.reachable_visit_keys is None:
+            memo.reachable_visit_keys = self._reachable_visit_keys()
+        return memo.reachable_visit_keys.isdisjoint(visited_pipes)
+
+    def _reachable_visit_keys(self) -> frozenset[str]:
+        """The `visit_key` of every pipe the sequence reaches through its steps' pipes, at any depth, itself excepted."""
+        reached_keys: set[str] = {self.visit_key}
+        pending_pipes: list[PipeAbstract] = [self]
+        while pending_pipes:
+            pending_pipe = pending_pipes.pop()
+            for dependency_code in pending_pipe.pipe_dependencies():
+                dependency = get_optional_pipe(pipe_code=dependency_code)
+                if dependency is None or dependency.visit_key in reached_keys:
+                    continue
+                reached_keys.add(dependency.visit_key)
+                pending_pipes.append(dependency)
+        return frozenset(reached_keys - {self.visit_key})
 
     @override
     def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, MemoryWrite]:
         """What the steps store, as the flow stands after the last one: a sequence runs its steps on its caller's memory.
 
         Each name the steps store carries the spec the typed flow gives it, the absence the taint walk leaves on it, and
-        whether some step stores it on every run.
+        whether some step stores it on every run. Built once per state of the current libraries, as the typed flow is.
 
         Raises:
             PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked, as validating the
@@ -119,9 +171,13 @@ class PipeSequence(PipeController):
             visited_pipes = set()
         if self.visit_key in visited_pipes:
             return {}
+        memo = self._current_flow_memo()
+        is_kept = self._is_independent_of_walk(memo=memo, visited_pipes=visited_pipes)
+        if is_kept and memo.memory_writes is not None:
+            return dict(memo.memory_writes)
         typed_flow = self._build_typed_flow(visited_pipes=visited_pipes)
         taint_analysis = self._analyze_taint(visited_pipes=visited_pipes | {self.visit_key}, typed_flow=typed_flow)
-        return {
+        written = {
             name: MemoryWrite(
                 stuff_spec=slot.stuff_spec,
                 disagreement=slot.disagreement,
@@ -130,6 +186,9 @@ class PipeSequence(PipeController):
             )
             for name, slot in typed_flow.written_slots.items()
         }
+        if is_kept:
+            memo.memory_writes = written
+        return dict(written)
 
     def _walk_needed_inputs(self, *, visited_pipes: set[str]) -> tuple[InputStuffSpecs, set[str]]:
         """The inputs the steps need from the sequence's caller, and, among them, the roots of binding steps.
@@ -246,52 +305,100 @@ class PipeSequence(PipeController):
 
     @override
     def validate_inputs_with_library(self):
-        """Derive every binding step through the typed flow, then check the steps reading a binding's result against it.
+        """Check every pipe step against the typed flow: each name its pipe reads must hold the concept and multiplicity it reads.
 
-        A step asking a sequence ending with a binding for a count of outputs is checked against what that binding binds first.
+        The flow derives every binding step on the way. A step asking a sequence ending with a binding for a count of outputs
+        is checked against what that binding binds first.
         """
         self._refuse_unhonoured_output_counts()
-        if not self.has_binding_step:
-            return
         typed_flow = self.build_typed_flow()
         for step_index, step in enumerate(self.sequential_sub_pipes):
             if not isinstance(step, SubPipe):
                 continue
-            binding_slots = typed_flow.binding_slots_by_pipe_step.get(step_index)
-            if binding_slots:
-                self._check_step_reading_bindings(step_index=step_index, step=step, binding_slots=binding_slots)
+            refusal = self._step_input_refusal(step_index=step_index, step=step, slots=typed_flow.slots_by_pipe_step.get(step_index, {}))
+            if refusal is not None:
+                raise refusal
 
-    def _check_step_reading_bindings(self, *, step_index: int, step: SubPipe, binding_slots: dict[str, FlowSlot]) -> None:
-        """Refuse a pipe step reading, among the bindings' results it can see, one whose spec its pipe does not need.
+    def _accepted_declared_names(self, *, visited_pipes: set[str]) -> frozenset[str]:
+        """The declared inputs whose declared spec every pipe step reading the caller's value under them accepts, as the check
+        of each step against the typed flow (`validate_inputs_with_library`) judges it, once per state of the current libraries.
+
+        That check is the authority on whether a declared input fits the steps reading it, so a declaration it accepts is what
+        the sequence needs (`needed_inputs`): a first step reading `note` as `Markdown` and a second reading it as `Text` are
+        both satisfied by a `Markdown`, which is not the last step's need.
 
         Raises:
-            PipeValidationError: ``INPUT_STUFF_SPEC_MISMATCH`` naming the step and the binding.
+            PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked, as validating the sequence
+                itself reports.
+        """
+        memo = self._current_flow_memo()
+        is_kept = self._is_independent_of_walk(memo=memo, visited_pipes=visited_pipes)
+        if is_kept and memo.accepted_declared_names is not None:
+            return memo.accepted_declared_names
+        typed_flow = self._build_typed_flow(visited_pipes=visited_pipes)
+        refused_names: set[str] = set()
+        for step_index, step in enumerate(self.sequential_sub_pipes):
+            if not isinstance(step, SubPipe):
+                continue
+            for variable_name, slot in typed_flow.slots_by_pipe_step.get(step_index, {}).items():
+                if variable_name in refused_names or variable_name not in self.inputs.root or slot.producer_step_index is not None:
+                    # Already refused, not a declared input, or a value an earlier step stored there rather than the caller's.
+                    continue
+                if self._step_input_refusal(step_index=step_index, step=step, slots={variable_name: slot}) is not None:
+                    refused_names.add(variable_name)
+        accepted_names = frozenset(name for name in self.inputs.root if name not in refused_names)
+        if is_kept:
+            memo.accepted_declared_names = accepted_names
+        return accepted_names
+
+    def _step_input_refusal(self, *, step_index: int, step: SubPipe, slots: dict[str, FlowSlot]) -> PipeValidationError | None:
+        """The refusal of a pipe step whose pipe declares an input, among the slots given, as a spec the slot does not hold,
+        `None` when every one of them holds what the pipe declares.
+
+        A step is checked against the inputs its pipe declares, its contract. An operator needs exactly what it declares. A
+        controller's declaration is what its own validation holds its steps, outcomes or branches to, while what it needs
+        (`needed_inputs`) keeps one need per name, which for a nested sequence is its declaration only where every step reading
+        the name accepts it. Reading the declaration never walks the pipe's own steps, so the sequence's `needed_inputs` can ask
+        this check which of its declarations it accepts.
+
+        A slot the flow cannot type, a value a pipe that does not resolve stored, is assumed to deliver, and so is the concept of
+        a value a pipe step stored as `Anything` or `Dynamic`. A slot whose possible values have different specs is checked
+        against each of them, each read as what stored it. The refusal is returned rather than raised, so that the same check
+        answers which declared inputs are accepted (`_accepted_declared_names`).
+
+        Returns:
+            ``INPUT_STUFF_SPEC_MISMATCH`` naming the step, the name and what stored it, or `None`.
         """
         step_pipe = get_optional_pipe(pipe_code=step.pipe_code)
         if step_pipe is None:
-            return
-        step_needs = step_pipe.needed_inputs()
+            return None
+        step_contract = step_pipe.inputs
         batch_item_name: str | None = None
         if step.batch_params is not None:
             batch_item_name = step.batch_params.input_item_stuff_name
-            list_slot = binding_slots.get(step.batch_params.input_list_stuff_name)
+            list_slot = slots.get(step.batch_params.input_list_stuff_name)
             if list_slot is not None:
-                self._check_batched_binding(
+                list_refusal = self._batched_list_refusal(
                     step_index=step_index,
                     step_pipe_code=step_pipe.code,
                     batch_params=step.batch_params,
                     slot=list_slot,
-                    item_need=step_needs.root.get(batch_item_name),
+                    item_need=step_contract.root.get(batch_item_name),
                 )
-        for input_name, needed_spec in step_needs.items:
+                if list_refusal is not None:
+                    return list_refusal
+        for input_name, needed_spec in step_contract.items:
             if input_name == batch_item_name:
                 continue
-            slot = binding_slots.get(input_name)
-            if slot is None or slot.stuff_spec is None:
+            slot = slots.get(input_name)
+            if slot is None:
                 continue
-            self._check_binding_consumer(
+            read_refusal = self._slot_read_refusal(
                 step_index=step_index, step_pipe_code=step_pipe.code, variable_name=input_name, slot=slot, needed_spec=needed_spec
             )
+            if read_refusal is not None:
+                return read_refusal
+        return None
 
     def final_binding_spec(self) -> StuffSpec | None:
         """The spec the binding step ending the sequence binds, `None` when the last step runs a pipe or the flow cannot type the binding's root.
@@ -355,101 +462,205 @@ class PipeSequence(PipeController):
                 required_concept_codes=[step_pipe.output.concept.concept_ref],
             )
 
-    def _check_binding_consumer(self, *, step_index: int, step_pipe_code: str, variable_name: str, slot: FlowSlot, needed_spec: StuffSpec) -> None:
-        """Refuse a step reading a binding's result as a concept or multiplicity the binding does not derive."""
-        bound_spec = slot.stuff_spec
-        if bound_spec is None or slot.binding_step_index is None:
-            return
+    def _render_spec(self, *, stuff_spec: StuffSpec) -> str:
+        """A spec's concept and multiplicity as an author writes them in this sequence's domain, its presence aside."""
+        return StuffSpec(concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity).to_bundle_representation(
+            relative_to_domain=self.domain_code
+        )
+
+    def _producer_label(self, *, producer_step_index: int) -> str:
+        """How a message names the pipe step that stored a value, e.g. "step 2 (pipe 'weigh_parcel')"."""
+        producer_step = self.sequential_sub_pipes[producer_step_index]
+        if isinstance(producer_step, BindingStep):
+            return f"the {producer_step.label}"
+        producer_pipe = get_optional_pipe(pipe_code=producer_step.pipe_code)
+        producer_code = producer_pipe.code if producer_pipe is not None else producer_step.pipe_code
+        return f"step {self._step_number(step_index=producer_step_index)} (pipe '{producer_code}')"
+
+    def _slot_read_refusal(
+        self, *, step_index: int, step_pipe_code: str, variable_name: str, slot: FlowSlot, needed_spec: StuffSpec
+    ) -> PipeValidationError | None:
+        """The refusal of a step reading a name as a concept or multiplicity the value the flow carries there does not have,
+        `None` when the value satisfies the read.
+
+        A refined concept satisfies its parent, and a fixed count a variable list; a flexible need (`Dynamic`, `Anything`)
+        takes any value, and a value a pipe step stored as `Anything` or `Dynamic` has a concept known only when it runs, so
+        its concept is assumed to satisfy the read while its multiplicity is still checked. Among the values a disagreement
+        lists, only those a pipe step stored are read that way: the value a step may leave in place, when the caller declared it
+        or a binding stored it, is checked as any other. The message names what stored the value: a binding step, an earlier
+        pipe step, or the sequence's own declared input.
+
+        Returns:
+            ``INPUT_STUFF_SPEC_MISMATCH`` naming the step, the name and what stored it, or `None`.
+        """
         if needed_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}:
-            return
-        binding_step = self.sequential_sub_pipes[slot.binding_step_index]
-        binding_label = (
-            binding_step.label if isinstance(binding_step, BindingStep) else f"step {self._step_number(step_index=slot.binding_step_index)}"
-        )
-        is_concept_compatible = get_concept_library().is_compatible(tested_concept=bound_spec.concept, wanted_concept=needed_spec.concept)
-        is_multiplicity_ok = is_multiplicity_compatible(source_multiplicity=bound_spec.multiplicity, target_multiplicity=needed_spec.multiplicity)
-        if is_concept_compatible and is_multiplicity_ok:
-            return
-        bound_ref = StuffSpec(concept=bound_spec.concept, multiplicity=bound_spec.multiplicity).to_bundle_representation(
-            relative_to_domain=self.domain_code
-        )
-        needed_ref = StuffSpec(concept=needed_spec.concept, multiplicity=needed_spec.multiplicity).to_bundle_representation(
-            relative_to_domain=self.domain_code
-        )
-        msg = (
-            f"In pipe '{self.code}', step {self._step_number(step_index=step_index)} (pipe '{step_pipe_code}') reads '{variable_name}' as "
-            f"'{needed_ref}', but the {binding_label} binds it as '{bound_ref}'. Declare the input as '{bound_ref}' in pipe '{step_pipe_code}', "
-            f"or bind a path that reaches a '{needed_ref}'."
-        )
-        raise PipeValidationError(
+            return None
+        step_label = f"step {self._step_number(step_index=step_index)} (pipe '{step_pipe_code}')"
+        needed_ref = self._render_spec(stuff_spec=needed_spec)
+        provided_spec = slot.stuff_spec
+        if provided_spec is None:
+            if slot.disagreement is None:
+                # A value a pipe that does not resolve at validation stored: nothing types it, so it is assumed to deliver.
+                return None
+            # Each value a disagreement lists is read as what stored it: a condition's outcome is a pipe store, while the value
+            # the name held before may be the caller's declared input or a binding's, which is checked as any other.
+            unreadable_specs = [
+                stored_spec.stuff_spec
+                for stored_spec in slot.disagreement.stored_specs
+                if not self._is_readable_as(
+                    provided_spec=stored_spec.stuff_spec, needed_spec=needed_spec, is_stored_by_pipe_step=stored_spec.is_stored_by_pipe_step
+                )
+            ]
+            if not unreadable_specs:
+                return None
+            msg = (
+                f"In pipe '{self.code}', {step_label} reads '{variable_name}' as '{needed_ref}', but the values '{variable_name}' may hold "
+                f"have different specs: {slot.disagreement.describe(relative_to_domain=self.domain_code)}. Store '{variable_name}' as a "
+                f"'{needed_ref}' wherever it is stored, or declare the input of pipe '{step_pipe_code}' as a concept every one of them satisfies."
+            )
+            return PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                variable_names=[variable_name],
+                provided_concept_code=unreadable_specs[0].concept.concept_ref,
+                required_concept_codes=[needed_spec.concept.concept_ref],
+            )
+        if self._is_readable_as(provided_spec=provided_spec, needed_spec=needed_spec, is_stored_by_pipe_step=slot.is_stored_by_pipe_step):
+            return None
+        provided_ref = self._render_spec(stuff_spec=provided_spec)
+        declare_remedy = f"Declare the input as '{provided_ref}' in pipe '{step_pipe_code}'"
+        if slot.binding_step_index is not None:
+            stored_phrase = f"{self._producer_label(producer_step_index=slot.binding_step_index)} binds it"
+            remedy = f"{declare_remedy}, or bind a path that reaches a '{needed_ref}'."
+        elif slot.producer_step_index is not None:
+            producer_label = self._producer_label(producer_step_index=slot.producer_step_index)
+            stored_phrase = f"{producer_label} stores it"
+            remedy = f"{declare_remedy}, or make {producer_label} store a '{needed_ref}' under '{variable_name}'."
+        else:
+            stored_phrase = "the sequence declares it"
+            remedy = f"{declare_remedy}, or declare '{variable_name}' as '{needed_ref}' in the inputs of pipe '{self.code}'."
+        msg = f"In pipe '{self.code}', {step_label} reads '{variable_name}' as '{needed_ref}', but {stored_phrase} as '{provided_ref}'. {remedy}"
+        return PipeValidationError(
             message=msg,
             error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
             domain_code=self.domain_code,
             pipe_code=self.code,
             variable_names=[variable_name],
-            provided_concept_code=bound_spec.concept.concept_ref,
+            provided_concept_code=provided_spec.concept.concept_ref,
             required_concept_codes=[needed_spec.concept.concept_ref],
         )
 
-    def _check_batched_binding(
+    @classmethod
+    def _is_readable_as(cls, *, provided_spec: StuffSpec, needed_spec: StuffSpec, is_stored_by_pipe_step: bool) -> bool:
+        """Whether a value of `provided_spec` satisfies a read as `needed_spec`: a compatible concept and multiplicity, the
+        concept of a value a pipe step stored being assumed to satisfy any read when it is known only when it runs.
+        """
+        if not is_multiplicity_compatible(source_multiplicity=provided_spec.multiplicity, target_multiplicity=needed_spec.multiplicity):
+            return False
+        if is_stored_by_pipe_step and cls._is_concept_known_only_at_run(stuff_spec=provided_spec):
+            return True
+        return get_concept_library().is_compatible(tested_concept=provided_spec.concept, wanted_concept=needed_spec.concept)
+
+    @staticmethod
+    def _is_concept_known_only_at_run(*, stuff_spec: StuffSpec) -> bool:
+        """Whether a pipe's output spec leaves the concept of the value it stores to the run: `Anything` or `Dynamic`, which a pipe
+        declares when what it produces varies, as a condition whose outcomes produce different concepts must declare `Anything`.
+
+        Only a pipe step's store is read this way. The run stores the concept the pipe actually produced, which nothing knows
+        before it, so the step reading it is assumed to get what it reads, as from a pipe that does not resolve at validation.
+        The sequence's own declared input is a contract its caller is held to, and a binding over a field holding `Anything`
+        binds a value whose concept is `Anything`, so both are checked as any other value, also where a later step may leave
+        them in place (`FlowSlot.is_stored_by_pipe_step`, `StoredSpec.is_stored_by_pipe_step`). The multiplicity, which the
+        pipe's declaration and the step's batch or count set, is checked whatever the concept.
+        """
+        return stuff_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
+
+    def _batched_list_refusal(
         self, *, step_index: int, step_pipe_code: str, batch_params: BatchParams, slot: FlowSlot, item_need: StuffSpec | None
-    ) -> None:
-        """Refuse a step batching over a binding's result that is not a list, or whose items its pipe reads as another concept.
+    ) -> PipeValidationError | None:
+        """The refusal of a step batching over a value that is not a list, or whose items its pipe reads as another concept,
+        `None` when the value is a list of what the pipe reads.
 
         A dotted `batch_over` is named by the path its author wrote, never by the private name the sequence bound it under.
+        A value the flow cannot type is assumed to deliver; one whose possible values have different specs is checked
+        against each of them, each read as what stored it. A list a pipe step stored as `Anything[]` or `Dynamic[]` holds
+        items whose concept is known only when it runs, so they are assumed to be what the pipe reads, while a single value
+        is still no list; a list the caller declared or a binding stored as `Anything[]` is checked as any other.
 
-        Raises:
-            PipeValidationError: ``INPUT_STUFF_SPEC_MISMATCH``, as a batch over a value that is not a list is refused, naming
-                the step and what the binding binds.
+        Returns:
+            ``INPUT_STUFF_SPEC_MISMATCH``, as a batch over a value that is not a list is refused, naming the step and what
+            stored the list, or `None`.
         """
-        bound_spec = slot.stuff_spec
-        if bound_spec is None or slot.binding_step_index is None:
-            return
-        binding_step = self.sequential_sub_pipes[slot.binding_step_index]
-        if not isinstance(binding_step, BindingStep):
-            return
-        if binding_step.is_dotted_batch_over:
-            batched_phrase = f"the dotted path '{binding_step.from_path}', which derives"
-        else:
-            batched_phrase = f"'{batch_params.input_list_stuff_name}', which the {binding_step.label} binds as"
+        list_name = batch_params.input_list_stuff_name
+        item_name = batch_params.input_item_stuff_name
         step_label = f"step {self._step_number(step_index=step_index)} (pipe '{step_pipe_code}')"
-        bound_ref = StuffSpec(concept=bound_spec.concept, multiplicity=bound_spec.multiplicity).to_bundle_representation(
-            relative_to_domain=self.domain_code
-        )
-        if not bound_spec.is_multiple():
+        binding_step = self.sequential_sub_pipes[slot.binding_step_index] if slot.binding_step_index is not None else None
+        is_bound_list = isinstance(binding_step, BindingStep)
+        # Each value the list may be, with whether a pipe step stored it: the slot's own provenance for a typed slot, and each
+        # value's for the values a disagreement lists, where the value the name held before may be the caller's or a binding's.
+        stored_values: list[tuple[StuffSpec, bool]]
+        batched_phrase: str
+        list_label = list_name
+        if slot.stuff_spec is not None:
+            stored_values = [(slot.stuff_spec, slot.is_stored_by_pipe_step)]
+            if isinstance(binding_step, BindingStep):
+                if binding_step.is_dotted_batch_over:
+                    batched_phrase = f"the dotted path '{binding_step.from_path}', which derives"
+                    list_label = binding_step.from_path
+                else:
+                    batched_phrase = f"'{list_name}', which the {binding_step.label} binds as"
+            elif slot.producer_step_index is not None:
+                batched_phrase = f"'{list_name}', which {self._producer_label(producer_step_index=slot.producer_step_index)} stores as"
+            else:
+                batched_phrase = f"'{list_name}', which the sequence declares as"
+        elif slot.disagreement is not None:
+            stored_values = [(stored_spec.stuff_spec, stored_spec.is_stored_by_pipe_step) for stored_spec in slot.disagreement.stored_specs]
+            batched_phrase = f"'{list_name}', which may hold"
+        else:
+            # A list a pipe that does not resolve at validation stored: nothing types it, so it is assumed to deliver.
+            return None
+        for stored_spec, is_stored_by_pipe_step in stored_values:
+            stored_ref = self._render_spec(stuff_spec=stored_spec)
+            if not stored_spec.is_multiple():
+                list_remedy = "a path that reaches a list, through a list root or a list field" if is_bound_list else "a name holding a list"
+                msg = (
+                    f"In pipe '{self.code}', {step_label} batches over {batched_phrase} a single '{stored_ref}', not a list: a batch runs its "
+                    f"pipe once per item of a list. Batch over {list_remedy}, or run the step on the value itself, without `batch_over`."
+                )
+                return PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
+                    domain_code=self.domain_code,
+                    pipe_code=self.code,
+                    variable_names=[list_label],
+                    provided_concept_code=stored_spec.concept.concept_ref,
+                )
+            if item_need is None or item_need.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}:
+                continue
+            if is_stored_by_pipe_step and self._is_concept_known_only_at_run(stuff_spec=stored_spec):
+                continue
+            if get_concept_library().is_compatible(tested_concept=stored_spec.concept, wanted_concept=item_need.concept):
+                continue
+            item_ref = StuffSpec(concept=stored_spec.concept).to_bundle_representation(relative_to_domain=self.domain_code)
+            needed_ref = StuffSpec(concept=item_need.concept).to_bundle_representation(relative_to_domain=self.domain_code)
+            list_remedy = "a path that reaches a list" if is_bound_list else "a list"
             msg = (
-                f"In pipe '{self.code}', {step_label} batches over {batched_phrase} a single '{bound_ref}', not a list: a batch runs its "
-                "pipe once per item of a list. Batch over a path that reaches a list, through a list root or a list field, or run the step "
-                "on the value itself, without `batch_over`."
+                f"In pipe '{self.code}', {step_label} batches over {batched_phrase} '{stored_ref}', but its pipe reads each item, "
+                f"'{item_name}', as '{needed_ref}'. Declare '{item_name}' as '{item_ref}' in pipe '{step_pipe_code}', or batch over "
+                f"{list_remedy} of '{needed_ref}'."
             )
-            raise PipeValidationError(
+            return PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-                variable_names=[binding_step.from_path if binding_step.is_dotted_batch_over else batch_params.input_list_stuff_name],
-                provided_concept_code=bound_spec.concept.concept_ref,
+                variable_names=[item_name],
+                provided_concept_code=stored_spec.concept.concept_ref,
+                required_concept_codes=[item_need.concept.concept_ref],
             )
-        if item_need is None or item_need.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}:
-            return
-        if get_concept_library().is_compatible(tested_concept=bound_spec.concept, wanted_concept=item_need.concept):
-            return
-        item_ref = StuffSpec(concept=bound_spec.concept).to_bundle_representation(relative_to_domain=self.domain_code)
-        needed_ref = StuffSpec(concept=item_need.concept).to_bundle_representation(relative_to_domain=self.domain_code)
-        msg = (
-            f"In pipe '{self.code}', {step_label} batches over {batched_phrase} '{bound_ref}', but its pipe reads each item, "
-            f"'{batch_params.input_item_stuff_name}', as '{needed_ref}'. Declare '{batch_params.input_item_stuff_name}' as '{item_ref}' in "
-            f"pipe '{step_pipe_code}', or batch over a path that reaches a list of '{needed_ref}'."
-        )
-        raise PipeValidationError(
-            message=msg,
-            error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
-            domain_code=self.domain_code,
-            pipe_code=self.code,
-            variable_names=[batch_params.input_item_stuff_name],
-            provided_concept_code=bound_spec.concept.concept_ref,
-            required_concept_codes=[item_need.concept.concept_ref],
-        )
+        return None
 
     @override
     def validate_output_static(self):
@@ -489,25 +700,12 @@ class PipeSequence(PipeController):
             last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
             last_step_concept = last_step_pipe.output.concept
             last_step_label = f"'{last_step_pipe.code}'"
-            is_last_step_output_optional = last_step_pipe.output.presence.is_optional
-
-            # The step's effective output, resolved exactly the way the run path resolves it (declared
-            # multiplicity + the step-level override), so this static promise cannot rule a count
-            # differently from the execution it describes. Reading the two apart — an override tested for
-            # truthiness, a declaration tested for `is None` — is what let a `nb_output = 1` step read as
-            # plural here while the runtime made it single.
-            multiplicity_resolution = output_multiplicity_to_apply(
-                base_multiplicity=last_step_pipe.output.multiplicity,
-                override_multiplicity=last_step.output_multiplicity,
-            )
-            # A declaration spells a singular slot with no suffix at all; `resolved_multiplicity` spells a
-            # forced single as `False`, which is override vocabulary and renders as nothing an author writes.
-            if not multiplicity_resolution.is_multiple_outputs_enabled:
-                effective_last_step_output_multiplicity = None
-            elif multiplicity_resolution.specific_output_count is not None:
-                effective_last_step_output_multiplicity = multiplicity_resolution.specific_output_count
-            else:
-                effective_last_step_output_multiplicity = True
+            # What the step stores under its result, resolved exactly the way the run path and the typed flow resolve it
+            # (`SubPipe.result_spec`): the pipe's declared multiplicity with the step's `nb_output` or `multiple_output`
+            # override, or, for a batched step, the variable list of its branches' results, whatever count it asks for.
+            last_step_result_spec = last_step.result_spec(step_pipe=last_step_pipe)
+            is_last_step_output_optional = last_step_result_spec.presence.is_optional
+            effective_last_step_output_multiplicity = last_step_result_spec.multiplicity
         is_plural_last_step_output = is_multiple_multiplicity(multiplicity=effective_last_step_output_multiplicity)
 
         taint_analysis = self.analyze_taint()
@@ -780,6 +978,16 @@ class PipeSequence(PipeController):
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+        """What the sequence needs from its caller: every name a step reads before an earlier step always stores it.
+
+        The walk of the steps keeps one need per name, the last step's reading it. Where the sequence declares the name and
+        every step reading the caller's value under it accepts the declaration (`_accepted_declared_names`), the declaration is
+        the need, its concept and multiplicity, so whatever calls the sequence, another sequence, a condition or a parallel, is
+        held to what every step accepts rather than to what the last one reads: a sequence declaring `note = "Markdown"` whose
+        last step reads a `Text` needs a `Markdown`. A declaration some step refuses leaves the last step's need, which the
+        generic check of the inputs then reports with the fix it offers. The presence stays the steps', as every reader of it
+        takes the declared marker first.
+        """
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -787,8 +995,26 @@ class PipeSequence(PipeController):
         if self.visit_key in visited_pipes:
             return InputStuffSpecsFactory.make_empty()
 
-        needed_inputs, _ = self._walk_needed_inputs(visited_pipes=visited_pipes)
-        return needed_inputs
+        walked_needs, _ = self._walk_needed_inputs(visited_pipes=visited_pipes)
+        differing_names = [
+            input_name
+            for input_name, walked_spec in walked_needs.items
+            if input_name in self.inputs.root and not is_same_value_spec(first_spec=self.inputs.root[input_name], second_spec=walked_spec)
+        ]
+        if not differing_names:
+            return walked_needs
+        accepted_names = self._accepted_declared_names(visited_pipes=visited_pipes)
+        for input_name in differing_names:
+            if input_name not in accepted_names:
+                continue
+            declared_spec = self.inputs.root[input_name]
+            walked_needs.add_stuff_spec(
+                variable_name=input_name,
+                concept=declared_spec.concept,
+                multiplicity=declared_spec.multiplicity,
+                presence=walked_needs.root[input_name].presence,
+            )
+        return walked_needs
 
     @override
     def pipe_dependencies(self) -> set[str]:
@@ -979,21 +1205,23 @@ class PipeSequence(PipeController):
             BindingStepRunError: Naming the step, the binding and both specs.
         """
         runtime_slots: dict[str, FlowSlot] = {}
-        for name, slot in typed_flow.binding_slots_by_pipe_step.get(step_index, {}).items():
+        for name, slot in typed_flow.slots_by_pipe_step.get(step_index, {}).items():
             if slot.binding_step_index is None or slot.binding_step_index not in runtime_bindings:
                 continue
             runtime_spec = runtime_bindings[slot.binding_step_index].stuff_spec
-            runtime_slots[name] = FlowSlot(stuff_spec=runtime_spec, binding_step_index=slot.binding_step_index)
+            runtime_slots[name] = FlowSlot(
+                stuff_spec=runtime_spec, binding_step_index=slot.binding_step_index, producer_step_index=slot.binding_step_index
+            )
         if not runtime_slots:
             return
-        try:
-            self._check_step_reading_bindings(step_index=step_index, step=step, binding_slots=runtime_slots)
-        except PipeValidationError as exc:
-            msg = (
-                f"{exc} The binding was derived when it ran, from the value its root held, since a pipe that did not resolve at "
-                "validation stored the root."
-            )
-            raise BindingStepRunError(msg) from exc
+        refusal = self._step_input_refusal(step_index=step_index, step=step, slots=runtime_slots)
+        if refusal is None:
+            return
+        msg = (
+            f"{refusal} The binding was derived when it ran, from the value its root held, since a pipe that did not resolve at "
+            "validation stored the root."
+        )
+        raise BindingStepRunError(msg) from refusal
 
     @override
     async def _dry_run_controller_pipe(
