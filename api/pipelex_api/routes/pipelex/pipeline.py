@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from contextlib import contextmanager
-from pathlib import Path, PurePosixPath
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from fastapi import APIRouter, Depends, Request
@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex.config import get_config, is_pipe_func_sandbox_hosted
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.methods.structures_check import ensure_no_structured_content_python
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
@@ -26,7 +27,14 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex_api.api_config import get_api_config, resolve_orchestration_mode
-from pipelex_api.bundle import ParsedBundle, materialize_parsed, parse_bundle
+from pipelex_api.bundle import (
+    ParsedBundle,
+    VendoredMethodPackage,
+    materialize_parsed,
+    materialized_methods_dir,
+    parse_bundle,
+    partition_bundle_entries,
+)
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_bad_request, raise_forbidden, raise_validation_error
 from pipelex_api.json_body import decode_json_body
@@ -407,6 +415,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             # here, so a group left out of this call is dropped with no error
             # and the run's spans lose their groups while the ack still says 202.
             extras=self.extras,
+            # The packages the request ships, which the base `execute` threads too.
+            methods_dirs=self.methods_dirs,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
         )
@@ -685,31 +695,58 @@ async def _parse_request(request: Request) -> tuple[RunRequest, PipelineApiExtra
     return run_request, extras
 
 
-@contextmanager
-def _bundle_run_source(run_request: RunRequest) -> Generator[tuple[list[str] | None, list[str] | None], None, None]:
-    """Resolve a run's `(mthds_contents, library_dirs)` from the request.
+class _BundleRunSource(NamedTuple):
+    """What a request's run source resolves to, before the routes add its entry pipe and provenance."""
 
-    A method bundle KEEPS the proven run path rather than replacing it: its `.mthds`
+    mthds_contents: list[str] | None
+    library_dirs: list[str] | None
+    methods_dirs: list[Path] | None
+
+
+def _ensure_vendored_packages_hold_no_structures(*, methods_dir: Path, packages: tuple[VendoredMethodPackage, ...]) -> None:
+    """Refuse a shipped package whose Python declares a structure class, as a fetched package is on this deployment.
+
+    The library load refuses the bundle's own structure classes, but never reads a shipped package's Python, which is
+    not in a library directory. Each package is named by the address its manifest declares, and each file by its path
+    inside the package, never by the temporary directory.
+    """
+    for package in packages:
+        if any(relpath.suffix == ".py" for relpath, _ in package.entries):
+            ensure_no_structured_content_python(package_dir=methods_dir / package.name, package_address=package.full_address)
+
+
+@contextmanager
+def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, None, None]:
+    """Resolve a run's `(mthds_contents, library_dirs, methods_dirs)` from the request.
+
+    A method bundle KEEPS the proven run path rather than replacing it: its own `.mthds`
     text travels as `mthds_contents` — so `main_pipe` resolves exactly as it does for a
-    plain (non-bundle) run — and ONLY the non-`.mthds` files (custom PipeFunc `.py`,
+    plain (non-bundle) run — and its other files (custom PipeFunc `.py`,
     `requirements.txt`) are materialized into a temp `library_dirs` entry, where the
     load path reads them without importing them. This mirrors "a normal run, plus the Python", instead of
     handing the engine a bare directory with no `mthds_contents` (which never resolves
     `main_pipe`, since that is only derived from `mthds_contents`).
 
-    No bundle → yields the request's own `mthds_contents` and no library dir (the
-    classic path, unchanged). Bundle with no non-`.mthds` files → yields the `.mthds`
-    texts and no library dir. The temp dir (when created) is cleaned up on exit.
+    The method packages the bundle ships under `.mthds/methods/<name>/` belong to neither:
+    every file of theirs is written into a temp directory of its own, as `<tmp>/<name>/…`,
+    which the engine searches first for an address-based reference and never writes, so a
+    shipped package wins over an installed copy and ends with the request. The other `.mthds`
+    paths are refused with a `422` naming the entry (`partition_bundle_entries`), and so is a
+    bundle whose only `.mthds` files are shipped ones.
 
-    Security gate (decision 5): a bundle that ships custom Python (`.py`) is only
-    honored on a sandbox-hosted deployment, where the load path reads the source
-    without importing it and refuses, with a 403 `MethodStructuresRefusedError`, a
-    bundle whose Python declares a structure class; PipeFunc source is captured for
-    the sandbox. On a non-hosted deployment, running that code would import it
-    in-process — refused with a 403 rather than executing untrusted code.
+    No bundle → yields the request's own `mthds_contents` and no directory (the classic path,
+    unchanged). Each temp dir is created only when it has files, and cleaned up on exit.
+
+    Security gate (decision 5): a bundle that ships custom Python (`.py`), in a shipped package
+    or not, is only honored on a sandbox-hosted deployment, where the load path reads the bundle's
+    own source without importing it and refuses, with a 403 `MethodStructuresRefusedError`, a
+    bundle whose Python declares a structure class; PipeFunc source is captured for the sandbox.
+    A shipped package's Python is checked the same way, as a fetched package's is, and never runs.
+    On a non-hosted deployment, running that code would import it in-process — refused with a 403
+    rather than executing untrusted code.
     """
     if run_request.bundle_b64 is None and run_request.files is None:
-        yield run_request.mthds_contents, None
+        yield _BundleRunSource(mthds_contents=run_request.mthds_contents, library_dirs=None, methods_dirs=None)
         return
     # Parse + guard in memory FIRST, then apply the sandbox-hosted gate BEFORE any disk write —
     # a bundle destined for a 403 on a non-hosted deployment never touches the filesystem.
@@ -717,25 +754,36 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[tuple[list[str] | N
     if parsed.has_python_sources and not is_pipe_func_sandbox_hosted():
         msg = "This bundle ships custom Python (.py); running it requires a sandbox-hosted deployment."
         raise_forbidden(message=msg, error_type=ErrorType.CUSTOM_CODE_REQUIRES_SANDBOX)
-    # Split: `.mthds` text → `mthds_contents` (the proven main_pipe path); everything else
-    # (`.py`, `requirements.txt`) → a temp `library_dirs` entry the load path source-captures.
+    # Split: the bundle's own `.mthds` text → `mthds_contents` (the proven main_pipe path); its other files
+    # (`.py`, `requirements.txt`) → a temp `library_dirs` entry the load path source-captures; the packages it
+    # ships → a temp methods directory.
+    partition = partition_bundle_entries(parsed.entries)
     mthds_contents: list[str] = []
-    other_entries: list[tuple[PurePosixPath, bytes]] = []
-    for relpath, content in parsed.entries:
-        if str(relpath).endswith(".mthds"):
-            try:
-                mthds_contents.append(content.decode("utf-8"))
-            except UnicodeDecodeError:
-                raise_validation_error(message=f"Bundle .mthds file '{relpath}' is not valid UTF-8.", error_type=ErrorType.INVALID_BUNDLE)
-        else:
-            other_entries.append((relpath, content))
+    for relpath, content in partition.mthds_entries:
+        try:
+            mthds_contents.append(content.decode("utf-8"))
+        except UnicodeDecodeError:
+            raise_validation_error(message=f"Bundle .mthds file '{relpath}' is not valid UTF-8.", error_type=ErrorType.INVALID_BUNDLE)
     if not mthds_contents:
-        raise_validation_error(message="Method bundle contains no .mthds file.", error_type=ErrorType.INVALID_BUNDLE)
-    if not other_entries:
-        yield mthds_contents, None
-        return
-    with materialize_parsed(ParsedBundle(entries=tuple(other_entries))) as bundle:
-        yield mthds_contents, [str(bundle.directory)]
+        msg = "Method bundle contains no .mthds file."
+        if partition.vendored_packages:
+            msg = (
+                "Method bundle contains no .mthds file of its own: the files under '.mthds/methods/<name>/' are the method "
+                "packages it ships, and the bundle's own .mthds files go outside '.mthds/'."
+            )
+        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    with ExitStack() as stack:
+        library_dirs: list[str] | None = None
+        if partition.library_entries:
+            library_bundle = stack.enter_context(materialize_parsed(ParsedBundle(entries=partition.library_entries)))
+            library_dirs = [str(library_bundle.directory)]
+        methods_dirs: list[Path] | None = None
+        if partition.vendored_packages:
+            methods_dir = stack.enter_context(materialized_methods_dir(partition.vendored_packages))
+            if is_pipe_func_sandbox_hosted():
+                _ensure_vendored_packages_hold_no_structures(methods_dir=methods_dir, packages=partition.vendored_packages)
+            methods_dirs = [methods_dir]
+        yield _BundleRunSource(mthds_contents=mthds_contents, library_dirs=library_dirs, methods_dirs=methods_dirs)
 
 
 class _ResolvedRunSource(NamedTuple):
@@ -743,6 +791,7 @@ class _ResolvedRunSource(NamedTuple):
 
     mthds_contents: list[str] | None
     library_dirs: list[str] | None
+    methods_dirs: list[Path] | None
     pipe_code: str | None
     method_provenance: MethodProvenance | None
 
@@ -753,7 +802,8 @@ def _run_source(run_request: RunRequest) -> Generator[_ResolvedRunSource, None, 
 
     A `method_ref` resolves through `pipelex_api.method_source.fetched_method_source` (fetch → locate →
     execution-locus gate → materialize) into exactly the shape a bundle produces — `.mthds` text
-    as `mthds_contents`, non-`.mthds` files in a temp `library_dirs` entry — so the engine runs
+    as `mthds_contents`, non-`.mthds` files in a temp `library_dirs` entry, the packages the package
+    ships under its own `.mthds/methods/` in a temp `methods_dirs` entry — so the engine runs
     the same proven path. The entry pipe defaults to the fetched manifest's `main_pipe`; a
     request `pipe_code` overrides it. Provenance `(address, tag, commit_sha)` rides back so the
     routes can put it on the response. The other two forms delegate to `_bundle_run_source`,
@@ -764,14 +814,16 @@ def _run_source(run_request: RunRequest) -> Generator[_ResolvedRunSource, None, 
             yield _ResolvedRunSource(
                 mthds_contents=fetched.mthds_contents,
                 library_dirs=fetched.library_dirs,
+                methods_dirs=fetched.methods_dirs,
                 pipe_code=run_request.pipe_code or fetched.main_pipe,
                 method_provenance=fetched.provenance,
             )
         return
-    with _bundle_run_source(run_request) as (mthds_contents, library_dirs):
+    with _bundle_run_source(run_request) as bundle_source:
         yield _ResolvedRunSource(
-            mthds_contents=mthds_contents,
-            library_dirs=library_dirs,
+            mthds_contents=bundle_source.mthds_contents,
+            library_dirs=bundle_source.library_dirs,
+            methods_dirs=bundle_source.methods_dirs,
             pipe_code=run_request.pipe_code,
             method_provenance=None,
         )
@@ -825,6 +877,7 @@ async def execute(request: Request) -> JSONResponse:
             read_scope=scopes.read_scope,
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
+            methods_dirs=source.methods_dirs,
         )
         response = await runner.execute(
             pipe_code=source.pipe_code,
@@ -916,6 +969,7 @@ async def start(
             read_scope=scopes.read_scope,
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
+            methods_dirs=source.methods_dirs,
         )
         start_result = await runner.start(
             pipe_code=source.pipe_code,

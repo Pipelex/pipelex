@@ -149,7 +149,9 @@ paths:
                   title: Bundle B64
                   description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the whole method
                     bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`), materialized into a temporary library
-                    directory before the run so custom PipeFunc Python travels with the method. Mutually exclusive with `files`.
+                    directory before the run so custom PipeFunc Python travels with the method. The method packages the bundle
+                    calls by address may travel with it under `.mthds/methods/<name>/`, each with its `METHODS.toml`; they
+                    are searched before the runner's installed copies, for this run alone. Mutually exclusive with `files`.
                     Custom `.py` is only honored on a sandbox-hosted deployment.
                 files:
                   anyOf:
@@ -403,7 +405,9 @@ paths:
                   title: Bundle B64
                   description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the whole method
                     bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`), materialized into a temporary library
-                    directory before the run so custom PipeFunc Python travels with the method. Mutually exclusive with `files`.
+                    directory before the run so custom PipeFunc Python travels with the method. The method packages the bundle
+                    calls by address may travel with it under `.mthds/methods/<name>/`, each with its `METHODS.toml`; they
+                    are searched before the runner's installed copies, for this run alone. Mutually exclusive with `files`.
                     Custom `.py` is only honored on a sandbox-hosted deployment.
                 files:
                   anyOf:

@@ -13,7 +13,15 @@ form, enforces the ingest guards (both transport forms are refused together; a
 hard file-count and total-size ceiling; per-entry path-safety against absolute
 paths and `..` traversal; a zip-bomb guard that bounds actual decompression),
 writes the surviving files into a fresh temp directory, and hands that directory
-back so the runner can load it via `library_dirs`. In a sandbox-hosted
+back so the runner can load it via `library_dirs`.
+
+A bundle may also ship the method packages it calls by address, each under
+`.mthds/methods/<name>/` at its root with its `METHODS.toml` there, the layout the
+standard names the local method cache. `partition_bundle_entries` sorts the entries
+into the bundle's own `.mthds` files, its other files, and those packages, refusing
+every other `.mthds` path with a `422 InvalidBundle` naming the entry, and
+`materialized_methods_dir` writes the packages into a temp directory of their own,
+`<tmp>/<name>/…`, which the runner hands the engine as `methods_dirs`. In a sandbox-hosted
 deployment the load path reads every `.py` as source text, never importing it:
 it refuses a bundle whose Python declares a structure class
 (`MethodStructuresRefusedError`, a 403) and captures the rest onto the crate for
@@ -34,8 +42,11 @@ import zipfile
 from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, NoReturn
 
+from mthds.package.discovery import MANIFEST_FILENAME
+from mthds.package.exceptions import ManifestError
+from mthds.package.manifest.parser import parse_methods_toml
 from pipelex import log
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
@@ -205,14 +216,120 @@ def parse_bundle(*, bundle_b64: str | None, files: dict[str, str] | None) -> Par
     return ParsedBundle(entries=tuple(entries))
 
 
+# Where a bundle ships the method packages it calls: `.mthds/methods/<name>/`, at the bundle's root and nowhere else.
+_MTHDS_DIR_NAME = ".mthds"
+_METHODS_DIR_NAME = "methods"
+_VENDORING_LAYOUT = (
+    "A method package shipped with the bundle goes under '.mthds/methods/<name>/' at the bundle's root, "
+    "with its manifest at '.mthds/methods/<name>/METHODS.toml'."
+)
+
+
+class VendoredMethodPackage(NamedTuple):
+    """A method package a bundle ships under `.mthds/methods/<name>/`, held in memory."""
+
+    name: str
+    """The package's directory name under `.mthds/methods/`."""
+
+    full_address: str
+    """The address its manifest declares, `address/name`, as a reference names it and a refusal names the package."""
+
+    entries: tuple[tuple[PurePosixPath, bytes], ...]
+    """Every file of the package, by its path relative to the package directory."""
+
+
+class BundlePartition(NamedTuple):
+    """A bundle's entries sorted into its own `.mthds` files, its other files, and the packages it ships."""
+
+    mthds_entries: tuple[tuple[PurePosixPath, bytes], ...]
+    library_entries: tuple[tuple[PurePosixPath, bytes], ...]
+    vendored_packages: tuple[VendoredMethodPackage, ...]
+
+
+def _refuse_entry(*, owner: str, relpath: PurePosixPath, reason: str) -> NoReturn:
+    msg = f"{owner} entry '{relpath.as_posix()}' {reason}. {_VENDORING_LAYOUT}"
+    raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+
+
+def _vendored_package(*, owner: str, name: str, entries: list[tuple[PurePosixPath, bytes]]) -> VendoredMethodPackage:
+    """Check one shipped package's directory and read the address its manifest declares."""
+    package_label = f"'.mthds/methods/{name}/'"
+    if name.startswith("."):
+        msg = f"{owner} ships {package_label}, a hidden directory, which is never searched for a package. {_VENDORING_LAYOUT}"
+        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    manifest_bytes = next((data for relpath, data in entries if relpath == PurePosixPath(MANIFEST_FILENAME)), None)
+    if manifest_bytes is None:
+        msg = f"{owner} ships {package_label} without a {MANIFEST_FILENAME}, so no reference could find it. {_VENDORING_LAYOUT}"
+        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    manifest_path = f".mthds/methods/{name}/{MANIFEST_FILENAME}"
+    try:
+        manifest = parse_methods_toml(manifest_bytes.decode("utf-8"))
+    except UnicodeDecodeError:
+        msg = f"{owner} entry '{manifest_path}' is not valid UTF-8. {_VENDORING_LAYOUT}"
+        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    except ManifestError as exc:
+        msg = f"{owner} entry '{manifest_path}' is not a valid method package manifest: {exc.message} {_VENDORING_LAYOUT}"
+        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    # The name a reference matches, as the engine's discovery gives it: the manifest's, else the directory's.
+    package_name = manifest.name if manifest.name is not None else name
+    return VendoredMethodPackage(name=name, full_address=f"{manifest.address}/{package_name}", entries=tuple(entries))
+
+
+def partition_bundle_entries(entries: tuple[tuple[PurePosixPath, bytes], ...], *, owner: str = "Bundle") -> BundlePartition:
+    """Sort a bundle's entries into its own `.mthds` files, its other files, and the method packages it ships.
+
+    An entry under `.mthds/methods/<name>/`, whatever its extension, belongs to the shipped package `<name>`, which
+    leaves the bundle's own content and its library directory. Every other `.mthds` path component is refused with a
+    `422 InvalidBundle` naming the entry rather than dropped, since nothing could ever find what it holds: a file
+    elsewhere under `.mthds/`, a `.mthds/methods/` store below the root, a file directly under `.mthds/methods/`, and a
+    `.mthds/` inside a shipped package, whose own dependencies are not loaded. A shipped package must be a directory
+    whose name does not start with a dot and whose `METHODS.toml` parses, and the address that manifest declares is read
+    here, to name the package in a refusal. Counting the bundle's own `.mthds` files is the caller's: a bundle whose only
+    `.mthds` files are shipped ones has no content of its own.
+
+    Args:
+        entries: The bundle's `(safe relpath, bytes)` entries.
+        owner: How a refusal names the bundle, for a method package fetched by address as for a request's bundle.
+
+    Returns:
+        The three groups, each in the bundle's entry order.
+    """
+    mthds_entries: list[tuple[PurePosixPath, bytes]] = []
+    library_entries: list[tuple[PurePosixPath, bytes]] = []
+    vendored_entries: dict[str, list[tuple[PurePosixPath, bytes]]] = {}
+    for relpath, data in entries:
+        parts = relpath.parts
+        if parts[0] == _MTHDS_DIR_NAME:
+            if len(parts) < 4 or parts[1] != _METHODS_DIR_NAME:
+                _refuse_entry(owner=owner, relpath=relpath, reason="is under '.mthds/' but not inside a shipped method package")
+            package_relpath = PurePosixPath(*parts[3:])
+            if _MTHDS_DIR_NAME in package_relpath.parts:
+                _refuse_entry(
+                    owner=owner,
+                    relpath=relpath,
+                    reason="is a '.mthds/' directory inside a shipped method package, whose own dependencies are not loaded",
+                )
+            vendored_entries.setdefault(parts[2], []).append((package_relpath, data))
+        elif _MTHDS_DIR_NAME in parts:
+            _refuse_entry(owner=owner, relpath=relpath, reason="is under a '.mthds/' directory below the bundle's root, which is never searched")
+        elif relpath.suffix == ".mthds":
+            mthds_entries.append((relpath, data))
+        else:
+            library_entries.append((relpath, data))
+    vendored_packages = tuple(
+        _vendored_package(owner=owner, name=name, entries=package_entries) for name, package_entries in vendored_entries.items()
+    )
+    return BundlePartition(mthds_entries=tuple(mthds_entries), library_entries=tuple(library_entries), vendored_packages=vendored_packages)
+
+
 @contextmanager
-def materialize_parsed(parsed: ParsedBundle) -> Generator[MaterializedBundle, None, None]:
+def materialize_parsed(parsed: ParsedBundle, *, prefix: str = "pipelex-bundle-") -> Generator[MaterializedBundle, None, None]:
     """Write an already-parsed bundle into a fresh temp directory, cleaned up on exit.
 
     The yielded `MaterializedBundle.directory` is safe to pass as a `library_dirs`
     entry; it is removed when the context exits, on both the happy and error path.
     """
-    directory = Path(tempfile.mkdtemp(prefix="pipelex-bundle-"))
+    directory = Path(tempfile.mkdtemp(prefix=prefix))
     try:
         root = directory.resolve()
         relpaths: list[str] = []
@@ -229,6 +346,18 @@ def materialize_parsed(parsed: ParsedBundle) -> Generator[MaterializedBundle, No
         yield MaterializedBundle(directory=directory, relpaths=tuple(relpaths))
     finally:
         shutil.rmtree(directory, ignore_errors=True)
+
+
+@contextmanager
+def materialized_methods_dir(packages: tuple[VendoredMethodPackage, ...]) -> Generator[Path, None, None]:
+    """Write shipped method packages into a temp directory of their own, as `<tmp>/<name>/…`, cleaned up on exit.
+
+    The directory is laid out like `.mthds/methods/`, one directory per package, which is what the engine's
+    `methods_dirs` take, and its path holds no `.mthds/methods` a walk-up from a bundle could take for a store.
+    """
+    entries = tuple((PurePosixPath(package.name) / relpath, data) for package in packages for relpath, data in package.entries)
+    with materialize_parsed(ParsedBundle(entries=entries), prefix="pipelex-methods-") as materialized:
+        yield materialized.directory
 
 
 @contextmanager

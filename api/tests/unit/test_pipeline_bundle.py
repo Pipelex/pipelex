@@ -4,8 +4,10 @@ The pipeline runner is mocked (as in `test_pipeline_routes`); these assert that
 the API layer KEEPS the proven run path for a bundle — the bundle's `.mthds` text
 is passed as `mthds_contents` (so the engine resolves `main_pipe` exactly as for a
 plain run) — while ONLY the non-`.mthds` files (custom PipeFunc `.py`, etc.) are
-materialized into a temporary `library_dirs` directory for source capture. They
-also assert the custom-Python sandbox gate and the both-forms guard.
+materialized into a temporary `library_dirs` directory for source capture, while the
+method packages it ships under `.mthds/methods/<name>/` leave both and are written
+into their own temporary `methods_dirs` directory. They also assert the custom-Python
+sandbox gate, the both-forms guard, and the shapes of `.mthds/` content refused.
 """
 
 import base64
@@ -14,6 +16,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
@@ -21,9 +24,53 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
-from tests.unit._constants import VALID_MTHDS
+from tests.unit._constants import UNRESOLVED_PACKAGE_MTHDS, VALID_MTHDS, VENDORED_PROBE_FILES, VENDORED_PROBE_MANIFEST, VENDORED_PROBE_MTHDS
 
 _PIPE_FUNC_PY = "def echo(working_memory):\n    return 'hi'\n"
+
+# Each `.mthds/` shape a request is refused for, with the text the refusal must name: the entry, or the package directory.
+_REFUSED_VENDORING_SHAPES: dict[str, tuple[dict[str, str], str]] = {
+    "a file under .mthds/ outside methods/": ({"bundle.mthds": UNRESOLVED_PACKAGE_MTHDS, ".mthds/foo": "x"}, ".mthds/foo"),
+    "a .mthds/methods/ store below the root": (
+        {"bundle.mthds": UNRESOLVED_PACKAGE_MTHDS, "sub/.mthds/methods/probe/probe.mthds": VENDORED_PROBE_MTHDS},
+        "sub/.mthds/methods/probe/probe.mthds",
+    ),
+    "a file directly under .mthds/methods/": (
+        {"bundle.mthds": UNRESOLVED_PACKAGE_MTHDS, ".mthds/methods/probe.mthds": VENDORED_PROBE_MTHDS},
+        ".mthds/methods/probe.mthds",
+    ),
+    "a package shipping its own .mthds/ store": (
+        {
+            **VENDORED_PROBE_FILES,
+            ".mthds/methods/probe/.mthds/methods/inner/inner.mthds": VENDORED_PROBE_MTHDS,
+        },
+        ".mthds/methods/probe/.mthds/methods/inner/inner.mthds",
+    ),
+    "a package directory without METHODS.toml": (
+        {"bundle.mthds": UNRESOLVED_PACKAGE_MTHDS, ".mthds/methods/probe/probe.mthds": VENDORED_PROBE_MTHDS},
+        ".mthds/methods/probe/",
+    ),
+    "a package whose METHODS.toml is not a manifest": (
+        {**VENDORED_PROBE_FILES, ".mthds/methods/probe/METHODS.toml": "[package]\nname = 'probe'\n"},
+        ".mthds/methods/probe/METHODS.toml",
+    ),
+    "a hidden package directory": (
+        {
+            "bundle.mthds": UNRESOLVED_PACKAGE_MTHDS,
+            ".mthds/methods/.probe/METHODS.toml": VENDORED_PROBE_MANIFEST,
+            ".mthds/methods/.probe/probe.mthds": VENDORED_PROBE_MTHDS,
+        },
+        ".mthds/methods/.probe/",
+    ),
+    "a request whose only .mthds files are vendored": (
+        {".mthds/methods/probe/METHODS.toml": VENDORED_PROBE_MANIFEST, ".mthds/methods/probe/probe.mthds": VENDORED_PROBE_MTHDS},
+        "no .mthds file of its own",
+    ),
+}
+
+
+def _files_under(directory: Path) -> list[str]:
+    return sorted(path.relative_to(directory).as_posix() for path in directory.rglob("*") if path.is_file())
 
 
 def _zip_b64(files: dict[str, str]) -> str:
@@ -60,26 +107,29 @@ def _build_client(mocker: MockerFixture) -> tuple[TestClient, dict[str, Any]]:
     }
     fake_execute_response.pipe_output.tokens_usages = None
 
-    def _record(library_dirs: list[str] | None, run_kwargs: dict[str, Any]) -> None:
+    def _record(runner_kwargs: dict[str, Any], run_kwargs: dict[str, Any]) -> None:
+        library_dirs: list[str] | None = runner_kwargs.get("library_dirs")
+        methods_dirs: list[Path] | None = runner_kwargs.get("methods_dirs")
         snapshot["library_dirs"] = library_dirs
+        snapshot["methods_dirs"] = methods_dirs
         snapshot["mthds_contents"] = run_kwargs.get("mthds_contents")
         if library_dirs:
             root = Path(library_dirs[0])
             snapshot["dir_exists"] = root.exists()
-            snapshot["files"] = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
+            snapshot["files"] = _files_under(root)
         else:
             snapshot["files"] = None
+        snapshot["methods_files"] = [_files_under(Path(methods_dir)) for methods_dir in methods_dirs] if methods_dirs else None
 
     def _make_runner(**kwargs: Any) -> Any:
-        library_dirs: list[str] | None = kwargs.get("library_dirs")
         runner = mocker.MagicMock()
 
         async def _execute(**run_kwargs: Any) -> Any:
-            _record(library_dirs, run_kwargs)
+            _record(kwargs, run_kwargs)
             return fake_execute_response
 
         async def _start(**run_kwargs: Any) -> Any:
-            _record(library_dirs, run_kwargs)
+            _record(kwargs, run_kwargs)
             return PipelexRunResultStart(
                 pipeline_run_id="run-1",
                 created_at="2026-01-15T12:00:00Z",
@@ -169,3 +219,49 @@ class TestPipelineBundle:
         )
         assert response.status_code == 422
         assert "mutually exclusive" in response.text
+
+    @pytest.mark.parametrize("transport", ["files", "bundle_b64"])
+    @pytest.mark.parametrize("path", ["/v1/execute", "/v1/start"])
+    def test_a_vendored_package_gets_its_own_methods_dir(self, mocker: MockerFixture, transport: str, path: str):
+        """A package under `.mthds/methods/<name>/` leaves `mthds_contents` and the library dir for a methods dir of its own."""
+        mocker.patch("pipelex_api.routes.pipelex.pipeline.is_pipe_func_sandbox_hosted", return_value=True)
+        client, snapshot = _build_client(mocker)
+        files = {**VENDORED_PROBE_FILES, "pipe_func.py": _PIPE_FUNC_PY}
+        body: dict[str, Any] = {"files": files} if transport == "files" else {"bundle_b64": _zip_b64(files)}
+
+        response = client.post(path, json={**body, "inputs": {"text": "hi"}})
+
+        assert response.status_code in {200, 202}, response.text
+        # The bundle's own file alone is the content; the package's bundle is not the caller's own domain.
+        assert snapshot["mthds_contents"] == [UNRESOLVED_PACKAGE_MTHDS]
+        # The library dir holds the bundle's own Python, and nothing of the package.
+        assert snapshot["files"] == ["pipe_func.py"]
+        # The package is in its own methods dir, laid out as `<name>/…`, a path no walk-up could take for a store.
+        (methods_dir,) = snapshot["methods_dirs"]
+        assert snapshot["methods_files"] == [["probe/METHODS.toml", "probe/probe.mthds"]]
+        assert ".mthds/methods" not in Path(methods_dir).as_posix()
+        # Cleaned once the request returns, like the library dir.
+        assert not Path(methods_dir).exists()
+
+    def test_a_bundle_shipping_no_package_gets_no_methods_dir(self, mocker: MockerFixture):
+        client, snapshot = _build_client(mocker)
+        response = client.post("/v1/execute", json={"files": {"main.mthds": VALID_MTHDS}, "inputs": {"text": "hi"}})
+        assert response.status_code == 200
+        assert snapshot["methods_dirs"] is None
+
+    @pytest.mark.parametrize("transport", ["files", "bundle_b64"])
+    @pytest.mark.parametrize("shape", list(_REFUSED_VENDORING_SHAPES))
+    def test_a_misplaced_mthds_entry_is_refused(self, mocker: MockerFixture, transport: str, shape: str):
+        """A `.mthds` path no reference could find is refused with the layout to use, never dropped."""
+        files, named = _REFUSED_VENDORING_SHAPES[shape]
+        client, snapshot = _build_client(mocker)
+        body: dict[str, Any] = {"files": files} if transport == "files" else {"bundle_b64": _zip_b64(files)}
+
+        response = client.post("/v1/execute", json={**body, "inputs": {"text": "hi"}})
+
+        assert response.status_code == 422, response.text
+        problem = response.json()
+        assert problem["error_type"] == "InvalidBundle"
+        assert named in problem["detail"]
+        assert ".mthds/methods/<name>/" in problem["detail"]
+        assert snapshot == {}, "the runner was reached"

@@ -71,7 +71,10 @@ class RunRequest(BaseModel):
         bundle_b64: PIPELEX-API EXTENSION — base64-encoded zip of the whole method
             bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`). Lets a
             caller ship custom PipeFunc Python alongside the method; materialized into a
-            temporary library directory before the run. Mutually exclusive with `files`.
+            temporary library directory before the run. The method packages the bundle
+            calls by address may travel with it under `.mthds/methods/<name>/`, each with
+            its `METHODS.toml`, and are searched before the runner's installed copies.
+            Mutually exclusive with `files`.
         files: PIPELEX-API EXTENSION — the bundle as a `{relative_path: text}` map (the
             unzipped equivalent of `bundle_b64`). Mutually exclusive with `bundle_b64`.
         method_ref: PIPELEX-API EXTENSION — run a published method by address instead of
@@ -95,6 +98,8 @@ class RunRequest(BaseModel):
             "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the whole "
             "method bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`), materialized into a "
             "temporary library directory before the run so custom PipeFunc Python travels with the method. "
+            "The method packages the bundle calls by address may travel with it under `.mthds/methods/<name>/`, "
+            "each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone. "
             "Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment."
         ),
     )
