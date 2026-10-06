@@ -202,13 +202,13 @@ Create a single unified summary that captures the key points across all document
 """
 ```
 
-!!! info "When You Actually Need `[]` Notation"
-    The `[]` notation is only required for **advanced use cases**:
-    
-    1. **Batching over items**: When using `batch_over` in a `PipeSequence` to process each item separately
-    2. **Looping in templates**: When you need to iterate over items using Jinja2 syntax (`{% for item in items %}`) in `PipeLLM`, `PipeCompose`, or `PipeCondition` prompts
-    
-    For most cases where you simply pass multiple items to a pipe that processes them all together, you don't need to declare the input with `[]`. The pipe will receive the list and process it as a whole.
+!!! info "Declare the list a pipe reads"
+    A pipe that reads several items declares its input with `[]`, or `[N]` for a fixed count, even when it processes them all together in one prompt. Inside a `PipeSequence`, validation checks every step against what the steps before it stored (see [What each step reads](pipe-controllers/PipeSequence.md#what-each-step-reads)): a step whose pipe reads a single `Page` where an extraction stored `Page[]` is refused with `input_stuff_spec_mismatch`, and so is a step reading a list where a single value was stored.
+
+    The list notation is also what lets you:
+
+    1. **Batch over the items**: `batch_over` in a `PipeSequence` runs a pipe once per item of a list
+    2. **Loop in templates**: iterate over the items using Jinja2 syntax (`{% for item in items %}`) in `PipeLLM`, `PipeCompose`, or `PipeCondition` prompts
 
 **3. Fixed count (bracket notation `[N]`)**
 
