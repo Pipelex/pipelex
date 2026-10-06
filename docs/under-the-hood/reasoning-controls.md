@@ -377,7 +377,7 @@ Anthropic and Gemini count the thinking budget against `max_tokens`, so a budget
 - When the request sets `max_tokens`, a quarter of it, and never less than one token, is reserved for the answer, so the budget is cut to at most `max_tokens` minus that reserve.
 - When `max_tokens` cannot hold the model's minimum beside the reserve, or a single thinking token for a model that declares no minimum, the call is refused with an `LLMCapabilityError` naming `max_tokens`, the reserve and the minimum, rather than sent to fail at the provider.
 
-On the Anthropic structured path, `max_tokens` is first capped by the structured-output timeout (`inference.llm.anthropic.structured_output_timeout_seconds`, 42,666 tokens at the default 1,200 seconds), so a `MAX` effort's 65,536-token budget becomes 32,000 there.
+On the Anthropic structured path, `max_tokens` is first capped by the number of tokens the structured-output timeout (`inference.llm.anthropic.structured_output_timeout_seconds`) leaves time to generate, so a `MAX` effort's budget is fitted inside that cap rather than inside the model's own output limit.
 
 ---
 

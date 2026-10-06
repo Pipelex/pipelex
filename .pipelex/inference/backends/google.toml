@@ -100,7 +100,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 1.25, output = 10.0 }
-# Gemini refuses a thinking budget of 0 for this model
+# Gemini refuses a thinking budget of 0 for this model: the alias resolved to gemini-3.1-pro-preview, which always thinks, in October 2026
 listed_constraints = ["thinking_cannot_be_disabled"]
 thinking_mode = "adaptive"
 
@@ -116,7 +116,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.10, output = 0.40 }
-# Gemini refuses a thinking budget of 0 for this model
+# Gemini refuses a thinking budget of 0 for this model: the alias resolved to gemini-3.5-flash-lite, which always thinks, in October 2026
 listed_constraints = ["thinking_cannot_be_disabled"]
 thinking_mode = "adaptive"
 

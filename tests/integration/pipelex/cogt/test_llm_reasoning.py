@@ -23,6 +23,12 @@ def _skip_unless_the_model_reasons(llm_worker: LLMWorkerAbstract) -> None:
         pytest.skip(f"'{llm_worker.inference_model.name}' declares thinking_mode=none")
 
 
+def _skip_unless_the_model_structures(llm_worker: LLMWorkerAbstract) -> None:
+    """Skip a model whose spec declares no structured output, such as the text-only Magistral models."""
+    if not llm_worker.is_gen_object_supported:
+        pytest.skip(f"'{llm_worker.inference_model.name}' does not support object generation")
+
+
 def _skip_unless_the_model_takes_a_budget(llm_worker: LLMWorkerAbstract) -> None:
     """Skip a model that takes no explicit reasoning budget: only manual thinking on a budget-mapped worker does."""
     _skip_unless_the_model_reasons(llm_worker)
@@ -155,6 +161,7 @@ class TestLLMReasoning:
     ):
         """A reasoning effort on a structured output reaches the provider and the object validates."""
         llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
+        _skip_unless_the_model_structures(llm_worker)
         _skip_unless_the_model_reasons(llm_worker)
         pretty_print(LLMReasoningTestCases.STRUCTURED_PROMPT, title=f"[{topic}] structured using '{llm_combo.handle}'")
         llm_job = LLMJobFactory.make_llm_job(
@@ -177,6 +184,7 @@ class TestLLMReasoning:
     ):
         """An explicit reasoning budget on a structured output reaches the provider and the object validates."""
         llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
+        _skip_unless_the_model_structures(llm_worker)
         _skip_unless_the_model_takes_a_budget(llm_worker)
         pretty_print(LLMReasoningTestCases.STRUCTURED_PROMPT, title=f"[budget={budget}] structured using '{llm_combo.handle}'")
         llm_job = LLMJobFactory.make_llm_job(
