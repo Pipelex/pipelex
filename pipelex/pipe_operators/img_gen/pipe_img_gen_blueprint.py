@@ -60,7 +60,6 @@ class PipeImgGenBlueprint(PipeBlueprint):
             declared_inputs=declared_inputs,
             variable_paths=variable_paths,
             reader="prompt or negative_prompt",
-            dotted_input_supplies_its_path=False,
         )
 
     @classmethod

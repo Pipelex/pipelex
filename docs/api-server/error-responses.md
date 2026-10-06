@@ -90,7 +90,7 @@ A validation error item may carry a `suggested_fix`: a deterministic repair the 
 
 **Fields:**
 
-- `fix_code` — the kebab-case rule id that produced the fix (`match-sequence-output`, `sync-controller-inputs`, `strip-native-concept-redecl`, `strip-namespace`, …). Stable; use it to allow-list or suppress rules.
+- `fix_code` — the kebab-case rule id that produced the fix (`match-sequence-output`, `sync-controller-inputs`, `strip-native-concept-redecl`, `strip-namespace`, `delete-redundant-dotted-input`, …). Stable; use it to allow-list or suppress rules.
 - `description` — human-readable summary of what the fix does.
 - `safety` — `safe` or `unsafe`. Only apply an `unsafe` fix behind an explicit opt-in: it is a likely correction, such as the one close match for an unknown model, that a person or an agent must confirm, and `pipelex fix bundle` never applies one on its own.
 - `source` — the file the ops target, when known. **An applier must only apply ops to the file they target** — in a multi-file library the ops are meaningless against any other file.

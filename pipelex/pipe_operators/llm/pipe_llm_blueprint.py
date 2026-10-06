@@ -114,7 +114,6 @@ class PipeLLMBlueprint(PipeBlueprint):
             declared_inputs=declared_inputs,
             variable_paths=filtered_variable_paths,
             reader="prompt or system_prompt",
-            dotted_input_supplies_its_path=True,
         )
 
     @override

@@ -6,6 +6,7 @@ of the validation report — CLI, API, MCP — sees fixes with zero extra plumbi
 """
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.pipe_machinery.validation import dropped_input_marker_warning
 from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixOp, FixSafety, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
@@ -13,18 +14,22 @@ SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
 STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE = "strip-native-concept-redecl"
 STRIP_NAMESPACE_FIX_CODE = "strip-namespace"
 RENAME_MODEL_FIX_CODE = "rename-model"
+DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE = "delete-redundant-dotted-input"
 
 # The codes `pipelex fix bundle --select/--ignore` accept: every SAFE rule the fix loop can apply. A new
 # SAFE rule constant above must be added here; the CLI rejects codes outside this set loudly (a typo'd
 # filter selects *behavior*, so lenient-ignore is wrong). An UNSAFE rule stays out: the loop never applies
 # it, so accepting it in `--select` would promise a fix the command then silently skips. `rename-model`
-# is the one such rule today.
+# is the one such rule today. A rule that is SAFE on some errors and UNSAFE on others, such as
+# `delete-redundant-dotted-input`, stays in: `--select` picks its SAFE fixes, and its UNSAFE ones are
+# skipped like any other.
 KNOWN_FIX_CODES: frozenset[str] = frozenset(
     {
         MATCH_SEQUENCE_OUTPUT_FIX_CODE,
         SYNC_CONTROLLER_INPUTS_FIX_CODE,
         STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE,
         STRIP_NAMESPACE_FIX_CODE,
+        DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE,
     }
 )
 
@@ -181,7 +186,56 @@ def plan_fix_for_blueprint_validation_error(error_data: PipelexBundleBlueprintVa
         return _plan_strip_native_concept_redecl(error_data)
     if error_data.error_type.is_invalid_pipe_code_syntax:
         return _plan_strip_namespace(error_data)
+    if error_data.error_type.is_invalid_input_name:
+        return _plan_delete_redundant_dotted_input(error_data=error_data)
     return None
+
+
+def _plan_delete_redundant_dotted_input(*, error_data: PipelexBundleBlueprintValidationErrorData) -> SuggestedFix | None:
+    """``delete-redundant-dotted-input``: an ``invalid_input_name`` carrying the enriched
+    ``redundant_input_name`` becomes a ``delete_key`` of that key in the pipe's ``inputs`` table.
+
+    The enrichment is set only when the same table declares the dotted name's root, which already
+    supplies every field a template reads through it. The fix is ``SAFE`` when deleting the key also
+    keeps the root's presence marker and multiplicity as the table's last declaration under the root set
+    them. When it would not, ``dropped_input_marker`` and ``root_input_marker`` carry the marker the key
+    declares and the one its root declares, and the fix is ``UNSAFE``: deleting the key would change what
+    a run requires, so ``pipelex fix bundle`` never applies it, and its description names the part that
+    differs, the multiplicity, the presence or both, and the edit that carries it onto the root. The two
+    markers are set together; a dropped marker without its root's is an incomplete enrichment and yields
+    no fix, never a ``SAFE`` one. A lone dotted name, whose root's concept nothing states, and a malformed
+    name carry no enrichment and are suppressed here structurally; their message names the remedies for
+    the author.
+    """
+    if error_data.redundant_input_name is None or error_data.pipe_code is None:
+        return None
+    description = (
+        f"Delete the dotted input '{error_data.redundant_input_name}' of pipe '{error_data.pipe_code}': its root is declared "
+        "beside it, and a template reads the field through the root"
+    )
+    safety = FixSafety.SAFE
+    if error_data.dropped_input_marker is not None:
+        if error_data.root_input_marker is None:
+            return None
+        marker_warning = dropped_input_marker_warning(
+            input_name=error_data.redundant_input_name,
+            dropped_input_marker=error_data.dropped_input_marker,
+            root_input_marker=error_data.root_input_marker,
+        )
+        description = f"{description}. {marker_warning}"
+        safety = FixSafety.UNSAFE
+    return SuggestedFix(
+        fix_code=DELETE_REDUNDANT_DOTTED_INPUT_FIX_CODE,
+        description=description,
+        safety=safety,
+        source=error_data.source,
+        ops=[
+            DeleteKeyOp(
+                table_path=["pipe", error_data.pipe_code, "inputs"],
+                key=error_data.redundant_input_name,
+            ),
+        ],
+    )
 
 
 def _plan_strip_native_concept_redecl(error_data: PipelexBundleBlueprintValidationErrorData) -> SuggestedFix | None:

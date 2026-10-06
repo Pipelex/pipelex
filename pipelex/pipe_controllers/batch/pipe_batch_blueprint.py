@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_machinery.validation import check_input_list_name
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -22,6 +23,9 @@ class PipeBatchBlueprint(PipeBlueprint):
 
     @override
     def validate_inputs(self):
+        # The list is one of the batch's own inputs, so its name is a plain input name: a list held in a
+        # field is declared under a plain name and handed to the batch by the calling sequence.
+        check_input_list_name(input_list_name=self.input_list_name)
         # The PipeBatch will iterate over a list and pass each item to the branch pipe,
         # so we must have the list's name as part of the batch inputs
         # and conversely, we must not have the item's name as part of the batch inputs

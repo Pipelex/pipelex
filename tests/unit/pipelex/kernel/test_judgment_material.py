@@ -40,7 +40,7 @@ class _ReportWithNestedContents(StructuredContent):
 
 
 class _Invoice(StructuredContent):
-    """A structure a dotted input reaches into."""
+    """A structured input, judged as one whole value under its plain name."""
 
     total: float
     note: str | None = None
@@ -155,27 +155,23 @@ class TestJudgmentMaterial:
         state, _, _ = build_judgment_material(memory=_memory({"report": report}), input_names=["report"])
         assert state == {"report": {"payload": {"text": "The roof is on fire"}, "extras": [{"number": 3}]}}
 
-    def test_a_dotted_input_is_the_value_at_its_path_keyed_by_its_full_name(self) -> None:
+    def test_a_structured_input_is_its_whole_value_keyed_by_its_plain_name(self) -> None:
+        """The material holds each declared input whole, under its plain name, and nothing it did not declare."""
         invoice = _Invoice(total=1250.0, note="rush", lines=[TextContent(text="roof"), TextContent(text="gutter")])
-        memory = _memory({"invoice": invoice})
+        memory = _memory({"invoice": invoice, "message": TextContent(text="help")})
 
-        state, images, documents = build_judgment_material(memory=memory, input_names=["invoice.total", "invoice.note", "invoice.lines"])
+        state, images, documents = build_judgment_material(memory=memory, input_names=["invoice"])
 
-        assert state == {"invoice.total": 1250.0, "invoice.note": "rush", "invoice.lines": ["roof", "gutter"]}
+        assert state == {"invoice": {"total": 1250.0, "note": "rush", "lines": [{"text": "roof"}, {"text": "gutter"}]}}
         assert images == {}
         assert documents == {}
 
-    def test_a_dotted_input_reaching_a_file_goes_to_the_file_channel(self) -> None:
-        invoice = _Invoice(total=1.0, scan=ImageContent(url="pipelex-storage://s/scan.png", mime_type="image/png"))
+    def test_a_dotted_name_is_never_walked_as_a_path(self) -> None:
+        """The dotted branch is gone, so a dotted name is looked up as a name, finds no stuff, and adds nothing."""
+        memory = _memory({"invoice": _Invoice(total=1.0, scan=ImageContent(url="pipelex-storage://s/scan.png", mime_type="image/png"))})
 
-        state, images, _ = build_judgment_material(memory=_memory({"invoice": invoice}), input_names=["invoice.scan"])
+        state, images, documents = build_judgment_material(memory=memory, input_names=["invoice.total", "invoice.scan"])
 
         assert state == {}
-        assert images == {"invoice.scan": [PromptImageUri(uri="pipelex-storage://s/scan.png", mime_type="image/png")]}
-
-    def test_a_dotted_input_whose_field_or_root_holds_nothing_is_left_out(self) -> None:
-        memory = _memory({"message": TextContent(text="help"), "invoice": _Invoice(total=1.0)})
-
-        state, _, _ = build_judgment_material(memory=memory, input_names=["message", "invoice.note", "estimate.total"])
-
-        assert state == {"message": "help"}
+        assert images == {}
+        assert documents == {}

@@ -108,19 +108,3 @@ output = "Text"
         applications = apply_fix_ops(toml_doc=toml_doc, ops=_MISSING_TABLE_OPS)
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED, FixOpOutcome.APPLIED]
         assert _dumps(toml_doc) == once
-
-    def test_dotted_input_key_survives_format(self) -> None:
-        """A quoted dotted input key (`"cv.name"`, a supported sub-attribute name) stays a flat
-        quoted entry through the format pass, not split into a nested table. Deleting an unrelated
-        sibling (with a bare ``cv`` root also present) must neither crash nor corrupt the file.
-        """
-        source = '[pipe.make_summary]\ntype = "PipeSequence"\ninputs = { "cv.name" = "Text", cv = "Curriculum", note = "Text" }\n'
-        toml_doc = tomlkit.loads(source)
-        applications = apply_fix_ops(toml_doc=toml_doc, ops=[DeleteKeyOp(table_path=_INPUTS_TABLE_PATH, key="note")])
-        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
-        formatted = serialize_and_format(toml_doc)
-        assert '"cv.name" = "Text"' in formatted
-        assert "note" not in formatted
-        # The dotted key stays a flat string entry, not a nested `cv = { name = ... }` table.
-        reloaded = tomlkit.loads(formatted).unwrap()
-        assert reloaded["pipe"]["make_summary"]["inputs"] == {"cv.name": "Text", "cv": "Curriculum"}

@@ -3552,6 +3552,10 @@ rationale = "Factory from source: builds the table from the template mapping; si
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
+["pipelex/language/mthds_schema_generator.py::_constrain_input_names"]
+param = "schema"
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
+
 ["pipelex/language/mthds_schema_generator.py::_convert_to_draft4"]
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
@@ -4127,14 +4131,6 @@ rationale = "Predicate on the pipe code; single operand."
 ["pipelex/pipe_machinery/validation.py::is_valid_input_name"]
 param = "input_name"
 rationale = "Predicate on the input name; single operand."
-
-["pipelex/pipe_machinery/validation.py::is_variable_satisfied_by_inputs"]
-param = "variable_path"
-rationale = "Predicate on the variable path; the inputs stay keyword."
-
-["pipelex/pipe_machinery/validation.py::validate_input_name"]
-param = "input_name"
-rationale = "Verb-object: validates the input name; single operand."
 
 ["pipelex/pipe_operators/compose/construct_blueprint.py::ConstructBlueprint.make_from_raw"]
 param = "raw"

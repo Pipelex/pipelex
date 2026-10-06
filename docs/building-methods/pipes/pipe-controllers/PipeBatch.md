@@ -49,7 +49,7 @@ This is the batch arm of the "route or skip" pattern: batch over items with a co
 | `inputs`           | dictionary   | The input concept(s) for the batch operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`           | string       | The output concept produced by the batch operation.                                                | Yes      |
 | `branch_pipe_code` | string       | The name of the single pipe to execute for each item in the input list.                                                                          | Yes      |
-| `input_list_name`  | string       | The name of the input list to iterate over. Must match one of the keys in `inputs`. Typically a plural noun (e.g. `articles`).                   | Yes      |
+| `input_list_name`  | string       | The name of the input list to iterate over. Must match one of the keys in `inputs`, so it is a plain input name, a `snake_case` identifier matching `[a-z][a-z0-9_]*`, and never a path into a field: a dotted name such as `catalog.pages` is refused as `invalid_input_name`. Typically a plural noun (e.g. `articles`). | Yes      |
 | `input_item_name`  | string       | The name that an individual item from the list will have inside its execution branch — this is how the branch pipe finds its input. Must differ from `input_list_name` and from every key in `inputs`. Typically the singular form of the list name (e.g. `article`). | Yes      |
 
 ### Example: Summarizing a list of articles

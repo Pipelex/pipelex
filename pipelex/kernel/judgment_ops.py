@@ -11,9 +11,7 @@ dispatch is on the content's class rather than on a concept, because the kernel 
 concept library.
 """
 
-from typing import Any, cast
-
-from pydantic_core import to_jsonable_python
+from typing import Any
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment
@@ -54,7 +52,6 @@ from pipelex.kernel.memory_ops import store_result
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
-from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
 # The one question a step asks travels under this key: the batch-first contract needs a key, and
@@ -180,31 +177,22 @@ def build_judgment_material(
 ) -> tuple[JudgmentState, dict[str, list[PromptImage]], dict[str, list[PromptDocument]]]:
     """The state and the files a judgment is asked over, one entry per input, keyed by its declared name.
 
-    An optional input that holds no value, whether its absence was recorded or it was never written, is
+    An input name is a plain name, so each entry is one whole value: the step's material holds exactly
+    what it declares, and a field reaches it only when the calling sequence binds it under a name of its
+    own. An optional input that holds no value, whether its absence was recorded or it was never written, is
     left out rather than sent as a null: a required input with no value never reaches the step, whose
-    presence scan refuses it. A dotted input, such as `invoice.total`, is the value at its path, keyed
-    by its full name, and is left out when the path holds nothing. An image or a document, or a list of
-    either, goes to the file channel; every other input is a member of the state. An image nested inside
-    a structured input is part of that input's JSON, its URL as text, which is the author's concern.
+    presence scan refuses it. An image or a document, or a list of either, goes to the file channel; every
+    other input is a member of the state. An image nested inside a structured input is part of that input's
+    JSON, its URL as text, which is the author's concern.
     """
     state: JudgmentState = {}
     images: dict[str, list[PromptImage]] = {}
     documents: dict[str, list[PromptDocument]] = {}
     for input_name in input_names:
-        stuff = memory.get_optional_stuff(name=get_root_from_dotted_path(input_name))
+        stuff = memory.get_optional_stuff(name=input_name)
         if stuff is None:
             continue
         content: StuffContent = stuff.content
-        if "." in input_name:
-            field_value = memory.get_typed_object_or_attribute(name=input_name, accept_list=True)
-            if field_value is None:
-                continue
-            if isinstance(field_value, list) and all(isinstance(item, StuffContent) for item in field_value):  # pyright: ignore[reportUnknownVariableType]
-                field_value = ListContent[StuffContent](items=cast("list[StuffContent]", field_value))
-            if not isinstance(field_value, StuffContent):
-                state[input_name] = to_jsonable_python(field_value, exclude_none=True, serialize_as_any=True)
-                continue
-            content = field_value
         if prompt_images := _prompt_images(content=content):
             images[input_name] = prompt_images
         elif prompt_documents := _prompt_documents(content=content):

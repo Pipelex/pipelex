@@ -27,7 +27,6 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeK
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
-from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
@@ -47,7 +46,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -331,10 +330,10 @@ class PipeAbstract(ABC, BaseModel):
 
     @final
     def generic_validate_inputs_with_library(self):
-        # First validate required variables are in the inputs (using prefix-based matching)
+        # First validate required variables are in the inputs: a variable path reads the input its root names
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
-            if not is_variable_satisfied_by_inputs(required_variable_path, input_names=input_names):
+            if get_root_from_dotted_path(required_variable_path) not in input_names:
                 msg = (
                     f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
                     f"Current inputs: {self.inputs.format_for_display()}"
@@ -371,7 +370,7 @@ class PipeAbstract(ABC, BaseModel):
                 # Compare the essential parts of StuffSpec (concept code + multiplicity)
                 # Skip validation if the needed stuff_spec is Dynamic or Anything (flexible output types)
                 declared_stuff_spec = self.inputs.root[var_name]
-                needed_stuff_spec = the_needed_inputs.root[named_stuff_spec.requirement_expression or var_name]
+                needed_stuff_spec = the_needed_inputs.root[var_name]
 
                 # Allow mismatch if the needed stuff_spec is a flexible type (Dynamic or Anything).
                 # Presence markers are deliberately NOT compared: a controller's boundary marker may

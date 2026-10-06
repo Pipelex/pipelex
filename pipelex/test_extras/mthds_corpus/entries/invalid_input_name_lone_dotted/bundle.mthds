@@ -1,0 +1,13 @@
+domain      = "catalog_proofing"
+description = "Check how a page of a mail-order catalog looks once printed"
+main_pipe   = "describe_printed_page"
+
+[pipe.describe_printed_page]
+type        = "PipeLLM"
+description = "Describe how a catalog page looks once printed"
+inputs      = { "page.page_view" = "Image" }
+output      = "Text"
+prompt      = """
+Describe how this catalog page looks once printed, and point out any picture cut off at the edge:
+@page.page_view
+"""

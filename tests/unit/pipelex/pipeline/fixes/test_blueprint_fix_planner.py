@@ -8,9 +8,13 @@ structurally. ``DELETE_KEY`` on ``["concept"]`` covers every authoring form (tab
 all normalize to a ``concept.<Code>`` key).
 """
 
+import pytest
+
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error
-from pipelex.suggested_fix import DeleteKeyOp, FixSafety, RenameTableKeyOp, SetKeyOp
+from pipelex.suggested_fix import DeleteKeyOp, FixSafety, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -43,6 +47,56 @@ def _strip_namespace_error_data(
         stripped_pipe_code=stripped_pipe_code,
         message="Pipe code 'greetings.hello' is not a valid pipe code. Must be in snake_case.",
     )
+
+
+def _invalid_input_name_error_data(
+    *,
+    variable_name: str,
+    redundant_input_name: str | None,
+    pipe_code: str | None = "describe_page",
+    dropped_input_marker: str | None = None,
+    root_input_marker: str | None = None,
+) -> PipelexBundleBlueprintValidationErrorData:
+    return PipelexBundleBlueprintValidationErrorData(
+        error_type=PipeValidationErrorType.INVALID_INPUT_NAME,
+        domain_code="catalog_review",
+        source="main.mthds",
+        pipe_code=pipe_code,
+        variable_names=[variable_name],
+        redundant_input_name=redundant_input_name,
+        dropped_input_marker=dropped_input_marker,
+        root_input_marker=root_input_marker,
+        message=f"Input '{variable_name}' is not a plain input name.",
+    )
+
+
+_REDUNDANT_INPUT_BUNDLE_HEADER = """domain = "dotted_safety"
+description = "Inputs declared once by their root and again by a dotted path into it"
+
+[concept]
+Item = "An item of an order"
+
+[pipe.read_input]
+type = "PipeLLM"
+description = "Reads a field of its input"
+output = "Text"
+"""
+
+
+def _fix_planned_from_inputs(input_specs: list[tuple[str, str]]) -> SuggestedFix:
+    """The fix planned for a bundle whose one pipe declares these inputs, in this order, through the parser and its categorizer."""
+    inputs_line = ", ".join(f'"{input_name}" = "{input_spec}"' for input_name, input_spec in input_specs)
+    dotted_name = next(input_name for input_name, _ in input_specs if "." in input_name)
+    mthds_content = f'{_REDUNDANT_INPUT_BUNDLE_HEADER}inputs = {{ {inputs_line} }}\nprompt = "Read ${dotted_name}"\n'
+    with pytest.raises(MthdsParserError) as exc_info:
+        MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="main.mthds")
+    errors = exc_info.value.validation_errors
+    assert len(errors) == 1, f"Expected exactly one error, got {[(error.error_type, error.message) for error in errors]}"
+    assert errors[0].error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+    fix = plan_fix_for_blueprint_validation_error(errors[0])
+    assert fix is not None
+    assert fix.fix_code == "delete-redundant-dotted-input"
+    return fix
 
 
 class TestBlueprintFixPlanner:
@@ -117,3 +171,218 @@ class TestBlueprintFixPlanner:
         fix = plan_fix_for_blueprint_validation_error(error_data)
         assert fix is not None
         assert fix.source == "sibling.mthds"
+
+    def test_redundant_dotted_input_yields_a_safe_delete_of_the_key(self) -> None:
+        """A dotted input whose root the same table declares is deleted from that pipe's `inputs`, safely."""
+        fix = plan_fix_for_blueprint_validation_error(
+            _invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name="page.page_view")
+        )
+        assert fix is not None
+        assert fix.fix_code == "delete-redundant-dotted-input"
+        assert fix.safety == FixSafety.SAFE
+        assert fix.source == "main.mthds"
+        assert fix.ops == [DeleteKeyOp(table_path=["pipe", "describe_page", "inputs"], key="page.page_view")]
+        assert "page.page_view" in fix.description
+
+    def test_lone_dotted_input_yields_none(self) -> None:
+        """A lone dotted input carries no enrichment, since nothing says its root's concept: the author repairs it."""
+        assert (
+            plan_fix_for_blueprint_validation_error(_invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name=None)) is None
+        )
+
+    def test_malformed_input_name_yields_none(self) -> None:
+        """A malformed name is never deleted: its repair is a rename only the author can choose."""
+        assert (
+            plan_fix_for_blueprint_validation_error(_invalid_input_name_error_data(variable_name="InvoiceTotal", redundant_input_name=None)) is None
+        )
+
+    def test_redundant_dotted_input_without_its_pipe_yields_none(self) -> None:
+        """Without the pipe the key lives in there is no table to delete it from."""
+        error_data = _invalid_input_name_error_data(variable_name="page.page_view", redundant_input_name="page.page_view", pipe_code=None)
+        assert plan_fix_for_blueprint_validation_error(error_data) is None
+
+    @pytest.mark.parametrize(
+        ("dropped_input_marker", "root_input_marker", "expected_warning"),
+        [
+            pytest.param(
+                "[]",
+                "[]?",
+                "Deleting 'data.text' drops its plain presence, where 'data' is optional (`?`): "
+                "remove `?` from 'data' if the root must not be optional",
+                id="presence-only",
+            ),
+            pytest.param(
+                "[]",
+                "",
+                "Deleting 'data.text' drops its list form (`[]`), where 'data' is a single value: add `[]` to 'data' if the root must be a list",
+                id="multiplicity-only",
+            ),
+            pytest.param(
+                "[]!",
+                "?",
+                "Deleting 'data.text' drops its list form (`[]`) and its forced presence (`!`), where 'data' is a single value and optional (`?`): "
+                "replace `?` with `[]!` on 'data' if the root must be a list and must be forced",
+                id="multiplicity-and-presence",
+            ),
+            pytest.param(
+                "!",
+                "?",
+                "Deleting 'data.text' drops its forced presence (`!`), where 'data' is optional (`?`): "
+                "replace `?` with `!` on 'data' if the root must be forced",
+                id="forced-key-under-an-optional-root",
+            ),
+            pytest.param(
+                "",
+                "?",
+                "Deleting 'data.text' drops its plain presence, where 'data' is optional (`?`): "
+                "remove `?` from 'data' if the root must not be optional",
+                id="plain-key-under-an-optional-root",
+            ),
+        ],
+    )
+    def test_redundant_dotted_input_dropping_a_marker_yields_an_unsafe_delete_naming_only_what_differs(
+        self,
+        dropped_input_marker: str,
+        root_input_marker: str,
+        expected_warning: str,
+    ) -> None:
+        """A deletion that would change the root's contract is offered as UNSAFE, naming only what differs and how to settle it on the root."""
+        fix = plan_fix_for_blueprint_validation_error(
+            _invalid_input_name_error_data(
+                variable_name="data.text",
+                redundant_input_name="data.text",
+                dropped_input_marker=dropped_input_marker,
+                root_input_marker=root_input_marker,
+            )
+        )
+        assert fix is not None
+        assert fix.fix_code == "delete-redundant-dotted-input"
+        assert fix.safety == FixSafety.UNSAFE
+        assert fix.ops == [DeleteKeyOp(table_path=["pipe", "describe_page", "inputs"], key="data.text")]
+        assert fix.description == (
+            "Delete the dotted input 'data.text' of pipe 'describe_page': its root is declared beside it, and a template reads the field "
+            f"through the root. {expected_warning}"
+        )
+
+    def test_redundant_dotted_input_with_a_dropped_marker_but_no_root_marker_yields_none(self) -> None:
+        """The two markers are set together; without the root's, the warning cannot say what differs, so no fix is offered rather than a SAFE one."""
+        error_data = _invalid_input_name_error_data(variable_name="data.text", redundant_input_name="data.text", dropped_input_marker="!")
+        assert plan_fix_for_blueprint_validation_error(error_data) is None
+
+    @pytest.mark.parametrize(
+        ("input_specs", "expected_safety", "deleted_key", "description_fragment"),
+        [
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text!")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its forced presence (`!`), where 'data' is optional (`?`): replace `?` with `!` on 'data' if the root must be forced",
+                id="key-forcing-an-optional-root-declared-after-it",
+            ),
+            pytest.param(
+                [("data.text", "Text!"), ("data", "Text?")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="key-forcing-an-optional-root-declared-before-it",
+            ),
+            pytest.param(
+                [("data", "Text!"), ("data.text", "Text!")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="equal-markers",
+            ),
+            pytest.param(
+                [("items", "Item"), ("items.x", "Text[]")],
+                FixSafety.UNSAFE,
+                "items.x",
+                "drops its list form (`[]`), where 'items' is a single value: add `[]` to 'items' if the root must be a list",
+                id="list-key-declared-after-its-single-root",
+            ),
+            pytest.param(
+                [("items.x", "Text[]"), ("items", "Item")],
+                FixSafety.SAFE,
+                "items.x",
+                None,
+                id="list-key-declared-before-its-single-root",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its plain presence, where 'data' is optional (`?`): remove `?` from 'data' if the root must not be optional",
+                id="plain-key-declared-after-its-optional-root",
+            ),
+            pytest.param(
+                [("data", "Text"), ("data.text", "Text[]")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its list form (`[]`), where 'data' is a single value: add `[]` to 'data' if the root must be a list",
+                id="multiplicity-only-list-key-declared-after-its-single-root",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text[]")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "drops its list form (`[]`) and its plain presence, where 'data' is a single value and optional (`?`): "
+                "replace `?` with `[]` on 'data' if the root must be a list and must not be optional",
+                id="list-key-declared-after-its-optional-single-root",
+            ),
+            pytest.param(
+                [("page", "Page"), ("page.page_view", "Image")],
+                FixSafety.SAFE,
+                "page.page_view",
+                None,
+                id="differing-concept-root-first",
+            ),
+            pytest.param(
+                [("page.page_view", "Image"), ("page", "Page")],
+                FixSafety.SAFE,
+                "page.page_view",
+                None,
+                id="differing-concept-root-last",
+            ),
+            pytest.param(
+                [("data", "Text"), ("data.text", "Text[1]")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="count-of-one-is-the-single-form",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text!"), ("data.page", "Text?")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="key-followed-by-another-under-its-root",
+            ),
+            pytest.param(
+                [("data", "Text?"), ("data.text", "Text!"), ("page", "Page"), ("page.page_view", "Image")],
+                FixSafety.SAFE,
+                "page.page_view",
+                None,
+                id="safe-deletion-reported-before-an-unsafe-one",
+            ),
+        ],
+    )
+    def test_redundant_dotted_input_is_safe_to_delete_only_when_the_roots_contract_holds(
+        self,
+        input_specs: list[tuple[str, str]],
+        expected_safety: FixSafety,
+        deleted_key: str,
+        description_fragment: str | None,
+    ) -> None:
+        """Deleting a dotted key beside its root is SAFE only when the root keeps the presence marker and multiplicity it had.
+
+        Before dotted names were refused, every declaration under a root was folded onto that root in declaration order, so
+        the last one set the root's presence marker and multiplicity. The concepts never decide: a field's concept differs
+        from its root's by nature. With several keys under one root the table is read in order, and a SAFE deletion is
+        reported before an UNSAFE one so the fix loop makes progress first.
+        """
+        fix = _fix_planned_from_inputs(input_specs)
+
+        assert fix.safety == expected_safety
+        assert fix.ops == [DeleteKeyOp(table_path=["pipe", "read_input", "inputs"], key=deleted_key)]
+        if description_fragment is not None:
+            assert description_fragment in fix.description

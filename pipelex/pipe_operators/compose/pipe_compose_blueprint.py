@@ -127,9 +127,7 @@ class PipeComposeBlueprint(PipeBlueprint):
             root = get_root_from_dotted_path(path)
             if not root.startswith("_") and root != "place_holder":
                 variable_paths.add(path)
-        check_inputs_match_variables(
-            declared_inputs=declared_inputs, variable_paths=variable_paths, reader="template", dotted_input_supplies_its_path=False
-        )
+        check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="template")
 
     def _validate_construct_inputs(self):
         """Validate inputs for construct mode.
@@ -147,7 +145,6 @@ class PipeComposeBlueprint(PipeBlueprint):
             declared_inputs=declared_inputs,
             variable_paths=construct_bp.get_required_variable_paths(),
             reader="construct",
-            dotted_input_supplies_its_path=False,
         )
 
     @override
