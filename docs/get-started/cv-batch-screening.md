@@ -93,7 +93,7 @@ type = "PipeLLM"
 description = """
 Parses and summarizes the job requirements from the extracted job offer content, identifying required skills, responsibilities, qualifications, and nice-to-haves
 """
-inputs = { job_offer_pages = "Page" }
+inputs = { job_offer_pages = "Page[]" }
 output = "JobRequirements"
 model = "$writing-factual"
 system_prompt = """
@@ -128,7 +128,7 @@ type = "PipeLLM"
 description = """
 Parses and summarizes the candidate's professional profile from the extracted CV content, identifying skills, experience, education, and achievements
 """
-inputs = { cv_pages = "Page" }
+inputs = { cv_pages = "Page[]" }
 output = "CandidateProfile"
 model = "$writing-factual"
 system_prompt = """
