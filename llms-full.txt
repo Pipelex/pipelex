@@ -918,7 +918,7 @@ type = "PipeLLM"
 description = """
 Parses and summarizes the job requirements from the extracted job offer content, identifying required skills, responsibilities, qualifications, and nice-to-haves
 """
-inputs = { job_offer_pages = "Page" }
+inputs = { job_offer_pages = "Page[]" }
 output = "JobRequirements"
 model = "$writing-factual"
 system_prompt = """
@@ -953,7 +953,7 @@ type = "PipeLLM"
 description = """
 Parses and summarizes the candidate's professional profile from the extracted CV content, identifying skills, experience, education, and achievements
 """
-inputs = { cv_pages = "Page" }
+inputs = { cv_pages = "Page[]" }
 output = "CandidateProfile"
 model = "$writing-factual"
 system_prompt = """
@@ -2038,12 +2038,13 @@ Check pipeline syntax, structure, and compatibility without execution:
 - **Syntax validation** — Catch MTHDS language errors via plxt linting
 - **Structure validation** — Resolve pipe and concept references in the loaded library, refuse concepts whose structures form a cycle or whose fields name a concept that cannot be found, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
 - **Input validation** — Ensure required inputs are provided and correctly typed, and that every variable a step reads is bound by the time that step runs
+- **What each sequence step reads** — Follow each `PipeSequence` step by step and check every step against the concept and multiplicity of each name it reads, whichever declared input or earlier step stored it (`input_stuff_spec_mismatch`): a step reading a single `Page` where an extraction stored `Page[]` is refused before anything runs
 - **Declared inputs are read** — For `PipeLLM`, `PipeCompose`, `PipeSearch` and `PipeImgGen`, every variable a template reads must be declared in `inputs` (`missing_input_variable`), and every declared input must be read by one of the pipe's templates (`extraneous_input_variable`): the prompt and system prompt of a `PipeLLM`, the template or the construct of a `PipeCompose`, the prompt of a `PipeSearch`, the prompt and negative prompt of a `PipeImgGen`. An unread input is refused on the pipe that declares it, before any controller above it is asked to supply it. A `PipeJudge` is the exception on that second rule: every input it declares is material for its model, so only the variables its `question` reads must be declared. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 A pipe that references a sub-pipe from a package that isn't loaded is reported as **skipped** rather than validated, so a passing run is not proof that every cross-package dependency resolves.
 
 !!! note "Steps read from working memory, not from the previous step"
-    A `PipeSequence` step resolves its inputs by name from working memory. They may come from the pipeline's inputs or from any earlier step — not necessarily the one immediately before it. Validation therefore checks that each name is bound when the step runs, rather than matching one step's output concept to the next step's declared input concept. There is no output-to-input chaining contract between consecutive steps to verify.
+    A `PipeSequence` step resolves its inputs by name from working memory. They may come from the pipeline's inputs or from any earlier step — not necessarily the one immediately before it. Validation therefore follows each name through the sequence rather than matching one step's output to the next step's input: it checks that each name is bound when the step runs, and that the value last stored under it has the concept and multiplicity the step reads. A refined concept satisfies a step reading its parent, a batched step always stores a list, a step calling a nested controller is held to the inputs it declares, and a name a pipe that does not resolve at validation stored, or a value a pipe step stores as `Anything`, such as the result of a condition whose outcomes produce different concepts, is assumed to hold the concept the step reads. See [PipeSequence](../building-methods/pipes/pipe-controllers/PipeSequence.md#what-each-step-reads).
 
 ## Dry Run Mode
 
@@ -2052,7 +2053,7 @@ Execute pipelines with mocked LLM responses to test pipeline logic, data flow, a
 - **Mock generation** — Format-compliant mock values for constrained fields, including structured outputs
 - **Configurable mock behavior** — Control mock list sizes, template handling, and response formats
 - **Full pipeline execution** — Working memory, controllers, and data flow all work as in production
-- **No credentials needed** — A dry run boots without inference credentials, on both `pipelex run --dry-run` and `pipelex-agent run --dry-run`. A backend whose API key is missing is skipped rather than fatal, so a dry run executes on a machine that holds no key at all. The one limit: a model handle that lives on a skipped backend cannot be resolved there, so a pipe pinning a bare handle such as `model = "gpt-4o-mini"` reports it as not found in the model deck; presets and the default model are unaffected
+- **No credentials needed** — A dry run boots without inference credentials, on both `pipelex run --dry-run` and `pipelex-agent run --dry-run`, and so does `pipelex validate`. Such a boot loads every enabled backend with all its models but resolves none of their keys, so validation and dry runs give the same verdict on a machine that holds no key at all as on one that holds them all: presets, the default models and a bare handle such as `model = "gpt-4o-mini"` resolve alike
 
 ## Allowed-to-Fail Pipes
 
@@ -2225,7 +2226,7 @@ The two inference documents, `.pipelex/inference/backends.toml` and `.pipelex/in
 
 ## Environment Variables
 
-Two configuration areas support `${...}` variable substitution in their TOML files: the inference backend configuration (`.pipelex/inference/backends.toml` and the per-backend TOML files under `.pipelex/inference/backends/`) and the telemetry configuration (`.pipelex/telemetry.toml`). In those files, use `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`. The `pipelex.toml` layering described above does not perform substitution — a `${env:VAR}` there stays a literal string.
+Two configuration areas support `${...}` variable substitution in their TOML files: the inference backend configuration (`.pipelex/inference/backends.toml` and the per-backend TOML files under `.pipelex/inference/backends/`) and the telemetry configuration (`.pipelex/telemetry.toml`). In those files, use `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`; a prefix other than `env` or `secret` is refused wherever it stands in a chain, even after a candidate that resolves. In the inference backend files, a variable stands only in a value a call sends, such as a key, an endpoint or a model id, never in a field that describes the model (see [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md)). The `pipelex.toml` layering described above does not perform substitution — a `${env:VAR}` there stays a literal string.
 
 ## Key Configuration Areas
 
@@ -3872,6 +3873,8 @@ The run is then refused, with an input error naming the input, when:
 - an `Image` input holds a file that is not an image, whatever reads it;
 - a document input is certain to reach a step whose model does not read its format: for example, Word transcripts batched into a `PipeExtract` whose extract model reads only PDF. The error names each input, its format, the step, the model and the formats that model reads.
 
+The check follows each input through the steps of the method: the items of a batch, the fields of a structured input, and what a binding step or a dotted `batch_over` binds, so a Word transcript at `cases[1].transcripts[0]`, batched through `batch_over = "cases.transcripts"` over a list of cases, is refused before the run. A list a binding gathers from a field that is not itself a list, such as `cases.attachment` over a list of cases, is not followed, and a step that reads its items refuses a file when it gets to it.
+
 A step reached only through a `PipeCondition`, or a step that may be skipped because an optional input is absent, may never run, so the run is not refused on its account. If it does run, it refuses the file itself, with the same kind of input error. The same holds for files a run produces along the way.
 
 ### NumberContent
@@ -4852,6 +4855,8 @@ Every pipe defines a **contract** through its `inputs` and `output` fields. This
 *   **`inputs`**: This dictionary defines the **mandatory and necessary** data that must be present in the [Working Memory](working-memory.md) before the pipe can execute. Each key in the dictionary becomes a variable name that you can reference in your pipe's logic (e.g., in prompts), and each value specifies the concept type that the data must conform to. If any required input is missing or doesn't match the expected concept, the pipeline will fail a clear error message.
 You can specify multiple inputs by using a list of concepts. For example, `inputs = { description = "ProductDescription", keywords = "Keyword[]" }` will require a `ProductDescription` and a list of `Keyword`s. (See more about [Understanding Multiplicity](./understanding-multiplicity.md) for details.)
 
+    An input name is a plain `snake_case` identifier, matching `[a-z][a-z0-9_]*`, and it names one whole value of the concept its slot declares. A dotted key such as `"invoice.total" = "Number"` does not declare a field of `invoice`: it is refused as `invalid_input_name`, on every pipe. A pipe that needs one field of a value declares the value with its whole concept, `invoice = "Invoice"`, and reads the field through it in its template, as `$invoice.total`. `pipelex fix bundle` deletes a dotted key whose root is declared beside it, since that root already supplies the field, unless the key, declared after its root, carries another presence marker or multiplicity than the root, such as `"data.text" = "Text!"` after `data = "Text?"`: deleting that key would change what the pipe requires, so the fix names only what differs, the multiplicity, the presence marker or both, with the edit that carries it onto the root (here, replace `?` with `!` on `data`), and is left for you to apply.
+
     Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can carry [intent hints](../concepts/intent-hints.md) beside its concept:
 
     ```toml
@@ -5708,6 +5713,8 @@ This is not a contradiction of "the run mode never changes the backend" — it's
 
 When a process boots without inference configured — `Pipelex.make(needs_inference=False)`, e.g. no AI provider set up — every run that process initiates is forced to dry-run mode. This is a property of the run, not of the backend: under a Temporal-enabled boot the forced-dry run still dispatches activities and mocks inside them, like any other dry run. A warning logs whenever a live-requested run is forced dry.
 
+Such a boot knows every model a boot with inference knows: it loads every enabled backend with its models and their constraints, and resolves none of their credentials. That is why a dry run validates a method the same way whether or not the machine holds the keys. What it cannot do is call a provider: if live work reaches it from another process, as it can on a Temporal worker, the call is refused with an `InferenceBackendCredentialsError` that names the variables this process did not resolve, and the remedy is to boot that process with inference.
+
 ## See Also
 
 - [Validation & Dry Run](../../features/validation-dry-run.md) — feature overview
@@ -6448,13 +6455,13 @@ Create a single unified summary that captures the key points across all document
 """
 ```
 
-!!! info "When You Actually Need `[]` Notation"
-    The `[]` notation is only required for **advanced use cases**:
-    
-    1. **Batching over items**: When using `batch_over` in a `PipeSequence` to process each item separately
-    2. **Looping in templates**: When you need to iterate over items using Jinja2 syntax (`{% for item in items %}`) in `PipeLLM`, `PipeCompose`, or `PipeCondition` prompts
-    
-    For most cases where you simply pass multiple items to a pipe that processes them all together, you don't need to declare the input with `[]`. The pipe will receive the list and process it as a whole.
+!!! info "Declare the list a pipe reads"
+    A pipe that reads several items declares its input with `[]`, or `[N]` for a fixed count, even when it processes them all together in one prompt. Inside a `PipeSequence`, validation checks every step against what the steps before it stored (see [What each step reads](pipe-controllers/PipeSequence.md#what-each-step-reads)): a step whose pipe reads a single `Page` where an extraction stored `Page[]` is refused with `input_stuff_spec_mismatch`, and so is a step reading a list where a single value was stored.
+
+    The list notation is also what lets you:
+
+    1. **Batch over the items**: `batch_over` in a `PipeSequence` runs a pipe once per item of a list
+    2. **Loop in templates**: iterate over the items using Jinja2 syntax (`{% for item in items %}`) in `PipeLLM`, `PipeCompose`, or `PipeCondition` prompts
 
 **3. Fixed count (bracket notation `[N]`)**
 
@@ -6513,6 +6520,8 @@ steps = [
     { pipe = "extract_single_invoice", batch_over = "invoice_images", batch_as = "invoice_image", result = "all_invoice_data" }
 ]
 ```
+
+When the list is held in a field of a bigger value, such as the scans of an `InvoiceBatch`, `batch_over` takes the dotted path, `batch_over = "invoice_batch.scans"`: the sequence binds the list at that path, then batches over it (see [Batching over a field](pipe-controllers/PipeSequence.md#batching-over-a-field)).
 
 ### Use Case 2: Generate Fixed Alternatives for Testing
 
@@ -6770,10 +6779,20 @@ The guard-lint covers every pipe that renders authored templates over its inputs
 
 Each controller has a defined behavior when a value inside its flow resolves absent:
 
-- **PipeSequence** — steps consuming an absent value plainly are lifted (skipped), and the absence propagates step to step. The sequence's own declared output must account for it: if the last producing step can be lifted, the sequence output must be declared `?` (otherwise `optional_not_handled`).
+- **PipeSequence** — steps consuming an absent value plainly are lifted (skipped), and the absence propagates step to step. The sequence's own declared output must account for it: if the last producing step can be lifted, the sequence output must be declared `?` (otherwise `optional_not_handled`). A name a nested sequence, a condition's outcome or an `add_each_output` parallel stores in the sequence's memory carries its absence the same way, and a nested controller that is lifted records an absence for every name it always stores (an empty list for a list), so a later step reading one is lifted in turn.
 - **PipeCondition** — the `continue` outcome resolves the declared output as a **declared-absent** record (memory otherwise unchanged). A condition that can reach `continue` must declare its output `?` (`optional_output_required`). See [PipeCondition](pipe-controllers/PipeCondition.md).
 - **PipeParallel** — combining under absence: a `Composite` output omits the absent component (with a ledger note); a structured output absorbs an absent branch into a non-required field as that field's declared default; a **required** field fed by a maybe-absent branch is rejected statically (`optional_branch_required_field`). See [PipeParallel](pipe-controllers/PipeParallel.md).
 - **PipeBatch** — absent branch results are **compacted** out of the aggregated list (a list cannot hold a hole). See [PipeBatch](pipe-controllers/PipeBatch.md).
+
+### Binding steps under absence
+
+A [binding step](pipe-controllers/PipeSequence.md#binding-steps) of a PipeSequence, `{ from = "delivery.note", result = "note" }`, can find nothing, and records it the way a pipe records an absent output:
+
+- **The path reaches a field holding nothing.** When `delivery.note` holds nothing, or `invoice.scan.url` is read from an invoice with no `scan`, the result is recorded as **declared-absent**, and the reason names the binding step, the sequence and the segment that held nothing (`'invoice.scan'`). The step does not fail.
+- **The root is absent.** When `delivery` is itself absent, for instance an optional method input the caller did not provide, the binding is **skipped** like a pipe whose plain input is absent, and its record chains to the root's own record, so the provenance runs from the result back to where the absence entered the flow.
+- **A list result is never absent.** A binding that crosses a list drops the items holding nothing and may bind an empty list, and over an absent root it binds an empty list, keeping the skip as a note.
+
+Statically, a single result is **maybe-absent** when its path walks a field that is not `required` and has no default, or, on a concept whose structure is a Python class, a field whose annotation admits `None` (`str | None`), even a required one. It then flows like any maybe-absent value: a later step reading it as a plain input may be lifted, a step reading it as `X?` runs with its guard, and a sequence ending with it, or with a step it may lift, declares its output `?` or is refused with `optional_not_handled`, whose message names the binding step as the absence origin. A `required` field, or one with a default, binds a value that is never absent.
 
 ## The Static Safety Net
 
@@ -7001,25 +7020,29 @@ Analyze this wedding photo and describe the key moments captured: $wedding_photo
 
 ### Images as Sub-attributes of Structured Content
 
-When working with structured content that contains image fields (like `PageContent` which has a `page_view` field), you need to specify the full path to the image attribute in the `inputs` section:
+When working with structured content that contains image fields (like `Page`, which has a `page_view` field), declare the structured value with its whole concept in `inputs`, and read the image field through it in the prompt:
 
 ```toml
 [pipe.analyze_page_view]
 type = "PipeLLM"
 description = "Analyze the visual layout of a page"
-inputs = { "page_content.page_view" = "Image" }
+inputs = { page = "Page" }
 output = "LayoutAnalysis"
 prompt = """
-Analyze the visual layout and design elements of this page: $page_content.page_view
+Analyze the visual layout and design elements of this page:
+@page.page_view
+
 Focus on typography, spacing, and overall composition.
 """
 ```
 
 In this example:
 
-- `page_content` is the input variable containing a `PageContent` object
-- `page_view` is the `ImageContent` field within the `PageContent` structure
-- The dot notation `page_content.page_view` tells Pipelex to extract the image from that specific field
+- `page` is the input variable, declared with its whole concept, `Page`
+- `page_view` is the `Image` field within the `Page` structure
+- The path `page.page_view` reads that field through `page`, and because the concept the path reaches is `Image`, Pipelex attaches it to the model call as an image
+
+An input name is always a plain name: a key such as `"page.page_view" = "Image"` is refused as `invalid_input_name`. When a pipe should receive only the field, under a name of its own, the calling sequence binds the field with a binding step, `{ from = "page.page_view", result = "page_view" }`, and the pipe declares `page_view = "Image"`.
 
 ### Multiple Images
 
@@ -7171,7 +7194,7 @@ The same rule governs `PipeImgGen` prompts (positive and negative), which use th
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string              | The type of the pipe: `PipeLLM`                                                                          | Yes      |
 | `description`               | string              | A description of the LLM operation.                                                                           | Yes      |
-| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
+| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. An input name is a plain `snake_case` name; for an image within structured content, declare the structured value (e.g., `page = "Page"`) and read the field through it in the prompt (`@page.page_view`). | No       |
 | `output`                    | string              | The output concept produced by the LLM operation with multiplicity notation using brackets (e.g., `"Text"`, `"Text[]"`, `"Text[3]"`).                                                | Yes      |
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | LLM choice used whenever this `PipeLLM` produces a structured output. Applies both to direct structured generation and to the structuring step when `structuring_method = "preliminary_text"` is set. | No       |
@@ -7828,7 +7851,7 @@ prompt = "Combine the styles of these reference images into a single coherent sc
 model = "$gen-image"
 ```
 
-Image references also work through a dotted path to a nested image field (e.g. `$page.page_view` when `page` is a `Page`), and through any of the `$var`, `@var`, or `{{ var }}` syntaxes.
+Image references also work through a dotted path to a nested image field (e.g. `$page.page_view` when the pipe declares `page = "Page"`), and through any of the `$var`, `@var`, or `{{ var }}` syntaxes. The image is detected from the concept the path reaches, so only the root is declared: an input name is a plain name, and a key such as `"page.page_view" = "Image"` is refused as `invalid_input_name`.
 
 ### Inputs and outputs
 
@@ -7976,7 +7999,7 @@ The fields a `PipeJudge` declares decide the kind of question it asks, and the k
 
 The output must be that native or a concept refining it, and `Dynamic` is neither: a pipe declaring `options` whose output is `YesNo` is refused when the method loads, with a message naming both sides. A `PipeJudge` produces one verdict, so its output cannot be a list; to judge every item of a list, map the `PipeJudge` over it with a [`PipeBatch`](../pipe-controllers/PipeBatch.md).
 
-**Every input is material to judge.** The model receives each input the pipe declares, by name, whether or not the question mentions it: a `Text` as its text, a `Number` as its number, a `YesNo` as its boolean, a list as a list, and a structured concept as its fields. An optional input that is absent is left out. Each input is sent whole, so an input name cannot reach into a field with a dot, as `invoice.total` would: declare `invoice` instead. So, unlike the other operators, a `PipeJudge` does not have to read its inputs in its `question`; it may still interpolate one, which suits a short parameter such as `"Is the message about $topic?"`, and every variable the question reads must be a declared input.
+**Every input is material to judge.** The model receives each input the pipe declares, by name, whether or not the question mentions it: a `Text` as its text, a `Number` as its number, a `YesNo` as its boolean, a list as a list, and a structured concept as its fields. An optional input that is absent is left out. Each input is sent whole, under its plain name: an input name never reaches into a field with a dot, on any pipe, and `"invoice.total" = "Number"` is refused as `invalid_input_name`. To judge one field of a larger value without sending the rest of it, have the calling sequence bind the field under a plain name with a binding step, `{ from = "invoice.total", result = "total_amount" }`, and declare `total_amount = "Number"`. So, unlike the other operators, a `PipeJudge` does not have to read its inputs in its `question`; it may still interpolate one, which suits a short parameter such as `"Is the message about $topic?"`, and every variable the question reads must be a declared input.
 
 **Images and documents are sent as files.** An `Image` or a `Document` input, or a list of either, reaches the model as a file rather than as text. Whether a model reads files is stated in its model configuration, and a `PipeJudge` with an image or a document input is refused when the method loads if its model does not read that kind of file, with a message naming the input and what the model reads. An input declared `Dynamic` names no kind of value, so a file it holds is checked when the step runs instead. A document given to the run in a format the model does not read is refused when the run starts, before any step spends anything. TypeSafe's model reads text only, so turn a document into text with a [`PipeExtract`](PipeExtract.md) step first.
 
@@ -8669,11 +8692,11 @@ The `PipeSequence` controller is used to execute a series of pipes one after ano
 
 ## How it works
 
-A `PipeSequence` defines a list of `steps`. Each step calls another pipe and gives a name to its output. The working memory is passed from one step to the next, accumulating results along the way.
+A `PipeSequence` defines a list of `steps`. A step is either a **pipe step**, which calls another pipe and gives a name to its output, or a **binding step**, which binds the value at a path in working memory to a new name (see [Binding steps](#binding-steps)). The working memory is passed from one step to the next, accumulating results along the way.
 
 -   The `input` of the `PipeSequence` is passed to the first pipe in the sequence.
 -   The `output` of each intermediate step is named via the `result` key and becomes available in the working memory for all subsequent steps.
--   The final `output` of the `PipeSequence` is the output produced by the very last step in the sequence.
+-   The final `output` of the `PipeSequence` is the output produced by the very last step in the sequence, a pipe step's output or the value a binding step binds.
 
 ## Configuration
 
@@ -8687,11 +8710,15 @@ A `PipeSequence` defines a list of `steps`. Each step calls another pipe and giv
 | `description` | string          | A description of the sequence operation.                                                                          | Yes      |
 | `inputs`    | dictionary  | The input concept(s) for the *first* pipe in the sequence, as a dictionary mapping input names to concept codes.                                                     | No       |
 | `output`   | string          | The output concept produced by the *last* pipe in the sequence.                                                | Yes      |
-| `steps`    | array of tables | An ordered list of the pipes to execute. Each table in the array defines a single step.                          | Yes      |
+| `steps`    | array of tables | An ordered list of the steps to run. Each table in the array defines a single step, a pipe step or a binding step. | Yes      |
 
 ### Step Configuration
 
-Each entry in the `steps` array is a table with the following keys:
+A step carrying `pipe` is a pipe step, and a step carrying `from` is a binding step. A step carries one or the other, never both, and each kind is a closed table: a key the kind does not define is refused.
+
+#### Pipe steps
+
+A pipe step is a table with the following keys:
 
 | Key      | Type   | Description                                                        | Required |
 | -------- | ------ | ------------------------------------------------------------------ | -------- |
@@ -8699,11 +8726,162 @@ Each entry in the `steps` array is a table with the following keys:
 | `result` | string | The name to give to this step's output in the working memory. When omitted, the output is stored only in the unnamed `main_stuff` slot (the default output), so later steps can pick it up as their implicit input but cannot reference it by a dedicated name. | No       |
 | `nb_output` | integer | Request a fixed number of outputs from this step's pipe. Cannot be combined with `multiple_output`. | No       |
 | `multiple_output` | boolean | Request a variable number of outputs from this step's pipe (the model decides how many). Cannot be combined with `nb_output`. | No       |
-| `batch_over` | string | The name of a list in the working memory to batch this step over, running the pipe once per item. Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
-| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). | No       |
+| `batch_over` | string | The list in the working memory to batch this step over, running the pipe once per item: a name, or a dotted path to a list held in a field, such as `catalog.pages`, which is a binding followed by a batch (see [Batching over a field](#batching-over-a-field)). Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
+| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). Like `result` and `batch_over`, it never starts with `_bound_`, a prefix reserved for the bound list of a dotted `batch_over`. | No       |
+
+#### Binding steps
+
+A binding step is a table with exactly these two keys:
+
+| Key      | Type   | Description                                                        | Required |
+| -------- | ------ | ------------------------------------------------------------------ | -------- |
+| `from`   | string | The path to bind: a name in working memory followed by zero or more field names, separated by single dots, each a letter followed by letters, digits and underscores. No subscript, expression or whitespace. | Yes      |
+| `result` | string | The name the bound value is stored under, a plain snake_case input name. | Yes      |
 
 !!! important "Output Concept Matching"
-    The output concept of the `PipeSequence` has to match the output of the last pipe in the sequence.
+    The output concept of the `PipeSequence` has to match the output of its last step: the output of the last pipe, or the concept a binding step derives when the sequence ends with one. A batched last step yields the variable list of its branches' results, `X[]`, whatever `nb_output` it asks for, so the sequence declares a variable list.
+
+## What each step reads
+
+Validation follows the values through the sequence, one step after the other, and checks every pipe step against what it reads. At each step, a name in working memory holds the concept and multiplicity of the value last stored under it:
+
+-   the sequence's declared `inputs`, to begin with;
+-   a pipe step's `result`, its pipe's output, made a list by `nb_output` or `multiple_output`, and always a variable list `X[]` for a batched step, whatever `nb_output` it asks for;
+-   what a nested `PipeSequence` or a `PipeCondition`'s outcome stores in the caller's memory, and the branch results of a `PipeParallel` with `add_each_output`;
+-   what a binding step binds (see [What a binding binds](#what-a-binding-binds)).
+
+A pipe step is checked against the `inputs` its pipe declares. For a nested `PipeSequence`, `PipeCondition`, `PipeParallel` or `PipeBatch`, that declaration is its contract, which its own validation holds its steps, outcomes or branches to, whatever the last of them reads. A pipe step whose pipe reads a name as a concept or a multiplicity the name does not hold is refused with `input_stuff_spec_mismatch`, and the message names the step, the name and what stored it:
+
+```text
+In pipe 'process_cv', step 2 (pipe 'analyze_one_cv') reads 'cv_pages' as 'Page', but step 1 (pipe 'extract_one_cv') stores it as 'Page[]'. Declare the input as 'Page[]' in pipe 'analyze_one_cv', or make step 1 (pipe 'extract_one_cv') store a 'Page' under 'cv_pages'.
+```
+
+-   The concept must be compatible with the read, as a sequence's output must be with its last step's: the same concept or a concept refining it, for instance, and any concept when the step reads `Anything` or `Dynamic`.
+-   The multiplicity must match: a list is not a single value, and a single value is not a list. A fixed count such as `Color[5]` satisfies a step reading a variable list `Color[]`, and no other count.
+-   A step's `batch_over` must name a list, whose items its pipe reads as the batch item's concept.
+-   A name whose values may have different concepts, as when the outcomes of a `PipeCondition` store it under different concepts, must satisfy the read with each of them, including the value it held before when an outcome stores nothing under it.
+-   A name a pipe that does not resolve at validation stored, such as a pipe of a dependency not loaded yet, is assumed to hold what the step reads.
+-   A value a pipe step stores as `Anything` or `Dynamic`, as the result of a `PipeCondition` whose outcomes produce different concepts, has a concept the run alone knows, so it is assumed to be the concept the step reads, and the items of a list stored as `Anything[]` the concept a batched pipe reads. Its multiplicity is still checked: a single `Anything` read as a list, or batched over, is refused. The sequence's own input declared as `Anything`, and a binding's value of `Anything`, are checked as any other value, also where a `PipeCondition` whose outcomes do not all store the name may leave them in place, and a binding cannot walk a path through a value stored as `Anything`, which has no structure (`binding_path_unresolved`).
+
+Every step reading a declared input is checked this way, not only the last one, so a declared input must satisfy each step that reads it, and one that does is valid even when the last step reads it as something else. When a first step reads `note` as `Markdown` and a later one reads it as `Text`, the sequence declares `note = "Markdown"`, which both accept, and declaring `note = "Text"` is refused at the first step; when a first step reads `pages` as `Page[3]` and a later one as `Page[]`, it declares `pages = "Page[3]"`. That declaration is then what the sequence needs from whatever calls it: a step calling it with a `Text` under `note`, or a `Page[]` under `pages`, is refused. A declared input no step reads is still refused with `extraneous_input_variable`, and a name a step reads from the caller that the sequence does not declare with `missing_input_variable`.
+
+## Binding steps
+
+A binding step hands one part of a bigger value to the steps after it, under a name of its own. An input name is always a plain name, so a pipe never declares `"invoice.total" = "Number"`: the calling sequence binds the field, and the pipe reads the bound name.
+
+```toml
+[pipe.acknowledge_invoice]
+type = "PipeSequence"
+description = "Acknowledges an invoice by its total"
+inputs = { invoice = "Invoice" }
+output = "Text"
+steps = [
+    { from = "invoice.total", result = "total_amount" },
+    { pipe = "write_receipt", result = "receipt" },
+]
+
+[pipe.write_receipt]
+type = "PipeCompose"
+description = "Writes the receipt for an amount"
+inputs = { total_amount = "Number" }
+output = "Text"
+template = "Received: $total_amount euros"
+```
+
+### What a binding binds
+
+The concept of the result is derived before the method runs, from the declared structures the path walks. The first segment names a value in working memory, the root, and each later segment names a field of the concept reached so far.
+
+| The path ends on | The result is |
+| --- | --- |
+| The root itself, `from = "departure_board"` | A renamed copy of the whole value, with its concept and multiplicity |
+| A field of concept `X`, or a field whose concept is `X` | `X` |
+| A `text` field, or a field declared by its `choices` | `Text` |
+| A `number` or `integer` field | `Number` |
+| A `boolean` field | `YesNo` |
+| A `date` or `datetime` field | `Date` (a `datetime` keeps its time) |
+| A `time` field | `Time` |
+| A `dict` field | `JSON` |
+| A `list` field of `X`, or of a plain type | `X[]`, or the native the plain type derives, as a list |
+| A field holding `Anything` | `Anything`, its value stored as an `Anything` input is: a string as a `Text`, a number as a `Number`, an object as a `JSON`, and so on. A list, or a value of no such type, is refused when the step runs |
+
+The root is typed by the latest step that stored a value under its name, or by the sequence's `inputs` when no step did. A step stores its `result`, and a batched step stores the list of its branches' results, `X[]`, whatever `nb_output` it carries. A nested `PipeSequence` runs its steps on the caller's working memory and a `PipeCondition` runs its chosen outcome there, so a name either of them stores counts as stored by the step that calls it, as do the branch results of a `PipeParallel` with `add_each_output`: a later step, a pipe step or a binding, reads it with no input of that name, and the name keeps its concept and whether it may be absent. A name only some outcomes of a condition store, when another outcome stores nothing under it or is `continue`, may still hold the value it held before, so the sequence needs it as an input, and it keeps its concept only when both values have the same one. When the values a name may hold have different concepts, its concept is not known before the run, so a binding reading it is refused with `binding_path_unresolved`, the message naming each outcome and the concept it stores. That happens when the outcomes of a condition store the name under different concepts, or when one outcome stores a value of another concept than the one an outcome storing nothing, such as `continue`, leaves. Store the name under one concept in every outcome, or bind inside each outcome, where its concept is known.
+
+A root stored by a pipe that does not resolve at validation, such as a pipe of a dependency not loaded yet, is assumed to deliver, as the rest of the sequence's checks assume. Its binding is derived when it runs, from the value the root holds, and checked then against what reads it: the sequence's declared output when the binding ends the sequence, its concept, its multiplicity and whether it may be absent, and the input of a later step reading the result. A mismatch is a run error, never a value of another concept. A root that may be absent still makes the result maybe-absent.
+
+A concept that refines another is walked through the structure it inherits, and a native concept through its pinned definition, so `page.page_view` binds an `Image`, every field of it kept, its `caption` included. A root holding a dependency package's concept, the output of one of the package's pipes, is walked through the package's own definitions, never through a concept of the method spelled the same.
+
+A path is refused with `binding_path_unresolved` when the walk cannot follow it, and the message names the segment and the fields the concept does have:
+
+-   a segment naming no field of the concept reached;
+-   a segment after a plain field (`invoice.total.amount`), after a `dict` field, or after a list with no declared item type;
+-   a segment into a concept with no structure to walk: a concept declared with neither a `structure` nor `refines`, whether as a string (`Notice = "A notice"`) or as a table with a description alone, unless its code names a registered Python class, whose fields are walked; `Dynamic`, `Anything`, `Composite`; a native holding its value in a single field (`Text`, `Number`, `Time`, `JSON`, `Markdown`); or a concept refining one of these. Bind the value itself instead, `from = "note"`.
+
+A path ending on a list with no declared item type is refused too, since nothing says what its items are.
+
+### Lists map and flatten
+
+When the path crosses a list, whether the root holds a list or a field does, the rest of the path is applied to every item, and every list crossed is flattened into one. The result is always one flat list, `X[]`: binding `pages.page_view` over `Page[]` gives `Image[]`, one image per page, and binding `shipments.parcels` over `Shipment[]` gives every parcel of every shipment. Items holding nothing are dropped, and an empty list is a valid result, so a list result is never absent.
+
+A single result never chooses one item of a list. When the run finds a list under a root typed as a single value, as when a count asked of the whole run reaches the steps of the sequence, the binding step fails with a run error naming the path and both shapes, rather than keep the first item. A bare name typed as a list that finds a single value fails the same way.
+
+### Absence
+
+A binding that finds nothing records an absence, under the optionality model (see [Understanding Optionality](../understanding-optionality.md#binding-steps-under-absence)):
+
+-   when the path reaches a field holding nothing, the result is recorded as `DECLARED_ABSENT`, and the reason names the segment that held nothing;
+-   when the root itself is absent, the binding is skipped as a pipe with an absent plain input is, and the result is recorded as `SKIPPED`, chained to the root's own record.
+
+A single result can be absent when its path walks a field that is not `required` and has no default, or, on a concept whose structure is a Python class, a field whose annotation admits `None`, required or not, so the static checks treat it as a maybe-absent value: a step reading it as a plain input may be lifted, and a sequence ending with it declares its output optional (`Text?`), or the validation refuses it with `optional_not_handled`.
+
+### A copy, with an identity of its own
+
+The bound value is a deep copy taken when the step runs: changing the root afterwards, or storing another value under the root's name, leaves the bound value as it was, and the reverse. The result is a new stuff with its own stuff code, and in the execution graph the binding is a node of its own, of kind `binding`, fed by the root's producer and producing the stuff it binds.
+
+### What validation checks
+
+-   A step that reads a bound name is checked against the derived concept and multiplicity, as every step is checked against what it reads (see [What each step reads](#what-each-step-reads)): reading `total_amount` as `Text` when the binding derives a `Number` is refused with `input_stuff_spec_mismatch`, and `batch_over` a bound name requires a list.
+-   A sequence ending with a binding step is checked as one ending with a pipe: its output concept with `inadequate_output_concept`, its multiplicity with `inadequate_output_multiplicity`, and a maybe-absent result with `optional_not_handled`.
+-   A step asking a sequence that ends with a binding step for a count of outputs, with `nb_output` or `multiple_output`, is refused with `inadequate_output_multiplicity` when the binding does not bind that count: a binding binds what its path derives, whatever count its caller asks for. A batched step asks its branches for nothing, so it is not checked.
+-   A root that is neither an input of the sequence nor stored by an earlier step on every run is refused with `missing_input_variable`.
+-   A malformed step is refused with `binding_step_invalid`: `pipe` beside `from`, a binding without `result`, a binding carrying `nb_output`, `multiple_output`, `batch_over` or `batch_as`, a `from` or a `result` outside its grammar, and a dotted `batch_over` outside the path grammar or on a `PipeParallel` branch. The schema refuses each of these too.
+
+A binding step lives in a `PipeSequence`'s `steps` only. A [`PipeParallel`](PipeParallel.md) branch is always a pipe step, since its branches run at once and a binding orders a value before the steps that read it: bind in the sequence before the parallel.
+
+### Batching over a field
+
+A pipe step's `batch_over` may be a dotted path to a list held in a field. The step is then a binding followed by a batch: the path is bound under a private name, by every rule of a binding step's `from`, and the step batches over the bound list.
+
+```toml
+[pipe.index_catalog]
+type = "PipeSequence"
+description = "Writes one index line per page of a catalog"
+inputs = { catalog = "Catalog" }
+output = "Text[]"
+steps = [
+    { pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "index_lines" },
+]
+```
+
+This step runs exactly as the two steps below, apart from the name the list is bound under:
+
+```toml
+steps = [
+    { from = "catalog.pages", result = "pages" },
+    { pipe = "write_index_line", batch_over = "pages", batch_as = "page", result = "index_lines" },
+]
+```
+
+So a dotted `batch_over` shares everything a binding does:
+
+-   The root is typed by the latest step that stored it, or by the sequence's `inputs`, and the sequence needs it as its own concept: `catalog` as a `Catalog`, never as the item's `CatalogPage`.
+-   Lists map and flatten, so `batch_over = "catalogs.pages"` over `Catalog[]` runs one branch per page of every catalog, and an absent root binds an empty list, which runs no branch.
+-   The path must reach a list, through a list root, a list field along the way, or a list field it ends on. A path deriving a single value, such as `catalog.season`, is refused before the run with `input_stuff_spec_mismatch`, as a batch over a value that is not a list is, and so is a list whose items the pipe reads as another concept.
+-   A path the structures cannot walk is refused with `binding_path_unresolved`, and a root that is neither an input of the sequence nor stored by an earlier step with `missing_input_variable`, each message naming the `batch_over` as written.
+-   A path outside the path grammar, such as `catalog..pages`, is refused with `binding_step_invalid`, which the schema catches too.
+-   In the execution graph, the binding is a node of kind `binding`, fed by the root's producer, and it feeds the batch.
+
+The private name starts with an underscore, `_bound_catalog_pages` for `catalog.pages`, so no template or input can read it: it shows only in the working memory the run leaves and in the graph. The `_bound_` prefix is reserved for these names. A nested `PipeSequence` binds in the working memory of the sequence calling it, so a name of the caller taking the prefix could be overwritten by the list a sequence it calls binds: a pipe step's `result`, `batch_as` or plain `batch_over`, on a sequence step or a `PipeParallel` branch, and a [`PipeBatch`](PipeBatch.md)'s `input_item_name` that starts with `_bound_` are refused with `invalid_input_name`, which the schema catches too, and the message asks for another name. Only a sequence's steps bind, so a [`PipeParallel`](PipeParallel.md) branch carries a plain `batch_over` only, and a dotted one there is refused with `binding_step_invalid`: bind the list in a step before the `PipeParallel`, and batch the branch over the bound name.
 
 ### Example
 
@@ -8815,6 +8993,8 @@ Each entry in the `branches` array is a table with the following keys:
 | `pipe`   | string | The name of the pipe to execute for this branch.                                         | Yes      |
 | `result` | string | The name for this branch's output. Must be unique within the `PipeParallel` definition. | Yes      |
 
+A branch is always a pipe step. A [binding step](PipeSequence.md#binding-steps), `{ from = "invoice.total", result = "total_amount" }`, is refused in `branches` with `binding_step_invalid`: the branches run at once, and a binding orders a value before the steps that read it, so bind the value in the calling sequence, in a step before the `PipeParallel`, and have the branch read the bound name. A branch may carry `batch_over` and `batch_as`, but its `batch_over` is a plain name: a dotted one, such as `catalog.pages`, binds before it batches (see [Batching over a field](PipeSequence.md#batching-over-a-field)), so it is refused with `binding_step_invalid` too, and the calling sequence binds the list before the `PipeParallel`.
+
 ### Example: Extracting different details from a text
 
 Imagine you have a product description and you want to extract the product features and the product sentiment at the same time.
@@ -8897,7 +9077,7 @@ This is the ideal controller for processing collections of documents, images, or
 
 1.  **Input List**: It identifies an input list from the working memory.
 2.  **Branching**: For each item in the input list, it creates a new, isolated execution branch.
-3.  **Isolation & Injection**: Each branch gets a deep copy of the `WorkingMemory`. The specific item for that branch is injected into this memory with a defined name.
+3.  **Isolation & Injection**: Each branch gets a deep copy of the `WorkingMemory`. The specific item for that branch, taken from the branch's own copy of the list, is injected into this memory with a defined name, so a branch that rewrites its item in place leaves the batched list and the other branches as they were.
 4.  **Concurrent Execution**: The specified `branch_pipe_code` runs across the branches concurrently — in bounded chunks, by default at most `max_concurrency` branches at a time. Each branch pipe operates only on its own item.
 5.  **Aggregation**: After all branches have completed, `PipeBatch` collects the individual output from each one and aggregates them into a single new list. This list becomes the final output of the `PipeBatch` pipe.
 
@@ -8932,8 +9112,8 @@ This is the batch arm of the "route or skip" pattern: batch over items with a co
 | `inputs`           | dictionary   | The input concept(s) for the batch operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`           | string       | The output concept produced by the batch operation.                                                | Yes      |
 | `branch_pipe_code` | string       | The name of the single pipe to execute for each item in the input list.                                                                          | Yes      |
-| `input_list_name`  | string       | The name of the input list to iterate over. Must match one of the keys in `inputs`. Typically a plural noun (e.g. `articles`).                   | Yes      |
-| `input_item_name`  | string       | The name that an individual item from the list will have inside its execution branch — this is how the branch pipe finds its input. Must differ from `input_list_name` and from every key in `inputs`. Typically the singular form of the list name (e.g. `article`). | Yes      |
+| `input_list_name`  | string       | The name of the input list to iterate over. Must match one of the keys in `inputs`, so it is a plain input name, a `snake_case` identifier matching `[a-z][a-z0-9_]*`, and never a path into a field: a dotted name such as `catalog.pages` is refused as `invalid_input_name`. To map a pipe over a list held in a field, have the calling sequence bind it to the batch's list with a binding step, or run the branch pipe in a sequence step whose dotted `batch_over` binds the list and batches over it (see [Batching over a field](PipeSequence.md#batching-over-a-field)). Typically a plural noun (e.g. `articles`). | Yes      |
+| `input_item_name`  | string       | The name that an individual item from the list will have inside its execution branch — this is how the branch pipe finds its input. Must differ from `input_list_name` and from every key in `inputs`, and never starts with `_bound_`, a prefix reserved for the bound list of a dotted `batch_over` (see [Batching over a field](PipeSequence.md#batching-over-a-field)), which is refused as `invalid_input_name`. Typically the singular form of the list name (e.g. `article`). | Yes      |
 
 ### Example: Summarizing a list of articles
 
@@ -8989,6 +9169,8 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 4.  **Execute Chosen Pipe**: The chosen pipe is then executed. It receives the exact same `WorkingMemory` and inputs that were passed to the `PipeCondition` operator. The output of the chosen pipe becomes the output of the `PipeCondition` itself.
 
 When the expression renders nothing, no outcome can be chosen and the pipe fails with `Conditional expression returned no result`, naming the pipe. That refusal and the others a condition makes are faults in your method, each reported with its reason and a next step. In a run, an expression that renders nothing, a `fail` outcome and a chosen pipe whose inputs are missing fail the run, which a hosted run answers with HTTP 422. In the dry run of `pipelex validate`, which runs every branch instead of choosing one, an expression that renders nothing over the mock inputs and a condition whose every outcome is `fail` give a `dry_run` item.
+
+A dry run, which is what `pipelex validate` and `pipelex run … --dry-run` do, runs every outcome because it cannot know which one a live run would take. Each outcome runs on a copy of the memory the condition received, so no outcome reads what another one wrote, and the default outcome runs last: the steps after the condition read its output, which is what a live run falls back to when no key matches. The graph of a dry run draws the condition's output as one stuff that every outcome produces and the next step reads.
 
 An expression that does not parse, whether written as `expression` or as `expression_template`, is refused when the bundle loads, before anything runs, and so is one the run could not compile, such as one naming a filter or a test that does not exist outside any conditional. Jinja2 resolves a name inside an `{% if %}` block or an inline `if` only when the expression renders, so a wrong name there fails the run rather than the load. `pipelex validate` reports either as an item on the condition naming the field and the line of it that fails, and a run of the bundle is refused with the same item, which a hosted run answers with HTTP 422. The item quotes none of the expression, which may be a host library's.
 
@@ -10306,7 +10488,7 @@ pipelex fix bundle my_bundle.mthds --select match-sequence-output
 
 ## What Gets Fixed
 
-Only fixes classified as SAFE are applied — deterministic corrections derived from the structured validation errors, never from guesswork. Errors without a safe deterministic fix are left in place and reported as remaining errors. An unsafe fix, such as `rename-model` for a model name the deck only nearly matches, still shows on its error, labelled `💡 Suggested fix (unsafe, confirm before applying):`, for you to check and apply by hand, and is not a code `--select` or `--ignore` accepts. The available fix rule codes (for `--select`/`--ignore`) are listed in the error message when you pass an unknown code.
+Only fixes classified as SAFE are applied — deterministic corrections derived from the structured validation errors, never from guesswork. Errors without a safe deterministic fix are left in place and reported as remaining errors. An unsafe fix, such as `rename-model` for a model name the deck only nearly matches, still shows on its error, labelled `💡 Suggested fix (unsafe, confirm before applying):`, for you to check and apply by hand, and is not a code `--select` or `--ignore` accepts. One rule is safe on some errors and unsafe on others: `delete-redundant-dotted-input` deletes a dotted input key such as `"page.page_view" = "Image"` whose root `page` is declared beside it, and it is safe when the root keeps its presence marker and multiplicity. When the key, declared after its root, carries another presence marker or multiplicity than the root, as `"data.text" = "Text!"` after `data = "Text?"` does, deleting it would change what a run requires, so that fix is unsafe and names only what differs, the multiplicity, the presence marker or both, with the edit that carries it onto the root; `--select` accepts the code and applies only its safe fixes. The available fix rule codes (for `--select`/`--ignore`) are listed in the error message when you pass an unknown code.
 
 ## Related Documentation
 
@@ -10728,6 +10910,8 @@ pipelex show backends [OPTIONS]
 
 Displays all configured inference backends and the active routing profile with its routing rules.
 
+The command does not resolve credentials, so it works on a machine that holds no key: every enabled backend is listed, with the variables it reads its credentials from. An endpoint read from a variable is shown as not resolved, by the name of its variable.
+
 **Options:**
 
 - `--all`, `-a` - Show all backends including disabled ones (by default, only enabled backends are shown)
@@ -10744,7 +10928,7 @@ pipelex show backends --all
 
 **What it displays:**
 
-- Table of configured backends with status, endpoint, and model count
+- Table of configured backends with status, endpoint, credential variables, and model count
 - Active routing profile name and description
 - Default backend for the profile
 - Routing rules mapping model patterns to backends
@@ -13147,6 +13331,10 @@ enabled = true
 
 The `${VARIABLE_NAME}` syntax automatically loads values from your `.env` file. Set `enabled = true` to activate a backend, or `false` to disable it.
 
+Keys are needed only to call a provider. A process that runs methods resolves every enabled backend's variables when it starts, and refuses to start without one, naming it. A process that boots without inference, such as `pipelex validate`, `pipelex show backends` or a dry run, resolves none of them: it loads every enabled backend with all its models anyway, so a validation gives the same verdict whether or not your keys are set. Every backend reads its key from the variable its own `api_key` names, Linkup included.
+
+A variable may stand only in a value that a call sends: `api_key`, `endpoint` and a backend's extra keys (such as `aws_region` or `gcp_project_id`) in `backends.toml`, and a model's `model_id`, `endpoint_path` and request headers in its backend's file. A field that describes the model, such as `model_type`, `sdk`, `thinking_mode`, `structure_method`, `inputs`, `outputs`, `costs` or the constraints, is written literally, because a boot without inference must know it without resolving anything. Pipelex refuses to boot on a variable in such a field and names the field and the variable.
+
 An enabled backend must declare at least one model in its file under `backends/` (see [Model Specifications](#model-specifications)). Pipelex refuses to boot when one declares none, because routing would send models to a backend that cannot serve them: disable the backend, or list the models it serves. The `internal` backend is exempt, since plugins add its models at boot. A backend table also no longer accepts a `model_specs_section` key; an enabled backend that still carries one is refused, and the fix is to list its models in `backends/<name>.toml` and remove the key, or to disable the backend.
 
 Judgment models are served by their own backend alone, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
@@ -15519,7 +15707,7 @@ That boot stands up the model deck, the content generator, the class registry, t
 
 **`read_scope` is required too, and `None` is a value you pass, not a default.** It bounds what the run may read: every `pipelex-storage://` key a step reads must lie under it, compared segment by segment, and no step reads a bare path or a `file://` URI from the local disk. `https://` and `data:` URLs are untouched. A value can carry any URL its method or its model chose, so the check runs where values are read, in every content-generation leaf before the dry-run branch, and `shape_inputs` applies it to a table given as a CSV input, which is always a local file. The storage scope must lie under the read scope, since a run reads its own outputs back, and a mismatch is refused at construction. A multi-tenant host passes its tenant's prefix (the hosted platform passes the organization id); `None` is the explicit statement that the run is unscoped, which is the truth for a single-tenant service or a laptop. It has no default for the storage scope's reason: a host that forgot it would run unscoped, and an unscoped run reads every key the process's credentials reach. A refused read raises `UriReadRefusedError`, a caller-facing input error that names where the URL sat and never quotes it.
 
-`needs_inference=False` boots keyless (no credentials, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `PipelexKernel.make` applies that rule through the same `runtime_hub.resolve_run_mode_for_boot` the pipe tier uses — a second copy of the rule at a second factory is how the two would drift apart.
+`needs_inference=False` boots keyless (every enabled backend and model loaded, no credential resolved, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `PipelexKernel.make` applies that rule through the same `runtime_hub.resolve_run_mode_for_boot` the pipe tier uses — a second copy of the rule at a second factory is how the two would drift apart.
 
 ---
 
@@ -15572,7 +15760,7 @@ Both façade calls take the concept and the output class the caller wants, defau
 
 The two `assemble_*` functions are there because `run_llm_text` and `run_img_gen` both take a *ready* prompt. A caller that could not build one would be holding an operator it cannot reach, which is what image generation was until `assemble_img_gen_prompt` existed: its only builder was an interpreter-layer blueprint. What they own is the part a caller must not re-derive — resolving `ImageReference` and `DocumentReference` out of working memory, and, on the image side, keeping the `[Image N]` tokens numbered from the same registry that orders `input_images`, since a mismatch mislabels which image the prompt is describing and nothing downstream can detect it.
 
-`run_judgment` asks one question over the step's inputs by name, which it calls the material. `build_judgment_material` reads each input off its content's class, never off its concept, so the kernel stays free of the concept library: text is its string, a number its number, a yes/no its boolean, a date or a time its ISO string, a list the array of its items, any other structure its JSON object without its absent members, and an image or a document, or a list of either, travels beside that JSON state as prompt images and documents keyed by the input's name. An optional input that holds no value is left out, whether its absence was recorded or it was never written. A dotted input, such as `invoice.total`, is the value at its path, keyed by its full name, and is left out when the path holds nothing. `make_verdict_content` turns the answer into the verdict native: a yes/no answer's probability decides the verdict against the step's threshold, inclusive, or against 0.5 when none is declared; an answer with no probability keeps the model's own verdict, and when a threshold was declared a live run logs a warning and its `JudgmentResult` reports `threshold_applied` as false. A rating's distribution is keyed by the level index written as text. `judgment_setting_of_choice` gives the setting of the step's model, else of the deck's default, and raises `JudgmentModelMissingError` when neither names one, since the deck serves none by default. `served_judgment_model` gives the spec of the model a handle resolves to on this boot, or `None` when no backend serves one, a waterfall none of whose models is served included. `resolve_judgment_setting` then pins the setting to the handle the model resolves to; on a dry run, a model no backend serves on this boot keeps the deck's handle, since no judging worker is called.
+`run_judgment` asks one question over the step's inputs by name, which it calls the material. `build_judgment_material` reads each input off its content's class, never off its concept, so the kernel stays free of the concept library: text is its string, a number its number, a yes/no its boolean, a date or a time its ISO string, a list the array of its items, any other structure its JSON object without its absent members, and an image or a document, or a list of either, travels beside that JSON state as prompt images and documents keyed by the input's name. An optional input that holds no value is left out, whether its absence was recorded or it was never written. An input name is a plain name, so each entry is one input's whole value, and the material holds exactly what the step declares: a field reaches a judgment only when the calling sequence binds it under a name of its own. `make_verdict_content` turns the answer into the verdict native: a yes/no answer's probability decides the verdict against the step's threshold, inclusive, or against 0.5 when none is declared; an answer with no probability keeps the model's own verdict, and when a threshold was declared a live run logs a warning and its `JudgmentResult` reports `threshold_applied` as false. A rating's distribution is keyed by the level index written as text. `judgment_setting_of_choice` gives the setting of the step's model, else of the deck's default, and raises `JudgmentModelMissingError` when neither names one, since the deck serves none by default. `served_judgment_model` gives the spec of the model a handle resolves to on this boot, or `None` when no backend serves one, a waterfall none of whose models is served included. `resolve_judgment_setting` then pins the setting to the handle the model resolves to; on a dry run, a model no backend serves on this boot keeps the deck's handle, since no judging worker is called.
 
 **Every entry point that renders a template takes a required `templating_style`** — `run_llm_text`, `run_llm_object`, `derive_structure_prompt`, `assemble_llm_prompt`, `assemble_img_gen_prompt`, `run_search`, `run_judgment`, `run_compose_template`. It is not nullable, and that is the contract: the Jinja2 filters that tag and format a value have no default of their own, so a call that omitted the style would render a prompt in a shape nobody chose. `resolve_templating_style(authored=...)` is what produces one — pass what the caller authored, or `None` to take the runtime default.
 
@@ -16648,6 +16836,7 @@ class GraphSpec(BaseModel):
 | `OUTPUT` | Pipeline output node |
 | `ARTIFACT` | Generated artifact |
 | `ERROR` | Error node |
+| `BINDING` | A PipeSequence binding step, `{ from = "invoice.total", result = "total_amount" }`: its `pipe_code` is the `from` path and its `pipe_type` is `BindingStep`; its input is the root's stuff and its output the stuff it binds, so DATA edges run from the root's producer to the binding and from the binding to every step reading the result |
 
 ### Edge Types
 
@@ -16784,6 +16973,20 @@ This paradigm enables:
 - Visualization of data lineage across the execution graph
 - Debugging by tracing which pipe produced unexpected output
 
+### A Dry-Run Condition's Output
+
+A stuff usually has one producer. The exception is the output of a `PipeCondition` in a dry run, which runs every outcome because it cannot know which one a live run would take. Every outcome writes the condition's one slot, so the graph draws that slot as one stuff with a producer per outcome, which is also the shape the static graph builder in mthds-ui draws for the same method.
+
+The condition runs every outcome but the last on a copy of the working memory and run params it received, as `PipeParallel` runs its branches, so no outcome reads what a sibling wrote. The last outcome is the default outcome's pipe when the default is a pipe, the others running before it in sorted order. It runs on the condition's own memory, so the steps after the condition read its stuff, which is the condition's output digest.
+
+Once every outcome has run, the condition registers a `ConditionOutputMerge` (`pipelex/graph/condition_output_merge.py`) through the tracer's `register_condition_output_merge`, which the event log carries as a `ConditionOutputMergeEvent`. It names the condition's node, its output digest and the digests the other outcomes minted for the slot. Only a stuff minted inside the condition is merged: an outcome that hands back a stuff it was given keeps its digest, and nothing is merged when the last outcome resolves its slot absent. Both graph builders apply every merge to the finished graph through `apply_condition_output_merges`, which moves each merged digest onto the condition's, transitively for a condition run as another condition's outcome, across every io item and every edge's stuff digests. The last step of an outcome sequence and the output list of an outcome batch therefore move with their outcome.
+
+Each outcome's io item keeps its own concept and multiplicity, so its node still says what that outcome writes. When the merged outcomes write different concepts or multiplicities, or declare different ones, the merge also carries the condition's declared output concept, a list when the declaration or the invocation's `nb_output` or `multiple_output` makes it one. The declarations count because an outcome's stuff can stand for several: an outcome that is itself a condition hands back only its last outcome's stuff, while its declaration covers every one of them. A list is recorded as `True`, never as an item count, as on every other io item. A condition run as a `PipeBatch`'s branch is given the branch's stuff code, which every outcome mints under, so there is no digest to merge; when its outcomes still write or declare different outputs, the condition records a merge with no merged digest and the typing alone.
+
+The rewrite gives that typing to every io item on the shared stuff whose node is not inside the condition's outcomes, read off the finished graph's `CONTAINS` edges: the condition's own item, every controller whose output is the condition's, such as a sequence ending on the condition or a batch branch's sequence, and every step reading the stuff. A consumer typing a stuff from the first item naming its digest, which is an enclosing controller's, therefore reads the declaration rather than the concept of whichever outcome ran last. When several typed conditions are merged onto one stuff, an item takes the typing of the outermost one whose outcomes it is not inside, and a node inside another condition's outcomes takes a typing only when it is that typed condition or encloses it: an outer outcome sequence ending on an inner condition carries the inner typing, while the inner condition's sibling outcome keeps its own concept.
+
+An outcome that is a `PipeParallel` or a `PipeBatch` writes the shared stuff as a controller, combining its branches or aggregating its items into it, so it is no producer of the stuff. `GraphAnalysis` still counts it as one of the stuff's writers, so the stuff belongs to the condition all the same.
+
 ### Data Flow Edge Generation
 
 DATA edges are generated at teardown by correlating input/output digests:
@@ -16820,7 +17023,7 @@ is_root = analysis.is_root("node_123")
 
 # Data flow
 stuff_info = analysis.get_stuff_info(digest="abc123")
-producer = analysis.get_producer(digest="abc123")
+producers = analysis.get_producers(digest="abc123")
 consumers = analysis.get_consumers(digest="abc123")
 ```
 
@@ -16832,8 +17035,9 @@ consumers = analysis.get_consumers(digest="abc123")
 | `controller_node_ids` | Nodes with children |
 | `root_nodes` | Top-level nodes |
 | `stuff_registry` | Digest → StuffInfo |
-| `stuff_producers` | Digest → producer node ID |
+| `stuff_producers` | Digest → producer node IDs, more than one for a dry-run condition's output |
 | `stuff_consumers` | Digest → consumer node IDs |
+| `shared_stuff_controllers` | Digest → the deepest controller containing every writer, for a stuff with several writers: its producers, and the parallel or batch controllers combining or aggregating into it. That controller's output item types the stuff in `stuff_registry` |
 
 ---
 
@@ -16862,6 +17066,7 @@ print(mermaidflow.mermaid_code)
 - Operators rendered as rectangles inside subgraphs
 - Stuff nodes (data items) rendered as stadium shapes
 - DATA edges connect producers → stuff → consumers
+- A stuff with several writers is rendered once, inside the deepest controller containing them all, never inside a parallel outcome combining into it, with an edge from each producer
 
 In the standalone viewer (`mermaidflow.html`), clicking a stuff node opens its JSON content, and an image or PDF output also offers a preview rendered from the URL that JSON carries.
 
@@ -16987,6 +17192,7 @@ validate_graphspec(graph_spec)
 | `pipelex/system/trace_context.py` | Serializable tracing context — sits below `graph/` because it rides in every job's metadata |
 | `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `interpreter.pipeline_execution.graph.data_inclusion` |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
+| `pipelex/graph/condition_output_merge.py` | The merge record of a dry-run condition and the rewrite both graph builders apply |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |
 | `pipelex/graph/validation.py` | GraphSpec validation |
@@ -19324,7 +19530,7 @@ flowchart TD
 
 `check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
 
-`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose credentials do not resolve is skipped rather than reported: that is the Credentials row's finding. Without leniency an enabled backend whose key is not set yet would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after that backend in `backends.toml` would go unreported. Leniency covers credentials and nothing else: a malformed file stays fatal, and so do the refusals of an enabled backend that declares no model or still carries `model_specs_section`. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
+`check_backend_files()` loads the backend library once per enabled backend, and loads it without resolving credentials (`CredentialResolution.SKIP`, the keyless boot's mode). The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend's credentials are the Credentials row's finding, not this one's. Resolving them here would report an enabled backend whose key is not set yet as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after that backend in `backends.toml` would go unreported. Skipping credentials skips nothing else: every enabled backend is loaded, a malformed file stays fatal, and so do the refusals of an enabled backend that declares no model or still carries `model_specs_section`. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load resolves credentials, which the probe's does not, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
 ### Fix Targeting
 
@@ -23395,7 +23601,7 @@ Most of the list is enforced by the type checker: the matches over the family en
 
 5. **Silent: the routing profiles.** The default `all_enabled_backends` profile tries the backends its `fallback_order` lists first and any other enabled backend after them, so list the vendor there when it should be tried before the end. A profile whose `default` is a single backend sends every handle there, and a handle that backend does not serve is silently dropped from the deck — so a user who has the vendor's key still cannot use its models. Give such a profile an `optional_routes` entry sending the vendor's models to its backend; an optional route applies only while that backend is enabled.
 
-6. **Silent: the CI placeholder list.** CI runners hold no provider keys, and every test module boots live, so each variable an enabled kit backend references must be in `ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI` in `pipelex/test_extras/shared_pytest_plugins.py`. `tests/unit/pipelex/test_extras/test_ci_placeholder_keys.py` fails when one is missing. The agent CLI's end-to-end tests build their own hermetic environment, with a dummy value per variable, in the `offline_subprocess_env` fixture of `tests/e2e/agent_cli/conftest.py`, and nothing checks that list: a variable missing there only makes a dry run skip the backend.
+6. **Silent: the CI placeholder list.** CI runners hold no provider keys, and every test module boots live, so each variable an enabled kit backend references must be in `ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI` in `pipelex/test_extras/shared_pytest_plugins.py`. `tests/unit/pipelex/test_extras/test_ci_placeholder_keys.py` fails when one is missing. The agent CLI's end-to-end tests build their own hermetic environment, with a dummy value per variable, in the `offline_subprocess_env` fixture of `tests/e2e/agent_cli/conftest.py`, and nothing checks that list: a dry run resolves no key, so a variable missing there only reaches the tests of commands that check credentials, such as `pipelex doctor`.
 
 7. **Plugin surface tests.** The `(family, sdk)` pair in `tests/unit/pipelex/plugins/test_inference_backend_coverage.py`, a missing-extra guard test mirroring Linkup's, the SDK's import name in the blocked list of `tests/unit/pipelex/plugins/test_import_light_boot.py`, and an arm in `tests/integration/pipelex/system/test_keyless_boot_forced_dry.py` showing that a keyless boot does not need the key.
 
@@ -23549,7 +23755,9 @@ An entry directory holds either exactly one `.mthds` file, or several with a `bu
     .venv/bin/pipelex validate bundle pipelex/test_extras/mthds_corpus/entries/native_time_departure/
     ```
 
-6. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
+6. **Give an `offline` entry its expectations.** An `offline` entry ships an `inputs.json` and runs for real in the offline runner, which checks what the run leaves in working memory against the expectations in `tests/integration/pipelex/test_extras/test_data.py`, keyed by the entry's name: a value's concept and the fields its content must hold, or a recorded absence and its kind.
+
+7. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
 
 An **invalid** entry additionally declares the exact wire `error_type` it must produce. Read that string off the runtime rather than inferring it from the source:
 
@@ -23622,6 +23830,7 @@ The tier governs execution, never validation: the entry-validation gate below pa
 | Manifest | `tests/unit/pipelex/test_extras/test_mthds_corpus_manifest.py` | The strict `entry.toml` model rejected something. |
 | Layout and filters | `tests/unit/pipelex/test_extras/test_mthds_corpus_loader.py` | An entry's name does not match its directory, its bundle does not resolve, or the loader's filter semantics changed. |
 | Entry validation | `tests/integration/pipelex/test_extras/test_mthds_corpus_entries.py` | A valid entry stopped validating, or an invalid one stopped failing with exactly its declared error. Runs over every entry regardless of tier, so an `inference`-tier entry that broke is caught without spending a token. |
+| Offline runs | `tests/integration/pipelex/test_extras/test_mthds_corpus_offline_runs.py` | An `offline`-tier entry stopped running live with its `inputs.json`, or left values in working memory other than the ones its expectations name. An entry holds no expected outputs, so each offline entry's expectations live in that suite's `test_data.py`, keyed by entry name, and a new offline entry with none there is red too. |
 | Packaging | `tests/integration/pipelex/test_extras/test_mthds_corpus_packaging.py` | A corpus file stopped shipping in the wheel, or the generator started shipping. It builds a real wheel and derives what it expects from the corpus tree, so a new entry is covered with no wiring. |
 
 ## Consuming the corpus from a test
@@ -26467,7 +26676,7 @@ A validation error item may carry a `suggested_fix`: a deterministic repair the 
 
 **Fields:**
 
-- `fix_code` — the kebab-case rule id that produced the fix (`match-sequence-output`, `sync-controller-inputs`, `strip-native-concept-redecl`, `strip-namespace`, …). Stable; use it to allow-list or suppress rules.
+- `fix_code` — the kebab-case rule id that produced the fix (`match-sequence-output`, `sync-controller-inputs`, `strip-native-concept-redecl`, `strip-namespace`, `delete-redundant-dotted-input`, …). Stable; use it to allow-list or suppress rules.
 - `description` — human-readable summary of what the fix does.
 - `safety` — `safe` or `unsafe`. Only apply an `unsafe` fix behind an explicit opt-in: it is a likely correction, such as the one close match for an unknown model, that a person or an agent must confirm, and `pipelex fix bundle` never applies one on its own.
 - `source` — the file the ops target, when known. **An applier must only apply ops to the file they target** — in a multi-file library the ops are meaningless against any other file.
